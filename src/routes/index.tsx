@@ -2,17 +2,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 import { Hero } from "@/components/landing/hero";
 import { Features } from "@/components/landing/features";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { CertBenefits } from "@/components/landing/cert-benefits";
+import { Testimonials } from "@/components/landing/testimonials";
 import { Pricing } from "@/components/landing/pricing";
-import { Contact } from "@/components/landing/contact";
+import { CTA } from "@/components/landing/cta";
 import { Footer } from "@/components/landing/footer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "CareCompliance — DSPD compliance, training & audit-ready reports" },
-      { name: "description", content: "Run your disability services agency with peace of mind. Structured training, automated certification tracking, and instant audit-ready reporting." },
-      { property: "og:title", content: "CareCompliance — Peace-of-mind DSPD compliance" },
-      { property: "og:description", content: "Structured training, automated certification tracking, and instant audit-ready reporting for disability services agencies." },
+      { title: "Care Academy — Employee training & certification platform" },
+      { name: "description", content: "Modern training and certification for teams. Assign courses, track progress, and issue verifiable certificates — all in one place." },
+      { property: "og:title", content: "Care Academy — Train, certify, stay audit-ready" },
+      { property: "og:description", content: "Modern training and certification platform for teams that take compliance seriously." },
     ],
   }),
   component: Index,
@@ -25,8 +28,11 @@ function Index() {
       <main className="flex-1">
         <Hero />
         <Features />
+        <HowItWorks />
+        <CertBenefits />
+        <Testimonials />
         <Pricing />
-        <Contact />
+        <CTA />
       </main>
       <Footer />
     </div>

@@ -4,26 +4,25 @@ import { Check } from "lucide-react";
 
 const tiers = [
   {
-    name: "Starter",
-    price: "$99",
-    desc: "For small agencies just getting started.",
-    features: ["Up to 15 staff", "Core training library", "Email reminders", "Basic reports"],
-    cta: "Start free trial",
-    featured: false,
-  },
-  {
-    name: "Growth",
-    price: "$249",
-    desc: "For growing agencies with active caseloads.",
-    features: ["Up to 75 staff", "Full DSPD library", "Automated renewals", "Audit-ready exports", "Priority support"],
+    name: "Per active employee",
+    price: "$25",
+    desc: "Simple per-seat pricing. Add or remove employees anytime — billing adjusts automatically.",
+    features: [
+      "Unlimited course assignments",
+      "Full certification tracking",
+      "Manager dashboards & reports",
+      "Email invites & onboarding",
+      "Verifiable certificate links",
+      "Priority email support",
+    ],
     cta: "Start free trial",
     featured: true,
   },
   {
     name: "Enterprise",
     price: "Custom",
-    desc: "Multi-site agencies & state partners.",
-    features: ["Unlimited staff", "Custom modules", "SSO + SAML", "Dedicated success manager"],
+    desc: "For multi-site organizations with SSO, custom training, and dedicated success management.",
+    features: ["SSO / SAML", "Custom course authoring", "Dedicated CSM", "Custom integrations", "Volume pricing"],
     cta: "Talk to sales",
     featured: false,
   },
@@ -31,24 +30,20 @@ const tiers = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="bg-secondary/40 py-24">
+    <section id="pricing" className="bg-background py-24">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-accent">Pricing</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
-            Simple, transparent pricing
-          </h2>
-          <p className="mt-4 text-muted-foreground">Per month, billed annually. No setup fees.</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Simple, per-seat pricing</h2>
+          <p className="mt-4 text-muted-foreground">Only pay for the employees you're actively training. Cancel anytime.</p>
         </div>
 
-        <div className="mt-16 grid gap-6 md:grid-cols-3">
+        <div className="mx-auto mt-16 grid max-w-4xl gap-6 md:grid-cols-2">
           {tiers.map((t) => (
             <div
               key={t.name}
               className={`relative rounded-2xl border p-8 ${
-                t.featured
-                  ? "border-accent bg-card shadow-[var(--shadow-elegant)] md:scale-105"
-                  : "border-border bg-card shadow-[var(--shadow-card)]"
+                t.featured ? "border-accent bg-card shadow-[var(--shadow-elegant)]" : "border-border bg-card shadow-[var(--shadow-card)]"
               }`}
             >
               {t.featured && (
@@ -60,21 +55,15 @@ export function Pricing() {
               <p className="mt-2 text-sm text-muted-foreground">{t.desc}</p>
               <div className="mt-6 flex items-baseline gap-1">
                 <span className="text-4xl font-semibold tracking-tight">{t.price}</span>
-                {t.price !== "Custom" && <span className="text-sm text-muted-foreground">/mo</span>}
+                {t.price !== "Custom" && <span className="text-sm text-muted-foreground">/ employee / mo</span>}
               </div>
               <ul className="mt-6 space-y-3 text-sm">
                 {t.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 text-accent" /> {f}
-                  </li>
+                  <li key={f} className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 text-accent" /> {f}</li>
                 ))}
               </ul>
-              <Button
-                asChild
-                className={`mt-8 w-full ${t.featured ? "bg-[image:var(--gradient-brand)] text-primary-foreground" : ""}`}
-                variant={t.featured ? "default" : "outline"}
-              >
-                <Link to="/signup">{t.cta}</Link>
+              <Button asChild className={`mt-8 w-full ${t.featured ? "bg-[image:var(--gradient-brand)] text-primary-foreground" : ""}`} variant={t.featured ? "default" : "outline"}>
+                <Link to={t.name === "Enterprise" ? "/contact" : "/signup"}>{t.cta}</Link>
               </Button>
             </div>
           ))}

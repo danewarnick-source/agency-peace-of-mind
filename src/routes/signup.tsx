@@ -162,9 +162,10 @@ function SignupPage() {
       <Button variant="outline" onClick={google} className="w-full">Continue with Google</Button>
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link to="/login" search={invite ? { redirect: `/signup?invite=${invite}` } : undefined} className="font-medium text-accent hover:underline">
+        <Link to="/login" className="font-medium text-accent hover:underline">
           Sign in
         </Link>
+
       </p>
     </AuthShell>
   );

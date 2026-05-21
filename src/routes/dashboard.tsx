@@ -25,6 +25,7 @@ const NAV: NavItem[] = [
   { to: "/dashboard/courses", label: "Course Library", icon: BookOpen, roles: ["employee", "manager", "admin", "super_admin"] },
   { to: "/dashboard/certifications", label: "Certifications", icon: BadgeCheck },
   { to: "/dashboard/employees", label: "Employees", icon: Users, roles: ["admin", "super_admin"] },
+  { to: "/dashboard/roles", label: "Roles", icon: ShieldCheck, roles: ["admin", "super_admin"] },
   { to: "/dashboard/team", label: "My Team", icon: UserCog, roles: ["admin", "manager", "super_admin"] },
   { to: "/dashboard/reports", label: "Reports", icon: FileBarChart, roles: ["admin", "manager", "super_admin"] },
   { to: "/dashboard/billing", label: "Billing", icon: CreditCard, roles: ["admin", "super_admin"] },

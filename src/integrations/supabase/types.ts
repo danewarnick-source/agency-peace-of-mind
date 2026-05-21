@@ -620,23 +620,44 @@ export type Database = {
         Row: {
           agency_name: string | null
           created_at: string
+          department: string | null
           email: string | null
+          first_name: string | null
           full_name: string | null
+          hire_date: string | null
           id: string
+          is_active: boolean
+          last_name: string | null
+          must_change_password: boolean
+          username: string | null
         }
         Insert: {
           agency_name?: string | null
           created_at?: string
+          department?: string | null
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
+          hire_date?: string | null
           id: string
+          is_active?: boolean
+          last_name?: string | null
+          must_change_password?: boolean
+          username?: string | null
         }
         Update: {
           agency_name?: string | null
           created_at?: string
+          department?: string | null
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
+          hire_date?: string | null
           id?: string
+          is_active?: boolean
+          last_name?: string | null
+          must_change_password?: boolean
+          username?: string | null
         }
         Relationships: []
       }

@@ -46,6 +46,7 @@ const NAV: NavItem[] = [
 function DashboardLayout() {
   const { session, loading, user } = useAuth();
   const { data: org } = useCurrentOrg();
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -58,7 +59,6 @@ function DashboardLayout() {
   }
 
   const role: Role = org?.role ?? "employee";
-  const { can } = usePermissions();
   const visible = NAV.filter((n) => {
     if (n.roles && !n.roles.includes(role)) return false;
     if (n.perm && !can(n.perm)) return false;

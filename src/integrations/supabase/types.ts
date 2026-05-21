@@ -219,6 +219,57 @@ export type Database = {
           },
         ]
       }
+      external_certifications: {
+        Row: {
+          cert_name: string | null
+          cert_type: string
+          created_at: string
+          expires_at: string | null
+          file_url: string | null
+          id: string
+          issued_date: string | null
+          issuer: string | null
+          organization_id: string
+          reviewed_at: string | null
+          reviewer_id: string | null
+          reviewer_notes: string | null
+          status: Database["public"]["Enums"]["external_cert_status"]
+          user_id: string
+        }
+        Insert: {
+          cert_name?: string | null
+          cert_type: string
+          created_at?: string
+          expires_at?: string | null
+          file_url?: string | null
+          id?: string
+          issued_date?: string | null
+          issuer?: string | null
+          organization_id: string
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          reviewer_notes?: string | null
+          status?: Database["public"]["Enums"]["external_cert_status"]
+          user_id: string
+        }
+        Update: {
+          cert_name?: string | null
+          cert_type?: string
+          created_at?: string
+          expires_at?: string | null
+          file_url?: string | null
+          id?: string
+          issued_date?: string | null
+          issuer?: string | null
+          organization_id?: string
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          reviewer_notes?: string | null
+          status?: Database["public"]["Enums"]["external_cert_status"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -496,6 +547,147 @@ export type Database = {
         }
         Relationships: []
       }
+      program_acknowledgements: {
+        Row: {
+          acknowledged_at: string
+          course_id: string
+          id: string
+          program_assignment_id: string
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          course_id: string
+          id?: string
+          program_assignment_id: string
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          course_id?: string
+          id?: string
+          program_assignment_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_acknowledgements_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_acknowledgements_program_assignment_id_fkey"
+            columns: ["program_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "program_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      program_assignments: {
+        Row: {
+          assigned_by: string | null
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          expires_at: string | null
+          id: string
+          organization_id: string
+          program_id: string
+          progress: number
+          status: Database["public"]["Enums"]["assignment_status"]
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          expires_at?: string | null
+          id?: string
+          organization_id: string
+          program_id: string
+          progress?: number
+          status?: Database["public"]["Enums"]["assignment_status"]
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          expires_at?: string | null
+          id?: string
+          organization_id?: string
+          program_id?: string
+          progress?: number
+          status?: Database["public"]["Enums"]["assignment_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_assignments_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "training_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      program_courses: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          order_index: number
+          program_id: string
+          required: boolean
+          unlock_after: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          program_id: string
+          required?: boolean
+          unlock_after?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          program_id?: string
+          required?: boolean
+          unlock_after?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_courses_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_courses_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "training_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_courses_unlock_after_fkey"
+            columns: ["unlock_after"]
+            isOneToOne: false
+            referencedRelation: "program_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           enabled: boolean
@@ -594,6 +786,57 @@ export type Database = {
         }
         Relationships: []
       }
+      training_programs: {
+        Row: {
+          annual_renewal: boolean
+          category: string | null
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          estimated_minutes: number | null
+          id: string
+          is_global: boolean
+          is_published: boolean
+          name: string
+          organization_id: string | null
+          slug: string
+          validity_months: number | null
+        }
+        Insert: {
+          annual_renewal?: boolean
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          is_global?: boolean
+          is_published?: boolean
+          name: string
+          organization_id?: string | null
+          slug: string
+          validity_months?: number | null
+        }
+        Update: {
+          annual_renewal?: boolean
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          is_global?: boolean
+          is_published?: boolean
+          name?: string
+          organization_id?: string | null
+          slug?: string
+          validity_months?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -619,6 +862,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "manager" | "employee" | "super_admin"
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
+      external_cert_status: "pending" | "approved" | "rejected" | "expired"
       invitation_status: "pending" | "accepted" | "revoked"
     }
     CompositeTypes: {
@@ -749,6 +993,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "manager", "employee", "super_admin"],
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
+      external_cert_status: ["pending", "approved", "rejected", "expired"],
       invitation_status: ["pending", "accepted", "revoked"],
     },
   },

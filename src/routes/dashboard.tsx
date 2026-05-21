@@ -9,6 +9,7 @@ import { ROLE_LABEL, type Permission, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, BadgeCheck, FileBarChart, CreditCard,
   Users, BookOpen, Settings, LogOut, UserCog, Building2, ShieldCheck, Mail,
+  Layers, FileCheck2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,7 +31,9 @@ const NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/super-admin", label: "Platform", icon: Building2, roles: ["super_admin"] },
   { to: "/dashboard/training", label: "My Training", icon: GraduationCap, perm: "view_own_training" },
+  { to: "/dashboard/programs", label: "Programs", icon: Layers, perm: "view_own_training" },
   { to: "/dashboard/courses", label: "Course Library", icon: BookOpen, perm: "view_own_training" },
+  { to: "/dashboard/external-certifications", label: "External Certs", icon: FileCheck2, perm: "upload_external_certs" },
   { to: "/dashboard/certifications", label: "Certifications", icon: BadgeCheck, perm: "view_certifications" },
   { to: "/dashboard/employees", label: "Employees", icon: Users, perm: "manage_users" },
   { to: "/dashboard/invitations", label: "Invitations", icon: Mail, perm: "invite_users" },

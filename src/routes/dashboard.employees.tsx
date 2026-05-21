@@ -39,6 +39,22 @@ function EmployeesPage() {
   const qc = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [resetUser, setResetUser] = useState<{ id: string; name: string } | null>(null);
+  const [tempPassword, setTempPassword] = useState(() => genPassword());
+  const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
+
+  const createManual = useServerFn(createEmployeeManually);
+  const resetPwFn = useServerFn(adminResetEmployeePassword);
+
+  const { data: tracks } = useQuery({
+    enabled: !!org,
+    queryKey: ["tracks-mini", org?.organization_id],
+    queryFn: async () => {
+      const { data } = await supabase.from("training_tracks").select("id, name").eq("is_published", true);
+      return data ?? [];
+    },
+  });
 
   const { data: members } = useQuery({
     enabled: !!org,

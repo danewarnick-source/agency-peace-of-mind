@@ -77,6 +77,10 @@ function ProgramsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {programs.map((p) => {
+            if (!p.id) {
+              console.error("[ProgramsPage] Program missing ID", p);
+              return null;
+            }
             const a = byProgram.get(p.id);
             const isComplete = a?.status === "completed";
             return (

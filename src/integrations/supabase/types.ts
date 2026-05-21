@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      certification_types: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_global: boolean
+          name: string
+          organization_id: string | null
+          requires_upload: boolean
+          track_id: string | null
+          validity_months: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_global?: boolean
+          name: string
+          organization_id?: string | null
+          requires_upload?: boolean
+          track_id?: string | null
+          validity_months?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_global?: boolean
+          name?: string
+          organization_id?: string | null
+          requires_upload?: boolean
+          track_id?: string | null
+          validity_months?: number | null
+        }
+        Relationships: []
+      }
       certifications: {
         Row: {
           course_id: string
@@ -223,6 +262,7 @@ export type Database = {
         Row: {
           cert_name: string | null
           cert_type: string
+          certification_type_id: string | null
           created_at: string
           expires_at: string | null
           file_url: string | null
@@ -230,6 +270,7 @@ export type Database = {
           issued_date: string | null
           issuer: string | null
           organization_id: string
+          renewal_reminder_sent_at: string | null
           reviewed_at: string | null
           reviewer_id: string | null
           reviewer_notes: string | null
@@ -239,6 +280,7 @@ export type Database = {
         Insert: {
           cert_name?: string | null
           cert_type: string
+          certification_type_id?: string | null
           created_at?: string
           expires_at?: string | null
           file_url?: string | null
@@ -246,6 +288,7 @@ export type Database = {
           issued_date?: string | null
           issuer?: string | null
           organization_id: string
+          renewal_reminder_sent_at?: string | null
           reviewed_at?: string | null
           reviewer_id?: string | null
           reviewer_notes?: string | null
@@ -255,6 +298,7 @@ export type Database = {
         Update: {
           cert_name?: string | null
           cert_type?: string
+          certification_type_id?: string | null
           created_at?: string
           expires_at?: string | null
           file_url?: string | null
@@ -262,6 +306,7 @@ export type Database = {
           issued_date?: string | null
           issuer?: string | null
           organization_id?: string
+          renewal_reminder_sent_at?: string | null
           reviewed_at?: string | null
           reviewer_id?: string | null
           reviewer_notes?: string | null
@@ -804,6 +849,78 @@ export type Database = {
         }
         Relationships: []
       }
+      track_assignments: {
+        Row: {
+          assigned_by: string | null
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          expires_at: string | null
+          id: string
+          organization_id: string
+          progress: number
+          recurs_at: string | null
+          status: Database["public"]["Enums"]["assignment_status"]
+          track_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          expires_at?: string | null
+          id?: string
+          organization_id: string
+          progress?: number
+          recurs_at?: string | null
+          status?: Database["public"]["Enums"]["assignment_status"]
+          track_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          expires_at?: string | null
+          id?: string
+          organization_id?: string
+          progress?: number
+          recurs_at?: string | null
+          status?: Database["public"]["Enums"]["assignment_status"]
+          track_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      track_programs: {
+        Row: {
+          created_at: string
+          id: string
+          order_index: number
+          program_id: string
+          required: boolean
+          track_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_index?: number
+          program_id: string
+          required?: boolean
+          track_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_index?: number
+          program_id?: string
+          required?: boolean
+          track_id?: string
+        }
+        Relationships: []
+      }
       training_modules: {
         Row: {
           category: string | null
@@ -885,6 +1002,57 @@ export type Database = {
         }
         Relationships: []
       }
+      training_tracks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_within_days: number | null
+          id: string
+          is_global: boolean
+          is_published: boolean
+          min_annual_hours: number | null
+          name: string
+          organization_id: string | null
+          recurrence_months: number | null
+          slug: string
+          track_type: Database["public"]["Enums"]["track_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_within_days?: number | null
+          id?: string
+          is_global?: boolean
+          is_published?: boolean
+          min_annual_hours?: number | null
+          name: string
+          organization_id?: string | null
+          recurrence_months?: number | null
+          slug: string
+          track_type?: Database["public"]["Enums"]["track_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_within_days?: number | null
+          id?: string
+          is_global?: boolean
+          is_published?: boolean
+          min_annual_hours?: number | null
+          name?: string
+          organization_id?: string | null
+          recurrence_months?: number | null
+          slug?: string
+          track_type?: Database["public"]["Enums"]["track_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -912,6 +1080,13 @@ export type Database = {
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
       invitation_status: "pending" | "accepted" | "revoked"
+      track_type:
+        | "onboarding_30"
+        | "certification_90"
+        | "behavioral"
+        | "abi_specialty"
+        | "annual"
+        | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1043,6 +1218,14 @@ export const Constants = {
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
       invitation_status: ["pending", "accepted", "revoked"],
+      track_type: [
+        "onboarding_30",
+        "certification_90",
+        "behavioral",
+        "abi_specialty",
+        "annual",
+        "custom",
+      ],
     },
   },
 } as const

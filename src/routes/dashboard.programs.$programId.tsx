@@ -4,9 +4,10 @@ import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { usePermissions } from "@/hooks/use-permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Circle, Lock, PlayCircle, FileText, Clock, RotateCcw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Lock, PlayCircle, FileText, Clock, RotateCcw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/programs/$programId")({
@@ -38,6 +39,7 @@ function ProgramPlayer() {
   const { programId } = Route.useParams();
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
+  const { role, can, isLoading: permissionsLoading } = usePermissions();
   const qc = useQueryClient();
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
 

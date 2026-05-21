@@ -3,7 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 
-export const Route = createFileRoute("/dashboard/team")({ component: TeamPage });
+import { RequireRole } from "@/components/rbac-guard";
+
+export const Route = createFileRoute("/dashboard/team")({
+  component: () => (
+    <RequireRole roles={["admin", "manager", "super_admin"]}>
+      <TeamPage />
+    </RequireRole>
+  ),
+});
 
 function TeamPage() {
   const { data: org } = useCurrentOrg();

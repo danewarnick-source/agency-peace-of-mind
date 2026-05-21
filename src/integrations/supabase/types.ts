@@ -14,7 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          agency_name: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          agency_name?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          agency_name?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      staff_certifications: {
+        Row: {
+          certification: string
+          created_at: string
+          expiration_date: string | null
+          id: string
+          issued_date: string | null
+          role: string | null
+          staff_name: string
+          status: string
+        }
+        Insert: {
+          certification: string
+          created_at?: string
+          expiration_date?: string | null
+          id?: string
+          issued_date?: string | null
+          role?: string | null
+          staff_name: string
+          status?: string
+        }
+        Update: {
+          certification?: string
+          created_at?: string
+          expiration_date?: string | null
+          id?: string
+          issued_date?: string | null
+          role?: string | null
+          staff_name?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      training_modules: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          progress: number | null
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          progress?: number | null
+          title: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          progress?: number | null
+          title?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

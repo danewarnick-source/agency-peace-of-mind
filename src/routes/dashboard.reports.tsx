@@ -10,7 +10,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 
 export const Route = createFileRoute("/dashboard/reports")({
   component: () => (
-    <RequirePermission perm="view_org_reports">
+    <RequirePermission perm="export_reports">
       <ReportsPage />
     </RequirePermission>
   ),

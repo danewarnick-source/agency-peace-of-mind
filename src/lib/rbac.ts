@@ -7,7 +7,6 @@ export const ROLE_LABEL: Record<Role, string> = {
   employee: "Employee",
 };
 
-/** Default landing path for each role after login. */
 export const ROLE_HOME: Record<Role, string> = {
   super_admin: "/super-admin",
   admin: "/admin",
@@ -15,47 +14,76 @@ export const ROLE_HOME: Record<Role, string> = {
   employee: "/employee",
 };
 
-/** Permission keys used across the dashboard. */
-export type Permission =
-  | "view_platform_metrics"
-  | "manage_all_orgs"
-  | "manage_employees"
-  | "manage_roles"
-  | "manage_courses"
-  | "assign_training"
-  | "view_org_reports"
-  | "view_team_reports"
-  | "manage_billing"
-  | "view_billing"
-  | "view_own_training"
-  | "view_certifications";
+/** Canonical list of permission keys. Add to this list to expose a new toggle. */
+export const ALL_PERMISSIONS = [
+  "manage_users",
+  "invite_users",
+  "remove_users",
+  "manage_roles",
+  "assign_training",
+  "create_courses",
+  "edit_courses",
+  "manage_certifications",
+  "export_reports",
+  "view_analytics",
+  "view_team_reports",
+  "manage_billing",
+  "view_billing",
+  "manage_organization",
+  "view_own_training",
+  "view_certifications",
+  "view_platform_metrics",
+  "manage_all_orgs",
+] as const;
 
-const MATRIX: Record<Role, Permission[]> = {
-  super_admin: [
-    "view_platform_metrics", "manage_all_orgs",
-    "manage_employees", "manage_roles", "manage_courses", "assign_training",
-    "view_org_reports", "view_team_reports",
-    "manage_billing", "view_billing",
-    "view_own_training", "view_certifications",
-  ],
+export type Permission = (typeof ALL_PERMISSIONS)[number];
+
+export const PERMISSION_LABEL: Record<Permission, string> = {
+  manage_users: "Manage users",
+  invite_users: "Invite users",
+  remove_users: "Remove users",
+  manage_roles: "Manage roles & permissions",
+  assign_training: "Assign training",
+  create_courses: "Create courses",
+  edit_courses: "Edit courses",
+  manage_certifications: "Manage certifications",
+  export_reports: "Export reports",
+  view_analytics: "View analytics",
+  view_team_reports: "View team reports",
+  manage_billing: "Manage billing",
+  view_billing: "View billing",
+  manage_organization: "Manage organization",
+  view_own_training: "View own training",
+  view_certifications: "View certifications",
+  view_platform_metrics: "View platform metrics",
+  manage_all_orgs: "Manage all organizations",
+};
+
+/** Default permission matrix used to seed org-specific overrides. */
+export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
+  super_admin: [...ALL_PERMISSIONS],
   admin: [
-    "manage_employees", "manage_roles", "manage_courses", "assign_training",
-    "view_org_reports", "view_team_reports",
-    "manage_billing", "view_billing",
+    "manage_users", "invite_users", "remove_users", "manage_roles",
+    "assign_training", "create_courses", "edit_courses", "manage_certifications",
+    "export_reports", "view_analytics", "view_team_reports",
+    "manage_billing", "view_billing", "manage_organization",
     "view_own_training", "view_certifications",
   ],
   manager: [
-    "assign_training", "view_team_reports",
-    "view_own_training", "view_certifications",
+    "invite_users", "assign_training", "view_team_reports",
+    "view_analytics", "view_own_training", "view_certifications",
   ],
   employee: ["view_own_training", "view_certifications"],
 };
 
-export function can(role: Role | undefined | null, perm: Permission): boolean {
+export function defaultCan(role: Role | undefined | null, perm: Permission): boolean {
   if (!role) return false;
-  return MATRIX[role].includes(perm);
+  return DEFAULT_MATRIX[role].includes(perm);
 }
 
 export function hasAnyRole(role: Role | undefined | null, roles: Role[]): boolean {
   return !!role && roles.includes(role);
 }
+
+/** Back-compat alias used by older components. */
+export const can = defaultCan;

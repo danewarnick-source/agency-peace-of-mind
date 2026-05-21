@@ -16,7 +16,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 
 export const Route = createFileRoute("/dashboard/employees")({
   component: () => (
-    <RequirePermission perm="manage_employees">
+    <RequirePermission perm="manage_users">
       <EmployeesPage />
     </RequirePermission>
   ),

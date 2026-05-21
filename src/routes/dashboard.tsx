@@ -2,12 +2,13 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tan
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { usePermissions } from "@/hooks/use-permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ROLE_LABEL, type Role } from "@/lib/rbac";
+import { ROLE_LABEL, type Permission, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, BadgeCheck, FileBarChart, CreditCard,
-  Users, BookOpen, Settings, LogOut, UserCog, Building2, ShieldCheck,
+  Users, BookOpen, Settings, LogOut, UserCog, Building2, ShieldCheck, Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,21 +17,31 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
 });
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; roles?: Role[] };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  perm?: Permission;
+  roles?: Role[];
+};
 
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/super-admin", label: "Platform", icon: Building2, roles: ["super_admin"] },
-  { to: "/dashboard/training", label: "My Training", icon: GraduationCap, roles: ["employee", "manager", "admin"] },
-  { to: "/dashboard/courses", label: "Course Library", icon: BookOpen, roles: ["employee", "manager", "admin", "super_admin"] },
-  { to: "/dashboard/certifications", label: "Certifications", icon: BadgeCheck },
-  { to: "/dashboard/employees", label: "Employees", icon: Users, roles: ["admin", "super_admin"] },
-  { to: "/dashboard/roles", label: "Roles", icon: ShieldCheck, roles: ["admin", "super_admin"] },
+  { to: "/dashboard/training", label: "My Training", icon: GraduationCap, perm: "view_own_training" },
+  { to: "/dashboard/courses", label: "Course Library", icon: BookOpen, perm: "view_own_training" },
+  { to: "/dashboard/certifications", label: "Certifications", icon: BadgeCheck, perm: "view_certifications" },
+  { to: "/dashboard/employees", label: "Employees", icon: Users, perm: "manage_users" },
+  { to: "/dashboard/invitations", label: "Invitations", icon: Mail, perm: "invite_users" },
+  { to: "/dashboard/roles", label: "Roles", icon: UserCog, perm: "manage_roles" },
+  { to: "/dashboard/permissions", label: "Permissions", icon: ShieldCheck, perm: "manage_roles" },
   { to: "/dashboard/team", label: "My Team", icon: UserCog, roles: ["admin", "manager", "super_admin"] },
-  { to: "/dashboard/reports", label: "Reports", icon: FileBarChart, roles: ["admin", "manager", "super_admin"] },
-  { to: "/dashboard/billing", label: "Billing", icon: CreditCard, roles: ["admin", "super_admin"] },
+  { to: "/dashboard/reports", label: "Reports", icon: FileBarChart, perm: "export_reports" },
+  { to: "/dashboard/billing", label: "Billing", icon: CreditCard, perm: "view_billing" },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
+
 
 function DashboardLayout() {
   const { session, loading, user } = useAuth();
@@ -47,7 +58,13 @@ function DashboardLayout() {
   }
 
   const role: Role = org?.role ?? "employee";
-  const visible = NAV.filter((n) => !n.roles || n.roles.includes(role));
+  const { can } = usePermissions();
+  const visible = NAV.filter((n) => {
+    if (n.roles && !n.roles.includes(role)) return false;
+    if (n.perm && !can(n.perm)) return false;
+    return true;
+  });
+
 
   const signOut = async () => {
     await supabase.auth.signOut();

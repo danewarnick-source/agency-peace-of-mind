@@ -71,15 +71,16 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
   admin: [
     "manage_users", "invite_users", "remove_users", "manage_roles",
     "assign_training", "create_courses", "edit_courses", "manage_certifications",
+    "manage_programs", "approve_external_certs", "upload_external_certs",
     "export_reports", "view_analytics", "view_team_reports",
     "manage_billing", "view_billing", "manage_organization",
     "view_own_training", "view_certifications",
   ],
   manager: [
-    "invite_users", "assign_training", "view_team_reports",
-    "view_analytics", "view_own_training", "view_certifications",
+    "invite_users", "assign_training", "view_team_reports", "approve_external_certs",
+    "upload_external_certs", "view_analytics", "view_own_training", "view_certifications",
   ],
-  employee: ["view_own_training", "view_certifications"],
+  employee: ["view_own_training", "view_certifications", "upload_external_certs"],
 };
 
 export function defaultCan(role: Role | undefined | null, perm: Permission): boolean {

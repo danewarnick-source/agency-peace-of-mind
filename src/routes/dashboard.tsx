@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ROLE_LABEL, type Permission, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, BadgeCheck, FileBarChart, CreditCard,
-  Users, BookOpen, Settings, LogOut, UserCog, Building2, ShieldCheck, Mail,
+  Users, BookOpen, Settings, LogOut, UserCog, Building2, Mail,
   Layers, FileCheck2, Route as RouteIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -40,7 +40,7 @@ const NAV: NavItem[] = [
   { to: "/dashboard/employees", label: "Employees", icon: Users, perm: "manage_users" },
   { to: "/dashboard/invitations", label: "Invitations", icon: Mail, perm: "invite_users" },
   { to: "/dashboard/roles", label: "Roles", icon: UserCog, perm: "manage_roles" },
-  { to: "/dashboard/permissions", label: "Permissions", icon: ShieldCheck, perm: "manage_roles" },
+  { to: "/dashboard/permissions", label: "Permissions", icon: UserCog, perm: "manage_roles" },
   { to: "/dashboard/team", label: "My Team", icon: UserCog, roles: ["admin", "manager", "super_admin"] },
   { to: "/dashboard/reports", label: "Reports", icon: FileBarChart, perm: "export_reports" },
   { to: "/dashboard/billing", label: "Billing", icon: CreditCard, perm: "view_billing" },

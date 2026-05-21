@@ -145,7 +145,8 @@ function CourseEditor() {
         order_index: input.order_index ?? 0,
         duration_minutes: input.duration_minutes ?? 5,
         lesson_type: input.lesson_type ?? "text",
-        data: input.data ?? {},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: (input.data ?? {}) as any,
         video_url: input.video_url ?? null,
         pdf_url: input.pdf_url ?? null,
         required: input.required ?? true,

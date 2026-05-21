@@ -33,6 +33,7 @@ import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports
 import { Route as DashboardProgramsRouteImport } from './routes/dashboard.programs'
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
+import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardCoursesRouteImport } from './routes/dashboard.courses'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
@@ -160,6 +161,12 @@ const DashboardInvitationsRoute = DashboardInvitationsRouteImport.update({
   path: '/invitations',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardExternalCertificationsRoute =
+  DashboardExternalCertificationsRouteImport.update({
+    id: '/external-certifications',
+    path: '/external-certifications',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardEmployeesRoute = DashboardEmployeesRouteImport.update({
   id: '/employees',
   path: '/employees',
@@ -211,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
@@ -242,6 +250,7 @@ export interface FileRoutesByTo {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
@@ -275,6 +284,7 @@ export interface FileRoutesById {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
@@ -309,6 +319,7 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/courses'
     | '/dashboard/employees'
+    | '/dashboard/external-certifications'
     | '/dashboard/invitations'
     | '/dashboard/permissions'
     | '/dashboard/programs'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/courses'
     | '/dashboard/employees'
+    | '/dashboard/external-certifications'
     | '/dashboard/invitations'
     | '/dashboard/permissions'
     | '/dashboard/programs'
@@ -372,6 +384,7 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/courses'
     | '/dashboard/employees'
+    | '/dashboard/external-certifications'
     | '/dashboard/invitations'
     | '/dashboard/permissions'
     | '/dashboard/programs'
@@ -574,6 +587,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardInvitationsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/external-certifications': {
+      id: '/dashboard/external-certifications'
+      path: '/external-certifications'
+      fullPath: '/dashboard/external-certifications'
+      preLoaderRoute: typeof DashboardExternalCertificationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/employees': {
       id: '/dashboard/employees'
       path: '/employees'
@@ -646,6 +666,7 @@ interface DashboardRouteChildren {
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardCoursesRoute: typeof DashboardCoursesRouteWithChildren
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
+  DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
   DashboardProgramsRoute: typeof DashboardProgramsRouteWithChildren
@@ -663,6 +684,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardCoursesRoute: DashboardCoursesRouteWithChildren,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
+  DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardPermissionsRoute: DashboardPermissionsRoute,
   DashboardProgramsRoute: DashboardProgramsRouteWithChildren,

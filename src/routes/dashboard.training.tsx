@@ -1,16 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Progress } from "@/components/ui/progress";
-import { Clock } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { PlayCircle, Calendar } from "lucide-react";
 
-export const Route = createFileRoute("/dashboard/training")({ component: TrainingPage });
+export const Route = createFileRoute("/dashboard/training")({ component: MyTraining });
 
-function TrainingPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ["training_modules"],
+function MyTraining() {
+  const { user } = useAuth();
+  const { data: assignments, isLoading } = useQuery({
+    enabled: !!user,
+    queryKey: ["my-assignments", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("training_modules").select("*").order("created_at");
+      const { data } = await supabase
+        .from("course_assignments")
+        .select("id, status, progress, due_date, course_id, courses(id, title, description, category, cover_url, duration_minutes)")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false });
       return data ?? [];
     },
   });
@@ -18,38 +25,47 @@ function TrainingPage() {
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <h2 className="text-base font-semibold">Active training courses</h2>
-        <p className="text-sm text-muted-foreground">Track team progress on your assigned modules.</p>
+        <h2 className="text-base font-semibold">Assigned to you</h2>
+        <p className="text-sm text-muted-foreground">Complete each course to earn its certification.</p>
       </div>
 
-      <div className="grid gap-4">
-        {isLoading && <p className="text-sm text-muted-foreground">Loading modules…</p>}
-        {data?.map((m) => (
-          <div key={m.id} className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold tracking-tight">{m.title}</h3>
-                  {m.category && (
-                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">{m.category}</span>
-                  )}
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : !assignments?.length ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+          <p className="text-sm text-muted-foreground">No training assigned yet.</p>
+          <Button asChild className="mt-4"><Link to="/dashboard/courses">Browse Course Library</Link></Button>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {assignments.map((a) => {
+            const c = a.courses as { id: string; title: string; description: string | null; category: string | null; cover_url: string | null; duration_minutes: number | null } | null;
+            if (!c) return null;
+            return (
+              <div key={a.id} className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+                {c.cover_url && <img src={c.cover_url} alt="" className="h-40 w-full object-cover" />}
+                <div className="p-5">
+                  <p className="text-xs font-medium text-accent">{c.category}</p>
+                  <h3 className="mt-1 font-semibold tracking-tight">{c.title}</h3>
+                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{c.description}</p>
+                  <div className="mt-4">
+                    <div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full bg-[image:var(--gradient-brand)]" style={{ width: `${a.progress}%` }} /></div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{a.progress}% complete</span>
+                      {a.due_date && <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> Due {new Date(a.due_date).toLocaleDateString()}</span>}
+                    </div>
+                  </div>
+                  <Button asChild className="mt-5 w-full bg-[image:var(--gradient-brand)] text-primary-foreground">
+                    <Link to="/dashboard/courses/$courseId" params={{ courseId: c.id }}>
+                      <PlayCircle className="mr-2 h-4 w-4" /> {a.progress > 0 ? "Continue" : "Start"} course
+                    </Link>
+                  </Button>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{m.description}</p>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" /> {m.duration_minutes} min
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="mb-1.5 flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Progress</span>
-                <span className="font-medium">{m.progress ?? 0}%</span>
-              </div>
-              <Progress value={m.progress ?? 0} />
-            </div>
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

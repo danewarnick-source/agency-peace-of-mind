@@ -24,7 +24,10 @@ function ResetPassword() {
     if (password !== confirm) return toast.error("Passwords don't match");
     if (password.length < 8) return toast.error("Password must be at least 8 characters");
     setBusy(true);
-    const { error } = await supabase.auth.updateUser({ password });
+    const { data: u, error } = await supabase.auth.updateUser({ password });
+    if (!error && u.user) {
+      await supabase.from("profiles").update({ must_change_password: false }).eq("id", u.user.id);
+    }
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Password updated");

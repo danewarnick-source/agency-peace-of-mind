@@ -190,7 +190,14 @@ function ProgramPlayer() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (!program) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (programLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (!program) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+        Program not found or you don't have access.
+      </div>
+    );
+  }
 
   const activeCourse = ordered.find((pc) => pc.course_id === activeCourseId)?.courses ?? null;
   const activeStatus = activeCourseId ? courseProgress?.get(activeCourseId) : undefined;

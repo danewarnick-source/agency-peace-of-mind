@@ -40,6 +40,7 @@ import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.emplo
 import { Route as DashboardCoursesRouteImport } from './routes/dashboard.courses'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
+import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
@@ -201,6 +202,11 @@ const DashboardBillingRoute = DashboardBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => DashboardRoute,
 } as any)
+const CertificateCodeRoute = CertificateCodeRouteImport.update({
+  id: '/certificate/$code',
+  path: '/certificate/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardTracksTrackSlugRoute =
   DashboardTracksTrackSlugRouteImport.update({
     id: '/$trackSlug',
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
@@ -276,6 +283,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
@@ -314,6 +322,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
@@ -353,6 +362,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/super-admin'
     | '/unauthorized'
+    | '/certificate/$code'
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/courses'
@@ -389,6 +399,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/super-admin'
     | '/unauthorized'
+    | '/certificate/$code'
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/courses'
@@ -426,6 +437,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/super-admin'
     | '/unauthorized'
+    | '/certificate/$code'
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/courses'
@@ -464,6 +476,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SuperAdminRoute: typeof SuperAdminRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
+  CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
 }
 
@@ -686,6 +699,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBillingRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/certificate/$code': {
+      id: '/certificate/$code'
+      path: '/certificate/$code'
+      fullPath: '/certificate/$code'
+      preLoaderRoute: typeof CertificateCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/tracks/$trackSlug': {
       id: '/dashboard/tracks/$trackSlug'
       path: '/$trackSlug'
@@ -823,6 +843,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SuperAdminRoute: SuperAdminRoute,
   UnauthorizedRoute: UnauthorizedRoute,
+  CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
 }
 export const routeTree = rootRouteImport

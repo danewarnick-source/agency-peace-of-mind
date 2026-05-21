@@ -68,8 +68,10 @@ function CertificationsPage() {
                       <ExternalLink className="mr-1.5 h-3 w-3" /> Verify
                     </Link>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => window.print()}>
-                    <Download className="mr-1.5 h-3 w-3" /> PDF
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/certificate/$code" params={{ code: c.verification_code }} target="_blank">
+                      <Download className="mr-1.5 h-3 w-3" /> PDF
+                    </Link>
                   </Button>
                 </div>
               </div>

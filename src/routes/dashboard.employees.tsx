@@ -227,26 +227,42 @@ function EmployeesPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+      <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
-            <tr><th className="p-4 text-left">Name</th><th className="p-4 text-left">Email</th><th className="p-4 text-left">Role</th><th className="p-4 text-left">Joined</th><th className="p-4" /></tr>
+            <tr>
+              <th className="p-4 text-left">Name</th>
+              <th className="p-4 text-left">Login</th>
+              <th className="p-4 text-left">Role</th>
+              <th className="p-4 text-left">Status</th>
+              <th className="p-4 text-left">Joined</th>
+              <th className="p-4" />
+            </tr>
           </thead>
           <tbody>
-            {members?.map((m) => (
-              <tr key={m.id} className="border-b border-border last:border-0">
-                <td className="p-4 font-medium">{m.profile?.full_name ?? "—"}</td>
-                <td className="p-4 text-muted-foreground">{m.profile?.email ?? "—"}</td>
-                <td className="p-4"><span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span></td>
-                <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
-                <td className="p-4 text-right">
-                  <Button variant="ghost" size="sm" onClick={() => setAssignOpen(m.user_id)}><BookOpen className="mr-1 h-3.5 w-3.5" /> Assign</Button>
-                  {m.user_id !== user?.id && (
-                    <Button variant="ghost" size="sm" onClick={() => removeMutation.mutate(m.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {members?.map((m) => {
+              const name = m.profile?.full_name ?? "—";
+              const login = m.profile?.username ?? m.profile?.email ?? "—";
+              const needsReset = m.profile?.must_change_password;
+              return (
+                <tr key={m.id} className="border-b border-border last:border-0">
+                  <td className="p-4 font-medium">{name}{needsReset && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">Pending first login</span>}</td>
+                  <td className="p-4 text-muted-foreground">{login}</td>
+                  <td className="p-4"><span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span></td>
+                  <td className="p-4 text-xs">{m.active ? <span className="text-emerald-600">Active</span> : <span className="text-muted-foreground">Deactivated</span>}</td>
+                  <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
+                  <td className="p-4 text-right whitespace-nowrap">
+                    <Button variant="ghost" size="sm" onClick={() => setAssignOpen(m.user_id)}><BookOpen className="mr-1 h-3.5 w-3.5" /> Assign</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setResetUser({ id: m.user_id, name })}><KeyRound className="mr-1 h-3.5 w-3.5" /> Reset</Button>
+                    {m.user_id !== user?.id && (
+                      <Button variant="ghost" size="sm" onClick={() => toggleActiveMutation.mutate({ memberId: m.id, active: !m.active })}>
+                        {m.active ? <UserX className="h-3.5 w-3.5 text-destructive" /> : <UserCheck className="h-3.5 w-3.5 text-emerald-600" />}
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

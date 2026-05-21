@@ -31,6 +31,7 @@ const NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/super-admin", label: "Platform", icon: Building2, roles: ["super_admin"] },
   { to: "/dashboard/training", label: "My Training", icon: GraduationCap, perm: "view_own_training" },
+  { to: "/dashboard/tracks", label: "Training Tracks", icon: RouteIcon, perm: "view_own_training" },
   { to: "/dashboard/programs", label: "Programs", icon: Layers, perm: "view_own_training" },
   { to: "/dashboard/programs-admin", label: "Manage Programs", icon: Layers, perm: "manage_programs" },
   { to: "/dashboard/courses", label: "Course Library", icon: BookOpen, perm: "view_own_training" },

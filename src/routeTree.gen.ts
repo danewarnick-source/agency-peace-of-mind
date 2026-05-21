@@ -25,6 +25,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
 import { Route as DashboardTrainingRouteImport } from './routes/dashboard.training'
+import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
@@ -121,6 +122,11 @@ const VerifyCodeRoute = VerifyCodeRouteImport.update({
 const DashboardTrainingRoute = DashboardTrainingRouteImport.update({
   id: '/training',
   path: '/training',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardTracksRoute = DashboardTracksRouteImport.update({
+  id: '/tracks',
+  path: '/tracks',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardTeamRoute = DashboardTeamRouteImport.update({
@@ -241,6 +247,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
+  '/dashboard/tracks': typeof DashboardTracksRoute
   '/dashboard/training': typeof DashboardTrainingRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
+  '/dashboard/tracks': typeof DashboardTracksRoute
   '/dashboard/training': typeof DashboardTrainingRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
+  '/dashboard/tracks': typeof DashboardTracksRoute
   '/dashboard/training': typeof DashboardTrainingRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -348,6 +357,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
+    | '/dashboard/tracks'
     | '/dashboard/training'
     | '/verify/$code'
     | '/dashboard/'
@@ -382,6 +392,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
+    | '/dashboard/tracks'
     | '/dashboard/training'
     | '/verify/$code'
     | '/dashboard'
@@ -417,6 +428,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
+    | '/dashboard/tracks'
     | '/dashboard/training'
     | '/verify/$code'
     | '/dashboard/'
@@ -554,6 +566,13 @@ declare module '@tanstack/react-router' {
       path: '/training'
       fullPath: '/dashboard/training'
       preLoaderRoute: typeof DashboardTrainingRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/tracks': {
+      id: '/dashboard/tracks'
+      path: '/tracks'
+      fullPath: '/dashboard/tracks'
+      preLoaderRoute: typeof DashboardTracksRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/team': {
@@ -729,6 +748,7 @@ interface DashboardRouteChildren {
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
+  DashboardTracksRoute: typeof DashboardTracksRoute
   DashboardTrainingRoute: typeof DashboardTrainingRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
@@ -748,6 +768,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
+  DashboardTracksRoute: DashboardTracksRoute,
   DashboardTrainingRoute: DashboardTrainingRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }

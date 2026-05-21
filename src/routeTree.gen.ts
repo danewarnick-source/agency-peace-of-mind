@@ -30,6 +30,7 @@ import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.supe
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
+import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardCoursesRouteImport } from './routes/dashboard.courses'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
@@ -141,6 +142,11 @@ const DashboardReportsRoute = DashboardReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardPermissionsRoute = DashboardPermissionsRouteImport.update({
+  id: '/permissions',
+  path: '/permissions',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardEmployeesRoute = DashboardEmployeesRouteImport.update({
   id: '/employees',
   path: '/employees',
@@ -186,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
@@ -213,6 +220,7 @@ export interface FileRoutesByTo {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
@@ -242,6 +250,7 @@ export interface FileRoutesById {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
@@ -272,6 +281,7 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/courses'
     | '/dashboard/employees'
+    | '/dashboard/permissions'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/settings'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/courses'
     | '/dashboard/employees'
+    | '/dashboard/permissions'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/settings'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/courses'
     | '/dashboard/employees'
+    | '/dashboard/permissions'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/settings'
@@ -504,6 +516,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardReportsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/permissions': {
+      id: '/dashboard/permissions'
+      path: '/permissions'
+      fullPath: '/dashboard/permissions'
+      preLoaderRoute: typeof DashboardPermissionsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/employees': {
       id: '/dashboard/employees'
       path: '/employees'
@@ -558,6 +577,7 @@ interface DashboardRouteChildren {
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardCoursesRoute: typeof DashboardCoursesRouteWithChildren
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
+  DashboardPermissionsRoute: typeof DashboardPermissionsRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
@@ -572,6 +592,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardCoursesRoute: DashboardCoursesRouteWithChildren,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
+  DashboardPermissionsRoute: DashboardPermissionsRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
@@ -604,3 +625,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

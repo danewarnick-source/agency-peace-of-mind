@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, BadgeCheck, FileBarChart, CreditCard,
-  Users, BookOpen, Settings, LogOut, UserCog, Building2,
+  Users, BookOpen, Settings, LogOut, UserCog, Building2, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 

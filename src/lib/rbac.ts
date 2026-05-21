@@ -20,6 +20,7 @@ export type Permission =
   | "view_platform_metrics"
   | "manage_all_orgs"
   | "manage_employees"
+  | "manage_roles"
   | "manage_courses"
   | "assign_training"
   | "view_org_reports"

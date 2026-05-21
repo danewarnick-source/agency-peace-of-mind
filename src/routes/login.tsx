@@ -7,6 +7,8 @@ import { GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
+import { useServerFn } from "@tanstack/react-start";
+import { lookupEmailByUsername } from "@/lib/employees.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -18,20 +20,30 @@ function LoginPage() {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
   const [busy, setBusy] = useState(false);
+  const resolveUsername = useServerFn(lookupEmailByUsername);
 
   useEffect(() => {
-    // After login, /dashboard will route the user to their role-appropriate home view.
     if (!loading && session) navigate({ to: "/dashboard" });
   }, [loading, session, navigate]);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const identifier = String(fd.get("identifier")).trim();
+    const password = String(fd.get("password"));
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: String(fd.get("email")),
-      password: String(fd.get("password")),
-    });
+    let email = identifier;
+    if (!identifier.includes("@")) {
+      try {
+        const r = await resolveUsername({ data: { username: identifier } });
+        if (!r.email) { setBusy(false); return toast.error("No account with that username"); }
+        email = r.email;
+      } catch (err) {
+        setBusy(false);
+        return toast.error((err as Error).message);
+      }
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) return toast.error(error.message);
     navigate({ to: "/dashboard" });
@@ -45,7 +57,7 @@ function LoginPage() {
   return (
     <AuthShell title="Welcome back" subtitle="Sign in to your Care Academy dashboard.">
       <form onSubmit={onSubmit} className="grid gap-4">
-        <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" required /></div>
+        <div className="grid gap-2"><Label htmlFor="identifier">Email or username</Label><Input id="identifier" name="identifier" type="text" autoComplete="username" required /></div>
         <div className="grid gap-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>

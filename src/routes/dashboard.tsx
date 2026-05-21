@@ -59,6 +59,24 @@ function DashboardLayout() {
     if (!loading && !session) navigate({ to: "/login" });
   }, [loading, session, navigate]);
 
+  // Force password change for manually-onboarded employees on first login
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("must_change_password")
+      .eq("id", uid)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled && data?.must_change_password) {
+          navigate({ to: "/reset-password" });
+        }
+      });
+    return () => { cancelled = true; };
+  }, [session?.user?.id, navigate]);
+
   if (loading || !session) {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
   }

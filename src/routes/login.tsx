@@ -20,6 +20,7 @@ function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    // After login, /dashboard will route the user to their role-appropriate home view.
     if (!loading && session) navigate({ to: "/dashboard" });
   }, [loading, session, navigate]);
 

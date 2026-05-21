@@ -362,33 +362,81 @@ export type Database = {
           },
         ]
       }
+      lesson_quiz_attempts: {
+        Row: {
+          answers: Json
+          created_at: string
+          id: string
+          lesson_id: string
+          passed: boolean
+          score: number
+          total: number
+          user_id: string
+        }
+        Insert: {
+          answers?: Json
+          created_at?: string
+          id?: string
+          lesson_id: string
+          passed?: boolean
+          score?: number
+          total?: number
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          created_at?: string
+          id?: string
+          lesson_id?: string
+          passed?: boolean
+          score?: number
+          total?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       lessons: {
         Row: {
           content: string | null
           created_at: string
+          data: Json
           duration_minutes: number | null
           id: string
+          lesson_type: string
           module_id: string
           order_index: number
+          pdf_url: string | null
+          required: boolean
           title: string
+          video_url: string | null
         }
         Insert: {
           content?: string | null
           created_at?: string
+          data?: Json
           duration_minutes?: number | null
           id?: string
+          lesson_type?: string
           module_id: string
           order_index?: number
+          pdf_url?: string | null
+          required?: boolean
           title: string
+          video_url?: string | null
         }
         Update: {
           content?: string | null
           created_at?: string
+          data?: Json
           duration_minutes?: number | null
           id?: string
+          lesson_type?: string
           module_id?: string
           order_index?: number
+          pdf_url?: string | null
+          required?: boolean
           title?: string
+          video_url?: string | null
         }
         Relationships: [
           {

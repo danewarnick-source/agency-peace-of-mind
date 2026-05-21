@@ -30,12 +30,14 @@ import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.supe
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
+import { Route as DashboardProgramsRouteImport } from './routes/dashboard.programs'
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardCoursesRouteImport } from './routes/dashboard.courses'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
+import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
@@ -143,6 +145,11 @@ const DashboardReportsRoute = DashboardReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardProgramsRoute = DashboardProgramsRouteImport.update({
+  id: '/programs',
+  path: '/programs',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardPermissionsRoute = DashboardPermissionsRouteImport.update({
   id: '/permissions',
   path: '/permissions',
@@ -173,6 +180,12 @@ const DashboardBillingRoute = DashboardBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardProgramsProgramIdRoute =
+  DashboardProgramsProgramIdRouteImport.update({
+    id: '/$programId',
+    path: '/$programId',
+    getParentRoute: () => DashboardProgramsRoute,
+  } as any)
 const DashboardCoursesCourseIdRoute =
   DashboardCoursesCourseIdRouteImport.update({
     id: '/$courseId',
@@ -200,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
+  '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
@@ -209,6 +223,7 @@ export interface FileRoutesByFullPath {
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRoute
+  '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -229,6 +244,7 @@ export interface FileRoutesByTo {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
+  '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
@@ -238,6 +254,7 @@ export interface FileRoutesByTo {
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRoute
+  '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -260,6 +277,7 @@ export interface FileRoutesById {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
+  '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
@@ -269,6 +287,7 @@ export interface FileRoutesById {
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRoute
+  '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -292,6 +311,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/invitations'
     | '/dashboard/permissions'
+    | '/dashboard/programs'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/settings'
@@ -301,6 +321,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/dashboard/'
     | '/dashboard/courses/$courseId'
+    | '/dashboard/programs/$programId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -321,6 +342,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/invitations'
     | '/dashboard/permissions'
+    | '/dashboard/programs'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/settings'
@@ -330,6 +352,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/dashboard'
     | '/dashboard/courses/$courseId'
+    | '/dashboard/programs/$programId'
   id:
     | '__root__'
     | '/'
@@ -351,6 +374,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/invitations'
     | '/dashboard/permissions'
+    | '/dashboard/programs'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/settings'
@@ -360,6 +384,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/dashboard/'
     | '/dashboard/courses/$courseId'
+    | '/dashboard/programs/$programId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -528,6 +553,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardReportsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/programs': {
+      id: '/dashboard/programs'
+      path: '/programs'
+      fullPath: '/dashboard/programs'
+      preLoaderRoute: typeof DashboardProgramsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/permissions': {
       id: '/dashboard/permissions'
       path: '/permissions'
@@ -570,6 +602,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBillingRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/programs/$programId': {
+      id: '/dashboard/programs/$programId'
+      path: '/$programId'
+      fullPath: '/dashboard/programs/$programId'
+      preLoaderRoute: typeof DashboardProgramsProgramIdRouteImport
+      parentRoute: typeof DashboardProgramsRoute
+    }
     '/dashboard/courses/$courseId': {
       id: '/dashboard/courses/$courseId'
       path: '/$courseId'
@@ -591,6 +630,17 @@ const DashboardCoursesRouteChildren: DashboardCoursesRouteChildren = {
 const DashboardCoursesRouteWithChildren =
   DashboardCoursesRoute._addFileChildren(DashboardCoursesRouteChildren)
 
+interface DashboardProgramsRouteChildren {
+  DashboardProgramsProgramIdRoute: typeof DashboardProgramsProgramIdRoute
+}
+
+const DashboardProgramsRouteChildren: DashboardProgramsRouteChildren = {
+  DashboardProgramsProgramIdRoute: DashboardProgramsProgramIdRoute,
+}
+
+const DashboardProgramsRouteWithChildren =
+  DashboardProgramsRoute._addFileChildren(DashboardProgramsRouteChildren)
+
 interface DashboardRouteChildren {
   DashboardBillingRoute: typeof DashboardBillingRoute
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
@@ -598,6 +648,7 @@ interface DashboardRouteChildren {
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
+  DashboardProgramsRoute: typeof DashboardProgramsRouteWithChildren
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
@@ -614,6 +665,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardPermissionsRoute: DashboardPermissionsRoute,
+  DashboardProgramsRoute: DashboardProgramsRouteWithChildren,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
@@ -646,3 +698,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

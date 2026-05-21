@@ -58,7 +58,13 @@ function DashboardLayout() {
   }
 
   const role: Role = org?.role ?? "employee";
-  const visible = NAV.filter((n) => !n.roles || n.roles.includes(role));
+  const { can } = usePermissions();
+  const visible = NAV.filter((n) => {
+    if (n.roles && !n.roles.includes(role)) return false;
+    if (n.perm && !can(n.perm)) return false;
+    return true;
+  });
+
 
   const signOut = async () => {
     await supabase.auth.signOut();

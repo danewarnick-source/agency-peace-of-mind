@@ -279,6 +279,130 @@ function EmployeesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Add manually */}
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add employee manually</DialogTitle>
+            <DialogDescription>Creates the account immediately. No email invitation is sent.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            const trackIds = (fd.getAll("track_ids") as string[]).filter(Boolean);
+            manualMutation.mutate({
+              firstName: String(fd.get("first_name") || "").trim(),
+              lastName: String(fd.get("last_name") || "").trim(),
+              username: String(fd.get("username") || "").trim(),
+              email: String(fd.get("email") || "").trim(),
+              role: String(fd.get("role") || "employee") as Role,
+              department: String(fd.get("department") || "").trim(),
+              hireDate: String(fd.get("hire_date") || ""),
+              trackIds,
+              password: String(fd.get("password") || tempPassword),
+            });
+          }} className="grid gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2"><Label htmlFor="first_name">First name</Label><Input id="first_name" name="first_name" required /></div>
+              <div className="grid gap-2"><Label htmlFor="last_name">Last name</Label><Input id="last_name" name="last_name" required /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2"><Label htmlFor="username">Username</Label><Input id="username" name="username" required pattern="[a-zA-Z0-9._-]+" /></div>
+              <div className="grid gap-2"><Label htmlFor="email">Email (optional)</Label><Input id="email" name="email" type="email" /></div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="password">Temporary password</Label>
+              <div className="flex gap-2">
+                <Input id="password" name="password" defaultValue={tempPassword} key={tempPassword} required minLength={8} />
+                <Button type="button" variant="outline" onClick={() => setTempPassword(genPassword())}>Regenerate</Button>
+                <Button type="button" variant="outline" onClick={() => { navigator.clipboard.writeText(tempPassword); toast.success("Copied"); }}><Copy className="h-3.5 w-3.5" /></Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Employee will be prompted to change this on first login.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label htmlFor="role">Role</Label>
+                <Select name="role" defaultValue="employee">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2"><Label htmlFor="department">Department / team</Label><Input id="department" name="department" /></div>
+            </div>
+            <div className="grid gap-2"><Label htmlFor="hire_date">Hire date</Label><Input id="hire_date" name="hire_date" type="date" /></div>
+            {!!tracks?.length && (
+              <div className="grid gap-2">
+                <Label>Assigned training tracks</Label>
+                <div className="grid max-h-40 gap-1 overflow-y-auto rounded-md border border-border p-2 text-sm">
+                  {tracks.map((t) => (
+                    <label key={t.id} className="flex items-center gap-2">
+                      <input type="checkbox" name="track_ids" value={t.id} className="rounded" />
+                      {t.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="submit" disabled={manualMutation.isPending} className="bg-[image:var(--gradient-brand)] text-primary-foreground">
+                {manualMutation.isPending ? "Creating…" : "Create employee"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset password */}
+      <Dialog open={!!resetUser} onOpenChange={(o) => !o && setResetUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset password for {resetUser?.name}</DialogTitle>
+            <DialogDescription>A new temporary password will be set. The employee must change it on next sign-in.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            resetPwMutation.mutate({ userId: resetUser!.id, newPassword: String(fd.get("newpw")) });
+          }} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="newpw">New temporary password</Label>
+              <div className="flex gap-2">
+                <Input id="newpw" name="newpw" defaultValue={tempPassword} key={"r-" + tempPassword} required minLength={8} />
+                <Button type="button" variant="outline" onClick={() => setTempPassword(genPassword())}>Regenerate</Button>
+              </div>
+            </div>
+            <DialogFooter><Button type="submit" disabled={resetPwMutation.isPending}>Reset password</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credentials reveal */}
+      <Dialog open={!!credentialsShown} onOpenChange={(o) => !o && setCredentialsShown(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share these credentials</DialogTitle>
+            <DialogDescription>This password is shown only once. Copy it and share securely.</DialogDescription>
+          </DialogHeader>
+          {credentialsShown && (
+            <div className="grid gap-3 text-sm">
+              <div><div className="text-xs text-muted-foreground">Login</div><code className="block rounded bg-secondary p-2">{credentialsShown.identifier}</code></div>
+              <div>
+                <div className="text-xs text-muted-foreground">Temporary password</div>
+                <div className="flex gap-2">
+                  <code className="flex-1 rounded bg-secondary p-2">{credentialsShown.password}</code>
+                  <Button type="button" variant="outline" onClick={() => { navigator.clipboard.writeText(credentialsShown.password); toast.success("Copied"); }}><Copy className="h-3.5 w-3.5" /></Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter><Button onClick={() => setCredentialsShown(null)}>Done</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -571,6 +571,7 @@ export type Database = {
         Returns: boolean
       }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
+      is_super_admin: { Args: { _user: string }; Returns: boolean }
       user_org_ids: { Args: { _user: string }; Returns: string[] }
     }
     Enums: {

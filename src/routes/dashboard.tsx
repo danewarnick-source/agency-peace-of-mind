@@ -9,6 +9,7 @@ import { ROLE_LABEL, type Permission, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, BadgeCheck, FileBarChart, CreditCard,
   Users, BookOpen, Settings, LogOut, UserCog, Building2, ShieldCheck, Mail,
+  Layers, FileCheck2,
 } from "lucide-react";
 import { toast } from "sonner";
 

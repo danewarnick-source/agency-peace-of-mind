@@ -12,10 +12,12 @@ function makeRoleEntry(allowed: Role[]) {
     const navigate = useNavigate();
     useEffect(() => {
       if (loading || isLoading) return;
-      if (!session) return navigate({ to: "/login" });
+      if (!session) {
+        navigate({ to: "/login" });
+        return;
+      }
       const role = (org?.role ?? "employee") as Role;
       if (!allowed.includes(role)) {
-        // Send to their own role home instead of unauthorized — feels nicer than dead-ending.
         navigate({ to: ROLE_HOME[role] });
         return;
       }

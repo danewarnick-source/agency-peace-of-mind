@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Clock } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/courses")({ component: CourseLibrary });
+export const Route = createFileRoute("/dashboard/courses/")({ component: CourseLibrary });
 
 function CourseLibrary() {
   const { user } = useAuth();

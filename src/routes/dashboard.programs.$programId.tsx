@@ -9,7 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, CheckCircle2, Circle, Lock, PlayCircle, FileText, Clock, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/programs/$programId")({ component: ProgramPlayer });
+export const Route = createFileRoute("/dashboard/programs/$programId")({
+  component: ProgramPlayer,
+  notFoundComponent: () => (
+    <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+      Program not found.
+    </div>
+  ),
+});
 
 type ProgramCourseRow = {
   id: string;
@@ -34,14 +41,23 @@ function ProgramPlayer() {
   const qc = useQueryClient();
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
 
-  const { data: program } = useQuery({
+  if (!programId) {
+    console.error("[ProgramPlayer] Missing programId in route params");
+  }
+
+  const { data: program, isLoading: programLoading } = useQuery({
+    enabled: !!programId,
     queryKey: ["training-program", programId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("training_programs")
         .select("id, name, description, category, annual_renewal, validity_months, estimated_minutes, cover_url")
         .eq("id", programId)
         .maybeSingle();
+      if (error) {
+        console.error("[ProgramPlayer] Failed to load program", programId, error);
+        throw error;
+      }
       return data;
     },
   });

@@ -574,7 +574,7 @@ export type Database = {
       user_org_ids: { Args: { _user: string }; Returns: string[] }
     }
     Enums: {
-      app_role: "admin" | "manager" | "employee"
+      app_role: "admin" | "manager" | "employee" | "super_admin"
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
       invitation_status: "pending" | "accepted" | "revoked"
     }
@@ -704,7 +704,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "employee"],
+      app_role: ["admin", "manager", "employee", "super_admin"],
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
       invitation_status: ["pending", "accepted", "revoked"],
     },

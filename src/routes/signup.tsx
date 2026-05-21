@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { AuthShell } from "./login";
 
 export const Route = createFileRoute("/signup")({
-  head: () => ({ meta: [{ title: "Start free trial — CareCompliance" }] }),
+  head: () => ({ meta: [{ title: "Start free trial — Care Academy" }] }),
   component: SignupPage,
 });
 
@@ -34,13 +34,13 @@ function SignupPage() {
         emailRedirectTo: `${window.location.origin}/dashboard`,
         data: {
           full_name: String(fd.get("full_name")),
-          agency_name: String(fd.get("agency_name")),
+          agency_name: String(fd.get("company_name")),
         },
       },
     });
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Account created — welcome!");
+    toast.success("Account created — welcome to Care Academy!");
     navigate({ to: "/dashboard" });
   };
 
@@ -53,7 +53,7 @@ function SignupPage() {
     <AuthShell title="Start your free trial" subtitle="14 days free. No credit card required.">
       <form onSubmit={onSubmit} className="grid gap-4">
         <div className="grid gap-2"><Label htmlFor="full_name">Full name</Label><Input id="full_name" name="full_name" required /></div>
-        <div className="grid gap-2"><Label htmlFor="agency_name">Agency name</Label><Input id="agency_name" name="agency_name" required /></div>
+        <div className="grid gap-2"><Label htmlFor="company_name">Company name</Label><Input id="company_name" name="company_name" required /></div>
         <div className="grid gap-2"><Label htmlFor="email">Work email</Label><Input id="email" name="email" type="email" required /></div>
         <div className="grid gap-2"><Label htmlFor="password">Password</Label><Input id="password" name="password" type="password" minLength={8} required /></div>
         <Button type="submit" disabled={busy} className="bg-[image:var(--gradient-brand)] text-primary-foreground">

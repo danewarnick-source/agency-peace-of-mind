@@ -41,8 +41,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "CareCompliance" },
-      { name: "description", content: "DSPD compliance, training, and audit-ready reports for disability services agencies." },
+      { title: "Care Academy" },
+      { name: "description", content: "Modern employee training and certification platform for teams that take compliance seriously." },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),

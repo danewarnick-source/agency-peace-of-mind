@@ -125,6 +125,52 @@ function EmployeesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const manualMutation = useMutation({
+    mutationFn: async (input: {
+      firstName: string; lastName: string; username: string; email: string;
+      role: Role; department: string; hireDate: string; trackIds: string[]; password: string;
+    }) => {
+      return await createManual({ data: {
+        organizationId: org!.organization_id,
+        firstName: input.firstName, lastName: input.lastName, username: input.username,
+        email: input.email, temporaryPassword: input.password, role: input.role,
+        department: input.department, hireDate: input.hireDate, trackIds: input.trackIds,
+      } });
+    },
+    onSuccess: (res, vars) => {
+      toast.success("Employee account created");
+      setCredentialsShown({ identifier: vars.email || vars.username, password: vars.password });
+      setManualOpen(false);
+      setTempPassword(genPassword());
+      qc.invalidateQueries({ queryKey: ["members"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async (input: { memberId: string; active: boolean }) => {
+      const { error } = await supabase.from("organization_members")
+        .update({ active: input.active }).eq("id", input.memberId);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Updated"); qc.invalidateQueries({ queryKey: ["members"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const resetPwMutation = useMutation({
+    mutationFn: async (input: { userId: string; newPassword: string }) => {
+      await resetPwFn({ data: {
+        organizationId: org!.organization_id, userId: input.userId, newPassword: input.newPassword,
+      } });
+    },
+    onSuccess: (_d, vars) => {
+      toast.success("Password reset");
+      setCredentialsShown({ identifier: resetUser?.name ?? "Employee", password: vars.newPassword });
+      setResetUser(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">

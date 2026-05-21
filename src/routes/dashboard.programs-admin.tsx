@@ -101,10 +101,11 @@ function ProgramsAdminPage() {
       annual_renewal: boolean;
     }) => {
       if (!user || !org) throw new Error("Missing org context");
-      const slug =
-        input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") +
-        "-" +
-        Math.random().toString(36).slice(2, 7);
+      const baseSlug =
+        input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") ||
+        "program";
+      // crypto.randomUUID guarantees slug uniqueness even on collisions
+      const slug = `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`;
       const { data, error } = await supabase
         .from("training_programs")
         .insert({
@@ -118,9 +119,13 @@ function ProgramsAdminPage() {
           created_by: user.id,
           is_published: true,
         })
-        .select("id")
+        .select("id, slug, name")
         .single();
-      if (error) throw error;
+      if (error) {
+        console.error("[createProgram] insert failed", error);
+        throw error;
+      }
+      if (!data?.id) throw new Error("Program created but no ID returned");
       return data.id as string;
     },
     onSuccess: (id) => {

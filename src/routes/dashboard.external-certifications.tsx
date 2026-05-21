@@ -61,26 +61,23 @@ function ExternalCertsPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("external_certifications")
-        .select("*, profiles!external_certifications_user_id_fkey(full_name, email)")
-        .eq("organization_id", org!.organization_id)
-        .order("created_at", { ascending: false });
-      return (data as (ExtCert & { profiles: { full_name: string | null; email: string } | null })[]) ?? [];
-    },
-  });
-
-  // Fallback if FK alias above fails — try simpler query
-  const { data: orgCertsFallback } = useQuery({
-    enabled: !!org && canApprove && !orgCerts,
-    queryKey: ["org-ext-certs-fallback", org?.organization_id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("external_certifications")
         .select("*")
         .eq("organization_id", org!.organization_id)
         .order("created_at", { ascending: false });
-      return (data as ExtCert[]) ?? [];
+      const rows = (data as ExtCert[]) ?? [];
+      const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
+      let profileMap = new Map<string, { full_name: string | null; email: string }>();
+      if (userIds.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", userIds);
+        profileMap = new Map((profs ?? []).map((p) => [p.id, { full_name: p.full_name, email: p.email ?? "" }]));
+      }
+      return rows.map((r) => ({ ...r, profiles: profileMap.get(r.user_id) ?? null }));
     },
   });
+  const orgCertsFallback = orgCerts;
 
   const review = useMutation({
     mutationFn: async (args: { id: string; status: "approved" | "rejected"; notes?: string }) => {

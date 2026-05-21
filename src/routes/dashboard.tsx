@@ -13,13 +13,14 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
 });
 
-const nav = [
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+const nav: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/training", label: "Training Modules", icon: GraduationCap },
   { to: "/dashboard/certifications", label: "Staff Certifications", icon: BadgeCheck },
   { to: "/dashboard/reports", label: "Compliance Reports", icon: FileBarChart },
   { to: "/dashboard/billing", label: "Billing", icon: CreditCard },
-] as const;
+];
 
 function DashboardLayout() {
   const { session, loading, user } = useAuth();

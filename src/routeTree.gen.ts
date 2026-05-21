@@ -31,6 +31,7 @@ import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settin
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
+import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardCoursesRouteImport } from './routes/dashboard.courses'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
@@ -147,6 +148,11 @@ const DashboardPermissionsRoute = DashboardPermissionsRouteImport.update({
   path: '/permissions',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardInvitationsRoute = DashboardInvitationsRouteImport.update({
+  id: '/invitations',
+  path: '/invitations',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardEmployeesRoute = DashboardEmployeesRouteImport.update({
   id: '/employees',
   path: '/employees',
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByTo {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
@@ -250,6 +258,7 @@ export interface FileRoutesById {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
@@ -281,6 +290,7 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/courses'
     | '/dashboard/employees'
+    | '/dashboard/invitations'
     | '/dashboard/permissions'
     | '/dashboard/reports'
     | '/dashboard/roles'
@@ -309,6 +319,7 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/courses'
     | '/dashboard/employees'
+    | '/dashboard/invitations'
     | '/dashboard/permissions'
     | '/dashboard/reports'
     | '/dashboard/roles'
@@ -338,6 +349,7 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/courses'
     | '/dashboard/employees'
+    | '/dashboard/invitations'
     | '/dashboard/permissions'
     | '/dashboard/reports'
     | '/dashboard/roles'
@@ -523,6 +535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardPermissionsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/invitations': {
+      id: '/dashboard/invitations'
+      path: '/invitations'
+      fullPath: '/dashboard/invitations'
+      preLoaderRoute: typeof DashboardInvitationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/employees': {
       id: '/dashboard/employees'
       path: '/employees'
@@ -577,6 +596,7 @@ interface DashboardRouteChildren {
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardCoursesRoute: typeof DashboardCoursesRouteWithChildren
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
+  DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
@@ -592,6 +612,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardCoursesRoute: DashboardCoursesRouteWithChildren,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
+  DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardPermissionsRoute: DashboardPermissionsRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,

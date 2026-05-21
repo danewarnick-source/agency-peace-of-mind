@@ -152,7 +152,10 @@ function ProgramsAdminPage() {
   });
 
   const updateRow = useMutation({
-    mutationFn: async (input: { id: string; patch: Record<string, unknown> }) => {
+    mutationFn: async (input: {
+      id: string;
+      patch: { required?: boolean; unlock_after?: string | null; order_index?: number };
+    }) => {
       const { error } = await supabase
         .from("program_courses")
         .update(input.patch)

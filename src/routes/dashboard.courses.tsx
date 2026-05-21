@@ -63,8 +63,12 @@ function CourseLibrary() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {courses?.map((c) => {
             const enrolled = mine?.has(c.id);
+            const hasId = typeof c.id === "string" && c.id.length > 0;
+            if (!hasId) {
+              console.error("[CourseLibrary] Course is missing an id; skipping View link", c);
+            }
             return (
-              <div key={c.id} className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)]">
+              <div key={c.id ?? c.title} className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)]">
                 {c.cover_url && <img src={c.cover_url} alt="" className="h-36 w-full object-cover" />}
                 <div className="p-5">
                   <p className="text-xs font-medium text-accent">{c.category}</p>
@@ -74,13 +78,27 @@ function CourseLibrary() {
                     <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {c.duration_minutes} min</span>
                   </div>
                   <div className="mt-4 flex gap-2">
-                    <Button asChild variant="outline" size="sm" className="flex-1">
-                      <Link to="/dashboard/courses/$courseId" params={{ courseId: c.id }}>View</Link>
-                    </Button>
+                    {hasId ? (
+                      <Button asChild variant="outline" size="sm" className="flex-1">
+                        <Link
+                          to="/dashboard/courses/$courseId"
+                          params={{ courseId: c.id }}
+                          onClick={() => {
+                            if (!c.id) console.error("[CourseLibrary] View clicked with no course id");
+                          }}
+                        >
+                          View
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="flex-1" disabled>
+                        Unavailable
+                      </Button>
+                    )}
                     {enrolled ? (
                       <Button size="sm" disabled className="flex-1">Enrolled</Button>
                     ) : (
-                      <Button size="sm" className="flex-1 bg-[image:var(--gradient-brand)] text-primary-foreground" disabled={enrollMutation.isPending || !org} onClick={() => enrollMutation.mutate(c.id)}>
+                      <Button size="sm" className="flex-1 bg-[image:var(--gradient-brand)] text-primary-foreground" disabled={enrollMutation.isPending || !org || !hasId} onClick={() => hasId && enrollMutation.mutate(c.id)}>
                         <Plus className="mr-1 h-3.5 w-3.5" /> Enroll
                       </Button>
                     )}

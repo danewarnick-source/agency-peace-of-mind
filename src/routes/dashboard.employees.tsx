@@ -12,7 +12,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Mail, UserPlus, Trash2, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/employees")({ component: EmployeesPage });
+import { RequirePermission } from "@/components/rbac-guard";
+
+export const Route = createFileRoute("/dashboard/employees")({
+  component: () => (
+    <RequirePermission perm="manage_employees">
+      <EmployeesPage />
+    </RequirePermission>
+  ),
+});
 
 type Role = "admin" | "manager" | "employee";
 

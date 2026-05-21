@@ -571,10 +571,11 @@ export type Database = {
         Returns: boolean
       }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
+      is_super_admin: { Args: { _user: string }; Returns: boolean }
       user_org_ids: { Args: { _user: string }; Returns: string[] }
     }
     Enums: {
-      app_role: "admin" | "manager" | "employee"
+      app_role: "admin" | "manager" | "employee" | "super_admin"
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
       invitation_status: "pending" | "accepted" | "revoked"
     }
@@ -704,7 +705,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "employee"],
+      app_role: ["admin", "manager", "employee", "super_admin"],
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
       invitation_status: ["pending", "accepted", "revoked"],
     },

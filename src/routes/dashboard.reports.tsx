@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button";
 import { FileDown, FileBarChart } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/reports")({ component: ReportsPage });
+import { RequirePermission } from "@/components/rbac-guard";
+
+export const Route = createFileRoute("/dashboard/reports")({
+  component: () => (
+    <RequirePermission perm="view_org_reports">
+      <ReportsPage />
+    </RequirePermission>
+  ),
+});
 
 function ReportsPage() {
   const { data: org } = useCurrentOrg();

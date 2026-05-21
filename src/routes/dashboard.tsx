@@ -4,9 +4,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, BadgeCheck, FileBarChart, CreditCard,
-  Users, BookOpen, Settings, LogOut, UserCog,
+  Users, BookOpen, Settings, LogOut, UserCog, Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,17 +16,18 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
 });
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; roles?: Array<"admin" | "manager" | "employee"> };
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; roles?: Role[] };
 
-const nav: NavItem[] = [
+const NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/training", label: "My Training", icon: GraduationCap },
-  { to: "/dashboard/courses", label: "Course Library", icon: BookOpen },
+  { to: "/dashboard/super-admin", label: "Platform", icon: Building2, roles: ["super_admin"] },
+  { to: "/dashboard/training", label: "My Training", icon: GraduationCap, roles: ["employee", "manager", "admin"] },
+  { to: "/dashboard/courses", label: "Course Library", icon: BookOpen, roles: ["employee", "manager", "admin", "super_admin"] },
   { to: "/dashboard/certifications", label: "Certifications", icon: BadgeCheck },
-  { to: "/dashboard/employees", label: "Employees", icon: Users, roles: ["admin"] },
-  { to: "/dashboard/team", label: "My Team", icon: UserCog, roles: ["admin", "manager"] },
-  { to: "/dashboard/reports", label: "Reports", icon: FileBarChart, roles: ["admin", "manager"] },
-  { to: "/dashboard/billing", label: "Billing", icon: CreditCard, roles: ["admin"] },
+  { to: "/dashboard/employees", label: "Employees", icon: Users, roles: ["admin", "super_admin"] },
+  { to: "/dashboard/team", label: "My Team", icon: UserCog, roles: ["admin", "manager", "super_admin"] },
+  { to: "/dashboard/reports", label: "Reports", icon: FileBarChart, roles: ["admin", "manager", "super_admin"] },
+  { to: "/dashboard/billing", label: "Billing", icon: CreditCard, roles: ["admin", "super_admin"] },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
@@ -43,8 +45,8 @@ function DashboardLayout() {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
   }
 
-  const role = org?.role ?? "employee";
-  const visible = nav.filter((n) => !n.roles || n.roles.includes(role));
+  const role: Role = org?.role ?? "employee";
+  const visible = NAV.filter((n) => !n.roles || n.roles.includes(role));
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -85,7 +87,7 @@ function DashboardLayout() {
             <div className="font-medium text-sidebar-foreground">{user?.user_metadata?.full_name ?? user?.email}</div>
             <div className="flex items-center justify-between">
               <span className="truncate">{org?.organization_name ?? "Your workspace"}</span>
-              <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">{role}</span>
+              <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">{ROLE_LABEL[role]}</span>
             </div>
           </div>
           <Button onClick={signOut} variant="outline" size="sm" className="w-full border-sidebar-border bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
@@ -100,7 +102,7 @@ function DashboardLayout() {
             <h1 className="text-lg font-semibold tracking-tight">
               {visible.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard"}
             </h1>
-            <p className="text-xs text-muted-foreground">{org?.organization_name ?? "Workspace"} · {user?.email}</p>
+            <p className="text-xs text-muted-foreground">{org?.organization_name ?? "Workspace"} · {ROLE_LABEL[role]}</p>
           </div>
           <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
             <LogOut className="h-4 w-4" />

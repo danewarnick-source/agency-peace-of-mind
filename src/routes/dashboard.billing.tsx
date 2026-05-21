@@ -5,7 +5,15 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Check, CreditCard } from "lucide-react";
 
-export const Route = createFileRoute("/dashboard/billing")({ component: BillingPage });
+import { RequirePermission } from "@/components/rbac-guard";
+
+export const Route = createFileRoute("/dashboard/billing")({
+  component: () => (
+    <RequirePermission perm="view_billing">
+      <BillingPage />
+    </RequirePermission>
+  ),
+});
 
 function BillingPage() {
   const { data: org } = useCurrentOrg();

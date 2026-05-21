@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,7 +11,13 @@ export const Route = createFileRoute("/dashboard/")({ component: Overview });
 function Overview() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
-  const isManager = org?.role === "admin" || org?.role === "manager";
+  const navigate = useNavigate();
+  const isManager = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+
+  // Super admins live on the platform console.
+  useEffect(() => {
+    if (org?.role === "super_admin") navigate({ to: "/dashboard/super-admin" });
+  }, [org?.role, navigate]);
 
   const { data: stats } = useQuery({
     enabled: !!org && isManager,

@@ -28,6 +28,7 @@ import { Route as DashboardTrainingRouteImport } from './routes/dashboard.traini
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
+import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardCoursesRouteImport } from './routes/dashboard.courses'
@@ -130,6 +131,11 @@ const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardRolesRoute = DashboardRolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardReportsRoute = DashboardReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/reports': typeof DashboardReportsRoute
+  '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
@@ -207,6 +214,7 @@ export interface FileRoutesByTo {
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/reports': typeof DashboardReportsRoute
+  '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
@@ -235,6 +243,7 @@ export interface FileRoutesById {
   '/dashboard/courses': typeof DashboardCoursesRouteWithChildren
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/reports': typeof DashboardReportsRoute
+  '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
@@ -264,6 +273,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses'
     | '/dashboard/employees'
     | '/dashboard/reports'
+    | '/dashboard/roles'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses'
     | '/dashboard/employees'
     | '/dashboard/reports'
+    | '/dashboard/roles'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses'
     | '/dashboard/employees'
     | '/dashboard/reports'
+    | '/dashboard/roles'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
@@ -478,6 +490,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/roles': {
+      id: '/dashboard/roles'
+      path: '/roles'
+      fullPath: '/dashboard/roles'
+      preLoaderRoute: typeof DashboardRolesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/reports': {
       id: '/dashboard/reports'
       path: '/reports'
@@ -540,6 +559,7 @@ interface DashboardRouteChildren {
   DashboardCoursesRoute: typeof DashboardCoursesRouteWithChildren
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
+  DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
@@ -553,6 +573,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCoursesRoute: DashboardCoursesRouteWithChildren,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardReportsRoute: DashboardReportsRoute,
+  DashboardRolesRoute: DashboardRolesRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,

@@ -20,6 +20,7 @@ export type Permission =
   | "view_platform_metrics"
   | "manage_all_orgs"
   | "manage_employees"
+  | "manage_roles"
   | "manage_courses"
   | "assign_training"
   | "view_org_reports"
@@ -32,13 +33,13 @@ export type Permission =
 const MATRIX: Record<Role, Permission[]> = {
   super_admin: [
     "view_platform_metrics", "manage_all_orgs",
-    "manage_employees", "manage_courses", "assign_training",
+    "manage_employees", "manage_roles", "manage_courses", "assign_training",
     "view_org_reports", "view_team_reports",
     "manage_billing", "view_billing",
     "view_own_training", "view_certifications",
   ],
   admin: [
-    "manage_employees", "manage_courses", "assign_training",
+    "manage_employees", "manage_roles", "manage_courses", "assign_training",
     "view_org_reports", "view_team_reports",
     "manage_billing", "view_billing",
     "view_own_training", "view_certifications",

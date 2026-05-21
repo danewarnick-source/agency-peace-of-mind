@@ -90,11 +90,23 @@ function ProgramPlayer() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("program_courses")
-        .select("id, order_index, required, unlock_after, course_id, course:course_id(id, title, description, category, duration_minutes, cover_url)")
+        .select("id, order_index, required, unlock_after, course_id")
         .eq("program_id", programId)
         .order("order_index");
       if (error) throw error;
-      return (data as unknown as ProgramCourseRow[]) ?? [];
+
+      const rows = (data ?? []) as Array<Pick<ProgramCourseRow, "id" | "order_index" | "required" | "unlock_after" | "course_id">>;
+      const courseIds = rows.map((row) => row.course_id);
+      if (!courseIds.length) return [];
+
+      const { data: courseRows, error: courseError } = await supabase
+        .from("courses")
+        .select("id, title, description, category, duration_minutes, cover_url")
+        .in("id", courseIds);
+      if (courseError) throw courseError;
+
+      const courseMap = new Map((courseRows ?? []).map((course) => [course.id, course]));
+      return rows.map((row) => ({ ...row, course: courseMap.get(row.course_id) ?? null }));
     },
   });
 

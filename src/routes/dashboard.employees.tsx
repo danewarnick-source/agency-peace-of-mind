@@ -105,14 +105,6 @@ function EmployeesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const removeMutation = useMutation({
-    mutationFn: async (memberId: string) => {
-      const { error } = await supabase.from("organization_members").update({ active: false }).eq("id", memberId);
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Employee removed"); qc.invalidateQueries({ queryKey: ["members"] }); },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const assignMutation = useMutation({
     mutationFn: async (input: { userId: string; courseId: string; dueDate: string | null }) => {

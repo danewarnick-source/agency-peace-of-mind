@@ -63,10 +63,11 @@ function EmployeesPage() {
       const { data } = await supabase
         .from("organization_members")
         .select("id, role, job_title, active, user_id, created_at")
-        .eq("organization_id", org!.organization_id)
-        .eq("active", true);
+        .eq("organization_id", org!.organization_id);
       const ids = (data ?? []).map((m) => m.user_id);
-      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+      const { data: profs } = await supabase.from("profiles")
+        .select("id, full_name, email, username, must_change_password, department, hire_date")
+        .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       const profMap = new Map((profs ?? []).map((p) => [p.id, p]));
       return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) }));
     },

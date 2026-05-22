@@ -22,7 +22,20 @@ function CourseLibrary() {
         .select("id, title, description, category, cover_url, duration_minutes, is_global")
         .eq("is_published", true)
         .order("created_at", { ascending: false });
-      return data ?? [];
+      const rows = (data ?? []) as Array<Record<string, any>>;
+      // Temporary injected external lesson for testing Mindsmith integration
+      const injected: Record<string, any> = {
+        id: "mindsmith-health-safety",
+        title: "Core Health & Safety Protocols (Utah DHHS/DPSD)",
+        description:
+          "Compliance training covering 911, medical/mental health crises, seizure orientation, and choking protocols.",
+        category: "Compliance",
+        cover_url: null,
+        duration_minutes: 30,
+        is_global: true,
+        mindsmith_url: "https://app.mindsmith.ai/learn/cmpgdu05x000404l147zeo1pi",
+      };
+      return [injected, ...rows];
     },
   });
 
@@ -78,7 +91,16 @@ function CourseLibrary() {
                     <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {c.duration_minutes} min</span>
                   </div>
                   <div className="mt-4 flex gap-2">
-                    {hasId ? (
+                    {c.mindsmith_url ? (
+                      <Button asChild variant="outline" size="sm" className="flex-1">
+                        <Link
+                          to="/dashboard/courses/mindsmith"
+                          search={{ url: c.mindsmith_url, title: c.title, category: c.category }}
+                        >
+                          View
+                        </Link>
+                      </Button>
+                    ) : hasId ? (
                       <Button asChild variant="outline" size="sm" className="flex-1">
                         <Link
                           to="/dashboard/courses/$courseId"
@@ -95,7 +117,7 @@ function CourseLibrary() {
                         Unavailable
                       </Button>
                     )}
-                    {enrolled ? (
+                    {c.mindsmith_url ? null : enrolled ? (
                       <Button size="sm" disabled className="flex-1">Enrolled</Button>
                     ) : (
                       <Button size="sm" className="flex-1 bg-[image:var(--gradient-brand)] text-primary-foreground" disabled={enrollMutation.isPending || !org || !hasId} onClick={() => hasId && enrollMutation.mutate(c.id)}>

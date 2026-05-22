@@ -91,7 +91,16 @@ function CourseLibrary() {
                     <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {c.duration_minutes} min</span>
                   </div>
                   <div className="mt-4 flex gap-2">
-                    {hasId ? (
+                    {c.mindsmith_url ? (
+                      <Button asChild variant="outline" size="sm" className="flex-1">
+                        <Link
+                          to="/dashboard/courses/mindsmith"
+                          search={{ url: c.mindsmith_url, title: c.title, category: c.category }}
+                        >
+                          View
+                        </Link>
+                      </Button>
+                    ) : hasId ? (
                       <Button asChild variant="outline" size="sm" className="flex-1">
                         <Link
                           to="/dashboard/courses/$courseId"

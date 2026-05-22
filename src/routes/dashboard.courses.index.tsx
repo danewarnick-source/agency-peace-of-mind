@@ -125,7 +125,7 @@ function ComplianceRoadmap() {
                           }
                           variant={isCompleted ? "outline" : "default"}
                         >
-                          <Link to="/training/$id" params={{ id: m.id }}>
+                          <Link to="/dashboard/training/$id" params={{ id: m.id }}>
                             <PlayCircle className="mr-1 h-3.5 w-3.5" />
                             {isCompleted ? "Review" : isFinal ? "Start Quiz" : "Start Module"}
                           </Link>

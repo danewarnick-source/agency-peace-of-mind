@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { PlayCircle, Calendar } from "lucide-react";
 
-export const Route = createFileRoute("/dashboard/training")({ component: MyTraining });
+export const Route = createFileRoute("/dashboard/training/")({ component: MyTraining });
 
 function MyTraining() {
   const { user } = useAuth();

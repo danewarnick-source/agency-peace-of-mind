@@ -19,7 +19,7 @@ function CourseLibrary() {
     queryFn: async () => {
       const { data } = await supabase
         .from("courses")
-        .select("id, title, description, category, cover_url, duration_minutes, is_global, mindsmith_url")
+        .select("id, title, description, category, cover_url, duration_minutes, is_global")
         .eq("is_published", true)
         .order("created_at", { ascending: false });
       const rows = (data ?? []) as Array<Record<string, any>>;

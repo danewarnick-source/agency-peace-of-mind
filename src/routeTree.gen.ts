@@ -41,6 +41,7 @@ import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
+import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
@@ -208,6 +209,11 @@ const DashboardCoursesIndexRoute = DashboardCoursesIndexRouteImport.update({
   path: '/courses/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardTrainingIdRoute = DashboardTrainingIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => DashboardTrainingRoute,
+} as any)
 const DashboardTracksTrackSlugRoute =
   DashboardTracksTrackSlugRouteImport.update({
     id: '/$trackSlug',
@@ -268,13 +274,14 @@ export interface FileRoutesByFullPath {
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
-  '/dashboard/training': typeof DashboardTrainingRoute
+  '/dashboard/training': typeof DashboardTrainingRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
+  '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
@@ -306,13 +313,14 @@ export interface FileRoutesByTo {
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
-  '/dashboard/training': typeof DashboardTrainingRoute
+  '/dashboard/training': typeof DashboardTrainingRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
+  '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
@@ -346,13 +354,14 @@ export interface FileRoutesById {
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
-  '/dashboard/training': typeof DashboardTrainingRoute
+  '/dashboard/training': typeof DashboardTrainingRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
+  '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
@@ -394,6 +403,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
     | '/dashboard/tracks/$trackSlug'
+    | '/dashboard/training/$id'
     | '/dashboard/courses/'
     | '/dashboard/courses/$courseId/edit'
   fileRoutesByTo: FileRoutesByTo
@@ -432,6 +442,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
     | '/dashboard/tracks/$trackSlug'
+    | '/dashboard/training/$id'
     | '/dashboard/courses'
     | '/dashboard/courses/$courseId/edit'
   id:
@@ -471,6 +482,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
     | '/dashboard/tracks/$trackSlug'
+    | '/dashboard/training/$id'
     | '/dashboard/courses/'
     | '/dashboard/courses/$courseId/edit'
   fileRoutesById: FileRoutesById
@@ -719,6 +731,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/training/$id': {
+      id: '/dashboard/training/$id'
+      path: '/$id'
+      fullPath: '/dashboard/training/$id'
+      preLoaderRoute: typeof DashboardTrainingIdRouteImport
+      parentRoute: typeof DashboardTrainingRoute
+    }
     '/dashboard/tracks/$trackSlug': {
       id: '/dashboard/tracks/$trackSlug'
       path: '/$trackSlug'
@@ -780,6 +799,17 @@ const DashboardTracksRouteWithChildren = DashboardTracksRoute._addFileChildren(
   DashboardTracksRouteChildren,
 )
 
+interface DashboardTrainingRouteChildren {
+  DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
+}
+
+const DashboardTrainingRouteChildren: DashboardTrainingRouteChildren = {
+  DashboardTrainingIdRoute: DashboardTrainingIdRoute,
+}
+
+const DashboardTrainingRouteWithChildren =
+  DashboardTrainingRoute._addFileChildren(DashboardTrainingRouteChildren)
+
 interface DashboardCoursesCourseIdRouteChildren {
   DashboardCoursesCourseIdEditRoute: typeof DashboardCoursesCourseIdEditRoute
 }
@@ -809,7 +839,7 @@ interface DashboardRouteChildren {
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
   DashboardTracksRoute: typeof DashboardTracksRouteWithChildren
-  DashboardTrainingRoute: typeof DashboardTrainingRoute
+  DashboardTrainingRoute: typeof DashboardTrainingRouteWithChildren
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesMindsmithRoute: typeof DashboardCoursesMindsmithRoute
@@ -831,7 +861,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
   DashboardTracksRoute: DashboardTracksRouteWithChildren,
-  DashboardTrainingRoute: DashboardTrainingRoute,
+  DashboardTrainingRoute: DashboardTrainingRouteWithChildren,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesMindsmithRoute: DashboardCoursesMindsmithRoute,

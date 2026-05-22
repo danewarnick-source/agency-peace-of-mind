@@ -117,7 +117,7 @@ function CourseLibrary() {
                         Unavailable
                       </Button>
                     )}
-                    {enrolled ? (
+                    {c.mindsmith_url ? null : enrolled ? (
                       <Button size="sm" disabled className="flex-1">Enrolled</Button>
                     ) : (
                       <Button size="sm" className="flex-1 bg-[image:var(--gradient-brand)] text-primary-foreground" disabled={enrollMutation.isPending || !org || !hasId} onClick={() => hasId && enrollMutation.mutate(c.id)}>

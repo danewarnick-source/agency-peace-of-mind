@@ -24,7 +24,6 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
-import { Route as DashboardTrainingRouteImport } from './routes/dashboard.training'
 import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
@@ -40,6 +39,7 @@ import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.emplo
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
+import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
 import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
@@ -123,11 +123,6 @@ const VerifyCodeRoute = VerifyCodeRouteImport.update({
   path: '/verify/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardTrainingRoute = DashboardTrainingRouteImport.update({
-  id: '/training',
-  path: '/training',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardTracksRoute = DashboardTracksRouteImport.update({
   id: '/tracks',
   path: '/tracks',
@@ -204,15 +199,20 @@ const CertificateCodeRoute = CertificateCodeRouteImport.update({
   path: '/certificate/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardTrainingIndexRoute = DashboardTrainingIndexRouteImport.update({
+  id: '/training/',
+  path: '/training/',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardCoursesIndexRoute = DashboardCoursesIndexRouteImport.update({
   id: '/courses/',
   path: '/courses/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardTrainingIdRoute = DashboardTrainingIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => DashboardTrainingRoute,
+  id: '/training/$id',
+  path: '/training/$id',
+  getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardTracksTrackSlugRoute =
   DashboardTracksTrackSlugRouteImport.update({
@@ -274,7 +274,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
-  '/dashboard/training': typeof DashboardTrainingRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
@@ -283,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
+  '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
 export interface FileRoutesByTo {
@@ -313,7 +313,6 @@ export interface FileRoutesByTo {
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
-  '/dashboard/training': typeof DashboardTrainingRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
@@ -322,6 +321,7 @@ export interface FileRoutesByTo {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
+  '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
 export interface FileRoutesById {
@@ -354,7 +354,6 @@ export interface FileRoutesById {
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
-  '/dashboard/training': typeof DashboardTrainingRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
@@ -363,6 +362,7 @@ export interface FileRoutesById {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
+  '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
 export interface FileRouteTypes {
@@ -396,7 +396,6 @@ export interface FileRouteTypes {
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/tracks'
-    | '/dashboard/training'
     | '/verify/$code'
     | '/dashboard/'
     | '/dashboard/courses/$courseId'
@@ -405,6 +404,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/courses/'
+    | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -435,7 +435,6 @@ export interface FileRouteTypes {
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/tracks'
-    | '/dashboard/training'
     | '/verify/$code'
     | '/dashboard'
     | '/dashboard/courses/$courseId'
@@ -444,6 +443,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/courses'
+    | '/dashboard/training'
     | '/dashboard/courses/$courseId/edit'
   id:
     | '__root__'
@@ -475,7 +475,6 @@ export interface FileRouteTypes {
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/tracks'
-    | '/dashboard/training'
     | '/verify/$code'
     | '/dashboard/'
     | '/dashboard/courses/$courseId'
@@ -484,6 +483,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/courses/'
+    | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
   fileRoutesById: FileRoutesById
 }
@@ -612,13 +612,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard/training': {
-      id: '/dashboard/training'
-      path: '/training'
-      fullPath: '/dashboard/training'
-      preLoaderRoute: typeof DashboardTrainingRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/dashboard/tracks': {
       id: '/dashboard/tracks'
       path: '/tracks'
@@ -724,6 +717,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CertificateCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/training/': {
+      id: '/dashboard/training/'
+      path: '/training'
+      fullPath: '/dashboard/training/'
+      preLoaderRoute: typeof DashboardTrainingIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/courses/': {
       id: '/dashboard/courses/'
       path: '/courses'
@@ -733,10 +733,10 @@ declare module '@tanstack/react-router' {
     }
     '/dashboard/training/$id': {
       id: '/dashboard/training/$id'
-      path: '/$id'
+      path: '/training/$id'
       fullPath: '/dashboard/training/$id'
       preLoaderRoute: typeof DashboardTrainingIdRouteImport
-      parentRoute: typeof DashboardTrainingRoute
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/tracks/$trackSlug': {
       id: '/dashboard/tracks/$trackSlug'
@@ -799,17 +799,6 @@ const DashboardTracksRouteWithChildren = DashboardTracksRoute._addFileChildren(
   DashboardTracksRouteChildren,
 )
 
-interface DashboardTrainingRouteChildren {
-  DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
-}
-
-const DashboardTrainingRouteChildren: DashboardTrainingRouteChildren = {
-  DashboardTrainingIdRoute: DashboardTrainingIdRoute,
-}
-
-const DashboardTrainingRouteWithChildren =
-  DashboardTrainingRoute._addFileChildren(DashboardTrainingRouteChildren)
-
 interface DashboardCoursesCourseIdRouteChildren {
   DashboardCoursesCourseIdEditRoute: typeof DashboardCoursesCourseIdEditRoute
 }
@@ -839,11 +828,12 @@ interface DashboardRouteChildren {
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
   DashboardTracksRoute: typeof DashboardTracksRouteWithChildren
-  DashboardTrainingRoute: typeof DashboardTrainingRouteWithChildren
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesMindsmithRoute: typeof DashboardCoursesMindsmithRoute
+  DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
   DashboardCoursesIndexRoute: typeof DashboardCoursesIndexRoute
+  DashboardTrainingIndexRoute: typeof DashboardTrainingIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -861,11 +851,12 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
   DashboardTracksRoute: DashboardTracksRouteWithChildren,
-  DashboardTrainingRoute: DashboardTrainingRouteWithChildren,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesMindsmithRoute: DashboardCoursesMindsmithRoute,
+  DashboardTrainingIdRoute: DashboardTrainingIdRoute,
   DashboardCoursesIndexRoute: DashboardCoursesIndexRoute,
+  DashboardTrainingIndexRoute: DashboardTrainingIndexRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
@@ -892,3 +883,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

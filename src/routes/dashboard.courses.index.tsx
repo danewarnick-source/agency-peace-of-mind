@@ -19,10 +19,23 @@ function CourseLibrary() {
     queryFn: async () => {
       const { data } = await supabase
         .from("courses")
-        .select("id, title, description, category, cover_url, duration_minutes, is_global")
+        .select("id, title, description, category, cover_url, duration_minutes, is_global, mindsmith_url")
         .eq("is_published", true)
         .order("created_at", { ascending: false });
-      return data ?? [];
+      const rows = (data ?? []) as Array<Record<string, any>>;
+      // Temporary injected external lesson for testing Mindsmith integration
+      const injected: Record<string, any> = {
+        id: "mindsmith-health-safety",
+        title: "Core Health & Safety Protocols (Utah DHHS/DPSD)",
+        description:
+          "Compliance training covering 911, medical/mental health crises, seizure orientation, and choking protocols.",
+        category: "Compliance",
+        cover_url: null,
+        duration_minutes: 30,
+        is_global: true,
+        mindsmith_url: "https://app.mindsmith.ai/learn/cmpgdu05x000404l147zeo1pi",
+      };
+      return [injected, ...rows];
     },
   });
 

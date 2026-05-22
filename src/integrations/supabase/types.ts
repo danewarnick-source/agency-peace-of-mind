@@ -944,30 +944,27 @@ export type Database = {
       }
       training_modules: {
         Row: {
-          category: string | null
           created_at: string
           description: string | null
-          duration_minutes: number | null
           id: string
-          progress: number | null
+          mindsmith_url: string | null
+          sequence_order: number
           title: string
         }
         Insert: {
-          category?: string | null
           created_at?: string
           description?: string | null
-          duration_minutes?: number | null
           id?: string
-          progress?: number | null
+          mindsmith_url?: string | null
+          sequence_order: number
           title: string
         }
         Update: {
-          category?: string | null
           created_at?: string
           description?: string | null
-          duration_minutes?: number | null
           id?: string
-          progress?: number | null
+          mindsmith_url?: string | null
+          sequence_order?: number
           title?: string
         }
         Relationships: []
@@ -1073,6 +1070,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      user_training_progress: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          is_completed: boolean
+          module_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          module_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          module_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_training_progress_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "training_modules"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

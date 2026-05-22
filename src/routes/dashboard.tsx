@@ -30,11 +30,8 @@ type NavItem = {
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/super-admin", label: "Platform", icon: Building2, roles: ["super_admin"] },
-  { to: "/dashboard/training", label: "My Training", icon: GraduationCap, perm: "view_own_training" },
-  { to: "/dashboard/tracks", label: "Training Tracks", icon: RouteIcon, perm: "view_own_training" },
-  { to: "/dashboard/programs", label: "Programs", icon: Layers, perm: "view_own_training" },
-  { to: "/dashboard/programs-admin", label: "Manage Programs", icon: Layers, perm: "manage_programs" },
-  { to: "/dashboard/courses", label: "Course Library", icon: BookOpen, perm: "view_own_training" },
+  { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap, perm: "view_own_training" },
+  { to: "/dashboard/training", label: "Course Library", icon: BookOpen, perm: "view_own_training" },
   { to: "/dashboard/external-certifications", label: "External Certs", icon: FileCheck2, perm: "upload_external_certs" },
   { to: "/dashboard/certifications", label: "Certifications", icon: BadgeCheck, perm: "view_certifications" },
   { to: "/dashboard/employees", label: "Employees", icon: Users, perm: "manage_users" },

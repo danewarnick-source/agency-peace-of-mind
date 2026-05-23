@@ -23,11 +23,13 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?
 
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
   { to: "/dashboard/training", label: "Course Library", icon: BookOpen },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },

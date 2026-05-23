@@ -150,8 +150,9 @@ function TimesheetsPage() {
     let q = supabase
       .from("shifts")
       .select(SELECT)
-      .eq("organization_id", org!.organization_id)
       .order("clock_in_time", { ascending: false, nullsFirst: false });
+    // Note: no organization_id filter — RLS restricts to orgs the admin manages,
+    // so shifts logged under any of the admin's orgs are visible here.
     if (staffId !== "all") q = q.eq("user_id", staffId);
     if (clientId !== "all") q = q.eq("client_id", clientId);
     if (startDate) {

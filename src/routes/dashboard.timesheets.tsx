@@ -97,10 +97,16 @@ function TimesheetsPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
 
+  // Default range: first day of current month → last day of current month
+  const today = new Date();
+  const firstOfMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const lastOfMonth = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+
   const [staffId, setStaffId] = useState<string>("all");
   const [clientId, setClientId] = useState<string>("all");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>(firstOfMonth);
+  const [endDate, setEndDate] = useState<string>(lastOfMonth);
   const [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState<ShiftRow | null>(null);
 
@@ -145,13 +151,18 @@ function TimesheetsPage() {
       .from("shifts")
       .select(SELECT)
       .eq("organization_id", org!.organization_id)
-      .order("clock_in_time", { ascending: false });
+      .order("clock_in_time", { ascending: false, nullsFirst: false });
     if (staffId !== "all") q = q.eq("user_id", staffId);
     if (clientId !== "all") q = q.eq("client_id", clientId);
-    if (startDate) q = q.gte("clock_in_time", new Date(startDate).toISOString());
+    if (startDate) {
+      // Local midnight → avoids UTC/timezone drift dropping today's shifts
+      const [y, m, d] = startDate.split("-").map(Number);
+      const start = new Date(y, m - 1, d, 0, 0, 0, 0);
+      q = q.gte("clock_in_time", start.toISOString());
+    }
     if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      const [y, m, d] = endDate.split("-").map(Number);
+      const end = new Date(y, m - 1, d, 23, 59, 59, 999);
       q = q.lte("clock_in_time", end.toISOString());
     }
     const { data, error } = await q;
@@ -166,11 +177,11 @@ function TimesheetsPage() {
   });
 
   const pending = useMemo(
-    () => (shifts ?? []).filter((s) => s.status === "pending_approval"),
+    () => (shifts ?? []).filter((s) => s.status === "pending_approval" || s.status === "flagged_review"),
     [shifts]
   );
   const historical = useMemo(
-    () => (shifts ?? []).filter((s) => s.status !== "pending_approval" && s.status !== "active"),
+    () => (shifts ?? []).filter((s) => s.status === "approved"),
     [shifts]
   );
 
@@ -252,7 +263,7 @@ function TimesheetsPage() {
   };
 
   const clearFilters = () => {
-    setStaffId("all"); setClientId("all"); setStartDate(""); setEndDate("");
+    setStaffId("all"); setClientId("all"); setStartDate(firstOfMonth); setEndDate(lastOfMonth);
   };
 
   return (

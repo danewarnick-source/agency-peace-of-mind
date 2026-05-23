@@ -107,6 +107,30 @@ export type Database = {
           },
         ]
       }
+      clients: {
+        Row: {
+          created_at: string
+          first_name: string
+          id: string
+          last_name: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          first_name: string
+          id?: string
+          last_name: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          organization_id?: string
+        }
+        Relationships: []
+      }
       course_assignments: {
         Row: {
           assigned_by: string | null
@@ -837,6 +861,100 @@ export type Database = {
           },
         ]
       }
+      shift_notes: {
+        Row: {
+          created_at: string
+          goals_addressed: string[]
+          id: string
+          narrative_summary: string | null
+          shift_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          goals_addressed?: string[]
+          id?: string
+          narrative_summary?: string | null
+          shift_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          goals_addressed?: string[]
+          id?: string
+          narrative_summary?: string | null
+          shift_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_notes_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shifts: {
+        Row: {
+          client_id: string | null
+          clock_in_lat: number | null
+          clock_in_long: number | null
+          clock_in_time: string | null
+          clock_out_lat: number | null
+          clock_out_long: number | null
+          clock_out_time: string | null
+          created_at: string
+          device_fingerprint: string | null
+          id: string
+          organization_id: string
+          outside_geofence: boolean
+          status: Database["public"]["Enums"]["shift_status"]
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          clock_in_lat?: number | null
+          clock_in_long?: number | null
+          clock_in_time?: string | null
+          clock_out_lat?: number | null
+          clock_out_long?: number | null
+          clock_out_time?: string | null
+          created_at?: string
+          device_fingerprint?: string | null
+          id?: string
+          organization_id: string
+          outside_geofence?: boolean
+          status?: Database["public"]["Enums"]["shift_status"]
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          clock_in_lat?: number | null
+          clock_in_long?: number | null
+          clock_in_time?: string | null
+          clock_out_lat?: number | null
+          clock_out_long?: number | null
+          clock_out_time?: string | null
+          created_at?: string
+          device_fingerprint?: string | null
+          id?: string
+          organization_id?: string
+          outside_geofence?: boolean
+          status?: Database["public"]["Enums"]["shift_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_certifications: {
         Row: {
           certification: string
@@ -1133,6 +1251,7 @@ export type Database = {
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
       invitation_status: "pending" | "accepted" | "revoked"
+      shift_status: "pending" | "approved" | "rejected" | "flagged"
       track_type:
         | "onboarding_30"
         | "certification_90"
@@ -1271,6 +1390,7 @@ export const Constants = {
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
       invitation_status: ["pending", "accepted", "revoked"],
+      shift_status: ["pending", "approved", "rejected", "flagged"],
       track_type: [
         "onboarding_30",
         "certification_90",

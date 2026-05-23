@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -8,15 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, X, UserPlus, Contact2 } from "lucide-react";
+import { Plus, X, UserPlus, Contact2, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 
 export const Route = createFileRoute("/dashboard/clients")({
@@ -35,14 +35,25 @@ type Client = {
   phone_number: string | null;
   physical_address: string | null;
   pcsp_goals: string[];
-  job_code: string | null;
+  job_code: string[] | null;
   medicaid_id: string | null;
+};
+
+type ClientFormValues = {
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  physical_address: string;
+  pcsp_goals: string[];
+  job_code: string[];
+  medicaid_id: string;
 };
 
 function ClientsPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<Client | null>(null);
 
   const { data: clients, isLoading } = useQuery({
     enabled: !!org,
@@ -60,11 +71,7 @@ function ClientsPage() {
   });
 
   const addMutation = useMutation({
-    mutationFn: async (input: {
-      first_name: string; last_name: string; phone_number: string;
-      physical_address: string; pcsp_goals: string[]; job_code: string;
-      medicaid_id: string;
-    }) => {
+    mutationFn: async (input: ClientFormValues) => {
       const { error } = await supabase.from("clients").insert({
         organization_id: org!.organization_id,
         ...input,
@@ -77,7 +84,25 @@ function ClientsPage() {
     onSuccess: () => {
       toast.success("Client added");
       qc.invalidateQueries({ queryKey: ["clients"] });
-      setOpen(false);
+      setAddOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async (input: ClientFormValues & { id: string }) => {
+      const { id, ...rest } = input;
+      const { error } = await supabase
+        .from("clients")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update(rest as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Client updated");
+      qc.invalidateQueries({ queryKey: ["clients"] });
+      setEditing(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -88,14 +113,19 @@ function ClientsPage() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Client Directory</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage individuals served and their PCSP care goals.
+            Manage individuals served, authorized service codes, and PCSP goals.
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
             <Button size="sm"><UserPlus className="mr-2 h-4 w-4" /> Add new client</Button>
           </DialogTrigger>
-          <AddClientDialog onSubmit={(v) => addMutation.mutate(v)} pending={addMutation.isPending} />
+          <ClientFormDialog
+            title="Add a new client"
+            submitLabel="Save client"
+            pending={addMutation.isPending}
+            onSubmit={(v) => addMutation.mutate(v)}
+          />
         </Dialog>
       </div>
 
@@ -113,10 +143,11 @@ function ClientsPage() {
               <TableRow>
                 <TableHead>Full name</TableHead>
                 <TableHead>Medicaid ID</TableHead>
-                <TableHead>Job code</TableHead>
+                <TableHead>Authorized codes</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Address</TableHead>
                 <TableHead>Active goals</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -125,9 +156,13 @@ function ClientsPage() {
                   <TableCell className="font-medium">{c.first_name} {c.last_name}</TableCell>
                   <TableCell className="font-mono text-xs">{c.medicaid_id || <span className="text-muted-foreground">—</span>}</TableCell>
                   <TableCell>
-                    {c.job_code ? (
-                      <Badge variant="outline" className="font-mono" title={jobCodeLabel(c.job_code)}>{c.job_code}</Badge>
-                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                    <div className="flex flex-wrap gap-1">
+                      {(c.job_code ?? []).length ? (
+                        (c.job_code ?? []).map((code) => (
+                          <Badge key={code} variant="outline" className="font-mono" title={jobCodeLabel(code)}>{code}</Badge>
+                        ))
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{c.phone_number || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{c.physical_address || "—"}</TableCell>
@@ -140,35 +175,79 @@ function ClientsPage() {
                       ) : <span className="text-xs text-muted-foreground">No goals</span>}
                     </div>
                   </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(c)}>
+                      <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
       </div>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        {editing && (
+          <ClientFormDialog
+            title={`Edit ${editing.first_name} ${editing.last_name}`}
+            submitLabel="Save changes"
+            pending={editMutation.isPending}
+            initial={{
+              first_name: editing.first_name,
+              last_name: editing.last_name,
+              phone_number: editing.phone_number ?? "",
+              physical_address: editing.physical_address ?? "",
+              pcsp_goals: editing.pcsp_goals ?? [],
+              job_code: editing.job_code ?? [],
+              medicaid_id: editing.medicaid_id ?? "",
+            }}
+            onSubmit={(v) => editMutation.mutate({ ...v, id: editing.id })}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }
 
-function AddClientDialog({
-  onSubmit, pending,
+function ClientFormDialog({
+  title, submitLabel, pending, onSubmit, initial,
 }: {
-  onSubmit: (v: { first_name: string; last_name: string; phone_number: string; physical_address: string; pcsp_goals: string[]; job_code: string; medicaid_id: string }) => void;
+  title: string;
+  submitLabel: string;
   pending: boolean;
+  onSubmit: (v: ClientFormValues) => void;
+  initial?: ClientFormValues;
 }) {
-  const [first, setFirst] = useState("");
-  const [last, setLast] = useState("");
-  const [phone, setPhone] = useState("");
-  const [addr, setAddr] = useState("");
-  const [jobCode, setJobCode] = useState<string>("");
-  const [medicaidId, setMedicaidId] = useState("");
+  const [first, setFirst] = useState(initial?.first_name ?? "");
+  const [last, setLast] = useState(initial?.last_name ?? "");
+  const [phone, setPhone] = useState(initial?.phone_number ?? "");
+  const [addr, setAddr] = useState(initial?.physical_address ?? "");
+  const [jobCodes, setJobCodes] = useState<string[]>(initial?.job_code ?? []);
+  const [medicaidId, setMedicaidId] = useState(initial?.medicaid_id ?? "");
   const [goalInput, setGoalInput] = useState("");
-  const [goals, setGoals] = useState<string[]>([]);
+  const [goals, setGoals] = useState<string[]>(initial?.pcsp_goals ?? []);
+
+  // Reset state when initial changes (e.g. opening Edit for a different row)
+  useEffect(() => {
+    if (!initial) return;
+    setFirst(initial.first_name);
+    setLast(initial.last_name);
+    setPhone(initial.phone_number);
+    setAddr(initial.physical_address);
+    setJobCodes(initial.job_code);
+    setMedicaidId(initial.medicaid_id);
+    setGoals(initial.pcsp_goals);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canSubmit = useMemo(
-    () => Boolean(first.trim() && last.trim() && addr.trim() && jobCode && medicaidId.trim()),
-    [first, last, addr, jobCode, medicaidId]
+    () => Boolean(first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim()),
+    [first, last, addr, jobCodes, medicaidId]
   );
+
+  const toggleCode = (code: string) =>
+    setJobCodes((prev) => prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]);
 
   const addGoal = () => {
     const v = goalInput.trim();
@@ -179,8 +258,8 @@ function AddClientDialog({
   const removeGoal = (g: string) => setGoals(goals.filter((x) => x !== g));
 
   return (
-    <DialogContent>
-      <DialogHeader><DialogTitle>Add a new client</DialogTitle></DialogHeader>
+    <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -191,7 +270,7 @@ function AddClientDialog({
             phone_number: phone.trim(),
             physical_address: addr.trim(),
             pcsp_goals: goals,
-            job_code: jobCode,
+            job_code: jobCodes,
             medicaid_id: medicaidId.trim(),
           });
         }}
@@ -220,15 +299,20 @@ function AddClientDialog({
           <Input id="addr" value={addr} onChange={(e) => setAddr(e.target.value)} required maxLength={255} />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="job-code">DSPD Authorization Billing Job Code</Label>
-          <Select value={jobCode} onValueChange={setJobCode}>
-            <SelectTrigger id="job-code"><SelectValue placeholder="Select billing job code" /></SelectTrigger>
-            <SelectContent>
-              {JOB_CODES.map((j) => (
-                <SelectItem key={j.code} value={j.code}>{j.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>DSPD Authorization Billing Job Codes</Label>
+          <div className="grid grid-cols-1 gap-1.5 rounded-md border border-border p-3 sm:grid-cols-2">
+            {JOB_CODES.map((j) => (
+              <label key={j.code} className="flex cursor-pointer items-start gap-2 rounded p-1.5 text-sm hover:bg-accent">
+                <Checkbox
+                  checked={jobCodes.includes(j.code)}
+                  onCheckedChange={() => toggleCode(j.code)}
+                  className="mt-0.5"
+                />
+                <span><span className="font-mono font-medium">{j.code}</span> <span className="text-xs text-muted-foreground">— {j.label.split("— ")[1]}</span></span>
+              </label>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">Select all codes this individual is authorized for. Staff will pick one per shift at clock-in.</p>
         </div>
         <div className="grid gap-2">
           <Label>PCSP goals</Label>
@@ -257,7 +341,7 @@ function AddClientDialog({
         </div>
         <DialogFooter>
           <Button type="submit" disabled={!canSubmit || pending}>
-            {pending ? "Saving…" : "Save client"}
+            {pending ? "Saving…" : submitLabel}
           </Button>
         </DialogFooter>
       </form>

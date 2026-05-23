@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus } from "lucide-react";
+import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 import { RequirePermission } from "@/components/rbac-guard";
@@ -33,6 +33,16 @@ export const Route = createFileRoute("/dashboard/employees")({
 
 type Role = "admin" | "manager" | "employee";
 
+type EditableMember = {
+  membershipId: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  employeeId: string;
+  role: Role;
+  active: boolean;
+};
+
 function EmployeesPage() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
@@ -43,6 +53,7 @@ function EmployeesPage() {
   const [resetUser, setResetUser] = useState<{ id: string; name: string } | null>(null);
   const [tempPassword, setTempPassword] = useState(() => genPassword());
   const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
+  const [editingMember, setEditingMember] = useState<EditableMember | null>(null);
 
   const createManual = useServerFn(createEmployeeManually);
   const resetPwFn = useServerFn(adminResetEmployeePassword);
@@ -66,7 +77,7 @@ function EmployeesPage() {
         .eq("organization_id", org!.organization_id);
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
-        .select("id, full_name, email, username, must_change_password, department, hire_date")
+        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id")
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       const profMap = new Map((profs ?? []).map((p) => [p.id, p]));
       return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) }));
@@ -164,6 +175,32 @@ function EmployeesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const editMemberMutation = useMutation({
+    mutationFn: async (input: EditableMember) => {
+      const { error: pErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: input.fullName,
+          email: input.email || null,
+          employee_id: input.employeeId || null,
+        })
+        .eq("id", input.userId);
+      if (pErr) throw pErr;
+
+      const { error: mErr } = await supabase
+        .from("organization_members")
+        .update({ role: input.role, active: input.active })
+        .eq("id", input.membershipId);
+      if (mErr) throw mErr;
+    },
+    onSuccess: () => {
+      toast.success("Employee updated");
+      qc.invalidateQueries({ queryKey: ["members"] });
+      setEditingMember(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
@@ -244,6 +281,15 @@ function EmployeesPage() {
                   <td className="p-4 text-xs">{m.active ? <span className="text-emerald-600">Active</span> : <span className="text-muted-foreground">Deactivated</span>}</td>
                   <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
                   <td className="p-4 text-right whitespace-nowrap">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingMember({
+                      membershipId: m.id,
+                      userId: m.user_id,
+                      fullName: m.profile?.full_name ?? "",
+                      email: m.profile?.email ?? "",
+                      employeeId: m.profile?.employee_id ?? "",
+                      role: m.role as Role,
+                      active: m.active,
+                    })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setAssignOpen(m.user_id)}><BookOpen className="mr-1 h-3.5 w-3.5" /> Assign</Button>
                     <Button variant="ghost" size="sm" onClick={() => setResetUser({ id: m.user_id, name })}><KeyRound className="mr-1 h-3.5 w-3.5" /> Reset</Button>
                     {m.user_id !== user?.id && (
@@ -401,6 +447,66 @@ function EmployeesPage() {
             </div>
           )}
           <DialogFooter><Button onClick={() => setCredentialsShown(null)}>Done</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit employee */}
+      <Dialog open={!!editingMember} onOpenChange={(o) => !o && setEditingMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit employee</DialogTitle>
+            <DialogDescription>Update profile, role, and employment status. Changes save immediately.</DialogDescription>
+          </DialogHeader>
+          {editingMember && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                editMemberMutation.mutate({
+                  membershipId: editingMember.membershipId,
+                  userId: editingMember.userId,
+                  fullName: String(fd.get("full_name") || "").trim(),
+                  email: String(fd.get("email") || "").trim(),
+                  employeeId: String(fd.get("employee_id") || "").trim(),
+                  role: String(fd.get("role") || "employee") as Role,
+                  active: String(fd.get("active") || "true") === "true",
+                });
+              }}
+              className="grid gap-4"
+            >
+              <div className="grid gap-2"><Label htmlFor="full_name">Full name</Label><Input id="full_name" name="full_name" defaultValue={editingMember.fullName} required /></div>
+              <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={editingMember.email} /></div>
+              <div className="grid gap-2"><Label htmlFor="employee_id">Employee ID</Label><Input id="employee_id" name="employee_id" defaultValue={editingMember.employeeId} placeholder="e.g. EMP-1042" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-role">System role</Label>
+                  <Select name="role" defaultValue={editingMember.role}>
+                    <SelectTrigger id="edit-role"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="employee">Staff</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-active">Employment status</Label>
+                  <Select name="active" defaultValue={editingMember.active ? "true" : "false"}>
+                    <SelectTrigger id="edit-active"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Active</SelectItem>
+                      <SelectItem value="false">Deactivated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={editMemberMutation.isPending}>
+                  {editMemberMutation.isPending ? "Saving…" : "Save changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

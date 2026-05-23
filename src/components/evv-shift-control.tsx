@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Clock, MapPin, Play, Square, ShieldAlert, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { jobCodeLabel } from "@/lib/job-codes";
 
 type Client = {
   id: string;
@@ -19,6 +20,7 @@ type Client = {
   home_latitude: number | null;
   home_longitude: number | null;
   pcsp_goals: string[];
+  job_code: string[] | null;
 };
 
 type ActiveShift = {
@@ -79,6 +81,7 @@ export function EvvShiftControl() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [selectedJobCode, setSelectedJobCode] = useState<string>("");
   const [active, setActive] = useState<ActiveShift | null>(null);
   const [clockingIn, setClockingIn] = useState(false);
   const [showDocLock, setShowDocLock] = useState(false);
@@ -92,11 +95,12 @@ export function EvvShiftControl() {
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code" as any)
         .eq("organization_id", org!.organization_id)
         .order("last_name");
       if (error) throw error;
-      return (data ?? []) as Client[];
+      return (data ?? []) as unknown as Client[];
     },
   });
 
@@ -133,6 +137,20 @@ export function EvvShiftControl() {
     [clients, selectedClientId]
   );
 
+  const authorizedCodes = useMemo(
+    () => (selectedClient?.job_code ?? []).filter(Boolean),
+    [selectedClient]
+  );
+
+  // Auto-select when only one code exists; reset when client changes.
+  useEffect(() => {
+    if (authorizedCodes.length === 1) setSelectedJobCode(authorizedCodes[0]);
+    else setSelectedJobCode("");
+  }, [selectedClientId, authorizedCodes]);
+
+  const needsCodeChoice = authorizedCodes.length > 1;
+  const codeReady = authorizedCodes.length === 0 || Boolean(selectedJobCode);
+
   const elapsed = active ? now - new Date(active.clock_in_time).getTime() : 0;
 
   const insertShift = async (opts: {
@@ -153,6 +171,7 @@ export function EvvShiftControl() {
         device_fingerprint: deviceFingerprint(),
         outside_geofence: opts.outsideGeofence,
         clock_in_bypass_reason: opts.bypassReason,
+        job_code: selectedJobCode || null,
         status: "active",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any)
@@ -164,6 +183,7 @@ export function EvvShiftControl() {
 
   const handleClockIn = async () => {
     if (!selectedClientId) return toast.error("Select a client first");
+    if (needsCodeChoice && !selectedJobCode) return toast.error("Select the service type for this shift");
     if (!org || !user || !selectedClient) return;
     setClockingIn(true);
     try {
@@ -221,6 +241,7 @@ export function EvvShiftControl() {
   const onCompleteShift = () => {
     setActive(null);
     setSelectedClientId("");
+    setSelectedJobCode("");
     setShowDocLock(false);
   };
 
@@ -258,8 +279,31 @@ export function EvvShiftControl() {
           </Select>
         </div>
 
+        {selectedClientId && needsCodeChoice && !active && (
+          <div className="grid gap-2">
+            <Label>Select Service Type for This Shift</Label>
+            <Select value={selectedJobCode} onValueChange={setSelectedJobCode}>
+              <SelectTrigger><SelectValue placeholder="Choose the billing code you are working" /></SelectTrigger>
+              <SelectContent>
+                {authorizedCodes.map((code) => (
+                  <SelectItem key={code} value={code}>{jobCodeLabel(code)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              This client is authorized for multiple services. Pick the one you are providing right now — it will be locked to this shift's billing record.
+            </p>
+          </div>
+        )}
+
+        {selectedClientId && authorizedCodes.length === 1 && !active && (
+          <p className="text-[11px] text-muted-foreground">
+            Service code: <span className="font-mono font-medium text-foreground">{authorizedCodes[0]}</span> — {jobCodeLabel(authorizedCodes[0])}
+          </p>
+        )}
+
         {!active ? (
-          <Button onClick={handleClockIn} disabled={!selectedClientId || clockingIn} size="lg">
+          <Button onClick={handleClockIn} disabled={!selectedClientId || !codeReady || clockingIn} size="lg">
             {clockingIn ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Capturing location…</> : <><Play className="mr-2 h-4 w-4" /> Clock In</>}
           </Button>
         ) : (

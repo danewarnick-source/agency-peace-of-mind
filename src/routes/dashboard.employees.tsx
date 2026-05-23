@@ -281,6 +281,15 @@ function EmployeesPage() {
                   <td className="p-4 text-xs">{m.active ? <span className="text-emerald-600">Active</span> : <span className="text-muted-foreground">Deactivated</span>}</td>
                   <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
                   <td className="p-4 text-right whitespace-nowrap">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingMember({
+                      membershipId: m.id,
+                      userId: m.user_id,
+                      fullName: m.profile?.full_name ?? "",
+                      email: m.profile?.email ?? "",
+                      employeeId: m.profile?.employee_id ?? "",
+                      role: m.role as Role,
+                      active: m.active,
+                    })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setAssignOpen(m.user_id)}><BookOpen className="mr-1 h-3.5 w-3.5" /> Assign</Button>
                     <Button variant="ghost" size="sm" onClick={() => setResetUser({ id: m.user_id, name })}><KeyRound className="mr-1 h-3.5 w-3.5" /> Reset</Button>
                     {m.user_id !== user?.id && (

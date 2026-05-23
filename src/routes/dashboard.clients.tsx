@@ -35,6 +35,7 @@ type Client = {
   phone_number: string | null;
   physical_address: string | null;
   pcsp_goals: string[];
+  job_code: string | null;
 };
 
 function ClientsPage() {

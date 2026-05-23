@@ -15,9 +15,51 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, X, UserPlus, Contact2, Pencil } from "lucide-react";
+import { Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
+
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+    const res = await fetch(url, {
+      headers: { "Accept": "application/json", "User-Agent": "CareAcademyEVV/1.0 (compliance@careacademy.app)" },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as Array<{ lat: string; lon: string }>;
+    if (!Array.isArray(json) || !json.length) return null;
+    const lat = parseFloat(json[0].lat);
+    const lng = parseFloat(json[0].lon);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
+function getBrowserPosition(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (!("geolocation" in navigator)) return reject(new Error("Geolocation not supported"));
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      (e) => reject(e),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  });
+}
+
+async function resolveCoords(addr: string): Promise<{ lat: number | null; lng: number | null }> {
+  if (addr && addr.trim().toLowerCase() !== "testing headquarters") {
+    const geo = await geocodeAddress(addr);
+    if (geo) return { lat: geo.lat, lng: geo.lng };
+  }
+  try {
+    const pos = await getBrowserPosition();
+    return { lat: pos.lat, lng: pos.lng };
+  } catch {
+    return { lat: null, lng: null };
+  }
+}
 
 export const Route = createFileRoute("/dashboard/clients")({
   head: () => ({ meta: [{ title: "Clients — Care Academy" }] }),
@@ -70,13 +112,15 @@ function ClientsPage() {
     },
   });
 
+
   const addMutation = useMutation({
     mutationFn: async (input: ClientFormValues) => {
+      const coords = await resolveCoords(input.physical_address);
       const { error } = await supabase.from("clients").insert({
         organization_id: org!.organization_id,
         ...input,
-        home_latitude: 40.3524,
-        home_longitude: -111.9051,
+        home_latitude: coords.lat,
+        home_longitude: coords.lng,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
       if (error) throw error;
@@ -92,10 +136,11 @@ function ClientsPage() {
   const editMutation = useMutation({
     mutationFn: async (input: ClientFormValues & { id: string }) => {
       const { id, ...rest } = input;
+      const coords = await resolveCoords(rest.physical_address);
       const { error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update(rest as any)
+        .update({ ...rest, home_latitude: coords.lat, home_longitude: coords.lng } as any)
         .eq("id", id);
       if (error) throw error;
     },
@@ -226,6 +271,7 @@ function ClientFormDialog({
   const [jobCodes, setJobCodes] = useState<string[]>(initial?.job_code ?? []);
   const [medicaidId, setMedicaidId] = useState(initial?.medicaid_id ?? "");
   const [goalInput, setGoalInput] = useState("");
+  const [pinning, setPinning] = useState(false);
   const [goals, setGoals] = useState<string[]>(initial?.pcsp_goals ?? []);
 
   // Reset state when initial changes (e.g. opening Edit for a different row)
@@ -295,8 +341,32 @@ function ClientFormDialog({
           <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="addr">Street address</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="addr">Street address</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pinning}
+              onClick={async () => {
+                setPinning(true);
+                try {
+                  const pos = await getBrowserPosition();
+                  setAddr("Testing Headquarters");
+                  toast.success(`Pinned to current location (${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)})`);
+                } catch {
+                  toast.error("Could not get current location — check browser permissions");
+                } finally {
+                  setPinning(false);
+                }
+              }}
+            >
+              {pinning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <MapPin className="mr-1.5 h-3.5 w-3.5" />}
+              Pin to My Current Location
+            </Button>
+          </div>
           <Input id="addr" value={addr} onChange={(e) => setAddr(e.target.value)} required maxLength={255} />
+          <p className="text-[11px] text-muted-foreground">Address is auto-geocoded via OpenStreetMap on save. Use Pin for desk testing.</p>
         </div>
         <div className="grid gap-2">
           <Label>DSPD Authorization Billing Job Codes</Label>

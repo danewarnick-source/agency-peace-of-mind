@@ -60,7 +60,7 @@ function ClientsPage() {
   const addMutation = useMutation({
     mutationFn: async (input: {
       first_name: string; last_name: string; phone_number: string;
-      physical_address: string; pcsp_goals: string[];
+      physical_address: string; pcsp_goals: string[]; job_code: string;
     }) => {
       const { error } = await supabase.from("clients").insert({
         organization_id: org!.organization_id,

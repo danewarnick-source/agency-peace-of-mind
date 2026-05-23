@@ -175,6 +175,32 @@ function EmployeesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const editMemberMutation = useMutation({
+    mutationFn: async (input: EditableMember) => {
+      const { error: pErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: input.fullName,
+          email: input.email || null,
+          employee_id: input.employeeId || null,
+        })
+        .eq("id", input.userId);
+      if (pErr) throw pErr;
+
+      const { error: mErr } = await supabase
+        .from("organization_members")
+        .update({ role: input.role, active: input.active })
+        .eq("id", input.membershipId);
+      if (mErr) throw mErr;
+    },
+    onSuccess: () => {
+      toast.success("Employee updated");
+      qc.invalidateQueries({ queryKey: ["members"] });
+      setEditingMember(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">

@@ -151,13 +151,18 @@ function TimesheetsPage() {
       .from("shifts")
       .select(SELECT)
       .eq("organization_id", org!.organization_id)
-      .order("clock_in_time", { ascending: false });
+      .order("clock_in_time", { ascending: false, nullsFirst: false });
     if (staffId !== "all") q = q.eq("user_id", staffId);
     if (clientId !== "all") q = q.eq("client_id", clientId);
-    if (startDate) q = q.gte("clock_in_time", new Date(startDate).toISOString());
+    if (startDate) {
+      // Local midnight → avoids UTC/timezone drift dropping today's shifts
+      const [y, m, d] = startDate.split("-").map(Number);
+      const start = new Date(y, m - 1, d, 0, 0, 0, 0);
+      q = q.gte("clock_in_time", start.toISOString());
+    }
     if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      const [y, m, d] = endDate.split("-").map(Number);
+      const end = new Date(y, m - 1, d, 23, 59, 59, 999);
       q = q.lte("clock_in_time", end.toISOString());
     }
     const { data, error } = await q;

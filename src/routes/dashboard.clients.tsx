@@ -147,17 +147,21 @@ function ClientsPage() {
 function AddClientDialog({
   onSubmit, pending,
 }: {
-  onSubmit: (v: { first_name: string; last_name: string; phone_number: string; physical_address: string; pcsp_goals: string[] }) => void;
+  onSubmit: (v: { first_name: string; last_name: string; phone_number: string; physical_address: string; pcsp_goals: string[]; job_code: string }) => void;
   pending: boolean;
 }) {
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
   const [phone, setPhone] = useState("");
   const [addr, setAddr] = useState("");
+  const [jobCode, setJobCode] = useState<string>("");
   const [goalInput, setGoalInput] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
 
-  const canSubmit = useMemo(() => first.trim() && last.trim() && addr.trim(), [first, last, addr]);
+  const canSubmit = useMemo(
+    () => Boolean(first.trim() && last.trim() && addr.trim() && jobCode),
+    [first, last, addr, jobCode]
+  );
 
   const addGoal = () => {
     const v = goalInput.trim();

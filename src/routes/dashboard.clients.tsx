@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/table";
 import { Plus, X, UserPlus, Contact2 } from "lucide-react";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 
 export const Route = createFileRoute("/dashboard/clients")({
   head: () => ({ meta: [{ title: "Clients — Care Academy" }] }),

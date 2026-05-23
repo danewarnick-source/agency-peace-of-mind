@@ -14,6 +14,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Award, AlertTriangle, TrendingUp, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { EvvShiftControl } from "@/components/evv-shift-control";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 
@@ -213,6 +214,8 @@ function Overview() {
           </div>
         </div>
       ) : (
+        <div className="space-y-6">
+          <EvvShiftControl />
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <h2 className="text-base font-semibold">My active training</h2>
           {!myAssigns?.length ? (
@@ -236,6 +239,7 @@ function Overview() {
               ))}
             </ul>
           )}
+        </div>
         </div>
       )}
     </div>

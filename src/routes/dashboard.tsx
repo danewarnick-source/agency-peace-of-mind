@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, BookOpen, Settings,
-  LogOut, Users, Building2,
+  LogOut, Users, Building2, Contact2, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +30,8 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/training", label: "Course Library", icon: BookOpen },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
+  { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
+  { to: "/dashboard/evv-compliance", label: "EVV Compliance", icon: ShieldCheck },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

@@ -111,23 +111,38 @@ export type Database = {
         Row: {
           created_at: string
           first_name: string
+          home_latitude: number | null
+          home_longitude: number | null
           id: string
           last_name: string
           organization_id: string
+          pcsp_goals: string[]
+          phone_number: string | null
+          physical_address: string | null
         }
         Insert: {
           created_at?: string
           first_name: string
+          home_latitude?: number | null
+          home_longitude?: number | null
           id?: string
           last_name: string
           organization_id: string
+          pcsp_goals?: string[]
+          phone_number?: string | null
+          physical_address?: string | null
         }
         Update: {
           created_at?: string
           first_name?: string
+          home_latitude?: number | null
+          home_longitude?: number | null
           id?: string
           last_name?: string
           organization_id?: string
+          pcsp_goals?: string[]
+          phone_number?: string | null
+          physical_address?: string | null
         }
         Relationships: []
       }
@@ -890,7 +905,7 @@ export type Database = {
           {
             foreignKeyName: "shift_notes_shift_id_fkey"
             columns: ["shift_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
@@ -1251,7 +1266,12 @@ export type Database = {
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
       invitation_status: "pending" | "accepted" | "revoked"
-      shift_status: "pending" | "approved" | "rejected" | "flagged"
+      shift_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "flagged"
+        | "pending_approval"
       track_type:
         | "onboarding_30"
         | "certification_90"
@@ -1390,7 +1410,13 @@ export const Constants = {
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
       invitation_status: ["pending", "accepted", "revoked"],
-      shift_status: ["pending", "approved", "rejected", "flagged"],
+      shift_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "flagged",
+        "pending_approval",
+      ],
       track_type: [
         "onboarding_30",
         "certification_90",

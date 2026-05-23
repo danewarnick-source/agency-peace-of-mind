@@ -114,6 +114,7 @@ export type Database = {
           home_latitude: number | null
           home_longitude: number | null
           id: string
+          job_code: string | null
           last_name: string
           organization_id: string
           pcsp_goals: string[]
@@ -126,6 +127,7 @@ export type Database = {
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
+          job_code?: string | null
           last_name: string
           organization_id: string
           pcsp_goals?: string[]
@@ -138,6 +140,7 @@ export type Database = {
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
+          job_code?: string | null
           last_name?: string
           organization_id?: string
           pcsp_goals?: string[]
@@ -922,6 +925,7 @@ export type Database = {
           clock_out_time: string | null
           created_at: string
           device_fingerprint: string | null
+          geofence_bypass_reason: string | null
           id: string
           organization_id: string
           outside_geofence: boolean
@@ -938,6 +942,7 @@ export type Database = {
           clock_out_time?: string | null
           created_at?: string
           device_fingerprint?: string | null
+          geofence_bypass_reason?: string | null
           id?: string
           organization_id: string
           outside_geofence?: boolean
@@ -954,6 +959,7 @@ export type Database = {
           clock_out_time?: string | null
           created_at?: string
           device_fingerprint?: string | null
+          geofence_bypass_reason?: string | null
           id?: string
           organization_id?: string
           outside_geofence?: boolean
@@ -1272,6 +1278,7 @@ export type Database = {
         | "rejected"
         | "flagged"
         | "pending_approval"
+        | "active"
       track_type:
         | "onboarding_30"
         | "certification_90"
@@ -1416,6 +1423,7 @@ export const Constants = {
         "rejected",
         "flagged",
         "pending_approval",
+        "active",
       ],
       track_type: [
         "onboarding_30",

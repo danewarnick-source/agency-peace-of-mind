@@ -136,6 +136,20 @@ export function EvvShiftControl() {
     [clients, selectedClientId]
   );
 
+  const authorizedCodes = useMemo(
+    () => (selectedClient?.job_code ?? []).filter(Boolean),
+    [selectedClient]
+  );
+
+  // Auto-select when only one code exists; reset when client changes.
+  useEffect(() => {
+    if (authorizedCodes.length === 1) setSelectedJobCode(authorizedCodes[0]);
+    else setSelectedJobCode("");
+  }, [selectedClientId, authorizedCodes]);
+
+  const needsCodeChoice = authorizedCodes.length > 1;
+  const codeReady = authorizedCodes.length === 0 || Boolean(selectedJobCode);
+
   const elapsed = active ? now - new Date(active.clock_in_time).getTime() : 0;
 
   const insertShift = async (opts: {
@@ -156,6 +170,7 @@ export function EvvShiftControl() {
         device_fingerprint: deviceFingerprint(),
         outside_geofence: opts.outsideGeofence,
         clock_in_bypass_reason: opts.bypassReason,
+        job_code: selectedJobCode || null,
         status: "active",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any)
@@ -167,6 +182,7 @@ export function EvvShiftControl() {
 
   const handleClockIn = async () => {
     if (!selectedClientId) return toast.error("Select a client first");
+    if (needsCodeChoice && !selectedJobCode) return toast.error("Select the service type for this shift");
     if (!org || !user || !selectedClient) return;
     setClockingIn(true);
     try {

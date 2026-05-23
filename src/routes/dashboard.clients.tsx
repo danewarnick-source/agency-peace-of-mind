@@ -184,6 +184,7 @@ function AddClientDialog({
             phone_number: phone.trim(),
             physical_address: addr.trim(),
             pcsp_goals: goals,
+            job_code: jobCode,
           });
         }}
         className="grid gap-4"

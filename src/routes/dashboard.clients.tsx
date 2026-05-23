@@ -36,6 +36,7 @@ type Client = {
   physical_address: string | null;
   pcsp_goals: string[];
   job_code: string | null;
+  medicaid_id: string | null;
 };
 
 function ClientsPage() {
@@ -49,11 +50,12 @@ function ClientsPage() {
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, medicaid_id" as any)
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Client[];
+      return (data ?? []) as unknown as Client[];
     },
   });
 
@@ -61,13 +63,15 @@ function ClientsPage() {
     mutationFn: async (input: {
       first_name: string; last_name: string; phone_number: string;
       physical_address: string; pcsp_goals: string[]; job_code: string;
+      medicaid_id: string;
     }) => {
       const { error } = await supabase.from("clients").insert({
         organization_id: org!.organization_id,
         ...input,
         home_latitude: 40.3524,
         home_longitude: -111.9051,
-      });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {

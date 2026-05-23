@@ -152,9 +152,10 @@ export function EvvShiftControl() {
         clock_in_long: opts.lng,
         device_fingerprint: deviceFingerprint(),
         outside_geofence: opts.outsideGeofence,
-        geofence_bypass_reason: opts.bypassReason,
+        clock_in_bypass_reason: opts.bypassReason,
         status: "active",
-      })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)
       .select("id, client_id, clock_in_time")
       .single();
     if (error) throw error;

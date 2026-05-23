@@ -271,6 +271,7 @@ function ClientFormDialog({
   const [jobCodes, setJobCodes] = useState<string[]>(initial?.job_code ?? []);
   const [medicaidId, setMedicaidId] = useState(initial?.medicaid_id ?? "");
   const [goalInput, setGoalInput] = useState("");
+  const [pinning, setPinning] = useState(false);
   const [goals, setGoals] = useState<string[]>(initial?.pcsp_goals ?? []);
 
   // Reset state when initial changes (e.g. opening Edit for a different row)

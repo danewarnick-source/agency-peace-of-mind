@@ -49,7 +49,7 @@ function ClientsPage() {
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals")
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code")
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;

@@ -340,8 +340,32 @@ function ClientFormDialog({
           <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="addr">Street address</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="addr">Street address</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pinning}
+              onClick={async () => {
+                setPinning(true);
+                try {
+                  const pos = await getBrowserPosition();
+                  setAddr("Testing Headquarters");
+                  toast.success(`Pinned to current location (${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)})`);
+                } catch {
+                  toast.error("Could not get current location — check browser permissions");
+                } finally {
+                  setPinning(false);
+                }
+              }}
+            >
+              {pinning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <MapPin className="mr-1.5 h-3.5 w-3.5" />}
+              Pin to My Current Location
+            </Button>
+          </div>
           <Input id="addr" value={addr} onChange={(e) => setAddr(e.target.value)} required maxLength={255} />
+          <p className="text-[11px] text-muted-foreground">Address is auto-geocoded via OpenStreetMap on save. Use Pin for desk testing.</p>
         </div>
         <div className="grid gap-2">
           <Label>DSPD Authorization Billing Job Codes</Label>

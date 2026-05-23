@@ -213,7 +213,7 @@ function Overview() {
         </div>
       )}
 
-      {showAdmin && <LiveMonitor shifts={liveShifts ?? []} />}
+      {showAdmin && <LiveMonitor shifts={(liveShifts ?? []) as unknown as LiveShift[]} />}
 
       {showAdmin ? (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">

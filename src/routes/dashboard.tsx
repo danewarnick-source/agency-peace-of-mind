@@ -32,6 +32,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/evv-compliance", label: "EVV Compliance", icon: ShieldCheck },
+  { to: "/dashboard/timesheets", label: "Timesheets", icon: ClipboardList },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

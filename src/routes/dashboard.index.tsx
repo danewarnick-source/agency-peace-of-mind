@@ -82,6 +82,34 @@ function Overview() {
     },
   });
 
+  // Live active-shift monitor (admin view)
+  const { data: liveShifts } = useQuery({
+    enabled: !!org && showAdmin,
+    queryKey: ["live-shifts", org?.organization_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("shifts")
+        .select(`id, user_id, clock_in_time, outside_geofence,
+          profiles:user_id(full_name, email),
+          clients:client_id(first_name, last_name, job_code)`)
+        .eq("organization_id", org!.organization_id)
+        .eq("status", "active")
+        .is("clock_out_time", null)
+        .order("clock_in_time", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 30_000,
+  });
+
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!showAdmin) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, [showAdmin]);
+  void tick;
+
   const { data: myAssigns } = useQuery({
     enabled: !!user && !showAdmin,
     queryKey: ["my-assigns", user?.id],

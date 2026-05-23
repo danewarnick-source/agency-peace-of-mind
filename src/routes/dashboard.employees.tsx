@@ -33,6 +33,16 @@ export const Route = createFileRoute("/dashboard/employees")({
 
 type Role = "admin" | "manager" | "employee";
 
+type EditableMember = {
+  membershipId: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  employeeId: string;
+  role: Role;
+  active: boolean;
+};
+
 function EmployeesPage() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();

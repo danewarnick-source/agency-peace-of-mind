@@ -97,10 +97,16 @@ function TimesheetsPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
 
+  // Default range: first day of current month → last day of current month
+  const today = new Date();
+  const firstOfMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const lastOfMonth = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+
   const [staffId, setStaffId] = useState<string>("all");
   const [clientId, setClientId] = useState<string>("all");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>(firstOfMonth);
+  const [endDate, setEndDate] = useState<string>(lastOfMonth);
   const [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState<ShiftRow | null>(null);
 

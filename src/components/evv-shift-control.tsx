@@ -99,7 +99,7 @@ export function EvvShiftControl() {
         .eq("organization_id", org!.organization_id)
         .order("last_name");
       if (error) throw error;
-      return (data ?? []) as Client[];
+      return (data ?? []) as unknown as Client[];
     },
   });
 

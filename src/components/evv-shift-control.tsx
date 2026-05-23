@@ -89,20 +89,7 @@ export function EvvShiftControl() {
   const [now, setNow] = useState(() => Date.now());
   const timerRef = useRef<number | null>(null);
 
-  const { data: clients } = useQuery({
-    enabled: !!org,
-    queryKey: ["evv-clients", org?.organization_id],
-    queryFn: async (): Promise<Client[]> => {
-      const { data, error } = await supabase
-        .from("clients")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code" as any)
-        .eq("organization_id", org!.organization_id)
-        .order("last_name");
-      if (error) throw error;
-      return (data ?? []) as unknown as Client[];
-    },
-  });
+  const { data: clients } = useCaseload();
 
   useEffect(() => {
     if (!user) return;

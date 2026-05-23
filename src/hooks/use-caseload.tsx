@@ -46,7 +46,7 @@ export function useCaseload() {
         .select("client_id")
         .eq("staff_id", user!.id);
       if (error) throw error;
-      const ids = ((rows ?? []) as { client_id: string }[]).map((r) => r.client_id);
+      const ids = ((rows ?? []) as unknown as { client_id: string }[]).map((r) => r.client_id);
       if (!ids.length) return [];
       const { data, error: e2 } = await supabase
         .from("clients")

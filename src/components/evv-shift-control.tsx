@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Clock, MapPin, Play, Square, ShieldAlert, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { jobCodeLabel } from "@/lib/job-codes";
 
 type Client = {
   id: string;

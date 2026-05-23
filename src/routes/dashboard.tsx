@@ -9,7 +9,7 @@ import { ROLE_LABEL, type Permission, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, BadgeCheck, FileBarChart, CreditCard,
   Users, BookOpen, Settings, LogOut, UserCog, Building2, Mail,
-  Layers, FileCheck2, Route as RouteIcon,
+  Layers, FileCheck2, Route as RouteIcon, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,6 +40,7 @@ const NAV: NavItem[] = [
   { to: "/dashboard/permissions", label: "Permissions", icon: UserCog, perm: "manage_roles" },
   { to: "/dashboard/team", label: "My Team", icon: UserCog, roles: ["admin", "manager", "super_admin"] },
   { to: "/dashboard/reports", label: "Reports", icon: FileBarChart, perm: "export_reports" },
+  { to: "/dashboard/evv-compliance", label: "EVV Compliance", icon: ShieldCheck, perm: "export_reports" },
   { to: "/dashboard/billing", label: "Billing", icon: CreditCard, perm: "view_billing" },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

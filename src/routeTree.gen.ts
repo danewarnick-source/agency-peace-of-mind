@@ -35,6 +35,7 @@ import { Route as DashboardProgramsRouteImport } from './routes/dashboard.progra
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
+import { Route as DashboardEvvComplianceRouteImport } from './routes/dashboard.evv-compliance'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
@@ -179,6 +180,11 @@ const DashboardExternalCertificationsRoute =
     path: '/external-certifications',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardEvvComplianceRoute = DashboardEvvComplianceRouteImport.update({
+  id: '/evv-compliance',
+  path: '/evv-compliance',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardEmployeesRoute = DashboardEmployeesRouteImport.update({
   id: '/employees',
   path: '/employees',
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
@@ -302,6 +309,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
@@ -343,6 +351,7 @@ export interface FileRoutesById {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
@@ -385,6 +394,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/employees'
+    | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
     | '/dashboard/permissions'
@@ -424,6 +434,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/employees'
+    | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
     | '/dashboard/permissions'
@@ -464,6 +475,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/employees'
+    | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
     | '/dashboard/permissions'
@@ -689,6 +701,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardExternalCertificationsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/evv-compliance': {
+      id: '/dashboard/evv-compliance'
+      path: '/evv-compliance'
+      fullPath: '/dashboard/evv-compliance'
+      preLoaderRoute: typeof DashboardEvvComplianceRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/employees': {
       id: '/dashboard/employees'
       path: '/employees'
@@ -817,6 +836,7 @@ interface DashboardRouteChildren {
   DashboardBillingRoute: typeof DashboardBillingRoute
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
+  DashboardEvvComplianceRoute: typeof DashboardEvvComplianceRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
@@ -840,6 +860,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBillingRoute: DashboardBillingRoute,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
+  DashboardEvvComplianceRoute: DashboardEvvComplianceRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardPermissionsRoute: DashboardPermissionsRoute,

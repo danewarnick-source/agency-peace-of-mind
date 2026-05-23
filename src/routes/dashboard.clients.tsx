@@ -108,6 +108,7 @@ function ClientsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Full name</TableHead>
+                <TableHead>Job code</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Address</TableHead>
                 <TableHead>Active goals</TableHead>
@@ -117,6 +118,11 @@ function ClientsPage() {
               {clients.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.first_name} {c.last_name}</TableCell>
+                  <TableCell>
+                    {c.job_code ? (
+                      <Badge variant="outline" className="font-mono" title={jobCodeLabel(c.job_code)}>{c.job_code}</Badge>
+                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{c.phone_number || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{c.physical_address || "—"}</TableCell>
                   <TableCell>

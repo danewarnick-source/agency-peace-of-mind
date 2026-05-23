@@ -177,11 +177,11 @@ function TimesheetsPage() {
   });
 
   const pending = useMemo(
-    () => (shifts ?? []).filter((s) => s.status === "pending_approval"),
+    () => (shifts ?? []).filter((s) => s.status === "pending_approval" || s.status === "flagged_review"),
     [shifts]
   );
   const historical = useMemo(
-    () => (shifts ?? []).filter((s) => s.status !== "pending_approval" && s.status !== "active"),
+    () => (shifts ?? []).filter((s) => s.status === "approved"),
     [shifts]
   );
 

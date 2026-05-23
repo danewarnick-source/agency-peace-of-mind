@@ -109,16 +109,19 @@ function TimesheetsPage() {
     enabled: !!org,
     queryKey: ["ts-staff", org?.organization_id],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data: mems } = await supabase
         .from("organization_members")
-        .select("user_id, profiles:user_id(full_name, email)")
+        .select("user_id")
         .eq("organization_id", org!.organization_id)
         .eq("active", true);
-      return (data ?? []).map((m) => ({
-        id: m.user_id,
-        name: (m.profiles as { full_name: string | null; email: string | null } | null)?.full_name
-          || (m.profiles as { email: string | null } | null)?.email || "—",
-      }));
+      const ids = (mems ?? []).map((m) => m.user_id);
+      if (!ids.length) return [] as { id: string; name: string }[];
+      const { data: profs } = await supabase
+        .from("profiles").select("id, full_name, email").in("id", ids);
+      return (profs ?? []).map((p) => ({
+        id: p.id,
+        name: p.full_name || p.email || "—",
+      })).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
 

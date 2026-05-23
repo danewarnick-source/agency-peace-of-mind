@@ -14,6 +14,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Award, AlertTriangle, TrendingUp, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { EvvShiftControl } from "@/components/evv-shift-control";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 

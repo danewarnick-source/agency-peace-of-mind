@@ -24,6 +24,7 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
+  { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
 ];
 

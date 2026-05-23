@@ -39,6 +39,7 @@ import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.inv
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
 import { Route as DashboardEvvComplianceRouteImport } from './routes/dashboard.evv-compliance'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
+import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
@@ -203,6 +204,11 @@ const DashboardEmployeesRoute = DashboardEmployeesRouteImport.update({
   path: '/employees',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardDailyLogsRoute = DashboardDailyLogsRouteImport.update({
+  id: '/daily-logs',
+  path: '/daily-logs',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardClientsRoute = DashboardClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
@@ -287,6 +293,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
@@ -330,6 +337,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
@@ -375,6 +383,7 @@ export interface FileRoutesById {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
@@ -421,6 +430,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
+    | '/dashboard/daily-logs'
     | '/dashboard/employees'
     | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
@@ -464,6 +474,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
+    | '/dashboard/daily-logs'
     | '/dashboard/employees'
     | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
@@ -508,6 +519,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
+    | '/dashboard/daily-logs'
     | '/dashboard/employees'
     | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
@@ -765,6 +777,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardEmployeesRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/daily-logs': {
+      id: '/dashboard/daily-logs'
+      path: '/daily-logs'
+      fullPath: '/dashboard/daily-logs'
+      preLoaderRoute: typeof DashboardDailyLogsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/clients': {
       id: '/dashboard/clients'
       path: '/clients'
@@ -893,6 +912,7 @@ interface DashboardRouteChildren {
   DashboardBillingRoute: typeof DashboardBillingRoute
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientsRoute: typeof DashboardClientsRoute
+  DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardEvvComplianceRoute: typeof DashboardEvvComplianceRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
@@ -920,6 +940,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBillingRoute: DashboardBillingRoute,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientsRoute: DashboardClientsRoute,
+  DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardEvvComplianceRoute: DashboardEvvComplianceRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,

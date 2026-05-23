@@ -311,6 +311,67 @@ export type Database = {
           },
         ]
       }
+      daily_logs: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          log_date: string
+          narrative: string
+          organization_id: string
+          pcsp_goals_addressed: string[]
+          signature_data_url: string | null
+          submitted_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          log_date?: string
+          narrative: string
+          organization_id: string
+          pcsp_goals_addressed?: string[]
+          signature_data_url?: string | null
+          submitted_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          log_date?: string
+          narrative?: string
+          organization_id?: string
+          pcsp_goals_addressed?: string[]
+          signature_data_url?: string | null
+          submitted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       external_certifications: {
         Row: {
           cert_name: string | null

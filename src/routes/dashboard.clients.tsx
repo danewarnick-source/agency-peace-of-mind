@@ -208,6 +208,17 @@ function AddClientDialog({
           <Input id="addr" value={addr} onChange={(e) => setAddr(e.target.value)} required maxLength={255} />
         </div>
         <div className="grid gap-2">
+          <Label htmlFor="job-code">DSPD Authorization Billing Job Code</Label>
+          <Select value={jobCode} onValueChange={setJobCode}>
+            <SelectTrigger id="job-code"><SelectValue placeholder="Select billing job code" /></SelectTrigger>
+            <SelectContent>
+              {JOB_CODES.map((j) => (
+                <SelectItem key={j.code} value={j.code}>{j.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
           <Label>PCSP goals</Label>
           <div className="flex gap-2">
             <Input

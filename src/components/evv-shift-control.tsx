@@ -94,7 +94,8 @@ export function EvvShiftControl() {
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code" as any)
         .eq("organization_id", org!.organization_id)
         .order("last_name");
       if (error) throw error;

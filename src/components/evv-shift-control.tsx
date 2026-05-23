@@ -241,6 +241,7 @@ export function EvvShiftControl() {
   const onCompleteShift = () => {
     setActive(null);
     setSelectedClientId("");
+    setSelectedJobCode("");
     setShowDocLock(false);
   };
 
@@ -278,8 +279,31 @@ export function EvvShiftControl() {
           </Select>
         </div>
 
+        {selectedClientId && needsCodeChoice && !active && (
+          <div className="grid gap-2">
+            <Label>Select Service Type for This Shift</Label>
+            <Select value={selectedJobCode} onValueChange={setSelectedJobCode}>
+              <SelectTrigger><SelectValue placeholder="Choose the billing code you are working" /></SelectTrigger>
+              <SelectContent>
+                {authorizedCodes.map((code) => (
+                  <SelectItem key={code} value={code}>{jobCodeLabel(code)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              This client is authorized for multiple services. Pick the one you are providing right now — it will be locked to this shift's billing record.
+            </p>
+          </div>
+        )}
+
+        {selectedClientId && authorizedCodes.length === 1 && !active && (
+          <p className="text-[11px] text-muted-foreground">
+            Service code: <span className="font-mono font-medium text-foreground">{authorizedCodes[0]}</span> — {jobCodeLabel(authorizedCodes[0])}
+          </p>
+        )}
+
         {!active ? (
-          <Button onClick={handleClockIn} disabled={!selectedClientId || clockingIn} size="lg">
+          <Button onClick={handleClockIn} disabled={!selectedClientId || !codeReady || clockingIn} size="lg">
             {clockingIn ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Capturing location…</> : <><Play className="mr-2 h-4 w-4" /> Clock In</>}
           </Button>
         ) : (

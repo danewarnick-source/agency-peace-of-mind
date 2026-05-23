@@ -26,6 +26,7 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
 import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
 import { Route as DashboardTimesheetsRouteImport } from './routes/dashboard.timesheets'
+import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timeclock'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
@@ -134,6 +135,11 @@ const DashboardTracksRoute = DashboardTracksRouteImport.update({
 const DashboardTimesheetsRoute = DashboardTimesheetsRouteImport.update({
   id: '/timesheets',
   path: '/timesheets',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardTimeclockRoute = DashboardTimeclockRouteImport.update({
+  id: '/timeclock',
+  path: '/timeclock',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardTeamRoute = DashboardTeamRouteImport.update({
@@ -293,6 +299,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
+  '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/timesheets': typeof DashboardTimesheetsRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
@@ -335,6 +342,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
+  '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/timesheets': typeof DashboardTimesheetsRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
@@ -379,6 +387,7 @@ export interface FileRoutesById {
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
+  '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/timesheets': typeof DashboardTimesheetsRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
@@ -424,6 +433,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
+    | '/dashboard/timeclock'
     | '/dashboard/timesheets'
     | '/dashboard/tracks'
     | '/verify/$code'
@@ -466,6 +476,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
+    | '/dashboard/timeclock'
     | '/dashboard/timesheets'
     | '/dashboard/tracks'
     | '/verify/$code'
@@ -509,6 +520,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
+    | '/dashboard/timeclock'
     | '/dashboard/timesheets'
     | '/dashboard/tracks'
     | '/verify/$code'
@@ -660,6 +672,13 @@ declare module '@tanstack/react-router' {
       path: '/timesheets'
       fullPath: '/dashboard/timesheets'
       preLoaderRoute: typeof DashboardTimesheetsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/timeclock': {
+      id: '/dashboard/timeclock'
+      path: '/timeclock'
+      fullPath: '/dashboard/timeclock'
+      preLoaderRoute: typeof DashboardTimeclockRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/team': {
@@ -886,6 +905,7 @@ interface DashboardRouteChildren {
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
+  DashboardTimeclockRoute: typeof DashboardTimeclockRoute
   DashboardTimesheetsRoute: typeof DashboardTimesheetsRoute
   DashboardTracksRoute: typeof DashboardTracksRouteWithChildren
   DashboardIndexRoute: typeof DashboardIndexRoute
@@ -912,6 +932,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
+  DashboardTimeclockRoute: DashboardTimeclockRoute,
   DashboardTimesheetsRoute: DashboardTimesheetsRoute,
   DashboardTracksRoute: DashboardTracksRouteWithChildren,
   DashboardIndexRoute: DashboardIndexRoute,

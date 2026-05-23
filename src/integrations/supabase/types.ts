@@ -313,6 +313,8 @@ export type Database = {
       }
       daily_logs: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           client_id: string
           created_at: string
           id: string
@@ -321,10 +323,13 @@ export type Database = {
           organization_id: string
           pcsp_goals_addressed: string[]
           signature_data_url: string | null
+          status: string
           submitted_at: string
           user_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           client_id: string
           created_at?: string
           id?: string
@@ -333,10 +338,13 @@ export type Database = {
           organization_id: string
           pcsp_goals_addressed?: string[]
           signature_data_url?: string | null
+          status?: string
           submitted_at?: string
           user_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           client_id?: string
           created_at?: string
           id?: string
@@ -345,6 +353,7 @@ export type Database = {
           organization_id?: string
           pcsp_goals_addressed?: string[]
           signature_data_url?: string | null
+          status?: string
           submitted_at?: string
           user_id?: string
         }
@@ -954,6 +963,48 @@ export type Database = {
           },
         ]
       }
+      scheduled_shifts: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          ends_at: string
+          id: string
+          job_code: string | null
+          notes: string | null
+          organization_id: string
+          shift_type: string
+          staff_id: string
+          starts_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          ends_at: string
+          id?: string
+          job_code?: string | null
+          notes?: string | null
+          organization_id: string
+          shift_type?: string
+          staff_id: string
+          starts_at: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string
+          id?: string
+          job_code?: string | null
+          notes?: string | null
+          organization_id?: string
+          shift_type?: string
+          staff_id?: string
+          starts_at?: string
+        }
+        Relationships: []
+      }
       shift_notes: {
         Row: {
           created_at: string
@@ -1080,6 +1131,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      staff_assignments: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          organization_id: string
+          staff_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id: string
+          staff_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id?: string
+          staff_id?: string
+        }
+        Relationships: []
       }
       staff_certifications: {
         Row: {

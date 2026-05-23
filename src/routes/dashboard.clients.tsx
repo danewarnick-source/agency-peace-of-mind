@@ -95,24 +95,10 @@ function ClientsPage() {
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
-type ClientWriteValues = ClientFormValues & {
-  home_latitude: number | null;
-  home_longitude: number | null;
-};
+      return (data ?? []) as unknown as Client[];
+    },
+  });
 
-async function resolveCoords(addr: string): Promise<{ lat: number | null; lng: number | null }> {
-  if (addr && addr.trim().toLowerCase() !== "testing headquarters") {
-    const geo = await geocodeAddress(addr);
-    if (geo) return { lat: geo.lat, lng: geo.lng };
-  }
-  // Fallback to browser location
-  try {
-    const pos = await getBrowserPosition();
-    return { lat: pos.lat, lng: pos.lng };
-  } catch {
-    return { lat: null, lng: null };
-  }
-}
 
   const addMutation = useMutation({
     mutationFn: async (input: ClientFormValues) => {

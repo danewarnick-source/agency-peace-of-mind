@@ -19,6 +19,7 @@ type Client = {
   home_latitude: number | null;
   home_longitude: number | null;
   pcsp_goals: string[];
+  job_code: string[] | null;
 };
 
 type ActiveShift = {

@@ -43,6 +43,7 @@ function EmployeesPage() {
   const [resetUser, setResetUser] = useState<{ id: string; name: string } | null>(null);
   const [tempPassword, setTempPassword] = useState(() => genPassword());
   const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
+  const [editingMember, setEditingMember] = useState<EditableMember | null>(null);
 
   const createManual = useServerFn(createEmployeeManually);
   const resetPwFn = useServerFn(adminResetEmployeePassword);

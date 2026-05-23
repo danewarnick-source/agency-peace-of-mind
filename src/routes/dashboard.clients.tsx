@@ -15,9 +15,38 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, X, UserPlus, Contact2, Pencil } from "lucide-react";
+import { Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
+
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+    const res = await fetch(url, {
+      headers: { "Accept": "application/json", "User-Agent": "CareAcademyEVV/1.0 (compliance@careacademy.app)" },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as Array<{ lat: string; lon: string }>;
+    if (!Array.isArray(json) || !json.length) return null;
+    const lat = parseFloat(json[0].lat);
+    const lng = parseFloat(json[0].lon);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
+function getBrowserPosition(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (!("geolocation" in navigator)) return reject(new Error("Geolocation not supported"));
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      (e) => reject(e),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  });
+}
 
 export const Route = createFileRoute("/dashboard/clients")({
   head: () => ({ meta: [{ title: "Clients — Care Academy" }] }),

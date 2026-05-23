@@ -40,13 +40,15 @@ export function useOrgPermissions() {
 
 /** Convenience: returns can(perm) for the current user's role using DB overrides. */
 export function usePermissions() {
-  const { data: org } = useCurrentOrg();
-  const { data: matrix, isLoading } = useOrgPermissions();
+  const { data: org, isLoading: orgLoading } = useCurrentOrg();
+  const { data: matrix, isLoading: matrixLoading } = useOrgPermissions();
   const role = (org?.role ?? null) as Role | null;
   const can = (perm: Permission): boolean => {
     if (!role) return false;
     if (matrix) return !!matrix[role]?.[perm];
     return DEFAULT_MATRIX[role].includes(perm);
   };
-  return { role, can, isLoading };
+  // Wait for org to load before reporting ready — otherwise role-based guards
+  // see role=null and incorrectly redirect to /unauthorized on first paint.
+  return { role, can, isLoading: orgLoading || matrixLoading };
 }

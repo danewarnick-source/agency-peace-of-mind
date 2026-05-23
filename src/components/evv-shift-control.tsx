@@ -80,6 +80,7 @@ export function EvvShiftControl() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [selectedJobCode, setSelectedJobCode] = useState<string>("");
   const [active, setActive] = useState<ActiveShift | null>(null);
   const [clockingIn, setClockingIn] = useState(false);
   const [showDocLock, setShowDocLock] = useState(false);

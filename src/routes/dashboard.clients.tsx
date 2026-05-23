@@ -153,7 +153,7 @@ function ClientsPage() {
 function AddClientDialog({
   onSubmit, pending,
 }: {
-  onSubmit: (v: { first_name: string; last_name: string; phone_number: string; physical_address: string; pcsp_goals: string[]; job_code: string }) => void;
+  onSubmit: (v: { first_name: string; last_name: string; phone_number: string; physical_address: string; pcsp_goals: string[]; job_code: string; medicaid_id: string }) => void;
   pending: boolean;
 }) {
   const [first, setFirst] = useState("");
@@ -161,12 +161,13 @@ function AddClientDialog({
   const [phone, setPhone] = useState("");
   const [addr, setAddr] = useState("");
   const [jobCode, setJobCode] = useState<string>("");
+  const [medicaidId, setMedicaidId] = useState("");
   const [goalInput, setGoalInput] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
 
   const canSubmit = useMemo(
-    () => Boolean(first.trim() && last.trim() && addr.trim() && jobCode),
-    [first, last, addr, jobCode]
+    () => Boolean(first.trim() && last.trim() && addr.trim() && jobCode && medicaidId.trim()),
+    [first, last, addr, jobCode, medicaidId]
   );
 
   const addGoal = () => {
@@ -191,6 +192,7 @@ function AddClientDialog({
             physical_address: addr.trim(),
             pcsp_goals: goals,
             job_code: jobCode,
+            medicaid_id: medicaidId.trim(),
           });
         }}
         className="grid gap-4"
@@ -204,6 +206,10 @@ function AddClientDialog({
             <Label htmlFor="last">Last name</Label>
             <Input id="last" value={last} onChange={(e) => setLast(e.target.value)} required maxLength={100} />
           </div>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="medicaid">Individual Medicaid ID Number</Label>
+          <Input id="medicaid" value={medicaidId} onChange={(e) => setMedicaidId(e.target.value)} required maxLength={50} placeholder="e.g. 1234567890" />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="phone">Phone number</Label>

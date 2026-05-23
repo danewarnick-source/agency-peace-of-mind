@@ -36,6 +36,7 @@ type Client = {
   physical_address: string | null;
   pcsp_goals: string[];
   job_code: string | null;
+  medicaid_id: string | null;
 };
 
 function ClientsPage() {
@@ -49,11 +50,12 @@ function ClientsPage() {
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, medicaid_id" as any)
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Client[];
+      return (data ?? []) as unknown as Client[];
     },
   });
 
@@ -61,13 +63,15 @@ function ClientsPage() {
     mutationFn: async (input: {
       first_name: string; last_name: string; phone_number: string;
       physical_address: string; pcsp_goals: string[]; job_code: string;
+      medicaid_id: string;
     }) => {
       const { error } = await supabase.from("clients").insert({
         organization_id: org!.organization_id,
         ...input,
         home_latitude: 40.3524,
         home_longitude: -111.9051,
-      });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -108,6 +112,7 @@ function ClientsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Full name</TableHead>
+                <TableHead>Medicaid ID</TableHead>
                 <TableHead>Job code</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Address</TableHead>
@@ -118,6 +123,7 @@ function ClientsPage() {
               {clients.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.first_name} {c.last_name}</TableCell>
+                  <TableCell className="font-mono text-xs">{c.medicaid_id || <span className="text-muted-foreground">—</span>}</TableCell>
                   <TableCell>
                     {c.job_code ? (
                       <Badge variant="outline" className="font-mono" title={jobCodeLabel(c.job_code)}>{c.job_code}</Badge>
@@ -147,7 +153,7 @@ function ClientsPage() {
 function AddClientDialog({
   onSubmit, pending,
 }: {
-  onSubmit: (v: { first_name: string; last_name: string; phone_number: string; physical_address: string; pcsp_goals: string[]; job_code: string }) => void;
+  onSubmit: (v: { first_name: string; last_name: string; phone_number: string; physical_address: string; pcsp_goals: string[]; job_code: string; medicaid_id: string }) => void;
   pending: boolean;
 }) {
   const [first, setFirst] = useState("");
@@ -155,12 +161,13 @@ function AddClientDialog({
   const [phone, setPhone] = useState("");
   const [addr, setAddr] = useState("");
   const [jobCode, setJobCode] = useState<string>("");
+  const [medicaidId, setMedicaidId] = useState("");
   const [goalInput, setGoalInput] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
 
   const canSubmit = useMemo(
-    () => Boolean(first.trim() && last.trim() && addr.trim() && jobCode),
-    [first, last, addr, jobCode]
+    () => Boolean(first.trim() && last.trim() && addr.trim() && jobCode && medicaidId.trim()),
+    [first, last, addr, jobCode, medicaidId]
   );
 
   const addGoal = () => {
@@ -185,6 +192,7 @@ function AddClientDialog({
             physical_address: addr.trim(),
             pcsp_goals: goals,
             job_code: jobCode,
+            medicaid_id: medicaidId.trim(),
           });
         }}
         className="grid gap-4"
@@ -198,6 +206,10 @@ function AddClientDialog({
             <Label htmlFor="last">Last name</Label>
             <Input id="last" value={last} onChange={(e) => setLast(e.target.value)} required maxLength={100} />
           </div>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="medicaid">Individual Medicaid ID Number</Label>
+          <Input id="medicaid" value={medicaidId} onChange={(e) => setMedicaidId(e.target.value)} required maxLength={50} placeholder="e.g. 1234567890" />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="phone">Phone number</Label>

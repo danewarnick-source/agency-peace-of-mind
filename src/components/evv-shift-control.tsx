@@ -152,9 +152,10 @@ export function EvvShiftControl() {
         clock_in_long: opts.lng,
         device_fingerprint: deviceFingerprint(),
         outside_geofence: opts.outsideGeofence,
-        geofence_bypass_reason: opts.bypassReason,
+        clock_in_bypass_reason: opts.bypassReason,
         status: "active",
-      })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)
       .select("id, client_id, clock_in_time")
       .single();
     if (error) throw error;
@@ -360,43 +361,82 @@ function DocumentationLockModal({
   const [checked, setChecked] = useState<string[]>([]);
   const [narrative, setNarrative] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [geo, setGeo] = useState<{
+    lat: number | null;
+    lng: number | null;
+    distance: number | null;
+    outside: boolean;
+    locating: boolean;
+    error: string | null;
+  }>({ lat: null, lng: null, distance: null, outside: false, locating: true, error: null });
+  const [clockOutReason, setClockOutReason] = useState("");
+
+  // Capture clock-out GPS as soon as modal opens so we can show the bypass UI conditionally.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const pos = await getPosition();
+        if (cancelled) return;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        let distance: number | null = null;
+        let outside = false;
+        if (client.home_latitude != null && client.home_longitude != null) {
+          distance = haversineMiles(lat, lng, client.home_latitude, client.home_longitude);
+          outside = distance > GEOFENCE_MILES;
+        }
+        setGeo({ lat, lng, distance, outside, locating: false, error: null });
+      } catch (e) {
+        if (cancelled) return;
+        // Treat permission failure as outside geofence — force a deviation reason.
+        setGeo({
+          lat: null, lng: null, distance: null, outside: true, locating: false,
+          error: e instanceof Error ? e.message : "Could not capture location",
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggle = (g: string) => setChecked(
     checked.includes(g) ? checked.filter((x) => x !== g) : [...checked, g]
   );
 
-  const canSubmit = narrative.trim().length >= 50 && !submitting;
+  const narrativeOk = narrative.trim().length >= 50;
+  const bypassOk = !geo.outside || clockOutReason.trim().length >= 10;
+  const canSubmit = !geo.locating && narrativeOk && bypassOk && !submitting;
 
   const submit = async () => {
     if (!user) return;
-    if (narrative.trim().length < 50) return toast.error("Narrative must be at least 50 characters");
+    if (!narrativeOk) return toast.error("Narrative must be at least 50 characters");
+    if (geo.outside && clockOutReason.trim().length < 10) {
+      return toast.error("Clock-out deviation reason is required (min 10 characters)");
+    }
     setSubmitting(true);
     try {
-      let outLat: number | null = null;
-      let outLng: number | null = null;
-      let outsideGeofence = false;
-      try {
-        const pos = await getPosition();
-        outLat = pos.coords.latitude;
-        outLng = pos.coords.longitude;
-        if (client.home_latitude != null && client.home_longitude != null) {
-          const dist = haversineMiles(outLat, outLng, client.home_latitude, client.home_longitude);
-          outsideGeofence = dist > GEOFENCE_MILES;
-        }
-      } catch {
-        outsideGeofence = true;
-      }
-
       const clockOut = new Date().toISOString();
+
+      // Read existing shift to preserve clock-in geofence flag — OR-merge into final outside_geofence.
+      const { data: existing } = await supabase
+        .from("shifts")
+        .select("outside_geofence")
+        .eq("id", shiftId)
+        .maybeSingle();
+      const finalOutside = Boolean(existing?.outside_geofence) || geo.outside;
+
       const { error: e1 } = await supabase
         .from("shifts")
         .update({
           clock_out_time: clockOut,
-          clock_out_lat: outLat,
-          clock_out_long: outLng,
-          outside_geofence: outsideGeofence,
+          clock_out_lat: geo.lat,
+          clock_out_long: geo.lng,
+          outside_geofence: finalOutside,
+          clock_out_bypass_reason: geo.outside ? clockOutReason.trim() : null,
           status: "pending_approval",
-        })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
         .eq("id", shiftId);
       if (e1) throw e1;
 
@@ -410,7 +450,7 @@ function DocumentationLockModal({
         }, { onConflict: "shift_id" });
       if (e2) throw e2;
 
-      toast.success(outsideGeofence ? "Shift saved — flagged outside geofence" : "Shift submitted for approval");
+      toast.success(finalOutside ? "Shift saved — flagged outside geofence" : "Shift submitted for approval");
       onComplete();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to submit shift");
@@ -422,7 +462,7 @@ function DocumentationLockModal({
   return (
     <Dialog open onOpenChange={() => { /* non-dismissible */ }}>
       <DialogContent
-        className="max-w-lg"
+        className="max-w-lg max-h-[90vh] overflow-y-auto"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
@@ -432,9 +472,41 @@ function DocumentationLockModal({
             <ShieldAlert className="h-5 w-5 text-destructive" />
             Mandatory Shift Documentation Lock
           </DialogTitle>
+          <DialogDescription>
+            Complete all required EVV documentation before closing this shift.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-5">
+          {/* Geofence status banner */}
+          <div className={`rounded-lg border p-3 text-xs ${
+            geo.locating
+              ? "border-border bg-secondary/40"
+              : geo.outside
+                ? "border-orange-400 bg-orange-50 text-orange-900 dark:bg-orange-500/10 dark:text-orange-200"
+                : "border-emerald-500/40 bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
+          }`}>
+            {geo.locating ? (
+              <span className="flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Capturing clock-out GPS coordinates…</span>
+            ) : geo.outside ? (
+              <span className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  <strong>Clock-out outside geofence.</strong>{" "}
+                  {geo.distance != null
+                    ? `You are ${geo.distance.toFixed(2)} mi from ${client.first_name}'s home (threshold ${GEOFENCE_MILES} mi).`
+                    : geo.error}
+                  {" "}A deviation reason is required below.
+                </span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5" /> Clock-out GPS confirmed on-site
+                {geo.distance != null ? ` (${(geo.distance * 5280).toFixed(0)} ft from home).` : "."}
+              </span>
+            )}
+          </div>
+
           <div>
             <p className="text-sm font-medium">PCSP goals addressed</p>
             <p className="mb-3 text-xs text-muted-foreground">
@@ -465,13 +537,33 @@ function DocumentationLockModal({
               className="mt-1.5"
               maxLength={4000}
             />
-            <p className={`mt-1 text-[11px] ${narrative.trim().length >= 50 ? "text-muted-foreground" : "text-destructive"}`}>
+            <p className={`mt-1 text-[11px] ${narrativeOk ? "text-muted-foreground" : "text-destructive"}`}>
               {narrative.trim().length}/50 characters minimum
             </p>
           </div>
 
+          {geo.outside && (
+            <div>
+              <Label htmlFor="clockout-reason" className="text-orange-700 dark:text-orange-300">
+                Reason for Clock-Out Deviation
+              </Label>
+              <Textarea
+                id="clockout-reason"
+                value={clockOutReason}
+                onChange={(e) => setClockOutReason(e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder="e.g. Dropped client off at authorized family respite location at 555 Main St."
+                className="mt-1.5"
+              />
+              <p className={`mt-1 text-[11px] ${clockOutReason.trim().length >= 10 ? "text-muted-foreground" : "text-destructive"}`}>
+                {clockOutReason.trim().length}/10 characters minimum
+              </p>
+            </div>
+          )}
+
           <Button onClick={submit} disabled={!canSubmit} size="lg">
-            {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…</> : "Submit Documentation & Clock Out"}
+            {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…</> : "Submit Documentation & Close Shift"}
           </Button>
         </div>
       </DialogContent>

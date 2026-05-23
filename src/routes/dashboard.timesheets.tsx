@@ -21,7 +21,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from "@/components/ui/sheet";
+import {
   Download, Loader2, AlertTriangle, MapPin, Info, Check, Pencil, Filter, ClipboardList,
+  ShieldCheck, FileText, Clock, User, IdCard, Stethoscope, CalendarDays, Navigation, Hash,
 } from "lucide-react";
 import { toast } from "sonner";
 import { jobCodeLabel } from "@/lib/job-codes";
@@ -46,19 +50,23 @@ type ShiftRow = {
   clock_out_lat: number | null;
   clock_out_long: number | null;
   outside_geofence: boolean;
-  geofence_bypass_reason: string | null;
+  clock_in_bypass_reason: string | null;
+  clock_out_bypass_reason: string | null;
+  geofence_bypass_reason: string | null; // legacy
   device_fingerprint: string | null;
   status: string;
-  profiles: { id?: string; full_name: string | null; email: string | null } | null;
-  clients: { id?: string; first_name: string | null; last_name: string | null; job_code: string | null } | null;
+  created_at: string | null;
+  profiles: { id?: string; full_name: string | null; email: string | null; employee_id: string | null } | null;
+  clients: { id?: string; first_name: string | null; last_name: string | null; job_code: string | null; medicaid_id: string | null } | null;
   shift_notes: { goals_addressed: string[] | null; narrative_summary: string | null }[] | null;
 };
 
 const SELECT = `id, user_id, client_id, clock_in_time, clock_out_time,
   clock_in_lat, clock_in_long, clock_out_lat, clock_out_long,
-  outside_geofence, geofence_bypass_reason, device_fingerprint, status,
-  profiles:user_id ( full_name, email ),
-  clients:client_id ( first_name, last_name, job_code ),
+  outside_geofence, clock_in_bypass_reason, clock_out_bypass_reason, geofence_bypass_reason,
+  device_fingerprint, status, created_at,
+  profiles:user_id ( full_name, email, employee_id ),
+  clients:client_id ( first_name, last_name, job_code, medicaid_id ),
   shift_notes ( goals_addressed, narrative_summary )`;
 
 function employeeName(r: ShiftRow) {
@@ -71,6 +79,10 @@ function fmtDate(iso: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString();
 }
+function fmtDateTime(iso: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString();
+}
 function fmtTime(iso: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -80,6 +92,10 @@ function decimalHours(inIso: string | null, outIso: string | null) {
   const ms = new Date(outIso).getTime() - new Date(inIso).getTime();
   if (!isFinite(ms) || ms <= 0) return "0.00";
   return (ms / 3600000).toFixed(2);
+}
+function gpsString(lat: number | null, lng: number | null) {
+  if (lat == null || lng == null) return "";
+  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 }
 function csvEscape(v: unknown) {
   const s = v == null ? "" : String(v);
@@ -97,18 +113,14 @@ function TimesheetsPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
 
-  // Default range: first day of current month → last day of current month
-  const today = new Date();
-  const firstOfMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
-  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const lastOfMonth = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
-
+  // RELAXED DEFAULTS — load every shift so the table is never empty on initial mount.
   const [staffId, setStaffId] = useState<string>("all");
   const [clientId, setClientId] = useState<string>("all");
-  const [startDate, setStartDate] = useState<string>(firstOfMonth);
-  const [endDate, setEndDate] = useState<string>(lastOfMonth);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState<ShiftRow | null>(null);
+  const [auditRow, setAuditRow] = useState<ShiftRow | null>(null);
 
   // Staff & client option lists
   const { data: staff } = useQuery({
@@ -149,14 +161,13 @@ function TimesheetsPage() {
   const fetchShifts = async (): Promise<ShiftRow[]> => {
     let q = supabase
       .from("shifts")
-      .select(SELECT)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select(SELECT as any)
       .order("clock_in_time", { ascending: false, nullsFirst: false });
-    // Note: no organization_id filter — RLS restricts to orgs the admin manages,
-    // so shifts logged under any of the admin's orgs are visible here.
+    // RLS restricts to orgs the admin manages.
     if (staffId !== "all") q = q.eq("user_id", staffId);
     if (clientId !== "all") q = q.eq("client_id", clientId);
     if (startDate) {
-      // Local midnight → avoids UTC/timezone drift dropping today's shifts
       const [y, m, d] = startDate.split("-").map(Number);
       const start = new Date(y, m - 1, d, 0, 0, 0, 0);
       q = q.gte("clock_in_time", start.toISOString());
@@ -178,7 +189,7 @@ function TimesheetsPage() {
   });
 
   const pending = useMemo(
-    () => (shifts ?? []).filter((s) => s.status === "pending_approval" || s.status === "flagged_review"),
+    () => (shifts ?? []).filter((s) => s.status === "pending_approval" || s.status === "flagged_review" || s.status === "active"),
     [shifts]
   );
   const historical = useMemo(
@@ -222,26 +233,33 @@ function TimesheetsPage() {
     setExporting(true);
     try {
       const headers = [
-        "Shift ID", "Employee", "Client", "Job Code", "Date",
-        "Clock In", "Clock Out", "Total Hours",
-        "In Coords", "Out Coords", "Geofence Status", "Bypass Reason",
-        "Device Fingerprint", "Goals Addressed", "Narrative", "Status",
+        "Staff_Name", "Employee_ID", "Client_Name", "Medicaid_ID", "Job_Code",
+        "Date_of_Service", "Clock_In_Time", "Clock_Out_Time", "Total_Hours",
+        "Clock_In_GPS", "Clock_Out_GPS", "Outside_Geofence_Status",
+        "Clock_In_Bypass_Reason", "Clock_Out_Bypass_Reason",
+        "Care_Goals_Addressed", "Shift_Narrative_Summary", "Electronic_Record_Created_At",
       ];
       const rows = [headers.join(",")];
       for (const r of shifts) {
         const note = r.shift_notes?.[0];
-        const geofence = r.outside_geofence ? "FLAGGED - Outside Geofence" : "PASS - On-Site";
         rows.push([
-          r.id, employeeName(r), clientName(r), r.clients?.job_code ?? "",
-          fmtDate(r.clock_in_time), fmtTime(r.clock_in_time), fmtTime(r.clock_out_time),
+          employeeName(r),
+          r.profiles?.employee_id ?? "",
+          clientName(r),
+          r.clients?.medicaid_id ?? "",
+          r.clients?.job_code ?? "",
+          fmtDate(r.clock_in_time),
+          r.clock_in_time ?? "",
+          r.clock_out_time ?? "",
           decimalHours(r.clock_in_time, r.clock_out_time),
-          r.clock_in_lat != null ? `${r.clock_in_lat}, ${r.clock_in_long}` : "",
-          r.clock_out_lat != null ? `${r.clock_out_lat}, ${r.clock_out_long}` : "",
-          geofence, r.geofence_bypass_reason ?? "",
-          r.device_fingerprint ?? "",
+          gpsString(r.clock_in_lat, r.clock_in_long),
+          gpsString(r.clock_out_lat, r.clock_out_long),
+          r.outside_geofence ? "FLAGGED - Outside Geofence" : "PASS - On-Site",
+          r.clock_in_bypass_reason ?? r.geofence_bypass_reason ?? "",
+          r.clock_out_bypass_reason ?? "",
           (note?.goals_addressed ?? []).join("; "),
           note?.narrative_summary ?? "",
-          r.status,
+          r.created_at ?? "",
         ].map(csvEscape).join(","));
       }
       const csv = "\ufeff" + rows.join("\n");
@@ -264,7 +282,7 @@ function TimesheetsPage() {
   };
 
   const clearFilters = () => {
-    setStaffId("all"); setClientId("all"); setStartDate(firstOfMonth); setEndDate(lastOfMonth);
+    setStaffId("all"); setClientId("all"); setStartDate(""); setEndDate("");
   };
 
   return (
@@ -275,7 +293,7 @@ function TimesheetsPage() {
             <ClipboardList className="h-6 w-6 text-muted-foreground" /> Timesheets
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Review, approve, and audit all EVV shift logs across your workforce.
+            21st Century Cures Act EVV records — click a row to open the federal audit view.
           </p>
         </div>
         <Button onClick={exportCsv} disabled={exporting || !shifts?.length} className="shrink-0">
@@ -328,12 +346,13 @@ function TimesheetsPage() {
 
       <ShiftSection
         title="Pending Review"
-        subtitle="Shifts awaiting administrative approval"
+        subtitle="Active shifts and entries awaiting administrative approval"
         rows={pending}
         loading={isLoading}
         showActions
         onApprove={(id) => approveMutation.mutate(id)}
         onEdit={setEditing}
+        onRowClick={setAuditRow}
         approvingId={approveMutation.variables ?? null}
         approving={approveMutation.isPending}
       />
@@ -346,6 +365,7 @@ function TimesheetsPage() {
         showActions={false}
         onApprove={() => {}}
         onEdit={setEditing}
+        onRowClick={setAuditRow}
         approvingId={null}
         approving={false}
       />
@@ -358,12 +378,14 @@ function TimesheetsPage() {
           saving={editMutation.isPending}
         />
       )}
+
+      <AuditSheet row={auditRow} onClose={() => setAuditRow(null)} />
     </div>
   );
 }
 
 function ShiftSection({
-  title, subtitle, rows, loading, showActions, onApprove, onEdit, approvingId, approving,
+  title, subtitle, rows, loading, showActions, onApprove, onEdit, onRowClick, approvingId, approving,
 }: {
   title: string;
   subtitle: string;
@@ -372,6 +394,7 @@ function ShiftSection({
   showActions: boolean;
   onApprove: (id: string) => void;
   onEdit: (r: ShiftRow) => void;
+  onRowClick: (r: ShiftRow) => void;
   approvingId: string | null;
   approving: boolean;
 }) {
@@ -405,71 +428,90 @@ function ShiftSection({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
-                <TableRow
-                  key={r.id}
-                  className={r.outside_geofence ? "bg-orange-50/50 dark:bg-orange-500/5" : undefined}
-                >
-                  <TableCell className="font-medium">{employeeName(r)}</TableCell>
-                  <TableCell>{clientName(r)}</TableCell>
-                  <TableCell>
-                    {r.clients?.job_code ? (
-                      <Badge variant="outline" className="font-mono" title={jobCodeLabel(r.clients.job_code)}>
-                        {r.clients.job_code}
-                      </Badge>
-                    ) : "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{fmtDate(r.clock_in_time)}</TableCell>
-                  <TableCell className="tabular-nums">{fmtTime(r.clock_in_time)}</TableCell>
-                  <TableCell className="tabular-nums">{fmtTime(r.clock_out_time)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{decimalHours(r.clock_in_time, r.clock_out_time)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      {r.outside_geofence ? (
-                        <Badge variant="outline" className="border-orange-400 text-orange-700 dark:text-orange-300">
-                          <AlertTriangle className="mr-1 h-3 w-3" /> Flagged
+              {rows.map((r) => {
+                const inBypass = r.clock_in_bypass_reason ?? r.geofence_bypass_reason;
+                const outBypass = r.clock_out_bypass_reason;
+                return (
+                  <TableRow
+                    key={r.id}
+                    onClick={() => onRowClick(r)}
+                    className={`cursor-pointer ${r.outside_geofence ? "bg-orange-50/50 dark:bg-orange-500/5" : ""}`}
+                  >
+                    <TableCell className="font-medium">{employeeName(r)}</TableCell>
+                    <TableCell>{clientName(r)}</TableCell>
+                    <TableCell>
+                      {r.clients?.job_code ? (
+                        <Badge variant="outline" className="font-mono" title={jobCodeLabel(r.clients.job_code)}>
+                          {r.clients.job_code}
                         </Badge>
-                      ) : (
-                        <Badge variant="secondary"><MapPin className="mr-1 h-3 w-3" /> On-site</Badge>
-                      )}
-                      {r.geofence_bypass_reason && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button type="button" className="inline-flex items-center text-orange-600 hover:text-orange-700">
-                              <Info className="h-3.5 w-3.5" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p className="text-xs font-medium">Deviation explanation</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{r.geofence_bypass_reason}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </TableCell>
-                  {showActions && (
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <Button size="sm" variant="ghost" onClick={() => onEdit(r)}>
-                          <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => onApprove(r.id)}
-                          disabled={approving && approvingId === r.id}
-                        >
-                          {approving && approvingId === r.id ? (
-                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Check className="mr-1 h-3.5 w-3.5" />
-                          )}
-                          Approve
-                        </Button>
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{fmtDate(r.clock_in_time)}</TableCell>
+                    <TableCell className="tabular-nums">{fmtTime(r.clock_in_time)}</TableCell>
+                    <TableCell className="tabular-nums">{fmtTime(r.clock_out_time)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{decimalHours(r.clock_in_time, r.clock_out_time)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {r.outside_geofence ? (
+                          <Badge variant="outline" className="border-orange-400 text-orange-700 dark:text-orange-300">
+                            <AlertTriangle className="mr-1 h-3 w-3" /> Flagged
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary"><MapPin className="mr-1 h-3 w-3" /> On-site</Badge>
+                        )}
+                        {inBypass && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="border-orange-300 text-orange-700 dark:text-orange-300">
+                                <Info className="mr-1 h-3 w-3" /> In
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-xs font-medium">Clock-in deviation</p>
+                              <p className="mt-1 text-xs text-muted-foreground">{inBypass}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {outBypass && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="border-orange-300 text-orange-700 dark:text-orange-300">
+                                <Info className="mr-1 h-3 w-3" /> Out
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-xs font-medium">Clock-out deviation</p>
+                              <p className="mt-1 text-xs text-muted-foreground">{outBypass}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+                    {showActions && (
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-end gap-1.5">
+                          <Button size="sm" variant="ghost" onClick={() => onEdit(r)}>
+                            <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => onApprove(r.id)}
+                            disabled={(approving && approvingId === r.id) || r.status === "active"}
+                            title={r.status === "active" ? "Shift still active" : "Approve shift"}
+                          >
+                            {approving && approvingId === r.id ? (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Check className="mr-1 h-3.5 w-3.5" />
+                            )}
+                            Approve
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TooltipProvider>
@@ -515,5 +557,165 @@ function EditShiftDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ----------------------- Federal Audit Slide-out Sheet ---------------------- */
+
+function MandateBlock({
+  number, title, icon: Icon, children,
+}: {
+  number: number;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-card/50 p-4">
+      <header className="mb-3 flex items-start gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Federal Mandate {number}
+          </p>
+          <p className="text-sm font-semibold">{title}</p>
+        </div>
+      </header>
+      <div className="space-y-1.5 pl-11 text-sm">{children}</div>
+    </section>
+  );
+}
+
+function KV({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-2">
+      <span className="text-xs text-muted-foreground">{label}:</span>
+      <span className={mono ? "font-mono text-xs" : "text-sm"}>{value}</span>
+    </div>
+  );
+}
+
+function AuditSheet({ row, onClose }: { row: ShiftRow | null; onClose: () => void }) {
+  const r = row;
+  const note = r?.shift_notes?.[0];
+  const inBypass = r?.clock_in_bypass_reason ?? r?.geofence_bypass_reason ?? null;
+  const outBypass = r?.clock_out_bypass_reason ?? null;
+  return (
+    <Sheet open={!!r} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+        {r && (
+          <>
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                Detailed Shift Audit View
+              </SheetTitle>
+              <SheetDescription>
+                21st Century Cures Act EVV compliance record · Shift{" "}
+                <span className="font-mono text-xs">{r.id.slice(0, 8)}</span>
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="mt-6 space-y-4">
+              <MandateBlock number={1} title="Service Type Performed" icon={Stethoscope}>
+                {r.clients?.job_code ? (
+                  <>
+                    <KV label="Job Code" value={<Badge variant="outline" className="font-mono">{r.clients.job_code}</Badge>} />
+                    <p className="text-xs text-muted-foreground">{jobCodeLabel(r.clients.job_code)}</p>
+                  </>
+                ) : <p className="text-xs text-muted-foreground">No job code on file.</p>}
+              </MandateBlock>
+
+              <MandateBlock number={2} title="Individual Receiving Service" icon={User}>
+                <KV label="Name" value={clientName(r)} />
+                <KV label="Medicaid ID" value={r.clients?.medicaid_id ?? "—"} mono />
+              </MandateBlock>
+
+              <MandateBlock number={3} title="Individual Providing Service" icon={IdCard}>
+                <KV label="Name" value={employeeName(r)} />
+                <KV label="Employee ID" value={r.profiles?.employee_id ?? "—"} mono />
+              </MandateBlock>
+
+              <MandateBlock number={4} title="Date of Service" icon={CalendarDays}>
+                <KV label="Service Date" value={fmtDate(r.clock_in_time)} />
+              </MandateBlock>
+
+              <MandateBlock number={5} title="Time Service Begins/Ends" icon={Clock}>
+                <KV label="Clock-In" value={fmtDateTime(r.clock_in_time)} mono />
+                <KV label="Clock-Out" value={fmtDateTime(r.clock_out_time)} mono />
+                <KV label="Total Hours" value={`${decimalHours(r.clock_in_time, r.clock_out_time)} hrs`} mono />
+              </MandateBlock>
+
+              <MandateBlock number={6} title="Location of Service Delivery" icon={Navigation}>
+                <KV
+                  label="Clock-In GPS"
+                  value={gpsString(r.clock_in_lat, r.clock_in_long) || "—"}
+                  mono
+                />
+                <KV
+                  label="Clock-Out GPS"
+                  value={gpsString(r.clock_out_lat, r.clock_out_long) || "—"}
+                  mono
+                />
+                <div className="pt-1">
+                  {r.outside_geofence ? (
+                    <Badge variant="outline" className="border-orange-400 text-orange-700 dark:text-orange-300">
+                      <AlertTriangle className="mr-1 h-3 w-3" /> Geofence: FLAGGED
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary"><MapPin className="mr-1 h-3 w-3" /> Geofence: PASS</Badge>
+                  )}
+                </div>
+                {inBypass && (
+                  <div className="mt-2 rounded-md border border-orange-300/60 bg-orange-50/60 p-2 text-xs dark:bg-orange-500/5">
+                    <p className="font-semibold text-orange-800 dark:text-orange-200">Clock-In Deviation Reason</p>
+                    <p className="text-muted-foreground">{inBypass}</p>
+                  </div>
+                )}
+                {outBypass && (
+                  <div className="mt-2 rounded-md border border-orange-300/60 bg-orange-50/60 p-2 text-xs dark:bg-orange-500/5">
+                    <p className="font-semibold text-orange-800 dark:text-orange-200">Clock-Out Deviation Reason</p>
+                    <p className="text-muted-foreground">{outBypass}</p>
+                  </div>
+                )}
+              </MandateBlock>
+
+              <MandateBlock number={7} title="Date of Creation of Electronic Record" icon={Hash}>
+                <KV label="Record Created (immutable)" value={fmtDateTime(r.created_at)} mono />
+                {r.device_fingerprint && <KV label="Device Fingerprint" value={r.device_fingerprint} mono />}
+              </MandateBlock>
+
+              <section className="rounded-xl border border-border bg-card/50 p-4">
+                <header className="mb-3 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">PCSP Care Goals Addressed</p>
+                </header>
+                <div className="flex flex-wrap gap-1.5">
+                  {note?.goals_addressed?.length ? (
+                    note.goals_addressed.map((g) => (
+                      <Badge key={g} variant="secondary" className="font-normal">{g}</Badge>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No goals checked for this shift.</p>
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-border bg-card/50 p-4">
+                <header className="mb-2 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">Narrative Shift Summary</p>
+                </header>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                  {note?.narrative_summary || "No narrative submitted."}
+                </p>
+              </section>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }

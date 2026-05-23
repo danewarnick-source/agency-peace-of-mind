@@ -116,6 +116,7 @@ export type Database = {
           id: string
           job_code: string | null
           last_name: string
+          medicaid_id: string | null
           organization_id: string
           pcsp_goals: string[]
           phone_number: string | null
@@ -129,6 +130,7 @@ export type Database = {
           id?: string
           job_code?: string | null
           last_name: string
+          medicaid_id?: string | null
           organization_id: string
           pcsp_goals?: string[]
           phone_number?: string | null
@@ -142,6 +144,7 @@ export type Database = {
           id?: string
           job_code?: string | null
           last_name?: string
+          medicaid_id?: string | null
           organization_id?: string
           pcsp_goals?: string[]
           phone_number?: string | null
@@ -672,6 +675,7 @@ export type Database = {
           created_at: string
           department: string | null
           email: string | null
+          employee_id: string | null
           first_name: string | null
           full_name: string | null
           hire_date: string | null
@@ -686,6 +690,7 @@ export type Database = {
           created_at?: string
           department?: string | null
           email?: string | null
+          employee_id?: string | null
           first_name?: string | null
           full_name?: string | null
           hire_date?: string | null
@@ -700,6 +705,7 @@ export type Database = {
           created_at?: string
           department?: string | null
           email?: string | null
+          employee_id?: string | null
           first_name?: string | null
           full_name?: string | null
           hire_date?: string | null
@@ -932,9 +938,11 @@ export type Database = {
       shifts: {
         Row: {
           client_id: string | null
+          clock_in_bypass_reason: string | null
           clock_in_lat: number | null
           clock_in_long: number | null
           clock_in_time: string | null
+          clock_out_bypass_reason: string | null
           clock_out_lat: number | null
           clock_out_long: number | null
           clock_out_time: string | null
@@ -949,9 +957,11 @@ export type Database = {
         }
         Insert: {
           client_id?: string | null
+          clock_in_bypass_reason?: string | null
           clock_in_lat?: number | null
           clock_in_long?: number | null
           clock_in_time?: string | null
+          clock_out_bypass_reason?: string | null
           clock_out_lat?: number | null
           clock_out_long?: number | null
           clock_out_time?: string | null
@@ -966,9 +976,11 @@ export type Database = {
         }
         Update: {
           client_id?: string | null
+          clock_in_bypass_reason?: string | null
           clock_in_lat?: number | null
           clock_in_long?: number | null
           clock_in_time?: string | null
+          clock_out_bypass_reason?: string | null
           clock_out_lat?: number | null
           clock_out_long?: number | null
           clock_out_time?: string | null

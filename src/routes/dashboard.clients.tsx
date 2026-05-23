@@ -48,6 +48,19 @@ function getBrowserPosition(): Promise<{ lat: number; lng: number }> {
   });
 }
 
+async function resolveCoords(addr: string): Promise<{ lat: number | null; lng: number | null }> {
+  if (addr && addr.trim().toLowerCase() !== "testing headquarters") {
+    const geo = await geocodeAddress(addr);
+    if (geo) return { lat: geo.lat, lng: geo.lng };
+  }
+  try {
+    const pos = await getBrowserPosition();
+    return { lat: pos.lat, lng: pos.lng };
+  } catch {
+    return { lat: null, lng: null };
+  }
+}
+
 export const Route = createFileRoute("/dashboard/clients")({
   head: () => ({ meta: [{ title: "Clients — Care Academy" }] }),
   component: () => (

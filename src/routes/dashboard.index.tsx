@@ -12,9 +12,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Award, AlertTriangle, TrendingUp, UserPlus } from "lucide-react";
+import { Users, Award, AlertTriangle, TrendingUp, UserPlus, Radio } from "lucide-react";
 import { toast } from "sonner";
 import { EvvShiftControl } from "@/components/evv-shift-control";
+import { Badge } from "@/components/ui/badge";
+import { jobCodeLabel } from "@/lib/job-codes";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 
@@ -79,6 +81,34 @@ function Overview() {
       return { total: tot, rows };
     },
   });
+
+  // Live active-shift monitor (admin view)
+  const { data: liveShifts } = useQuery({
+    enabled: !!org && showAdmin,
+    queryKey: ["live-shifts", org?.organization_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("shifts")
+        .select(`id, user_id, clock_in_time, outside_geofence,
+          profiles:user_id(full_name, email),
+          clients:client_id(first_name, last_name, job_code)`)
+        .eq("organization_id", org!.organization_id)
+        .eq("status", "active")
+        .is("clock_out_time", null)
+        .order("clock_in_time", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 30_000,
+  });
+
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!showAdmin) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, [showAdmin]);
+  void tick;
 
   const { data: myAssigns } = useQuery({
     enabled: !!user && !showAdmin,
@@ -183,6 +213,8 @@ function Overview() {
         </div>
       )}
 
+      {showAdmin && <LiveMonitor shifts={(liveShifts ?? []) as unknown as LiveShift[]} />}
+
       {showAdmin ? (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <div className="flex items-end justify-between">
@@ -245,3 +277,84 @@ function Overview() {
     </div>
   );
 }
+
+type LiveShift = {
+  id: string;
+  clock_in_time: string | null;
+  outside_geofence: boolean;
+  profiles: { full_name: string | null; email: string | null } | null;
+  clients: { first_name: string | null; last_name: string | null; job_code: string | null } | null;
+};
+
+function durationLabel(iso: string | null) {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return "0 mins";
+  const mins = Math.floor(ms / 60000);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m} min${m === 1 ? "" : "s"}`;
+  return `${h} hr${h === 1 ? "" : "s"} ${m} min${m === 1 ? "" : "s"}`;
+}
+
+function LiveMonitor({ shifts }: { shifts: LiveShift[] }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <div className="flex items-end justify-between">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          </span>
+          <div>
+            <h3 className="flex items-center gap-2 text-base font-semibold">
+              <Radio className="h-4 w-4 text-emerald-500" /> Active Field Monitoring
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Staff currently clocked-in. Updates every 30 seconds.
+            </p>
+          </div>
+        </div>
+        <span className="text-xs text-muted-foreground">{shifts.length} on shift</span>
+      </div>
+
+      {!shifts.length ? (
+        <p className="mt-6 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          No staff are currently clocked into a shift.
+        </p>
+      ) : (
+        <ul className="mt-4 divide-y divide-border">
+          {shifts.map((s) => {
+            const name = s.profiles?.full_name || s.profiles?.email || "—";
+            const client = s.clients ? `${s.clients.first_name ?? ""} ${s.clients.last_name ?? ""}`.trim() : "—";
+            return (
+              <li key={s.id} className="flex items-center justify-between gap-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{name}</p>
+                  <p className="truncate text-xs text-muted-foreground">Serving {client || "—"}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {s.clients?.job_code && (
+                    <Badge variant="outline" className="font-mono" title={jobCodeLabel(s.clients.job_code)}>
+                      {s.clients.job_code}
+                    </Badge>
+                  )}
+                  {s.outside_geofence && (
+                    <Badge variant="outline" className="border-orange-400 text-orange-700 dark:text-orange-300">
+                      <AlertTriangle className="mr-1 h-3 w-3" /> Off-site
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="font-mono text-sm tabular-nums">{durationLabel(s.clock_in_time)}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">on clock</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+

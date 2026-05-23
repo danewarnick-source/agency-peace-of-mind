@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/table";
 import { Plus, X, UserPlus, Contact2 } from "lucide-react";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 
 export const Route = createFileRoute("/dashboard/clients")({
   head: () => ({ meta: [{ title: "Clients — Care Academy" }] }),
@@ -33,6 +35,7 @@ type Client = {
   phone_number: string | null;
   physical_address: string | null;
   pcsp_goals: string[];
+  job_code: string | null;
 };
 
 function ClientsPage() {
@@ -46,7 +49,7 @@ function ClientsPage() {
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals")
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code")
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
@@ -57,7 +60,7 @@ function ClientsPage() {
   const addMutation = useMutation({
     mutationFn: async (input: {
       first_name: string; last_name: string; phone_number: string;
-      physical_address: string; pcsp_goals: string[];
+      physical_address: string; pcsp_goals: string[]; job_code: string;
     }) => {
       const { error } = await supabase.from("clients").insert({
         organization_id: org!.organization_id,
@@ -105,6 +108,7 @@ function ClientsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Full name</TableHead>
+                <TableHead>Job code</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Address</TableHead>
                 <TableHead>Active goals</TableHead>
@@ -114,6 +118,11 @@ function ClientsPage() {
               {clients.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.first_name} {c.last_name}</TableCell>
+                  <TableCell>
+                    {c.job_code ? (
+                      <Badge variant="outline" className="font-mono" title={jobCodeLabel(c.job_code)}>{c.job_code}</Badge>
+                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{c.phone_number || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{c.physical_address || "—"}</TableCell>
                   <TableCell>
@@ -138,17 +147,21 @@ function ClientsPage() {
 function AddClientDialog({
   onSubmit, pending,
 }: {
-  onSubmit: (v: { first_name: string; last_name: string; phone_number: string; physical_address: string; pcsp_goals: string[] }) => void;
+  onSubmit: (v: { first_name: string; last_name: string; phone_number: string; physical_address: string; pcsp_goals: string[]; job_code: string }) => void;
   pending: boolean;
 }) {
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
   const [phone, setPhone] = useState("");
   const [addr, setAddr] = useState("");
+  const [jobCode, setJobCode] = useState<string>("");
   const [goalInput, setGoalInput] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
 
-  const canSubmit = useMemo(() => first.trim() && last.trim() && addr.trim(), [first, last, addr]);
+  const canSubmit = useMemo(
+    () => Boolean(first.trim() && last.trim() && addr.trim() && jobCode),
+    [first, last, addr, jobCode]
+  );
 
   const addGoal = () => {
     const v = goalInput.trim();
@@ -171,6 +184,7 @@ function AddClientDialog({
             phone_number: phone.trim(),
             physical_address: addr.trim(),
             pcsp_goals: goals,
+            job_code: jobCode,
           });
         }}
         className="grid gap-4"
@@ -192,6 +206,17 @@ function AddClientDialog({
         <div className="grid gap-2">
           <Label htmlFor="addr">Street address</Label>
           <Input id="addr" value={addr} onChange={(e) => setAddr(e.target.value)} required maxLength={255} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="job-code">DSPD Authorization Billing Job Code</Label>
+          <Select value={jobCode} onValueChange={setJobCode}>
+            <SelectTrigger id="job-code"><SelectValue placeholder="Select billing job code" /></SelectTrigger>
+            <SelectContent>
+              {JOB_CODES.map((j) => (
+                <SelectItem key={j.code} value={j.code}>{j.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="grid gap-2">
           <Label>PCSP goals</Label>

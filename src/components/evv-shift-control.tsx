@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Clock, MapPin, Play, Square, ShieldAlert, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Clock, MapPin, Play, Square, ShieldAlert, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 type Client = {
@@ -37,7 +37,6 @@ function deviceFingerprint() {
     new Date().getTimezoneOffset(),
     navigator.hardwareConcurrency ?? "",
   ];
-  // simple non-crypto hash
   let h = 0;
   const s = parts.join("|");
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
@@ -70,6 +69,12 @@ function formatDuration(ms: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
 
+type PendingBypass = {
+  lat: number;
+  lng: number;
+  distance: number;
+} | null;
+
 export function EvvShiftControl() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
@@ -77,6 +82,7 @@ export function EvvShiftControl() {
   const [active, setActive] = useState<ActiveShift | null>(null);
   const [clockingIn, setClockingIn] = useState(false);
   const [showDocLock, setShowDocLock] = useState(false);
+  const [pendingBypass, setPendingBypass] = useState<PendingBypass>(null);
   const [now, setNow] = useState(() => Date.now());
   const timerRef = useRef<number | null>(null);
 
@@ -94,7 +100,6 @@ export function EvvShiftControl() {
     },
   });
 
-  // Load existing active shift (no clock_out_time) for this user
   useEffect(() => {
     if (!user) return;
     supabase
@@ -113,7 +118,6 @@ export function EvvShiftControl() {
       });
   }, [user]);
 
-  // Ticker
   useEffect(() => {
     if (!active) {
       if (timerRef.current) window.clearInterval(timerRef.current);
@@ -131,9 +135,35 @@ export function EvvShiftControl() {
 
   const elapsed = active ? now - new Date(active.clock_in_time).getTime() : 0;
 
+  const insertShift = async (opts: {
+    lat: number;
+    lng: number;
+    outsideGeofence: boolean;
+    bypassReason: string | null;
+  }) => {
+    const { data, error } = await supabase
+      .from("shifts")
+      .insert({
+        organization_id: org!.organization_id,
+        user_id: user!.id,
+        client_id: selectedClientId,
+        clock_in_time: new Date().toISOString(),
+        clock_in_lat: opts.lat,
+        clock_in_long: opts.lng,
+        device_fingerprint: deviceFingerprint(),
+        outside_geofence: opts.outsideGeofence,
+        geofence_bypass_reason: opts.bypassReason,
+        status: "active",
+      })
+      .select("id, client_id, clock_in_time")
+      .single();
+    if (error) throw error;
+    return data as ActiveShift;
+  };
+
   const handleClockIn = async () => {
     if (!selectedClientId) return toast.error("Select a client first");
-    if (!org || !user) return;
+    if (!org || !user || !selectedClient) return;
     setClockingIn(true);
     try {
       const pos = await getPosition().catch((err: GeolocationPositionError | Error) => {
@@ -141,23 +171,45 @@ export function EvvShiftControl() {
         if (code === 1) throw new Error("Location permission denied — EVV requires GPS to clock in.");
         throw new Error("Unable to get your location. Enable GPS and try again.");
       });
-      const { data, error } = await supabase
-        .from("shifts")
-        .insert({
-          organization_id: org.organization_id,
-          user_id: user.id,
-          client_id: selectedClientId,
-          clock_in_time: new Date().toISOString(),
-          clock_in_lat: pos.coords.latitude,
-          clock_in_long: pos.coords.longitude,
-          device_fingerprint: deviceFingerprint(),
-          status: "pending",
-        })
-        .select("id, client_id, clock_in_time")
-        .single();
-      if (error) throw error;
-      setActive(data as ActiveShift);
+
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      if (selectedClient.home_latitude != null && selectedClient.home_longitude != null) {
+        const dist = haversineMiles(lat, lng, selectedClient.home_latitude, selectedClient.home_longitude);
+        if (dist > GEOFENCE_MILES) {
+          // Intercept — require bypass reason
+          setPendingBypass({ lat, lng, distance: dist });
+          setClockingIn(false);
+          return;
+        }
+      }
+
+      const data = await insertShift({ lat, lng, outsideGeofence: false, bypassReason: null });
+      setActive(data);
       toast.success("Clocked in");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to clock in");
+    } finally {
+      setClockingIn(false);
+    }
+  };
+
+  const handleBypassConfirm = async (reason: string) => {
+    if (!pendingBypass || !user || !org) return;
+    setClockingIn(true);
+    try {
+      const data = await insertShift({
+        lat: pendingBypass.lat,
+        lng: pendingBypass.lng,
+        outsideGeofence: true,
+        bypassReason: reason,
+      });
+      setActive(data);
+      setPendingBypass(null);
+      toast.warning("Clocked in OUTSIDE geofence — flagged for compliance review", {
+        description: `${pendingBypass.distance.toFixed(2)} mi from client's home. Reason logged.`,
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to clock in");
     } finally {
@@ -191,11 +243,7 @@ export function EvvShiftControl() {
       <div className="mt-6 grid gap-4">
         <div className="grid gap-2">
           <Label>Client</Label>
-          <Select
-            value={selectedClientId}
-            onValueChange={setSelectedClientId}
-            disabled={!!active}
-          >
+          <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={!!active}>
             <SelectTrigger><SelectValue placeholder="Select the individual you are serving" /></SelectTrigger>
             <SelectContent>
               {!clients?.length ? (
@@ -225,6 +273,15 @@ export function EvvShiftControl() {
         </p>
       </div>
 
+      {pendingBypass && (
+        <GeofenceBypassModal
+          distance={pendingBypass.distance}
+          submitting={clockingIn}
+          onConfirm={handleBypassConfirm}
+          onCancel={() => setPendingBypass(null)}
+        />
+      )}
+
       {showDocLock && active && selectedClient && (
         <DocumentationLockModal
           client={selectedClient}
@@ -233,6 +290,62 @@ export function EvvShiftControl() {
         />
       )}
     </div>
+  );
+}
+
+function GeofenceBypassModal({
+  distance, onConfirm, onCancel, submitting,
+}: {
+  distance: number;
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+  submitting: boolean;
+}) {
+  const [reason, setReason] = useState("");
+  const canSubmit = reason.trim().length >= 10 && !submitting;
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o && !submitting) onCancel(); }}>
+      <DialogContent
+        className="max-w-lg"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            Geofence Verification Deviation
+          </DialogTitle>
+          <DialogDescription>
+            <span className="font-medium text-foreground">EVV Warning:</span> You are outside the designated radius for this individual
+            ({distance.toFixed(2)} mi from their home address, threshold {GEOFENCE_MILES} mi).
+            To proceed, you must provide an administrative reason for audit tracking.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3">
+          <Label htmlFor="bypass-reason">Reason for Deviation</Label>
+          <Textarea
+            id="bypass-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={4}
+            maxLength={500}
+            placeholder="e.g. Met client at community center for inclusion goals"
+          />
+          <p className={`text-[11px] ${reason.trim().length >= 10 ? "text-muted-foreground" : "text-destructive"}`}>
+            {reason.trim().length}/10 characters minimum
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={submitting}>Cancel</Button>
+          <Button onClick={() => onConfirm(reason.trim())} disabled={!canSubmit} variant="destructive">
+            {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging…</> : "Confirm & Clock In"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -259,7 +372,6 @@ function DocumentationLockModal({
     if (narrative.trim().length < 50) return toast.error("Narrative must be at least 50 characters");
     setSubmitting(true);
     try {
-      // capture clock-out location for geofence check
       let outLat: number | null = null;
       let outLng: number | null = null;
       let outsideGeofence = false;

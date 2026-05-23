@@ -14,7 +14,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Award, AlertTriangle, TrendingUp, UserPlus, Radio } from "lucide-react";
 import { toast } from "sonner";
-import { EvvShiftControl } from "@/components/evv-shift-control";
+
 import { Badge } from "@/components/ui/badge";
 import { jobCodeLabel } from "@/lib/job-codes";
 

@@ -114,7 +114,7 @@ export type Database = {
           home_latitude: number | null
           home_longitude: number | null
           id: string
-          job_code: string | null
+          job_code: string[]
           last_name: string
           medicaid_id: string | null
           organization_id: string
@@ -128,7 +128,7 @@ export type Database = {
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
-          job_code?: string | null
+          job_code?: string[]
           last_name: string
           medicaid_id?: string | null
           organization_id: string
@@ -142,7 +142,7 @@ export type Database = {
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
-          job_code?: string | null
+          job_code?: string[]
           last_name?: string
           medicaid_id?: string | null
           organization_id?: string
@@ -950,6 +950,7 @@ export type Database = {
           device_fingerprint: string | null
           geofence_bypass_reason: string | null
           id: string
+          job_code: string | null
           organization_id: string
           outside_geofence: boolean
           status: Database["public"]["Enums"]["shift_status"]
@@ -969,6 +970,7 @@ export type Database = {
           device_fingerprint?: string | null
           geofence_bypass_reason?: string | null
           id?: string
+          job_code?: string | null
           organization_id: string
           outside_geofence?: boolean
           status?: Database["public"]["Enums"]["shift_status"]
@@ -988,6 +990,7 @@ export type Database = {
           device_fingerprint?: string | null
           geofence_bypass_reason?: string | null
           id?: string
+          job_code?: string | null
           organization_id?: string
           outside_geofence?: boolean
           status?: Database["public"]["Enums"]["shift_status"]

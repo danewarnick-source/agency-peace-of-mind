@@ -95,17 +95,33 @@ function ClientsPage() {
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as unknown as Client[];
-    },
-  });
+type ClientWriteValues = ClientFormValues & {
+  home_latitude: number | null;
+  home_longitude: number | null;
+};
+
+async function resolveCoords(addr: string): Promise<{ lat: number | null; lng: number | null }> {
+  if (addr && addr.trim().toLowerCase() !== "testing headquarters") {
+    const geo = await geocodeAddress(addr);
+    if (geo) return { lat: geo.lat, lng: geo.lng };
+  }
+  // Fallback to browser location
+  try {
+    const pos = await getBrowserPosition();
+    return { lat: pos.lat, lng: pos.lng };
+  } catch {
+    return { lat: null, lng: null };
+  }
+}
 
   const addMutation = useMutation({
     mutationFn: async (input: ClientFormValues) => {
+      const coords = await resolveCoords(input.physical_address);
       const { error } = await supabase.from("clients").insert({
         organization_id: org!.organization_id,
         ...input,
-        home_latitude: 40.3524,
-        home_longitude: -111.9051,
+        home_latitude: coords.lat,
+        home_longitude: coords.lng,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
       if (error) throw error;
@@ -121,10 +137,11 @@ function ClientsPage() {
   const editMutation = useMutation({
     mutationFn: async (input: ClientFormValues & { id: string }) => {
       const { id, ...rest } = input;
+      const coords = await resolveCoords(rest.physical_address);
       const { error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update(rest as any)
+        .update({ ...rest, home_latitude: coords.lat, home_longitude: coords.lng } as any)
         .eq("id", id);
       if (error) throw error;
     },

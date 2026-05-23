@@ -449,6 +449,66 @@ function EmployeesPage() {
           <DialogFooter><Button onClick={() => setCredentialsShown(null)}>Done</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit employee */}
+      <Dialog open={!!editingMember} onOpenChange={(o) => !o && setEditingMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit employee</DialogTitle>
+            <DialogDescription>Update profile, role, and employment status. Changes save immediately.</DialogDescription>
+          </DialogHeader>
+          {editingMember && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                editMemberMutation.mutate({
+                  membershipId: editingMember.membershipId,
+                  userId: editingMember.userId,
+                  fullName: String(fd.get("full_name") || "").trim(),
+                  email: String(fd.get("email") || "").trim(),
+                  employeeId: String(fd.get("employee_id") || "").trim(),
+                  role: String(fd.get("role") || "employee") as Role,
+                  active: String(fd.get("active") || "true") === "true",
+                });
+              }}
+              className="grid gap-4"
+            >
+              <div className="grid gap-2"><Label htmlFor="full_name">Full name</Label><Input id="full_name" name="full_name" defaultValue={editingMember.fullName} required /></div>
+              <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={editingMember.email} /></div>
+              <div className="grid gap-2"><Label htmlFor="employee_id">Employee ID</Label><Input id="employee_id" name="employee_id" defaultValue={editingMember.employeeId} placeholder="e.g. EMP-1042" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-role">System role</Label>
+                  <Select name="role" defaultValue={editingMember.role}>
+                    <SelectTrigger id="edit-role"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="employee">Staff</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-active">Employment status</Label>
+                  <Select name="active" defaultValue={editingMember.active ? "true" : "false"}>
+                    <SelectTrigger id="edit-active"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Active</SelectItem>
+                      <SelectItem value="false">Deactivated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={editMemberMutation.isPending}>
+                  {editMemberMutation.isPending ? "Saving…" : "Save changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

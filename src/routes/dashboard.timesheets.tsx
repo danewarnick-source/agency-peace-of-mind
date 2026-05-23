@@ -263,7 +263,7 @@ function TimesheetsPage() {
   };
 
   const clearFilters = () => {
-    setStaffId("all"); setClientId("all"); setStartDate(""); setEndDate("");
+    setStaffId("all"); setClientId("all"); setStartDate(firstOfMonth); setEndDate(lastOfMonth);
   };
 
   return (

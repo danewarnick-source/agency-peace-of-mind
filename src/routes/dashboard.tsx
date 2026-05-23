@@ -3,13 +3,14 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
+import { usePortalView } from "@/hooks/use-portal-view";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ROLE_LABEL, type Permission, type Role } from "@/lib/rbac";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
-  LayoutDashboard, GraduationCap, BadgeCheck, FileBarChart, CreditCard,
-  Users, BookOpen, Settings, LogOut, UserCog, Building2, Mail,
-  Layers, FileCheck2, Route as RouteIcon, ShieldCheck,
+  LayoutDashboard, GraduationCap, BookOpen, Settings,
+  LogOut, Users, Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,38 +19,25 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
 });
 
-type NavItem = {
-  to: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  exact?: boolean;
-  perm?: Permission;
-  roles?: Role[];
-};
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
 
-const NAV: NavItem[] = [
+const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/super-admin", label: "Platform", icon: Building2, roles: ["super_admin"] },
-  { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap, perm: "view_own_training" },
-  { to: "/dashboard/training", label: "Course Library", icon: BookOpen, perm: "view_own_training" },
-  { to: "/dashboard/external-certifications", label: "External Certs", icon: FileCheck2, perm: "upload_external_certs" },
-  { to: "/dashboard/certifications", label: "Certifications", icon: BadgeCheck, perm: "view_certifications" },
-  { to: "/dashboard/employees", label: "Employees", icon: Users, perm: "manage_users" },
-  { to: "/dashboard/invitations", label: "Invitations", icon: Mail, perm: "invite_users" },
-  { to: "/dashboard/roles", label: "Roles", icon: UserCog, perm: "manage_roles" },
-  { to: "/dashboard/permissions", label: "Permissions", icon: UserCog, perm: "manage_roles" },
-  { to: "/dashboard/team", label: "My Team", icon: UserCog, roles: ["admin", "manager", "super_admin"] },
-  { to: "/dashboard/reports", label: "Reports", icon: FileBarChart, perm: "export_reports" },
-  { to: "/dashboard/evv-compliance", label: "EVV Compliance", icon: ShieldCheck, perm: "export_reports" },
-  { to: "/dashboard/billing", label: "Billing", icon: CreditCard, perm: "view_billing" },
-  { to: "/dashboard/settings", label: "Settings", icon: Settings },
+  { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
 ];
 
+const ADMIN_NAV: NavItem[] = [
+  { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/training", label: "Course Library", icon: BookOpen },
+  { to: "/dashboard/employees", label: "Employees", icon: Users },
+  { to: "/dashboard/settings", label: "Settings", icon: Settings },
+];
 
 function DashboardLayout() {
   const { session, loading, user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { can } = usePermissions();
+  const { view, setView } = usePortalView();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -57,20 +45,13 @@ function DashboardLayout() {
     if (!loading && !session) navigate({ to: "/login" });
   }, [loading, session, navigate]);
 
-  // Force password change for manually-onboarded employees on first login
   useEffect(() => {
     const uid = session?.user?.id;
     if (!uid) return;
     let cancelled = false;
-    supabase
-      .from("profiles")
-      .select("must_change_password")
-      .eq("id", uid)
-      .maybeSingle()
+    supabase.from("profiles").select("must_change_password").eq("id", uid).maybeSingle()
       .then(({ data }) => {
-        if (!cancelled && data?.must_change_password) {
-          navigate({ to: "/reset-password" });
-        }
+        if (!cancelled && data?.must_change_password) navigate({ to: "/reset-password" });
       });
     return () => { cancelled = true; };
   }, [session?.user?.id, navigate]);
@@ -80,13 +61,9 @@ function DashboardLayout() {
   }
 
   const role: Role = org?.role ?? "employee";
-  const visible = NAV.filter((n) => {
-    if (n.roles && !n.roles.includes(role)) return false;
-    if (n.perm && !can(n.perm)) return false;
-    return true;
-  });
-
-
+  const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
+  const effectiveView = isAdminCapable ? view : "staff";
+  const nav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
   const signOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out");
@@ -102,8 +79,30 @@ function DashboardLayout() {
           </span>
           Care Academy
         </div>
+
+        {isAdminCapable && (
+          <div className="border-b border-sidebar-border px-4 py-4">
+            <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+              Portal View
+            </label>
+            <Select value={effectiveView} onValueChange={(v) => setView(v as "staff" | "admin")}>
+              <SelectTrigger className="w-full border-sidebar-border bg-sidebar-accent/40 text-sidebar-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="staff">
+                  <span className="inline-flex items-center gap-2"><GraduationCap className="h-3.5 w-3.5" /> Staff View</span>
+                </SelectItem>
+                <SelectItem value="admin">
+                  <span className="inline-flex items-center gap-2"><Building2 className="h-3.5 w-3.5" /> Admin View</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {visible.map((item) => {
+          {nav.map((item) => {
             const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
             const Icon = item.icon;
             return (
@@ -121,6 +120,7 @@ function DashboardLayout() {
             );
           })}
         </nav>
+
         <div className="border-t border-sidebar-border p-4">
           <div className="mb-3 text-xs text-sidebar-foreground/60">
             <div className="font-medium text-sidebar-foreground">{user?.user_metadata?.full_name ?? user?.email}</div>
@@ -139,7 +139,7 @@ function DashboardLayout() {
         <header className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
           <div>
             <h1 className="text-lg font-semibold tracking-tight">
-              {visible.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard"}
+              {nav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard"}
             </h1>
             <p className="text-xs text-muted-foreground">{org?.organization_name ?? "Workspace"} · {ROLE_LABEL[role]}</p>
           </div>

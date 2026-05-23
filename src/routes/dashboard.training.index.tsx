@@ -1,69 +1,172 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
-import { PlayCircle, Calendar } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PlayCircle, Award, UserPlus, BookOpen } from "lucide-react";
+import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/training/")({ component: MyTraining });
+export const Route = createFileRoute("/dashboard/training/")({ component: CourseLibrary });
 
-function MyTraining() {
-  const { user } = useAuth();
-  const { data: assignments, isLoading } = useQuery({
-    enabled: !!user,
-    queryKey: ["my-assignments", user?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("course_assignments")
-        .select("id, status, progress, due_date, course_id, courses(id, title, description, category, cover_url, duration_minutes)")
-        .eq("user_id", user!.id)
-        .order("created_at", { ascending: false });
-      return data ?? [];
+type Module = {
+  id: string;
+  title: string;
+  description: string | null;
+  sequence_order: number;
+};
+
+function CourseLibrary() {
+  const { data: org } = useCurrentOrg();
+  const qc = useQueryClient();
+  const isAdmin = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const [selectedUser, setSelectedUser] = useState<string>("");
+
+  const { data: modules, isLoading } = useQuery({
+    queryKey: ["training-modules"],
+    queryFn: async (): Promise<Module[]> => {
+      const { data, error } = await supabase
+        .from("training_modules")
+        .select("id, title, description, sequence_order")
+        .order("sequence_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Module[];
     },
+  });
+
+  const { data: members } = useQuery({
+    enabled: !!org && isAdmin,
+    queryKey: ["org-members-for-assign", org?.organization_id],
+    queryFn: async () => {
+      const { data: mems } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", org!.organization_id)
+        .eq("active", true);
+      const ids = (mems ?? []).map((m) => m.user_id);
+      if (!ids.length) return [];
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, username")
+        .in("id", ids);
+      return (profs ?? []).map((p) => ({
+        id: p.id,
+        label: p.full_name || p.email || p.username || "—",
+      }));
+    },
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      if (!modules?.length) throw new Error("Modules not loaded");
+      // Insert a progress row per module if it doesn't exist (best-effort upsert by user/module).
+      const rows = modules.map((m) => ({
+        user_id: userId,
+        module_id: m.id,
+        is_completed: false,
+      }));
+      // Check existing
+      const { data: existing } = await supabase
+        .from("user_training_progress")
+        .select("module_id")
+        .eq("user_id", userId);
+      const existingSet = new Set((existing ?? []).map((r) => r.module_id));
+      const toInsert = rows.filter((r) => !existingSet.has(r.module_id));
+      if (!toInsert.length) return { inserted: 0 };
+      const { error } = await supabase.from("user_training_progress").insert(toInsert);
+      if (error) throw error;
+      return { inserted: toInsert.length };
+    },
+    onSuccess: (res) => {
+      toast.success(
+        res.inserted
+          ? `Compliance track assigned (${res.inserted} module${res.inserted === 1 ? "" : "s"})`
+          : "Track already assigned to this employee",
+      );
+      qc.invalidateQueries({ queryKey: ["my-training-progress"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <h2 className="text-base font-semibold">Assigned to you</h2>
-        <p className="text-sm text-muted-foreground">Complete each course to earn its certification.</p>
+        <p className="text-xs font-medium text-accent">Utah DSPD Provider Compliance</p>
+        <h2 className="mt-1 text-xl font-semibold tracking-tight">Course Library</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The six required compliance modules for every direct-support professional.
+        </p>
       </div>
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : !assignments?.length ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-          <p className="text-sm text-muted-foreground">No training assigned yet.</p>
-          <Button asChild className="mt-4"><Link to="/dashboard/courses">Browse Course Library</Link></Button>
+      {isAdmin && (
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-accent" />
+            <h3 className="text-sm font-semibold">Assign Training Track</h3>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Initialize the 6-module compliance track for an employee.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="min-w-[260px] flex-1">
+              <Select value={selectedUser} onValueChange={setSelectedUser}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an employee…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members?.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => selectedUser && assignMutation.mutate(selectedUser)}
+              disabled={!selectedUser || assignMutation.isPending}
+              className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+            >
+              {assignMutation.isPending ? "Assigning…" : "Assign Compliance Track"}
+            </Button>
+          </div>
         </div>
+      )}
+
+      {isLoading || !modules ? (
+        <p className="text-sm text-muted-foreground">Loading modules…</p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {assignments.map((a) => {
-            const c = a.courses as { id: string; title: string; description: string | null; category: string | null; cover_url: string | null; duration_minutes: number | null } | null;
-            if (!c) return null;
+          {modules.map((m) => {
+            const isFinal = m.sequence_order === 6;
             return (
-              <div key={a.id} className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-                {c.cover_url && <img src={c.cover_url} alt="" className="h-40 w-full object-cover" />}
-                <div className="p-5">
-                  <p className="text-xs font-medium text-accent">{c.category}</p>
-                  <h3 className="mt-1 font-semibold tracking-tight">{c.title}</h3>
-                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{c.description}</p>
-                  <div className="mt-4">
-                    <div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full bg-[image:var(--gradient-brand)]" style={{ width: `${a.progress}%` }} /></div>
-                    <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{a.progress}% complete</span>
-                      {a.due_date && <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> Due {new Date(a.due_date).toLocaleDateString()}</span>}
-                    </div>
+              <div key={m.id} className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)]">
+                <div className="flex items-start gap-3">
+                  <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold ${isFinal ? "bg-amber-500/15 text-amber-600" : "bg-accent/15 text-accent"}`}>
+                    {isFinal ? <Award className="h-5 w-5" /> : m.sequence_order}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold tracking-tight">{m.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{m.description}</p>
                   </div>
-                  <Button asChild className="mt-5 w-full bg-[image:var(--gradient-brand)] text-primary-foreground">
-                    <Link to="/dashboard/courses/$courseId" params={{ courseId: c.id }}>
-                      <PlayCircle className="mr-2 h-4 w-4" /> {a.progress > 0 ? "Continue" : "Start"} course
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button asChild size="sm" variant="outline">
+                    <Link to="/dashboard/training/$id" params={{ id: m.id }}>
+                      <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+                      {isFinal ? "Open Quiz" : "Preview Module"}
                     </Link>
                   </Button>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {!isAdmin && (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
+          <BookOpen className="mx-auto h-5 w-5" />
+          <p className="mt-2">Visit <Link to="/dashboard/courses" className="font-medium text-accent hover:underline">My Trainings</Link> for your personal compliance roadmap.</p>
         </div>
       )}
     </div>

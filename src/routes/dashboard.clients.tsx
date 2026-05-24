@@ -19,6 +19,7 @@ import { Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2 } from "lucide-rea
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { ClientChartAuditMatrix } from "@/components/client-chart-audit";
+import { BulkImporter } from "@/components/bulk-importer";
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -162,17 +163,20 @@ function ClientsPage() {
             Manage individuals served, authorized service codes, and PCSP goals.
           </p>
         </div>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><UserPlus className="mr-2 h-4 w-4" /> Add new client</Button>
-          </DialogTrigger>
-          <ClientFormDialog
-            title="Add a new client"
-            submitLabel="Save client"
-            pending={addMutation.isPending}
-            onSubmit={(v) => addMutation.mutate(v)}
-          />
-        </Dialog>
+        <div className="flex flex-wrap items-center gap-2">
+          <BulkImporter organizationId={org?.organization_id} defaultKind="client" />
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm"><UserPlus className="mr-2 h-4 w-4" /> Add new client</Button>
+            </DialogTrigger>
+            <ClientFormDialog
+              title="Add a new client"
+              submitLabel="Save client"
+              pending={addMutation.isPending}
+              onSubmit={(v) => addMutation.mutate(v)}
+            />
+          </Dialog>
+        </div>
       </div>
 
       <ClientChartAuditMatrix />

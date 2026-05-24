@@ -163,11 +163,6 @@ const DashboardSubmissionsRoute = DashboardSubmissionsRouteImport.update({
   path: '/submissions',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardAuditPortalRoute = DashboardAuditPortalRouteImport.update({
-  id: '/audit-portal',
-  path: '/audit-portal',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -344,6 +339,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/submissions': typeof DashboardSubmissionsRoute
+  '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute

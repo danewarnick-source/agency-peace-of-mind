@@ -274,6 +274,7 @@ function EmployeesPage() {
               <th className="p-4 text-left">Name</th>
               <th className="p-4 text-left">Login</th>
               <th className="p-4 text-left">Role</th>
+              <th className="p-4 text-left">Position</th>
               <th className="p-4 text-left">Status</th>
               <th className="p-4 text-left">Joined</th>
               <th className="p-4" />
@@ -284,11 +285,13 @@ function EmployeesPage() {
               const name = m.profile?.full_name ?? "—";
               const login = m.profile?.username ?? m.profile?.email ?? "—";
               const needsReset = m.profile?.must_change_password;
+              const position = (m.profile?.position ?? "") as Position | "";
               return (
                 <tr key={m.id} className="border-b border-border last:border-0">
                   <td className="p-4 font-medium">{name}{needsReset && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">Pending first login</span>}</td>
                   <td className="p-4 text-muted-foreground">{login}</td>
                   <td className="p-4"><span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span></td>
+                  <td className="p-4">{position ? <Badge variant="outline" className="font-normal">{position}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</td>
                   <td className="p-4 text-xs">{m.active ? <span className="text-emerald-600">Active</span> : <span className="text-muted-foreground">Deactivated</span>}</td>
                   <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
                   <td className="p-4 text-right whitespace-nowrap">
@@ -300,6 +303,7 @@ function EmployeesPage() {
                       employeeId: m.profile?.employee_id ?? "",
                       role: m.role as Role,
                       active: m.active,
+                      position,
                     })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
                       <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload

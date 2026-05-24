@@ -11,7 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { RequirePermission } from "@/components/rbac-guard";

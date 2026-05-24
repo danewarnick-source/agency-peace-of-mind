@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Award, AlertTriangle, TrendingUp, UserPlus, Radio } from "lucide-react";
+import { Users, Award, AlertTriangle, TrendingUp, UserPlus, Radio, Clock as ClockIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";

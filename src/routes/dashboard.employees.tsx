@@ -490,6 +490,7 @@ function EmployeesPage() {
                   employeeId: String(fd.get("employee_id") || "").trim(),
                   role: String(fd.get("role") || "employee") as Role,
                   active: String(fd.get("active") || "true") === "true",
+                  position: (String(fd.get("position") || "") as Position | ""),
                 });
               }}
               className="grid gap-4"
@@ -497,6 +498,15 @@ function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="full_name">Full name</Label><Input id="full_name" name="full_name" defaultValue={editingMember.fullName} required /></div>
               <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={editingMember.email} /></div>
               <div className="grid gap-2"><Label htmlFor="employee_id">Employee ID</Label><Input id="employee_id" name="employee_id" defaultValue={editingMember.employeeId} placeholder="e.g. EMP-1042" /></div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-position">Agency Position</Label>
+                <Select name="position" defaultValue={editingMember.position || undefined}>
+                  <SelectTrigger id="edit-position"><SelectValue placeholder="Select a position" /></SelectTrigger>
+                  <SelectContent>
+                    {POSITIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-role">System role</Label>

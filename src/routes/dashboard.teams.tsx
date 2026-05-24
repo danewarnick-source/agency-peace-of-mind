@@ -342,11 +342,20 @@ function startDrag(e: DragEvent, payload: DragPayload) {
 }
 
 function StaffCard({ s, from }: { s: StaffRow; from: string | null }) {
+  const navigate = useNavigate();
+  const draggedRef = useRef(false);
   return (
     <div
       draggable
-      onDragStart={(e) => startDrag(e, { kind: "staff", id: s.id, from })}
-      className="group flex items-center gap-1.5 rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing"
+      onDragStart={(e) => { draggedRef.current = true; startDrag(e, { kind: "staff", id: s.id, from }); }}
+      onDragEnd={() => { setTimeout(() => { draggedRef.current = false; }, 50); }}
+      onClick={() => {
+        if (draggedRef.current) return;
+        navigate({ to: "/dashboard/employees", search: { id: s.id } as never });
+      }}
+      role="button"
+      tabIndex={0}
+      className="group flex items-center gap-1.5 rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md hover:border-primary/50 cursor-pointer active:cursor-grabbing transition-colors"
     >
       <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
       <span className="font-medium truncate flex-1">{s.name}</span>
@@ -358,12 +367,21 @@ function StaffCard({ s, from }: { s: StaffRow; from: string | null }) {
 }
 
 function ClientCard({ c, from }: { c: ClientRow; from: string | null }) {
+  const navigate = useNavigate();
+  const draggedRef = useRef(false);
   const funding = c.job_code?.[0] ?? "Self-pay";
   return (
     <div
       draggable
-      onDragStart={(e) => startDrag(e, { kind: "client", id: c.id, from })}
-      className="group rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing border-l-2 border-l-emerald-500"
+      onDragStart={(e) => { draggedRef.current = true; startDrag(e, { kind: "client", id: c.id, from }); }}
+      onDragEnd={() => { setTimeout(() => { draggedRef.current = false; }, 50); }}
+      onClick={() => {
+        if (draggedRef.current) return;
+        navigate({ to: "/dashboard/clients", search: { id: c.id } as never });
+      }}
+      role="button"
+      tabIndex={0}
+      className="group rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md hover:border-primary/50 cursor-pointer active:cursor-grabbing border-l-2 border-l-emerald-500 transition-colors"
     >
       <div className="flex items-center gap-1.5">
         <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />

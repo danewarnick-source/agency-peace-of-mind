@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { jobCodeLabel } from "@/lib/job-codes";
+import { StaffClientGrid } from "@/components/staff-client-grid";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 

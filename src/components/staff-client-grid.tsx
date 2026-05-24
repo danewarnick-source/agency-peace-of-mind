@@ -54,7 +54,7 @@ export function StaffClientGrid() {
             return (
               <Link
                 key={c.id}
-                to="/dashboard/client/$clientId"
+                to="/dashboard/workspace/$clientId"
                 params={{ clientId: c.id }}
                 className="group flex items-start gap-3 rounded-xl border border-border bg-background p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
               >

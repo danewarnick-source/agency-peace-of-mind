@@ -99,7 +99,7 @@ function EmarPage() {
         .select("medication_id, scheduled_for, status")
         .eq("organization_id", org!.organization_id)
         .gte("scheduled_for", todayStart).lt("scheduled_for", todayEnd);
-      return (data ?? []) as Array<{ medication_id: string; scheduled_for: string; status: string }>;
+      return ((data ?? []) as unknown) as Array<{ medication_id: string; scheduled_for: string; status: string }>;
     },
   });
   const doneKey = (r: DueRow) => `${r.medication_id}|${r.scheduled_for}`;

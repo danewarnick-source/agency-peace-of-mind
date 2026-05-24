@@ -21,6 +21,7 @@ import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { ClientChartAuditMatrix } from "@/components/client-chart-audit";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
+import { LifecyclePanel } from "@/components/lifecycle-panel";
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   try {

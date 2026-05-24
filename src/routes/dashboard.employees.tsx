@@ -18,6 +18,7 @@ import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus,
 import { toast } from "sonner";
 
 import { RequirePermission } from "@/components/rbac-guard";
+import { BulkImporter } from "@/components/bulk-importer";
 
 function genPassword(len = 14) {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";

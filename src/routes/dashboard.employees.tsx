@@ -542,6 +542,13 @@ function EmployeesPage() {
                 entityKind="employee"
                 entityId={editingMember.userId}
               />
+              <LifecyclePanel
+                kind="employee"
+                id={editingMember.userId}
+                fullName={editingMember.fullName}
+                organizationId={org?.organization_id}
+                onDone={() => setEditingMember(null)}
+              />
               <DialogFooter>
                 <Button type="submit" disabled={editMemberMutation.isPending}>
                   {editMemberMutation.isPending ? "Saving…" : "Save changes"}

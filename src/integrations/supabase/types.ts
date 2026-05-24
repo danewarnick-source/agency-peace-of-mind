@@ -160,6 +160,42 @@ export type Database = {
           },
         ]
       }
+      compliance_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          gap_key: string
+          gap_reference_date: string
+          gap_type: string
+          id: string
+          organization_id: string
+          reason: string
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          gap_key: string
+          gap_reference_date: string
+          gap_type: string
+          id?: string
+          organization_id: string
+          reason: string
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          gap_key?: string
+          gap_reference_date?: string
+          gap_type?: string
+          id?: string
+          organization_id?: string
+          reason?: string
+          staff_id?: string
+        }
+        Relationships: []
+      }
       course_assignments: {
         Row: {
           assigned_by: string | null
@@ -1192,6 +1228,48 @@ export type Database = {
           role?: string | null
           staff_name?: string
           status?: string
+        }
+        Relationships: []
+      }
+      staff_nudges: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          gap_key: string
+          gap_reference_date: string | null
+          gap_type: string
+          id: string
+          message: string
+          organization_id: string
+          priority: string
+          read_at: string | null
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          gap_key: string
+          gap_reference_date?: string | null
+          gap_type: string
+          id?: string
+          message: string
+          organization_id: string
+          priority?: string
+          read_at?: string | null
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          gap_key?: string
+          gap_reference_date?: string | null
+          gap_type?: string
+          id?: string
+          message?: string
+          organization_id?: string
+          priority?: string
+          read_at?: string | null
+          staff_id?: string
         }
         Relationships: []
       }

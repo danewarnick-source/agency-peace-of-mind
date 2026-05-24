@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { jobCodeLabel } from "@/lib/job-codes";
 import { StaffClientGrid } from "@/components/staff-client-grid";
+import { ComplianceMatrix } from "@/components/compliance-matrix";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 
@@ -56,32 +57,8 @@ function Overview() {
     },
   });
 
-  // Compliance status per employee — track training_modules completed
-  const { data: compliance } = useQuery({
-    enabled: !!org && showAdmin,
-    queryKey: ["compliance-status", org?.organization_id],
-    queryFn: async () => {
-      const [{ data: mems }, { count: totalModules }, { data: progress }] = await Promise.all([
-        supabase.from("organization_members").select("user_id").eq("organization_id", org!.organization_id).eq("active", true),
-        supabase.from("training_modules").select("*", { count: "exact", head: true }),
-        supabase.from("user_training_progress").select("user_id, is_completed"),
-      ]);
-      const ids = (mems ?? []).map((m) => m.user_id);
-      if (!ids.length) return { total: totalModules ?? 6, rows: [] as Array<{ id: string; name: string; pct: number }> };
-      const { data: profs } = await supabase
-        .from("profiles").select("id, full_name, email").in("id", ids);
-      const completedBy = new Map<string, number>();
-      (progress ?? []).forEach((p) => {
-        if (p.is_completed) completedBy.set(p.user_id, (completedBy.get(p.user_id) ?? 0) + 1);
-      });
-      const tot = totalModules ?? 6;
-      const rows = (profs ?? []).map((p) => {
-        const done = completedBy.get(p.id) ?? 0;
-        return { id: p.id, name: p.full_name || p.email || "—", pct: Math.min(100, Math.round((done / tot) * 100)) };
-      }).sort((a, b) => a.name.localeCompare(b.name));
-      return { total: tot, rows };
-    },
-  });
+
+
 
   // Live active-shift monitor (admin view)
   const { data: liveShifts } = useQuery({
@@ -217,35 +194,8 @@ function Overview() {
       {showAdmin && <LiveMonitor shifts={(liveShifts ?? []) as unknown as LiveShift[]} />}
 
       {showAdmin ? (
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-          <div className="flex items-end justify-between">
-            <div>
-              <h3 className="text-base font-semibold">Company Compliance Status</h3>
-              <p className="text-xs text-muted-foreground">
-                Onboarding progress across the {compliance?.total ?? 6}-module Utah DSPD compliance track.
-              </p>
-            </div>
-            <span className="text-xs text-muted-foreground">{compliance?.rows.length ?? 0} employees</span>
-          </div>
-          <div className="mt-6 space-y-3">
-            {!compliance?.rows.length ? (
-              <p className="text-sm text-muted-foreground">No employees yet — invite your team to begin.</p>
-            ) : (
-              compliance.rows.map((r) => (
-                <div key={r.id} className="grid grid-cols-[180px_1fr_48px] items-center gap-4">
-                  <span className="truncate text-sm">{r.name}</span>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                    <div
-                      className="h-full bg-[image:var(--gradient-brand)] transition-all"
-                      style={{ width: `${r.pct}%` }}
-                    />
-                  </div>
-                  <span className="text-right text-xs tabular-nums text-muted-foreground">{r.pct}%</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <ComplianceMatrix />
+
       ) : (
         <div className="space-y-6">
         <StaffClientGrid />

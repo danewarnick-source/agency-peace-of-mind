@@ -12,8 +12,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  AlertTriangle, BellRing, FileText, ShieldCheck, Pill, ClipboardSignature, Search,
+  AlertTriangle, BellRing, FileText, ShieldCheck, Pill, ClipboardSignature, Search, Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +41,8 @@ type Gap = {
   responsibleStaffName: string;
   label: string;
   detail: string;
+  clientId: string;
+  shiftId: string | null;
 };
 
 type ClientRow = {
@@ -124,6 +129,8 @@ export function ClientChartAuditMatrix() {
               responsibleStaffName: staff,
               label: "Missing Daily Note",
               detail: `${s.job_code || "Shift"} — ${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}. Assigned Staff: ${staff}.`,
+              clientId: c.id,
+              shiftId: s.id,
             });
           } else {
             notesOk++;
@@ -149,6 +156,8 @@ export function ClientChartAuditMatrix() {
               responsibleStaffName: staff,
               label: "Unsigned eMAR Med Pass",
               detail: `Medication window — ${new Date(day).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}. Responsible Staff: ${staff}.`,
+              clientId: c.id,
+              shiftId: s.id,
             });
           }
         });
@@ -186,6 +195,8 @@ export function ClientChartAuditMatrix() {
               responsibleStaffName: staff,
               label: "Missing Form: Incident Report",
               detail: `Required for behavioral/medical event logged on ${new Date(t.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} by Staff: ${staff}.`,
+              clientId: c.id,
+              shiftId: null,
             });
           }
         });
@@ -220,6 +231,8 @@ export function ClientChartAuditMatrix() {
               responsibleStaffName: "Program Coordinator",
               label: "Unsigned Monthly Progress Summary",
               detail: `${dt.toLocaleDateString(undefined, { month: "long", year: "numeric" })} signed summary not on file.`,
+              clientId: c.id,
+              shiftId: null,
             });
           }
         });
@@ -393,11 +406,15 @@ export function ClientChartAuditMatrix() {
                 <GapItem
                   key={g.key}
                   gap={g}
+                  orgId={org!.organization_id}
+                  adminUserId={user!.id}
                   onNudge={() => nudgeMut.mutate({ client: refreshedClient, gap: g })}
                   onOverride={(reason) => overrideMut.mutate({ client: refreshedClient, gap: g, reason })}
+                  onResolved={() => qc.invalidateQueries({ queryKey: ["client-chart-audit"] })}
                   isNudging={nudgeMut.isPending}
                   isOverriding={overrideMut.isPending}
                 />
+
               ))}
           </div>
         </SheetContent>
@@ -437,20 +454,124 @@ function MetricCell({ pct }: { pct: number }) {
 }
 
 function GapItem({
-  gap, onNudge, onOverride, isNudging, isOverriding,
+  gap, orgId, adminUserId, onNudge, onOverride, onResolved, isNudging, isOverriding,
 }: {
   gap: Gap;
+  orgId: string;
+  adminUserId: string;
   onNudge: () => void;
   onOverride: (reason: string) => void;
+  onResolved: () => void;
   isNudging: boolean;
   isOverriding: boolean;
 }) {
-  const [showOverride, setShowOverride] = useState(false);
+  const [mode, setMode] = useState<null | "resolve" | "waiver">(null);
   const [reason, setReason] = useState("");
   const [pinned, setPinned] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // Late-entry shift note / daily log
+  const [narrative, setNarrative] = useState("");
+
+  // Incident / monthly form
+  const [formTitle, setFormTitle] = useState(
+    gap.type === "incident_form" ? "Incident Report (Admin Late-Filed)" :
+    gap.type === "monthly_summary" ? "Monthly Progress Summary" : ""
+  );
+  const [formNarrative, setFormNarrative] = useState("");
+
+  // eMAR attestation
+  const [emarChecked, setEmarChecked] = useState(false);
 
   const icon = gap.type === "incident_form" ? "🚨" : "❌";
   const accent = gap.type === "incident_form" ? "border-red-500/40 bg-red-500/5" : "border-border";
+
+  const finishResolve = async (overrideReason: string) => {
+    // Always also write a compliance_override so the gap key is suppressed if the source row doesn't match exactly.
+    const { error: ovErr } = await supabase.from("compliance_overrides").insert({
+      organization_id: orgId,
+      staff_id: gap.responsibleStaffId ?? adminUserId,
+      gap_type: gap.type,
+      gap_reference_date: gap.refDate,
+      gap_key: gap.key,
+      reason: overrideReason,
+      created_by: adminUserId,
+    });
+    if (ovErr) throw ovErr;
+  };
+
+  const resolveLateNote = async () => {
+    if (!narrative.trim()) { toast.error("Enter a progress narrative first"); return; }
+    setBusy(true);
+    try {
+      if (gap.shiftId) {
+        const { error } = await supabase.from("shift_notes").insert({
+          shift_id: gap.shiftId,
+          user_id: adminUserId,
+          narrative_summary: `[FILED_BY_ADMIN_OVERRIDE @ ${new Date().toISOString()}] ${narrative.trim()}`,
+          goals_addressed: [],
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("daily_logs").insert({
+          organization_id: orgId,
+          user_id: adminUserId,
+          client_id: gap.clientId,
+          log_date: gap.refDate,
+          narrative: `[FILED_BY_ADMIN_OVERRIDE @ ${new Date().toISOString()}] ${narrative.trim()}`,
+          pcsp_goals_addressed: [],
+          status: "filed_by_admin_override",
+        });
+        if (error) throw error;
+      }
+      await finishResolve(`Late-entry notation filed by admin: "${narrative.trim().slice(0, 120)}"`);
+      toast.success("✅ Late entry filed — chart recalculating");
+      onResolved();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resolveForm = async () => {
+    if (!formNarrative.trim()) { toast.error("Enter the clinical narrative"); return; }
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("submitted_forms").insert({
+        organization_id: orgId,
+        client_id: gap.clientId,
+        user_id: gap.responsibleStaffId ?? adminUserId,
+        form_type: gap.type === "incident_form" ? "incident_report" : "medical_summary",
+        title: formTitle.trim() || (gap.type === "incident_form" ? "Incident Report" : "Monthly Summary"),
+        narrative: `[FILED_BY_ADMIN_OVERRIDE @ ${new Date().toISOString()}] ${formNarrative.trim()}`,
+        occurred_at: new Date(gap.refDate).toISOString(),
+        payload: { filed_by_admin: adminUserId, original_gap_key: gap.key },
+      });
+      if (error) throw error;
+      await finishResolve(`${gap.label} filed by admin with locked client/date/staff context.`);
+      toast.success("✅ Form filed & signed — chart recalculating");
+      onResolved();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resolveEmar = async () => {
+    if (!emarChecked) { toast.error("Check the physical-count attestation"); return; }
+    setBusy(true);
+    try {
+      await finishResolve(`eMAR physical pill-count verified & signed by admin credentials [${adminUserId.slice(0, 8)}] @ ${new Date().toISOString()}`);
+      toast.success("✅ eMAR attestation signed — chart recalculating");
+      onResolved();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className={`rounded-lg border ${accent} bg-background p-3`}>
@@ -462,25 +583,90 @@ function GapItem({
           variant="outline"
           disabled={pinned || isNudging || !gap.responsibleStaffId}
           className="h-7 gap-1 text-[11px]"
-          onClick={() => {
-            onNudge();
-            setPinned(true);
-          }}
+          onClick={() => { onNudge(); setPinned(true); }}
         >
-          {pinned
-            ? <>✓ Staff Pinned</>
-            : <><BellRing className="h-3 w-3" /> 🔔 Nudge Responsible Staff</>}
+          {pinned ? <>✓ Staff Pinned</> : <><BellRing className="h-3 w-3" /> 🔔 Nudge Responsible Staff</>}
+        </Button>
+        <Button
+          size="sm"
+          className="h-7 gap-1 text-[11px]"
+          onClick={() => setMode((m) => m === "resolve" ? null : "resolve")}
+        >
+          <Wrench className="h-3 w-3" /> ⚙️ Resolve &amp; File Form Now
         </Button>
         <Button
           size="sm"
           variant="ghost"
           className="h-7 gap-1 text-[11px]"
-          onClick={() => setShowOverride((v) => !v)}
+          onClick={() => setMode((m) => m === "waiver" ? null : "waiver")}
         >
-          ⚙️ Administrative Chart Waiver
+          Waiver only
         </Button>
       </div>
-      {showOverride && (
+
+      {mode === "resolve" && (gap.type === "shift_note") && (
+        <div className="mt-3 space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3">
+          <Label className="text-[11px] font-semibold uppercase tracking-wide text-primary">📝 Admin Late-Entry Notation</Label>
+          <Textarea
+            value={narrative}
+            onChange={(e) => setNarrative(e.target.value)}
+            placeholder="Type the progress summary on behalf of the agency (what occurred, goals addressed, client response)…"
+            className="min-h-[100px] text-xs"
+          />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setMode(null)}>Cancel</Button>
+            <Button size="sm" className="h-7 text-[11px]" disabled={busy} onClick={resolveLateNote}>
+              {busy ? "Filing…" : "Submit Administrative Entry"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {mode === "resolve" && (gap.type === "incident_form" || gap.type === "monthly_summary") && (
+        <div className="mt-3 space-y-2 rounded-md border border-red-500/30 bg-red-500/5 p-3">
+          <Label className="text-[11px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">
+            🚨 Pre-Filled {gap.type === "incident_form" ? "Incident Report" : "Monthly Summary"}
+          </Label>
+          <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/50 p-2 text-[10px] font-mono">
+            <div><span className="text-muted-foreground">Client ID:</span> <span className="opacity-70">🔒 {gap.clientId.slice(0, 8)}…</span></div>
+            <div><span className="text-muted-foreground">Service Date:</span> <span className="opacity-70">🔒 {gap.refDate}</span></div>
+            <div className="col-span-2"><span className="text-muted-foreground">Staff:</span> <span className="opacity-70">🔒 {gap.responsibleStaffName}</span></div>
+          </div>
+          <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="Form title" className="h-8 text-xs" />
+          <Textarea
+            value={formNarrative}
+            onChange={(e) => setFormNarrative(e.target.value)}
+            placeholder="Clinical narrative — describe the event, intervention, and outcome…"
+            className="min-h-[110px] text-xs"
+          />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setMode(null)}>Cancel</Button>
+            <Button size="sm" className="h-7 text-[11px]" disabled={busy} onClick={resolveForm}>
+              {busy ? "Filing…" : "File Form & Sign"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {mode === "resolve" && gap.type === "emar" && (
+        <div className="mt-3 space-y-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+          <Label className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            ⚠️ Confirm Physical Count Verification
+          </Label>
+          <label className="flex items-start gap-2 rounded-md bg-background/60 p-2 text-xs">
+            <Checkbox checked={emarChecked} onCheckedChange={(v) => setEmarChecked(Boolean(v))} className="mt-0.5" />
+            <span>✅ I have verified via physical pill-count / log-sheet audit that this medication was successfully administered on {gap.refDate}.</span>
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setMode(null)}>Cancel</Button>
+            <Button size="sm" className="h-7 text-[11px]" disabled={busy || !emarChecked} onClick={resolveEmar}>
+              {busy ? "Signing…" : "Confirm Override"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {mode === "waiver" && (
         <div className="mt-2 space-y-2 rounded-md border border-border/70 bg-muted/40 p-2">
           <Textarea
             value={reason}
@@ -489,13 +675,8 @@ function GapItem({
             className="min-h-[64px] text-xs"
           />
           <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => { setShowOverride(false); setReason(""); }}>Cancel</Button>
-            <Button
-              size="sm"
-              className="h-7 text-[11px]"
-              disabled={!reason.trim() || isOverriding}
-              onClick={() => onOverride(reason.trim())}
-            >
+            <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => { setMode(null); setReason(""); }}>Cancel</Button>
+            <Button size="sm" className="h-7 text-[11px]" disabled={!reason.trim() || isOverriding} onClick={() => onOverride(reason.trim())}>
               {isOverriding ? "Saving…" : "Save Waiver"}
             </Button>
           </div>

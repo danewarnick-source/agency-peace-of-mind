@@ -473,42 +473,86 @@ function StatCard({ label, value, icon: Icon, tone }: {
   );
 }
 
+function fmtLongDate(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  return d.toLocaleDateString(undefined, {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+}
+function fmtClockTime(iso: string | null | undefined) {
+  if (!iso || iso === "—") return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 function ResultRowItem({ row }: { row: ResultRow }) {
-  const Icon = row.kind === "shift" ? Clock : row.kind === "daily_log" ? ClipboardCheck : FileText;
-  const tone =
-    row.kind === "shift"
-      ? "bg-blue-500/15 text-blue-700 dark:text-blue-300"
-      : row.kind === "daily_log"
-      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-      : "bg-amber-500/15 text-amber-700 dark:text-amber-300";
-  return (
-    <li className="px-5 py-4">
-      <div className="flex items-start gap-3">
-        <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone}`}>
-          <Icon className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm font-medium">{row.title}</p>
-            <span className="text-xs text-muted-foreground">
-              {new Date(row.occurred_at).toLocaleString()}
+  const staffName = String(row.meta["Staff"] ?? "—");
+  const clientName = String(row.meta["Client"] ?? "—");
+  const dateLabel = fmtLongDate(row.occurred_at);
+
+  if (row.kind === "shift") {
+    const billedIn = fmtClockTime(row.meta["Billed clock-in"] as string);
+    const billedOut = fmtClockTime(row.meta["Billed clock-out"] as string);
+    const billedHrs = String(row.meta["Billed hours"] ?? "0.00");
+    const code = String(row.meta["Code"] ?? "—");
+    return (
+      <li className="px-8 py-7">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h3 className="text-xl font-bold tracking-tight text-foreground">
+            {staffName} <span className="text-muted-foreground font-medium">·</span> {clientName}
+          </h3>
+          <Badge variant="outline" className="text-[10px] uppercase tracking-wider">Hourly Shift</Badge>
+        </div>
+        <p className="mt-2 text-base font-medium text-muted-foreground">📅 {dateLabel}</p>
+
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <div className="space-y-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Time Window</p>
+            <p className="text-2xl font-semibold tabular-nums">
+              {billedIn} <span className="text-muted-foreground">–</span> {billedOut}
+            </p>
+            <span className="inline-flex rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-foreground/80">
+              Code: {code}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">{row.subtitle}</p>
-          <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
-            {Object.entries(row.meta).filter(([, v]) => v !== "" && v != null).map(([k, v]) => (
-              <div key={k} className="flex gap-2">
-                <dt className="shrink-0 text-muted-foreground">{k}:</dt>
-                <dd className="min-w-0 break-words font-mono text-[11px]">
-                  {k === "Outside geofence" && v === "YES"
-                    ? <span className="inline-flex items-center gap-1 rounded bg-orange-500/15 px-1.5 py-0.5 text-orange-700 dark:text-orange-300"><MapPin className="h-3 w-3" /> YES</span>
-                    : String(v)}
-                </dd>
-              </div>
-            ))}
-          </dl>
+
+          <div className="rounded-xl border border-primary/15 bg-primary/5 p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Billing Impact</p>
+            <p className="mt-2 text-3xl font-bold tabular-nums text-primary">{billedHrs} <span className="text-base font-semibold text-foreground/70">Hours Billed</span></p>
+          </div>
         </div>
+      </li>
+    );
+  }
+
+  // daily_log or submitted_form — archival document layout
+  const kindLabel = row.kind === "daily_log" ? "🏠 Daily Host Home Log" : formTypeLabel(String(row.meta["Type"] ?? "submitted_form"));
+  const narrative = String(row.meta["Narrative"] ?? "");
+  const goals = row.kind === "daily_log" ? String(row.meta["Goals addressed"] ?? "") : "";
+  return (
+    <li className="px-8 py-7">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h3 className="text-xl font-bold tracking-tight text-foreground">{clientName}</h3>
+        <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{kindLabel}</Badge>
       </div>
+      <p className="mt-2 text-base font-medium text-muted-foreground">📅 {dateLabel}</p>
+      <p className="mt-1 text-sm text-muted-foreground">Caregiver: <span className="font-medium text-foreground">{staffName}</span></p>
+
+      {goals && goals !== "—" && (
+        <div className="mt-5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">PCSP Goals Addressed</p>
+          <p className="mt-1.5 text-sm font-medium text-foreground/90">{goals}</p>
+        </div>
+      )}
+      {narrative && narrative !== "—" && (
+        <div className="mt-5 rounded-xl border border-border bg-muted/40 p-5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Narrative</p>
+          <p className="mt-2 whitespace-pre-wrap text-base leading-relaxed text-foreground">{narrative}</p>
+        </div>
+      )}
     </li>
   );
 }

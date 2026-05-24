@@ -63,7 +63,7 @@ function BankMappingPage() {
   const [plaidStep, setPlaidStep] = useState<"institution" | "credentials" | "linking" | "success">("institution");
   const [chosenInstitution, setChosenInstitution] = useState<string | null>(null);
   const [creds, setCreds] = useState({ user: "demo_user", pass: "••••••••" });
-  const [syncing, setSyncing] = useState(false);
+  
   const [draftMap, setDraftMap] = useState<Record<string, string>>({});
 
   const banks = useQuery({

@@ -231,6 +231,8 @@ export function ClientChartAuditMatrix() {
               responsibleStaffName: "Program Coordinator",
               label: "Unsigned Monthly Progress Summary",
               detail: `${dt.toLocaleDateString(undefined, { month: "long", year: "numeric" })} signed summary not on file.`,
+              clientId: c.id,
+              shiftId: null,
             });
           }
         });

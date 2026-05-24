@@ -202,7 +202,7 @@ function AuditPortalPage() {
 
 type ResultRow = {
   id: string;
-  kind: "shift" | "daily_log" | "submitted_form";
+  kind: "shift" | "daily_log" | "submitted_form" | "shift_note";
   occurred_at: string;
   title: string;
   subtitle: string;

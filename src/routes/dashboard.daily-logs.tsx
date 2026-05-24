@@ -397,13 +397,30 @@ function AdminAuditQueue() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <FileSignature className="h-6 w-6 text-muted-foreground" /> Residential Audit Queue
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Host Home daily journals submitted by caregivers, grouped by date of service. Click any row to review and approve for billing.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <FileSignature className="h-6 w-6 text-muted-foreground" /> Residential Audit Queue
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Host Home daily journals submitted by caregivers, grouped by date of service. Click any row to review and approve for billing.
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            if (!pendingIds.length) return;
+            if (window.confirm(`Approve all ${pendingIds.length} pending daily log${pendingIds.length === 1 ? "" : "s"} for billing?`)) {
+              approveAllMut.mutate(pendingIds);
+            }
+          }}
+          disabled={!pendingIds.length || approveAllMut.isPending}
+        >
+          {approveAllMut.isPending ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Approving…</>
+          ) : (
+            <>Approve All Pending ({pendingIds.length})</>
+          )}
+        </Button>
       </div>
 
       {isLoading ? (

@@ -18,6 +18,7 @@ import {
 import { Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
+import { ClientChartAuditMatrix } from "@/components/client-chart-audit";
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   try {

@@ -258,6 +258,8 @@ function ClientsPage() {
               medicaid_id: editing.medicaid_id ?? "",
             }}
             onSubmit={(v) => editMutation.mutate({ ...v, id: editing.id })}
+            clientId={editing.id}
+            organizationId={org?.organization_id}
           />
         )}
       </Dialog>

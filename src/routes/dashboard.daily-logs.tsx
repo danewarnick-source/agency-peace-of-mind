@@ -8,7 +8,7 @@ import { useCaseload } from "@/hooks/use-caseload";
 import { useEffectiveView } from "@/hooks/use-effective-view";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -189,17 +189,28 @@ function DailyLogDialog({ client, onClose }: { client: CaseloadClient | null; on
         </DialogHeader>
 
         {client && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div>
               <Label className="mb-2 block text-sm font-medium">PCSP goals addressed today</Label>
               {client.pcsp_goals?.length ? (
-                <div className="space-y-2 rounded-lg border border-border p-3">
-                  {client.pcsp_goals.map((g) => (
-                    <label key={g} className="flex items-start gap-2 text-sm">
-                      <Checkbox checked={goals.includes(g)} onCheckedChange={() => toggleGoal(g)} className="mt-0.5" />
-                      <span>{g}</span>
-                    </label>
-                  ))}
+                <div className="flex flex-wrap gap-2">
+                  {client.pcsp_goals.map((g) => {
+                    const on = goals.includes(g);
+                    return (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => toggleGoal(g)}
+                        className={`rounded-full border px-4 py-2 text-sm font-medium transition-all active:scale-[0.97] ${
+                          on
+                            ? "border-teal-600 bg-teal-600 text-white shadow-sm hover:bg-teal-700"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-teal-400 hover:bg-teal-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-teal-950/40"
+                        }`}
+                      >
+                        {on ? "✓ " : ""}{g}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
@@ -216,36 +227,44 @@ function DailyLogDialog({ client, onClose }: { client: CaseloadClient | null; on
                 onChange={(e) => setNarrative(e.target.value)}
                 placeholder="Describe today's care, activities, mood, meals, incidents, and goal progress…"
                 rows={5}
+                className="resize-none rounded-xl border-slate-300 dark:border-slate-700"
               />
-              <p className="mt-1 text-xs text-muted-foreground">
-                {remaining > 0
-                  ? `${remaining} more character${remaining === 1 ? "" : "s"} required (minimum ${MIN_NARRATIVE}).`
-                  : `${narrative.trim().length} characters — minimum met.`}
-              </p>
+              <div className="mt-1.5 flex items-center justify-between text-xs">
+                <span className={remaining > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}>
+                  {remaining > 0
+                    ? `${remaining} more character${remaining === 1 ? "" : "s"} required`
+                    : `✓ Minimum met`}
+                </span>
+                <span className="font-mono text-muted-foreground">
+                  {narrative.trim().length} / {MIN_NARRATIVE}
+                </span>
+              </div>
             </div>
 
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <Label className="text-sm font-medium">Caregiver signature</Label>
-                <Button type="button" variant="ghost" size="sm" onClick={clearCanvas}>
-                  <Eraser className="mr-1 h-3.5 w-3.5" /> Clear
-                </Button>
+              <Label className="mb-2 block text-sm font-medium">Caregiver signature</Label>
+              <div className="overflow-hidden rounded-xl border-2 border-slate-300 bg-white p-1 shadow-inner dark:border-slate-700">
+                <canvas
+                  ref={canvasRef}
+                  width={600}
+                  height={180}
+                  onPointerDown={onPointerDown}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onPointerLeave={onPointerUp}
+                  className="block w-full touch-none rounded-lg bg-white"
+                  style={{ height: 180 }}
+                />
               </div>
-              <canvas
-                ref={canvasRef}
-                width={600}
-                height={180}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-                onPointerLeave={onPointerUp}
-                className="block w-full touch-none rounded-lg border border-border bg-white"
-                style={{ height: 180 }}
-              />
-              <p className="mt-1 text-xs text-muted-foreground">Sign with your finger or mouse to attest this entry.</p>
+              <div className="mt-1.5 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Sign with your finger or mouse to attest this entry.</span>
+                <button type="button" onClick={clearCanvas} className="inline-flex items-center gap-1 font-medium text-slate-500 hover:text-slate-900 hover:underline dark:hover:text-slate-100">
+                  <Eraser className="h-3 w-3" /> 🔄 Clear Signature
+                </button>
+              </div>
             </div>
 
-            <Button onClick={submit} disabled={!canSubmit} className="w-full">
+            <Button onClick={submit} disabled={!canSubmit} className="h-12 w-full rounded-xl bg-emerald-600 text-base font-semibold hover:bg-emerald-700">
               {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…</>
                 : <><CheckCircle2 className="mr-2 h-4 w-4" /> Submit Daily Host Home Log</>}
             </Button>

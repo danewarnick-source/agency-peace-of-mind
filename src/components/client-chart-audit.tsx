@@ -205,7 +205,7 @@ export function ClientChartAuditMatrix() {
         const monthsToCheck = months.filter((m) => activeMonths.has(m));
         let monthlyOk = 0;
         monthsToCheck.forEach((m) => {
-          const matched = cForms.some((f) => f.form_type === "medical_summary" && (f.title?.toLowerCase().includes("summary") || true) && f.occurred_at.startsWith(m));
+          const matched = cForms.some((f) => f.form_type === "medical_summary" && f.occurred_at.startsWith(m));
           const key = `client_monthly:${c.id}:${m}`;
           if (matched || overrideKeys.has(key)) {
             monthlyOk++;

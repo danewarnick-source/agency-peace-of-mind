@@ -145,6 +145,18 @@ function TeamsPage() {
   const allStaff = staffQ.data ?? [];
   const allClients = clientsQ.data ?? [];
 
+  const seedMut = useMutation({
+    mutationFn: async () => {
+      const res = await seedMockStaff({});
+      return res;
+    },
+    onSuccess: () => {
+      toast.success("8 new mock staff seeded");
+      qc.invalidateQueries({ queryKey: ["teams-staff"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const MARCUS_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   const [simulateManager, setSimulateManager] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);

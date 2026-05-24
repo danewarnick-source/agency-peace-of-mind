@@ -43,6 +43,7 @@ type CaseloadClient = {
   first_name: string;
   last_name: string;
   pcsp_goals: string[];
+  job_code?: string[] | null;
 };
 
 function StaffDailyJournal() {

@@ -122,6 +122,7 @@ function BankMappingPage() {
     onSuccess: (r) => {
       toast.success(`🔗 Plaid handshake complete — ${r.added} sub-accounts discovered`);
       qc.invalidateQueries({ queryKey: ["agency_bank_accounts"] });
+      setPlaidStep("success");
     },
     onError: (e: Error) => toast.error(e.message),
   });

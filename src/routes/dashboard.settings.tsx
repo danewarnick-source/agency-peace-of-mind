@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Landmark, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/settings")({ component: SettingsPage });
@@ -64,6 +65,21 @@ function SettingsPage() {
             <Button type="submit" disabled={busy}>Save organization</Button>
           </div>
         </form>
+      )}
+
+      {org?.role === "admin" && (
+        <Link to="/dashboard/settings/bank-mapping" className="group lg:col-span-2">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
+            <div className="flex items-start gap-4">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><Landmark className="h-5 w-5" /></div>
+              <div>
+                <h2 className="text-base font-semibold">🏦 Institutional Client Banking Registry</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Link your corporate Plaid bank streams, map sub-accounts to client trust profiles, and auto-reconcile SSI/SSDI deposits into the PBA ledger.</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </div>
+        </Link>
       )}
     </div>
   );

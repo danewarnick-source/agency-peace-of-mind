@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { CalendarPlus, Loader2, Trash2, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarPlus, Loader2, Trash2, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 
@@ -52,6 +52,8 @@ function SchedulerPage() {
   const qc = useQueryClient();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [addOpen, setAddOpen] = useState(false);
+  const [quickAddDate, setQuickAddDate] = useState<Date | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -112,6 +114,28 @@ function SchedulerPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const moveMut = useMutation({
+    mutationFn: async ({ shift, targetDate }: { shift: ScheduledShift; targetDate: Date }) => {
+      const oldStart = new Date(shift.starts_at);
+      const oldEnd = new Date(shift.ends_at);
+      const durationMs = oldEnd.getTime() - oldStart.getTime();
+      const newStart = new Date(targetDate);
+      newStart.setHours(oldStart.getHours(), oldStart.getMinutes(), 0, 0);
+      const newEnd = new Date(newStart.getTime() + durationMs);
+      const { error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from("scheduled_shifts" as any)
+        .update({ starts_at: newStart.toISOString(), ends_at: newEnd.toISOString() })
+        .eq("id", shift.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Shift rescheduled");
+      qc.invalidateQueries({ queryKey: ["scheduled-shifts"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const byDay = useMemo(() => {
     const map = new Map<string, ScheduledShift[]>();
     (shifts ?? []).forEach((s) => {
@@ -128,6 +152,15 @@ function SchedulerPage() {
     return c ? `${c.first_name} ${c.last_name}` : "—";
   };
 
+  const handleDrop = (targetDate: Date) => {
+    if (!dragId || !shifts) return;
+    const shift = shifts.find((s) => s.id === dragId);
+    setDragId(null);
+    if (!shift) return;
+    if (dateKey(new Date(shift.starts_at)) === dateKey(targetDate)) return;
+    moveMut.mutate({ shift, targetDate });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -136,7 +169,7 @@ function SchedulerPage() {
             <CalendarIcon className="h-6 w-6 text-muted-foreground" /> Scheduler
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Build the week's caseload. Assign staff to clients with a job code and a shift type.
+            Drag a shift to another day to reschedule it. Hover an empty day to quick-add.
           </p>
         </div>
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -176,14 +209,36 @@ function SchedulerPage() {
           const items = byDay.get(dateKey(d)) ?? [];
           const isToday = dateKey(d) === dateKey(new Date());
           return (
-            <Card key={dateKey(d)} className={`min-h-[180px] p-3 ${isToday ? "ring-2 ring-primary/40" : ""}`}>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{fmtDay(d)}</p>
+            <Card
+              key={dateKey(d)}
+              onDragOver={(e) => { e.preventDefault(); }}
+              onDrop={() => handleDrop(d)}
+              className={`group/day relative min-h-[180px] p-3 transition-colors ${isToday ? "ring-2 ring-primary/40" : ""} ${dragId ? "hover:bg-primary/5" : ""}`}
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{fmtDay(d)}</p>
+                <button
+                  type="button"
+                  onClick={() => setQuickAddDate(d)}
+                  className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/day:opacity-100"
+                  aria-label="Quick add shift"
+                  title="Quick add shift"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
               {items.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground">No shifts</p>
               ) : (
                 <div className="space-y-2">
                   {items.map((s) => (
-                    <div key={s.id} className="group rounded-lg border border-border bg-secondary/30 p-2 text-xs">
+                    <div
+                      key={s.id}
+                      draggable
+                      onDragStart={() => setDragId(s.id)}
+                      onDragEnd={() => setDragId(null)}
+                      className={`group rounded-lg border border-border bg-secondary/30 p-2 text-xs transition-opacity cursor-grab active:cursor-grabbing ${dragId === s.id ? "opacity-40" : ""}`}
+                    >
                       <div className="flex items-start justify-between gap-1">
                         <p className="font-medium">{staffName(s.staff_id)}</p>
                         <button
@@ -220,6 +275,21 @@ function SchedulerPage() {
           );
         })}
       </div>
+
+      <Dialog open={!!quickAddDate} onOpenChange={(o) => { if (!o) setQuickAddDate(null); }}>
+        {quickAddDate && (
+          <AddShiftDialog
+            staff={staff ?? []}
+            clients={clients ?? []}
+            defaultDate={quickAddDate}
+            onClose={() => setQuickAddDate(null)}
+            onSaved={() => {
+              qc.invalidateQueries({ queryKey: ["scheduled-shifts"] });
+              setQuickAddDate(null);
+            }}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }

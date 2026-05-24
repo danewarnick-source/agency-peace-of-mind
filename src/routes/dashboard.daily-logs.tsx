@@ -362,6 +362,29 @@ function AdminAuditQueue() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const pendingIds = useMemo(
+    () => (logs ?? []).filter((l) => l.status === "pending_approval").map((l) => l.id),
+    [logs],
+  );
+
+  const approveAllMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!ids.length) return 0;
+      const { error } = await supabase
+        .from("daily_logs")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ status: "approved", approved_at: new Date().toISOString(), approved_by: user!.id } as any)
+        .in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      toast.success(`Approved ${count} daily log${count === 1 ? "" : "s"} for billing`);
+      qc.invalidateQueries({ queryKey: ["daily-logs-admin"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const grouped = useMemo(() => {
     const map = new Map<string, AdminLog[]>();
     (logs ?? []).forEach((l) => {
@@ -374,13 +397,30 @@ function AdminAuditQueue() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <FileSignature className="h-6 w-6 text-muted-foreground" /> Residential Audit Queue
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Host Home daily journals submitted by caregivers, grouped by date of service. Click any row to review and approve for billing.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <FileSignature className="h-6 w-6 text-muted-foreground" /> Residential Audit Queue
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Host Home daily journals submitted by caregivers, grouped by date of service. Click any row to review and approve for billing.
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            if (!pendingIds.length) return;
+            if (window.confirm(`Approve all ${pendingIds.length} pending daily log${pendingIds.length === 1 ? "" : "s"} for billing?`)) {
+              approveAllMut.mutate(pendingIds);
+            }
+          }}
+          disabled={!pendingIds.length || approveAllMut.isPending}
+        >
+          {approveAllMut.isPending ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Approving…</>
+          ) : (
+            <>Approve All Pending ({pendingIds.length})</>
+          )}
+        </Button>
       </div>
 
       {isLoading ? (

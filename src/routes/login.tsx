@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
-import { lookupEmailByUsername } from "@/lib/employees.functions";
+import { lookupEmailByUsername } from "@/lib/login.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -46,7 +46,7 @@ function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) return toast.error(error.message);
-    navigate({ to: "/dashboard" });
+    toast.success("Signed in");
   };
 
   const google = async () => {

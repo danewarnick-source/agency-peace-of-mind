@@ -21,6 +21,7 @@ import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { ClientChartAuditMatrix } from "@/components/client-chart-audit";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
+import { LifecyclePanel } from "@/components/lifecycle-panel";
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -107,11 +108,13 @@ function ClientsPage() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, medicaid_id" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, medicaid_id, account_status" as any)
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as unknown as Client[];
+      // Hide archived clients from active operational views.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ((data ?? []) as any[]).filter((c) => (c.account_status ?? "active") !== "archived") as unknown as Client[];
     },
   });
 
@@ -424,11 +427,19 @@ function ClientFormDialog({
           )}
         </div>
         {clientId && (
-          <CustomAttributesSection
-            organizationId={organizationId}
-            entityKind="client"
-            entityId={clientId}
-          />
+          <>
+            <CustomAttributesSection
+              organizationId={organizationId}
+              entityKind="client"
+              entityId={clientId}
+            />
+            <LifecyclePanel
+              kind="client"
+              id={clientId}
+              fullName={`${first.trim()} ${last.trim()}`.trim()}
+              organizationId={organizationId}
+            />
+          </>
         )}
         <DialogFooter>
           <Button type="submit" disabled={!canSubmit || pending}>

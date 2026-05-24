@@ -43,9 +43,24 @@ function LoginPage() {
         return toast.error((err as Error).message);
       }
     }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signIn, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { setBusy(false); return toast.error(error.message); }
+    // Block archived accounts immediately
+    if (signIn.user) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("account_status" as any)
+        .eq("id", signIn.user.id)
+        .maybeSingle();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((prof as any)?.account_status === "archived") {
+        await supabase.auth.signOut();
+        setBusy(false);
+        return toast.error("Account suspended. Contact your administrator.");
+      }
+    }
     setBusy(false);
-    if (error) return toast.error(error.message);
     toast.success("Signed in");
   };
 

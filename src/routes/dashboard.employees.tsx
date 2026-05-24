@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { RequirePermission } from "@/components/rbac-guard";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
+import { LifecyclePanel } from "@/components/lifecycle-panel";
 
 function genPassword(len = 14) {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -88,12 +89,15 @@ function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position, account_status" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) as any }));
+      return (data ?? [])
+        .map((m) => ({ ...m, profile: profMap.get(m.user_id) as any }))
+        // Hide archived accounts from the active operational roster.
+        .filter((m) => (m.profile?.account_status ?? "active") !== "archived");
     },
   });
 
@@ -537,6 +541,13 @@ function EmployeesPage() {
                 organizationId={org?.organization_id}
                 entityKind="employee"
                 entityId={editingMember.userId}
+              />
+              <LifecyclePanel
+                kind="employee"
+                id={editingMember.userId}
+                fullName={editingMember.fullName}
+                organizationId={org?.organization_id}
+                onDone={() => setEditingMember(null)}
               />
               <DialogFooter>
                 <Button type="submit" disabled={editMemberMutation.isPending}>

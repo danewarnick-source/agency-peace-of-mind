@@ -125,15 +125,47 @@ function TeamsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const teams = teamsQ.data ?? [];
-  const staff = staffQ.data ?? [];
-  const clients = clientsQ.data ?? [];
-  const staffName = (id: string | null) => staff.find((s) => s.id === id)?.name ?? "—";
-  const countStaff = (tid: string) => staff.filter((s) => s.team_id === tid).length;
-  const countClients = (tid: string) => clients.filter((c) => c.team_id === tid).length;
+  const allTeams = teamsQ.data ?? [];
+  const allStaff = staffQ.data ?? [];
+  const allClients = clientsQ.data ?? [];
+
+  const MARCUS_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const [simulateManager, setSimulateManager] = useState(false);
+  const marcusTeamId = allStaff.find((s) => s.id === MARCUS_ID)?.team_id ?? null;
+
+  const teams = simulateManager && marcusTeamId ? allTeams.filter((t) => t.id === marcusTeamId) : allTeams;
+  const staff = simulateManager && marcusTeamId
+    ? allStaff.filter((s) => s.team_id === marcusTeamId && s.id !== MARCUS_ID)
+    : allStaff;
+  const clients = simulateManager && marcusTeamId ? allClients.filter((c) => c.team_id === marcusTeamId) : allClients;
+
+  const staffName = (id: string | null) => allStaff.find((s) => s.id === id)?.name ?? "—";
+  const countStaff = (tid: string) => allStaff.filter((s) => s.team_id === tid).length;
+  const countClients = (tid: string) => allClients.filter((c) => c.team_id === tid).length;
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+        <span className="flex items-center gap-2 font-medium text-amber-700 dark:text-amber-300">
+          <FlaskConical className="h-4 w-4" /> 🧪 Sandbox Environment: Mock Hierarchy Loaded
+        </span>
+        <Button
+          size="sm"
+          variant={simulateManager ? "default" : "outline"}
+          onClick={() => setSimulateManager((v) => !v)}
+          className="gap-1.5"
+        >
+          {simulateManager ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+          {simulateManager ? "Exit Marcus Vance view" : "Simulate Manager Login (Marcus Vance)"}
+        </Button>
+      </div>
+
+      {simulateManager && (
+        <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-xs text-muted-foreground">
+          🔒 Filtered to Canyon View Residential only — staff & clients from sibling homes are blocked by the access firewall.
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">

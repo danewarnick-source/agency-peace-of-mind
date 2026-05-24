@@ -523,6 +523,8 @@ function ResultRowItem({ row }: { row: ResultRow }) {
     const billedOut = fmtClockTime(row.meta["Billed clock-out"] as string);
     const billedHrs = String(row.meta["Billed hours"] ?? "0.00");
     const code = String(row.meta["Code"] ?? "—");
+    const shiftNote = String(row.meta["Shift note narrative"] ?? "");
+    const shiftGoals = String(row.meta["Shift note goals"] ?? "");
     return (
       <li className="px-8 py-7">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -549,6 +551,24 @@ function ResultRowItem({ row }: { row: ResultRow }) {
             <p className="mt-2 text-3xl font-bold tabular-nums text-primary">{billedHrs} <span className="text-base font-semibold text-foreground/70">Hours Billed</span></p>
           </div>
         </div>
+
+        {/* Shift Notes */}
+        {(shiftGoals || shiftNote) && (
+          <div className="mt-6 rounded-xl border border-border bg-muted/40 p-5">
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Shift Note</p>
+            </div>
+            {shiftGoals && (
+              <p className="mt-2 text-sm font-medium text-foreground/90">
+                <span className="text-muted-foreground">Goals:</span> {shiftGoals}
+              </p>
+            )}
+            {shiftNote && (
+              <p className="mt-2 whitespace-pre-wrap text-base leading-relaxed text-foreground">{shiftNote}</p>
+            )}
+          </div>
+        )}
       </li>
     );
   }

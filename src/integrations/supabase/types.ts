@@ -488,6 +488,89 @@ export type Database = {
           },
         ]
       }
+      custom_field_definitions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_type: string
+          entity_kind: string
+          field_key: string
+          field_label: string
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_type: string
+          entity_kind: string
+          field_key: string
+          field_label: string
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_type?: string
+          entity_kind?: string
+          field_key?: string
+          field_label?: string
+          id?: string
+          organization_id?: string
+        }
+        Relationships: []
+      }
+      custom_field_values: {
+        Row: {
+          created_at: string
+          definition_id: string
+          entity_id: string
+          entity_kind: string
+          id: string
+          organization_id: string
+          updated_at: string
+          value_boolean: boolean | null
+          value_date: string | null
+          value_number: number | null
+          value_text: string | null
+        }
+        Insert: {
+          created_at?: string
+          definition_id: string
+          entity_id: string
+          entity_kind: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_date?: string | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          created_at?: string
+          definition_id?: string
+          entity_id?: string
+          entity_kind?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_date?: string | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_field_values_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "custom_field_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_logs: {
         Row: {
           approved_at: string | null

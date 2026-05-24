@@ -341,3 +341,132 @@ function Pipeline() {
     </div>
   );
 }
+
+const PLAID_INSTITUTIONS = [
+  { id: "chase", name: "Chase Business", logo: "🏦", color: "bg-blue-600" },
+  { id: "wells", name: "Wells Fargo Commercial", logo: "🏛️", color: "bg-red-600" },
+  { id: "bofa", name: "Bank of America Trust", logo: "🏦", color: "bg-rose-700" },
+  { id: "mtnamerica", name: "Mountain America CU", logo: "🏔️", color: "bg-emerald-700" },
+  { id: "citi", name: "Citi Commercial", logo: "🏙️", color: "bg-sky-700" },
+  { id: "usbank", name: "U.S. Bank Business", logo: "🇺🇸", color: "bg-indigo-700" },
+];
+
+type PlaidStep = "institution" | "credentials" | "linking" | "success";
+
+function PlaidLinkDialog({
+  open, onOpenChange, step, setStep, chosenInstitution, setChosenInstitution,
+  creds, setCreds, isLinking, onCommit,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  step: PlaidStep;
+  setStep: (s: PlaidStep) => void;
+  chosenInstitution: string | null;
+  setChosenInstitution: (v: string | null) => void;
+  creds: { user: string; pass: string };
+  setCreds: (v: { user: string; pass: string }) => void;
+  isLinking: boolean;
+  onCommit: () => void;
+}) {
+  const inst = PLAID_INSTITUTIONS.find((i) => i.id === chosenInstitution);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md p-0 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-slate-900 to-slate-800 px-5 py-3 text-white">
+          <div className="flex items-center gap-2">
+            <div className="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-xs font-bold">P</div>
+            <div>
+              <div className="text-sm font-semibold">Plaid Link · Sandbox</div>
+              <div className="text-[10px] uppercase tracking-wider text-white/60">Secure Bank Authentication</div>
+            </div>
+          </div>
+          <button onClick={() => onOpenChange(false)} className="rounded p-1 text-white/70 hover:bg-white/10 hover:text-white">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="p-5">
+          {step === "institution" && (
+            <>
+              <DialogHeader className="space-y-1">
+                <DialogTitle className="text-base">Select your institution</DialogTitle>
+                <DialogDescription className="text-xs">
+                  Choose the bank where your agency's operating & trust sub-accounts are held.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {PLAID_INSTITUTIONS.map((i) => (
+                  <button
+                    key={i.id}
+                    onClick={() => { setChosenInstitution(i.id); setStep("credentials"); }}
+                    className="flex items-center gap-2 rounded-lg border border-border p-3 text-left text-sm transition hover:border-primary hover:bg-muted/40"
+                  >
+                    <div className={`grid h-9 w-9 place-items-center rounded-md text-lg text-white ${i.color}`}>{i.logo}</div>
+                    <span className="font-medium leading-tight">{i.name}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <ShieldCheck className="h-3 w-3" /> 256-bit TLS · Read-only access · Tokenized credentials
+              </div>
+            </>
+          )}
+
+          {step === "credentials" && inst && (
+            <>
+              <DialogHeader className="space-y-1">
+                <div className="mb-2 flex items-center gap-2">
+                  <div className={`grid h-9 w-9 place-items-center rounded-md text-lg text-white ${inst.color}`}>{inst.logo}</div>
+                  <div>
+                    <DialogTitle className="text-base">{inst.name}</DialogTitle>
+                    <DialogDescription className="text-xs">Enter your online banking credentials</DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Username</label>
+                  <Input value={creds.user} onChange={(e) => setCreds({ ...creds, user: e.target.value })} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Password</label>
+                  <Input type="password" value={creds.pass} onChange={(e) => setCreds({ ...creds, pass: e.target.value })} />
+                </div>
+                <div className="flex items-start gap-1.5 rounded-md bg-muted/40 p-2 text-[11px] text-muted-foreground">
+                  <Lock className="mt-0.5 h-3 w-3 shrink-0" />
+                  Demo sandbox — no real credentials are transmitted. Pre-seeded test data will load.
+                </div>
+              </div>
+              <DialogFooter className="mt-4 gap-2 sm:gap-2">
+                <Button variant="ghost" onClick={() => setStep("institution")}>Back</Button>
+                <Button onClick={() => { setStep("linking"); onCommit(); }} disabled={isLinking}>
+                  {isLinking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
+                  Authenticate
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {step === "linking" && (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <div className="mt-4 text-sm font-medium">Establishing secure handshake…</div>
+              <div className="mt-1 text-xs text-muted-foreground">Discovering sub-accounts & trust fiduciary pools</div>
+            </div>
+          )}
+
+          {step === "success" && (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-500/15 text-emerald-600">
+                <CheckCircle2 className="h-7 w-7" />
+              </div>
+              <div className="mt-3 text-sm font-semibold">Bank portal authenticated</div>
+              <div className="mt-1 text-xs text-muted-foreground">Sub-accounts now appear in the Channel Mapping Grid.</div>
+              <Button className="mt-5" onClick={() => onOpenChange(false)}>Done</Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

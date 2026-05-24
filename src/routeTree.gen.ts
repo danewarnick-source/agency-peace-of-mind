@@ -30,6 +30,7 @@ import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timec
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
+import { Route as DashboardSchedulerRouteImport } from './routes/dashboard.scheduler'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
 import { Route as DashboardProgramsAdminRouteImport } from './routes/dashboard.programs-admin'
@@ -43,6 +44,7 @@ import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
+import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
@@ -158,6 +160,11 @@ const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSchedulerRoute = DashboardSchedulerRouteImport.update({
+  id: '/scheduler',
+  path: '/scheduler',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardRolesRoute = DashboardRolesRouteImport.update({
   id: '/roles',
   path: '/roles',
@@ -222,6 +229,11 @@ const DashboardCertificationsRoute = DashboardCertificationsRouteImport.update({
 const DashboardBillingRoute = DashboardBillingRouteImport.update({
   id: '/billing',
   path: '/billing',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardAssignmentsRoute = DashboardAssignmentsRouteImport.update({
+  id: '/assignments',
+  path: '/assignments',
   getParentRoute: () => DashboardRoute,
 } as any)
 const CertificateCodeRoute = CertificateCodeRouteImport.update({
@@ -290,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
+  '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
@@ -303,6 +316,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
+  '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
@@ -334,6 +348,7 @@ export interface FileRoutesByTo {
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
+  '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
@@ -347,6 +362,7 @@ export interface FileRoutesByTo {
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
+  '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
@@ -380,6 +396,7 @@ export interface FileRoutesById {
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
+  '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
@@ -393,6 +410,7 @@ export interface FileRoutesById {
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
+  '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
@@ -427,6 +445,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/unauthorized'
     | '/certificate/$code'
+    | '/dashboard/assignments'
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
@@ -440,6 +459,7 @@ export interface FileRouteTypes {
     | '/dashboard/programs-admin'
     | '/dashboard/reports'
     | '/dashboard/roles'
+    | '/dashboard/scheduler'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
@@ -471,6 +491,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/unauthorized'
     | '/certificate/$code'
+    | '/dashboard/assignments'
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
@@ -484,6 +505,7 @@ export interface FileRouteTypes {
     | '/dashboard/programs-admin'
     | '/dashboard/reports'
     | '/dashboard/roles'
+    | '/dashboard/scheduler'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
@@ -516,6 +538,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/unauthorized'
     | '/certificate/$code'
+    | '/dashboard/assignments'
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
@@ -529,6 +552,7 @@ export interface FileRouteTypes {
     | '/dashboard/programs-admin'
     | '/dashboard/reports'
     | '/dashboard/roles'
+    | '/dashboard/scheduler'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
     | '/dashboard/team'
@@ -714,6 +738,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/scheduler': {
+      id: '/dashboard/scheduler'
+      path: '/scheduler'
+      fullPath: '/dashboard/scheduler'
+      preLoaderRoute: typeof DashboardSchedulerRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/roles': {
       id: '/dashboard/roles'
       path: '/roles'
@@ -803,6 +834,13 @@ declare module '@tanstack/react-router' {
       path: '/billing'
       fullPath: '/dashboard/billing'
       preLoaderRoute: typeof DashboardBillingRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/assignments': {
+      id: '/dashboard/assignments'
+      path: '/assignments'
+      fullPath: '/dashboard/assignments'
+      preLoaderRoute: typeof DashboardAssignmentsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/certificate/$code': {
@@ -909,6 +947,7 @@ const DashboardCoursesCourseIdRouteWithChildren =
   )
 
 interface DashboardRouteChildren {
+  DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
   DashboardBillingRoute: typeof DashboardBillingRoute
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientsRoute: typeof DashboardClientsRoute
@@ -922,6 +961,7 @@ interface DashboardRouteChildren {
   DashboardProgramsAdminRoute: typeof DashboardProgramsAdminRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
+  DashboardSchedulerRoute: typeof DashboardSchedulerRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
@@ -937,6 +977,7 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardAssignmentsRoute: DashboardAssignmentsRoute,
   DashboardBillingRoute: DashboardBillingRoute,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientsRoute: DashboardClientsRoute,
@@ -950,6 +991,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardProgramsAdminRoute: DashboardProgramsAdminRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,
+  DashboardSchedulerRoute: DashboardSchedulerRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,

@@ -1096,6 +1096,8 @@ export type Database = {
           last_name: string | null
           must_change_password: boolean
           position: string | null
+          system_role: string
+          tenant_id: string | null
           username: string | null
         }
         Insert: {
@@ -1112,6 +1114,8 @@ export type Database = {
           last_name?: string | null
           must_change_password?: boolean
           position?: string | null
+          system_role?: string
+          tenant_id?: string | null
           username?: string | null
         }
         Update: {
@@ -1128,9 +1132,19 @@ export type Database = {
           last_name?: string | null
           must_change_password?: boolean
           position?: string | null
+          system_role?: string
+          tenant_id?: string | null
           username?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "provider_tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       program_acknowledgements: {
         Row: {
@@ -1272,6 +1286,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      provider_tenants: {
+        Row: {
+          agency_name: string
+          client_tier_limit: number
+          created_at: string
+          feature_ai_receipt_ocr: boolean
+          feature_lms_training: boolean
+          feature_pba_bank_feed: boolean
+          feature_quickbooks_sync: boolean
+          id: string
+          is_active: boolean
+          owner_email: string
+          updated_at: string
+        }
+        Insert: {
+          agency_name: string
+          client_tier_limit?: number
+          created_at?: string
+          feature_ai_receipt_ocr?: boolean
+          feature_lms_training?: boolean
+          feature_pba_bank_feed?: boolean
+          feature_quickbooks_sync?: boolean
+          id?: string
+          is_active?: boolean
+          owner_email: string
+          updated_at?: string
+        }
+        Update: {
+          agency_name?: string
+          client_tier_limit?: number
+          created_at?: string
+          feature_ai_receipt_ocr?: boolean
+          feature_lms_training?: boolean
+          feature_pba_bank_feed?: boolean
+          feature_quickbooks_sync?: boolean
+          id?: string
+          is_active?: boolean
+          owner_email?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       respite_stays: {
         Row: {

@@ -82,10 +82,11 @@ function TeamsPage() {
     queryFn: async (): Promise<ClientRow[]> => {
       const { data, error } = await supabase.from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, team_id, job_code" as any)
+        .select("id, first_name, last_name, team_id, job_code, account_status" as any)
         .eq("organization_id", orgId!).order("last_name");
       if (error) throw error;
-      return (data ?? []) as unknown as ClientRow[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ((data ?? []) as any[]).filter((c) => (c.account_status ?? "active") !== "archived") as unknown as ClientRow[];
     },
   });
 

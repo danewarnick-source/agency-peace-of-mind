@@ -535,7 +535,7 @@ function DocumentationLockModal({
     }
     setSubmitting(true);
     try {
-      const clockOut = new Date().toISOString();
+      const clockOut = roundToQuarterHourIso(new Date());
 
       // Read existing shift to preserve clock-in geofence flag — OR-merge into final outside_geofence.
       const { data: existing } = await supabase

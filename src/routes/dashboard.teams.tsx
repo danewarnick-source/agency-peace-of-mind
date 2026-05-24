@@ -65,12 +65,14 @@ function TeamsPage() {
       if (!ids.length) return [];
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, team_id" as any).in("id", ids);
+        .select("id, full_name, email, team_id, account_status" as any).in("id", ids);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return ((profs ?? []) as any[]).map((p) => ({
-        id: p.id, name: p.full_name || p.email || "—",
-        team_id: p.team_id ?? null, role: roleMap.get(p.id) ?? "staff",
-      })).sort((a, b) => a.name.localeCompare(b.name));
+      return ((profs ?? []) as any[])
+        .filter((p) => (p.account_status ?? "active") !== "archived")
+        .map((p) => ({
+          id: p.id, name: p.full_name || p.email || "—",
+          team_id: p.team_id ?? null, role: roleMap.get(p.id) ?? "staff",
+        })).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
 

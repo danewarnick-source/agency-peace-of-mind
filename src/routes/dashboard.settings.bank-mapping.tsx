@@ -85,7 +85,7 @@ function BankMappingPage() {
     enabled: !!orgId,
     queryKey: ["clients-min", orgId],
     queryFn: async (): Promise<Client[]> => {
-      const { data, error } = await supabase.from("clients").select("id, first_name, last_name").eq("organization_id", orgId).order("last_name");
+      const { data, error } = await supabase.from("clients").select("id, first_name, last_name").eq("organization_id", orgId!).order("last_name");
       if (error) throw error;
       return data ?? [];
     },

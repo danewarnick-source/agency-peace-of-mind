@@ -406,11 +406,15 @@ export function ClientChartAuditMatrix() {
                 <GapItem
                   key={g.key}
                   gap={g}
+                  orgId={org!.organization_id}
+                  adminUserId={user!.id}
                   onNudge={() => nudgeMut.mutate({ client: refreshedClient, gap: g })}
                   onOverride={(reason) => overrideMut.mutate({ client: refreshedClient, gap: g, reason })}
+                  onResolved={() => qc.invalidateQueries({ queryKey: ["client-chart-audit"] })}
                   isNudging={nudgeMut.isPending}
                   isOverriding={overrideMut.isPending}
                 />
+
               ))}
           </div>
         </SheetContent>

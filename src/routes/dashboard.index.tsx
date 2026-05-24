@@ -57,32 +57,8 @@ function Overview() {
     },
   });
 
-  // Compliance status per employee — track training_modules completed
-  const { data: compliance } = useQuery({
-    enabled: !!org && showAdmin,
-    queryKey: ["compliance-status", org?.organization_id],
-    queryFn: async () => {
-      const [{ data: mems }, { count: totalModules }, { data: progress }] = await Promise.all([
-        supabase.from("organization_members").select("user_id").eq("organization_id", org!.organization_id).eq("active", true),
-        supabase.from("training_modules").select("*", { count: "exact", head: true }),
-        supabase.from("user_training_progress").select("user_id, is_completed"),
-      ]);
-      const ids = (mems ?? []).map((m) => m.user_id);
-      if (!ids.length) return { total: totalModules ?? 6, rows: [] as Array<{ id: string; name: string; pct: number }> };
-      const { data: profs } = await supabase
-        .from("profiles").select("id, full_name, email").in("id", ids);
-      const completedBy = new Map<string, number>();
-      (progress ?? []).forEach((p) => {
-        if (p.is_completed) completedBy.set(p.user_id, (completedBy.get(p.user_id) ?? 0) + 1);
-      });
-      const tot = totalModules ?? 6;
-      const rows = (profs ?? []).map((p) => {
-        const done = completedBy.get(p.id) ?? 0;
-        return { id: p.id, name: p.full_name || p.email || "—", pct: Math.min(100, Math.round((done / tot) * 100)) };
-      }).sort((a, b) => a.name.localeCompare(b.name));
-      return { total: tot, rows };
-    },
-  });
+
+
 
   // Live active-shift monitor (admin view)
   const { data: liveShifts } = useQuery({

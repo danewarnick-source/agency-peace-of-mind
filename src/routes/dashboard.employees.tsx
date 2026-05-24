@@ -294,6 +294,9 @@ function EmployeesPage() {
                       role: m.role as Role,
                       active: m.active,
                     })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
+                      <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => setAssignOpen(m.user_id)}><BookOpen className="mr-1 h-3.5 w-3.5" /> Assign</Button>
                     <Button variant="ghost" size="sm" onClick={() => setResetUser({ id: m.user_id, name })}><KeyRound className="mr-1 h-3.5 w-3.5" /> Reset</Button>
                     {m.user_id !== user?.id && (

@@ -153,7 +153,7 @@ export function EvvShiftControl() {
         organization_id: org!.organization_id,
         user_id: user!.id,
         client_id: selectedClientId,
-        clock_in_time: new Date().toISOString(),
+        clock_in_time: roundToQuarterHourIso(new Date()),
         clock_in_lat: opts.lat,
         clock_in_long: opts.lng,
         device_fingerprint: deviceFingerprint(),

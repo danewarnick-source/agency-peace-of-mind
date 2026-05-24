@@ -238,6 +238,66 @@ export type Database = {
         }
         Relationships: []
       }
+      client_medications: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          discontinued_at: string | null
+          discontinued_by: string | null
+          dosage: string | null
+          end_date: string | null
+          frequency: string | null
+          id: string
+          instructions: string | null
+          is_active: boolean
+          medication_name: string
+          organization_id: string
+          prescriber: string | null
+          route: string | null
+          scheduled_times: string[]
+          start_date: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          discontinued_at?: string | null
+          discontinued_by?: string | null
+          dosage?: string | null
+          end_date?: string | null
+          frequency?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean
+          medication_name: string
+          organization_id: string
+          prescriber?: string | null
+          route?: string | null
+          scheduled_times?: string[]
+          start_date?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          discontinued_at?: string | null
+          discontinued_by?: string | null
+          dosage?: string | null
+          end_date?: string | null
+          frequency?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean
+          medication_name?: string
+          organization_id?: string
+          prescriber?: string | null
+          route?: string | null
+          scheduled_times?: string[]
+          start_date?: string | null
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           account_status: string
@@ -679,6 +739,65 @@ export type Database = {
           units?: number
         }
         Relationships: []
+      }
+      emar_logs: {
+        Row: {
+          administered_at: string | null
+          client_id: string
+          created_at: string
+          exception_reason: string | null
+          id: string
+          medication_id: string
+          notes: string | null
+          organization_id: string
+          scheduled_for: string
+          scheduled_time_label: string | null
+          signature_attestation: string | null
+          staff_id: string | null
+          staff_name: string | null
+          status: string
+        }
+        Insert: {
+          administered_at?: string | null
+          client_id: string
+          created_at?: string
+          exception_reason?: string | null
+          id?: string
+          medication_id: string
+          notes?: string | null
+          organization_id: string
+          scheduled_for: string
+          scheduled_time_label?: string | null
+          signature_attestation?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          status: string
+        }
+        Update: {
+          administered_at?: string | null
+          client_id?: string
+          created_at?: string
+          exception_reason?: string | null
+          id?: string
+          medication_id?: string
+          notes?: string | null
+          organization_id?: string
+          scheduled_for?: string
+          scheduled_time_label?: string | null
+          signature_attestation?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emar_logs_medication_id_fkey"
+            columns: ["medication_id"]
+            isOneToOne: false
+            referencedRelation: "client_medications"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       external_certifications: {
         Row: {

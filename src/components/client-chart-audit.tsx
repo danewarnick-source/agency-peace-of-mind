@@ -129,6 +129,8 @@ export function ClientChartAuditMatrix() {
               responsibleStaffName: staff,
               label: "Missing Daily Note",
               detail: `${s.job_code || "Shift"} — ${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}. Assigned Staff: ${staff}.`,
+              clientId: c.id,
+              shiftId: s.id,
             });
           } else {
             notesOk++;

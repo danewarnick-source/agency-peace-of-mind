@@ -202,7 +202,7 @@ function AuditPortalPage() {
 
 type ResultRow = {
   id: string;
-  kind: "shift" | "daily_log" | "submitted_form";
+  kind: "shift" | "daily_log" | "submitted_form" | "shift_note";
   occurred_at: string;
   title: string;
   subtitle: string;
@@ -229,14 +229,32 @@ function AuditResults({
       const orgId = org!.organization_id;
       const filterCol = mode === "staff" ? "user_id" : "client_id";
 
-      const [shiftsRes, logsRes, formsRes] = await Promise.all([
-        supabase
-          .from("shifts")
-          .select("id, user_id, client_id, clock_in_time, clock_out_time, job_code, clock_in_lat, clock_in_long, clock_out_lat, clock_out_long, outside_geofence, clock_in_bypass_reason, clock_out_bypass_reason, geofence_bypass_reason, created_at, status")
-          .eq("organization_id", orgId)
-          .eq(filterCol, targetId)
-          .gte("clock_in_time", startIso)
-          .lte("clock_in_time", endIso),
+      // 1) fetch shifts first so we can resolve shift_notes
+      const { data: shiftsData, error: shiftsErr } = await supabase
+        .from("shifts")
+        .select("id, user_id, client_id, clock_in_time, clock_out_time, job_code, clock_in_lat, clock_in_long, clock_out_lat, clock_out_long, outside_geofence, clock_in_bypass_reason, clock_out_bypass_reason, geofence_bypass_reason, created_at, status")
+        .eq("organization_id", orgId)
+        .eq(filterCol, targetId)
+        .gte("clock_in_time", startIso)
+        .lte("clock_in_time", endIso);
+      if (shiftsErr) throw shiftsErr;
+
+      // 2) fetch shift_notes for those shift ids
+      const shiftIds = (shiftsData ?? []).map((s) => s.id);
+      let notesData: { shift_id: string; narrative_summary: string | null; goals_addressed: string[]; created_at: string }[] = [];
+      if (shiftIds.length) {
+        const { data: nd, error: ndErr } = await supabase
+          .from("shift_notes")
+          .select("shift_id, narrative_summary, goals_addressed, created_at")
+          .in("shift_id", shiftIds);
+        if (ndErr) throw ndErr;
+        notesData = (nd ?? []) as typeof notesData;
+      }
+      const notesByShift = new Map<string, typeof notesData[number]>();
+      notesData.forEach((n) => notesByShift.set(n.shift_id, n));
+
+      // 3) fetch logs + forms in parallel
+      const [logsRes, formsRes] = await Promise.all([
         supabase
           .from("daily_logs")
           .select("id, user_id, client_id, log_date, narrative, pcsp_goals_addressed, signature_data_url, status, submitted_at")
@@ -253,14 +271,13 @@ function AuditResults({
           .gte("occurred_at", startIso)
           .lte("occurred_at", endIso),
       ]);
-      if (shiftsRes.error) throw shiftsRes.error;
       if (logsRes.error) throw logsRes.error;
       if (formsRes.error) throw formsRes.error;
 
       // Resolve names for the "other side" (the side not used as filter).
       const staffIds = new Set<string>();
       const clientIds = new Set<string>();
-      (shiftsRes.data ?? []).forEach((r) => { if (r.user_id) staffIds.add(r.user_id); if (r.client_id) clientIds.add(r.client_id); });
+      (shiftsData ?? []).forEach((r) => { if (r.user_id) staffIds.add(r.user_id); if (r.client_id) clientIds.add(r.client_id); });
       (logsRes.data ?? []).forEach((r) => { if (r.user_id) staffIds.add(r.user_id); if (r.client_id) clientIds.add(r.client_id); });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ((formsRes.data ?? []) as any[]).forEach((r) => { if (r.user_id) staffIds.add(r.user_id); if (r.client_id) clientIds.add(r.client_id); });
@@ -283,7 +300,7 @@ function AuditResults({
       let bypasses = 0;
       let shiftCount = 0;
 
-      (shiftsRes.data ?? []).forEach((s) => {
+      (shiftsData ?? []).forEach((s) => {
         const hrs = decimalHoursBetween(s.clock_in_time, s.clock_out_time);
         const rawIn = s.clock_in_time ? new Date(s.clock_in_time) : null;
         const rawOut = s.clock_out_time ? new Date(s.clock_out_time) : null;
@@ -297,9 +314,15 @@ function AuditResults({
         const bypassed = !!(s.outside_geofence || s.clock_in_bypass_reason || s.clock_out_bypass_reason || s.geofence_bypass_reason);
         if (bypassed) bypasses += 1;
 
+        const note = notesByShift.get(s.id);
+        const noteBlob = note
+          ? [note.narrative_summary, (note.goals_addressed ?? []).join(" ")].filter(Boolean).join(" ")
+          : "";
+
         const blob = [
           jobCodeLabel(s.job_code), staffName(s.user_id), clientName(s.client_id),
           s.clock_in_bypass_reason, s.clock_out_bypass_reason, s.geofence_bypass_reason,
+          noteBlob,
         ].filter(Boolean).join(" ").toLowerCase();
 
         rows.push({
@@ -324,6 +347,8 @@ function AuditResults({
             "Bypass reason": s.clock_in_bypass_reason || s.geofence_bypass_reason || s.clock_out_bypass_reason || "",
             "Staff": staffName(s.user_id),
             "Client": clientName(s.client_id),
+            "Shift note narrative": note?.narrative_summary ?? "",
+            "Shift note goals": (note?.goals_addressed ?? []).join("; ") || "",
           },
         });
       });
@@ -498,6 +523,8 @@ function ResultRowItem({ row }: { row: ResultRow }) {
     const billedOut = fmtClockTime(row.meta["Billed clock-out"] as string);
     const billedHrs = String(row.meta["Billed hours"] ?? "0.00");
     const code = String(row.meta["Code"] ?? "—");
+    const shiftNote = String(row.meta["Shift note narrative"] ?? "");
+    const shiftGoals = String(row.meta["Shift note goals"] ?? "");
     return (
       <li className="px-8 py-7">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -524,6 +551,24 @@ function ResultRowItem({ row }: { row: ResultRow }) {
             <p className="mt-2 text-3xl font-bold tabular-nums text-primary">{billedHrs} <span className="text-base font-semibold text-foreground/70">Hours Billed</span></p>
           </div>
         </div>
+
+        {/* Shift Notes */}
+        {(shiftGoals || shiftNote) && (
+          <div className="mt-6 rounded-xl border border-border bg-muted/40 p-5">
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Shift Note</p>
+            </div>
+            {shiftGoals && (
+              <p className="mt-2 text-sm font-medium text-foreground/90">
+                <span className="text-muted-foreground">Goals:</span> {shiftGoals}
+              </p>
+            )}
+            {shiftNote && (
+              <p className="mt-2 whitespace-pre-wrap text-base leading-relaxed text-foreground">{shiftNote}</p>
+            )}
+          </div>
+        )}
       </li>
     );
   }

@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Clock, MapPin, Play, Square, ShieldAlert, Loader2, AlertTriangle } from "lucide-react";
+import { MapPin, ShieldAlert, Loader2, AlertTriangle, Radio, Target } from "lucide-react";
 import { toast } from "sonner";
 import { jobCodeLabel } from "@/lib/job-codes";
 

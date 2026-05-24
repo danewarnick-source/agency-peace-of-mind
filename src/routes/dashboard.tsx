@@ -25,6 +25,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
+  { to: "/dashboard/scheduler", label: "My Schedule", icon: Calendar },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
 ];
 

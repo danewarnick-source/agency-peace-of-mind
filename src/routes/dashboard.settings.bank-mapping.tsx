@@ -213,11 +213,24 @@ function BankMappingPage() {
             Authenticate your corporate bank, map sub-accounts to client trust profiles, and let the SSI/SSDI feed auto-reconcile into the PBA ledger.
           </p>
         </div>
-        <Button size="lg" onClick={() => linkBank.mutate()} disabled={linkBank.isPending || authenticating}>
+        <Button size="lg" onClick={() => { setPlaidStep("institution"); setChosenInstitution(null); setPlaidOpen(true); }} disabled={linkBank.isPending}>
           {linkBank.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
           🔗 Authenticate Agency Bank Portal
         </Button>
       </div>
+
+      <PlaidLinkDialog
+        open={plaidOpen}
+        onOpenChange={setPlaidOpen}
+        step={plaidStep}
+        setStep={setPlaidStep}
+        chosenInstitution={chosenInstitution}
+        setChosenInstitution={setChosenInstitution}
+        creds={creds}
+        setCreds={setCreds}
+        isLinking={linkBank.isPending}
+        onCommit={() => linkBank.mutate()}
+      />
 
       {/* Mapping grid */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">

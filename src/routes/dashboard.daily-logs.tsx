@@ -8,7 +8,7 @@ import { useCaseload } from "@/hooks/use-caseload";
 import { useEffectiveView } from "@/hooks/use-effective-view";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";

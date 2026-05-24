@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { MapPin, ShieldAlert, Loader2, AlertTriangle, Radio, Target } from "lucide-react";
 import { toast } from "sonner";
 import { jobCodeLabel } from "@/lib/job-codes";
+import { roundToQuarterHourIso } from "@/lib/time-rounding";
 
 type Client = {
   id: string;
@@ -152,7 +153,7 @@ export function EvvShiftControl() {
         organization_id: org!.organization_id,
         user_id: user!.id,
         client_id: selectedClientId,
-        clock_in_time: new Date().toISOString(),
+        clock_in_time: roundToQuarterHourIso(new Date()),
         clock_in_lat: opts.lat,
         clock_in_long: opts.lng,
         device_fingerprint: deviceFingerprint(),
@@ -534,7 +535,7 @@ function DocumentationLockModal({
     }
     setSubmitting(true);
     try {
-      const clockOut = new Date().toISOString();
+      const clockOut = roundToQuarterHourIso(new Date());
 
       // Read existing shift to preserve clock-in geofence flag — OR-merge into final outside_geofence.
       const { data: existing } = await supabase

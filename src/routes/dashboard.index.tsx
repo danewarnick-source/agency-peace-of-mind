@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Award, AlertTriangle, TrendingUp, UserPlus, Radio } from "lucide-react";
+import { Users, Award, AlertTriangle, TrendingUp, UserPlus, Radio, Clock as ClockIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -247,6 +247,7 @@ function Overview() {
         </div>
       ) : (
         <div className="space-y-6">
+        <PayPeriodTracker />
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <h2 className="text-base font-semibold">My active training</h2>
           {!myAssigns?.length ? (
@@ -356,4 +357,154 @@ function LiveMonitor({ shifts }: { shifts: LiveShift[] }) {
     </div>
   );
 }
+
+/* ------------------------- Pay Period Hours Tracker ------------------------ */
+
+type PayRange = "current" | "previous" | "week" | "custom";
+
+function getBiweeklyPayPeriod(ref: Date, offsetPeriods = 0): { start: Date; end: Date } {
+  // Anchor: a known Monday start for biweekly periods.
+  const anchor = new Date(2024, 0, 1); // Mon Jan 1 2024
+  const msPerPeriod = 14 * 24 * 3600 * 1000;
+  const diff = ref.getTime() - anchor.getTime();
+  const periodIndex = Math.floor(diff / msPerPeriod) + offsetPeriods;
+  const start = new Date(anchor.getTime() + periodIndex * msPerPeriod);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start.getTime() + msPerPeriod - 1);
+  return { start, end };
+}
+
+function startOfWeek(ref: Date): { start: Date; end: Date } {
+  const d = new Date(ref);
+  const day = d.getDay(); // 0 = Sun
+  const diff = (day === 0 ? -6 : 1 - day);
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  const end = new Date(d.getTime() + 7 * 24 * 3600 * 1000 - 1);
+  return { start: d, end };
+}
+
+function fmtShort(d: Date) {
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function PayPeriodTracker() {
+  const { user } = useAuth();
+  const [range, setRange] = useState<PayRange>("current");
+  const [customStart, setCustomStart] = useState<string>("");
+  const [customEnd, setCustomEnd] = useState<string>("");
+
+  const { start, end } = (() => {
+    const now = new Date();
+    if (range === "current") return getBiweeklyPayPeriod(now, 0);
+    if (range === "previous") return getBiweeklyPayPeriod(now, -1);
+    if (range === "week") return startOfWeek(now);
+    if (range === "custom" && customStart && customEnd) {
+      const [sy, sm, sd] = customStart.split("-").map(Number);
+      const [ey, em, ed] = customEnd.split("-").map(Number);
+      return {
+        start: new Date(sy, sm - 1, sd, 0, 0, 0, 0),
+        end: new Date(ey, em - 1, ed, 23, 59, 59, 999),
+      };
+    }
+    return getBiweeklyPayPeriod(now, 0);
+  })();
+
+  const { data: rows } = useQuery({
+    enabled: !!user,
+    queryKey: ["my-pay-period-shifts", user?.id, start.toISOString(), end.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("shifts")
+        .select("clock_in_time, clock_out_time")
+        .eq("user_id", user!.id)
+        .gte("clock_in_time", start.toISOString())
+        .lte("clock_in_time", end.toISOString())
+        .not("clock_out_time", "is", null);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const totalHours = (rows ?? []).reduce((sum, r) => {
+    if (!r.clock_in_time || !r.clock_out_time) return sum;
+    const ms = new Date(r.clock_out_time).getTime() - new Date(r.clock_in_time).getTime();
+    return sum + (ms > 0 ? ms / 3_600_000 : 0);
+  }, 0);
+
+  const regular = Math.min(totalHours, 40);
+  const overtime = Math.max(0, totalHours - 40);
+  const regularPct = Math.min(100, (regular / 40) * 100);
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="flex items-center gap-2 text-base font-semibold">
+            <ClockIcon className="h-4 w-4 text-primary" /> My Hours This Pay Period
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {fmtShort(start)} – {fmtShort(end)} · Calculated from quarter-hour rounded shifts
+          </p>
+        </div>
+        <Select value={range} onValueChange={(v) => setRange(v as PayRange)}>
+          <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="current">Current Pay Period</SelectItem>
+            <SelectItem value="previous">Previous Pay Period</SelectItem>
+            <SelectItem value="week">This Week</SelectItem>
+            <SelectItem value="custom">Custom Range…</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {range === "custom" && (
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="grid gap-1">
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">From</Label>
+            <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="h-8 w-[160px] text-xs" />
+          </div>
+          <div className="grid gap-1">
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">To</Label>
+            <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="h-8 w-[160px] text-xs" />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 flex items-baseline gap-3">
+        <span className="text-5xl font-bold tabular-nums tracking-tight">{totalHours.toFixed(2)}</span>
+        <span className="text-sm font-medium text-muted-foreground">Hours Worked</span>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        <div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium">Regular Hours</span>
+            <span className="font-mono tabular-nums text-muted-foreground">
+              {regular.toFixed(2)} / 40.00
+            </span>
+          </div>
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-secondary">
+            <div className="h-full bg-emerald-500 transition-all" style={{ width: `${regularPct}%` }} />
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium">Overtime Hours</span>
+            <span className={`font-mono tabular-nums ${overtime > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+              {overtime.toFixed(2)}
+            </span>
+          </div>
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full bg-amber-500 transition-all"
+              style={{ width: `${Math.min(100, (overtime / 20) * 100)}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 

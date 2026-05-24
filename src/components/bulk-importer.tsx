@@ -407,6 +407,3 @@ export function BulkImporter({
   );
 }
 
-// Reserved for downstream use; signals server-side validation/Input wires
-type _Unused = Input;
-type Input = ParsedFile;

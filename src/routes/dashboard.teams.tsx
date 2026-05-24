@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -11,8 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Home, Plus, Pencil, Users, Contact2, Check, X, Loader2, FlaskConical, ShieldCheck, ShieldOff } from "lucide-react";
+import {
+  Home, Plus, Loader2, FlaskConical, ShieldCheck, ShieldOff,
+  UserRound, HeartHandshake, Package, ChevronLeft, ChevronRight, GripVertical, Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/teams")({
@@ -25,10 +27,12 @@ export const Route = createFileRoute("/dashboard/teams")({
 });
 
 type Team = { id: string; team_name: string; manager_id: string | null; organization_id: string | null };
-type StaffRow = { id: string; name: string; team_id: string | null };
-type ClientRow = { id: string; first_name: string; last_name: string; team_id: string | null };
+type StaffRow = { id: string; name: string; team_id: string | null; role?: string | null };
+type ClientRow = { id: string; first_name: string; last_name: string; team_id: string | null; job_code?: string[] | null };
 
 const UNASSIGNED = "__unassigned__";
+type DragKind = "staff" | "client";
+type DragPayload = { kind: DragKind; id: string; from: string | null };
 
 function TeamsPage() {
   const { data: org } = useCurrentOrg();
@@ -53,16 +57,18 @@ function TeamsPage() {
     enabled: !!orgId,
     queryKey: ["teams-staff", orgId],
     queryFn: async (): Promise<StaffRow[]> => {
-      const { data: mems } = await supabase.from("organization_members").select("user_id")
+      const { data: mems } = await supabase.from("organization_members").select("user_id, role")
         .eq("organization_id", orgId!).eq("active", true);
       const ids = (mems ?? []).map((m) => m.user_id);
+      const roleMap = new Map((mems ?? []).map((m) => [m.user_id, m.role as string]));
       if (!ids.length) return [];
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .select("id, full_name, email, team_id" as any).in("id", ids);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ((profs ?? []) as any[]).map((p) => ({
-        id: p.id, name: p.full_name || p.email || "—", team_id: p.team_id ?? null,
+        id: p.id, name: p.full_name || p.email || "—",
+        team_id: p.team_id ?? null, role: roleMap.get(p.id) ?? "staff",
       })).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
@@ -73,7 +79,7 @@ function TeamsPage() {
     queryFn: async (): Promise<ClientRow[]> => {
       const { data, error } = await supabase.from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, team_id" as any)
+        .select("id, first_name, last_name, team_id, job_code" as any)
         .eq("organization_id", orgId!).order("last_name");
       if (error) throw error;
       return (data ?? []) as unknown as ClientRow[];
@@ -92,27 +98,25 @@ function TeamsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const updateTeam = useMutation({
-    mutationFn: async (v: { id: string; team_name?: string; manager_id?: string | null }) => {
-      const patch: Record<string, unknown> = {};
-      if (v.team_name !== undefined) patch.team_name = v.team_name;
-      if (v.manager_id !== undefined) patch.manager_id = v.manager_id;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("teams") as any).update(patch).eq("id", v.id);
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Team updated"); qc.invalidateQueries({ queryKey: ["teams"] }); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const assignStaff = useMutation({
     mutationFn: async (v: { id: string; team_id: string | null }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabase.from("profiles").update({ team_id: v.team_id } as any).eq("id", v.id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Staff reassigned"); qc.invalidateQueries({ queryKey: ["teams-staff"] }); },
-    onError: (e: Error) => toast.error(e.message),
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: ["teams-staff", orgId] });
+      const prev = qc.getQueryData<StaffRow[]>(["teams-staff", orgId]);
+      qc.setQueryData<StaffRow[]>(["teams-staff", orgId], (old) =>
+        (old ?? []).map((s) => (s.id === v.id ? { ...s, team_id: v.team_id } : s)));
+      return { prev };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["teams-staff", orgId], ctx.prev);
+      toast.error(e.message);
+    },
+    onSuccess: () => toast.success("Staff reassigned"),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["teams-staff"] }),
   });
 
   const assignClient = useMutation({
@@ -121,8 +125,19 @@ function TeamsPage() {
       const { error } = await supabase.from("clients").update({ team_id: v.team_id } as any).eq("id", v.id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Client reassigned"); qc.invalidateQueries({ queryKey: ["teams-clients"] }); },
-    onError: (e: Error) => toast.error(e.message),
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: ["teams-clients", orgId] });
+      const prev = qc.getQueryData<ClientRow[]>(["teams-clients", orgId]);
+      qc.setQueryData<ClientRow[]>(["teams-clients", orgId], (old) =>
+        (old ?? []).map((c) => (c.id === v.id ? { ...c, team_id: v.team_id } : c)));
+      return { prev };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["teams-clients", orgId], ctx.prev);
+      toast.error(e.message);
+    },
+    onSuccess: () => toast.success("Client reassigned"),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["teams-clients"] }),
   });
 
   const allTeams = teamsQ.data ?? [];
@@ -131,17 +146,33 @@ function TeamsPage() {
 
   const MARCUS_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   const [simulateManager, setSimulateManager] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const marcusTeamId = allStaff.find((s) => s.id === MARCUS_ID)?.team_id ?? null;
 
   const teams = simulateManager && marcusTeamId ? allTeams.filter((t) => t.id === marcusTeamId) : allTeams;
   const staff = simulateManager && marcusTeamId
-    ? allStaff.filter((s) => s.team_id === marcusTeamId && s.id !== MARCUS_ID)
+    ? allStaff.filter((s) => s.team_id === marcusTeamId)
     : allStaff;
   const clients = simulateManager && marcusTeamId ? allClients.filter((c) => c.team_id === marcusTeamId) : allClients;
 
   const staffName = (id: string | null) => allStaff.find((s) => s.id === id)?.name ?? "—";
-  const countStaff = (tid: string) => allStaff.filter((s) => s.team_id === tid).length;
-  const countClients = (tid: string) => allClients.filter((c) => c.team_id === tid).length;
+  const unassignedStaff = staff.filter((s) => !s.team_id);
+  const unassignedClients = clients.filter((c) => !c.team_id);
+
+  const handleDrop = (teamId: string | null, accept: DragKind) => (e: DragEvent) => {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData("application/json");
+    if (!raw) return;
+    let p: DragPayload;
+    try { p = JSON.parse(raw); } catch { return; }
+    if (p.kind !== accept) {
+      toast.error(`Cannot drop a ${p.kind} into the ${accept} zone`);
+      return;
+    }
+    if (p.from === teamId) return;
+    if (p.kind === "staff") assignStaff.mutate({ id: p.id, team_id: teamId });
+    else assignClient.mutate({ id: p.id, team_id: teamId });
+  };
 
   return (
     <div className="space-y-6">
@@ -162,7 +193,7 @@ function TeamsPage() {
 
       {simulateManager && (
         <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-xs text-muted-foreground">
-          🔒 Filtered to Canyon View Residential only — staff & clients from sibling homes are blocked by the access firewall.
+          🔒 Filtered to Canyon View Residential only — sibling homes blocked by access firewall.
         </div>
       )}
 
@@ -172,19 +203,58 @@ function TeamsPage() {
             <Home className="h-6 w-6 text-primary" /> Facility & Team Organizational Hub
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Organize staff and clients into distinct group homes or operational units.
+            Drag staff & client cards between homes. Updates sync instantly.
           </p>
         </div>
-        <CreateTeamDialog staff={staff} onCreate={(v) => createTeam.mutate(v)} pending={createTeam.isPending} />
+        <CreateTeamDialog staff={allStaff} onCreate={(v) => createTeam.mutate(v)} pending={createTeam.isPending} />
       </div>
 
-      <Tabs defaultValue="teams" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="teams">Team Cards</TabsTrigger>
-          <TabsTrigger value="matrix">Assignment Matrix</TabsTrigger>
-        </TabsList>
+      <div className="flex gap-4 items-start">
+        {/* Unassigned drawer */}
+        <div className={`shrink-0 transition-all ${drawerOpen ? "w-72" : "w-12"}`}>
+          <Card className="overflow-hidden">
+            <div className="flex items-center justify-between gap-2 border-b bg-muted/40 p-2">
+              {drawerOpen && (
+                <span className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Package className="h-4 w-4" /> Unassigned Roster
+                </span>
+              )}
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDrawerOpen((v) => !v)}>
+                {drawerOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </div>
+            {drawerOpen && (
+              <div className="p-3 space-y-4 max-h-[70vh] overflow-y-auto">
+                <DropZone
+                  kind="staff"
+                  className="rounded-md bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 p-2 min-h-[60px] space-y-1.5"
+                  onDrop={handleDrop(null, "staff")}
+                >
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                    <UserRound className="h-3 w-3" /> Staff · {unassignedStaff.length}
+                  </div>
+                  {unassignedStaff.map((s) => <StaffCard key={s.id} s={s} from={null} />)}
+                  {!unassignedStaff.length && <p className="text-[11px] text-muted-foreground italic">All staff assigned</p>}
+                </DropZone>
 
-        <TabsContent value="teams" className="space-y-4">
+                <DropZone
+                  kind="client"
+                  className="rounded-md bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40 p-2 min-h-[60px] space-y-1.5"
+                  onDrop={handleDrop(null, "client")}
+                >
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                    <HeartHandshake className="h-3 w-3" /> Clients · {unassignedClients.length}
+                  </div>
+                  {unassignedClients.map((c) => <ClientCard key={c.id} c={c} from={null} />)}
+                  {!unassignedClients.length && <p className="text-[11px] text-muted-foreground italic">All clients placed</p>}
+                </DropZone>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Kanban board */}
+        <div className="flex-1 min-w-0 overflow-x-auto">
           {teamsQ.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading teams…</p>
           ) : !teams.length ? (
@@ -193,75 +263,139 @@ function TeamsPage() {
               <p className="mt-3 text-sm text-muted-foreground">No teams yet. Create your first group home above.</p>
             </Card>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {teams.map((t) => (
-                <TeamCard
-                  key={t.id}
-                  team={t}
-                  staff={staff}
-                  staffCount={countStaff(t.id)}
-                  clientCount={countClients(t.id)}
-                  managerName={staffName(t.manager_id)}
-                  onRename={(name) => updateTeam.mutate({ id: t.id, team_name: name })}
-                  onChangeManager={(mid) => updateTeam.mutate({ id: t.id, manager_id: mid })}
-                />
-              ))}
+            <div className="flex gap-4 pb-3" style={{ minWidth: "min-content" }}>
+              {teams.map((t) => {
+                const tStaff = staff.filter((s) => s.team_id === t.id);
+                const tClients = clients.filter((c) => c.team_id === t.id);
+                return (
+                  <Card key={t.id} className="w-72 shrink-0 flex flex-col">
+                    <div className="border-b p-3 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Home className="h-4 w-4 text-primary" />
+                        <h3 className="font-bold text-base truncate">{t.team_name}</h3>
+                      </div>
+                      <Badge variant="secondary" className="gap-1 font-medium">
+                        <UserRound className="h-3 w-3" /> Mgr: {staffName(t.manager_id)}
+                      </Badge>
+                      <div className="flex gap-1.5 pt-0.5">
+                        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200 gap-1">
+                          🟢 {tStaff.length} Staff
+                        </Badge>
+                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-200 gap-1">
+                          👥 {tClients.length} Clients
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="p-2 space-y-2 flex-1">
+                      <DropZone
+                        kind="staff"
+                        className="rounded-md bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-900/40 p-2 min-h-[100px] space-y-1.5"
+                        onDrop={handleDrop(t.id, "staff")}
+                      >
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                          👤 Staff Roster
+                        </div>
+                        {tStaff.map((s) => <StaffCard key={s.id} s={s} from={t.id} />)}
+                        {!tStaff.length && <p className="text-[11px] text-muted-foreground italic">Drop staff here</p>}
+                      </DropZone>
+
+                      <DropZone
+                        kind="client"
+                        className="rounded-md bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-900/40 p-2 min-h-[100px] space-y-1.5"
+                        onDrop={handleDrop(t.id, "client")}
+                      >
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                          🏠 Client Roster
+                        </div>
+                        {tClients.map((c) => <ClientCard key={c.id} c={c} from={t.id} />)}
+                        {!tClients.length && <p className="text-[11px] text-muted-foreground italic">Drop clients here</p>}
+                      </DropZone>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )}
-        </TabsContent>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        <TabsContent value="matrix">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="p-5">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                <Users className="h-4 w-4" /> Staff Roster Allocation
-              </h3>
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {staff.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between gap-3 rounded-lg border p-2.5">
-                    <span className="text-sm font-medium truncate">{s.name}</span>
-                    <Select
-                      value={s.team_id ?? UNASSIGNED}
-                      onValueChange={(v) => assignStaff.mutate({ id: s.id, team_id: v === UNASSIGNED ? null : v })}
-                    >
-                      <SelectTrigger className="w-[180px] h-8"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={UNASSIGNED}>— Unassigned —</SelectItem>
-                        {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.team_name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-                {!staff.length && <p className="text-sm text-muted-foreground">No staff in org.</p>}
-              </div>
-            </Card>
+function DropZone({
+  kind, className, onDrop, children,
+}: {
+  kind: DragKind;
+  className?: string;
+  onDrop: (e: DragEvent) => void;
+  children: React.ReactNode;
+}) {
+  const [over, setOver] = useState<"valid" | "invalid" | null>(null);
+  return (
+    <div
+      className={`${className ?? ""} transition-all ${
+        over === "valid" ? "ring-2 ring-primary ring-offset-1" : ""
+      } ${over === "invalid" ? "ring-2 ring-destructive ring-offset-1" : ""}`}
+      onDragOver={(e) => {
+        const t = e.dataTransfer.types.find((x) => x.startsWith("kind/"));
+        const draggedKind = t ? t.slice(5) : null;
+        if (draggedKind === kind) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          setOver("valid");
+        } else if (draggedKind) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "none";
+          setOver("invalid");
+        }
+      }}
+      onDragLeave={() => setOver(null)}
+      onDrop={(e) => { setOver(null); onDrop(e); }}
+    >
+      {children}
+    </div>
+  );
+}
 
-            <Card className="p-5">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                <Contact2 className="h-4 w-4" /> Client Roster Allocation
-              </h3>
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {clients.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-lg border p-2.5">
-                    <span className="text-sm font-medium truncate">{c.first_name} {c.last_name}</span>
-                    <Select
-                      value={c.team_id ?? UNASSIGNED}
-                      onValueChange={(v) => assignClient.mutate({ id: c.id, team_id: v === UNASSIGNED ? null : v })}
-                    >
-                      <SelectTrigger className="w-[180px] h-8"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={UNASSIGNED}>— Unassigned —</SelectItem>
-                        {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.team_name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-                {!clients.length && <p className="text-sm text-muted-foreground">No clients yet.</p>}
-              </div>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+function startDrag(e: DragEvent, payload: DragPayload) {
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("application/json", JSON.stringify(payload));
+  // Custom MIME marker so dropzones can validate kind during dragover
+  e.dataTransfer.setData(`kind/${payload.kind}`, "1");
+}
+
+function StaffCard({ s, from }: { s: StaffRow; from: string | null }) {
+  return (
+    <div
+      draggable
+      onDragStart={(e) => startDrag(e, { kind: "staff", id: s.id, from })}
+      className="group flex items-center gap-1.5 rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing"
+    >
+      <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
+      <span className="font-medium truncate flex-1">{s.name}</span>
+      <Badge variant="outline" className="gap-0.5 px-1.5 py-0 text-[10px] capitalize">
+        <UserRound className="h-2.5 w-2.5" />{s.role ?? "staff"}
+      </Badge>
+    </div>
+  );
+}
+
+function ClientCard({ c, from }: { c: ClientRow; from: string | null }) {
+  const funding = c.job_code?.[0] ?? "Self-pay";
+  return (
+    <div
+      draggable
+      onDragStart={(e) => startDrag(e, { kind: "client", id: c.id, from })}
+      className="group rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing border-l-2 border-l-emerald-500"
+    >
+      <div className="flex items-center gap-1.5">
+        <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
+        <span className="font-medium truncate flex-1">{c.first_name} {c.last_name}</span>
+      </div>
+      <div className="mt-1 flex items-center gap-1 pl-4 text-[10px] text-muted-foreground">
+        <Wallet className="h-2.5 w-2.5" /> {funding}
+      </div>
     </div>
   );
 }
@@ -312,54 +446,3 @@ function CreateTeamDialog({
   );
 }
 
-function TeamCard({
-  team, staff, staffCount, clientCount, managerName, onRename, onChangeManager,
-}: {
-  team: Team; staff: StaffRow[]; staffCount: number; clientCount: number; managerName: string;
-  onRename: (name: string) => void; onChangeManager: (mid: string | null) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(team.team_name);
-  return (
-    <Card className="p-5 space-y-4">
-      <div className="flex items-start justify-between gap-2">
-        {editing ? (
-          <div className="flex items-center gap-1 flex-1">
-            <Input value={draft} onChange={(e) => setDraft(e.target.value)} className="h-8" autoFocus />
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { onRename(draft.trim() || team.team_name); setEditing(false); }}>
-              <Check className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setDraft(team.team_name); setEditing(false); }}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <button className="flex items-center gap-1.5 text-left group" onClick={() => setEditing(true)}>
-            <Home className="h-4 w-4 text-primary" />
-            <h3 className="font-semibold text-base">{team.team_name}</h3>
-            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
-          </button>
-        )}
-      </div>
-
-      <div className="grid gap-1.5">
-        <Label className="text-xs text-muted-foreground">House Manager</Label>
-        <Select
-          value={team.manager_id ?? UNASSIGNED}
-          onValueChange={(v) => onChangeManager(v === UNASSIGNED ? null : v)}
-        >
-          <SelectTrigger className="h-9"><SelectValue placeholder={managerName} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={UNASSIGNED}>— No manager —</SelectItem>
-            {staff.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex gap-2 pt-1">
-        <Badge variant="secondary" className="gap-1"><Users className="h-3 w-3" /> {staffCount} Staff</Badge>
-        <Badge variant="secondary" className="gap-1"><Contact2 className="h-3 w-3" /> {clientCount} Clients</Badge>
-      </div>
-    </Card>
-  );
-}

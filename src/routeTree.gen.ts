@@ -51,7 +51,6 @@ import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing
 import { Route as DashboardAuditPortalRouteImport } from './routes/dashboard.audit-portal'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
-import { Route as ApiSeedStaffRouteImport } from './routes/api/seed-staff'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
@@ -61,6 +60,7 @@ import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashb
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
+import { Route as ApiPublicSeedStaffRouteImport } from './routes/api/public/seed-staff'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
@@ -274,11 +274,6 @@ const CertificateCodeRoute = CertificateCodeRouteImport.update({
   path: '/certificate/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSeedStaffRoute = ApiSeedStaffRouteImport.update({
-  id: '/api/seed-staff',
-  path: '/api/seed-staff',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DashboardTrainingIndexRoute = DashboardTrainingIndexRouteImport.update({
   id: '/training/',
   path: '/training/',
@@ -330,6 +325,11 @@ const DashboardCoursesCourseIdRoute =
     path: '/courses/$courseId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const ApiPublicSeedStaffRoute = ApiPublicSeedStaffRouteImport.update({
+  id: '/api/public/seed-staff',
+  path: '/api/public/seed-staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardCoursesCourseIdEditRoute =
   DashboardCoursesCourseIdEditRouteImport.update({
     id: '/edit',
@@ -351,7 +351,6 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
-  '/api/seed-staff': typeof ApiSeedStaffRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
@@ -381,6 +380,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -405,7 +405,6 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
-  '/api/seed-staff': typeof ApiSeedStaffRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
@@ -435,6 +434,7 @@ export interface FileRoutesByTo {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -461,7 +461,6 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
-  '/api/seed-staff': typeof ApiSeedStaffRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
@@ -491,6 +490,7 @@ export interface FileRoutesById {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -518,7 +518,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/super-admin'
     | '/unauthorized'
-    | '/api/seed-staff'
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/audit-portal'
@@ -548,6 +547,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
+    | '/api/public/seed-staff'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
@@ -572,7 +572,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/super-admin'
     | '/unauthorized'
-    | '/api/seed-staff'
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/audit-portal'
@@ -602,6 +601,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard'
+    | '/api/public/seed-staff'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
@@ -627,7 +627,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/super-admin'
     | '/unauthorized'
-    | '/api/seed-staff'
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/audit-portal'
@@ -657,6 +656,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
+    | '/api/public/seed-staff'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
@@ -683,9 +683,9 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SuperAdminRoute: typeof SuperAdminRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
-  ApiSeedStaffRoute: typeof ApiSeedStaffRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
+  ApiPublicSeedStaffRoute: typeof ApiPublicSeedStaffRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -984,13 +984,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CertificateCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/seed-staff': {
-      id: '/api/seed-staff'
-      path: '/api/seed-staff'
-      fullPath: '/api/seed-staff'
-      preLoaderRoute: typeof ApiSeedStaffRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/dashboard/training/': {
       id: '/dashboard/training/'
       path: '/training'
@@ -1053,6 +1046,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/courses/$courseId'
       preLoaderRoute: typeof DashboardCoursesCourseIdRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/api/public/seed-staff': {
+      id: '/api/public/seed-staff'
+      path: '/api/public/seed-staff'
+      fullPath: '/api/public/seed-staff'
+      preLoaderRoute: typeof ApiPublicSeedStaffRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/dashboard/courses/$courseId/edit': {
       id: '/dashboard/courses/$courseId/edit'
@@ -1202,10 +1202,20 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SuperAdminRoute: SuperAdminRoute,
   UnauthorizedRoute: UnauthorizedRoute,
-  ApiSeedStaffRoute: ApiSeedStaffRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
+  ApiPublicSeedStaffRoute: ApiPublicSeedStaffRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

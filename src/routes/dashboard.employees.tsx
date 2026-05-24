@@ -533,6 +533,11 @@ function EmployeesPage() {
                   </Select>
                 </div>
               </div>
+              <CustomAttributesSection
+                organizationId={org?.organization_id}
+                entityKind="employee"
+                entityId={editingMember.userId}
+              />
               <DialogFooter>
                 <Button type="submit" disabled={editMemberMutation.isPending}>
                   {editMemberMutation.isPending ? "Saving…" : "Save changes"}

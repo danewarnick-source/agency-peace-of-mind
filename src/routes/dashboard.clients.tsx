@@ -427,11 +427,19 @@ function ClientFormDialog({
           )}
         </div>
         {clientId && (
-          <CustomAttributesSection
-            organizationId={organizationId}
-            entityKind="client"
-            entityId={clientId}
-          />
+          <>
+            <CustomAttributesSection
+              organizationId={organizationId}
+              entityKind="client"
+              entityId={clientId}
+            />
+            <LifecyclePanel
+              kind="client"
+              id={clientId}
+              fullName={`${first.trim()} ${last.trim()}`.trim()}
+              organizationId={organizationId}
+            />
+          </>
         )}
         <DialogFooter>
           <Button type="submit" disabled={!canSubmit || pending}>

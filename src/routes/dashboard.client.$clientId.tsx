@@ -1,11 +1,12 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/dashboard/client/$clientId")({
-  component: LegacyClientDetailRedirect,
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/dashboard/workspace/$clientId",
+      params: { clientId: params.clientId },
+      replace: true,
+    });
+  },
+  component: () => null,
 });
-
-function LegacyClientDetailRedirect() {
-  const { clientId } = Route.useParams();
-
-  return <Navigate to="/dashboard/workspace/$clientId" params={{ clientId }} replace />;
-}

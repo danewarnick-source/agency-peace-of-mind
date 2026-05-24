@@ -13,8 +13,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  SearchCode, User, Home as HomeIcon, MapPin, Clock, ClipboardCheck,
-  FileText, Download, ShieldAlert, Filter, AlertTriangle,
+  SearchCode, User, Home as HomeIcon, Clock, ClipboardCheck,
+  Download, ShieldAlert, Filter, AlertTriangle,
 } from "lucide-react";
 import { jobCodeLabel } from "@/lib/job-codes";
 import { decimalHoursBetween, roundToQuarterHour } from "@/lib/time-rounding";

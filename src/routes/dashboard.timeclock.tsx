@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { EvvShiftControl } from "@/components/evv-shift-control";
+import { AdminTimeClockView } from "@/components/admin-time-clock";
+import { useEffectiveView } from "@/hooks/use-effective-view";
 
 export const Route = createFileRoute("/dashboard/timeclock")({
   head: () => ({ meta: [{ title: "Time Clock — Care Academy" }] }),
@@ -7,6 +9,12 @@ export const Route = createFileRoute("/dashboard/timeclock")({
 });
 
 function TimeClockPage() {
+  const { effective } = useEffectiveView();
+
+  if (effective === "admin") {
+    return <AdminTimeClockView />;
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>

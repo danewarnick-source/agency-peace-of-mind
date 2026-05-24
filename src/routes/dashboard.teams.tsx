@@ -193,15 +193,27 @@ function TeamsPage() {
         <span className="flex items-center gap-2 font-medium text-amber-700 dark:text-amber-300">
           <FlaskConical className="h-4 w-4" /> 🧪 Sandbox Environment: Mock Hierarchy Loaded
         </span>
-        <Button
-          size="sm"
-          variant={simulateManager ? "default" : "outline"}
-          onClick={() => setSimulateManager((v) => !v)}
-          className="gap-1.5"
-        >
-          {simulateManager ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-          {simulateManager ? "Exit Marcus Vance view" : "Simulate Manager Login (Marcus Vance)"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => seedMut.mutate()}
+            disabled={seedMut.isPending}
+            className="gap-1.5"
+          >
+            {seedMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
+            Add 8 Mock Staff
+          </Button>
+          <Button
+            size="sm"
+            variant={simulateManager ? "default" : "outline"}
+            onClick={() => setSimulateManager((v) => !v)}
+            className="gap-1.5"
+          >
+            {simulateManager ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+            {simulateManager ? "Exit Marcus Vance view" : "Simulate Manager Login (Marcus Vance)"}
+          </Button>
+        </div>
       </div>
 
       {simulateManager && (

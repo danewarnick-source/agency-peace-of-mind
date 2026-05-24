@@ -690,7 +690,7 @@ function CaseloadDrawer({
                     <p className="truncate text-sm font-medium">{c.first_name} {c.last_name}</p>
                   </div>
                   <div className="flex flex-wrap justify-end gap-1">
-                    {(c.job_code ?? []).filter(Boolean).map((code) => (
+                    {(c.job_code ?? []).filter(Boolean).map((code: string) => (
                       <Badge key={code} variant="secondary" className="font-mono text-[10px]">{code}</Badge>
                     ))}
                     {!(c.job_code?.length) && <span className="text-[10px] text-muted-foreground">No codes</span>}

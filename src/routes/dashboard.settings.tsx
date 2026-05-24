@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Outlet, createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -12,11 +12,16 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/dashboard/settings")({ component: SettingsPage });
 
 function SettingsPage() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user } = useAuth();
   const { data: org, refetch } = useCurrentOrg();
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [busy, setBusy] = useState(false);
+
+  if (pathname !== "/dashboard/settings") {
+    return <Outlet />;
+  }
 
   useEffect(() => {
     if (user) setFullName(user.user_metadata?.full_name ?? "");

@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Home, Plus, Loader2,
+  Home, Plus, Loader2, X,
   UserRound, HeartHandshake, Package, ChevronLeft, ChevronRight, GripVertical, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -243,12 +244,61 @@ function TeamsPage() {
               {teams.map((t) => {
                 const tStaff = staff.filter((s) => s.team_id === t.id);
                 const tClients = clients.filter((c) => c.team_id === t.id);
+                const addableStaff = staff.filter((s) => s.team_id !== t.id);
+                const addableClients = clients.filter((c) => c.team_id !== t.id);
                 return (
                   <Card key={t.id} className="w-72 shrink-0 flex flex-col">
                     <div className="border-b p-3 space-y-2">
                       <div className="flex items-center gap-1.5">
                         <Home className="h-4 w-4 text-primary" />
-                        <h3 className="font-bold text-base truncate">{t.team_name}</h3>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="font-bold text-base truncate text-left hover:text-primary hover:underline underline-offset-2 transition-colors focus:outline-none"
+                            >
+                              {t.team_name}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-72 space-y-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">➕ Quick-Add Staff</Label>
+                              <Select
+                                value=""
+                                onValueChange={(id) => assignStaff.mutate({ id, team_id: t.id })}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue placeholder="Select staff to add…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {addableStaff.length ? addableStaff.map((s) => (
+                                    <SelectItem key={s.id} value={s.id}>
+                                      {s.name}{s.team_id ? ` · ${allTeams.find((x) => x.id === s.team_id)?.team_name ?? ""}` : " · Unassigned"}
+                                    </SelectItem>
+                                  )) : <div className="px-2 py-1.5 text-xs text-muted-foreground">No staff available</div>}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">➕ Quick-Add Client</Label>
+                              <Select
+                                value=""
+                                onValueChange={(id) => assignClient.mutate({ id, team_id: t.id })}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue placeholder="Select client to add…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {addableClients.length ? addableClients.map((c) => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                      {c.first_name} {c.last_name}{c.team_id ? ` · ${allTeams.find((x) => x.id === c.team_id)?.team_name ?? ""}` : " · Unassigned"}
+                                    </SelectItem>
+                                  )) : <div className="px-2 py-1.5 text-xs text-muted-foreground">No clients available</div>}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <Badge variant="secondary" className="gap-1 font-medium">
                         <UserRound className="h-3 w-3" /> Mgr: {staffName(t.manager_id)}
@@ -272,7 +322,12 @@ function TeamsPage() {
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
                           👤 Staff Roster
                         </div>
-                        {tStaff.map((s) => <StaffCard key={s.id} s={s} from={t.id} />)}
+                        {tStaff.map((s) => (
+                          <StaffCard
+                            key={s.id} s={s} from={t.id}
+                            onRemove={() => assignStaff.mutate({ id: s.id, team_id: null })}
+                          />
+                        ))}
                         {!tStaff.length && <p className="text-[11px] text-muted-foreground italic">Drop staff here</p>}
                       </DropZone>
 
@@ -284,7 +339,12 @@ function TeamsPage() {
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                           🏠 Client Roster
                         </div>
-                        {tClients.map((c) => <ClientCard key={c.id} c={c} from={t.id} />)}
+                        {tClients.map((c) => (
+                          <ClientCard
+                            key={c.id} c={c} from={t.id}
+                            onRemove={() => assignClient.mutate({ id: c.id, team_id: null })}
+                          />
+                        ))}
                         {!tClients.length && <p className="text-[11px] text-muted-foreground italic">Drop clients here</p>}
                       </DropZone>
                     </div>
@@ -341,7 +401,7 @@ function startDrag(e: DragEvent, payload: DragPayload) {
   e.dataTransfer.setData(`kind/${payload.kind}`, "1");
 }
 
-function StaffCard({ s, from }: { s: StaffRow; from: string | null }) {
+function StaffCard({ s, from, onRemove }: { s: StaffRow; from: string | null; onRemove?: () => void }) {
   const navigate = useNavigate();
   const draggedRef = useRef(false);
   return (
@@ -355,18 +415,30 @@ function StaffCard({ s, from }: { s: StaffRow; from: string | null }) {
       }}
       role="button"
       tabIndex={0}
-      className="group flex items-center gap-1.5 rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md hover:border-primary/50 cursor-pointer active:cursor-grabbing transition-colors"
+      className="group flex items-center gap-1.5 rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md hover:border-primary/50 cursor-pointer active:cursor-grabbing transition-colors animate-in fade-in duration-200"
     >
       <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
       <span className="font-medium truncate flex-1">{s.name}</span>
       <Badge variant="outline" className="gap-0.5 px-1.5 py-0 text-[10px] capitalize">
         <UserRound className="h-2.5 w-2.5" />{s.role ?? "staff"}
       </Badge>
+      {onRemove && (
+        <button
+          type="button"
+          draggable={false}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-opacity"
+          aria-label="Remove from program"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }
 
-function ClientCard({ c, from }: { c: ClientRow; from: string | null }) {
+function ClientCard({ c, from, onRemove }: { c: ClientRow; from: string | null; onRemove?: () => void }) {
   const navigate = useNavigate();
   const draggedRef = useRef(false);
   const funding = c.job_code?.[0] ?? "Self-pay";
@@ -381,11 +453,23 @@ function ClientCard({ c, from }: { c: ClientRow; from: string | null }) {
       }}
       role="button"
       tabIndex={0}
-      className="group rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md hover:border-primary/50 cursor-pointer active:cursor-grabbing border-l-2 border-l-emerald-500 transition-colors"
+      className="group rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md hover:border-primary/50 cursor-pointer active:cursor-grabbing border-l-2 border-l-emerald-500 transition-colors animate-in fade-in duration-200"
     >
       <div className="flex items-center gap-1.5">
         <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
         <span className="font-medium truncate flex-1">{c.first_name} {c.last_name}</span>
+        {onRemove && (
+          <button
+            type="button"
+            draggable={false}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-opacity"
+            aria-label="Remove from program"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
       </div>
       <div className="mt-1 flex items-center gap-1 pl-4 text-[10px] text-muted-foreground">
         <Wallet className="h-2.5 w-2.5" /> {funding}

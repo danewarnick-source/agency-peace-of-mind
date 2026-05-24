@@ -290,26 +290,78 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
     },
   });
 
-  const [type, setType] = useState("deposit");
+  const [type, setType] = useState("withdrawal");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [memo, setMemo] = useState("");
   const [counterparty, setCounterparty] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
+  const [receiptPreview, setReceiptPreview] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [autofilled, setAutofilled] = useState<{ amount?: boolean; counterparty?: boolean; date?: boolean }>({});
+  const [flashGreen, setFlashGreen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const needsReceipt = Number(amount) > 50;
 
-  const upload = async (file: File) => {
-    setUploading(true);
+  const flagAutoFilled = (next: { amount?: boolean; counterparty?: boolean; date?: boolean }, green = false) => {
+    setAutofilled(next);
+    if (green) { setFlashGreen(true); setTimeout(() => setFlashGreen(false), 1800); }
+    setTimeout(() => setAutofilled({}), 6000);
+  };
+
+  const runParse = async (signedOrPublicUrl: string) => {
+    setParsing(true);
     try {
-      const path = `pba/${account.id}/${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage.from("training-assets").upload(path, file);
+      const { data, error } = await supabase.functions.invoke("parse-receipt-ocr", {
+        body: { imageUrl: signedOrPublicUrl },
+      });
       if (error) throw error;
-      const { data } = supabase.storage.from("training-assets").getPublicUrl(path);
-      setReceiptUrl(data.publicUrl);
-      toast.success("Receipt uploaded");
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setUploading(false); }
+      const d = data as { merchant_name?: string; total_amount?: number; transaction_date?: string; error?: string };
+      if (d?.error) throw new Error(d.error);
+      if (d?.total_amount != null) setAmount(String(d.total_amount));
+      if (d?.merchant_name) setCounterparty(d.merchant_name);
+      if (d?.transaction_date) setDate(d.transaction_date);
+      flagAutoFilled({ amount: d?.total_amount != null, counterparty: !!d?.merchant_name, date: !!d?.transaction_date });
+      toast.success("AI extracted receipt details");
+    } catch (e) {
+      toast.error(`AI parsing failed: ${(e as Error).message}`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    setReceiptPreview(URL.createObjectURL(file));
+    try {
+      const ext = file.name.split(".").pop() || "bin";
+      const path = `${org!.organization_id}/${account.client_id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("client_receipt_snapshots").upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      setReceiptUrl(path);
+      const { data: signed, error: sErr } = await supabase.storage.from("client_receipt_snapshots").createSignedUrl(path, 600);
+      if (sErr) throw sErr;
+      await runParse(signed.signedUrl);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const simulateMock = (m: { merchant_name: string; total_amount: number; transaction_date: string; preview: string }) => {
+    setReceiptPreview(m.preview);
+    setParsing(true);
+    setTimeout(() => {
+      setAmount(String(m.total_amount));
+      setCounterparty(m.merchant_name);
+      setDate(m.transaction_date);
+      setMemo((prev) => prev || `Mock receipt — ${m.merchant_name}`);
+      flagAutoFilled({ amount: true, counterparty: true, date: true }, true);
+      setParsing(false);
+      toast.success(`Simulated AI extraction · ${m.merchant_name}`);
+    }, 900);
   };
 
   const addTx = useMutation({
@@ -331,13 +383,21 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
       toast.success("Transaction recorded");
       qc.invalidateQueries({ queryKey: ["pba-tx"] });
       qc.invalidateQueries({ queryKey: ["pba-accounts"] });
-      setAmount(""); setMemo(""); setCounterparty(""); setReceiptUrl("");
+      setAmount(""); setMemo(""); setCounterparty(""); setReceiptUrl(""); setReceiptPreview(""); setAutofilled({});
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const balance = useMemo(() => Number(account.current_balance), [account]);
   const ratio = balance / Number(account.medicaid_threshold || 1);
+
+  const hl = (on?: boolean) =>
+    cn(
+      "transition-colors",
+      on && (flashGreen
+        ? "border-emerald-500/70 ring-2 ring-emerald-500/20"
+        : "border-sky-500/60 ring-2 ring-sky-500/20")
+    );
 
   return (
     <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
@@ -351,8 +411,46 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
         <Stat label="Headroom" value={`${Math.max(0, Math.round((1 - ratio) * 100))}%`} tone={ratio >= 0.9 ? "red" : ratio >= 0.75 ? "amber" : "emerald"} />
       </div>
 
-      <div className="rounded-lg border border-border p-4">
+      <div className="relative rounded-lg border border-border p-4">
+        {parsing && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 backdrop-blur-sm">
+            <div className="flex items-center gap-2 rounded-full border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-700 dark:text-sky-300">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              🤖 AI is reading receipt telemetry and parsing data…
+            </div>
+          </div>
+        )}
+
         <h4 className="text-sm font-semibold">New transaction</h4>
+
+        {/* Drop-zone */}
+        <label
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault(); setDragOver(false);
+            const f = e.dataTransfer.files?.[0]; if (f) void handleFile(f);
+          }}
+          className={cn(
+            "mt-3 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-4 text-center transition-colors",
+            dragOver ? "border-sky-500 bg-sky-500/10" : "border-border bg-muted/30 hover:bg-muted/50"
+          )}
+        >
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,application/pdf"
+            className="hidden"
+            disabled={uploading || parsing}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }}
+          />
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <ImageIcon className="h-4 w-4 text-sky-600" />
+            📸 Upload or Drag Receipt Snapshot (Auto-Extract Details)
+          </div>
+          <p className="text-[11px] text-muted-foreground">PNG · JPG · PDF — uploads to secure receipt vault then runs AI vision OCR</p>
+          {uploading && <p className="text-[11px] text-sky-600">Uploading securely…</p>}
+        </label>
+
         <div className="mt-3 grid gap-3 md:grid-cols-4">
           <div className="grid gap-1.5"><Label>Type</Label>
             <Select value={type} onValueChange={setType}>
@@ -367,26 +465,44 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-1.5"><Label>Amount</Label><Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
-          <div className="grid gap-1.5"><Label>Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-          <div className="grid gap-1.5"><Label>Counterparty</Label><Input value={counterparty} onChange={(e) => setCounterparty(e.target.value)} maxLength={120} /></div>
+          <div className="grid gap-1.5">
+            <Label className="flex items-center gap-1.5">Amount {autofilled.amount && <AutoBadge green={flashGreen} />}</Label>
+            <Input className={hl(autofilled.amount)} type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="flex items-center gap-1.5">Date {autofilled.date && <AutoBadge green={flashGreen} />}</Label>
+            <Input className={hl(autofilled.date)} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="flex items-center gap-1.5">Location / Description {autofilled.counterparty && <AutoBadge green={flashGreen} />}</Label>
+            <Input className={hl(autofilled.counterparty)} value={counterparty} onChange={(e) => setCounterparty(e.target.value)} maxLength={120} />
+          </div>
           <div className="grid gap-1.5 md:col-span-4"><Label>Memo</Label><Input value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={300} /></div>
-          {needsReceipt && (
+          {needsReceipt && !receiptUrl && (
             <div className="md:col-span-4 grid gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-              <Label className="flex items-center gap-1.5 text-xs"><Receipt className="h-3.5 w-3.5" /> Receipt required (amount over $50)</Label>
-              <div className="flex items-center gap-2">
-                <Input type="file" accept="image/*,application/pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} disabled={uploading} />
-                {receiptUrl && <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"><Upload className="mr-1 h-3 w-3" /> Attached</Badge>}
+              <Label className="flex items-center gap-1.5 text-xs"><Receipt className="h-3.5 w-3.5" /> Receipt required (amount over $50) — use the drop-zone above</Label>
+            </div>
+          )}
+          {receiptPreview && (
+            <div className="md:col-span-4 flex items-start gap-3 rounded-md border border-border bg-muted/30 p-3">
+              <img src={receiptPreview} alt="Receipt preview" className="h-28 w-28 rounded border border-border object-cover" />
+              <div className="flex-1 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Captured snapshot</p>
+                <p className="mt-1">Verify the extracted fields above match this receipt before logging the transaction.</p>
+                {receiptUrl && <Badge variant="outline" className="mt-2 border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"><Upload className="mr-1 h-3 w-3" /> Stored in secure vault</Badge>}
               </div>
             </div>
           )}
         </div>
         <div className="mt-3 flex justify-end">
           <Button onClick={() => addTx.mutate()} disabled={!amount || addTx.isPending || (needsReceipt && !receiptUrl)}>
-            {addTx.isPending ? "Saving…" : "Record transaction"}
+            {addTx.isPending ? "Saving…" : "Confirm & Log Transaction"}
           </Button>
         </div>
       </div>
+
+      <MockReceiptDeck onSimulate={simulateMock} />
+
 
       <div className="rounded-lg border border-border">
         <Table>

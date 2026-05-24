@@ -145,7 +145,7 @@ function TeamsPage() {
   const allClients = clientsQ.data ?? [];
 
   const [drawerOpen, setDrawerOpen] = useState(true);
-  const navigate = useNavigate();
+
 
   const teams = allTeams;
   const staff = allStaff;

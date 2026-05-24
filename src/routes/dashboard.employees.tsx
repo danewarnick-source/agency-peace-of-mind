@@ -88,8 +88,10 @@ function EmployeesPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
-      const profMap = new Map((profs ?? []).map((p) => [p.id, p]));
-      return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) as any }));
     },
   });
 

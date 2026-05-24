@@ -30,7 +30,6 @@ import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timec
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
 import { Route as DashboardSubmissionsRouteImport } from './routes/dashboard.submissions'
-import { Route as DashboardAuditPortalRouteImport } from './routes/dashboard.audit-portal'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardSchedulerRouteImport } from './routes/dashboard.scheduler'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
@@ -162,6 +161,11 @@ const DashboardSuperAdminRoute = DashboardSuperAdminRouteImport.update({
 const DashboardSubmissionsRoute = DashboardSubmissionsRouteImport.update({
   id: '/submissions',
   path: '/submissions',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardAuditPortalRoute = DashboardAuditPortalRouteImport.update({
+  id: '/audit-portal',
+  path: '/audit-portal',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({

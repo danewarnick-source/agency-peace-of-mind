@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, type DragEvent } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useRef, useState, type DragEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -12,11 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import {
-  Home, Plus, Loader2, FlaskConical, ShieldCheck, ShieldOff, UserPlus,
+  Home, Plus, Loader2,
   UserRound, HeartHandshake, Package, ChevronLeft, ChevronRight, GripVertical, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { seedMockStaff } from "@/lib/seed.functions";
 
 export const Route = createFileRoute("/dashboard/teams")({
   head: () => ({ meta: [{ title: "Teams & Group Homes — Care Academy" }] }),
@@ -145,28 +144,12 @@ function TeamsPage() {
   const allStaff = staffQ.data ?? [];
   const allClients = clientsQ.data ?? [];
 
-  const seedMut = useMutation({
-    mutationFn: async () => {
-      const res = await seedMockStaff({});
-      return res;
-    },
-    onSuccess: () => {
-      toast.success("8 new mock staff seeded");
-      qc.invalidateQueries({ queryKey: ["teams-staff"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const MARCUS_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-  const [simulateManager, setSimulateManager] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
-  const marcusTeamId = allStaff.find((s) => s.id === MARCUS_ID)?.team_id ?? null;
 
-  const teams = simulateManager && marcusTeamId ? allTeams.filter((t) => t.id === marcusTeamId) : allTeams;
-  const staff = simulateManager && marcusTeamId
-    ? allStaff.filter((s) => s.team_id === marcusTeamId)
-    : allStaff;
-  const clients = simulateManager && marcusTeamId ? allClients.filter((c) => c.team_id === marcusTeamId) : allClients;
+
+  const teams = allTeams;
+  const staff = allStaff;
+  const clients = allClients;
 
   const staffName = (id: string | null) => allStaff.find((s) => s.id === id)?.name ?? "—";
   const unassignedStaff = staff.filter((s) => !s.team_id);
@@ -189,38 +172,6 @@ function TeamsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-        <span className="flex items-center gap-2 font-medium text-amber-700 dark:text-amber-300">
-          <FlaskConical className="h-4 w-4" /> 🧪 Sandbox Environment: Mock Hierarchy Loaded
-        </span>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => seedMut.mutate()}
-            disabled={seedMut.isPending}
-            className="gap-1.5"
-          >
-            {seedMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
-            Add 8 Mock Staff
-          </Button>
-          <Button
-            size="sm"
-            variant={simulateManager ? "default" : "outline"}
-            onClick={() => setSimulateManager((v) => !v)}
-            className="gap-1.5"
-          >
-            {simulateManager ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-            {simulateManager ? "Exit Marcus Vance view" : "Simulate Manager Login (Marcus Vance)"}
-          </Button>
-        </div>
-      </div>
-
-      {simulateManager && (
-        <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-xs text-muted-foreground">
-          🔒 Filtered to Canyon View Residential only — sibling homes blocked by access firewall.
-        </div>
-      )}
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -391,11 +342,20 @@ function startDrag(e: DragEvent, payload: DragPayload) {
 }
 
 function StaffCard({ s, from }: { s: StaffRow; from: string | null }) {
+  const navigate = useNavigate();
+  const draggedRef = useRef(false);
   return (
     <div
       draggable
-      onDragStart={(e) => startDrag(e, { kind: "staff", id: s.id, from })}
-      className="group flex items-center gap-1.5 rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing"
+      onDragStart={(e) => { draggedRef.current = true; startDrag(e, { kind: "staff", id: s.id, from }); }}
+      onDragEnd={() => { setTimeout(() => { draggedRef.current = false; }, 50); }}
+      onClick={() => {
+        if (draggedRef.current) return;
+        navigate({ to: "/dashboard/employees", search: { id: s.id } as never });
+      }}
+      role="button"
+      tabIndex={0}
+      className="group flex items-center gap-1.5 rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md hover:border-primary/50 cursor-pointer active:cursor-grabbing transition-colors"
     >
       <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
       <span className="font-medium truncate flex-1">{s.name}</span>
@@ -407,12 +367,21 @@ function StaffCard({ s, from }: { s: StaffRow; from: string | null }) {
 }
 
 function ClientCard({ c, from }: { c: ClientRow; from: string | null }) {
+  const navigate = useNavigate();
+  const draggedRef = useRef(false);
   const funding = c.job_code?.[0] ?? "Self-pay";
   return (
     <div
       draggable
-      onDragStart={(e) => startDrag(e, { kind: "client", id: c.id, from })}
-      className="group rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing border-l-2 border-l-emerald-500"
+      onDragStart={(e) => { draggedRef.current = true; startDrag(e, { kind: "client", id: c.id, from }); }}
+      onDragEnd={() => { setTimeout(() => { draggedRef.current = false; }, 50); }}
+      onClick={() => {
+        if (draggedRef.current) return;
+        navigate({ to: "/dashboard/clients", search: { id: c.id } as never });
+      }}
+      role="button"
+      tabIndex={0}
+      className="group rounded-md border bg-card p-2 text-xs shadow-sm hover:shadow-md hover:border-primary/50 cursor-pointer active:cursor-grabbing border-l-2 border-l-emerald-500 transition-colors"
     >
       <div className="flex items-center gap-1.5">
         <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />

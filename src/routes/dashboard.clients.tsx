@@ -174,6 +174,10 @@ function ClientsPage() {
         </Dialog>
       </div>
 
+      <ClientChartAuditMatrix />
+
+
+
       <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
         {isLoading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">Loading…</div>

@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { RequirePermission } from "@/components/rbac-guard";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
+import { LifecyclePanel } from "@/components/lifecycle-panel";
 
 function genPassword(len = 14) {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";

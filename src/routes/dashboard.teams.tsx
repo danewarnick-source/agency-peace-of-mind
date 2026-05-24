@@ -144,28 +144,12 @@ function TeamsPage() {
   const allStaff = staffQ.data ?? [];
   const allClients = clientsQ.data ?? [];
 
-  const seedMut = useMutation({
-    mutationFn: async () => {
-      const res = await seedMockStaff({});
-      return res;
-    },
-    onSuccess: () => {
-      toast.success("8 new mock staff seeded");
-      qc.invalidateQueries({ queryKey: ["teams-staff"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const MARCUS_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-  const [simulateManager, setSimulateManager] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
-  const marcusTeamId = allStaff.find((s) => s.id === MARCUS_ID)?.team_id ?? null;
+  const navigate = useNavigate();
 
-  const teams = simulateManager && marcusTeamId ? allTeams.filter((t) => t.id === marcusTeamId) : allTeams;
-  const staff = simulateManager && marcusTeamId
-    ? allStaff.filter((s) => s.team_id === marcusTeamId)
-    : allStaff;
-  const clients = simulateManager && marcusTeamId ? allClients.filter((c) => c.team_id === marcusTeamId) : allClients;
+  const teams = allTeams;
+  const staff = allStaff;
+  const clients = allClients;
 
   const staffName = (id: string | null) => allStaff.find((s) => s.id === id)?.name ?? "—";
   const unassignedStaff = staff.filter((s) => !s.team_id);

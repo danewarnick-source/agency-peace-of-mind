@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { EvvShiftControl } from "@/components/evv-shift-control";
 import { jobCodeLabel } from "@/lib/job-codes";
 
-export const Route = createFileRoute("/dashboard/client/$clientId")({
+export const Route = createFileRoute("/dashboard/clients/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — Care Academy" }] }),
   component: ClientWorkspace,
 });

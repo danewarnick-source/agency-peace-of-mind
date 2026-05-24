@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS position text CHECK (position IN ('Direct Care','Host Staff','Office Staff','Admin'));

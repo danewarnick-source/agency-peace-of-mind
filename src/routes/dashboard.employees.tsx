@@ -19,6 +19,7 @@ import { toast } from "sonner";
 
 import { RequirePermission } from "@/components/rbac-guard";
 import { BulkImporter } from "@/components/bulk-importer";
+import { CustomAttributesSection } from "@/components/custom-attributes-section";
 
 function genPassword(len = 14) {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -532,6 +533,11 @@ function EmployeesPage() {
                   </Select>
                 </div>
               </div>
+              <CustomAttributesSection
+                organizationId={org?.organization_id}
+                entityKind="employee"
+                entityId={editingMember.userId}
+              />
               <DialogFooter>
                 <Button type="submit" disabled={editMemberMutation.isPending}>
                   {editMemberMutation.isPending ? "Saving…" : "Save changes"}

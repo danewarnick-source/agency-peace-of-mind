@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { ClientChartAuditMatrix } from "@/components/client-chart-audit";
 import { BulkImporter } from "@/components/bulk-importer";
+import { CustomAttributesSection } from "@/components/custom-attributes-section";
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -257,6 +258,8 @@ function ClientsPage() {
               medicaid_id: editing.medicaid_id ?? "",
             }}
             onSubmit={(v) => editMutation.mutate({ ...v, id: editing.id })}
+            clientId={editing.id}
+            organizationId={org?.organization_id}
           />
         )}
       </Dialog>
@@ -265,13 +268,15 @@ function ClientsPage() {
 }
 
 function ClientFormDialog({
-  title, submitLabel, pending, onSubmit, initial,
+  title, submitLabel, pending, onSubmit, initial, clientId, organizationId,
 }: {
   title: string;
   submitLabel: string;
   pending: boolean;
   onSubmit: (v: ClientFormValues) => void;
   initial?: ClientFormValues;
+  clientId?: string;
+  organizationId?: string;
 }) {
   const [first, setFirst] = useState(initial?.first_name ?? "");
   const [last, setLast] = useState(initial?.last_name ?? "");
@@ -418,6 +423,13 @@ function ClientFormDialog({
             </div>
           )}
         </div>
+        {clientId && (
+          <CustomAttributesSection
+            organizationId={organizationId}
+            entityKind="client"
+            entityId={clientId}
+          />
+        )}
         <DialogFooter>
           <Button type="submit" disabled={!canSubmit || pending}>
             {pending ? "Saving…" : submitLabel}

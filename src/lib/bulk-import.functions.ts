@@ -5,11 +5,42 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const RowSchema = z.record(z.string(), z.union([z.string(), z.number(), z.null()]).optional());
 
+const CustomFieldSchema = z.object({
+  header: z.string().min(1),
+  label: z.string().min(1).max(120),
+  data_type: z.enum(["text", "number", "boolean", "date"]),
+});
+
 const Input = z.object({
   kind: z.enum(["employee", "client"]),
   organizationId: z.string().uuid(),
   rows: z.array(RowSchema).min(1).max(500),
+  customFields: z.array(CustomFieldSchema).default([]),
 });
+
+function slugify(s: string): string {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 60) || "field";
+}
+
+function coerceValue(raw: unknown, type: "text" | "number" | "boolean" | "date") {
+  const s = raw === null || raw === undefined ? "" : String(raw).trim();
+  if (!s) return { value_text: null, value_number: null, value_boolean: null, value_date: null };
+  if (type === "number") {
+    const n = Number(s.replace(/[, $]/g, ""));
+    return { value_text: null, value_number: Number.isFinite(n) ? n : null, value_boolean: null, value_date: null };
+  }
+  if (type === "boolean") {
+    const t = s.toLowerCase();
+    const b = ["yes", "y", "true", "1", "t"].includes(t) ? true
+            : ["no", "n", "false", "0", "f"].includes(t) ? false : null;
+    return { value_text: null, value_number: null, value_boolean: b, value_date: null };
+  }
+  if (type === "date") {
+    const d = new Date(s);
+    return { value_text: null, value_number: null, value_boolean: null, value_date: isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10) };
+  }
+  return { value_text: s, value_number: null, value_boolean: null, value_date: null };
+}
 
 async function resolveTeamId(
   orgId: string,
@@ -20,7 +51,6 @@ async function resolveTeamId(
   if (!name) return null;
   const key = name.toLowerCase();
   if (cache.has(key)) return cache.get(key)!;
-  // case-insensitive lookup
   const { data: existing } = await supabaseAdmin
     .from("teams")
     .select("id, team_name")
@@ -45,7 +75,6 @@ export const bulkImportRoster = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data, context }) => {
-    // permission check
     const { data: mem } = await supabaseAdmin
       .from("organization_members")
       .select("role,active")
@@ -57,11 +86,62 @@ export const bulkImportRoster = createServerFn({ method: "POST" })
       throw new Error("Forbidden");
     }
 
+    // Upsert custom field definitions, build header → definition_id+type map
+    const cfMap = new Map<string, { id: string; type: "text" | "number" | "boolean" | "date" }>();
+    for (const cf of data.customFields) {
+      const field_key = slugify(cf.label);
+      const { data: existing } = await supabaseAdmin
+        .from("custom_field_definitions")
+        .select("id, data_type")
+        .eq("organization_id", data.organizationId)
+        .eq("entity_kind", data.kind)
+        .eq("field_key", field_key)
+        .maybeSingle();
+      let defId = existing?.id as string | undefined;
+      if (!defId) {
+        const { data: ins, error } = await supabaseAdmin
+          .from("custom_field_definitions")
+          .insert({
+            organization_id: data.organizationId,
+            entity_kind: data.kind,
+            field_key,
+            field_label: cf.label,
+            data_type: cf.data_type,
+            created_by: context.userId,
+          })
+          .select("id")
+          .single();
+        if (error || !ins) continue;
+        defId = ins.id;
+      }
+      cfMap.set(cf.header, { id: defId!, type: cf.data_type });
+    }
+
     const teamCache = new Map<string, string>();
     let created = 0;
     let teamsCreated = 0;
-    const teamsBefore = teamCache.size;
     const errors: string[] = [];
+
+    const writeCustomValues = async (entityId: string, row: Record<string, unknown>) => {
+      for (const [header, meta] of cfMap.entries()) {
+        const raw = row[`__custom__${header}`];
+        const coerced = coerceValue(raw, meta.type);
+        if (
+          coerced.value_text === null &&
+          coerced.value_number === null &&
+          coerced.value_boolean === null &&
+          coerced.value_date === null
+        ) continue;
+        await supabaseAdmin.from("custom_field_values").upsert({
+          organization_id: data.organizationId,
+          definition_id: meta.id,
+          entity_kind: data.kind,
+          entity_id: entityId,
+          ...coerced,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "definition_id,entity_id" });
+      }
+    };
 
     for (const raw of data.rows) {
       const r = raw as Record<string, string | number | null | undefined>;
@@ -83,7 +163,6 @@ export const bulkImportRoster = createServerFn({ method: "POST" })
             const slug = fullName.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "");
             email = `${slug}.${Math.random().toString(36).slice(2, 6)}@import.local`;
           }
-          // create or find auth user
           let userId: string | undefined;
           const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({
             email,
@@ -117,7 +196,6 @@ export const bulkImportRoster = createServerFn({ method: "POST" })
             .eq("organization_id", data.organizationId)
             .maybeSingle();
           if (!existingMem) {
-            // deactivate any auto-created personal-org memberships first
             await supabaseAdmin.from("organization_members")
               .update({ active: false })
               .eq("user_id", userId)
@@ -130,9 +208,9 @@ export const bulkImportRoster = createServerFn({ method: "POST" })
               job_title: get("position") || null,
             });
           }
+          await writeCustomValues(userId, r);
           created++;
         } else {
-          // client
           let first = get("first_name");
           let last = get("last_name");
           if (!first && !last) {
@@ -146,7 +224,7 @@ export const bulkImportRoster = createServerFn({ method: "POST" })
           const jobCodes = jobCodeRaw
             ? jobCodeRaw.split(/[,;|]/).map((s) => s.trim()).filter(Boolean)
             : [];
-          const { error } = await supabaseAdmin.from("clients").insert({
+          const { data: client, error } = await supabaseAdmin.from("clients").insert({
             organization_id: data.organizationId,
             first_name: first || "—",
             last_name: last || "—",
@@ -155,8 +233,9 @@ export const bulkImportRoster = createServerFn({ method: "POST" })
             medicaid_id: get("medicaid_id") || null,
             job_code: jobCodes,
             team_id: teamId,
-          });
-          if (error) { errors.push(`Client ${first} ${last}: ${error.message}`); continue; }
+          }).select("id").single();
+          if (error || !client) { errors.push(`Client ${first} ${last}: ${error?.message ?? "insert failed"}`); continue; }
+          await writeCustomValues(client.id, r);
           created++;
         }
       } catch (e) {
@@ -164,5 +243,5 @@ export const bulkImportRoster = createServerFn({ method: "POST" })
       }
     }
 
-    return { created, teamsCreated, errors, teamsBefore };
+    return { created, teamsCreated, errors, customFieldsCreated: cfMap.size };
   });

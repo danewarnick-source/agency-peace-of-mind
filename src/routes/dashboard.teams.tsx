@@ -172,38 +172,6 @@ function TeamsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-        <span className="flex items-center gap-2 font-medium text-amber-700 dark:text-amber-300">
-          <FlaskConical className="h-4 w-4" /> 🧪 Sandbox Environment: Mock Hierarchy Loaded
-        </span>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => seedMut.mutate()}
-            disabled={seedMut.isPending}
-            className="gap-1.5"
-          >
-            {seedMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
-            Add 8 Mock Staff
-          </Button>
-          <Button
-            size="sm"
-            variant={simulateManager ? "default" : "outline"}
-            onClick={() => setSimulateManager((v) => !v)}
-            className="gap-1.5"
-          >
-            {simulateManager ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-            {simulateManager ? "Exit Marcus Vance view" : "Simulate Manager Login (Marcus Vance)"}
-          </Button>
-        </div>
-      </div>
-
-      {simulateManager && (
-        <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-xs text-muted-foreground">
-          🔒 Filtered to Canyon View Residential only — sibling homes blocked by access firewall.
-        </div>
-      )}
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>

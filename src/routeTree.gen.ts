@@ -51,6 +51,7 @@ import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing
 import { Route as DashboardAuditPortalRouteImport } from './routes/dashboard.audit-portal'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
+import { Route as ApiSeedStaffRouteImport } from './routes/api/seed-staff'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
@@ -273,6 +274,11 @@ const CertificateCodeRoute = CertificateCodeRouteImport.update({
   path: '/certificate/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSeedStaffRoute = ApiSeedStaffRouteImport.update({
+  id: '/api/seed-staff',
+  path: '/api/seed-staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardTrainingIndexRoute = DashboardTrainingIndexRouteImport.update({
   id: '/training/',
   path: '/training/',
@@ -345,6 +351,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/api/seed-staff': typeof ApiSeedStaffRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
@@ -398,6 +405,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/api/seed-staff': typeof ApiSeedStaffRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
@@ -453,6 +461,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/api/seed-staff': typeof ApiSeedStaffRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
@@ -509,6 +518,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/super-admin'
     | '/unauthorized'
+    | '/api/seed-staff'
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/audit-portal'
@@ -562,6 +572,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/super-admin'
     | '/unauthorized'
+    | '/api/seed-staff'
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/audit-portal'
@@ -616,6 +627,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/super-admin'
     | '/unauthorized'
+    | '/api/seed-staff'
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/audit-portal'
@@ -671,6 +683,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SuperAdminRoute: typeof SuperAdminRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
+  ApiSeedStaffRoute: typeof ApiSeedStaffRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
 }
@@ -971,6 +984,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CertificateCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/seed-staff': {
+      id: '/api/seed-staff'
+      path: '/api/seed-staff'
+      fullPath: '/api/seed-staff'
+      preLoaderRoute: typeof ApiSeedStaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/training/': {
       id: '/dashboard/training/'
       path: '/training'
@@ -1182,6 +1202,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SuperAdminRoute: SuperAdminRoute,
   UnauthorizedRoute: UnauthorizedRoute,
+  ApiSeedStaffRoute: ApiSeedStaffRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
 }

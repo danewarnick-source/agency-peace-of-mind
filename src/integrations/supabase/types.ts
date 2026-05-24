@@ -1195,6 +1195,48 @@ export type Database = {
         }
         Relationships: []
       }
+      submitted_forms: {
+        Row: {
+          attachment_url: string | null
+          client_id: string
+          created_at: string
+          form_type: string
+          id: string
+          narrative: string | null
+          occurred_at: string
+          organization_id: string
+          payload: Json
+          title: string
+          user_id: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          client_id: string
+          created_at?: string
+          form_type: string
+          id?: string
+          narrative?: string | null
+          occurred_at?: string
+          organization_id: string
+          payload?: Json
+          title: string
+          user_id: string
+        }
+        Update: {
+          attachment_url?: string | null
+          client_id?: string
+          created_at?: string
+          form_type?: string
+          id?: string
+          narrative?: string | null
+          occurred_at?: string
+          organization_id?: string
+          payload?: Json
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       track_assignments: {
         Row: {
           assigned_by: string | null

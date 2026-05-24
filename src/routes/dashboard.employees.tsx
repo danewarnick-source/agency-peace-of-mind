@@ -223,6 +223,7 @@ function EmployeesPage() {
           <p className="text-sm text-muted-foreground">{members?.length ?? 0} active · billed at $25/employee/mo</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <BulkImporter organizationId={org?.organization_id} defaultKind="employee" />
           <Button variant="outline" onClick={() => { setTempPassword(genPassword()); setManualOpen(true); }}>
             <ShieldPlus className="mr-2 h-4 w-4" /> Add manually
           </Button>

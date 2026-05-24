@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Home, Plus, Pencil, Users, Contact2, Check, X, Loader2 } from "lucide-react";
+import { Home, Plus, Pencil, Users, Contact2, Check, X, Loader2, FlaskConical, ShieldCheck, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/teams")({

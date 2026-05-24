@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, type DragEvent } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useRef, useState, type DragEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -12,11 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import {
-  Home, Plus, Loader2, FlaskConical, ShieldCheck, ShieldOff, UserPlus,
+  Home, Plus, Loader2,
   UserRound, HeartHandshake, Package, ChevronLeft, ChevronRight, GripVertical, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { seedMockStaff } from "@/lib/seed.functions";
 
 export const Route = createFileRoute("/dashboard/teams")({
   head: () => ({ meta: [{ title: "Teams & Group Homes — Care Academy" }] }),

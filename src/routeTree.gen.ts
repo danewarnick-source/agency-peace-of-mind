@@ -49,12 +49,12 @@ import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.ass
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
+import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
 import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
-import { Route as DashboardClientsClientIdRouteImport } from './routes/dashboard.clients.$clientId'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
@@ -258,6 +258,12 @@ const DashboardCoursesIndexRoute = DashboardCoursesIndexRouteImport.update({
   path: '/courses/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardWorkspaceClientIdRoute =
+  DashboardWorkspaceClientIdRouteImport.update({
+    id: '/workspace/$clientId',
+    path: '/workspace/$clientId',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardTrainingIdRoute = DashboardTrainingIdRouteImport.update({
   id: '/training/$id',
   path: '/training/$id',
@@ -287,12 +293,6 @@ const DashboardCoursesCourseIdRoute =
     path: '/courses/$courseId',
     getParentRoute: () => DashboardRoute,
   } as any)
-const DashboardClientsClientIdRoute =
-  DashboardClientsClientIdRouteImport.update({
-    id: '/$clientId',
-    path: '/$clientId',
-    getParentRoute: () => DashboardClientsRoute,
-  } as any)
 const DashboardCoursesCourseIdEditRoute =
   DashboardCoursesCourseIdEditRouteImport.update({
     id: '/edit',
@@ -318,7 +318,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
-  '/dashboard/clients': typeof DashboardClientsRouteWithChildren
+  '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
@@ -339,12 +339,12 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
-  '/dashboard/clients/$clientId': typeof DashboardClientsClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
+  '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -366,7 +366,7 @@ export interface FileRoutesByTo {
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
-  '/dashboard/clients': typeof DashboardClientsRouteWithChildren
+  '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
@@ -387,12 +387,12 @@ export interface FileRoutesByTo {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
-  '/dashboard/clients/$clientId': typeof DashboardClientsClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
+  '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -416,7 +416,7 @@ export interface FileRoutesById {
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
-  '/dashboard/clients': typeof DashboardClientsRouteWithChildren
+  '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
@@ -437,12 +437,12 @@ export interface FileRoutesById {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
-  '/dashboard/clients/$clientId': typeof DashboardClientsClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
+  '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -488,12 +488,12 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
-    | '/dashboard/clients/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
+    | '/dashboard/workspace/$clientId'
     | '/dashboard/courses/'
     | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
@@ -536,12 +536,12 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard'
-    | '/dashboard/clients/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
+    | '/dashboard/workspace/$clientId'
     | '/dashboard/courses'
     | '/dashboard/training'
     | '/dashboard/courses/$courseId/edit'
@@ -585,12 +585,12 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
-    | '/dashboard/clients/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
+    | '/dashboard/workspace/$clientId'
     | '/dashboard/courses/'
     | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
@@ -896,6 +896,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/workspace/$clientId': {
+      id: '/dashboard/workspace/$clientId'
+      path: '/workspace/$clientId'
+      fullPath: '/dashboard/workspace/$clientId'
+      preLoaderRoute: typeof DashboardWorkspaceClientIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/training/$id': {
       id: '/dashboard/training/$id'
       path: '/training/$id'
@@ -931,13 +938,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/clients/$clientId': {
-      id: '/dashboard/clients/$clientId'
-      path: '/$clientId'
-      fullPath: '/dashboard/clients/$clientId'
-      preLoaderRoute: typeof DashboardClientsClientIdRouteImport
-      parentRoute: typeof DashboardClientsRoute
-    }
     '/dashboard/courses/$courseId/edit': {
       id: '/dashboard/courses/$courseId/edit'
       path: '/edit'
@@ -947,17 +947,6 @@ declare module '@tanstack/react-router' {
     }
   }
 }
-
-interface DashboardClientsRouteChildren {
-  DashboardClientsClientIdRoute: typeof DashboardClientsClientIdRoute
-}
-
-const DashboardClientsRouteChildren: DashboardClientsRouteChildren = {
-  DashboardClientsClientIdRoute: DashboardClientsClientIdRoute,
-}
-
-const DashboardClientsRouteWithChildren =
-  DashboardClientsRoute._addFileChildren(DashboardClientsRouteChildren)
 
 interface DashboardProgramsRouteChildren {
   DashboardProgramsProgramIdRoute: typeof DashboardProgramsProgramIdRoute
@@ -1000,7 +989,7 @@ interface DashboardRouteChildren {
   DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
   DashboardBillingRoute: typeof DashboardBillingRoute
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
-  DashboardClientsRoute: typeof DashboardClientsRouteWithChildren
+  DashboardClientsRoute: typeof DashboardClientsRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardEvvComplianceRoute: typeof DashboardEvvComplianceRoute
@@ -1023,6 +1012,7 @@ interface DashboardRouteChildren {
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesMindsmithRoute: typeof DashboardCoursesMindsmithRoute
   DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
+  DashboardWorkspaceClientIdRoute: typeof DashboardWorkspaceClientIdRoute
   DashboardCoursesIndexRoute: typeof DashboardCoursesIndexRoute
   DashboardTrainingIndexRoute: typeof DashboardTrainingIndexRoute
 }
@@ -1031,7 +1021,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAssignmentsRoute: DashboardAssignmentsRoute,
   DashboardBillingRoute: DashboardBillingRoute,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
-  DashboardClientsRoute: DashboardClientsRouteWithChildren,
+  DashboardClientsRoute: DashboardClientsRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardEvvComplianceRoute: DashboardEvvComplianceRoute,
@@ -1054,6 +1044,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesMindsmithRoute: DashboardCoursesMindsmithRoute,
   DashboardTrainingIdRoute: DashboardTrainingIdRoute,
+  DashboardWorkspaceClientIdRoute: DashboardWorkspaceClientIdRoute,
   DashboardCoursesIndexRoute: DashboardCoursesIndexRoute,
   DashboardTrainingIndexRoute: DashboardTrainingIndexRoute,
 }
@@ -1082,3 +1073,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

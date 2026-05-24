@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useCaseload } from "@/hooks/use-caseload";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -89,20 +89,7 @@ export function EvvShiftControl() {
   const [now, setNow] = useState(() => Date.now());
   const timerRef = useRef<number | null>(null);
 
-  const { data: clients } = useQuery({
-    enabled: !!org,
-    queryKey: ["evv-clients", org?.organization_id],
-    queryFn: async (): Promise<Client[]> => {
-      const { data, error } = await supabase
-        .from("clients")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code" as any)
-        .eq("organization_id", org!.organization_id)
-        .order("last_name");
-      if (error) throw error;
-      return (data ?? []) as unknown as Client[];
-    },
-  });
+  const { data: clients } = useCaseload();
 
   useEffect(() => {
     if (!user) return;

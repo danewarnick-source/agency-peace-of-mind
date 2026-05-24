@@ -232,28 +232,77 @@ export function EvvShiftControl() {
     setShowDocLock(false);
   };
 
+  // Live GPS telemetry — watches position whenever a client is selected so the
+  // status strip can show "On-Site" / "Outside Geofence" before clock-in too.
+  const [telemetry, setTelemetry] = useState<{
+    status: "idle" | "locating" | "locked" | "denied";
+    distance: number | null;
+  }>({ status: "idle", distance: null });
+
+  useEffect(() => {
+    if (!("geolocation" in navigator)) {
+      setTelemetry({ status: "denied", distance: null });
+      return;
+    }
+    setTelemetry((t) => ({ ...t, status: "locating" }));
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        let distance: number | null = null;
+        if (selectedClient?.home_latitude != null && selectedClient?.home_longitude != null) {
+          distance = haversineMiles(
+            pos.coords.latitude, pos.coords.longitude,
+            selectedClient.home_latitude, selectedClient.home_longitude,
+          );
+        }
+        setTelemetry({ status: "locked", distance });
+      },
+      () => setTelemetry({ status: "denied", distance: null }),
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 15000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [selectedClient?.id, selectedClient?.home_latitude, selectedClient?.home_longitude]);
+
+  const onSite = telemetry.distance != null && telemetry.distance <= GEOFENCE_MILES;
+  const gpsLabel = telemetry.status === "locked"
+    ? "GPS: Locked"
+    : telemetry.status === "locating"
+      ? "GPS: Locating…"
+      : telemetry.status === "denied"
+        ? "GPS: Denied"
+        : "GPS: —";
+
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-base font-semibold">EVV Shift Control Center</h3>
-          <p className="text-xs text-muted-foreground">
-            Tamper-evident clock-in with GPS verification and mandatory shift documentation.
-          </p>
+    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-slate-950">
+      {/* Stopwatch header */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-7 text-white">
+        <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+          <span className="inline-flex items-center gap-1.5">
+            <span className={`inline-block h-1.5 w-1.5 rounded-full ${active ? "animate-pulse bg-emerald-400" : "bg-slate-500"}`} />
+            {active ? "Shift Running" : "Ready to Clock In"}
+          </span>
+          <span className="font-mono tracking-normal">{new Date(now).toLocaleDateString()}</span>
         </div>
-        {active && (
-          <div className="rounded-lg border border-border bg-secondary px-3 py-2 text-right">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Active shift</p>
-            <p className="font-mono text-lg tabular-nums">{formatDuration(elapsed)}</p>
-          </div>
-        )}
+        <div
+          className={`mt-3 text-center font-mono text-5xl font-bold leading-none tabular-nums sm:text-6xl ${
+            active ? "text-emerald-400" : "text-slate-200"
+          }`}
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {formatDuration(elapsed)}
+        </div>
+        <p className="mt-2 text-center text-[11px] uppercase tracking-[0.2em] text-slate-400">
+          Hours · Minutes · Seconds
+        </p>
       </div>
 
-      <div className="mt-6 grid gap-4">
-        <div className="grid gap-2">
-          <Label>Client</Label>
+      {/* Stacked input strip */}
+      <div className="divide-y divide-slate-200 px-6 dark:divide-slate-800">
+        <div className="flex items-center gap-3 py-3.5">
+          <span className="w-24 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Customer</span>
           <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={!!active}>
-            <SelectTrigger><SelectValue placeholder="Select the individual you are serving" /></SelectTrigger>
+            <SelectTrigger className="h-9 flex-1 border-0 bg-transparent px-0 text-sm font-medium shadow-none focus:ring-0 focus-visible:ring-0">
+              <SelectValue placeholder="Select an individual…" />
+            </SelectTrigger>
             <SelectContent>
               {!clients?.length ? (
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">No clients yet</div>
@@ -267,42 +316,80 @@ export function EvvShiftControl() {
         </div>
 
         {selectedClientId && needsCodeChoice && !active && (
-          <div className="grid gap-2">
-            <Label>Select Service Type for This Shift</Label>
+          <div className="flex items-center gap-3 py-3.5">
+            <span className="w-24 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Service</span>
             <Select value={selectedJobCode} onValueChange={setSelectedJobCode}>
-              <SelectTrigger><SelectValue placeholder="Choose the billing code you are working" /></SelectTrigger>
+              <SelectTrigger className="h-9 flex-1 border-0 bg-transparent px-0 text-sm font-medium shadow-none focus:ring-0 focus-visible:ring-0">
+                <SelectValue placeholder="Pick the billing code…" />
+              </SelectTrigger>
               <SelectContent>
                 {authorizedCodes.map((code) => (
                   <SelectItem key={code} value={code}>{jobCodeLabel(code)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-muted-foreground">
-              This client is authorized for multiple services. Pick the one you are providing right now — it will be locked to this shift's billing record.
-            </p>
           </div>
         )}
 
-        {selectedClientId && authorizedCodes.length === 1 && !active && (
-          <p className="text-[11px] text-muted-foreground">
-            Service code: <span className="font-mono font-medium text-foreground">{authorizedCodes[0]}</span> — {jobCodeLabel(authorizedCodes[0])}
-          </p>
+        {selectedClientId && authorizedCodes.length === 1 && (
+          <div className="flex items-center gap-3 py-3.5">
+            <span className="w-24 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Service</span>
+            <span className="flex-1 text-sm font-medium">
+              <span className="font-mono">{authorizedCodes[0]}</span>
+              <span className="ml-2 text-muted-foreground">{jobCodeLabel(authorizedCodes[0])}</span>
+            </span>
+          </div>
         )}
+      </div>
 
-        {!active ? (
-          <Button onClick={handleClockIn} disabled={!selectedClientId || !codeReady || clockingIn} size="lg">
-            {clockingIn ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Capturing location…</> : <><Play className="mr-2 h-4 w-4" /> Clock In</>}
-          </Button>
+      {/* Weighted punch buttons */}
+      <div className="grid grid-cols-2 gap-3 px-6 pt-5">
+        <button
+          type="button"
+          onClick={handleClockIn}
+          disabled={!!active || !selectedClientId || !codeReady || clockingIn}
+          className={`group flex h-16 items-center justify-center gap-2 rounded-2xl text-base font-bold uppercase tracking-wider text-white shadow-lg transition-all ${
+            active
+              ? "cursor-not-allowed bg-slate-300 text-slate-500 shadow-none dark:bg-slate-800 dark:text-slate-600"
+              : "bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
+          }`}
+        >
+          {clockingIn ? <Loader2 className="h-5 w-5 animate-spin" /> : <span className="text-lg">🟢</span>}
+          Clock In
+        </button>
+        <button
+          type="button"
+          onClick={() => active && setShowDocLock(true)}
+          disabled={!active}
+          className={`flex h-16 items-center justify-center gap-2 rounded-2xl text-base font-bold uppercase tracking-wider text-white shadow-lg transition-all ${
+            active
+              ? "animate-pulse bg-rose-500 hover:animate-none hover:bg-rose-600 active:scale-[0.98]"
+              : "cursor-not-allowed bg-slate-300 text-slate-500 shadow-none dark:bg-slate-800 dark:text-slate-600"
+          }`}
+        >
+          <span className="text-lg">🔴</span>
+          Clock Out
+        </button>
+      </div>
+
+      {/* Live telemetry strip */}
+      <div className="mx-6 mt-4 mb-6 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-[11px] font-medium dark:border-slate-800 dark:bg-slate-900/50">
+        <span className={`inline-flex items-center gap-1.5 ${telemetry.status === "locked" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500"}`}>
+          <Radio className={`h-3.5 w-3.5 ${telemetry.status === "locating" ? "animate-pulse" : ""}`} />
+          📡 {gpsLabel}
+        </span>
+        {selectedClient?.home_latitude != null && telemetry.distance != null ? (
+          <span className={`inline-flex items-center gap-1.5 ${onSite ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+            {onSite ? <Target className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+            {onSite
+              ? `🎯 On-Site (${telemetry.distance.toFixed(2)} mi)`
+              : `⚠️ Outside Geofence (${telemetry.distance.toFixed(2)} mi)`}
+          </span>
         ) : (
-          <Button onClick={() => setShowDocLock(true)} size="lg" variant="destructive">
-            <Square className="mr-2 h-4 w-4" /> Clock Out
-          </Button>
+          <span className="inline-flex items-center gap-1.5 text-slate-500">
+            <MapPin className="h-3.5 w-3.5" /> Geofence: {GEOFENCE_MILES} mi
+          </span>
         )}
-
-        <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <MapPin className="h-3 w-3" /> GPS + device fingerprint captured on clock-in.
-          <Clock className="ml-2 h-3 w-3" /> Geofence radius: {GEOFENCE_MILES} mi
-        </p>
       </div>
 
       {pendingBypass && (

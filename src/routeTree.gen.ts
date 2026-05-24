@@ -29,6 +29,7 @@ import { Route as DashboardTimesheetsRouteImport } from './routes/dashboard.time
 import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timeclock'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
+import { Route as DashboardSubmissionsRouteImport } from './routes/dashboard.submissions'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardSchedulerRouteImport } from './routes/dashboard.scheduler'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
@@ -53,6 +54,7 @@ import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
+import { Route as DashboardClientClientIdRouteImport } from './routes/dashboard.client.$clientId'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
@@ -153,6 +155,11 @@ const DashboardTeamRoute = DashboardTeamRouteImport.update({
 const DashboardSuperAdminRoute = DashboardSuperAdminRouteImport.update({
   id: '/super-admin',
   path: '/super-admin',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSubmissionsRoute = DashboardSubmissionsRouteImport.update({
+  id: '/submissions',
+  path: '/submissions',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
@@ -280,6 +287,11 @@ const DashboardCoursesCourseIdRoute =
     path: '/courses/$courseId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardClientClientIdRoute = DashboardClientClientIdRouteImport.update({
+  id: '/client/$clientId',
+  path: '/client/$clientId',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardCoursesCourseIdEditRoute =
   DashboardCoursesCourseIdEditRouteImport.update({
     id: '/edit',
@@ -318,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
+  '/dashboard/submissions': typeof DashboardSubmissionsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
@@ -325,6 +338,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/client/$clientId': typeof DashboardClientClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -364,6 +378,7 @@ export interface FileRoutesByTo {
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
+  '/dashboard/submissions': typeof DashboardSubmissionsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
@@ -371,6 +386,7 @@ export interface FileRoutesByTo {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/dashboard/client/$clientId': typeof DashboardClientClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -412,6 +428,7 @@ export interface FileRoutesById {
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
+  '/dashboard/submissions': typeof DashboardSubmissionsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
@@ -419,6 +436,7 @@ export interface FileRoutesById {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/client/$clientId': typeof DashboardClientClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -461,6 +479,7 @@ export interface FileRouteTypes {
     | '/dashboard/roles'
     | '/dashboard/scheduler'
     | '/dashboard/settings'
+    | '/dashboard/submissions'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/timeclock'
@@ -468,6 +487,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
+    | '/dashboard/client/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
@@ -507,6 +527,7 @@ export interface FileRouteTypes {
     | '/dashboard/roles'
     | '/dashboard/scheduler'
     | '/dashboard/settings'
+    | '/dashboard/submissions'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/timeclock'
@@ -514,6 +535,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard'
+    | '/dashboard/client/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
@@ -554,6 +576,7 @@ export interface FileRouteTypes {
     | '/dashboard/roles'
     | '/dashboard/scheduler'
     | '/dashboard/settings'
+    | '/dashboard/submissions'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/timeclock'
@@ -561,6 +584,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
+    | '/dashboard/client/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
@@ -731,6 +755,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSuperAdminRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/submissions': {
+      id: '/dashboard/submissions'
+      path: '/submissions'
+      fullPath: '/dashboard/submissions'
+      preLoaderRoute: typeof DashboardSubmissionsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/settings': {
       id: '/dashboard/settings'
       path: '/settings'
@@ -899,6 +930,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/client/$clientId': {
+      id: '/dashboard/client/$clientId'
+      path: '/client/$clientId'
+      fullPath: '/dashboard/client/$clientId'
+      preLoaderRoute: typeof DashboardClientClientIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/courses/$courseId/edit': {
       id: '/dashboard/courses/$courseId/edit'
       path: '/edit'
@@ -963,12 +1001,14 @@ interface DashboardRouteChildren {
   DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardSchedulerRoute: typeof DashboardSchedulerRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
+  DashboardSubmissionsRoute: typeof DashboardSubmissionsRoute
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
   DashboardTimeclockRoute: typeof DashboardTimeclockRoute
   DashboardTimesheetsRoute: typeof DashboardTimesheetsRoute
   DashboardTracksRoute: typeof DashboardTracksRouteWithChildren
   DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardClientClientIdRoute: typeof DashboardClientClientIdRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesMindsmithRoute: typeof DashboardCoursesMindsmithRoute
   DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
@@ -993,12 +1033,14 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardRolesRoute: DashboardRolesRoute,
   DashboardSchedulerRoute: DashboardSchedulerRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
+  DashboardSubmissionsRoute: DashboardSubmissionsRoute,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
   DashboardTimeclockRoute: DashboardTimeclockRoute,
   DashboardTimesheetsRoute: DashboardTimesheetsRoute,
   DashboardTracksRoute: DashboardTracksRouteWithChildren,
   DashboardIndexRoute: DashboardIndexRoute,
+  DashboardClientClientIdRoute: DashboardClientClientIdRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesMindsmithRoute: DashboardCoursesMindsmithRoute,
   DashboardTrainingIdRoute: DashboardTrainingIdRoute,

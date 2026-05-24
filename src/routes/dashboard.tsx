@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings,
-  LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar,
+  LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/dashboard")({
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
 
 const STAFF_NAV: NavItem[] = [
-  { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/scheduler", label: "My Schedule", icon: Calendar },
@@ -34,6 +34,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: Calendar },
+  { to: "/dashboard/submissions", label: "Submissions", icon: FolderOpen },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },

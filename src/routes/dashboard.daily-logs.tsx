@@ -362,6 +362,29 @@ function AdminAuditQueue() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const pendingIds = useMemo(
+    () => (logs ?? []).filter((l) => l.status === "pending_approval").map((l) => l.id),
+    [logs],
+  );
+
+  const approveAllMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!ids.length) return 0;
+      const { error } = await supabase
+        .from("daily_logs")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ status: "approved", approved_at: new Date().toISOString(), approved_by: user!.id } as any)
+        .in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      toast.success(`Approved ${count} daily log${count === 1 ? "" : "s"} for billing`);
+      qc.invalidateQueries({ queryKey: ["daily-logs-admin"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const grouped = useMemo(() => {
     const map = new Map<string, AdminLog[]>();
     (logs ?? []).forEach((l) => {

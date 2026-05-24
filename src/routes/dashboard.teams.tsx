@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Home, Plus, Loader2,
+  Home, Plus, Loader2, X,
   UserRound, HeartHandshake, Package, ChevronLeft, ChevronRight, GripVertical, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";

@@ -218,35 +218,8 @@ function Overview() {
       {showAdmin && <LiveMonitor shifts={(liveShifts ?? []) as unknown as LiveShift[]} />}
 
       {showAdmin ? (
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-          <div className="flex items-end justify-between">
-            <div>
-              <h3 className="text-base font-semibold">Company Compliance Status</h3>
-              <p className="text-xs text-muted-foreground">
-                Onboarding progress across the {compliance?.total ?? 6}-module Utah DSPD compliance track.
-              </p>
-            </div>
-            <span className="text-xs text-muted-foreground">{compliance?.rows.length ?? 0} employees</span>
-          </div>
-          <div className="mt-6 space-y-3">
-            {!compliance?.rows.length ? (
-              <p className="text-sm text-muted-foreground">No employees yet — invite your team to begin.</p>
-            ) : (
-              compliance.rows.map((r) => (
-                <div key={r.id} className="grid grid-cols-[180px_1fr_48px] items-center gap-4">
-                  <span className="truncate text-sm">{r.name}</span>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                    <div
-                      className="h-full bg-[image:var(--gradient-brand)] transition-all"
-                      style={{ width: `${r.pct}%` }}
-                    />
-                  </div>
-                  <span className="text-right text-xs tabular-nums text-muted-foreground">{r.pct}%</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <ComplianceMatrix />
+
       ) : (
         <div className="space-y-6">
         <StaffClientGrid />

@@ -36,6 +36,9 @@ export const Route = createFileRoute("/dashboard/employees")({
 
 type Role = "admin" | "manager" | "employee";
 
+type Position = "Direct Care" | "Host Staff" | "Office Staff" | "Admin";
+const POSITIONS: Position[] = ["Direct Care", "Host Staff", "Office Staff", "Admin"];
+
 type EditableMember = {
   membershipId: string;
   userId: string;
@@ -44,6 +47,7 @@ type EditableMember = {
   employeeId: string;
   role: Role;
   active: boolean;
+  position: Position | "";
 };
 
 function EmployeesPage() {

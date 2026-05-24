@@ -190,11 +190,13 @@ function EmployeesPage() {
     mutationFn: async (input: EditableMember) => {
       const { error: pErr } = await supabase
         .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({
           full_name: input.fullName,
           email: input.email || null,
           employee_id: input.employeeId || null,
-        })
+          position: input.position || null,
+        } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;
 

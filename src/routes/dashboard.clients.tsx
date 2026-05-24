@@ -268,13 +268,15 @@ function ClientsPage() {
 }
 
 function ClientFormDialog({
-  title, submitLabel, pending, onSubmit, initial,
+  title, submitLabel, pending, onSubmit, initial, clientId, organizationId,
 }: {
   title: string;
   submitLabel: string;
   pending: boolean;
   onSubmit: (v: ClientFormValues) => void;
   initial?: ClientFormValues;
+  clientId?: string;
+  organizationId?: string;
 }) {
   const [first, setFirst] = useState(initial?.first_name ?? "");
   const [last, setLast] = useState(initial?.last_name ?? "");

@@ -23,9 +23,11 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Download, Loader2, AlertTriangle, MapPin, Info, Check, Pencil, Filter, ClipboardList,
   ShieldCheck, FileText, Clock, User, IdCard, Stethoscope, CalendarDays, Navigation, Hash,
+  ClipboardCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { jobCodeLabel } from "@/lib/job-codes";

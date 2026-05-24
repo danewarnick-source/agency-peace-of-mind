@@ -244,12 +244,61 @@ function TeamsPage() {
               {teams.map((t) => {
                 const tStaff = staff.filter((s) => s.team_id === t.id);
                 const tClients = clients.filter((c) => c.team_id === t.id);
+                const addableStaff = staff.filter((s) => s.team_id !== t.id);
+                const addableClients = clients.filter((c) => c.team_id !== t.id);
                 return (
                   <Card key={t.id} className="w-72 shrink-0 flex flex-col">
                     <div className="border-b p-3 space-y-2">
                       <div className="flex items-center gap-1.5">
                         <Home className="h-4 w-4 text-primary" />
-                        <h3 className="font-bold text-base truncate">{t.team_name}</h3>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="font-bold text-base truncate text-left hover:text-primary hover:underline underline-offset-2 transition-colors focus:outline-none"
+                            >
+                              {t.team_name}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-72 space-y-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">➕ Quick-Add Staff</Label>
+                              <Select
+                                value=""
+                                onValueChange={(id) => assignStaff.mutate({ id, team_id: t.id })}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue placeholder="Select staff to add…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {addableStaff.length ? addableStaff.map((s) => (
+                                    <SelectItem key={s.id} value={s.id}>
+                                      {s.name}{s.team_id ? ` · ${allTeams.find((x) => x.id === s.team_id)?.team_name ?? ""}` : " · Unassigned"}
+                                    </SelectItem>
+                                  )) : <div className="px-2 py-1.5 text-xs text-muted-foreground">No staff available</div>}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">➕ Quick-Add Client</Label>
+                              <Select
+                                value=""
+                                onValueChange={(id) => assignClient.mutate({ id, team_id: t.id })}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue placeholder="Select client to add…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {addableClients.length ? addableClients.map((c) => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                      {c.first_name} {c.last_name}{c.team_id ? ` · ${allTeams.find((x) => x.id === c.team_id)?.team_name ?? ""}` : " · Unassigned"}
+                                    </SelectItem>
+                                  )) : <div className="px-2 py-1.5 text-xs text-muted-foreground">No clients available</div>}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <Badge variant="secondary" className="gap-1 font-medium">
                         <UserRound className="h-3 w-3" /> Mgr: {staffName(t.manager_id)}
@@ -273,7 +322,12 @@ function TeamsPage() {
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
                           👤 Staff Roster
                         </div>
-                        {tStaff.map((s) => <StaffCard key={s.id} s={s} from={t.id} />)}
+                        {tStaff.map((s) => (
+                          <StaffCard
+                            key={s.id} s={s} from={t.id}
+                            onRemove={() => assignStaff.mutate({ id: s.id, team_id: null })}
+                          />
+                        ))}
                         {!tStaff.length && <p className="text-[11px] text-muted-foreground italic">Drop staff here</p>}
                       </DropZone>
 
@@ -285,7 +339,12 @@ function TeamsPage() {
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                           🏠 Client Roster
                         </div>
-                        {tClients.map((c) => <ClientCard key={c.id} c={c} from={t.id} />)}
+                        {tClients.map((c) => (
+                          <ClientCard
+                            key={c.id} c={c} from={t.id}
+                            onRemove={() => assignClient.mutate({ id: c.id, team_id: null })}
+                          />
+                        ))}
                         {!tClients.length && <p className="text-[11px] text-muted-foreground italic">Drop clients here</p>}
                       </DropZone>
                     </div>

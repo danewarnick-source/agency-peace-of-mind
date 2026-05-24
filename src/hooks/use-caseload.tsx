@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
 import { useCurrentOrg } from "./use-org";
+import { usePortalView } from "./use-portal-view";
 
 export type CaseloadClient = {
   id: string;
@@ -22,14 +23,16 @@ export type CaseloadClient = {
 export function useCaseload() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
+  const { view } = usePortalView();
   const role = org?.role;
   const isManagerial = role === "admin" || role === "manager" || role === "super_admin";
+  const canSeeWholeOrgCaseload = isManagerial && view === "admin";
 
   return useQuery({
     enabled: !!user && !!org,
-    queryKey: ["caseload", org?.organization_id, user?.id, isManagerial],
+    queryKey: ["caseload", org?.organization_id, user?.id, canSeeWholeOrgCaseload],
     queryFn: async (): Promise<CaseloadClient[]> => {
-      if (isManagerial) {
+      if (canSeeWholeOrgCaseload) {
         const { data, error } = await supabase
           .from("clients")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,6 +47,7 @@ export function useCaseload() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from("staff_assignments" as any)
         .select("client_id")
+        .eq("organization_id", org!.organization_id)
         .eq("staff_id", user!.id);
       if (error) throw error;
       const ids = ((rows ?? []) as unknown as { client_id: string }[]).map((r) => r.client_id);
@@ -52,6 +56,7 @@ export function useCaseload() {
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code, medicaid_id, physical_address" as any)
+        .eq("organization_id", org!.organization_id)
         .in("id", ids)
         .order("last_name");
       if (e2) throw e2;

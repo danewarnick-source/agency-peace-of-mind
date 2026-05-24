@@ -35,6 +35,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: Calendar },
   { to: "/dashboard/submissions", label: "Submissions", icon: FolderOpen },
+  { to: "/dashboard/audit-portal", label: "Audit Portal", icon: ShieldAlert },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },

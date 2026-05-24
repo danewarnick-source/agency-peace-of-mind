@@ -37,6 +37,7 @@ import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports
 import { Route as DashboardProgramsAdminRouteImport } from './routes/dashboard.programs-admin'
 import { Route as DashboardProgramsRouteImport } from './routes/dashboard.programs'
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
+import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
 import { Route as DashboardEvvComplianceRouteImport } from './routes/dashboard.evv-compliance'
@@ -199,6 +200,11 @@ const DashboardPermissionsRoute = DashboardPermissionsRouteImport.update({
   path: '/permissions',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardPbaLedgerRoute = DashboardPbaLedgerRouteImport.update({
+  id: '/pba-ledger',
+  path: '/pba-ledger',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardInvitationsRoute = DashboardInvitationsRouteImport.update({
   id: '/invitations',
   path: '/invitations',
@@ -338,6 +344,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
+  '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
@@ -388,6 +395,7 @@ export interface FileRoutesByTo {
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
+  '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
@@ -440,6 +448,7 @@ export interface FileRoutesById {
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
+  '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
@@ -493,6 +502,7 @@ export interface FileRouteTypes {
     | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
+    | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
@@ -543,6 +553,7 @@ export interface FileRouteTypes {
     | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
+    | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
@@ -594,6 +605,7 @@ export interface FileRouteTypes {
     | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
+    | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
@@ -836,6 +848,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardPermissionsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/pba-ledger': {
+      id: '/dashboard/pba-ledger'
+      path: '/pba-ledger'
+      fullPath: '/dashboard/pba-ledger'
+      preLoaderRoute: typeof DashboardPbaLedgerRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/invitations': {
       id: '/dashboard/invitations'
       path: '/invitations'
@@ -1035,6 +1054,7 @@ interface DashboardRouteChildren {
   DashboardEvvComplianceRoute: typeof DashboardEvvComplianceRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
+  DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
   DashboardProgramsRoute: typeof DashboardProgramsRouteWithChildren
   DashboardProgramsAdminRoute: typeof DashboardProgramsAdminRoute
@@ -1069,6 +1089,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardEvvComplianceRoute: DashboardEvvComplianceRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
+  DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,
   DashboardPermissionsRoute: DashboardPermissionsRoute,
   DashboardProgramsRoute: DashboardProgramsRouteWithChildren,
   DashboardProgramsAdminRoute: DashboardProgramsAdminRoute,

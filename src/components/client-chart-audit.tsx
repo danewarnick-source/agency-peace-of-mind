@@ -685,8 +685,3 @@ function GapItem({
     </div>
   );
 }
-
-      )}
-    </div>
-  );
-}

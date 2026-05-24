@@ -252,6 +252,7 @@ export type Database = {
           pcsp_goals: string[]
           phone_number: string | null
           physical_address: string | null
+          team_id: string | null
         }
         Insert: {
           created_at?: string
@@ -266,6 +267,7 @@ export type Database = {
           pcsp_goals?: string[]
           phone_number?: string | null
           physical_address?: string | null
+          team_id?: string | null
         }
         Update: {
           created_at?: string
@@ -280,6 +282,7 @@ export type Database = {
           pcsp_goals?: string[]
           phone_number?: string | null
           physical_address?: string | null
+          team_id?: string | null
         }
         Relationships: [
           {
@@ -287,6 +290,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -1097,6 +1107,7 @@ export type Database = {
           must_change_password: boolean
           position: string | null
           system_role: string
+          team_id: string | null
           tenant_id: string | null
           username: string | null
         }
@@ -1115,6 +1126,7 @@ export type Database = {
           must_change_password?: boolean
           position?: string | null
           system_role?: string
+          team_id?: string | null
           tenant_id?: string | null
           username?: string | null
         }
@@ -1133,10 +1145,18 @@ export type Database = {
           must_change_password?: boolean
           position?: string | null
           system_role?: string
+          team_id?: string | null
           tenant_id?: string | null
           username?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -1712,6 +1732,58 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      teams: {
+        Row: {
+          created_at: string
+          id: string
+          manager_id: string | null
+          organization_id: string | null
+          team_name: string
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          manager_id?: string | null
+          organization_id?: string | null
+          team_name: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          manager_id?: string | null
+          organization_id?: string | null
+          team_name?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "provider_tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       track_assignments: {
         Row: {

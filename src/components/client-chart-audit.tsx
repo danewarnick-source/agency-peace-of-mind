@@ -156,6 +156,8 @@ export function ClientChartAuditMatrix() {
               responsibleStaffName: staff,
               label: "Unsigned eMAR Med Pass",
               detail: `Medication window — ${new Date(day).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}. Responsible Staff: ${staff}.`,
+              clientId: c.id,
+              shiftId: s.id,
             });
           }
         });

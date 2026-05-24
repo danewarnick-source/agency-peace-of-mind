@@ -5,6 +5,7 @@ export const JOB_CODES = [
   { code: "DSG", label: "DSG — Day Support Group" },
   { code: "SEI", label: "SEI — Supported Employment Individual" },
   { code: "RHS", label: "RHS — Residential Support Health & Safety" },
+  { code: "HHS", label: "HHS — Host Home Daily" },
 ] as const;
 
 export type JobCode = (typeof JOB_CODES)[number]["code"];

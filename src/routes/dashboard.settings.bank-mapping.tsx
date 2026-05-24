@@ -10,8 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Landmark, Link2, Loader2, Save, RefreshCw, Zap, ArrowLeft, CheckCircle2, BookOpen } from "lucide-react";
+import { Landmark, Link2, Loader2, Save, RefreshCw, Zap, ArrowLeft, CheckCircle2, BookOpen, Lock, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/dashboard/settings/bank-mapping")({
   head: () => ({ meta: [{ title: "Bank Mapping — Care Academy" }] }),

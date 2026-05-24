@@ -195,6 +195,8 @@ export function ClientChartAuditMatrix() {
               responsibleStaffName: staff,
               label: "Missing Form: Incident Report",
               detail: `Required for behavioral/medical event logged on ${new Date(t.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} by Staff: ${staff}.`,
+              clientId: c.id,
+              shiftId: null,
             });
           }
         });

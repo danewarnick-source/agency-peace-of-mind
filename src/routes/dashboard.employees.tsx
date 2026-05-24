@@ -85,7 +85,8 @@ function EmployeesPage() {
         .eq("organization_id", org!.organization_id);
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
-        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       const profMap = new Map((profs ?? []).map((p) => [p.id, p]));
       return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) }));

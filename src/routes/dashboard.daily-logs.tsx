@@ -43,11 +43,30 @@ type CaseloadClient = {
   first_name: string;
   last_name: string;
   pcsp_goals: string[];
+  job_code?: string[] | null;
 };
 
 function StaffDailyJournal() {
-  const { data: clients, isLoading } = useCaseload();
+  const { data: caseload, isLoading } = useCaseload();
   const [activeClient, setActiveClient] = useState<CaseloadClient | null>(null);
+
+  // Security guard: caseload is already filtered by staff_assignments for the
+  // logged-in user via the useCaseload hook. Additionally restrict the Daily
+  // Logs journal to Host Home (HHS) authorized clients only.
+  const allowedIds = useMemo(
+    () => new Set((caseload ?? []).map((c) => c.id)),
+    [caseload],
+  );
+  const clients = useMemo(
+    () =>
+      (caseload ?? []).filter(
+        (c) =>
+          allowedIds.has(c.id) &&
+          Array.isArray(c.job_code) &&
+          c.job_code.includes("HHS"),
+      ) as unknown as CaseloadClient[],
+    [caseload, allowedIds],
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -60,32 +79,36 @@ function StaffDailyJournal() {
 
       {isLoading ? (
         <div className="grid place-items-center py-12 text-sm text-muted-foreground">Loading caseload…</div>
-      ) : !clients?.length ? (
+      ) : !clients.length ? (
         <Card className="p-8 text-center text-sm text-muted-foreground">
-          No clients on your caseload. Ask your administrator to assign you to individuals from the Caseloads tab.
+          No clients currently assigned to your caseload. Please contact an Administrator.
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {clients.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActiveClient(c as CaseloadClient)}
-              className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
-            >
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <User className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{c.first_name} {c.last_name}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {c.pcsp_goals?.length ?? 0} PCSP goal{(c.pcsp_goals?.length ?? 0) === 1 ? "" : "s"} on file
-                </p>
-                <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition group-hover:opacity-100">
-                  <ClipboardCheck className="h-3 w-3" /> Open daily journal
-                </p>
-              </div>
-            </button>
-          ))}
+          {clients.map((c) => {
+            // Component-level guard: never render a client outside the caseload.
+            if (!allowedIds.has(c.id)) return null;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setActiveClient(c as CaseloadClient)}
+                className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+              >
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <User className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{c.first_name} {c.last_name}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {c.pcsp_goals?.length ?? 0} PCSP goal{(c.pcsp_goals?.length ?? 0) === 1 ? "" : "s"} on file
+                  </p>
+                  <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition group-hover:opacity-100">
+                    <ClipboardCheck className="h-3 w-3" /> Open daily journal
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 

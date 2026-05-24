@@ -339,7 +339,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/submissions': typeof DashboardSubmissionsRoute
-  '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute

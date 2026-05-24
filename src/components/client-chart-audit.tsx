@@ -41,6 +41,8 @@ type Gap = {
   responsibleStaffName: string;
   label: string;
   detail: string;
+  clientId: string;
+  shiftId: string | null;
 };
 
 type ClientRow = {

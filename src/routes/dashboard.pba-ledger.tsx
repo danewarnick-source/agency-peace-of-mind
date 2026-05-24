@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Wallet, Plus, ShieldAlert, Receipt, CheckCircle2, Shuffle, Upload } from "lucide-react";
+import { Wallet, Plus, ShieldAlert, Receipt, CheckCircle2, Shuffle, Upload, Sparkles, ImageIcon, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/pba-ledger")({
   head: () => ({ meta: [{ title: "PBA Trust Ledger — Care Academy" }] }),
@@ -289,26 +290,78 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
     },
   });
 
-  const [type, setType] = useState("deposit");
+  const [type, setType] = useState("withdrawal");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [memo, setMemo] = useState("");
   const [counterparty, setCounterparty] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
+  const [receiptPreview, setReceiptPreview] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [autofilled, setAutofilled] = useState<{ amount?: boolean; counterparty?: boolean; date?: boolean }>({});
+  const [flashGreen, setFlashGreen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const needsReceipt = Number(amount) > 50;
 
-  const upload = async (file: File) => {
-    setUploading(true);
+  const flagAutoFilled = (next: { amount?: boolean; counterparty?: boolean; date?: boolean }, green = false) => {
+    setAutofilled(next);
+    if (green) { setFlashGreen(true); setTimeout(() => setFlashGreen(false), 1800); }
+    setTimeout(() => setAutofilled({}), 6000);
+  };
+
+  const runParse = async (signedOrPublicUrl: string) => {
+    setParsing(true);
     try {
-      const path = `pba/${account.id}/${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage.from("training-assets").upload(path, file);
+      const { data, error } = await supabase.functions.invoke("parse-receipt-ocr", {
+        body: { imageUrl: signedOrPublicUrl },
+      });
       if (error) throw error;
-      const { data } = supabase.storage.from("training-assets").getPublicUrl(path);
-      setReceiptUrl(data.publicUrl);
-      toast.success("Receipt uploaded");
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setUploading(false); }
+      const d = data as { merchant_name?: string; total_amount?: number; transaction_date?: string; error?: string };
+      if (d?.error) throw new Error(d.error);
+      if (d?.total_amount != null) setAmount(String(d.total_amount));
+      if (d?.merchant_name) setCounterparty(d.merchant_name);
+      if (d?.transaction_date) setDate(d.transaction_date);
+      flagAutoFilled({ amount: d?.total_amount != null, counterparty: !!d?.merchant_name, date: !!d?.transaction_date });
+      toast.success("AI extracted receipt details");
+    } catch (e) {
+      toast.error(`AI parsing failed: ${(e as Error).message}`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    setReceiptPreview(URL.createObjectURL(file));
+    try {
+      const ext = file.name.split(".").pop() || "bin";
+      const path = `${org!.organization_id}/${account.client_id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("client_receipt_snapshots").upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      setReceiptUrl(path);
+      const { data: signed, error: sErr } = await supabase.storage.from("client_receipt_snapshots").createSignedUrl(path, 600);
+      if (sErr) throw sErr;
+      await runParse(signed.signedUrl);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const simulateMock = (m: { merchant_name: string; total_amount: number; transaction_date: string; preview: string }) => {
+    setReceiptPreview(m.preview);
+    setParsing(true);
+    setTimeout(() => {
+      setAmount(String(m.total_amount));
+      setCounterparty(m.merchant_name);
+      setDate(m.transaction_date);
+      setMemo((prev) => prev || `Mock receipt — ${m.merchant_name}`);
+      flagAutoFilled({ amount: true, counterparty: true, date: true }, true);
+      setParsing(false);
+      toast.success(`Simulated AI extraction · ${m.merchant_name}`);
+    }, 900);
   };
 
   const addTx = useMutation({
@@ -330,13 +383,21 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
       toast.success("Transaction recorded");
       qc.invalidateQueries({ queryKey: ["pba-tx"] });
       qc.invalidateQueries({ queryKey: ["pba-accounts"] });
-      setAmount(""); setMemo(""); setCounterparty(""); setReceiptUrl("");
+      setAmount(""); setMemo(""); setCounterparty(""); setReceiptUrl(""); setReceiptPreview(""); setAutofilled({});
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const balance = useMemo(() => Number(account.current_balance), [account]);
   const ratio = balance / Number(account.medicaid_threshold || 1);
+
+  const hl = (on?: boolean) =>
+    cn(
+      "transition-colors",
+      on && (flashGreen
+        ? "border-emerald-500/70 ring-2 ring-emerald-500/20"
+        : "border-sky-500/60 ring-2 ring-sky-500/20")
+    );
 
   return (
     <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
@@ -350,8 +411,46 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
         <Stat label="Headroom" value={`${Math.max(0, Math.round((1 - ratio) * 100))}%`} tone={ratio >= 0.9 ? "red" : ratio >= 0.75 ? "amber" : "emerald"} />
       </div>
 
-      <div className="rounded-lg border border-border p-4">
+      <div className="relative rounded-lg border border-border p-4">
+        {parsing && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 backdrop-blur-sm">
+            <div className="flex items-center gap-2 rounded-full border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-700 dark:text-sky-300">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              🤖 AI is reading receipt telemetry and parsing data…
+            </div>
+          </div>
+        )}
+
         <h4 className="text-sm font-semibold">New transaction</h4>
+
+        {/* Drop-zone */}
+        <label
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault(); setDragOver(false);
+            const f = e.dataTransfer.files?.[0]; if (f) void handleFile(f);
+          }}
+          className={cn(
+            "mt-3 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-4 text-center transition-colors",
+            dragOver ? "border-sky-500 bg-sky-500/10" : "border-border bg-muted/30 hover:bg-muted/50"
+          )}
+        >
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,application/pdf"
+            className="hidden"
+            disabled={uploading || parsing}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }}
+          />
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <ImageIcon className="h-4 w-4 text-sky-600" />
+            📸 Upload or Drag Receipt Snapshot (Auto-Extract Details)
+          </div>
+          <p className="text-[11px] text-muted-foreground">PNG · JPG · PDF — uploads to secure receipt vault then runs AI vision OCR</p>
+          {uploading && <p className="text-[11px] text-sky-600">Uploading securely…</p>}
+        </label>
+
         <div className="mt-3 grid gap-3 md:grid-cols-4">
           <div className="grid gap-1.5"><Label>Type</Label>
             <Select value={type} onValueChange={setType}>
@@ -366,26 +465,44 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-1.5"><Label>Amount</Label><Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
-          <div className="grid gap-1.5"><Label>Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-          <div className="grid gap-1.5"><Label>Counterparty</Label><Input value={counterparty} onChange={(e) => setCounterparty(e.target.value)} maxLength={120} /></div>
+          <div className="grid gap-1.5">
+            <Label className="flex items-center gap-1.5">Amount {autofilled.amount && <AutoBadge green={flashGreen} />}</Label>
+            <Input className={hl(autofilled.amount)} type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="flex items-center gap-1.5">Date {autofilled.date && <AutoBadge green={flashGreen} />}</Label>
+            <Input className={hl(autofilled.date)} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="flex items-center gap-1.5">Location / Description {autofilled.counterparty && <AutoBadge green={flashGreen} />}</Label>
+            <Input className={hl(autofilled.counterparty)} value={counterparty} onChange={(e) => setCounterparty(e.target.value)} maxLength={120} />
+          </div>
           <div className="grid gap-1.5 md:col-span-4"><Label>Memo</Label><Input value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={300} /></div>
-          {needsReceipt && (
+          {needsReceipt && !receiptUrl && (
             <div className="md:col-span-4 grid gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-              <Label className="flex items-center gap-1.5 text-xs"><Receipt className="h-3.5 w-3.5" /> Receipt required (amount over $50)</Label>
-              <div className="flex items-center gap-2">
-                <Input type="file" accept="image/*,application/pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} disabled={uploading} />
-                {receiptUrl && <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"><Upload className="mr-1 h-3 w-3" /> Attached</Badge>}
+              <Label className="flex items-center gap-1.5 text-xs"><Receipt className="h-3.5 w-3.5" /> Receipt required (amount over $50) — use the drop-zone above</Label>
+            </div>
+          )}
+          {receiptPreview && (
+            <div className="md:col-span-4 flex items-start gap-3 rounded-md border border-border bg-muted/30 p-3">
+              <img src={receiptPreview} alt="Receipt preview" className="h-28 w-28 rounded border border-border object-cover" />
+              <div className="flex-1 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Captured snapshot</p>
+                <p className="mt-1">Verify the extracted fields above match this receipt before logging the transaction.</p>
+                {receiptUrl && <Badge variant="outline" className="mt-2 border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"><Upload className="mr-1 h-3 w-3" /> Stored in secure vault</Badge>}
               </div>
             </div>
           )}
         </div>
         <div className="mt-3 flex justify-end">
           <Button onClick={() => addTx.mutate()} disabled={!amount || addTx.isPending || (needsReceipt && !receiptUrl)}>
-            {addTx.isPending ? "Saving…" : "Record transaction"}
+            {addTx.isPending ? "Saving…" : "Confirm & Log Transaction"}
           </Button>
         </div>
       </div>
+
+      <MockReceiptDeck onSimulate={simulateMock} />
+
 
       <div className="rounded-lg border border-border">
         <Table>
@@ -419,3 +536,104 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "re
     </div>
   );
 }
+
+function AutoBadge({ green }: { green?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium",
+        green
+          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+          : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+      )}
+    >
+      <Sparkles className="h-2.5 w-2.5" /> Auto-filled by AI
+    </span>
+  );
+}
+
+type MockReceipt = {
+  id: string;
+  title: string;
+  merchant_name: string;
+  total_amount: number;
+  transaction_date: string;
+  items: string[];
+  preview: string;
+};
+
+const MOCK_RECEIPTS: MockReceipt[] = [
+  {
+    id: "A",
+    title: "Groceries & Hygiene",
+    merchant_name: "Walmart Supercenter",
+    total_amount: 64.32,
+    transaction_date: new Date().toISOString().slice(0, 10),
+    items: ["Personal deodorant", "Shaving cream", "Toothbrush", "Sensory-friendly snack pack"],
+    preview: mockReceiptSvg("WALMART SUPERCENTER", 64.32, ["DEODORANT 6.49", "SHAVE CREAM 4.99", "TOOTHBRUSH 3.29", "SNACK PACK 14.55"]),
+  },
+  {
+    id: "B",
+    title: "Community Integration Activity",
+    merchant_name: "Megaplex Theatres",
+    total_amount: 24.50,
+    transaction_date: new Date().toISOString().slice(0, 10),
+    items: ["1x Adult Matinee ticket", "Water bottle — community socialization outing"],
+    preview: mockReceiptSvg("MEGAPLEX THEATRES", 24.50, ["ADULT MATINEE 19.50", "WATER BOTTLE 5.00"]),
+  },
+  {
+    id: "C",
+    title: "Medical & Specialized Equipment",
+    merchant_name: "Walgreens Pharmacy",
+    total_amount: 18.95,
+    transaction_date: new Date().toISOString().slice(0, 10),
+    items: ["Daily pill organizer box", "Thickener solution for swallowing support"],
+    preview: mockReceiptSvg("WALGREENS PHARMACY", 18.95, ["PILL ORGANIZER 7.49", "THICKENER SOLN 11.46"]),
+  },
+];
+
+function mockReceiptSvg(merchant: string, total: number, lines: string[]) {
+  const rows = lines.map((l, i) => `<text x='12' y='${78 + i * 16}' font-family='ui-monospace,Menlo,monospace' font-size='11' fill='%23374151'>${encodeURIComponent(l)}</text>`).join("");
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 240' width='220' height='240'>
+    <defs><pattern id='p' width='2' height='4' patternUnits='userSpaceOnUse'><rect width='2' height='4' fill='%23fefce8'/><rect width='2' height='1' fill='%23fef3c7'/></pattern></defs>
+    <rect width='220' height='240' fill='url(%23p)' stroke='%23d6d3d1'/>
+    <text x='110' y='28' text-anchor='middle' font-family='ui-monospace,Menlo,monospace' font-size='12' font-weight='700' fill='%23111827'>${encodeURIComponent(merchant)}</text>
+    <text x='110' y='44' text-anchor='middle' font-family='ui-monospace,Menlo,monospace' font-size='9' fill='%236b7280'>--- ITEMIZED ---</text>
+    ${rows}
+    <line x1='12' y1='${78 + lines.length * 16 + 4}' x2='208' y2='${78 + lines.length * 16 + 4}' stroke='%239ca3af' stroke-dasharray='2 2'/>
+    <text x='12' y='${78 + lines.length * 16 + 22}' font-family='ui-monospace,Menlo,monospace' font-size='12' font-weight='700' fill='%23111827'>TOTAL  $${total.toFixed(2)}</text>
+    <g transform='translate(12,${78 + lines.length * 16 + 34})'>
+      ${Array.from({ length: 30 }).map((_, i) => `<rect x='${i * 6}' y='0' width='${(i % 3) + 1}' height='22' fill='%23111827'/>`).join("")}
+    </g>
+  </svg>`.replace(/\n\s+/g, "");
+  return `data:image/svg+xml;utf8,${svg}`;
+}
+
+function MockReceiptDeck({ onSimulate }: { onSimulate: (m: MockReceipt) => void }) {
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h4 className="text-sm font-semibold">🧪 Review Sample Testing Receipts</h4>
+        <Badge variant="outline" className="text-[10px]">Sandbox demo</Badge>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {MOCK_RECEIPTS.map((m) => (
+          <div key={m.id} className="flex flex-col gap-2 rounded-md border border-border bg-card p-3">
+            <img src={m.preview} alt={`Mock receipt ${m.title}`} className="h-40 w-full rounded border border-border object-contain bg-yellow-50" />
+            <div>
+              <p className="text-xs font-semibold">{m.title}</p>
+              <p className="text-[11px] text-muted-foreground">{m.merchant_name} · ${m.total_amount.toFixed(2)}</p>
+              <ul className="mt-1 list-disc pl-4 text-[10px] text-muted-foreground">
+                {m.items.map((it) => <li key={it}>{it}</li>)}
+              </ul>
+            </div>
+            <Button size="sm" variant="outline" className="mt-auto" onClick={() => onSimulate(m)}>
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> 🤖 Test AI Extraction
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+

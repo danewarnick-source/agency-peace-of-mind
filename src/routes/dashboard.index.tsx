@@ -247,6 +247,7 @@ function Overview() {
         </div>
       ) : (
         <div className="space-y-6">
+        <PayPeriodTracker />
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <h2 className="text-base font-semibold">My active training</h2>
           {!myAssigns?.length ? (

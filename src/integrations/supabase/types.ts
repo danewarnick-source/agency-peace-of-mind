@@ -753,6 +753,7 @@ export type Database = {
           is_active: boolean
           last_name: string | null
           must_change_password: boolean
+          position: string | null
           username: string | null
         }
         Insert: {
@@ -768,6 +769,7 @@ export type Database = {
           is_active?: boolean
           last_name?: string | null
           must_change_password?: boolean
+          position?: string | null
           username?: string | null
         }
         Update: {
@@ -783,6 +785,7 @@ export type Database = {
           is_active?: boolean
           last_name?: string | null
           must_change_password?: boolean
+          position?: string | null
           username?: string | null
         }
         Relationships: []

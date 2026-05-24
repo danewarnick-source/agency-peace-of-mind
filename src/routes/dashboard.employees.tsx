@@ -36,6 +36,9 @@ export const Route = createFileRoute("/dashboard/employees")({
 
 type Role = "admin" | "manager" | "employee";
 
+type Position = "Direct Care" | "Host Staff" | "Office Staff" | "Admin";
+const POSITIONS: Position[] = ["Direct Care", "Host Staff", "Office Staff", "Admin"];
+
 type EditableMember = {
   membershipId: string;
   userId: string;
@@ -44,6 +47,7 @@ type EditableMember = {
   employeeId: string;
   role: Role;
   active: boolean;
+  position: Position | "";
 };
 
 function EmployeesPage() {
@@ -81,10 +85,13 @@ function EmployeesPage() {
         .eq("organization_id", org!.organization_id);
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
-        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
-      const profMap = new Map((profs ?? []).map((p) => [p.id, p]));
-      return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) as any }));
     },
   });
 
@@ -183,11 +190,13 @@ function EmployeesPage() {
     mutationFn: async (input: EditableMember) => {
       const { error: pErr } = await supabase
         .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({
           full_name: input.fullName,
           email: input.email || null,
           employee_id: input.employeeId || null,
-        })
+          position: input.position || null,
+        } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;
 
@@ -267,6 +276,7 @@ function EmployeesPage() {
               <th className="p-4 text-left">Name</th>
               <th className="p-4 text-left">Login</th>
               <th className="p-4 text-left">Role</th>
+              <th className="p-4 text-left">Position</th>
               <th className="p-4 text-left">Status</th>
               <th className="p-4 text-left">Joined</th>
               <th className="p-4" />
@@ -277,11 +287,13 @@ function EmployeesPage() {
               const name = m.profile?.full_name ?? "—";
               const login = m.profile?.username ?? m.profile?.email ?? "—";
               const needsReset = m.profile?.must_change_password;
+              const position = (m.profile?.position ?? "") as Position | "";
               return (
                 <tr key={m.id} className="border-b border-border last:border-0">
                   <td className="p-4 font-medium">{name}{needsReset && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">Pending first login</span>}</td>
                   <td className="p-4 text-muted-foreground">{login}</td>
                   <td className="p-4"><span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span></td>
+                  <td className="p-4">{position ? <Badge variant="outline" className="font-normal">{position}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</td>
                   <td className="p-4 text-xs">{m.active ? <span className="text-emerald-600">Active</span> : <span className="text-muted-foreground">Deactivated</span>}</td>
                   <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
                   <td className="p-4 text-right whitespace-nowrap">
@@ -293,6 +305,7 @@ function EmployeesPage() {
                       employeeId: m.profile?.employee_id ?? "",
                       role: m.role as Role,
                       active: m.active,
+                      position,
                     })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
                       <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload
@@ -477,6 +490,7 @@ function EmployeesPage() {
                   employeeId: String(fd.get("employee_id") || "").trim(),
                   role: String(fd.get("role") || "employee") as Role,
                   active: String(fd.get("active") || "true") === "true",
+                  position: (String(fd.get("position") || "") as Position | ""),
                 });
               }}
               className="grid gap-4"
@@ -484,6 +498,15 @@ function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="full_name">Full name</Label><Input id="full_name" name="full_name" defaultValue={editingMember.fullName} required /></div>
               <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={editingMember.email} /></div>
               <div className="grid gap-2"><Label htmlFor="employee_id">Employee ID</Label><Input id="employee_id" name="employee_id" defaultValue={editingMember.employeeId} placeholder="e.g. EMP-1042" /></div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-position">Agency Position</Label>
+                <Select name="position" defaultValue={editingMember.position || undefined}>
+                  <SelectTrigger id="edit-position"><SelectValue placeholder="Select a position" /></SelectTrigger>
+                  <SelectContent>
+                    {POSITIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-role">System role</Label>

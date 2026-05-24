@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { seedMockStaff } from "@/lib/seed.functions";
 
-export const Route = createFileRoute("/api/seed-staff")({
+export const Route = createFileRoute("/api/public/seed-staff")({
   server: {
     handlers: {
       POST: async () => {

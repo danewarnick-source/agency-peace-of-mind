@@ -346,31 +346,48 @@ function TimesheetsPage() {
         </div>
       </div>
 
-      <ShiftSection
-        title="Pending Review"
-        subtitle="Active shifts and entries awaiting administrative approval"
-        rows={pending}
-        loading={isLoading}
-        showActions
-        onApprove={(id) => approveMutation.mutate(id)}
-        onEdit={setEditing}
-        onRowClick={setAuditRow}
-        approvingId={approveMutation.variables ?? null}
-        approving={approveMutation.isPending}
-      />
+      <Tabs defaultValue="pending" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="pending" className="gap-1.5">
+            <ClipboardList className="h-3.5 w-3.5" /> Pending Review
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">{pending.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="approved" className="gap-1.5">
+            <ClipboardCheck className="h-3.5 w-3.5" /> Approved History
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">{historical.length}</Badge>
+          </TabsTrigger>
+        </TabsList>
 
-      <ShiftSection
-        title="Historical / Approved Logs"
-        subtitle="Archived and approved shift records"
-        rows={historical}
-        loading={isLoading}
-        showActions={false}
-        onApprove={() => {}}
-        onEdit={setEditing}
-        onRowClick={setAuditRow}
-        approvingId={null}
-        approving={false}
-      />
+        <TabsContent value="pending" className="space-y-4">
+          <ShiftSection
+            title="Pending Review"
+            subtitle="Active shifts and entries awaiting administrative approval"
+            rows={pending}
+            loading={isLoading}
+            showActions
+            onApprove={(id) => approveMutation.mutate(id)}
+            onEdit={setEditing}
+            onRowClick={setAuditRow}
+            approvingId={approveMutation.variables ?? null}
+            approving={approveMutation.isPending}
+          />
+        </TabsContent>
+
+        <TabsContent value="approved" className="space-y-4">
+          <ShiftSection
+            title="Approved History"
+            subtitle="Archived and approved shift records"
+            rows={historical}
+            loading={isLoading}
+            showActions={false}
+            onApprove={() => {}}
+            onEdit={setEditing}
+            onRowClick={setAuditRow}
+            approvingId={null}
+            approving={false}
+          />
+        </TabsContent>
+      </Tabs>
 
       {editing && (
         <EditShiftDialog

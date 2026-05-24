@@ -423,6 +423,13 @@ function ClientFormDialog({
             </div>
           )}
         </div>
+        {clientId && (
+          <CustomAttributesSection
+            organizationId={organizationId}
+            entityKind="client"
+            entityId={clientId}
+          />
+        )}
         <DialogFooter>
           <Button type="submit" disabled={!canSubmit || pending}>
             {pending ? "Saving…" : submitLabel}

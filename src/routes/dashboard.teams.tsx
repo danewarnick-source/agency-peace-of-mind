@@ -40,7 +40,7 @@ function TeamsPage() {
     queryKey: ["teams", orgId],
     queryFn: async (): Promise<Team[]> => {
       const { data, error } = await supabase
-        .from("teams" as never)
+        .from("teams")
         .select("id, team_name, manager_id, organization_id")
         .eq("organization_id", orgId!)
         .order("team_name");
@@ -82,7 +82,7 @@ function TeamsPage() {
 
   const createTeam = useMutation({
     mutationFn: async (v: { team_name: string; manager_id: string | null }) => {
-      const { error } = await supabase.from("teams" as never).insert({
+      const { error } = await supabase.from("teams").insert({
         organization_id: orgId, team_name: v.team_name, manager_id: v.manager_id,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
@@ -98,7 +98,7 @@ function TeamsPage() {
       if (v.team_name !== undefined) patch.team_name = v.team_name;
       if (v.manager_id !== undefined) patch.manager_id = v.manager_id;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase.from("teams" as never).update(patch as any).eq("id", v.id);
+      const { error } = await supabase.from("teams").update(patch as any).eq("id", v.id);
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Team updated"); qc.invalidateQueries({ queryKey: ["teams"] }); },

@@ -578,9 +578,7 @@ function CaseloadDrawer({
   });
 
   // Seed selection when drawer opens / data loads
-  useState(() => undefined);
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  useMemo(() => {
+  useEffect(() => {
     if (existing) {
       const ids = new Set(existing.map((e) => e.client_id));
       setOriginal(ids);

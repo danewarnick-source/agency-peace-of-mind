@@ -146,12 +146,3 @@ export const adminResetEmployeePassword = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const LookupInput = z.object({ username: z.string().trim().min(1).max(60) });
-// Public — no auth required; resolves username → email for login.
-export const lookupEmailByUsername = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => LookupInput.parse(d))
-  .handler(async ({ data }) => {
-    const { data: row } = await supabaseAdmin
-      .from("profiles").select("email").ilike("username", data.username).maybeSingle();
-    return { email: row?.email ?? null };
-  });

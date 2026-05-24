@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      agency_bank_accounts: {
+        Row: {
+          account_type: string
+          bank_name: string
+          id: string
+          institution_logo: string | null
+          linked_at: string
+          linked_by: string | null
+          mask: string
+          organization_id: string
+          plaid_account_id: string | null
+        }
+        Insert: {
+          account_type: string
+          bank_name: string
+          id?: string
+          institution_logo?: string | null
+          linked_at?: string
+          linked_by?: string | null
+          mask: string
+          organization_id: string
+          plaid_account_id?: string | null
+        }
+        Update: {
+          account_type?: string
+          bank_name?: string
+          id?: string
+          institution_logo?: string | null
+          linked_at?: string
+          linked_by?: string | null
+          mask?: string
+          organization_id?: string
+          plaid_account_id?: string | null
+        }
+        Relationships: []
+      }
+      agency_bank_mappings: {
+        Row: {
+          bank_account_id: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          bank_account_id: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          bank_account_id?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_bank_mappings_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: true
+            referencedRelation: "agency_bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       certification_types: {
         Row: {
           code: string
@@ -958,6 +1029,7 @@ export type Database = {
         Row: {
           account_id: string
           amount: number
+          auto_reconciled: boolean
           counterparty: string | null
           created_at: string
           created_by: string | null
@@ -966,11 +1038,13 @@ export type Database = {
           occurred_on: string
           organization_id: string
           receipt_url: string | null
+          source: string | null
           txn_type: string
         }
         Insert: {
           account_id: string
           amount: number
+          auto_reconciled?: boolean
           counterparty?: string | null
           created_at?: string
           created_by?: string | null
@@ -979,11 +1053,13 @@ export type Database = {
           occurred_on?: string
           organization_id: string
           receipt_url?: string | null
+          source?: string | null
           txn_type: string
         }
         Update: {
           account_id?: string
           amount?: number
+          auto_reconciled?: boolean
           counterparty?: string | null
           created_at?: string
           created_by?: string | null
@@ -992,6 +1068,7 @@ export type Database = {
           occurred_on?: string
           organization_id?: string
           receipt_url?: string | null
+          source?: string | null
           txn_type?: string
         }
         Relationships: [

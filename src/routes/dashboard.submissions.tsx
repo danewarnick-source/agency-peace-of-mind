@@ -183,14 +183,14 @@ function ClientLedger({
       const [shiftsRes, logsRes, formsRes] = await Promise.all([
         supabase
           .from("shifts")
-          .select("id, user_id, clock_in_time, clock_out_time, job_code, clock_in_lat, clock_in_long, outside_geofence, clock_in_bypass_reason, profiles:user_id(full_name, email)")
+          .select("id, user_id, clock_in_time, clock_out_time, job_code, clock_in_lat, clock_in_long, outside_geofence, clock_in_bypass_reason")
           .eq("organization_id", orgId)
           .eq("client_id", client.id)
           .gte("clock_in_time", startIso)
           .lte("clock_in_time", endIso),
         supabase
           .from("daily_logs")
-          .select("id, user_id, log_date, narrative, pcsp_goals_addressed, signature_data_url, status, submitted_at, profiles:user_id(full_name, email)")
+          .select("id, user_id, log_date, narrative, pcsp_goals_addressed, signature_data_url, status, submitted_at")
           .eq("organization_id", orgId)
           .eq("client_id", client.id)
           .gte("submitted_at", startIso)
@@ -198,7 +198,7 @@ function ClientLedger({
         supabase
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .from("submitted_forms" as any)
-          .select("id, user_id, form_type, title, narrative, attachment_url, payload, occurred_at, profiles:user_id(full_name, email)")
+          .select("id, user_id, form_type, title, narrative, attachment_url, payload, occurred_at")
           .eq("organization_id", orgId)
           .eq("client_id", client.id)
           .gte("occurred_at", startIso)
@@ -208,10 +208,26 @@ function ClientLedger({
       if (logsRes.error) throw logsRes.error;
       if (formsRes.error) throw formsRes.error;
 
+      // Resolve staff names in one batch (no FK required).
+      const staffIds = Array.from(new Set<string>([
+        ...(shiftsRes.data ?? []).map((s) => s.user_id),
+        ...(logsRes.data ?? []).map((l) => l.user_id),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...((formsRes.data ?? []) as any[]).map((f) => f.user_id),
+      ].filter(Boolean)));
+      const staffMap = new Map<string, string>();
+      if (staffIds.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", staffIds);
+        (profs ?? []).forEach((p) => staffMap.set(p.id, p.full_name || p.email || "—"));
+      }
+      const nameOf = (uid: string | null | undefined) => (uid && staffMap.get(uid)) || "—";
+
       const out: TimelineItem[] = [];
       (shiftsRes.data ?? []).forEach((s) => {
-        const staff = (s.profiles as { full_name?: string; email?: string } | null);
-        const staffName = staff?.full_name || staff?.email || "—";
+        const staffName = nameOf(s.user_id);
         const hrs = decimalHoursBetween(s.clock_in_time, s.clock_out_time);
         out.push({
           id: `shift-${s.id}`,
@@ -226,8 +242,7 @@ function ClientLedger({
         });
       });
       (logsRes.data ?? []).forEach((l) => {
-        const staff = (l.profiles as { full_name?: string; email?: string } | null);
-        const staffName = staff?.full_name || staff?.email || "—";
+        const staffName = nameOf(l.user_id);
         out.push({
           id: `log-${l.id}`,
           kind: "daily_log",
@@ -240,8 +255,7 @@ function ClientLedger({
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ((formsRes.data ?? []) as any[]).forEach((f) => {
-        const staff = (f.profiles as { full_name?: string; email?: string } | null);
-        const staffName = staff?.full_name || staff?.email || "—";
+        const staffName = nameOf(f.user_id);
         out.push({
           id: `form-${f.id}`,
           kind: "submitted_form",

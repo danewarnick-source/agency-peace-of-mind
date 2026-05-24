@@ -240,6 +240,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          account_status: string
           created_at: string
           first_name: string
           home_latitude: number | null
@@ -255,6 +256,7 @@ export type Database = {
           team_id: string | null
         }
         Insert: {
+          account_status?: string
           created_at?: string
           first_name: string
           home_latitude?: number | null
@@ -270,6 +272,7 @@ export type Database = {
           team_id?: string | null
         }
         Update: {
+          account_status?: string
           created_at?: string
           first_name?: string
           home_latitude?: number | null
@@ -1176,6 +1179,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_status: string
           agency_name: string | null
           created_at: string
           department: string | null
@@ -1195,6 +1199,7 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          account_status?: string
           agency_name?: string | null
           created_at?: string
           department?: string | null
@@ -1214,6 +1219,7 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          account_status?: string
           agency_name?: string | null
           created_at?: string
           department?: string | null

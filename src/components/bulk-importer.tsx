@@ -6,13 +6,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Sparkles, Upload, FileSpreadsheet, Loader2, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Sparkles, Upload, FileSpreadsheet, Loader2, ArrowRight, CheckCircle2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -21,10 +19,10 @@ import { bulkImportRoster } from "@/lib/bulk-import.functions";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Kind = "employee" | "client";
+type DataType = "text" | "number" | "boolean" | "date";
 
-const TARGET_FIELDS: Record<Kind, { key: string; label: string; required?: boolean }[]> = {
+const CORE_FIELDS: Record<Kind, { key: string; label: string; required?: boolean }[]> = {
   employee: [
-    { key: "__skip", label: "— Ignore —" },
     { key: "full_name", label: "Full Name", required: true },
     { key: "first_name", label: "First Name" },
     { key: "last_name", label: "Last Name" },
@@ -32,10 +30,9 @@ const TARGET_FIELDS: Record<Kind, { key: string; label: string; required?: boole
     { key: "phone", label: "Phone" },
     { key: "position", label: "Position / Title" },
     { key: "hire_date", label: "Hire Date" },
-    { key: "team_name", label: "Facility / Program (→ team)" },
+    { key: "team_name", label: "Facility / Program" },
   ],
   client: [
-    { key: "__skip", label: "— Ignore —" },
     { key: "first_name", label: "First Name", required: true },
     { key: "last_name", label: "Last Name", required: true },
     { key: "full_name", label: "Full Name (split)" },
@@ -43,7 +40,7 @@ const TARGET_FIELDS: Record<Kind, { key: string; label: string; required?: boole
     { key: "address", label: "Address" },
     { key: "medicaid_id", label: "Medicaid ID" },
     { key: "job_code", label: "Job Codes" },
-    { key: "team_name", label: "Facility / Program (→ team)" },
+    { key: "team_name", label: "Facility / Program" },
   ],
 };
 
@@ -58,23 +55,33 @@ const HEURISTICS: Record<string, string[]> = {
   team_name: ["team", "facility", "location", "program", "home", "house", "group home", "site"],
   address: ["address", "street", "physical address", "residence"],
   medicaid_id: ["medicaid", "medicaid id", "client id", "member id"],
-  job_code: ["job code", "code", "service code", "auth code"],
+  job_code: ["job code", "service code", "auth code"],
 };
 
-function aiGuess(header: string, kind: Kind): string {
+function aiGuessCore(header: string, kind: Kind): string | null {
   const norm = header.toLowerCase().trim();
-  const fields = TARGET_FIELDS[kind].map((f) => f.key);
-  // exact
+  const fields = CORE_FIELDS[kind].map((f) => f.key);
   for (const [target, kws] of Object.entries(HEURISTICS)) {
     if (!fields.includes(target)) continue;
     if (kws.some((kw) => norm === kw)) return target;
   }
-  // contains
   for (const [target, kws] of Object.entries(HEURISTICS)) {
     if (!fields.includes(target)) continue;
     if (kws.some((kw) => norm.includes(kw))) return target;
   }
-  return "__skip";
+  return null;
+}
+
+function inferType(samples: string[]): DataType {
+  const vals = samples.map((s) => (s ?? "").toString().trim()).filter(Boolean).slice(0, 25);
+  if (!vals.length) return "text";
+  const isBool = vals.every((v) => /^(yes|no|y|n|true|false|0|1|t|f)$/i.test(v));
+  if (isBool) return "boolean";
+  const isNum = vals.every((v) => /^-?\d+([.,]\d+)?$/.test(v.replace(/[$,\s]/g, "")));
+  if (isNum) return "number";
+  const isDate = vals.every((v) => !isNaN(new Date(v).getTime()) && /[\d]{1,4}[-/.][\d]{1,2}/.test(v));
+  if (isDate) return "date";
+  return "text";
 }
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[] };
@@ -82,8 +89,7 @@ type ParsedFile = { headers: string[]; rows: Record<string, string>[] };
 async function parseFile(file: File): Promise<ParsedFile> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".csv") || file.type === "text/csv") {
-    const text = await file.text();
-    return parseCsvText(text);
+    return parseCsvText(await file.text());
   }
   if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
     const buf = await file.arrayBuffer();
@@ -99,11 +105,9 @@ async function parseFile(file: File): Promise<ParsedFile> {
     return { headers, rows };
   }
   if (name.endsWith(".pdf")) {
-    throw new Error("PDF parsing isn't supported in-browser yet. Paste your data as CSV in the textarea below, or export your PDF to Excel/CSV first.");
+    throw new Error("PDF parsing isn't supported in-browser yet. Paste your data as CSV below, or export the PDF to Excel/CSV first.");
   }
-  // fallback: try CSV
-  const text = await file.text();
-  return parseCsvText(text);
+  return parseCsvText(await file.text());
 }
 
 function parseCsvText(text: string): ParsedFile {
@@ -117,7 +121,19 @@ function parseCsvText(text: string): ParsedFile {
   return { headers, rows };
 }
 
-type Step = "upload" | "map" | "review";
+type Step = "upload" | "review";
+
+type MappingEntry =
+  | { kind: "core"; target: string }
+  | { kind: "custom"; label: string; data_type: DataType; skip: boolean }
+  | { kind: "skip" };
+
+const TYPE_LABEL: Record<DataType, string> = {
+  text: "Text Box Added",
+  number: "Number Field Added",
+  boolean: "Yes/No Toggle Added",
+  date: "Date Picker Added",
+};
 
 export function BulkImporter({
   organizationId,
@@ -130,8 +146,7 @@ export function BulkImporter({
   const [kind, setKind] = useState<Kind>(defaultKind);
   const [step, setStep] = useState<Step>("upload");
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
-  const [mapping, setMapping] = useState<Record<string, string>>({});
-  const [reviewRows, setReviewRows] = useState<Record<string, string>[]>([]);
+  const [mapping, setMapping] = useState<Record<string, MappingEntry>>({});
   const [pasteText, setPasteText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -143,23 +158,34 @@ export function BulkImporter({
     setStep("upload");
     setParsed(null);
     setMapping({});
-    setReviewRows([]);
     setPasteText("");
   }, []);
+
+  const ingest = useCallback((p: ParsedFile) => {
+    setParsed(p);
+    const m: Record<string, MappingEntry> = {};
+    for (const h of p.headers) {
+      const core = aiGuessCore(h, kind);
+      if (core) {
+        m[h] = { kind: "core", target: core };
+      } else {
+        const samples = p.rows.slice(0, 25).map((r) => r[h] ?? "");
+        m[h] = { kind: "custom", label: h.trim(), data_type: inferType(samples), skip: false };
+      }
+    }
+    setMapping(m);
+    setStep("review");
+  }, [kind]);
 
   const handleFile = useCallback(async (file: File) => {
     try {
       const p = await parseFile(file);
       if (!p.rows.length) throw new Error("No rows found in file");
-      setParsed(p);
-      const m: Record<string, string> = {};
-      for (const h of p.headers) m[h] = aiGuess(h, kind);
-      setMapping(m);
-      setStep("map");
+      ingest(p);
     } catch (e) {
       toast.error((e as Error).message);
     }
-  }, [kind]);
+  }, [ingest]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -168,33 +194,40 @@ export function BulkImporter({
     if (f) void handleFile(f);
   }, [handleFile]);
 
-  const proceedToReview = useCallback(() => {
-    if (!parsed) return;
-    const rows = parsed.rows.map((r) => {
-      const out: Record<string, string> = {};
-      for (const [header, target] of Object.entries(mapping)) {
-        if (!target || target === "__skip") continue;
-        const val = (r[header] ?? "").toString().trim();
-        // merge if same target mapped twice
-        if (out[target]) out[target] = `${out[target]} ${val}`.trim();
-        else out[target] = val;
-      }
-      return out;
-    });
-    setReviewRows(rows);
-    setStep("review");
-  }, [parsed, mapping]);
-
-  const requiredKeys = TARGET_FIELDS[kind].filter((f) => f.required).map((f) => f.key);
-  const isRowInvalid = (row: Record<string, string>, key: string) =>
-    requiredKeys.includes(key) && !row[key]?.trim();
+  const mappedCore = useMemo(
+    () => Object.entries(mapping).filter(([, m]) => m.kind === "core") as [string, Extract<MappingEntry, { kind: "core" }>][],
+    [mapping]
+  );
+  const autoCustom = useMemo(
+    () => Object.entries(mapping).filter(([, m]) => m.kind === "custom") as [string, Extract<MappingEntry, { kind: "custom" }>][],
+    [mapping]
+  );
 
   const finalize = useCallback(async () => {
-    if (!organizationId) { toast.error("No organization context"); return; }
+    if (!organizationId || !parsed) { toast.error("No organization context"); return; }
     setSubmitting(true);
     try {
-      const res = await importFn({ data: { kind, organizationId, rows: reviewRows } });
-      toast.success(`Created ${res.created} ${kind}s · ${res.teamsCreated} new teams${res.errors.length ? ` · ${res.errors.length} skipped` : ""}`);
+      const activeCustom = autoCustom.filter(([, m]) => !m.skip);
+      const rows = parsed.rows.map((r) => {
+        const out: Record<string, string> = {};
+        for (const [header, m] of mappedCore) {
+          const val = (r[header] ?? "").toString().trim();
+          const target = m.target;
+          if (out[target]) out[target] = `${out[target]} ${val}`.trim();
+          else out[target] = val;
+        }
+        for (const [header] of activeCustom) {
+          out[`__custom__${header}`] = (r[header] ?? "").toString().trim();
+        }
+        return out;
+      });
+      const customFields = activeCustom.map(([header, m]) => ({
+        header,
+        label: m.label,
+        data_type: m.data_type,
+      }));
+      const res = await importFn({ data: { kind, organizationId, rows, customFields } });
+      toast.success(`Created ${res.created} ${kind}s · ${res.teamsCreated} new teams · ${res.customFieldsCreated} custom fields${res.errors.length ? ` · ${res.errors.length} skipped` : ""}`);
       if (res.errors.length) console.warn("Import errors:", res.errors);
       qc.invalidateQueries();
       setOpen(false);
@@ -204,14 +237,10 @@ export function BulkImporter({
     } finally {
       setSubmitting(false);
     }
-  }, [importFn, kind, organizationId, reviewRows, qc, reset]);
+  }, [importFn, kind, organizationId, parsed, mappedCore, autoCustom, qc, reset]);
 
-  // mapped target keys used (for review grid columns)
-  const reviewColumns = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of Object.values(mapping)) if (t && t !== "__skip") set.add(t);
-    return Array.from(set);
-  }, [mapping]);
+  const coreFieldLabel = (key: string) =>
+    CORE_FIELDS[kind].find((f) => f.key === key)?.label ?? key;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
@@ -220,15 +249,14 @@ export function BulkImporter({
           <Sparkles className="mr-2 h-4 w-4" /> AI Bulk Import (CSV, Excel, or PDF)
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> AI Bulk Importer</DialogTitle>
           <DialogDescription>
-            Upload your roster — we'll auto-map columns and route people to the right facility.
+            Drop your roster — AI auto-maps known fields and spins up custom attributes for anything new.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Type toggle */}
         <div className="flex items-center gap-2 rounded-lg border p-1 w-fit">
           <button
             type="button"
@@ -253,7 +281,7 @@ export function BulkImporter({
               <Upload className="h-10 w-10 text-muted-foreground" />
               <div>
                 <p className="font-medium">Drop CSV / Excel here</p>
-                <p className="text-xs text-muted-foreground">.csv, .xlsx, .xls supported</p>
+                <p className="text-xs text-muted-foreground">.csv, .xlsx, .xls supported · AI auto-builds custom fields</p>
               </div>
               <Label htmlFor="bulk-file" className="cursor-pointer">
                 <span className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
@@ -269,13 +297,13 @@ export function BulkImporter({
               </Label>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Or paste CSV / table data (great for PDF copy-paste)</Label>
+              <Label className="text-xs text-muted-foreground">Or paste CSV / table data</Label>
               <textarea
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
                 rows={5}
                 className="w-full rounded-md border bg-background p-2 text-sm font-mono"
-                placeholder={"full_name,email,facility\nJane Doe,jane@x.com,Canyon View"}
+                placeholder={"full_name,email,facility,shirt_size\nJane Doe,jane@x.com,Canyon View,Large"}
               />
               <Button
                 size="sm"
@@ -285,11 +313,7 @@ export function BulkImporter({
                   try {
                     const p = parseCsvText(pasteText);
                     if (!p.rows.length) throw new Error("Could not parse rows");
-                    setParsed(p);
-                    const m: Record<string, string> = {};
-                    for (const h of p.headers) m[h] = aiGuess(h, kind);
-                    setMapping(m);
-                    setStep("map");
+                    ingest(p);
                   } catch (e) { toast.error((e as Error).message); }
                 }}
               >Parse pasted data</Button>
@@ -297,96 +321,83 @@ export function BulkImporter({
           </div>
         )}
 
-        {step === "map" && parsed && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Detected <Badge variant="secondary">{parsed.headers.length} columns</Badge> and{" "}
-                <Badge variant="secondary">{parsed.rows.length} rows</Badge>. Confirm AI mapping below.
-              </p>
+        {step === "review" && parsed && (
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              Detected <Badge variant="secondary">{parsed.headers.length} columns</Badge>{" "}
+              <Badge variant="secondary">{parsed.rows.length} rows</Badge>{" "}
+              <Badge variant="secondary">{mappedCore.length} core matches</Badge>{" "}
+              <Badge className="bg-primary/10 text-primary border-primary/30" variant="outline">
+                <Wand2 className="mr-1 h-3 w-3" /> {autoCustom.filter(([, m]) => !m.skip).length} auto-generated
+              </Badge>
             </div>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>File Column</TableHead>
-                    <TableHead>Sample</TableHead>
-                    <TableHead className="w-[260px]">Maps to →</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {parsed.headers.map((h) => (
-                    <TableRow key={h}>
-                      <TableCell className="font-medium">{h}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground truncate max-w-[200px]">
-                        {parsed.rows[0]?.[h] || "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Select value={mapping[h]} onValueChange={(v) => setMapping((m) => ({ ...m, [h]: v }))}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {TARGET_FIELDS[kind].map((f) => (
-                              <SelectItem key={f.key} value={f.key}>
-                                {f.label}{f.required ? " *" : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    </TableRow>
+
+            {mappedCore.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                  ✅ Mapped Core Fields
+                </p>
+                <ul className="rounded-lg border divide-y">
+                  {mappedCore.map(([header, m]) => (
+                    <li key={header} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                      <span className="truncate"><span className="font-medium">{header}</span> <span className="text-muted-foreground">→ {coreFieldLabel(m.target)}</span></span>
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    </li>
                   ))}
-                </TableBody>
-              </Table>
-            </div>
+                </ul>
+              </div>
+            )}
+
+            {autoCustom.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                  ✨ Auto-Generated Fields
+                </p>
+                <ul className="rounded-lg border divide-y">
+                  {autoCustom.map(([header, m]) => (
+                    <li key={header} className={`flex items-center justify-between gap-3 px-3 py-2 text-sm ${m.skip ? "opacity-50" : ""}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{m.label}</div>
+                        <div className="text-xs text-muted-foreground">{TYPE_LABEL[m.data_type]}</div>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                        <Switch
+                          checked={m.skip}
+                          onCheckedChange={(v) => setMapping((cur) => ({ ...cur, [header]: { ...(cur[header] as Extract<MappingEntry, { kind: "custom" }>), skip: v } }))}
+                        />
+                        Don't Import
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <details className="rounded-lg border bg-muted/20 p-2 text-xs">
+              <summary className="cursor-pointer px-1 py-0.5 text-muted-foreground">Preview first 3 rows</summary>
+              <div className="mt-2 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {parsed.headers.map((h) => <TableHead key={h} className="text-xs">{h}</TableHead>)}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {parsed.rows.slice(0, 3).map((r, i) => (
+                      <TableRow key={i}>
+                        {parsed.headers.map((h) => <TableCell key={h} className="text-xs">{r[h] || "—"}</TableCell>)}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </details>
+
             <DialogFooter>
               <Button variant="ghost" onClick={() => setStep("upload")}>Back</Button>
-              <Button onClick={proceedToReview}>
-                Continue to review <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </DialogFooter>
-          </div>
-        )}
-
-        {step === "review" && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Review & edit. Missing required fields are highlighted in <span className="rounded bg-rose-100 px-1 text-rose-700 dark:bg-rose-950 dark:text-rose-300">crimson</span>.
-            </p>
-            <div className="max-h-[400px] overflow-auto rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {reviewColumns.map((c) => {
-                      const meta = TARGET_FIELDS[kind].find((f) => f.key === c);
-                      return <TableHead key={c}>{meta?.label ?? c}{meta?.required ? " *" : ""}</TableHead>;
-                    })}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reviewRows.map((row, idx) => (
-                    <TableRow key={idx}>
-                      {reviewColumns.map((c) => (
-                        <TableCell key={c} className="p-1">
-                          <Input
-                            value={row[c] ?? ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setReviewRows((rs) => rs.map((r, i) => i === idx ? { ...r, [c]: v } : r));
-                            }}
-                            className={`h-8 text-xs ${isRowInvalid(row, c) ? "bg-rose-50 border-rose-300 dark:bg-rose-950/40 dark:border-rose-800" : ""}`}
-                          />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setStep("map")}>Back</Button>
-              <Button onClick={finalize} disabled={submitting || !reviewRows.length}>
+              <Button onClick={finalize} disabled={submitting}>
                 {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                Finalize & Populate Roster
+                ⚡ Finalize & Populate Roster
               </Button>
             </DialogFooter>
           </div>
@@ -395,3 +406,7 @@ export function BulkImporter({
     </Dialog>
   );
 }
+
+// Reserved for downstream use; signals server-side validation/Input wires
+type _Unused = Input;
+type Input = ParsedFile;

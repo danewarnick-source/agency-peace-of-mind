@@ -40,6 +40,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/pba-ledger", label: "PBA Trust Ledger", icon: Wallet },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
+  { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

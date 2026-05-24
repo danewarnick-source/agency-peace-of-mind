@@ -446,8 +446,3 @@ function CreateTeamDialog({
   );
 }
 
-// Tabs/legacy types kept for type-cleanliness
-type _UnusedContact = typeof Contact2;
-type _UnusedUsers = typeof Users;
-const _u: [_UnusedContact, _UnusedUsers] | null = null;
-void _u;

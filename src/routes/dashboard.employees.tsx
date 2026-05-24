@@ -676,7 +676,7 @@ function CaseloadDrawer({
           ) : !filtered.length ? (
             <p className="p-6 text-center text-sm text-muted-foreground">No clients found.</p>
           ) : (
-            filtered.map((c) => {
+            filtered.map((c: ClientRow) => {
               const on = selected.has(c.id);
               return (
                 <label

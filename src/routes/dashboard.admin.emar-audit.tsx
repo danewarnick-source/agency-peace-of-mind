@@ -55,7 +55,9 @@ function AuditPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         supabase.from("teams" as any).select("id, team_name").eq("organization_id", org!.organization_id),
       ]);
-      const clientMap = new Map((clients ?? []).map((c: { id: string; first_name: string; last_name: string; team_id: string | null }) => [c.id, c]));
+      const clientMap = new Map<string, { id: string; first_name: string; last_name: string; team_id: string | null }>(
+        ((clients ?? []) as unknown as Array<{ id: string; first_name: string; last_name: string; team_id: string | null }>).map((c) => [c.id, c])
+      );
       const medMap = new Map((meds as unknown as Array<{ id: string; medication_name: string; dosage: string | null }> ?? []).map((m) => [m.id, m]));
       const teamMap = new Map((teams as unknown as Array<{ id: string; team_name: string }> ?? []).map((t) => [t.id, t.team_name]));
       return ((logs ?? []) as unknown as Row[]).map((l) => {

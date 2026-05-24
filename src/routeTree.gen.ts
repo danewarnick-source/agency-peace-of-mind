@@ -61,6 +61,7 @@ import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashb
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
+import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as ApiPublicSeedStaffRouteImport } from './routes/api/public/seed-staff'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
 
@@ -331,6 +332,11 @@ const DashboardCoursesCourseIdRoute =
     path: '/courses/$courseId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardAdminEmarAuditRoute = DashboardAdminEmarAuditRouteImport.update({
+  id: '/admin/emar-audit',
+  path: '/admin/emar-audit',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const ApiPublicSeedStaffRoute = ApiPublicSeedStaffRouteImport.update({
   id: '/api/public/seed-staff',
   path: '/api/public/seed-staff',
@@ -388,6 +394,7 @@ export interface FileRoutesByFullPath {
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
+  '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -443,6 +450,7 @@ export interface FileRoutesByTo {
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
   '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
+  '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -500,6 +508,7 @@ export interface FileRoutesById {
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
+  '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -558,6 +567,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/dashboard/'
     | '/api/public/seed-staff'
+    | '/dashboard/admin/emar-audit'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
@@ -613,6 +623,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/dashboard'
     | '/api/public/seed-staff'
+    | '/dashboard/admin/emar-audit'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
@@ -669,6 +680,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/dashboard/'
     | '/api/public/seed-staff'
+    | '/dashboard/admin/emar-audit'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/programs/$programId'
@@ -1066,6 +1078,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/admin/emar-audit': {
+      id: '/dashboard/admin/emar-audit'
+      path: '/admin/emar-audit'
+      fullPath: '/dashboard/admin/emar-audit'
+      preLoaderRoute: typeof DashboardAdminEmarAuditRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/api/public/seed-staff': {
       id: '/api/public/seed-staff'
       path: '/api/public/seed-staff'
@@ -1160,6 +1179,7 @@ interface DashboardRouteChildren {
   DashboardTimesheetsRoute: typeof DashboardTimesheetsRoute
   DashboardTracksRoute: typeof DashboardTracksRouteWithChildren
   DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardAdminEmarAuditRoute: typeof DashboardAdminEmarAuditRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesMindsmithRoute: typeof DashboardCoursesMindsmithRoute
   DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
@@ -1197,6 +1217,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardTimesheetsRoute: DashboardTimesheetsRoute,
   DashboardTracksRoute: DashboardTracksRouteWithChildren,
   DashboardIndexRoute: DashboardIndexRoute,
+  DashboardAdminEmarAuditRoute: DashboardAdminEmarAuditRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesMindsmithRoute: DashboardCoursesMindsmithRoute,
   DashboardTrainingIdRoute: DashboardTrainingIdRoute,

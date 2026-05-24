@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import {
-  Home, Plus, Users, Contact2, Loader2, FlaskConical, ShieldCheck, ShieldOff,
+  Home, Plus, Loader2, FlaskConical, ShieldCheck, ShieldOff,
   UserRound, HeartHandshake, Package, ChevronLeft, ChevronRight, GripVertical, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";

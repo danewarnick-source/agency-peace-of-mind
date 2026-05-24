@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
-  LayoutDashboard, GraduationCap, BookOpen, Settings,
-  LogOut, Users, Building2, Contact2, ShieldCheck, ClipboardList, Clock, ClipboardCheck, Calendar, UserCog,
+  LayoutDashboard, GraduationCap, Settings,
+  LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,12 +33,8 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: Calendar },
-  { to: "/dashboard/assignments", label: "Caseloads", icon: UserCog },
-  { to: "/dashboard/training", label: "Course Library", icon: BookOpen },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
-  { to: "/dashboard/evv-compliance", label: "EVV Compliance", icon: ShieldCheck },
-  { to: "/dashboard/timesheets", label: "Timesheets", icon: ClipboardList },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

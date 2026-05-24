@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -11,7 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { RequirePermission } from "@/components/rbac-guard";
@@ -54,6 +57,7 @@ function EmployeesPage() {
   const [tempPassword, setTempPassword] = useState(() => genPassword());
   const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
   const [editingMember, setEditingMember] = useState<EditableMember | null>(null);
+  const [caseloadFor, setCaseloadFor] = useState<{ id: string; name: string; role: string } | null>(null);
 
   const createManual = useServerFn(createEmployeeManually);
   const resetPwFn = useServerFn(adminResetEmployeePassword);
@@ -290,6 +294,9 @@ function EmployeesPage() {
                       role: m.role as Role,
                       active: m.active,
                     })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
+                      <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => setAssignOpen(m.user_id)}><BookOpen className="mr-1 h-3.5 w-3.5" /> Assign</Button>
                     <Button variant="ghost" size="sm" onClick={() => setResetUser({ id: m.user_id, name })}><KeyRound className="mr-1 h-3.5 w-3.5" /> Reset</Button>
                     {m.user_id !== user?.id && (
@@ -509,6 +516,201 @@ function EmployeesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CaseloadDrawer
+        member={caseloadFor}
+        organizationId={org?.organization_id ?? null}
+        onClose={() => setCaseloadFor(null)}
+      />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+/* Caseload Assignment Drawer                                                 */
+/* ------------------------------------------------------------------------- */
+
+type ClientRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  job_code: string[] | null;
+};
+
+function CaseloadDrawer({
+  member, organizationId, onClose,
+}: {
+  member: { id: string; name: string; role: string } | null;
+  organizationId: string | null;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [original, setOriginal] = useState<Set<string>>(new Set());
+
+  const { data: clients, isLoading: loadingClients } = useQuery({
+    enabled: !!member && !!organizationId,
+    queryKey: ["caseload-all-clients", organizationId],
+    queryFn: async (): Promise<ClientRow[]> => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name, job_code")
+        .eq("organization_id", organizationId!)
+        .order("last_name");
+      if (error) throw error;
+      return (data ?? []) as ClientRow[];
+    },
+  });
+
+  const { data: existing, isLoading: loadingExisting } = useQuery({
+    enabled: !!member && !!organizationId,
+    queryKey: ["caseload-for-staff", organizationId, member?.id],
+    queryFn: async (): Promise<{ id: string; client_id: string }[]> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await supabase.from("staff_assignments" as any)
+        .select("id, client_id")
+        .eq("organization_id", organizationId!)
+        .eq("staff_id", member!.id);
+      if (error) throw error;
+      return (data ?? []) as unknown as { id: string; client_id: string }[];
+    },
+  });
+
+  // Seed selection when drawer opens / data loads
+  useEffect(() => {
+    if (existing) {
+      const ids = new Set(existing.map((e) => e.client_id));
+      setOriginal(ids);
+      setSelected(new Set(ids));
+    }
+  }, [existing]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (clients ?? []).filter((c) =>
+      !q || `${c.first_name} ${c.last_name}`.toLowerCase().includes(q)
+      || (c.job_code ?? []).some((j) => j.toLowerCase().includes(q))
+    );
+  }, [clients, search]);
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      if (!member || !organizationId) return;
+      const toAdd = [...selected].filter((id) => !original.has(id));
+      const toRemoveIds = (existing ?? [])
+        .filter((e) => !selected.has(e.client_id))
+        .map((e) => e.id);
+
+      if (toRemoveIds.length) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await supabase.from("staff_assignments" as any)
+          .delete().in("id", toRemoveIds);
+        if (error) throw error;
+      }
+      if (toAdd.length) {
+        const rows = toAdd.map((client_id) => ({
+          organization_id: organizationId, staff_id: member.id, client_id,
+        }));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await supabase.from("staff_assignments" as any).insert(rows as any);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success(`Caseload updated successfully for ${member?.name ?? "employee"}`);
+      qc.invalidateQueries({ queryKey: ["caseload-for-staff"] });
+      qc.invalidateQueries({ queryKey: ["assignments"] });
+      qc.invalidateQueries({ queryKey: ["caseload"] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const dirty = useMemo(() => {
+    if (selected.size !== original.size) return true;
+    for (const id of selected) if (!original.has(id)) return true;
+    return false;
+  }, [selected, original]);
+
+  const loading = loadingClients || loadingExisting;
+
+  return (
+    <Sheet open={!!member} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle>Caseload Assignment Center: {member?.name ?? ""}</SheetTitle>
+          <SheetDescription>
+            Check every individual this staff member may serve. Changes restrict what they see in Time Clock and Daily Logs.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="relative mt-5">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by client name or service code…"
+            className="pl-9"
+          />
+        </div>
+
+        <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+          <span>{selected.size} of {clients?.length ?? 0} selected</span>
+          {dirty && <span className="font-medium text-amber-600 dark:text-amber-400">Unsaved changes</span>}
+        </div>
+
+        <div className="mt-2 divide-y divide-border rounded-xl border border-border">
+          {loading ? (
+            <div className="grid place-items-center p-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : !filtered.length ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">No clients found.</p>
+          ) : (
+            filtered.map((c: ClientRow) => {
+              const on = selected.has(c.id);
+              return (
+                <label
+                  key={c.id}
+                  className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors ${
+                    on ? "bg-primary/5" : "hover:bg-muted/40"
+                  }`}
+                >
+                  <Checkbox checked={on} onCheckedChange={() => toggle(c.id)} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{c.first_name} {c.last_name}</p>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {(c.job_code ?? []).filter(Boolean).map((code: string) => (
+                      <Badge key={code} variant="secondary" className="font-mono text-[10px]">{code}</Badge>
+                    ))}
+                    {!(c.job_code?.length) && <span className="text-[10px] text-muted-foreground">No codes</span>}
+                  </div>
+                </label>
+              );
+            })
+          )}
+        </div>
+
+        <SheetFooter className="mt-6">
+          <Button
+            className="w-full"
+            disabled={!dirty || saveMut.isPending}
+            onClick={() => saveMut.mutate()}
+          >
+            {saveMut.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save Caseload Modifications"}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

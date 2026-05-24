@@ -37,10 +37,12 @@ import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports
 import { Route as DashboardProgramsAdminRouteImport } from './routes/dashboard.programs-admin'
 import { Route as DashboardProgramsRouteImport } from './routes/dashboard.programs'
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
+import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
 import { Route as DashboardEvvComplianceRouteImport } from './routes/dashboard.evv-compliance'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
+import { Route as DashboardDspdControlsRouteImport } from './routes/dashboard.dspd-controls'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
@@ -198,6 +200,11 @@ const DashboardPermissionsRoute = DashboardPermissionsRouteImport.update({
   path: '/permissions',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardPbaLedgerRoute = DashboardPbaLedgerRouteImport.update({
+  id: '/pba-ledger',
+  path: '/pba-ledger',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardInvitationsRoute = DashboardInvitationsRouteImport.update({
   id: '/invitations',
   path: '/invitations',
@@ -217,6 +224,11 @@ const DashboardEvvComplianceRoute = DashboardEvvComplianceRouteImport.update({
 const DashboardEmployeesRoute = DashboardEmployeesRouteImport.update({
   id: '/employees',
   path: '/employees',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardDspdControlsRoute = DashboardDspdControlsRouteImport.update({
+  id: '/dspd-controls',
+  path: '/dspd-controls',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardDailyLogsRoute = DashboardDailyLogsRouteImport.update({
@@ -327,10 +339,12 @@ export interface FileRoutesByFullPath {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
+  '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
+  '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
@@ -376,10 +390,12 @@ export interface FileRoutesByTo {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
+  '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
+  '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
@@ -427,10 +443,12 @@ export interface FileRoutesById {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
+  '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
+  '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
@@ -479,10 +497,12 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/clients'
     | '/dashboard/daily-logs'
+    | '/dashboard/dspd-controls'
     | '/dashboard/employees'
     | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
+    | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
@@ -528,10 +548,12 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/clients'
     | '/dashboard/daily-logs'
+    | '/dashboard/dspd-controls'
     | '/dashboard/employees'
     | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
+    | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
@@ -578,10 +600,12 @@ export interface FileRouteTypes {
     | '/dashboard/certifications'
     | '/dashboard/clients'
     | '/dashboard/daily-logs'
+    | '/dashboard/dspd-controls'
     | '/dashboard/employees'
     | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
+    | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
@@ -824,6 +848,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardPermissionsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/pba-ledger': {
+      id: '/dashboard/pba-ledger'
+      path: '/pba-ledger'
+      fullPath: '/dashboard/pba-ledger'
+      preLoaderRoute: typeof DashboardPbaLedgerRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/invitations': {
       id: '/dashboard/invitations'
       path: '/invitations'
@@ -850,6 +881,13 @@ declare module '@tanstack/react-router' {
       path: '/employees'
       fullPath: '/dashboard/employees'
       preLoaderRoute: typeof DashboardEmployeesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/dspd-controls': {
+      id: '/dashboard/dspd-controls'
+      path: '/dspd-controls'
+      fullPath: '/dashboard/dspd-controls'
+      preLoaderRoute: typeof DashboardDspdControlsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/daily-logs': {
@@ -1011,10 +1049,12 @@ interface DashboardRouteChildren {
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientsRoute: typeof DashboardClientsRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
+  DashboardDspdControlsRoute: typeof DashboardDspdControlsRoute
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardEvvComplianceRoute: typeof DashboardEvvComplianceRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
+  DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
   DashboardProgramsRoute: typeof DashboardProgramsRouteWithChildren
   DashboardProgramsAdminRoute: typeof DashboardProgramsAdminRoute
@@ -1044,10 +1084,12 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientsRoute: DashboardClientsRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
+  DashboardDspdControlsRoute: DashboardDspdControlsRoute,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardEvvComplianceRoute: DashboardEvvComplianceRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
+  DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,
   DashboardPermissionsRoute: DashboardPermissionsRoute,
   DashboardProgramsRoute: DashboardProgramsRouteWithChildren,
   DashboardProgramsAdminRoute: DashboardProgramsAdminRoute,

@@ -107,6 +107,66 @@ export type Database = {
           },
         ]
       }
+      client_belongings: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          discard_reason: string | null
+          discarded_on: string | null
+          estimated_value: number
+          guardian_signature_data_url: string | null
+          id: string
+          inventoried_by: string | null
+          inventoried_by_name: string | null
+          inventoried_on: string
+          item_name: string
+          organization_id: string
+          signed_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          discard_reason?: string | null
+          discarded_on?: string | null
+          estimated_value?: number
+          guardian_signature_data_url?: string | null
+          id?: string
+          inventoried_by?: string | null
+          inventoried_by_name?: string | null
+          inventoried_on?: string
+          item_name: string
+          organization_id: string
+          signed_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          discard_reason?: string | null
+          discarded_on?: string | null
+          estimated_value?: number
+          guardian_signature_data_url?: string | null
+          id?: string
+          inventoried_by?: string | null
+          inventoried_by_name?: string | null
+          inventoried_on?: string
+          item_name?: string
+          organization_id?: string
+          signed_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           created_at: string
@@ -416,6 +476,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      els_usage_ledger: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          service_date: string
+          shift_id: string | null
+          units: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          service_date: string
+          shift_id?: string | null
+          units: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          service_date?: string
+          shift_id?: string | null
+          units?: number
+        }
+        Relationships: []
       }
       external_certifications: {
         Row: {
@@ -775,6 +871,139 @@ export type Database = {
         }
         Relationships: []
       }
+      pba_accounts: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          current_balance: number
+          id: string
+          medicaid_threshold: number
+          notes: string | null
+          opened_on: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          current_balance?: number
+          id?: string
+          medicaid_threshold?: number
+          notes?: string | null
+          opened_on?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_balance?: number
+          id?: string
+          medicaid_threshold?: number
+          notes?: string | null
+          opened_on?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pba_audit_samples: {
+        Row: {
+          account_id: string
+          assigned_auditor: string | null
+          created_at: string
+          id: string
+          organization_id: string
+          quarter: string
+          status: string
+          verified_at: string | null
+          verifier_notes: string | null
+        }
+        Insert: {
+          account_id: string
+          assigned_auditor?: string | null
+          created_at?: string
+          id?: string
+          organization_id: string
+          quarter: string
+          status?: string
+          verified_at?: string | null
+          verifier_notes?: string | null
+        }
+        Update: {
+          account_id?: string
+          assigned_auditor?: string | null
+          created_at?: string
+          id?: string
+          organization_id?: string
+          quarter?: string
+          status?: string
+          verified_at?: string | null
+          verifier_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pba_audit_samples_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "pba_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pba_transactions: {
+        Row: {
+          account_id: string
+          amount: number
+          counterparty: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          memo: string | null
+          occurred_on: string
+          organization_id: string
+          receipt_url: string | null
+          txn_type: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          counterparty?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          memo?: string | null
+          occurred_on?: string
+          organization_id: string
+          receipt_url?: string | null
+          txn_type: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          counterparty?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          memo?: string | null
+          occurred_on?: string
+          organization_id?: string
+          receipt_url?: string | null
+          txn_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pba_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "pba_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           agency_name: string | null
@@ -966,6 +1195,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      respite_stays: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_date: string
+          host_home_id: string
+          id: string
+          notes: string | null
+          organization_id: string
+          respite_client_id: string
+          start_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          host_home_id: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          respite_client_id: string
+          start_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          host_home_id?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          respite_client_id?: string
+          start_date?: string
+        }
+        Relationships: []
       }
       role_permissions: {
         Row: {
@@ -1557,6 +1822,7 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: string }
+      generate_pba_audit_sample: { Args: { _org: string }; Returns: number }
       has_org_role: {
         Args: {
           _org: string

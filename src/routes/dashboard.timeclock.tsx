@@ -12,7 +12,20 @@ function TimeClockPage() {
   const { effective } = useEffectiveView();
 
   if (effective === "admin") {
-    return <AdminTimeClockView />;
+    return (
+      <div className="space-y-8">
+        <div className="mx-auto max-w-2xl space-y-4">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">My Time Clock</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Clock yourself in for a shift. Admin oversight is shown below.
+            </p>
+          </div>
+          <EvvShiftControl />
+        </div>
+        <AdminTimeClockView />
+      </div>
+    );
   }
 
   return (

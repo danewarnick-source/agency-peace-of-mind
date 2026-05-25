@@ -29,7 +29,7 @@ function Overview() {
   const { data: org } = useCurrentOrg();
   const { view } = usePortalView();
   const qc = useQueryClient();
-  const navigate = useNavigate();
+  
   const isManager = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
   const showAdmin = isManager && view === "admin";
   const [inviteOpen, setInviteOpen] = useState(false);

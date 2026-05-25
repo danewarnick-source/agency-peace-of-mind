@@ -34,9 +34,8 @@ function Overview() {
   const showAdmin = isManager && view === "admin";
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  useEffect(() => {
-    if (org?.role === "super_admin") navigate({ to: "/dashboard/super-admin" });
-  }, [org?.role, navigate]);
+  // Note: super_admins can freely visit /dashboard to see the caseload view.
+  // The dedicated super-admin console is reachable from the sidebar.
 
   const { data: stats } = useQuery({
     enabled: !!org && showAdmin,

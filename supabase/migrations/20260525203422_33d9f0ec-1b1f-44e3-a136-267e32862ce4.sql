@@ -1,0 +1,1 @@
+ALTER TABLE public.shifts ADD COLUMN IF NOT EXISTS evv_verified boolean NOT NULL DEFAULT false;

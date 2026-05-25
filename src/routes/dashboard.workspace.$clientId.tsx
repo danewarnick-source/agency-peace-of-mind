@@ -57,23 +57,23 @@ function ClientWorkspace() {
   const { data: caseload, isLoading } = useCaseload();
   const navigate = useNavigate();
 
-  const client = useMemo(
-    () => (caseload ?? []).find((c) => c.id === clientId) ?? null,
-    [caseload, clientId],
-  );
+  const isMock = clientId.startsWith("mock-client-");
+  const client = useMemo(() => {
+    if (isMock) return MOCK_WORKSPACE_CLIENTS[clientId] ?? null;
+    return (caseload ?? []).find((c) => c.id === clientId) ?? null;
+  }, [caseload, clientId, isMock]);
 
-  // Security guard: if not in caseload, deny access.
+  // Security guard: if not in caseload (and not a mock test client), deny access.
   useEffect(() => {
+    if (isMock) return;
     if (!isLoading && caseload && !client) {
       toast.error("You are not assigned to this individual.");
       navigate({ to: "/dashboard" });
     }
-  }, [isLoading, caseload, client, navigate]);
+  }, [isLoading, caseload, client, navigate, isMock]);
 
-  if (isLoading || !client) {
-    return (
-      <p className="p-6 text-sm text-muted-foreground">Loading…</p>
-    );
+  if ((!isMock && isLoading) || !client) {
+    return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   }
 
   const codes = Array.isArray(client.job_code) ? client.job_code : [];

@@ -25,6 +25,47 @@ type ActiveShift = {
   job_code: string | null;
 };
 
+function createLocalMockShift(clientId: string, jobCode: string): ActiveShift {
+  return {
+    id: `mock-shift-${clientId}-${Date.now()}`,
+    clock_in_time: new Date().toISOString(),
+    job_code: jobCode || null,
+  };
+}
+
+function getClockInCoordinates(timeoutMs = 900) {
+  return new Promise<GeolocationCoordinates | null>((resolve) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      resolve(null);
+      return;
+    }
+
+    let finished = false;
+    const finish = (coords: GeolocationCoordinates | null) => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(timeoutId);
+      resolve(coords);
+    };
+
+    const timeoutId = window.setTimeout(() => finish(null), timeoutMs);
+
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => finish(pos.coords),
+        () => finish(null),
+        {
+          enableHighAccuracy: true,
+          timeout: Math.max(250, timeoutMs - 100),
+          maximumAge: 0,
+        },
+      );
+    } catch {
+      finish(null);
+    }
+  });
+}
+
 function fmtElapsed(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(s / 3600);
@@ -112,21 +153,14 @@ export function WorkShiftTab({
     }
     setBusy(true);
 
-    // Local mock fallback — keeps the UI usable in sandbox/preview even when
-    // tenant_id / staff_profile / network records are missing or slow.
+    const localMock = createLocalMockShift(clientId, jobCode);
     const startLocalMock = () => {
-      const mock: ActiveShift = {
-        id: `mock-shift-${clientId}-${Date.now()}`,
-        clock_in_time: new Date().toISOString(),
-        job_code: jobCode || null,
-      };
-      setActive(mock);
+      setActive(localMock);
       toast("🔄 Sandbox Mode: Shift started locally.");
     };
 
-    // 1.5s safety timer — if the DB round-trip stalls, drop the spinner and
-    // fall back to a local shift so narrative + goal fields unlock instantly.
     let settled = false;
+    let insertAbortTimer: number | null = null;
     const fallback = window.setTimeout(() => {
       if (settled) return;
       settled = true;
@@ -136,16 +170,9 @@ export function WorkShiftTab({
 
     try {
       if (!org) throw new Error("no-org");
-      const coords = await new Promise<GeolocationCoordinates | null>(
-        (resolve) => {
-          if (!("geolocation" in navigator)) return resolve(null);
-          navigator.geolocation.getCurrentPosition(
-            (pos) => resolve(pos.coords),
-            () => resolve(null),
-            { enableHighAccuracy: true, timeout: 1200, maximumAge: 0 },
-          );
-        },
-      );
+      const coords = await getClockInCoordinates(900);
+      const controller = new AbortController();
+      insertAbortTimer = window.setTimeout(() => controller.abort(), 1100);
       const { data, error } = await supabase
         .from("shifts")
         .insert({
@@ -159,8 +186,10 @@ export function WorkShiftTab({
           status: "active",
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any)
+        .abortSignal(controller.signal)
         .select("id, clock_in_time, job_code")
         .single();
+      if (insertAbortTimer) window.clearTimeout(insertAbortTimer);
       if (error) throw error;
       if (settled) return;
       settled = true;
@@ -168,6 +197,7 @@ export function WorkShiftTab({
       setActive(data as ActiveShift);
       toast.success(`Clocked in with ${clientName}`);
     } catch {
+      if (insertAbortTimer) window.clearTimeout(insertAbortTimer);
       if (settled) return;
       settled = true;
       window.clearTimeout(fallback);

@@ -84,6 +84,15 @@ export function WorkShiftTab({
   const [showAlert, setShowAlert] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const tickRef = useRef<number | null>(null);
+  const isClockRunning = Boolean(active?.id);
+  const activeClockInTime = active?.clock_in_time ?? null;
+
+  const clearTick = () => {
+    if (tickRef.current !== null) {
+      window.clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+  };
 
   // Fetch any open shift for this user+client.
   useEffect(() => {
@@ -105,25 +114,40 @@ export function WorkShiftTab({
       });
   }, [user, clientId]);
 
-  // Live stopwatch — driven by `active`. When `active` becomes null the
-  // interval is cleared automatically (no ghost clock).
+  // Live stopwatch — always own exactly one interval and tear it down on any
+  // shift identity change so clock-out cannot leave a ghost timer behind.
   useEffect(() => {
-    if (!active) {
-      if (tickRef.current) {
-        window.clearInterval(tickRef.current);
-        tickRef.current = null;
-      }
+    clearTick();
+
+    if (!isClockRunning || !activeClockInTime) {
       setNow(Date.now());
       return;
     }
-    tickRef.current = window.setInterval(() => setNow(Date.now()), 1000);
+
+    const startedAt = new Date(activeClockInTime).getTime();
+    if (Number.isNaN(startedAt)) {
+      setNow(Date.now());
+      return;
+    }
+
+    setNow(Date.now());
+
+    const interval = window.setInterval(() => {
+      setNow((prev) => {
+        const next = Date.now();
+        return next === prev ? prev : next;
+      });
+    }, 1000);
+
+    tickRef.current = interval;
+
     return () => {
-      if (tickRef.current) {
-        window.clearInterval(tickRef.current);
+      window.clearInterval(interval);
+      if (tickRef.current === interval) {
         tickRef.current = null;
       }
     };
-  }, [active]);
+  }, [isClockRunning, activeClockInTime]);
 
   const elapsed = active
     ? now - new Date(active.clock_in_time).getTime()

@@ -302,20 +302,22 @@ function CreateTenantDialog({
   );
 }
 
+const PLATFORM_FEATURES: { key: string; label: string; category: string }[] = [
+  { key: "time_clock", label: "⏱️ Time Clock", category: "Operations" },
+  { key: "daily_notes", label: "📋 Daily Logs", category: "Operations" },
+  { key: "scheduler", label: "📅 Scheduler", category: "Operations" },
+  { key: "audit_portal", label: "🛡️ Audit Portal", category: "Compliance" },
+  { key: "emar_pass", label: "🩺 eMAR Pass System", category: "Clinical" },
+  { key: "emar_audit", label: "📊 eMAR Audit Ledger", category: "Clinical" },
+  { key: "pba_trust_ledger", label: "🧮 PBA Trust Ledger", category: "Financial" },
+  { key: "employees", label: "👥 Employees Registry", category: "Registry" },
+  { key: "clients", label: "👥 Clients Registry", category: "Registry" },
+  { key: "teams_homes", label: "🏠 Teams & Homes", category: "Registry" },
+  { key: "ai_assistance", label: "🤖 AI Importer & Assistance", category: "Intelligence" },
+];
+
 function TenantFeatureRegistry({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
-
-  const { data: features = [] } = useQuery({
-    queryKey: ["system-features"],
-    queryFn: async (): Promise<SystemFeature[]> => {
-      const { data, error } = await supabase
-        .from("system_features")
-        .select("feature_key, feature_name, category, sort_order")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
 
   const { data: flags = {} } = useQuery({
     queryKey: ["tenant-features", tenantId],
@@ -354,7 +356,7 @@ function TenantFeatureRegistry({ tenantId }: { tenantId: string }) {
     onSuccess: () => toast.success("Feature updated"),
   });
 
-  const grouped = features.reduce<Record<string, SystemFeature[]>>((acc, f) => {
+  const grouped = PLATFORM_FEATURES.reduce<Record<string, typeof PLATFORM_FEATURES>>((acc, f) => {
     (acc[f.category] ??= []).push(f);
     return acc;
   }, {});
@@ -362,8 +364,8 @@ function TenantFeatureRegistry({ tenantId }: { tenantId: string }) {
   return (
     <div className="rounded-lg border border-border">
       <div className="flex items-center justify-between border-b border-border p-4">
-        <p className="text-sm font-semibold">🎛️ Feature Registry</p>
-        <Badge variant="outline" className="text-[10px]">{features.length} modules</Badge>
+        <p className="text-sm font-semibold">🎛️ Platform Feature Toggles</p>
+        <Badge variant="outline" className="text-[10px]">{PLATFORM_FEATURES.length} modules</Badge>
       </div>
       <ScrollArea className="h-[420px]">
         <div className="space-y-5 p-4">
@@ -372,18 +374,18 @@ function TenantFeatureRegistry({ tenantId }: { tenantId: string }) {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{category}</p>
               <div className="space-y-1 rounded-md border border-border/60 bg-card">
                 {items.map((f) => {
-                  const enabled = flags[f.feature_key] ?? true;
+                  const enabled = flags[f.key] ?? true;
                   return (
-                    <div key={f.feature_key} className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2.5 last:border-b-0">
+                    <div key={f.key} className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2.5 last:border-b-0">
                       <div className="min-w-0">
-                        <Label htmlFor={`feat-${f.feature_key}`} className="text-sm font-medium">{f.feature_name}</Label>
-                        <p className="truncate text-[11px] text-muted-foreground">{f.feature_key}</p>
+                        <Label htmlFor={`feat-${f.key}`} className="text-sm font-medium">{f.label}</Label>
+                        <p className="truncate text-[11px] text-muted-foreground">{f.key}</p>
                       </div>
                       <Switch
-                        id={`feat-${f.feature_key}`}
+                        id={`feat-${f.key}`}
                         checked={enabled}
                         disabled={toggle.isPending}
-                        onCheckedChange={(checked) => toggle.mutate({ key: f.feature_key, enabled: checked })}
+                        onCheckedChange={(checked) => toggle.mutate({ key: f.key, enabled: checked })}
                       />
                     </div>
                   );
@@ -396,4 +398,5 @@ function TenantFeatureRegistry({ tenantId }: { tenantId: string }) {
     </div>
   );
 }
+
 

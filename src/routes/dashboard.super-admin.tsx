@@ -118,7 +118,7 @@ function SuperAdminConsole() {
       </div>
 
       <Tabs defaultValue="tenants" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="tenants">🛰️ Tenant Console</TabsTrigger>
           <TabsTrigger value="personnel">👥 Cross-Tenant Personnel Registry</TabsTrigger>
         </TabsList>

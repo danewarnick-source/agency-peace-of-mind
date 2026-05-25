@@ -493,10 +493,7 @@ function CreateTenantDialog({
 }
 
 const PLATFORM_FEATURES: { key: string; label: string; category: string }[] = [
-  { key: "time_clock", label: "⏱️ Time Clock", category: "Operations" },
   { key: "daily_notes", label: "📋 Daily Logs", category: "Operations" },
-  { key: "scheduler", label: "📅 Scheduler", category: "Operations" },
-  { key: "audit_portal", label: "🛡️ Audit Portal", category: "Compliance" },
   { key: "emar_pass", label: "🩺 eMAR Pass System", category: "Clinical" },
   { key: "emar_audit", label: "📊 eMAR Audit Ledger", category: "Clinical" },
   { key: "pba_trust_ledger", label: "🧮 PBA Trust Ledger", category: "Financial" },

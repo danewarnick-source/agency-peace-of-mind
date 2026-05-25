@@ -1941,6 +1941,33 @@ export type Database = {
         }
         Relationships: []
       }
+      system_features: {
+        Row: {
+          category: string
+          created_at: string
+          feature_key: string
+          feature_name: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          feature_key: string
+          feature_name: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          feature_key?: string
+          feature_name?: string
+          id?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       teams: {
         Row: {
           created_at: string
@@ -1986,6 +2013,45 @@ export type Database = {
           },
           {
             foreignKeyName: "teams_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "provider_tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_features: {
+        Row: {
+          feature_key: string
+          id: string
+          is_enabled: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          feature_key: string
+          id?: string
+          is_enabled?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          feature_key?: string
+          id?: string
+          is_enabled?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_features_feature_key_fkey"
+            columns: ["feature_key"]
+            isOneToOne: false
+            referencedRelation: "system_features"
+            referencedColumns: ["feature_key"]
+          },
+          {
+            foreignKeyName: "tenant_features_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "provider_tenants"

@@ -22,6 +22,8 @@ import { ClientChartAuditMatrix } from "@/components/client-chart-audit";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
+import { MedicationsManager } from "@/components/medications-manager";
+import { MarCalendar } from "@/components/mar-calendar";
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -433,6 +435,11 @@ function ClientFormDialog({
               entityKind="client"
               entityId={clientId}
             />
+            <div className="grid gap-4 rounded-lg border border-border p-4">
+              <h3 className="text-sm font-semibold">💊 Medications & MAR</h3>
+              <MedicationsManager clientId={clientId} organizationId={organizationId} />
+              <MarCalendar clientId={clientId} />
+            </div>
             <LifecyclePanel
               kind="client"
               id={clientId}

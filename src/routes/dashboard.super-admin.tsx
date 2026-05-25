@@ -301,3 +301,99 @@ function CreateTenantDialog({
     </Dialog>
   );
 }
+
+function TenantFeatureRegistry({ tenantId }: { tenantId: string }) {
+  const qc = useQueryClient();
+
+  const { data: features = [] } = useQuery({
+    queryKey: ["system-features"],
+    queryFn: async (): Promise<SystemFeature[]> => {
+      const { data, error } = await supabase
+        .from("system_features")
+        .select("feature_key, feature_name, category, sort_order")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: flags = {} } = useQuery({
+    queryKey: ["tenant-features", tenantId],
+    queryFn: async (): Promise<Record<string, boolean>> => {
+      const { data, error } = await supabase
+        .from("tenant_features")
+        .select("feature_key, is_enabled")
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      const out: Record<string, boolean> = {};
+      for (const row of data ?? []) out[row.feature_key] = row.is_enabled;
+      return out;
+    },
+  });
+
+  const toggle = useMutation({
+    mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
+      const { error } = await supabase
+        .from("tenant_features")
+        .upsert(
+          { tenant_id: tenantId, feature_key: key, is_enabled: enabled, updated_at: new Date().toISOString() },
+          { onConflict: "tenant_id,feature_key" },
+        );
+      if (error) throw error;
+    },
+    onMutate: async ({ key, enabled }) => {
+      await qc.cancelQueries({ queryKey: ["tenant-features", tenantId] });
+      const prev = qc.getQueryData<Record<string, boolean>>(["tenant-features", tenantId]);
+      qc.setQueryData<Record<string, boolean>>(["tenant-features", tenantId], { ...(prev ?? {}), [key]: enabled });
+      return { prev };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["tenant-features", tenantId], ctx.prev);
+      toast.error(e.message);
+    },
+    onSuccess: () => toast.success("Feature updated"),
+  });
+
+  const grouped = features.reduce<Record<string, SystemFeature[]>>((acc, f) => {
+    (acc[f.category] ??= []).push(f);
+    return acc;
+  }, {});
+
+  return (
+    <div className="rounded-lg border border-border">
+      <div className="flex items-center justify-between border-b border-border p-4">
+        <p className="text-sm font-semibold">🎛️ Feature Registry</p>
+        <Badge variant="outline" className="text-[10px]">{features.length} modules</Badge>
+      </div>
+      <ScrollArea className="h-[420px]">
+        <div className="space-y-5 p-4">
+          {Object.entries(grouped).map(([category, items]) => (
+            <div key={category} className="space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{category}</p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-card">
+                {items.map((f) => {
+                  const enabled = flags[f.feature_key] ?? true;
+                  return (
+                    <div key={f.feature_key} className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2.5 last:border-b-0">
+                      <div className="min-w-0">
+                        <Label htmlFor={`feat-${f.feature_key}`} className="text-sm font-medium">{f.feature_name}</Label>
+                        <p className="truncate text-[11px] text-muted-foreground">{f.feature_key}</p>
+                      </div>
+                      <Switch
+                        id={`feat-${f.feature_key}`}
+                        checked={enabled}
+                        disabled={toggle.isPending}
+                        onCheckedChange={(checked) => toggle.mutate({ key: f.feature_key, enabled: checked })}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+

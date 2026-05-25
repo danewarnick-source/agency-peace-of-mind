@@ -117,59 +117,72 @@ function SuperAdminConsole() {
         })}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-        <div className="flex items-center justify-between border-b border-border p-5">
-          <div>
-            <h2 className="text-base font-semibold">🛰️ Multi-Tenant Command Console</h2>
-            <p className="text-sm text-muted-foreground">All registered provider agencies, their subscription tier, and live feature status.</p>
+      <Tabs defaultValue="tenants" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="tenants">🛰️ Tenant Console</TabsTrigger>
+          <TabsTrigger value="personnel">👥 Cross-Tenant Personnel Registry</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tenants" className="space-y-4">
+          <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+            <div className="flex items-center justify-between border-b border-border p-5">
+              <div>
+                <h2 className="text-base font-semibold">🛰️ Multi-Tenant Command Console</h2>
+                <p className="text-sm text-muted-foreground">All registered provider agencies, their subscription tier, and live feature status.</p>
+              </div>
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" /> Register tenant
+              </Button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="p-4 text-left">Agency</th>
+                    <th className="p-4 text-left">Owner</th>
+                    <th className="p-4 text-left">Tier</th>
+                    <th className="p-4 text-left">Features</th>
+                    <th className="p-4 text-left">Status</th>
+                    <th className="p-4 text-right">Manage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tenantsLoading && (
+                    <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Loading tenants…</td></tr>
+                  )}
+                  {!tenantsLoading && !tenants.length && (
+                    <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No provider tenants yet. Click “Register tenant” to add one.</td></tr>
+                  )}
+                  {tenants.map((t) => (
+                    <tr key={t.id} className="border-t border-border">
+                      <td className="p-4 font-medium">{t.agency_name}</td>
+                      <td className="p-4 text-muted-foreground">{t.owner_email}</td>
+                      <td className="p-4">{t.client_tier_limit} clients</td>
+                      <td className="p-4 text-xs text-muted-foreground">
+                        Dynamic registry — open Manage to view
+                      </td>
+                      <td className="p-4">
+                        <Badge variant={t.is_active ? "default" : "outline"}>
+                          {t.is_active ? "Active" : "Suspended"}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => setActiveTenant(t)}>
+                          <Settings2 className="mr-1.5 h-4 w-4" /> Manage
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" /> Register tenant
-          </Button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="p-4 text-left">Agency</th>
-                <th className="p-4 text-left">Owner</th>
-                <th className="p-4 text-left">Tier</th>
-                <th className="p-4 text-left">Features</th>
-                <th className="p-4 text-left">Status</th>
-                <th className="p-4 text-right">Manage</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tenantsLoading && (
-                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Loading tenants…</td></tr>
-              )}
-              {!tenantsLoading && !tenants.length && (
-                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No provider tenants yet. Click “Register tenant” to add one.</td></tr>
-              )}
-              {tenants.map((t) => (
-                <tr key={t.id} className="border-t border-border">
-                  <td className="p-4 font-medium">{t.agency_name}</td>
-                  <td className="p-4 text-muted-foreground">{t.owner_email}</td>
-                  <td className="p-4">{t.client_tier_limit} clients</td>
-                  <td className="p-4 text-xs text-muted-foreground">
-                    Dynamic registry — open Manage to view
-                  </td>
-                  <td className="p-4">
-                    <Badge variant={t.is_active ? "default" : "outline"}>
-                      {t.is_active ? "Active" : "Suspended"}
-                    </Badge>
-                  </td>
-                  <td className="p-4 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTenant(t)}>
-                      <Settings2 className="mr-1.5 h-4 w-4" /> Manage
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="personnel">
+          <PersonnelRegistry />
+        </TabsContent>
+      </Tabs>
 
       <ManageTenantSheet
         tenant={activeTenant}
@@ -183,6 +196,186 @@ function SuperAdminConsole() {
         onOpenChange={setCreateOpen}
         onCreated={() => qc.invalidateQueries({ queryKey: ["provider-tenants"] })}
       />
+    </div>
+  );
+}
+
+type DirectoryRow = {
+  kind: "staff" | "client";
+  user_id: string;
+  full_name: string;
+  email: string | null;
+  role: string;
+  organization_id: string | null;
+  organization_name: string;
+  account_status: string;
+};
+
+function PersonnelRegistry() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [search, setSearch] = useState("");
+
+  const { data = [], isLoading } = useQuery({
+    queryKey: ["cross-tenant-personnel"],
+    queryFn: async (): Promise<DirectoryRow[]> => {
+      const [orgsRes, membersRes, profilesRes, clientsRes] = await Promise.all([
+        supabase.from("organizations").select("id, name"),
+        supabase.from("organization_members").select("user_id, organization_id, role, active"),
+        supabase.from("profiles").select("id, email, full_name, first_name, last_name, account_status"),
+        supabase.from("clients").select("id, organization_id, first_name, last_name, account_status"),
+      ]);
+      const orgMap = new Map<string, string>(
+        (orgsRes.data ?? []).map((o) => [o.id, o.name]),
+      );
+      const profileMap = new Map<string, NonNullable<typeof profilesRes.data>[number]>(
+        (profilesRes.data ?? []).map((p) => [p.id, p]),
+      );
+
+      const staff: DirectoryRow[] = (membersRes.data ?? []).map((m) => {
+        const p = profileMap.get(m.user_id);
+        const name =
+          p?.full_name ||
+          [p?.first_name, p?.last_name].filter(Boolean).join(" ") ||
+          p?.email ||
+          "(unnamed)";
+        return {
+          kind: "staff",
+          user_id: m.user_id,
+          full_name: name,
+          email: p?.email ?? null,
+          role: m.role,
+          organization_id: m.organization_id,
+          organization_name: orgMap.get(m.organization_id) ?? "—",
+          account_status: (p?.account_status ?? (m.active ? "active" : "archived")) as string,
+        };
+      });
+
+      const clients: DirectoryRow[] = (clientsRes.data ?? []).map((c) => ({
+        kind: "client",
+        user_id: c.id,
+        full_name: `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || "(unnamed)",
+        email: null,
+        role: "client",
+        organization_id: c.organization_id,
+        organization_name: orgMap.get(c.organization_id) ?? "—",
+        account_status: (c.account_status ?? "active") as string,
+      }));
+
+      return [...staff, ...clients].sort((a, b) =>
+        a.organization_name.localeCompare(b.organization_name) ||
+        a.full_name.localeCompare(b.full_name),
+      );
+    },
+  });
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return data;
+    return data.filter(
+      (r) =>
+        r.full_name.toLowerCase().includes(q) ||
+        (r.email ?? "").toLowerCase().includes(q) ||
+        r.organization_name.toLowerCase().includes(q) ||
+        r.role.toLowerCase().includes(q),
+    );
+  }, [data, search]);
+
+  const actAs = (row: DirectoryRow) => {
+    if (!user) {
+      toast.error("No active Super-Admin session detected");
+      return;
+    }
+    startImpersonation({
+      original_admin_id: user.id,
+      original_admin_name: (user.user_metadata?.full_name as string) ?? user.email ?? "Super-Admin",
+      original_admin_email: user.email ?? "",
+      current_user_id: row.user_id,
+      current_user_name: row.full_name,
+      current_user_email: row.email ?? "",
+      tenant_id: row.organization_id,
+      tenant_name: row.organization_name,
+      role: row.role,
+      started_at: new Date().toISOString(),
+    });
+    toast.success(`Now acting as ${row.full_name}`);
+    navigate({ to: "/dashboard" });
+  };
+
+  const roleBadge = (role: string) => {
+    const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
+    return (
+      <Badge variant={isAdmin ? "default" : "outline"} className="text-[10px] uppercase">
+        {isAdmin ? "Admin" : role === "client" ? "Client" : "Staff"}
+      </Badge>
+    );
+  };
+
+  return (
+    <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+      <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold">👥 Cross-Tenant Personnel Registry</h2>
+          <p className="text-sm text-muted-foreground">
+            Every user profile across every provider tenant — staff and clients.
+          </p>
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, email, agency, role…"
+            className="pl-9"
+          />
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+            <tr>
+              <th className="p-3 text-left">Full Name</th>
+              <th className="p-3 text-left">Agency</th>
+              <th className="p-3 text-left">Role</th>
+              <th className="p-3 text-left">Email</th>
+              <th className="p-3 text-left">Status</th>
+              <th className="p-3 text-right">System Operations</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && (
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Loading personnel…</td></tr>
+            )}
+            {!isLoading && !filtered.length && (
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No personnel match this search.</td></tr>
+            )}
+            {filtered.map((row) => (
+              <tr key={`${row.kind}-${row.user_id}`} className="border-t border-border hover:bg-muted/20">
+                <td className="p-3 font-medium">{row.full_name}</td>
+                <td className="p-3 text-muted-foreground">{row.organization_name}</td>
+                <td className="p-3">{roleBadge(row.role)}</td>
+                <td className="p-3 text-muted-foreground">{row.email ?? "—"}</td>
+                <td className="p-3">
+                  <Badge variant={row.account_status === "active" ? "default" : "outline"} className="text-[10px] uppercase">
+                    {row.account_status}
+                  </Badge>
+                </td>
+                <td className="p-3 text-right">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={row.kind === "client"}
+                    title={row.kind === "client" ? "Clients do not have a login session" : "Act as this user"}
+                    onClick={() => actAs(row)}
+                  >
+                    <Eye className="mr-1.5 h-3.5 w-3.5" /> 👁️ Act As User
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

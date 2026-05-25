@@ -1,0 +1,324 @@
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Activity,
+  AlertOctagon,
+  Loader2,
+  Stethoscope,
+} from "lucide-react";
+import { toast } from "sonner";
+
+type FormType = "incident_report" | "medical_summary" | "behavior_tracking";
+
+const CARDS: {
+  type: FormType;
+  title: string;
+  desc: string;
+  icon: typeof AlertOctagon;
+  accent: string;
+}[] = [
+  {
+    type: "incident_report",
+    title: "Critical / Non-Critical Incident Report",
+    desc: "Utah DHHS-style incident reporting with severity, response, and notifications.",
+    icon: AlertOctagon,
+    accent:
+      "border-rose-200 hover:border-rose-400 bg-rose-50/40 dark:bg-rose-950/10",
+  },
+  {
+    type: "medical_summary",
+    title: "Medical Appointment Log",
+    desc: "Doctor instructions, vitals, prescriptions, and follow-up tracking.",
+    icon: Stethoscope,
+    accent:
+      "border-blue-200 hover:border-blue-400 bg-blue-50/40 dark:bg-blue-950/10",
+  },
+  {
+    type: "behavior_tracking",
+    title: "Behavior / Seizure Data Sheet",
+    desc: "Antecedent, behavior, consequence + seizure type, duration, and recovery.",
+    icon: Activity,
+    accent:
+      "border-violet-200 hover:border-violet-400 bg-violet-50/40 dark:bg-violet-950/10",
+  },
+];
+
+export function FormsHubTab({
+  clientId,
+  clientName,
+}: {
+  clientId: string;
+  clientName: string;
+}) {
+  const [active, setActive] = useState<FormType | null>(null);
+
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {CARDS.map((c) => {
+          const Icon = c.icon;
+          return (
+            <button
+              key={c.type}
+              type="button"
+              onClick={() => setActive(c.type)}
+              className={`group flex min-h-[44px] flex-col rounded-2xl border-2 p-5 text-left shadow-sm transition hover:shadow-md ${c.accent}`}
+            >
+              <Icon
+                className="mb-3 h-7 w-7 text-foreground/70 transition group-hover:scale-110"
+                aria-hidden="true"
+              />
+              <p className="font-semibold leading-tight">{c.title}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{c.desc}</p>
+            </button>
+          );
+        })}
+      </div>
+      <FormDialog
+        type={active}
+        clientId={clientId}
+        clientName={clientName}
+        onClose={() => setActive(null)}
+      />
+    </>
+  );
+}
+
+function FormDialog({
+  type,
+  clientId,
+  clientName,
+  onClose,
+}: {
+  type: FormType | null;
+  clientId: string;
+  clientName: string;
+  onClose: () => void;
+}) {
+  const { user } = useAuth();
+  const { data: org } = useCurrentOrg();
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [title, setTitle] = useState("");
+  const [narrative, setNarrative] = useState("");
+  const [occurredAt, setOccurredAt] = useState(() =>
+    new Date().toISOString().slice(0, 16),
+  );
+  // type-specific
+  const [severity, setSeverity] = useState("low");
+  const [provider, setProvider] = useState("");
+  const [bp, setBp] = useState("");
+  const [pulse, setPulse] = useState("");
+  const [behaviorKind, setBehaviorKind] = useState("behavior");
+  const [duration, setDuration] = useState("");
+
+  useEffect(() => {
+    if (!type) return;
+    setTitle("");
+    setNarrative("");
+    setSeverity("low");
+    setProvider("");
+    setBp("");
+    setPulse("");
+    setBehaviorKind("behavior");
+    setDuration("");
+    setOccurredAt(new Date().toISOString().slice(0, 16));
+  }, [type]);
+
+  const headings: Record<FormType, string> = {
+    incident_report: "Critical / Non-Critical Incident Report",
+    medical_summary: "Medical Appointment Log",
+    behavior_tracking: "Behavior / Seizure Data Sheet",
+  };
+
+  async function submit() {
+    if (!user || !org || !type) return;
+    if (!title.trim() || !narrative.trim()) {
+      toast.error("Title and narrative are required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload: Record<string, unknown> = {};
+      if (type === "incident_report") payload.severity = severity;
+      if (type === "medical_summary") {
+        payload.provider = provider;
+        payload.bp = bp;
+        payload.pulse = pulse;
+      }
+      if (type === "behavior_tracking") {
+        payload.kind = behaviorKind;
+        payload.duration_minutes = parseFloat(duration) || 0;
+      }
+      const { error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from("submitted_forms" as any)
+        .insert({
+          organization_id: org.organization_id,
+          user_id: user.id, // active caregiver auto-attached
+          client_id: clientId, // active individual auto-attached
+          form_type: type,
+          title: title.trim(),
+          narrative: narrative.trim(),
+          payload,
+          occurred_at: new Date(occurredAt).toISOString(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+      if (error) throw error;
+      toast.success(`Submitted to ${clientName}'s record`);
+      qc.invalidateQueries({ queryKey: ["client-timeline"] });
+      onClose();
+    } catch (e) {
+      toast.error((e as Error).message || "Could not submit");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!type} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{type ? headings[type] : ""}</DialogTitle>
+          <DialogDescription>{clientName}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="title">Title / summary</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={200}
+              required
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="when">When did this occur?</Label>
+            <Input
+              id="when"
+              type="datetime-local"
+              value={occurredAt}
+              onChange={(e) => setOccurredAt(e.target.value)}
+            />
+          </div>
+
+          {type === "incident_report" && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="sev">Severity</Label>
+              <select
+                id="sev"
+                value={severity}
+                onChange={(e) => setSeverity(e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="low">Non-critical · Low</option>
+                <option value="moderate">Non-critical · Moderate</option>
+                <option value="high">Critical · High</option>
+                <option value="critical">Critical · Reportable</option>
+              </select>
+            </div>
+          )}
+
+          {type === "medical_summary" && (
+            <>
+              <div className="grid gap-1.5">
+                <Label htmlFor="prov">Provider / clinic</Label>
+                <Input
+                  id="prov"
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  maxLength={120}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="bp">Blood pressure</Label>
+                  <Input
+                    id="bp"
+                    value={bp}
+                    onChange={(e) => setBp(e.target.value)}
+                    placeholder="120/80"
+                    maxLength={20}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pulse">Pulse (bpm)</Label>
+                  <Input
+                    id="pulse"
+                    value={pulse}
+                    onChange={(e) => setPulse(e.target.value)}
+                    inputMode="numeric"
+                    maxLength={5}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {type === "behavior_tracking" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="kind">Kind</Label>
+                <select
+                  id="kind"
+                  value={behaviorKind}
+                  onChange={(e) => setBehaviorKind(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="behavior">Behavior</option>
+                  <option value="seizure">Seizure</option>
+                </select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="dur">Duration (min)</Label>
+                <Input
+                  id="dur"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  inputMode="decimal"
+                  maxLength={6}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="narr">Narrative / details</Label>
+            <Textarea
+              id="narr"
+              value={narrative}
+              onChange={(e) => setNarrative(e.target.value)}
+              rows={5}
+              maxLength={5000}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={busy}>
+            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Submit
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

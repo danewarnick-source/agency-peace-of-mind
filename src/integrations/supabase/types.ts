@@ -713,7 +713,6 @@ export type Database = {
           notes: string | null
           organization_id: string
           service_date: string
-          shift_id: string | null
           units: number
         }
         Insert: {
@@ -724,7 +723,6 @@ export type Database = {
           notes?: string | null
           organization_id: string
           service_date: string
-          shift_id?: string | null
           units: number
         }
         Update: {
@@ -735,7 +733,6 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           service_date?: string
-          shift_id?: string | null
           units?: number
         }
         Relationships: []
@@ -1628,178 +1625,6 @@ export type Database = {
           },
         ]
       }
-      scheduled_shifts: {
-        Row: {
-          client_id: string
-          created_at: string
-          created_by: string | null
-          ends_at: string
-          id: string
-          job_code: string | null
-          notes: string | null
-          organization_id: string
-          shift_type: string
-          staff_id: string
-          starts_at: string
-        }
-        Insert: {
-          client_id: string
-          created_at?: string
-          created_by?: string | null
-          ends_at: string
-          id?: string
-          job_code?: string | null
-          notes?: string | null
-          organization_id: string
-          shift_type?: string
-          staff_id: string
-          starts_at: string
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          created_by?: string | null
-          ends_at?: string
-          id?: string
-          job_code?: string | null
-          notes?: string | null
-          organization_id?: string
-          shift_type?: string
-          staff_id?: string
-          starts_at?: string
-        }
-        Relationships: []
-      }
-      shift_notes: {
-        Row: {
-          created_at: string
-          goals_addressed: string[]
-          id: string
-          narrative_summary: string | null
-          shift_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          goals_addressed?: string[]
-          id?: string
-          narrative_summary?: string | null
-          shift_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          goals_addressed?: string[]
-          id?: string
-          narrative_summary?: string | null
-          shift_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shift_notes_shift_id_fkey"
-            columns: ["shift_id"]
-            isOneToOne: true
-            referencedRelation: "shifts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shift_notes_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      shifts: {
-        Row: {
-          client_id: string | null
-          clock_in_bypass_reason: string | null
-          clock_in_lat: number | null
-          clock_in_long: number | null
-          clock_in_time: string | null
-          clock_out_bypass_reason: string | null
-          clock_out_lat: number | null
-          clock_out_long: number | null
-          clock_out_time: string | null
-          created_at: string
-          device_fingerprint: string | null
-          evv_verified: boolean
-          geofence_bypass_reason: string | null
-          id: string
-          job_code: string | null
-          organization_id: string
-          outside_geofence: boolean
-          status: Database["public"]["Enums"]["shift_status"]
-          user_id: string
-        }
-        Insert: {
-          client_id?: string | null
-          clock_in_bypass_reason?: string | null
-          clock_in_lat?: number | null
-          clock_in_long?: number | null
-          clock_in_time?: string | null
-          clock_out_bypass_reason?: string | null
-          clock_out_lat?: number | null
-          clock_out_long?: number | null
-          clock_out_time?: string | null
-          created_at?: string
-          device_fingerprint?: string | null
-          evv_verified?: boolean
-          geofence_bypass_reason?: string | null
-          id?: string
-          job_code?: string | null
-          organization_id: string
-          outside_geofence?: boolean
-          status?: Database["public"]["Enums"]["shift_status"]
-          user_id: string
-        }
-        Update: {
-          client_id?: string | null
-          clock_in_bypass_reason?: string | null
-          clock_in_lat?: number | null
-          clock_in_long?: number | null
-          clock_in_time?: string | null
-          clock_out_bypass_reason?: string | null
-          clock_out_lat?: number | null
-          clock_out_long?: number | null
-          clock_out_time?: string | null
-          created_at?: string
-          device_fingerprint?: string | null
-          evv_verified?: boolean
-          geofence_bypass_reason?: string | null
-          id?: string
-          job_code?: string | null
-          organization_id?: string
-          outside_geofence?: boolean
-          status?: Database["public"]["Enums"]["shift_status"]
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shifts_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shifts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shifts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       staff_assignments: {
         Row: {
           client_id: string
@@ -2386,13 +2211,6 @@ export type Database = {
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
       invitation_status: "pending" | "accepted" | "revoked"
-      shift_status:
-        | "pending"
-        | "approved"
-        | "rejected"
-        | "flagged"
-        | "pending_approval"
-        | "active"
       track_type:
         | "onboarding_30"
         | "certification_90"
@@ -2531,14 +2349,6 @@ export const Constants = {
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
       invitation_status: ["pending", "accepted", "revoked"],
-      shift_status: [
-        "pending",
-        "approved",
-        "rejected",
-        "flagged",
-        "pending_approval",
-        "active",
-      ],
       track_type: [
         "onboarding_30",
         "certification_90",

@@ -111,7 +111,7 @@ function toDtLocal(iso: string | null) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function TimesheetsPage() {
+export function TimesheetsPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
 

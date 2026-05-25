@@ -149,41 +149,26 @@ function SuperAdminConsole() {
               {!tenantsLoading && !tenants.length && (
                 <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No provider tenants yet. Click “Register tenant” to add one.</td></tr>
               )}
-              {tenants.map((t) => {
-                const enabled = FEATURE_KEYS.filter((f) => t[f.key]).length;
-                return (
-                  <tr key={t.id} className="border-t border-border">
-                    <td className="p-4 font-medium">{t.agency_name}</td>
-                    <td className="p-4 text-muted-foreground">{t.owner_email}</td>
-                    <td className="p-4">{t.client_tier_limit} clients</td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {FEATURE_KEYS.map((f) => (
-                          <Badge
-                            key={f.key}
-                            variant={t[f.key] ? "default" : "outline"}
-                            className="text-[10px]"
-                          >
-                            {t[f.key] ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3 opacity-50" />}
-                            {f.label}
-                          </Badge>
-                        ))}
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">{enabled}/4 enabled</p>
-                    </td>
-                    <td className="p-4">
-                      <Badge variant={t.is_active ? "default" : "outline"}>
-                        {t.is_active ? "Active" : "Suspended"}
-                      </Badge>
-                    </td>
-                    <td className="p-4 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setActiveTenant(t)}>
-                        <Settings2 className="mr-1.5 h-4 w-4" /> Manage
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {tenants.map((t) => (
+                <tr key={t.id} className="border-t border-border">
+                  <td className="p-4 font-medium">{t.agency_name}</td>
+                  <td className="p-4 text-muted-foreground">{t.owner_email}</td>
+                  <td className="p-4">{t.client_tier_limit} clients</td>
+                  <td className="p-4 text-xs text-muted-foreground">
+                    Dynamic registry — open Manage to view
+                  </td>
+                  <td className="p-4">
+                    <Badge variant={t.is_active ? "default" : "outline"}>
+                      {t.is_active ? "Active" : "Suspended"}
+                    </Badge>
+                  </td>
+                  <td className="p-4 text-right">
+                    <Button variant="ghost" size="sm" onClick={() => setActiveTenant(t)}>
+                      <Settings2 className="mr-1.5 h-4 w-4" /> Manage
+                    </Button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

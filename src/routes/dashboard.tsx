@@ -95,7 +95,17 @@ function DashboardLayout() {
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
   const effectiveView = isAdminCapable ? view : "staff";
-  const nav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
+  const baseNav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
+  const { data: disabled } = useDisabledFeatures();
+  const nav = baseNav.filter((item) => {
+    const key = NAV_FEATURE_KEY[item.to];
+    return !key || !disabled?.has(key);
+  });
+  const currentFeatureKey = routeToFeatureKey(pathname);
+  const isLocked = !!currentFeatureKey && !!disabled?.has(currentFeatureKey);
+  const lockedLabel = isLocked
+    ? baseNav.find((n) => NAV_FEATURE_KEY[n.to] === currentFeatureKey)?.label
+    : undefined;
   const signOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out");

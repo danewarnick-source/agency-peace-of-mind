@@ -25,14 +25,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
 import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
-import { Route as DashboardTimesheetsRouteImport } from './routes/dashboard.timesheets'
-import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timeclock'
 import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
-import { Route as DashboardSubmissionsRouteImport } from './routes/dashboard.submissions'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
-import { Route as DashboardSchedulerRouteImport } from './routes/dashboard.scheduler'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
 import { Route as DashboardProgramsAdminRouteImport } from './routes/dashboard.programs-admin'
@@ -41,7 +37,6 @@ import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.per
 import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
-import { Route as DashboardEvvComplianceRouteImport } from './routes/dashboard.evv-compliance'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardEmarRouteImport } from './routes/dashboard.emar'
 import { Route as DashboardDspdControlsRouteImport } from './routes/dashboard.dspd-controls'
@@ -49,7 +44,6 @@ import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
-import { Route as DashboardAuditPortalRouteImport } from './routes/dashboard.audit-portal'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
@@ -145,16 +139,6 @@ const DashboardTracksRoute = DashboardTracksRouteImport.update({
   path: '/tracks',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardTimesheetsRoute = DashboardTimesheetsRouteImport.update({
-  id: '/timesheets',
-  path: '/timesheets',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardTimeclockRoute = DashboardTimeclockRouteImport.update({
-  id: '/timeclock',
-  path: '/timeclock',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardTeamsRoute = DashboardTeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
@@ -170,19 +154,9 @@ const DashboardSuperAdminRoute = DashboardSuperAdminRouteImport.update({
   path: '/super-admin',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardSubmissionsRoute = DashboardSubmissionsRouteImport.update({
-  id: '/submissions',
-  path: '/submissions',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardSchedulerRoute = DashboardSchedulerRouteImport.update({
-  id: '/scheduler',
-  path: '/scheduler',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardRolesRoute = DashboardRolesRouteImport.update({
@@ -226,11 +200,6 @@ const DashboardExternalCertificationsRoute =
     path: '/external-certifications',
     getParentRoute: () => DashboardRoute,
   } as any)
-const DashboardEvvComplianceRoute = DashboardEvvComplianceRouteImport.update({
-  id: '/evv-compliance',
-  path: '/evv-compliance',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardEmployeesRoute = DashboardEmployeesRouteImport.update({
   id: '/employees',
   path: '/employees',
@@ -264,11 +233,6 @@ const DashboardCertificationsRoute = DashboardCertificationsRouteImport.update({
 const DashboardBillingRoute = DashboardBillingRouteImport.update({
   id: '/billing',
   path: '/billing',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardAuditPortalRoute = DashboardAuditPortalRouteImport.update({
-  id: '/audit-portal',
-  path: '/audit-portal',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardAssignmentsRoute = DashboardAssignmentsRouteImport.update({
@@ -365,7 +329,6 @@ export interface FileRoutesByFullPath {
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
-  '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
@@ -373,7 +336,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
-  '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -382,14 +344,10 @@ export interface FileRoutesByFullPath {
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
-  '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/submissions': typeof DashboardSubmissionsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
-  '/dashboard/timeclock': typeof DashboardTimeclockRoute
-  '/dashboard/timesheets': typeof DashboardTimesheetsRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -421,7 +379,6 @@ export interface FileRoutesByTo {
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
-  '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
@@ -429,7 +386,6 @@ export interface FileRoutesByTo {
   '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
-  '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -438,14 +394,10 @@ export interface FileRoutesByTo {
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
-  '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/submissions': typeof DashboardSubmissionsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
-  '/dashboard/timeclock': typeof DashboardTimeclockRoute
-  '/dashboard/timesheets': typeof DashboardTimesheetsRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -479,7 +431,6 @@ export interface FileRoutesById {
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
-  '/dashboard/audit-portal': typeof DashboardAuditPortalRoute
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
@@ -487,7 +438,6 @@ export interface FileRoutesById {
   '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
-  '/dashboard/evv-compliance': typeof DashboardEvvComplianceRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -496,14 +446,10 @@ export interface FileRoutesById {
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
-  '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/submissions': typeof DashboardSubmissionsRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
-  '/dashboard/timeclock': typeof DashboardTimeclockRoute
-  '/dashboard/timesheets': typeof DashboardTimesheetsRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -538,7 +484,6 @@ export interface FileRouteTypes {
     | '/unauthorized'
     | '/certificate/$code'
     | '/dashboard/assignments'
-    | '/dashboard/audit-portal'
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
@@ -546,7 +491,6 @@ export interface FileRouteTypes {
     | '/dashboard/dspd-controls'
     | '/dashboard/emar'
     | '/dashboard/employees'
-    | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
     | '/dashboard/pba-ledger'
@@ -555,14 +499,10 @@ export interface FileRouteTypes {
     | '/dashboard/programs-admin'
     | '/dashboard/reports'
     | '/dashboard/roles'
-    | '/dashboard/scheduler'
     | '/dashboard/settings'
-    | '/dashboard/submissions'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
-    | '/dashboard/timeclock'
-    | '/dashboard/timesheets'
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
@@ -594,7 +534,6 @@ export interface FileRouteTypes {
     | '/unauthorized'
     | '/certificate/$code'
     | '/dashboard/assignments'
-    | '/dashboard/audit-portal'
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
@@ -602,7 +541,6 @@ export interface FileRouteTypes {
     | '/dashboard/dspd-controls'
     | '/dashboard/emar'
     | '/dashboard/employees'
-    | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
     | '/dashboard/pba-ledger'
@@ -611,14 +549,10 @@ export interface FileRouteTypes {
     | '/dashboard/programs-admin'
     | '/dashboard/reports'
     | '/dashboard/roles'
-    | '/dashboard/scheduler'
     | '/dashboard/settings'
-    | '/dashboard/submissions'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
-    | '/dashboard/timeclock'
-    | '/dashboard/timesheets'
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard'
@@ -651,7 +585,6 @@ export interface FileRouteTypes {
     | '/unauthorized'
     | '/certificate/$code'
     | '/dashboard/assignments'
-    | '/dashboard/audit-portal'
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
@@ -659,7 +592,6 @@ export interface FileRouteTypes {
     | '/dashboard/dspd-controls'
     | '/dashboard/emar'
     | '/dashboard/employees'
-    | '/dashboard/evv-compliance'
     | '/dashboard/external-certifications'
     | '/dashboard/invitations'
     | '/dashboard/pba-ledger'
@@ -668,14 +600,10 @@ export interface FileRouteTypes {
     | '/dashboard/programs-admin'
     | '/dashboard/reports'
     | '/dashboard/roles'
-    | '/dashboard/scheduler'
     | '/dashboard/settings'
-    | '/dashboard/submissions'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
-    | '/dashboard/timeclock'
-    | '/dashboard/timesheets'
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
@@ -826,20 +754,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardTracksRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/timesheets': {
-      id: '/dashboard/timesheets'
-      path: '/timesheets'
-      fullPath: '/dashboard/timesheets'
-      preLoaderRoute: typeof DashboardTimesheetsRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/timeclock': {
-      id: '/dashboard/timeclock'
-      path: '/timeclock'
-      fullPath: '/dashboard/timeclock'
-      preLoaderRoute: typeof DashboardTimeclockRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/dashboard/teams': {
       id: '/dashboard/teams'
       path: '/teams'
@@ -861,25 +775,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSuperAdminRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/submissions': {
-      id: '/dashboard/submissions'
-      path: '/submissions'
-      fullPath: '/dashboard/submissions'
-      preLoaderRoute: typeof DashboardSubmissionsRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/dashboard/settings': {
       id: '/dashboard/settings'
       path: '/settings'
       fullPath: '/dashboard/settings'
       preLoaderRoute: typeof DashboardSettingsRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/scheduler': {
-      id: '/dashboard/scheduler'
-      path: '/scheduler'
-      fullPath: '/dashboard/scheduler'
-      preLoaderRoute: typeof DashboardSchedulerRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/roles': {
@@ -938,13 +838,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardExternalCertificationsRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/evv-compliance': {
-      id: '/dashboard/evv-compliance'
-      path: '/evv-compliance'
-      fullPath: '/dashboard/evv-compliance'
-      preLoaderRoute: typeof DashboardEvvComplianceRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/dashboard/employees': {
       id: '/dashboard/employees'
       path: '/employees'
@@ -992,13 +885,6 @@ declare module '@tanstack/react-router' {
       path: '/billing'
       fullPath: '/dashboard/billing'
       preLoaderRoute: typeof DashboardBillingRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/audit-portal': {
-      id: '/dashboard/audit-portal'
-      path: '/audit-portal'
-      fullPath: '/dashboard/audit-portal'
-      preLoaderRoute: typeof DashboardAuditPortalRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/assignments': {
@@ -1152,7 +1038,6 @@ const DashboardCoursesCourseIdRouteWithChildren =
 
 interface DashboardRouteChildren {
   DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
-  DashboardAuditPortalRoute: typeof DashboardAuditPortalRoute
   DashboardBillingRoute: typeof DashboardBillingRoute
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientsRoute: typeof DashboardClientsRoute
@@ -1160,7 +1045,6 @@ interface DashboardRouteChildren {
   DashboardDspdControlsRoute: typeof DashboardDspdControlsRoute
   DashboardEmarRoute: typeof DashboardEmarRoute
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
-  DashboardEvvComplianceRoute: typeof DashboardEvvComplianceRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
@@ -1169,14 +1053,10 @@ interface DashboardRouteChildren {
   DashboardProgramsAdminRoute: typeof DashboardProgramsAdminRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
-  DashboardSchedulerRoute: typeof DashboardSchedulerRoute
   DashboardSettingsRoute: typeof DashboardSettingsRouteWithChildren
-  DashboardSubmissionsRoute: typeof DashboardSubmissionsRoute
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
   DashboardTeamsRoute: typeof DashboardTeamsRoute
-  DashboardTimeclockRoute: typeof DashboardTimeclockRoute
-  DashboardTimesheetsRoute: typeof DashboardTimesheetsRoute
   DashboardTracksRoute: typeof DashboardTracksRouteWithChildren
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardAdminEmarAuditRoute: typeof DashboardAdminEmarAuditRoute
@@ -1190,7 +1070,6 @@ interface DashboardRouteChildren {
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAssignmentsRoute: DashboardAssignmentsRoute,
-  DashboardAuditPortalRoute: DashboardAuditPortalRoute,
   DashboardBillingRoute: DashboardBillingRoute,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientsRoute: DashboardClientsRoute,
@@ -1198,7 +1077,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardDspdControlsRoute: DashboardDspdControlsRoute,
   DashboardEmarRoute: DashboardEmarRoute,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
-  DashboardEvvComplianceRoute: DashboardEvvComplianceRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,
@@ -1207,14 +1085,10 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardProgramsAdminRoute: DashboardProgramsAdminRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,
-  DashboardSchedulerRoute: DashboardSchedulerRoute,
   DashboardSettingsRoute: DashboardSettingsRouteWithChildren,
-  DashboardSubmissionsRoute: DashboardSubmissionsRoute,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
   DashboardTeamsRoute: DashboardTeamsRoute,
-  DashboardTimeclockRoute: DashboardTimeclockRoute,
-  DashboardTimesheetsRoute: DashboardTimesheetsRoute,
   DashboardTracksRoute: DashboardTracksRouteWithChildren,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardAdminEmarAuditRoute: DashboardAdminEmarAuditRoute,
@@ -1251,3 +1125,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

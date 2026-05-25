@@ -33,11 +33,14 @@ const STAFF_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/compliance-desk", label: "🛡️ Compliance Desk", icon: ShieldCheck },
+  { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
+  { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: Calendar },
+  { to: "/dashboard/submissions", label: "Submissions", icon: FolderOpen },
   { to: "/dashboard/audit-portal", label: "Audit Portal", icon: ShieldAlert },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
   { to: "/dashboard/emar", label: "eMAR Pass", icon: Pill },
+  { to: "/dashboard/admin/emar-audit", label: "eMAR Audit", icon: ShieldAlert },
   { to: "/dashboard/pba-ledger", label: "PBA Trust Ledger", icon: Wallet },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },

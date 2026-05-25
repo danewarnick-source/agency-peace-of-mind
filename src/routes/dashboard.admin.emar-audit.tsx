@@ -36,7 +36,7 @@ const STATUS_COLOR: Record<Row["status"], string> = {
   missed: "bg-amber-100 text-amber-800",
 };
 
-export function AuditPage() {
+function AuditPage() {
   const { data: org } = useCurrentOrg();
   const [filter, setFilter] = useState<"all" | "refused" | "missed">("all");
   const [staffFilter, setStaffFilter] = useState("");

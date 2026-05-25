@@ -43,7 +43,7 @@ type TimelineItem = {
   payload: Record<string, unknown>;
 };
 
-export function SubmissionsPage() {
+function SubmissionsPage() {
   const { data: org } = useCurrentOrg();
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [q, setQ] = useState("");

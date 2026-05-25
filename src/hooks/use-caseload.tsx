@@ -42,25 +42,19 @@ export function useCaseload() {
         if (error) throw error;
         return (data ?? []) as unknown as CaseloadClient[];
       }
-      // Staff: restrict to assignments
-      const { data: rows, error } = await supabase
+      // Staff: caseload resolver handles direct assignments + group-home override
+      // (tenant-scoped via _org; RLS still applies to returned rows).
+      const { data, error } = await supabase.rpc(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("staff_assignments" as any)
-        .select("client_id")
-        .eq("organization_id", org!.organization_id)
-        .eq("staff_id", user!.id);
+        "clients_for_staff" as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _org: org!.organization_id, _staff: user!.id } as any,
+      );
       if (error) throw error;
-      const ids = ((rows ?? []) as unknown as { client_id: string }[]).map((r) => r.client_id);
-      if (!ids.length) return [];
-      const { data, error: e2 } = await supabase
-        .from("clients")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code, medicaid_id, physical_address" as any)
-        .eq("organization_id", org!.organization_id)
-        .in("id", ids)
-        .order("last_name");
-      if (e2) throw e2;
-      return (data ?? []) as unknown as CaseloadClient[];
+      const rows = (data ?? []) as unknown as CaseloadClient[];
+      // Sort by last name to match prior behavior
+      return [...rows].sort((a, b) => (a.last_name ?? "").localeCompare(b.last_name ?? ""));
+
     },
   });
 }

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings,
-  LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen, ShieldAlert, ShieldCheck, Wallet,
+  LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen, ShieldAlert, ShieldCheck, Wallet, Pill,
 } from "lucide-react";
 import { toast } from "sonner";
 

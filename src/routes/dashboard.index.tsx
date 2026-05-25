@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,14 +29,13 @@ function Overview() {
   const { data: org } = useCurrentOrg();
   const { view } = usePortalView();
   const qc = useQueryClient();
-  const navigate = useNavigate();
+  
   const isManager = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
   const showAdmin = isManager && view === "admin";
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  useEffect(() => {
-    if (org?.role === "super_admin") navigate({ to: "/dashboard/super-admin" });
-  }, [org?.role, navigate]);
+  // Note: super_admins can freely visit /dashboard to see the caseload view.
+  // The dedicated super-admin console is reachable from the sidebar.
 
   const { data: stats } = useQuery({
     enabled: !!org && showAdmin,

@@ -186,6 +186,18 @@ export function WorkShiftTab({
       return;
     }
     setBusy(true);
+
+    // Sandbox/local mock shift — no DB write, just clear the UI.
+    if (active.id.startsWith("mock-shift-")) {
+      toast.success("Sandbox shift completed locally.");
+      setActive(null);
+      setNarrative("");
+      setGoalScores({});
+      setTouched({});
+      setBusy(false);
+      return;
+    }
+
     try {
       // Persist narrative + goals as a shift_note FIRST so the DB trigger passes.
       const addressed = pcspGoals

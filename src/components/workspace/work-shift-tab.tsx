@@ -25,44 +25,28 @@ type ActiveShift = {
   job_code: string | null;
 };
 
-function createLocalMockShift(clientId: string, jobCode: string): ActiveShift {
-  return {
-    id: `mock-shift-${clientId}-${Date.now()}`,
-    clock_in_time: new Date().toISOString(),
-    job_code: jobCode || null,
-  };
-}
-
-function getClockInCoordinates(timeoutMs = 900) {
-  return new Promise<GeolocationCoordinates | null>((resolve) => {
+/**
+ * Wraps navigator.geolocation.getCurrentPosition in a Promise.
+ * Rejects (and alerts the user) if permission is denied or the request times out.
+ * EVV compliance requires a real coordinate — we never silently proceed without one.
+ */
+function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      resolve(null);
+      const msg = "Location access is required for EVV compliance. Please enable location services.";
+      if (typeof window !== "undefined") window.alert(msg);
+      reject(new Error("geolocation-unavailable"));
       return;
     }
-
-    let finished = false;
-    const finish = (coords: GeolocationCoordinates | null) => {
-      if (finished) return;
-      finished = true;
-      window.clearTimeout(timeoutId);
-      resolve(coords);
-    };
-
-    const timeoutId = window.setTimeout(() => finish(null), timeoutMs);
-
-    try {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => finish(pos.coords),
-        () => finish(null),
-        {
-          enableHighAccuracy: true,
-          timeout: Math.max(250, timeoutMs - 100),
-          maximumAge: 0,
-        },
-      );
-    } catch {
-      finish(null);
-    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {
+        const msg = "Location access is required for EVV compliance. Please enable location services.";
+        if (typeof window !== "undefined") window.alert(msg);
+        reject(new Error("geolocation-denied"));
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
   });
 }
 
@@ -72,18 +56,6 @@ function fmtElapsed(ms: number) {
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-}
-
-function resetShiftDraft(
-  setNarrative: (value: string) => void,
-  setGoalScores: (value: Record<string, number>) => void,
-  setTouched: (value: Record<string, boolean>) => void,
-  setShowAlert: (value: boolean) => void,
-) {
-  setNarrative("");
-  setGoalScores({});
-  setTouched({});
-  setShowAlert(false);
 }
 
 export function WorkShiftTab({
@@ -133,16 +105,23 @@ export function WorkShiftTab({
       });
   }, [user, clientId]);
 
-  // Live stopwatch
+  // Live stopwatch — driven by `active`. When `active` becomes null the
+  // interval is cleared automatically (no ghost clock).
   useEffect(() => {
     if (!active) {
-      if (tickRef.current) window.clearInterval(tickRef.current);
-      tickRef.current = null;
+      if (tickRef.current) {
+        window.clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+      setNow(Date.now());
       return;
     }
     tickRef.current = window.setInterval(() => setNow(Date.now()), 1000);
     return () => {
-      if (tickRef.current) window.clearInterval(tickRef.current);
+      if (tickRef.current) {
+        window.clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
     };
   }, [active]);
 
@@ -158,51 +137,51 @@ export function WorkShiftTab({
   const canClockOut = narrativeReady && goalsReady;
 
   async function clockIn() {
-    if (!user) return;
+    if (!user) {
+      toast.error("You must be signed in to clock in.");
+      return;
+    }
+    if (!org) {
+      toast.error("No active organization. Refresh and try again.");
+      return;
+    }
     if (authorizedCodes.length > 0 && !jobCode) {
       toast.error("Pick a job billing code first.");
       return;
     }
     setBusy(true);
 
-    const localMock = createLocalMockShift(clientId, jobCode);
-    const startLocalMock = () => {
-      setActive(localMock);
-      toast("🔄 Sandbox Mode: Shift started locally.");
-    };
+    let coords: { lat: number; lng: number };
+    try {
+      coords = await getCurrentLocation();
+    } catch {
+      setBusy(false); // EVV failure — alert already shown, do not proceed.
+      return;
+    }
 
     try {
-      const remoteShift = await Promise.race<ActiveShift>([
-        (async () => {
-          if (!org) throw new Error("no-org");
-          const coords = await getClockInCoordinates(900);
-          const { data, error } = await supabase
-            .from("shifts")
-            .insert({
-              organization_id: org.organization_id,
-              user_id: user.id,
-              client_id: clientId,
-              clock_in_time: new Date().toISOString(),
-              clock_in_lat: coords?.latitude ?? null,
-              clock_in_long: coords?.longitude ?? null,
-              job_code: jobCode || null,
-              status: "active",
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any)
-            .select("id, clock_in_time, job_code")
-            .single();
-          if (error) throw error;
-          return data as ActiveShift;
-        })(),
-        new Promise<ActiveShift>((_, reject) => {
-          window.setTimeout(() => reject(new Error("clock-in-timeout")), 1500);
-        }),
-      ]);
+      const { data, error } = await supabase
+        .from("shifts")
+        .insert({
+          organization_id: org.organization_id,
+          user_id: user.id,
+          client_id: clientId,
+          clock_in_time: new Date().toISOString(),
+          clock_in_lat: coords.lat,
+          clock_in_long: coords.lng,
+          job_code: jobCode || null,
+          status: "active",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
+        .select("id, clock_in_time, job_code")
+        .single();
 
-      setActive(remoteShift);
+      if (error) throw error;
+
+      setActive(data as ActiveShift);
       toast.success(`Clocked in with ${clientName}`);
-    } catch {
-      startLocalMock();
+    } catch (e) {
+      toast.error(`Clock in failed: ${(e as Error).message}`);
     } finally {
       setBusy(false);
     }
@@ -211,71 +190,71 @@ export function WorkShiftTab({
   async function clockOut() {
     if (!user || !org || !active) return;
 
-    // Frontend compliance guardrail.
     if (!canClockOut) {
       setShowAlert(true);
       return;
     }
     setBusy(true);
 
-    const finishLocalClockOut = (message: string) => {
-      toast.success(message);
-      setActive(null);
-      resetShiftDraft(setNarrative, setGoalScores, setTouched, setShowAlert);
-      qc.invalidateQueries({ queryKey: ["client-timeline"] });
-    };
-
-    // Sandbox/local mock shift — no DB write, just clear the UI.
-    if (active.id.startsWith("mock-shift-")) {
-      finishLocalClockOut("Sandbox shift completed locally.");
-      setBusy(false);
+    let coords: { lat: number; lng: number };
+    try {
+      coords = await getCurrentLocation();
+    } catch {
+      setBusy(false); // EVV failure — alert already shown, do not proceed.
       return;
     }
 
     try {
-      await Promise.race([
-        (async () => {
-          // Persist narrative + goals as a shift_note FIRST so the DB trigger passes.
-          const addressed = pcspGoals
-            .filter((g) => touched[g])
-            .map((g) => `${g} (${goalScores[g] ?? 0}%)`);
-          const { error: noteErr } = await supabase
-            .from("shift_notes")
-            .insert({
-              shift_id: active.id,
-              user_id: user.id,
-              narrative_summary: narrative.trim(),
-              goals_addressed: addressed,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any);
-          if (noteErr) throw noteErr;
+      // Persist narrative + goals as a shift_note FIRST so the DB trigger
+      // (enforce_shift_note_on_clockout) passes on the subsequent UPDATE.
+      const addressed = pcspGoals
+        .filter((g) => touched[g])
+        .map((g) => `${g} (${goalScores[g] ?? 0}%)`);
 
-          const coords = await getClockInCoordinates(900);
+      const { error: noteErr } = await supabase
+        .from("shift_notes")
+        .insert({
+          shift_id: active.id,
+          user_id: user.id,
+          narrative_summary: narrative.trim(),
+          goals_addressed: addressed,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+      if (noteErr) throw noteErr;
 
-          const { error: shiftErr } = await supabase
-            .from("shifts")
-            .update({
-              clock_out_time: new Date().toISOString(),
-              clock_out_lat: coords?.latitude ?? null,
-              clock_out_long: coords?.longitude ?? null,
-              status: "completed",
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any)
-            .eq("id", active.id);
-          if (shiftErr) throw shiftErr;
-        })(),
-        new Promise((_, reject) => {
-          window.setTimeout(() => reject(new Error("clock-out-timeout")), 1500);
-        }),
-      ]);
+      const { error: shiftErr } = await supabase
+        .from("shifts")
+        .update({
+          clock_out_time: new Date().toISOString(),
+          clock_out_lat: coords.lat,
+          clock_out_long: coords.lng,
+          status: "pending_approval",
+          evv_verified: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
+        .eq("id", active.id);
+      if (shiftErr) throw shiftErr;
 
-      finishLocalClockOut("Shift completed");
+      // CRUCIAL UI FIX — clear the running clock interval, reset timer
+      // state, clear the active shift, and drop the spinner. The interval
+      // effect above tears down on setActive(null), but we null tickRef
+      // here as well for safety.
+      if (tickRef.current) {
+        window.clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+      setActive(null);
+      setNow(Date.now());
+      setNarrative("");
+      setGoalScores({});
+      setTouched({});
+      setShowAlert(false);
+      qc.invalidateQueries({ queryKey: ["client-timeline"] });
+      qc.invalidateQueries({ queryKey: ["timesheets"] });
+
+      toast.success("Shift submitted for review");
     } catch (e) {
-      finishLocalClockOut(
-        (e as Error).message === "clock-out-timeout"
-          ? "🔄 Sandbox Mode: Shift completed locally."
-          : "🔄 Sandbox Mode: Shift completed locally.",
-      );
+      toast.error(`Clock out failed: ${(e as Error).message}`);
     } finally {
       setBusy(false);
     }

@@ -1725,6 +1725,7 @@ export type Database = {
           clock_out_time: string | null
           created_at: string
           device_fingerprint: string | null
+          evv_verified: boolean
           geofence_bypass_reason: string | null
           id: string
           job_code: string | null
@@ -1745,6 +1746,7 @@ export type Database = {
           clock_out_time?: string | null
           created_at?: string
           device_fingerprint?: string | null
+          evv_verified?: boolean
           geofence_bypass_reason?: string | null
           id?: string
           job_code?: string | null
@@ -1765,6 +1767,7 @@ export type Database = {
           clock_out_time?: string | null
           created_at?: string
           device_fingerprint?: string | null
+          evv_verified?: boolean
           geofence_bypass_reason?: string | null
           id?: string
           job_code?: string | null

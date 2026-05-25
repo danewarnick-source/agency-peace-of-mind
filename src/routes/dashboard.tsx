@@ -13,6 +13,7 @@ import {
   LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen, ShieldAlert, ShieldCheck, Wallet, Pill,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Care Academy" }] }),
@@ -85,7 +86,9 @@ function DashboardLayout() {
   };
 
   return (
-    <div className="grid min-h-screen md:grid-cols-[260px_1fr]">
+    <div className="flex min-h-screen flex-col">
+      <ImpersonationBanner />
+      <div className="grid flex-1 md:grid-cols-[260px_1fr]">
       <aside className="hidden flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-semibold">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
@@ -164,6 +167,7 @@ function DashboardLayout() {
         <main className="flex-1 bg-secondary/40 p-6 md:p-8">
           <Outlet />
         </main>
+      </div>
       </div>
     </div>
   );

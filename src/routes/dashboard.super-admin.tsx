@@ -227,20 +227,8 @@ function ManageTenantSheet({
               <p className="text-xs text-muted-foreground">Max concurrent clients this agency may serve.</p>
             </div>
 
-            <div className="space-y-3 rounded-lg border border-border p-4">
-              <p className="text-sm font-semibold">Feature flags</p>
-              {FEATURE_KEYS.map((f) => (
-                <div key={f.key} className="flex items-center justify-between gap-3">
-                  <Label htmlFor={f.key} className="text-sm font-normal">{f.label}</Label>
-                  <Switch
-                    id={f.key}
-                    checked={tenant[f.key]}
-                    disabled={busy}
-                    onCheckedChange={(checked) => onPatch({ [f.key]: checked } as Partial<Tenant>)}
-                  />
-                </div>
-              ))}
-            </div>
+            <TenantFeatureRegistry tenantId={tenant.id} />
+
 
             <div className="flex items-center justify-between rounded-lg border border-border p-4">
               <div>

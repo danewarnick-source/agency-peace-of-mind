@@ -19,22 +19,6 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
 });
 
-const NAV_FEATURE_KEY: Record<string, FeatureKey> = {
-  "/dashboard": "overview",
-  "/dashboard/timeclock": "time_clock",
-  "/dashboard/daily-logs": "daily_notes",
-  "/dashboard/scheduler": "scheduler",
-  "/dashboard/submissions": "submissions",
-  "/dashboard/audit-portal": "audit_portal",
-  "/dashboard/dspd-controls": "dspd_controls",
-  "/dashboard/emar": "emar_pass",
-  "/dashboard/admin/emar-audit": "emar_audit",
-  "/dashboard/pba-ledger": "pba_trust_ledger",
-  "/dashboard/employees": "employees",
-  "/dashboard/clients": "clients",
-  "/dashboard/teams": "teams_homes",
-};
-
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
 
 const STAFF_NAV: NavItem[] = [

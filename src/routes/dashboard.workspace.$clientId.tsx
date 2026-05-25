@@ -1,6 +1,31 @@
 import { useEffect, useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCaseload } from "@/hooks/use-caseload";
+import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
+
+const MOCK_WORKSPACE_CLIENTS: Record<string, CaseloadClient> = {
+  "mock-client-john-smith": {
+    id: "mock-client-john-smith",
+    first_name: "John",
+    last_name: "Smith",
+    home_latitude: null,
+    home_longitude: null,
+    pcsp_goals: ["Practice grocery budgeting", "Community outing 1x/week"],
+    job_code: ["T2017"],
+    medicaid_id: null,
+    physical_address: "Maple House — 412 N Main St",
+  },
+  "mock-client-jane-doe": {
+    id: "mock-client-jane-doe",
+    first_name: "Jane",
+    last_name: "Doe",
+    home_latitude: null,
+    home_longitude: null,
+    pcsp_goals: ["Morning hygiene routine", "Prepare lunch independently"],
+    job_code: ["S5125"],
+    medicaid_id: null,
+    physical_address: "Oak House — 88 Willow Ln",
+  },
+};
 import { Badge } from "@/components/ui/badge";
 import {
   Tabs,

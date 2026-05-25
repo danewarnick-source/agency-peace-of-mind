@@ -162,7 +162,7 @@ function DashboardLayout() {
           </Button>
         </header>
         <main className="flex-1 bg-secondary/40 p-6 md:p-8">
-          {isLocked ? <FeatureLocked featureName={lockedLabel} /> : <Outlet />}
+          <Outlet />
         </main>
       </div>
     </div>

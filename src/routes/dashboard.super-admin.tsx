@@ -200,7 +200,7 @@ function ManageTenantSheet({
 }) {
   return (
     <Sheet open={!!tenant} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-md">
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>⚙️ Manage Subscriptions & Permissions</SheetTitle>
           <SheetDescription>

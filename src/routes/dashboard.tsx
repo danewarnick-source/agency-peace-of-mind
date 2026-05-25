@@ -11,7 +11,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings,
-  LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen, ShieldAlert, ShieldCheck, Wallet, Pill, Menu,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, ShieldAlert, ShieldCheck, Wallet, Pill, Menu,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
@@ -25,20 +25,14 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?
 
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
-  { to: "/dashboard/scheduler", label: "My Schedule", icon: Calendar },
   { to: "/dashboard/emar", label: "eMAR Pass", icon: Pill },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/timesheets", label: "Timesheets", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
-  { to: "/dashboard/scheduler", label: "Scheduler", icon: Calendar },
-  { to: "/dashboard/submissions", label: "Submissions", icon: FolderOpen },
-  { to: "/dashboard/audit-portal", label: "Audit Portal", icon: ShieldAlert },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
   { to: "/dashboard/emar", label: "eMAR Pass", icon: Pill },
   { to: "/dashboard/admin/emar-audit", label: "eMAR Audit", icon: ShieldAlert },

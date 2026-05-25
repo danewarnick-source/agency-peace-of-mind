@@ -18,7 +18,7 @@ import {
 import { Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
-import { ClientChartAuditMatrix } from "@/components/client-chart-audit";
+
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
@@ -185,7 +185,7 @@ function ClientsPage() {
         </div>
       </div>
 
-      <ClientChartAuditMatrix />
+
 
 
 
@@ -195,7 +195,7 @@ function ClientsPage() {
         ) : !clients?.length ? (
           <div className="flex flex-col items-center gap-2 p-12 text-center text-sm text-muted-foreground">
             <Contact2 className="h-8 w-8 text-muted-foreground/60" />
-            <p>No clients yet. Add your first client to begin tracking shifts.</p>
+            <p>No clients yet. Add your first client to get started.</p>
           </div>
         ) : (
           <Table>

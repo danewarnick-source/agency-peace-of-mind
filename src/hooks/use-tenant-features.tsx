@@ -3,18 +3,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 
 export type FeatureKey =
-  | "overview" | "time_clock" | "daily_notes" | "scheduler" | "submissions"
-  | "audit_portal" | "dspd_controls" | "emar_pass" | "emar_audit"
+  | "overview" | "daily_notes"
+  | "dspd_controls" | "emar_pass" | "emar_audit"
   | "pba_trust_ledger" | "employees" | "clients" | "teams_homes" | "ai_assistance";
 
 /** Map a pathname to its governing feature key. Returns null when unguarded. */
 export function routeToFeatureKey(pathname: string): FeatureKey | null {
   if (pathname === "/dashboard") return "overview";
-  if (pathname.startsWith("/dashboard/timeclock")) return "time_clock";
   if (pathname.startsWith("/dashboard/daily-logs")) return "daily_notes";
-  if (pathname.startsWith("/dashboard/scheduler")) return "scheduler";
-  if (pathname.startsWith("/dashboard/submissions")) return "submissions";
-  if (pathname.startsWith("/dashboard/audit-portal")) return "audit_portal";
   if (pathname.startsWith("/dashboard/dspd-controls")) return "dspd_controls";
   if (pathname.startsWith("/dashboard/admin/emar-audit")) return "emar_audit";
   if (pathname.startsWith("/dashboard/emar")) return "emar_pass";

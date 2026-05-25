@@ -35,14 +35,12 @@ import {
 } from "@/components/ui/tabs";
 import {
   ArrowLeft,
-  ClipboardList,
   FileText,
   Pill,
   User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AboutTab } from "@/components/workspace/about-tab";
-import { WorkShiftTab } from "@/components/workspace/work-shift-tab";
 import { EmarTab } from "@/components/workspace/emar-tab";
 import { FormsHubTab } from "@/components/workspace/forms-hub-tab";
 import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
@@ -119,20 +117,13 @@ function ClientWorkspace() {
 
         <Tabs defaultValue="about" className="w-full">
           {/* Touch-friendly tab bar — mirrored across mobile and desktop */}
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-4">
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1">
             <TabsTrigger
               value="about"
               className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
             >
               <User className="h-4 w-4" />
               <span>About</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="shift"
-              className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
-            >
-              <ClipboardList className="h-4 w-4" />
-              <span>Work Shift</span>
             </TabsTrigger>
             <TabsTrigger
               value="emar"
@@ -152,15 +143,6 @@ function ClientWorkspace() {
 
           <TabsContent value="about" className="mt-5">
             <AboutTab client={client} />
-          </TabsContent>
-
-          <TabsContent value="shift" className="mt-5">
-            <WorkShiftTab
-              clientId={client.id}
-              clientName={`${client.first_name} ${client.last_name}`}
-              pcspGoals={client.pcsp_goals ?? []}
-              authorizedCodes={codes}
-            />
           </TabsContent>
 
           <TabsContent value="emar" className="mt-5">

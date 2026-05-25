@@ -22,16 +22,19 @@ export type CaseloadClient = {
  */
 export function useCaseload() {
   const { user } = useAuth();
-  const { data: org } = useCurrentOrg();
+  const { data: org, isLoading: orgLoading } = useCurrentOrg();
   const { view } = usePortalView();
   const role = org?.role;
   const isManagerial = role === "admin" || role === "manager" || role === "super_admin";
-  const canSeeWholeOrgCaseload = isManagerial && view === "admin";
+  const shouldForceStaffCaseload = role === "super_admin";
+  const canSeeWholeOrgCaseload = isManagerial && view === "admin" && !shouldForceStaffCaseload;
 
   return useQuery({
     enabled: !!user && !!org,
-    queryKey: ["caseload", org?.organization_id, user?.id, canSeeWholeOrgCaseload],
+    queryKey: ["caseload", org?.organization_id, user?.id, canSeeWholeOrgCaseload, shouldForceStaffCaseload],
     queryFn: async (): Promise<CaseloadClient[]> => {
+      if (orgLoading || !org || !user) return [];
+
       if (canSeeWholeOrgCaseload) {
         const { data, error } = await supabase
           .from("clients")

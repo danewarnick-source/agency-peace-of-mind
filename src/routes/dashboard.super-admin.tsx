@@ -23,12 +23,6 @@ type Tenant = {
   created_at: string;
 };
 
-type SystemFeature = {
-  feature_key: string;
-  feature_name: string;
-  category: string;
-  sort_order: number;
-};
 
 export const Route = createFileRoute("/dashboard/super-admin")({
   component: () => (

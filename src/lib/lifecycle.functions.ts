@@ -18,32 +18,8 @@ async function assertManager(actorId: string, orgId: string) {
   }
 }
 
-async function staffActiveBlockers(staffId: string, orgId: string) {
-  // Open shift (clocked in = no clock_out_time yet)
-  const { data: openShifts } = await supabaseAdmin
-    .from("shifts")
-    .select("id")
-    .eq("organization_id", orgId)
-    .eq("user_id", staffId)
-    .is("clock_out_time", null)
-    .limit(1);
-  if (openShifts && openShifts.length) {
-    return "This staff member is currently clocked in. Please clock them out before removing them from the platform.";
-  }
-  // Scheduled shifts in next 24h
-  const now = new Date();
-  const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const { data: upcoming } = await supabaseAdmin
-    .from("scheduled_shifts")
-    .select("id")
-    .eq("organization_id", orgId)
-    .eq("staff_id", staffId)
-    .gte("starts_at", now.toISOString())
-    .lte("starts_at", horizon.toISOString())
-    .limit(1);
-  if (upcoming && upcoming.length) {
-    return "Action Blocked: This staff member has active operational assignments. Please reassign their scheduled shifts before removing them from the platform.";
-  }
+async function staffActiveBlockers(_staffId: string, _orgId: string) {
+  // Time-clock module removed; no active-shift blockers to check.
   return null;
 }
 
@@ -148,8 +124,7 @@ export const deleteEntity = createServerFn({ method: "POST" })
 
       // Wipe dependent rows then the client itself.
       await supabaseAdmin.from("daily_logs").delete().eq("client_id", data.id);
-      await supabaseAdmin.from("shifts").delete().eq("client_id", data.id);
-      await supabaseAdmin.from("scheduled_shifts").delete().eq("client_id", data.id);
+
       await supabaseAdmin.from("pba_transactions").delete()
         .in("account_id",
           (await supabaseAdmin.from("pba_accounts").select("id").eq("client_id", data.id)).data?.map(r => r.id) ?? ["00000000-0000-0000-0000-000000000000"]

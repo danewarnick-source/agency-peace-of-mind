@@ -13,6 +13,7 @@ import {
   LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen, ShieldAlert, ShieldCheck, Wallet, Pill,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Care Academy" }] }),

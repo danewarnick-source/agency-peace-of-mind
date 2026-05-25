@@ -1,0 +1,2 @@
+DELETE FROM public.tenant_features WHERE tenant_id IN (SELECT id FROM public.provider_tenants WHERE agency_name <> 'True North Supports LLC (REAL)');
+DELETE FROM public.provider_tenants WHERE agency_name <> 'True North Supports LLC (REAL)';

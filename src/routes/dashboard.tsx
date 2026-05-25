@@ -13,8 +13,6 @@ import {
   LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen, ShieldAlert, ShieldCheck, Wallet, Pill,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useDisabledFeatures, routeToFeatureKey, type FeatureKey } from "@/hooks/use-tenant-features";
-import { FeatureLocked } from "@/components/feature-locked";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Care Academy" }] }),

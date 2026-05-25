@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RequirePermission } from "@/components/rbac-guard";
-import { Building2, Users, BookOpen, Award, Settings2, Plus, CheckCircle2, XCircle } from "lucide-react";
+import { Building2, Users, BookOpen, Award, Settings2, Plus } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 
 type Tenant = {
@@ -19,19 +20,15 @@ type Tenant = {
   owner_email: string;
   client_tier_limit: number;
   is_active: boolean;
-  feature_quickbooks_sync: boolean;
-  feature_pba_bank_feed: boolean;
-  feature_ai_receipt_ocr: boolean;
-  feature_lms_training: boolean;
   created_at: string;
 };
 
-const FEATURE_KEYS = [
-  { key: "feature_quickbooks_sync", label: "QuickBooks Sync" },
-  { key: "feature_pba_bank_feed", label: "PBA Bank Feed" },
-  { key: "feature_ai_receipt_ocr", label: "AI Receipt OCR" },
-  { key: "feature_lms_training", label: "LMS Training" },
-] as const;
+type SystemFeature = {
+  feature_key: string;
+  feature_name: string;
+  category: string;
+  sort_order: number;
+};
 
 export const Route = createFileRoute("/dashboard/super-admin")({
   component: () => (
@@ -152,41 +149,26 @@ function SuperAdminConsole() {
               {!tenantsLoading && !tenants.length && (
                 <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No provider tenants yet. Click “Register tenant” to add one.</td></tr>
               )}
-              {tenants.map((t) => {
-                const enabled = FEATURE_KEYS.filter((f) => t[f.key]).length;
-                return (
-                  <tr key={t.id} className="border-t border-border">
-                    <td className="p-4 font-medium">{t.agency_name}</td>
-                    <td className="p-4 text-muted-foreground">{t.owner_email}</td>
-                    <td className="p-4">{t.client_tier_limit} clients</td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {FEATURE_KEYS.map((f) => (
-                          <Badge
-                            key={f.key}
-                            variant={t[f.key] ? "default" : "outline"}
-                            className="text-[10px]"
-                          >
-                            {t[f.key] ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3 opacity-50" />}
-                            {f.label}
-                          </Badge>
-                        ))}
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">{enabled}/4 enabled</p>
-                    </td>
-                    <td className="p-4">
-                      <Badge variant={t.is_active ? "default" : "outline"}>
-                        {t.is_active ? "Active" : "Suspended"}
-                      </Badge>
-                    </td>
-                    <td className="p-4 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setActiveTenant(t)}>
-                        <Settings2 className="mr-1.5 h-4 w-4" /> Manage
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {tenants.map((t) => (
+                <tr key={t.id} className="border-t border-border">
+                  <td className="p-4 font-medium">{t.agency_name}</td>
+                  <td className="p-4 text-muted-foreground">{t.owner_email}</td>
+                  <td className="p-4">{t.client_tier_limit} clients</td>
+                  <td className="p-4 text-xs text-muted-foreground">
+                    Dynamic registry — open Manage to view
+                  </td>
+                  <td className="p-4">
+                    <Badge variant={t.is_active ? "default" : "outline"}>
+                      {t.is_active ? "Active" : "Suspended"}
+                    </Badge>
+                  </td>
+                  <td className="p-4 text-right">
+                    <Button variant="ghost" size="sm" onClick={() => setActiveTenant(t)}>
+                      <Settings2 className="mr-1.5 h-4 w-4" /> Manage
+                    </Button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -218,7 +200,7 @@ function ManageTenantSheet({
 }) {
   return (
     <Sheet open={!!tenant} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-md">
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>⚙️ Manage Subscriptions & Permissions</SheetTitle>
           <SheetDescription>
@@ -245,20 +227,8 @@ function ManageTenantSheet({
               <p className="text-xs text-muted-foreground">Max concurrent clients this agency may serve.</p>
             </div>
 
-            <div className="space-y-3 rounded-lg border border-border p-4">
-              <p className="text-sm font-semibold">Feature flags</p>
-              {FEATURE_KEYS.map((f) => (
-                <div key={f.key} className="flex items-center justify-between gap-3">
-                  <Label htmlFor={f.key} className="text-sm font-normal">{f.label}</Label>
-                  <Switch
-                    id={f.key}
-                    checked={tenant[f.key]}
-                    disabled={busy}
-                    onCheckedChange={(checked) => onPatch({ [f.key]: checked } as Partial<Tenant>)}
-                  />
-                </div>
-              ))}
-            </div>
+            <TenantFeatureRegistry tenantId={tenant.id} />
+
 
             <div className="flex items-center justify-between rounded-lg border border-border p-4">
               <div>
@@ -331,3 +301,99 @@ function CreateTenantDialog({
     </Dialog>
   );
 }
+
+function TenantFeatureRegistry({ tenantId }: { tenantId: string }) {
+  const qc = useQueryClient();
+
+  const { data: features = [] } = useQuery({
+    queryKey: ["system-features"],
+    queryFn: async (): Promise<SystemFeature[]> => {
+      const { data, error } = await supabase
+        .from("system_features")
+        .select("feature_key, feature_name, category, sort_order")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: flags = {} } = useQuery({
+    queryKey: ["tenant-features", tenantId],
+    queryFn: async (): Promise<Record<string, boolean>> => {
+      const { data, error } = await supabase
+        .from("tenant_features")
+        .select("feature_key, is_enabled")
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      const out: Record<string, boolean> = {};
+      for (const row of data ?? []) out[row.feature_key] = row.is_enabled;
+      return out;
+    },
+  });
+
+  const toggle = useMutation({
+    mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
+      const { error } = await supabase
+        .from("tenant_features")
+        .upsert(
+          { tenant_id: tenantId, feature_key: key, is_enabled: enabled, updated_at: new Date().toISOString() },
+          { onConflict: "tenant_id,feature_key" },
+        );
+      if (error) throw error;
+    },
+    onMutate: async ({ key, enabled }) => {
+      await qc.cancelQueries({ queryKey: ["tenant-features", tenantId] });
+      const prev = qc.getQueryData<Record<string, boolean>>(["tenant-features", tenantId]);
+      qc.setQueryData<Record<string, boolean>>(["tenant-features", tenantId], { ...(prev ?? {}), [key]: enabled });
+      return { prev };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["tenant-features", tenantId], ctx.prev);
+      toast.error(e.message);
+    },
+    onSuccess: () => toast.success("Feature updated"),
+  });
+
+  const grouped = features.reduce<Record<string, SystemFeature[]>>((acc, f) => {
+    (acc[f.category] ??= []).push(f);
+    return acc;
+  }, {});
+
+  return (
+    <div className="rounded-lg border border-border">
+      <div className="flex items-center justify-between border-b border-border p-4">
+        <p className="text-sm font-semibold">🎛️ Feature Registry</p>
+        <Badge variant="outline" className="text-[10px]">{features.length} modules</Badge>
+      </div>
+      <ScrollArea className="h-[420px]">
+        <div className="space-y-5 p-4">
+          {Object.entries(grouped).map(([category, items]) => (
+            <div key={category} className="space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{category}</p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-card">
+                {items.map((f) => {
+                  const enabled = flags[f.feature_key] ?? true;
+                  return (
+                    <div key={f.feature_key} className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2.5 last:border-b-0">
+                      <div className="min-w-0">
+                        <Label htmlFor={`feat-${f.feature_key}`} className="text-sm font-medium">{f.feature_name}</Label>
+                        <p className="truncate text-[11px] text-muted-foreground">{f.feature_key}</p>
+                      </div>
+                      <Switch
+                        id={`feat-${f.feature_key}`}
+                        checked={enabled}
+                        disabled={toggle.isPending}
+                        onCheckedChange={(checked) => toggle.mutate({ key: f.feature_key, enabled: checked })}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+

@@ -1803,6 +1803,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_group_home_assignment: boolean
           organization_id: string
           staff_id: string
         }
@@ -1811,6 +1812,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_group_home_assignment?: boolean
           organization_id: string
           staff_id: string
         }
@@ -1819,6 +1821,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_group_home_assignment?: boolean
           organization_id?: string
           staff_id?: string
         }
@@ -2297,10 +2300,67 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      employee_client_assignments: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          created_by: string | null
+          employee_id: string | null
+          id: string | null
+          is_group_home_assignment: boolean | null
+          organization_id: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string | null
+          is_group_home_assignment?: boolean | null
+          organization_id?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string | null
+          is_group_home_assignment?: boolean | null
+          organization_id?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: string }
+      clients_for_staff: {
+        Args: { _org: string; _staff: string }
+        Returns: {
+          account_status: string
+          created_at: string
+          first_name: string
+          home_latitude: number | null
+          home_longitude: number | null
+          id: string
+          job_code: string[]
+          last_name: string
+          medicaid_id: string | null
+          organization_id: string
+          pcsp_goals: string[]
+          phone_number: string | null
+          physical_address: string | null
+          team_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "clients"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       generate_pba_audit_sample: { Args: { _org: string }; Returns: number }
       has_org_role: {
         Args: {

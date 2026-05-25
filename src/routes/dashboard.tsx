@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -7,10 +7,11 @@ import { usePortalView } from "@/hooks/use-portal-view";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings,
-  LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen, ShieldAlert, ShieldCheck, Wallet, Pill,
+  LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen, ShieldAlert, ShieldCheck, Wallet, Pill, Menu,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";

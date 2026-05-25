@@ -189,56 +189,78 @@ export function WorkShiftTab({
 
   async function clockOut() {
     if (!user || !org || !active) return;
-
     if (!canClockOut) {
       setShowAlert(true);
       return;
     }
     setBusy(true);
 
-    let coords: { lat: number; lng: number };
+    // Clock OUT: location is best-effort. If GPS fails, we still let the
+    // user out — never trap them inside a building with a stuck shift.
+    let coords: { lat: number; lng: number } | null = null;
+    let geoFailed = false;
     try {
-      coords = await getCurrentLocation();
+      coords = await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+        if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+          reject(new Error("geolocation-unavailable"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => reject(new Error("geolocation-denied")),
+          { enableHighAccuracy: true, timeout: 10000 },
+        );
+      });
     } catch {
-      setBusy(false); // EVV failure — alert already shown, do not proceed.
-      return;
+      geoFailed = true;
+      coords = null;
     }
 
-    try {
-      // Persist narrative + goals as a shift_note FIRST so the DB trigger
-      // (enforce_shift_note_on_clockout) passes on the subsequent UPDATE.
-      const addressed = pcspGoals
-        .filter((g) => touched[g])
-        .map((g) => `${g} (${goalScores[g] ?? 0}%)`);
+    const addressed = pcspGoals
+      .filter((g) => touched[g])
+      .map((g) => `${g} (${goalScores[g] ?? 0}%)`);
 
+    const finalNarrative = geoFailed
+      ? `${narrative.trim()}\n\n[System Note: Geolocation failed on clock out]`
+      : narrative.trim();
+
+    try {
+      // 1) Insert the shift_note FIRST (trigger requires it before UPDATE).
       const { error: noteErr } = await supabase
         .from("shift_notes")
         .insert({
           shift_id: active.id,
           user_id: user.id,
-          narrative_summary: narrative.trim(),
+          narrative_summary: finalNarrative,
           goals_addressed: addressed,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
       if (noteErr) throw noteErr;
 
+      // 2) Close the shift. GPS values are null if geo failed.
       const { error: shiftErr } = await supabase
         .from("shifts")
         .update({
           clock_out_time: new Date().toISOString(),
-          clock_out_lat: coords.lat,
-          clock_out_long: coords.lng,
+          clock_out_lat: coords?.lat ?? null,
+          clock_out_long: coords?.lng ?? null,
           status: "pending_approval",
-          evv_verified: true,
+          evv_verified: !geoFailed,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any)
-        .eq("id", active.id);
+        .eq("id", active.id)
+        .eq("user_id", user.id);
       if (shiftErr) throw shiftErr;
 
-      // CRUCIAL UI FIX — clear the running clock interval, reset timer
-      // state, clear the active shift, and drop the spinner. The interval
-      // effect above tears down on setActive(null), but we null tickRef
-      // here as well for safety.
+      toast.success(
+        geoFailed
+          ? "Clocked out — GPS unavailable, flagged for admin review."
+          : "Shift submitted for review",
+      );
+    } catch (e) {
+      toast.error(`Clock out failed: ${(e as Error).message}`);
+    } finally {
+      // ABSOLUTE reset — runs even if every mutation above threw.
       if (tickRef.current) {
         window.clearInterval(tickRef.current);
         tickRef.current = null;
@@ -249,14 +271,9 @@ export function WorkShiftTab({
       setGoalScores({});
       setTouched({});
       setShowAlert(false);
+      setBusy(false);
       qc.invalidateQueries({ queryKey: ["client-timeline"] });
       qc.invalidateQueries({ queryKey: ["timesheets"] });
-
-      toast.success("Shift submitted for review");
-    } catch (e) {
-      toast.error(`Clock out failed: ${(e as Error).message}`);
-    } finally {
-      setBusy(false);
     }
   }
 

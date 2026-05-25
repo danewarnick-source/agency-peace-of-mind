@@ -34,7 +34,7 @@ const STAFF_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
+  { to: "/dashboard/timesheets", label: "Timesheets", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: Calendar },
   { to: "/dashboard/submissions", label: "Submissions", icon: FolderOpen },

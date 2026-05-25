@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RequirePermission } from "@/components/rbac-guard";
-import { Building2, Users, BookOpen, Award, Settings2, Plus, CheckCircle2, XCircle } from "lucide-react";
+import { Building2, Users, BookOpen, Award, Settings2, Plus } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 
 type Tenant = {
@@ -19,19 +20,15 @@ type Tenant = {
   owner_email: string;
   client_tier_limit: number;
   is_active: boolean;
-  feature_quickbooks_sync: boolean;
-  feature_pba_bank_feed: boolean;
-  feature_ai_receipt_ocr: boolean;
-  feature_lms_training: boolean;
   created_at: string;
 };
 
-const FEATURE_KEYS = [
-  { key: "feature_quickbooks_sync", label: "QuickBooks Sync" },
-  { key: "feature_pba_bank_feed", label: "PBA Bank Feed" },
-  { key: "feature_ai_receipt_ocr", label: "AI Receipt OCR" },
-  { key: "feature_lms_training", label: "LMS Training" },
-] as const;
+type SystemFeature = {
+  feature_key: string;
+  feature_name: string;
+  category: string;
+  sort_order: number;
+};
 
 export const Route = createFileRoute("/dashboard/super-admin")({
   component: () => (

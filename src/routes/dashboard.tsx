@@ -86,7 +86,9 @@ function DashboardLayout() {
   };
 
   return (
-    <div className="grid min-h-screen md:grid-cols-[260px_1fr]">
+    <div className="flex min-h-screen flex-col">
+      <ImpersonationBanner />
+      <div className="grid flex-1 md:grid-cols-[260px_1fr]">
       <aside className="hidden flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-semibold">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">

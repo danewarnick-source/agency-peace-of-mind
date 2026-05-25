@@ -159,48 +159,37 @@ export function WorkShiftTab({
       toast("🔄 Sandbox Mode: Shift started locally.");
     };
 
-    let settled = false;
-    let insertAbortTimer: number | null = null;
-    const fallback = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      startLocalMock();
-      setBusy(false);
-    }, 1500);
-
     try {
-      if (!org) throw new Error("no-org");
-      const coords = await getClockInCoordinates(900);
-      const controller = new AbortController();
-      insertAbortTimer = window.setTimeout(() => controller.abort(), 1100);
-      const { data, error } = await supabase
-        .from("shifts")
-        .insert({
-          organization_id: org.organization_id,
-          user_id: user.id,
-          client_id: clientId,
-          clock_in_time: new Date().toISOString(),
-          clock_in_lat: coords?.latitude ?? null,
-          clock_in_long: coords?.longitude ?? null,
-          job_code: jobCode || null,
-          status: "active",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any)
-        .abortSignal(controller.signal)
-        .select("id, clock_in_time, job_code")
-        .single();
-      if (insertAbortTimer) window.clearTimeout(insertAbortTimer);
-      if (error) throw error;
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(fallback);
-      setActive(data as ActiveShift);
+      const remoteShift = await Promise.race<ActiveShift>([
+        (async () => {
+          if (!org) throw new Error("no-org");
+          const coords = await getClockInCoordinates(900);
+          const { data, error } = await supabase
+            .from("shifts")
+            .insert({
+              organization_id: org.organization_id,
+              user_id: user.id,
+              client_id: clientId,
+              clock_in_time: new Date().toISOString(),
+              clock_in_lat: coords?.latitude ?? null,
+              clock_in_long: coords?.longitude ?? null,
+              job_code: jobCode || null,
+              status: "active",
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any)
+            .select("id, clock_in_time, job_code")
+            .single();
+          if (error) throw error;
+          return data as ActiveShift;
+        })(),
+        new Promise<ActiveShift>((_, reject) => {
+          window.setTimeout(() => reject(new Error("clock-in-timeout")), 1500);
+        }),
+      ]);
+
+      setActive(remoteShift);
       toast.success(`Clocked in with ${clientName}`);
     } catch {
-      if (insertAbortTimer) window.clearTimeout(insertAbortTimer);
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(fallback);
       startLocalMock();
     } finally {
       setBusy(false);

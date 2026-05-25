@@ -56,6 +56,7 @@ function DashboardLayout() {
   const { view, setView } = usePortalView();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/login" });
@@ -86,7 +87,6 @@ function DashboardLayout() {
     navigate({ to: "/" });
   };
 
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   const SidebarBody = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>

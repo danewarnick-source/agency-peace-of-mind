@@ -13,29 +13,11 @@ import {
   LogOut, Users, Building2, Contact2, Clock, ClipboardCheck, Calendar, FolderOpen, ShieldAlert, ShieldCheck, Wallet, Pill,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useDisabledFeatures, routeToFeatureKey, type FeatureKey } from "@/hooks/use-tenant-features";
-import { FeatureLocked } from "@/components/feature-locked";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Care Academy" }] }),
   component: DashboardLayout,
 });
-
-const NAV_FEATURE_KEY: Record<string, FeatureKey> = {
-  "/dashboard": "overview",
-  "/dashboard/timeclock": "time_clock",
-  "/dashboard/daily-logs": "daily_notes",
-  "/dashboard/scheduler": "scheduler",
-  "/dashboard/submissions": "submissions",
-  "/dashboard/audit-portal": "audit_portal",
-  "/dashboard/dspd-controls": "dspd_controls",
-  "/dashboard/emar": "emar_pass",
-  "/dashboard/admin/emar-audit": "emar_audit",
-  "/dashboard/pba-ledger": "pba_trust_ledger",
-  "/dashboard/employees": "employees",
-  "/dashboard/clients": "clients",
-  "/dashboard/teams": "teams_homes",
-};
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
 
@@ -95,17 +77,7 @@ function DashboardLayout() {
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
   const effectiveView = isAdminCapable ? view : "staff";
-  const baseNav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
-  const { data: disabled } = useDisabledFeatures();
-  const nav = baseNav.filter((item) => {
-    const key = NAV_FEATURE_KEY[item.to];
-    return !key || !disabled?.has(key);
-  });
-  const currentFeatureKey = routeToFeatureKey(pathname);
-  const isLocked = !!currentFeatureKey && !!disabled?.has(currentFeatureKey);
-  const lockedLabel = isLocked
-    ? baseNav.find((n) => NAV_FEATURE_KEY[n.to] === currentFeatureKey)?.label
-    : undefined;
+  const nav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
   const signOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out");
@@ -190,7 +162,7 @@ function DashboardLayout() {
           </Button>
         </header>
         <main className="flex-1 bg-secondary/40 p-6 md:p-8">
-          {isLocked ? <FeatureLocked featureName={lockedLabel} /> : <Outlet />}
+          <Outlet />
         </main>
       </div>
     </div>

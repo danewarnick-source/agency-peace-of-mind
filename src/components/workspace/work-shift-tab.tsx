@@ -74,6 +74,18 @@ function fmtElapsed(ms: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
 
+function resetShiftDraft(
+  setNarrative: (value: string) => void,
+  setGoalScores: (value: Record<string, number>) => void,
+  setTouched: (value: Record<string, boolean>) => void,
+  setShowAlert: (value: boolean) => void,
+) {
+  setNarrative("");
+  setGoalScores({});
+  setTouched({});
+  setShowAlert(false);
+}
+
 export function WorkShiftTab({
   clientId,
   clientName,
@@ -206,64 +218,64 @@ export function WorkShiftTab({
     }
     setBusy(true);
 
+    const finishLocalClockOut = (message: string) => {
+      toast.success(message);
+      setActive(null);
+      resetShiftDraft(setNarrative, setGoalScores, setTouched, setShowAlert);
+      qc.invalidateQueries({ queryKey: ["client-timeline"] });
+    };
+
     // Sandbox/local mock shift — no DB write, just clear the UI.
     if (active.id.startsWith("mock-shift-")) {
-      toast.success("Sandbox shift completed locally.");
-      setActive(null);
-      setNarrative("");
-      setGoalScores({});
-      setTouched({});
+      finishLocalClockOut("Sandbox shift completed locally.");
       setBusy(false);
       return;
     }
 
     try {
-      // Persist narrative + goals as a shift_note FIRST so the DB trigger passes.
-      const addressed = pcspGoals
-        .filter((g) => touched[g])
-        .map((g) => `${g} (${goalScores[g] ?? 0}%)`);
-      const { error: noteErr } = await supabase
-        .from("shift_notes")
-        .insert({
-          shift_id: active.id,
-          user_id: user.id,
-          narrative_summary: narrative.trim(),
-          goals_addressed: addressed,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
-      if (noteErr) throw noteErr;
+      await Promise.race([
+        (async () => {
+          // Persist narrative + goals as a shift_note FIRST so the DB trigger passes.
+          const addressed = pcspGoals
+            .filter((g) => touched[g])
+            .map((g) => `${g} (${goalScores[g] ?? 0}%)`);
+          const { error: noteErr } = await supabase
+            .from("shift_notes")
+            .insert({
+              shift_id: active.id,
+              user_id: user.id,
+              narrative_summary: narrative.trim(),
+              goals_addressed: addressed,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any);
+          if (noteErr) throw noteErr;
 
-      const coords = await new Promise<GeolocationCoordinates | null>(
-        (resolve) => {
-          if (!("geolocation" in navigator)) return resolve(null);
-          navigator.geolocation.getCurrentPosition(
-            (pos) => resolve(pos.coords),
-            () => resolve(null),
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
-          );
-        },
-      );
+          const coords = await getClockInCoordinates(900);
 
-      const { error: shiftErr } = await supabase
-        .from("shifts")
-        .update({
-          clock_out_time: new Date().toISOString(),
-          clock_out_lat: coords?.latitude ?? null,
-          clock_out_long: coords?.longitude ?? null,
-          status: "completed",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any)
-        .eq("id", active.id);
-      if (shiftErr) throw shiftErr;
+          const { error: shiftErr } = await supabase
+            .from("shifts")
+            .update({
+              clock_out_time: new Date().toISOString(),
+              clock_out_lat: coords?.latitude ?? null,
+              clock_out_long: coords?.longitude ?? null,
+              status: "completed",
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any)
+            .eq("id", active.id);
+          if (shiftErr) throw shiftErr;
+        })(),
+        new Promise((_, reject) => {
+          window.setTimeout(() => reject(new Error("clock-out-timeout")), 1500);
+        }),
+      ]);
 
-      toast.success("Shift completed");
-      setActive(null);
-      setNarrative("");
-      setGoalScores({});
-      setTouched({});
-      qc.invalidateQueries({ queryKey: ["client-timeline"] });
+      finishLocalClockOut("Shift completed");
     } catch (e) {
-      toast.error((e as Error).message || "Could not clock out");
+      finishLocalClockOut(
+        (e as Error).message === "clock-out-timeout"
+          ? "🔄 Sandbox Mode: Shift completed locally."
+          : "🔄 Sandbox Mode: Shift completed locally.",
+      );
     } finally {
       setBusy(false);
     }

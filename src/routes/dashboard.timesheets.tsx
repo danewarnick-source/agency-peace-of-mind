@@ -479,6 +479,23 @@ function ShiftSection({
                         ) : (
                           <Badge variant="secondary"><MapPin className="mr-1 h-3 w-3" /> On-site</Badge>
                         )}
+                        {r.evv_verified && (
+                          <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-200">
+                            📍 EVV Verified
+                          </Badge>
+                        )}
+                        {r.clock_in_lat != null && r.clock_in_long != null && (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${r.clock_in_lat},${r.clock_in_long}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-medium text-foreground hover:bg-accent"
+                            title="Open clock-in location in Google Maps"
+                          >
+                            <Navigation className="h-3 w-3" /> Map
+                          </a>
+                        )}
                         {inBypass && (
                           <Tooltip>
                             <TooltipTrigger asChild>

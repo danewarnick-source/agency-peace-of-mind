@@ -1,6 +1,31 @@
 import { useEffect, useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCaseload } from "@/hooks/use-caseload";
+import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
+
+const MOCK_WORKSPACE_CLIENTS: Record<string, CaseloadClient> = {
+  "mock-client-john-smith": {
+    id: "mock-client-john-smith",
+    first_name: "John",
+    last_name: "Smith",
+    home_latitude: null,
+    home_longitude: null,
+    pcsp_goals: ["Practice grocery budgeting", "Community outing 1x/week"],
+    job_code: ["T2017"],
+    medicaid_id: null,
+    physical_address: "Maple House — 412 N Main St",
+  },
+  "mock-client-jane-doe": {
+    id: "mock-client-jane-doe",
+    first_name: "Jane",
+    last_name: "Doe",
+    home_latitude: null,
+    home_longitude: null,
+    pcsp_goals: ["Morning hygiene routine", "Prepare lunch independently"],
+    job_code: ["S5125"],
+    medicaid_id: null,
+    physical_address: "Oak House — 88 Willow Ln",
+  },
+};
 import { Badge } from "@/components/ui/badge";
 import {
   Tabs,
@@ -32,23 +57,23 @@ function ClientWorkspace() {
   const { data: caseload, isLoading } = useCaseload();
   const navigate = useNavigate();
 
-  const client = useMemo(
-    () => (caseload ?? []).find((c) => c.id === clientId) ?? null,
-    [caseload, clientId],
-  );
+  const isMock = clientId.startsWith("mock-client-");
+  const client = useMemo(() => {
+    if (isMock) return MOCK_WORKSPACE_CLIENTS[clientId] ?? null;
+    return (caseload ?? []).find((c) => c.id === clientId) ?? null;
+  }, [caseload, clientId, isMock]);
 
-  // Security guard: if not in caseload, deny access.
+  // Security guard: if not in caseload (and not a mock test client), deny access.
   useEffect(() => {
+    if (isMock) return;
     if (!isLoading && caseload && !client) {
       toast.error("You are not assigned to this individual.");
       navigate({ to: "/dashboard" });
     }
-  }, [isLoading, caseload, client, navigate]);
+  }, [isLoading, caseload, client, navigate, isMock]);
 
-  if (isLoading || !client) {
-    return (
-      <p className="p-6 text-sm text-muted-foreground">Loading…</p>
-    );
+  if ((!isMock && isLoading) || !client) {
+    return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   }
 
   const codes = Array.isArray(client.job_code) ? client.job_code : [];

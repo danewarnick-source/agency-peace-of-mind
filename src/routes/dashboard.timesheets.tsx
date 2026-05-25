@@ -57,6 +57,7 @@ type ShiftRow = {
   geofence_bypass_reason: string | null; // legacy
   device_fingerprint: string | null;
   status: string;
+  evv_verified: boolean | null;
   created_at: string | null;
   profiles: { id?: string; full_name: string | null; email: string | null; employee_id: string | null } | null;
   clients: { id?: string; first_name: string | null; last_name: string | null; job_code: string | null; medicaid_id: string | null } | null;
@@ -66,7 +67,7 @@ type ShiftRow = {
 const SELECT = `id, user_id, client_id, clock_in_time, clock_out_time,
   clock_in_lat, clock_in_long, clock_out_lat, clock_out_long,
   outside_geofence, clock_in_bypass_reason, clock_out_bypass_reason, geofence_bypass_reason,
-  device_fingerprint, status, created_at,
+  device_fingerprint, status, evv_verified, created_at,
   profiles:user_id ( full_name, email, employee_id ),
   clients:client_id ( first_name, last_name, job_code, medicaid_id ),
   shift_notes ( goals_addressed, narrative_summary )`;

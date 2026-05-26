@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
-import { saveDailyRecord, saveEmarLog, setAttendance, savePrnForm, saveIncidentReport } from "@/lib/hhs.functions";
+import { saveDailyRecord, saveEmarLog, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
 
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
   head: () => ({ meta: [{ title: "Host Home Client Hub — Care Academy" }] }),
@@ -448,45 +448,181 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
   );
 }
 
-// ============ Attendance ============
+// ============ Attendance — 31-day grid + court-proof attestation ============
 function AttendanceTab({ orgId, clientId }: { orgId: string; clientId: string }) {
+  const { user } = useAuth();
   const fn = useServerFn(setAttendance);
-  const [presence, setPresence] = useState<"Present" | "Away">("Present");
-  const [reason, setReason] = useState("");
+  const listFn = useServerFn(listAttendance);
+  const qc = useQueryClient();
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const todayDay = now.getDate();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  const daysInMonth = monthEnd.getDate();
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const { data: rows = [] } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["hhs-att-month", orgId, clientId, fmt(monthStart)],
+    queryFn: () => listFn({ data: { organizationId: orgId, monthStart: fmt(monthStart), monthEnd: fmt(monthEnd) } }),
+  });
+  const byDate = useMemo(() => {
+    const m = new Map<string, Record<string, unknown>>();
+    (rows as Array<Record<string, unknown>>)
+      .filter((r) => String(r.client_id) === clientId)
+      .forEach((r) => m.set(String(r.record_date), r));
+    return m;
+  }, [rows, clientId]);
+
+  const [selected, setSelected] = useState<number | null>(todayDay);
+  const [action, setAction] = useState<"Present" | "Away" | null>(null);
+  const [agreed, setAgreed] = useState(false);
+  const [initials, setInitials] = useState("");
+  const [awayCategory, setAwayCategory] = useState<"Hospitalization" | "Family Leave" | "Unapproved Absence">("Hospitalization");
+
+  const fullName = (user?.user_metadata?.full_name ?? user?.email ?? "").toString().trim();
+  const parts = fullName.split(/\s+/).filter(Boolean);
+  const expectedInitials = (parts[0]?.[0] ?? "") + (parts[parts.length - 1]?.[0] ?? "");
+  const initialsValid = initials.trim().toUpperCase() === expectedInitials.toUpperCase() && expectedInitials.length === 2;
+
+  const selectedDate = selected ? new Date(year, month, selected) : null;
+  const isToday = selected === todayDay;
+  const isFuture = !!selected && selected > todayDay;
+
   const mut = useMutation({
-    mutationFn: async () =>
-      fn({
+    mutationFn: async () => {
+      if (!selectedDate || !action) throw new Error("Pick a date and an action.");
+      return fn({
         data: {
           organizationId: orgId,
           clientId,
-          recordDate: new Date().toISOString().slice(0, 10),
-          presenceStatus: presence,
-          awayReason: presence === "Away" ? reason : null,
+          recordDate: fmt(selectedDate),
+          presenceStatus: action,
+          awayReason: action === "Away" ? awayCategory : null,
+          awayCategory: action === "Away" ? awayCategory : null,
+          staffInitials: action === "Present" ? initials.trim().toUpperCase() : null,
+          attestationAccepted: action === "Present" ? agreed : false,
         },
-      }),
-    onSuccess: () => toast.success("Today's billing presence recorded."),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Attendance recorded with court-admissible audit trail.");
+      setAction(null); setAgreed(false); setInitials("");
+      qc.invalidateQueries({ queryKey: ["hhs-att-month"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">📅 State Billing Status for Today</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
-        <RadioGroup value={presence} onValueChange={(v) => setPresence(v as "Present" | "Away")} className="space-y-2">
-          <label className="flex items-center gap-2 text-sm">
-            <RadioGroupItem value="Present" /> 🟢 Present in Home (billable overnight)
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <RadioGroupItem value="Away" /> 🟡 Away / Unbillable Leave (hospitalization, family respite, etc.)
-          </label>
-        </RadioGroup>
-        {presence === "Away" && (
-          <div>
-            <Label>Reason</Label>
-            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Hospitalization, family visit…" />
+      <CardHeader>
+        <CardTitle className="text-base">📅 {now.toLocaleString(undefined, { month: "long", year: "numeric" })} — Court-Proof Attendance</CardTitle>
+        <p className="text-xs text-muted-foreground">Tap a date tile. Future dates are locked. Light-green = signed present; amber = away.</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-7 gap-1.5">
+          {["S","M","T","W","T","F","S"].map((d, i) => (
+            <div key={i} className="text-center text-[10px] font-medium text-muted-foreground">{d}</div>
+          ))}
+          {Array.from({ length: monthStart.getDay() }).map((_, i) => <div key={`pad-${i}`} />)}
+          {Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1;
+            const rec = byDate.get(fmt(new Date(year, month, day)));
+            const status = rec ? String(rec.presence_status) : null;
+            const initialsStamp = rec ? String((rec as Record<string, unknown>).staff_initials_signature ?? "") : "";
+            const future = day > todayDay;
+            const isSel = selected === day;
+            const cls = future
+              ? "bg-muted/40 text-muted-foreground/40 cursor-not-allowed"
+              : status === "Present"
+                ? "bg-green-200 dark:bg-green-900/40 text-green-900 dark:text-green-100 border-green-400"
+                : status === "Away"
+                  ? "bg-amber-200 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 border-amber-400"
+                  : "bg-background hover:bg-muted";
+            return (
+              <button
+                key={day}
+                disabled={future}
+                onClick={() => { setSelected(day); setAction(null); setAgreed(false); setInitials(""); }}
+                className={`relative h-12 rounded border text-xs font-medium transition ${cls} ${isSel ? "ring-2 ring-primary" : ""}`}
+                title={status ? `Day ${day}: ${status}${initialsStamp ? ` (${initialsStamp})` : ""}` : `Day ${day}`}
+              >
+                <div>{day}</div>
+                {status === "Present" && initialsStamp && (
+                  <div className="absolute bottom-0.5 right-1 text-[9px] font-bold">{initialsStamp}</div>
+                )}
+                {status === "Present" && <div className="absolute top-0.5 left-1 text-[9px]">✓</div>}
+                {status === "Away" && <div className="absolute top-0.5 left-1 text-[9px]">AWAY</div>}
+              </button>
+            );
+          })}
+        </div>
+
+        {selected && !isFuture && (
+          <div className="rounded-lg border-2 border-dashed p-4 space-y-3">
+            <div className="font-semibold text-sm">
+              ✍️ Daily Attendance & Billing Verification — {selectedDate?.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+              {!isToday && <Badge variant="outline" className="ml-2">backfill</Badge>}
+            </div>
+            <RadioGroup value={action ?? ""} onValueChange={(v) => setAction(v as "Present" | "Away")} className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <RadioGroupItem value="Present" /> 🟢 Client Present Overnight (billable)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <RadioGroupItem value="Away" /> 🟡 Client Away / Leave (unbillable)
+              </label>
+            </RadioGroup>
+
+            {action === "Present" && (
+              <div className="space-y-2 rounded border border-red-300 bg-red-50/40 dark:bg-red-950/20 p-3">
+                <p className="text-xs leading-relaxed">
+                  <strong>⚠️ LEGAL ATTESTATION:</strong> I hereby certify and formally attest under penalty of Medicaid fraud and perjury that the information recorded for this calendar date is true, accurate, and complete. I verify that the client slept overnight under my direct supervision in a certified Host Home setting, and I understand that falsification of this billing data is subject to state and federal criminal prosecution.
+                </p>
+                <label className="flex items-start gap-2 text-xs">
+                  <Checkbox checked={agreed} onCheckedChange={(c) => setAgreed(!!c)} />
+                  <span>I have read and agree to this legal attestation statement.</span>
+                </label>
+                <div>
+                  <Label className="text-xs">Type your initials ({expectedInitials || "—"})</Label>
+                  <Input value={initials} onChange={(e) => setInitials(e.target.value)} maxLength={4} className="h-9 w-24 font-bold tracking-widest" />
+                  {initials && !initialsValid && (
+                    <p className="text-[11px] text-destructive mt-1">Initials must match your profile name ({expectedInitials}).</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {action === "Away" && (
+              <div className="space-y-2 rounded border border-amber-300 bg-amber-50/40 dark:bg-amber-950/20 p-3">
+                <Label className="text-xs">Reason for absence</Label>
+                <Select value={awayCategory} onValueChange={(v) => setAwayCategory(v as typeof awayCategory)}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Hospitalization">Hospitalization</SelectItem>
+                    <SelectItem value="Family Leave">Family Leave</SelectItem>
+                    <SelectItem value="Unapproved Absence">Unapproved Absence</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">This day will be flagged as unbillable.</p>
+              </div>
+            )}
+
+            <Button
+              onClick={() => mut.mutate()}
+              disabled={
+                mut.isPending ||
+                !action ||
+                (action === "Present" && (!agreed || !initialsValid)) ||
+                (action === "Away" && !awayCategory)
+              }
+            >
+              {mut.isPending ? "Saving…" : action === "Present" ? "Sign & Save (Billable)" : "Save Absence"}
+            </Button>
           </div>
         )}
-        <Button onClick={() => mut.mutate()} disabled={mut.isPending}>Save Today's Status</Button>
       </CardContent>
     </Card>
   );

@@ -781,7 +781,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
                 narrativeOk ? "text-emerald-600" : "text-muted-foreground"
               }`}
             >
-              Word Count: {wordCount} / 100 words minimum
+              Word Count: {wordCount} / 50 words minimum
             </div>
             {showNarrativeError && !narrativeOk && (
               <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">

@@ -171,6 +171,7 @@ function ClientWorkspace() {
                 homeLat: client.home_latitude,
                 homeLng: client.home_longitude,
                 geofenceRadiusFeet: client.geofence_radius_feet ?? 1000,
+                pcspGoals: client.pcsp_goals ?? [],
               }}
             />
           </TabsContent>

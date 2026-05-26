@@ -521,26 +521,49 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </div>
       ) : null}
 
-      {/* Free OSM/Leaflet proximity map — pulls up the instant the Clock-In tab opens. */}
-      {!isRunning && mapHome && (
-        <div className="mb-4 space-y-1">
-          <GeofenceMap
-            homeLat={mapHome.lat}
-            homeLng={mapHome.lng}
-            radiusFeet={mapRadiusFeet}
-            caregiver={livePos}
-            insideZone={insideZone}
-            height={250}
-          />
-          <p className="text-[11px] text-muted-foreground">
-            {livePos
-              ? insideZone
-                ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
-                : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
-              : "Awaiting browser location permission…"}
-          </p>
+      {/* Responsive 2-col layout: map (left/top) + controls (right/bottom) */}
+      <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
+        {/* MAP COLUMN */}
+        <div className="space-y-2">
+          {hardwareDenied ? (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+              <p className="mb-1 font-semibold">⚠️ Hardware Permission Required</p>
+              <p>
+                You approved EVV consent on your profile, but your browser or
+                device settings are currently blocking location access. Please
+                open your device&apos;s system settings, authorize location
+                tracking for this web browser application, and refresh the
+                screen to unlock shift punches.
+              </p>
+            </div>
+          ) : !isRunning && mapHome ? (
+            <>
+              <GeofenceMap
+                homeLat={mapHome.lat}
+                homeLng={mapHome.lng}
+                radiusFeet={mapRadiusFeet}
+                caregiver={livePos}
+                insideZone={insideZone}
+                height={260}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {livePos
+                  ? insideZone
+                    ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
+                    : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
+                  : "Awaiting browser location permission…"}
+              </p>
+            </>
+          ) : !isRunning ? (
+            <div className="flex h-[260px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-xs text-muted-foreground">
+              No geofence configured for this client.
+            </div>
+          ) : null}
         </div>
-      )}
+
+        {/* CONTROLS COLUMN */}
+        <div className="flex flex-col">
+
 
 
 

@@ -367,11 +367,11 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     }
     setBusy(true);
     try {
-      // Use the cached coordinates from the live map feed — no redundant
-      // getCurrentPosition call that would race the permission state.
-      if (hardwareDenied) { setDenied(true); return; }
-      if (!livePos) {
-        toast.error("Still acquiring GPS — please wait a moment and try again.");
+      // Frame-blocked or hardware-denied: bypass the GPS lock by opening the
+      // variance modal so the caregiver can clock in via manual justification.
+      if (hardwareDenied || !livePos) {
+        setVariance({ frameBlocked: true, pos: null });
+        setVarianceReason("");
         return;
       }
       const pos = livePos;
@@ -404,8 +404,8 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   async function submitVariance() {
     if (!variance) return;
     const reason = varianceReason.trim();
-    if (reason.length === 0) {
-      toast.error("Please provide a variance justification.");
+    if (reason.length < 10) {
+      toast.error("Please type at least 10 characters of justification.");
       return;
     }
     setBusy(true);

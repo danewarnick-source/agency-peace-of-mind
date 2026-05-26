@@ -116,14 +116,25 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const [denied, setDenied] = useState(false);
   const [success, setSuccess] = useState<null | { duration: string }>(null);
   const [now, setNow] = useState<number>(() => Date.now());
-  const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
+  // `currentCaregiverCoords` — single shared cache fed by watchPosition.
+  // Same source as the blue dot on the Leaflet map; reused at punch time
+  // to avoid a redundant getCurrentPosition call that races permissions.
+  const [livePos, setLivePos] = useState<{ lat: number; lng: number; acc: number } | null>(null);
+  const [hardwareDenied, setHardwareDenied] = useState(false);
 
-  // Live geolocation watch — feeds the map's blue dot.
   useEffect(() => {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) return;
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      setHardwareDenied(true);
+      return;
+    }
     const id = navigator.geolocation.watchPosition(
-      (p) => setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => { /* permission denied — map still renders with house + zone */ },
+      (p) => {
+        setHardwareDenied(false);
+        setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) setHardwareDenied(true);
+      },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
     );
     return () => navigator.geolocation.clearWatch(id);

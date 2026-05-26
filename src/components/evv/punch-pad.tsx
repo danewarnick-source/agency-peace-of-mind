@@ -17,8 +17,7 @@ import {
   Play, Square, MapPin, Lock, Loader2, AlertTriangle, CheckCircle2, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
-import { EVV_SERVICE_CODES, padMemberId } from "@/lib/evv-codes";
-import { jobCodeLabel } from "@/lib/job-codes";
+import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from "@/lib/evv-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { GeofenceMap } from "@/components/evv/geofence-map";
 import { EvvConsentGate } from "@/components/evv/consent-gate";

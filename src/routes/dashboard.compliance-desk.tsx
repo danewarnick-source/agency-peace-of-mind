@@ -276,12 +276,8 @@ function PendingTable({
                     <MapPin className="mr-1 h-3 w-3" /> View
                   </Button>
                 </TableCell>
-                <TableCell>
-                  {r.outside_geofence_reason ? (
-                    <Button variant="ghost" size="sm" className="text-amber-600" onClick={() => onReason(r)}>
-                      <AlertTriangle className="mr-1 h-3 w-3" /> Justified
-                    </Button>
-                  ) : <span className="text-[11px] text-muted-foreground">—</span>}
+                <TableCell onClick={() => r.outside_geofence_reason && onReason(r)} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
+                  <GeofenceBadge reason={r.outside_geofence_reason} />
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1.5">

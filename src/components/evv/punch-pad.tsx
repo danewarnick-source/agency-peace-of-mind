@@ -123,6 +123,18 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const [denied, setDenied] = useState(false);
   const [success, setSuccess] = useState<null | { duration: string }>(null);
   const [now, setNow] = useState<number>(() => Date.now());
+  const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Live geolocation watch — feeds the map's blue dot.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) return;
+    const id = navigator.geolocation.watchPosition(
+      (p) => setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => { /* permission denied — map still renders with house + zone */ },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
 
   // Geofence variance overlay state
   const [variance, setVariance] = useState<null | {

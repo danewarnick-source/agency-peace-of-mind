@@ -615,12 +615,11 @@ function ReasonDialog({ row, onClose }: { row: Row | null; onClose: () => void }
 
 function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
   const link = useMemo(() => {
-    if (!row) return "";
+    if (!row) return null;
     const a = row.gps_in_coordinates;
-    const b = row.gps_out_coordinates;
-    if (!a) return "";
-    if (!b) return `https://www.openstreetmap.org/?mlat=${a.latitude}&mlon=${a.longitude}#map=17/${a.latitude}/${a.longitude}`;
-    return `https://www.openstreetmap.org/?bbox=${Math.min(a.longitude,b.longitude)},${Math.min(a.latitude,b.latitude)},${Math.max(a.longitude,b.longitude)},${Math.max(a.latitude,b.latitude)}`;
+    if (!a) return null;
+    // Always drop a red marker pin at the clock-in coordinates (street-level zoom 17).
+    return osmPinLink(a.latitude, a.longitude);
   }, [row]);
 
   return (

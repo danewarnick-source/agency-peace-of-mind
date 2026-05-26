@@ -12,10 +12,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Award, AlertTriangle, TrendingUp, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
+import { AgencyHealthSnapshot } from "@/components/agency-health-snapshot";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 

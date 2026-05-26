@@ -662,6 +662,45 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </DialogContent>
       </Dialog>
 
+      {/* Out-of-bounds variance — CLOCK-OUT (symmetric) */}
+      <Dialog open={!!outVariance} onOpenChange={(o) => { if (!o) { setOutVariance(null); setOutVarianceReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📍 Out-of-Bounds EVV Exception Alert
+            </DialogTitle>
+            <DialogDescription>
+              You are located outside the authorized radius limit set by your Administrator
+              for this client. A variance text justification is required to log this clock-out.
+            </DialogDescription>
+          </DialogHeader>
+          {outVariance && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+              Measured distance: <span className="font-mono font-semibold">{outVariance.distanceFeet.toLocaleString()} ft</span>
+              {" "}· Allowed: <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
+            </div>
+          )}
+          <div className="grid gap-2">
+            <Label htmlFor="out-variance-reason">Variance justification</Label>
+            <Textarea
+              id="out-variance-reason"
+              rows={4}
+              value={outVarianceReason}
+              onChange={(e) => setOutVarianceReason(e.target.value)}
+              placeholder="e.g. Completed community outing and clocked out at the destination."
+              maxLength={500}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOutVariance(null); setOutVarianceReason(""); }}>Cancel</Button>
+            <Button onClick={submitOutVariance} disabled={busy || outVarianceReason.trim().length < 5}>
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Submit & Clock Out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Success */}
       <Dialog open={!!success} onOpenChange={(o) => !o && setSuccess(null)}>
         <DialogContent>

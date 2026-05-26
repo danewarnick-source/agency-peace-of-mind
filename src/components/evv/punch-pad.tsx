@@ -326,7 +326,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     !!org?.organization_id;
 
   async function writeShift(args: {
-    pos: { lat: number; lng: number; acc: number };
+    pos: { lat: number; lng: number; acc: number } | null;
     outsideReason?: string;
   }) {
     if (!user || !org || !clientForPunch) return;
@@ -339,7 +339,9 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       utah_medicaid_provider_id: providerIdFromOrg(org.organization_id),
       utah_medicaid_member_id: clientForPunch.memberId,
       service_type_code: serviceCode,
-      gps_in_coordinates: { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc },
+      gps_in_coordinates: args.pos
+        ? { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc }
+        : { latitude: null, longitude: null, accuracy_meters: null },
       shift_entry_type: entryType,
       status: "Active",
       timezone_setting: timezone,

@@ -1,9 +1,9 @@
-// Utah DHHS / Medicaid master service code registry.
+// Utah DHHS / Medicaid master service code registry (35 codes).
 // `evvLock: true`  → MANDATES EVV LOCATION LOCK (geofence enforced)
 // `evvLock: false` → BYPASSES EVV LOCATION LOCK (passive GPS capture only)
 //
-// CRITICAL EXCLUSION: HHS (Host Home Supports) is intentionally absent.
-// Host Home documentation is handled via the Daily Notes tab module only.
+// HHS (Host Home Supports) is included as a SYSTEM BYPASS EXEMPTION
+// (evvLock:false) so it can be assigned in the admin DSPD multi-select.
 export interface ServiceCodeDef {
   code: string;
   label: string;

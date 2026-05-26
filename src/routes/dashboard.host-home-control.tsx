@@ -299,7 +299,7 @@ function ComplianceAuditsTab({ orgId, clientMap }: { orgId?: string; clientMap?:
                   )}
                 </div>
                 <p className="mt-2 text-sm whitespace-pre-wrap">{String(r.description)}</p>
-                {r.protective_actions && <p className="mt-1 text-xs text-muted-foreground">Protective: {String(r.protective_actions)}</p>}
+                {r.protective_actions ? <p className="mt-1 text-xs text-muted-foreground">Protective: {String(r.protective_actions)}</p> : null}
                 {status !== "upi_filed" && (
                   <Button size="sm" className="mt-2" onClick={() => setFiling({ id: String(r.id) })}>
                     ✅ Mark as Successfully Filed in UPI

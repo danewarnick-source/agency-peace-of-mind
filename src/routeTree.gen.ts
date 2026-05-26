@@ -37,6 +37,7 @@ import { Route as DashboardProgramsRouteImport } from './routes/dashboard.progra
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
 import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
+import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardEmarRouteImport } from './routes/dashboard.emar'
@@ -201,6 +202,12 @@ const DashboardInvitationsRoute = DashboardInvitationsRouteImport.update({
   path: '/invitations',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardHostHomeControlRoute =
+  DashboardHostHomeControlRouteImport.update({
+    id: '/host-home-control',
+    path: '/host-home-control',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardExternalCertificationsRoute =
   DashboardExternalCertificationsRouteImport.update({
     id: '/external-certifications',
@@ -350,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
+  '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
@@ -402,6 +410,7 @@ export interface FileRoutesByTo {
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
+  '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
@@ -456,6 +465,7 @@ export interface FileRoutesById {
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
+  '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
@@ -511,6 +521,7 @@ export interface FileRouteTypes {
     | '/dashboard/emar'
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
+    | '/dashboard/host-home-control'
     | '/dashboard/invitations'
     | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
@@ -563,6 +574,7 @@ export interface FileRouteTypes {
     | '/dashboard/emar'
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
+    | '/dashboard/host-home-control'
     | '/dashboard/invitations'
     | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
@@ -616,6 +628,7 @@ export interface FileRouteTypes {
     | '/dashboard/emar'
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
+    | '/dashboard/host-home-control'
     | '/dashboard/invitations'
     | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
@@ -862,6 +875,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardInvitationsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/host-home-control': {
+      id: '/dashboard/host-home-control'
+      path: '/host-home-control'
+      fullPath: '/dashboard/host-home-control'
+      preLoaderRoute: typeof DashboardHostHomeControlRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/external-certifications': {
       id: '/dashboard/external-certifications'
       path: '/external-certifications'
@@ -1085,6 +1105,7 @@ interface DashboardRouteChildren {
   DashboardEmarRoute: typeof DashboardEmarRoute
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
+  DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
@@ -1119,6 +1140,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardEmarRoute: DashboardEmarRoute,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
+  DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,
   DashboardPermissionsRoute: DashboardPermissionsRoute,

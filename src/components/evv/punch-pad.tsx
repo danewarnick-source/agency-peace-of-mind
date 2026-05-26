@@ -871,48 +871,112 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </DialogContent>
       </Dialog>
 
-      {/* Out-of-bounds variance */}
       <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); } }}>
+
         <DialogContent className="max-h-[85vh] overflow-y-auto">
+
           <DialogHeader>
+
             <DialogTitle className="flex items-center gap-2">
+
               ⚠️ Geofence Variance Notice
+
             </DialogTitle>
+
             <DialogDescription>
+
               {variance?.frameBlocked
+
                 ? "Our system cannot verify your exact proximity to the approved client perimeter because mobile location access is restricted or unavailable on this browser frame. To proceed with clocking into this EVV Shift, state compliance requires a manual location justification."
+
                 : "Our system detects you are starting your shift outside the approved client home perimeter. Please provide a brief justification explaining why you are clocking in from this location (e.g., Community outing, medical transit, network latency)."}
+
             </DialogDescription>
+
           </DialogHeader>
-          {variance && typeof variance.distanceFeet === "number" && typeof variance.limitFeet === "number" && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
-              Measured distance: <span className="font-mono font-semibold">{variance.distanceFeet.toLocaleString()} ft</span>
-              {" "}· Allowed: <span className="font-mono font-semibold">{variance.limitFeet.toLocaleString()} ft</span>
+
+          {mapHome && (
+
+            <div className="mt-2 overflow-hidden rounded-lg border border-border">
+
+              <GeofenceMap
+
+                homeLat={mapHome.lat}
+
+                homeLng={mapHome.lng}
+
+                radiusFeet={mapRadiusFeet}
+
+                caregiver={variance?.pos ?? livePos}
+
+                insideZone={false}
+
+                height={160}
+
+              />
+
             </div>
+
           )}
+
+          {variance && typeof variance.distanceFeet === "number" && typeof variance.limitFeet === "number" && (
+
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+
+              Measured distance: <span className="font-mono font-semibold">{variance.distanceFeet.toLocaleString()} ft</span>
+
+              {" "}· Allowed: <span className="font-mono font-semibold">{variance.limitFeet.toLocaleString()} ft</span>
+
+            </div>
+
+          )}
+
           <div className="grid gap-2">
+
             <Label htmlFor="variance-reason">Location variance justification</Label>
+
             <Textarea
+
               id="variance-reason"
+
               rows={4}
+
               value={varianceReason}
+
               onChange={(e) => setVarianceReason(e.target.value)}
+
               placeholder="Provide a brief narrative reason explaining your location or device variance (e.g., Device location permissions restricted, starting shift at community job site, bad cell reception)."
+
               maxLength={500}
+
               required
+
             />
+
             <p className="text-[11px] text-muted-foreground">
+
               {varianceReason.trim().length}/10 characters minimum
+
             </p>
+
           </div>
+
           <DialogFooter>
+
             <Button variant="outline" onClick={() => { setVariance(null); setVarianceReason(""); }}>Cancel</Button>
+
             <Button onClick={submitVariance} disabled={busy || varianceReason.trim().length < 10}>
+
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+
               Confirm Clock In &amp; Start Shift
+
             </Button>
+
           </DialogFooter>
+
         </DialogContent>
+
       </Dialog>
 
       {/* Out-of-bounds variance — CLOCK-OUT (symmetric) */}

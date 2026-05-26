@@ -27,6 +27,8 @@ const MOCK_WORKSPACE_CLIENTS: Record<string, CaseloadClient> = {
   },
 };
 import { Badge } from "@/components/ui/badge";
+import { PunchPad } from "@/components/evv/punch-pad";
+import { padMemberId } from "@/lib/evv-codes";
 import {
   Tabs,
   TabsContent,

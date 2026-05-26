@@ -416,6 +416,11 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       rounded_clock_out: roundToQuarterHourISO(clockOut),
     };
     if (args.outsideReason) update.outside_geofence_reason = args.outsideReason;
+    if (args.aiStatus) {
+      update.ai_compliance_status = args.aiStatus;
+      update.ai_compliance_feedback = args.aiFeedback ?? null;
+      update.ai_coaching_iterations = args.aiIterationCount ?? 0;
+    }
 
     const { error } = await supabase
       .from("evv_timesheets")

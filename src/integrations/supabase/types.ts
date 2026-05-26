@@ -811,6 +811,10 @@ export type Database = {
           id: string
           organization_id: string
           outside_geofence_reason: string | null
+          raw_clock_in: string | null
+          raw_clock_out: string | null
+          rounded_clock_in: string | null
+          rounded_clock_out: string | null
           service_type_code: string
           shift_entry_type: string
           shift_note_text: string | null
@@ -833,6 +837,10 @@ export type Database = {
           id?: string
           organization_id: string
           outside_geofence_reason?: string | null
+          raw_clock_in?: string | null
+          raw_clock_out?: string | null
+          rounded_clock_in?: string | null
+          rounded_clock_out?: string | null
           service_type_code: string
           shift_entry_type: string
           shift_note_text?: string | null
@@ -855,6 +863,10 @@ export type Database = {
           id?: string
           organization_id?: string
           outside_geofence_reason?: string | null
+          raw_clock_in?: string | null
+          raw_clock_out?: string | null
+          rounded_clock_in?: string | null
+          rounded_clock_out?: string | null
           service_type_code?: string
           shift_entry_type?: string
           shift_note_text?: string | null

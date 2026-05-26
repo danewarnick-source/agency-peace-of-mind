@@ -68,16 +68,9 @@ function haversineFeet(a: { lat: number; lng: number }, b: { lat: number; lng: n
   return 2 * EARTH_RADIUS_FEET * Math.asin(Math.min(1, Math.sqrt(x)));
 }
 
-function getPosition(): Promise<{ lat: number; lng: number; acc: number }> {
-  return new Promise((resolve, reject) => {
-    if (!("geolocation" in navigator)) return reject(new Error("Geolocation unsupported"));
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }),
-      (e) => reject(e),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-  });
-}
+// NOTE: Per Phase spec — DO NOT make a redundant getCurrentPosition() call on
+// punch. Use the already-cached `currentCaregiverCoords` (livePos) from the
+// live watchPosition feed that powers the blue dot on the map.
 
 function fmtElapsed(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000));

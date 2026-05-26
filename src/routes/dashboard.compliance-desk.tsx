@@ -104,6 +104,9 @@ type Row = {
   is_edited_by_admin: boolean;
   edited_by_admin_name: string | null;
   edit_audit_history_log: AuditEntry[];
+  ai_compliance_status: string | null;
+  ai_coaching_iterations: number | null;
+  ai_compliance_feedback: string | null;
   clients: { first_name: string; last_name: string; physical_address: string | null } | null;
   staff: { full_name: string | null; email: string | null } | null;
 };
@@ -158,8 +161,27 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
       <TableCell colSpan={colSpan} className="bg-muted/30 py-3">
         <div className="rounded-lg border border-border bg-background/60 p-3 space-y-2.5">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-foreground">
               💬 Shift Note
+              {row.ai_compliance_status === "Verified" && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-md border border-emerald-500/50 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300"
+                  title={row.ai_compliance_feedback ?? "AI Documentation Coach cleared this note."}
+                >
+                  🟢 AI CLEARED
+                  {row.ai_coaching_iterations && row.ai_coaching_iterations > 1
+                    ? ` · ${row.ai_coaching_iterations}×`
+                    : ""}
+                </span>
+              )}
+              {row.ai_compliance_status === "Exception" && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-md border border-rose-500/50 bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-300"
+                  title={row.ai_compliance_feedback ?? "Submitted with Exception Flag — review required."}
+                >
+                  🔴 AI FLAG
+                </span>
+              )}
             </div>
             <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">
               {note.length > 0 ? note : <span className="italic text-muted-foreground">No narrative recorded.</span>}
@@ -189,7 +211,7 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
 
 
 
-const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, clients(first_name,last_name,physical_address)";
+const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, clients(first_name,last_name,physical_address)";
 
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));

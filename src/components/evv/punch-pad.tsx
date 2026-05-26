@@ -21,6 +21,7 @@ import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { GeofenceMap } from "@/components/evv/geofence-map";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
+import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
 
 type EntryType = "Client_Profile_Pass" | "General_Sidebar_Unscheduled";
 
@@ -154,6 +155,12 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const [baselineChecked, setBaselineChecked] = useState(false);
   const [narrative, setNarrative] = useState("");
   const [showNarrativeError, setShowNarrativeError] = useState(false);
+  // AI Documentation Coach state
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiCoach, setAiCoach] = useState<CoachResult | null>(null);
+  const [aiIterations, setAiIterations] = useState(0);
+  const [aiFlagCount, setAiFlagCount] = useState(0);
+  const [allowException, setAllowException] = useState(false);
 
   const facilities = useMemo(() => {
     const set = new Set<string>();
@@ -377,12 +384,19 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     setBaselineChecked(false);
     setNarrative("");
     setShowNarrativeError(false);
+    setAiCoach(null);
+    setAiIterations(0);
+    setAiFlagCount(0);
+    setAllowException(false);
     setShowCompliance(true);
   }
 
   async function finalizeClockOut(args: {
     pos: { lat: number; lng: number; acc: number };
     outsideReason?: string;
+    aiStatus?: "Verified" | "Flagged" | "Exception";
+    aiFeedback?: string;
+    aiIterationCount?: number;
   }) {
     if (!user || !active) return;
     const selectedGoals = Object.entries(checkedGoals)
@@ -402,6 +416,11 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       rounded_clock_out: roundToQuarterHourISO(clockOut),
     };
     if (args.outsideReason) update.outside_geofence_reason = args.outsideReason;
+    if (args.aiStatus) {
+      update.ai_compliance_status = args.aiStatus;
+      update.ai_compliance_feedback = args.aiFeedback ?? null;
+      update.ai_coaching_iterations = args.aiIterationCount ?? 0;
+    }
 
     const { error } = await supabase
       .from("evv_timesheets")
@@ -419,7 +438,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
   }
 
-  async function submitCompliance() {
+  async function submitCompliance(opts?: { exception?: boolean }) {
     if (!user || !active) return;
     if (!hasGoalSelected) {
       toast.error("Select at least one PCSP goal or baseline monitoring.");
@@ -429,6 +448,58 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       setShowNarrativeError(true);
       return;
     }
+
+    // ── AI Documentation Coach intercept ─────────────────────────────
+    // Only call when the caregiver has NOT chosen the exception escape valve
+    // and we have not yet received a "Verified" verdict on the current text.
+    const isException = !!opts?.exception;
+    let aiVerdict: CoachResult | null = aiCoach;
+    let iterationsToPersist = aiIterations;
+
+    if (!isException && (!aiVerdict || aiVerdict.status !== "Verified")) {
+      setAiBusy(true);
+      try {
+        const selectedGoalsForAi = Object.entries(checkedGoals)
+          .filter(([, v]) => v)
+          .map(([k]) => k);
+        if (baselineChecked) selectedGoalsForAi.push("General baseline monitoring & safety oversight");
+        const clientFirst =
+          lockedClient?.name?.split(" ")?.[0] ??
+          caseload.find((c) => c.id === active.client_id)?.first_name ??
+          "the client";
+
+        const verdict = await evaluateShiftNote({
+          data: {
+            narrative: narrative.trim(),
+            goals: selectedGoalsForAi,
+            clientFirstName: clientFirst,
+          },
+        });
+        aiVerdict = verdict;
+        setAiCoach(verdict);
+        const nextIter = aiIterations + 1;
+        setAiIterations(nextIter);
+        iterationsToPersist = nextIter;
+
+        if (verdict.status === "Flagged") {
+          const nextFlags = aiFlagCount + 1;
+          setAiFlagCount(nextFlags);
+          if (nextFlags >= 2) setAllowException(true);
+          return; // Block submission — caregiver must revise.
+        }
+      } catch (e) {
+        toast.error((e as Error).message || "AI coach unavailable — please try again.");
+        return;
+      } finally {
+        setAiBusy(false);
+      }
+    }
+
+    const aiStatusForRow: "Verified" | "Exception" = isException ? "Exception" : "Verified";
+    const aiFeedbackForRow = isException
+      ? "🔴 Submitted with Exception Flag — AI coaching not satisfied; pending admin review."
+      : aiVerdict?.feedback ?? "Verified by AI Documentation Coach.";
+
     setBusy(true);
     try {
       // Same single-source cache as clock-in — never call getCurrentPosition again.
@@ -465,7 +536,12 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         }
       }
 
-      await finalizeClockOut({ pos });
+      await finalizeClockOut({
+        pos,
+        aiStatus: aiStatusForRow,
+        aiFeedback: aiFeedbackForRow,
+        aiIterationCount: iterationsToPersist,
+      });
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");
     } finally {
@@ -935,6 +1011,8 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
               onChange={(e) => {
                 setNarrative(e.target.value);
                 if (showNarrativeError) setShowNarrativeError(false);
+                // Invalidate prior AI verdict so the next submit re-checks the new text.
+                if (aiCoach) setAiCoach(null);
               }}
               placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
               maxLength={5000}
@@ -956,7 +1034,40 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             )}
           </div>
 
-          <DialogFooter className="mt-2">
+          {/* 💡 AI Documentation Coach Suggestions */}
+          {(aiBusy || aiCoach) && (
+            <div
+              className={`rounded-lg border-2 px-4 py-3 ${
+                aiCoach?.status === "Verified"
+                  ? "border-emerald-500/40 bg-emerald-500/10"
+                  : "border-amber-500/40 bg-amber-500/10"
+              }`}
+            >
+              <div className="mb-1 flex items-center gap-2 text-sm font-bold">
+                💡 AI Documentation Coach Suggestions
+                {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+              </div>
+              {aiCoach && (
+                <p
+                  className={`text-xs leading-relaxed ${
+                    aiCoach.status === "Verified"
+                      ? "text-emerald-800 dark:text-emerald-200"
+                      : "text-amber-900 dark:text-amber-100"
+                  }`}
+                >
+                  {aiCoach.status === "Verified" ? "🟢 AI CLEARED — " : "⚠️ "}
+                  {aiCoach.feedback}
+                </p>
+              )}
+              {aiCoach?.status === "Flagged" && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Edit your narrative above based on the tip, then re-submit. Iteration {aiIterations}.
+                </p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="mt-2 flex flex-col gap-2 sm:flex-col">
             <div
               className="w-full"
               onMouseEnter={() => { if (!narrativeOk) setShowNarrativeError(true); }}
@@ -964,14 +1075,31 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             >
               <Button
                 type="button"
-                onClick={submitCompliance}
-                disabled={!canSubmitCompliance}
+                onClick={() => submitCompliance()}
+                disabled={!canSubmitCompliance || aiBusy}
                 className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               >
-                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                💾 Submit Final Timesheet to Compliance Desk
+                {busy || aiBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {aiBusy
+                  ? "🧠 AI Coach reviewing your note…"
+                  : aiCoach?.status === "Verified"
+                    ? "💾 Submit Final Timesheet to Compliance Desk"
+                    : aiCoach?.status === "Flagged"
+                      ? "🔁 Re-Check with AI Coach"
+                      : "💾 Submit Final Timesheet to Compliance Desk"}
               </Button>
             </div>
+            {allowException && aiCoach?.status === "Flagged" && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => submitCompliance({ exception: true })}
+                disabled={busy || aiBusy}
+                className="w-full border-rose-500/50 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300"
+              >
+                🚩 Submit with Exception Flag
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

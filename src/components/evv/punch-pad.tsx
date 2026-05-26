@@ -190,6 +190,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
           homeLat: c.home_latitude ?? null,
           homeLng: c.home_longitude ?? null,
           geofenceRadiusFeet: c.geofence_radius_feet ?? null,
+          pcspGoals: c.pcsp_goals ?? undefined,
         };
       })();
 

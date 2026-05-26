@@ -509,6 +509,29 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </div>
       ) : null}
 
+      {/* Free OSM/Leaflet proximity map — pulls up the instant the Clock-In tab opens. */}
+      {!isRunning && mapHome && (
+        <div className="mb-4 space-y-1">
+          <GeofenceMap
+            homeLat={mapHome.lat}
+            homeLng={mapHome.lng}
+            radiusFeet={mapRadiusFeet}
+            caregiver={livePos}
+            insideZone={insideZone}
+            height={250}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            {livePos
+              ? insideZone
+                ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
+                : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
+              : "Awaiting browser location permission…"}
+          </p>
+        </div>
+      )}
+
+
+
       <div className="grid gap-3">
         {entryType === "General_Sidebar_Unscheduled" && (
           <>

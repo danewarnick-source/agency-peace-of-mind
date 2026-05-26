@@ -228,6 +228,19 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     return EVV_SERVICE_CODES.map((c) => ({ code: c.code, label: c.label }));
   }, [clientForPunch?.authorizedCodes]);
 
+  // Map / proximity derivation — shared by clock-in pad and clock-out modal.
+  const mapHome =
+    typeof clientForPunch?.homeLat === "number" &&
+    typeof clientForPunch?.homeLng === "number" &&
+    isFinite(clientForPunch.homeLat as number) &&
+    isFinite(clientForPunch.homeLng as number)
+      ? { lat: clientForPunch!.homeLat as number, lng: clientForPunch!.homeLng as number }
+      : null;
+  const mapRadiusFeet = clientForPunch?.geofenceRadiusFeet ?? 1000;
+  const insideZone = mapHome && livePos
+    ? haversineFeet(mapHome, livePos) <= mapRadiusFeet
+    : true;
+
   const requireFacility = entryType === "General_Sidebar_Unscheduled";
   const inReady =
     !!serviceCode &&

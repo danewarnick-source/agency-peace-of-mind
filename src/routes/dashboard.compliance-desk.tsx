@@ -227,80 +227,9 @@ async function hydrateStaff(list: Row[]) {
   return list;
 }
 
-// ============================================================
-// 🤖 Structural constraint extractor — runs ONCE on submit only.
-// Pulls just the hard date/hour windows out of the prompt so we can
-// pass them into the pgvector RPC. All actual conceptual matching is
-// performed by the embedding model, not by string parsing.
-// ============================================================
-type StructuralConstraints = {
-  hourMin: number | null;
-  dateFromIso: string | null;
-  dateToIso: string | null;
-};
+// (Frontend regex constraint extractor removed — the hybrid LLM router on the
+// server now parses caregiver names, client names, dates, and times directly.)
 
-const MONTHS: Record<string, number> = {
-  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
-  may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7,
-  sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
-};
-function startOfMonth(y: number, m: number) {
-  return new Date(y, m, 1, 0, 0, 0, 0).toISOString();
-}
-function endOfMonth(y: number, m: number) {
-  return new Date(y, m + 1, 0, 23, 59, 59, 999).toISOString();
-}
-
-function extractConstraints(raw: string): StructuralConstraints {
-  const q = raw.trim().toLowerCase();
-  let dateFromIso: string | null = null;
-  let dateToIso: string | null = null;
-  let hourMin: number | null = null;
-  const now = new Date();
-  const year = now.getFullYear();
-
-  const monthRange = q.match(/from\s+([a-z]+)\s+to\s+([a-z]+)/);
-  if (monthRange && MONTHS[monthRange[1]] != null && MONTHS[monthRange[2]] != null) {
-    const a = MONTHS[monthRange[1]];
-    const b = MONTHS[monthRange[2]];
-    dateFromIso = startOfMonth(year, Math.min(a, b));
-    dateToIso = endOfMonth(year, Math.max(a, b));
-  } else {
-    const single = q.match(/(?:^|\s)(?:in\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?=\s|$)/);
-    if (single) {
-      const m = MONTHS[single[1]];
-      dateFromIso = startOfMonth(year, m);
-      dateToIso = endOfMonth(year, m);
-    }
-  }
-
-  if (q.includes("last summer")) {
-    dateFromIso = new Date(year - 1, 5, 1, 0, 0, 0, 0).toISOString();
-    dateToIso = new Date(year - 1, 7, 31, 23, 59, 59, 999).toISOString();
-  } else if (q.includes("this summer")) {
-    dateFromIso = new Date(year, 5, 1, 0, 0, 0, 0).toISOString();
-    dateToIso = new Date(year, 7, 31, 23, 59, 59, 999).toISOString();
-  } else if (q.includes("last month")) {
-    const d = new Date(year, now.getMonth() - 1, 1);
-    dateFromIso = startOfMonth(d.getFullYear(), d.getMonth());
-    dateToIso = endOfMonth(d.getFullYear(), d.getMonth());
-  } else if (q.includes("this month")) {
-    dateFromIso = startOfMonth(year, now.getMonth());
-    dateToIso = endOfMonth(year, now.getMonth());
-  }
-
-  const afterRe = q.match(/after\s+(\d{1,2})\s*(am|pm)?/);
-  if (afterRe) {
-    let h = parseInt(afterRe[1], 10);
-    if (afterRe[2] === "pm" && h < 12) h += 12;
-    if (afterRe[2] === "am" && h === 12) h = 0;
-    if (h >= 0 && h <= 23) hourMin = h;
-  }
-  if (hourMin == null && q.includes("night shift")) hourMin = 18;
-  if (hourMin == null && q.includes("evening")) hourMin = 17;
-
-  return { hourMin, dateFromIso, dateToIso };
-}
 
 
 function ComplianceDeskPage() {
@@ -311,15 +240,11 @@ function ComplianceDeskPage() {
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);
 
-  // 🤖 AI Vector Search — fully decoupled from keystrokes.
-  // `aiInput` is the controlled text box. `submitted` is the locked-in
-  // query that triggers the vector pipeline. Nothing fires until the
-  // admin clicks "Ask AI" or presses Enter.
+  // 🤖 Hybrid AI Search — LLM routes the query into SQL filters
+  // (+ optional vector match). Submission is decoupled from keystrokes:
+  // nothing fires until the admin clicks "Ask AI" or presses Enter.
   const [aiInput, setAiInput] = useState("");
-  const [submitted, setSubmitted] = useState<{
-    query: string;
-    constraints: StructuralConstraints;
-  } | null>(null);
+  const [submitted, setSubmitted] = useState<{ query: string } | null>(null);
   const isSearching = submitted !== null;
 
   const runVectorSearch = useServerFn(searchTimesheetsByVector);
@@ -358,26 +283,16 @@ function ComplianceDeskPage() {
 
   const vectorQ = useQuery({
     enabled: isSearching && !!org?.organization_id,
-    queryKey: [
-      "evv-vector-search",
-      org?.organization_id,
-      submitted?.query,
-      submitted?.constraints.hourMin,
-      submitted?.constraints.dateFromIso,
-      submitted?.constraints.dateToIso,
-    ],
+    queryKey: ["evv-hybrid-search", org?.organization_id, submitted?.query],
     queryFn: async () => {
       const res = await runVectorSearch({
         data: {
           query: submitted!.query,
           organizationId: org!.organization_id,
-          hourMin: submitted!.constraints.hourMin,
-          dateFrom: submitted!.constraints.dateFromIso,
-          dateTo: submitted!.constraints.dateToIso,
           matchCount: 50,
         },
       });
-      return res.matches;
+      return res;
     },
     staleTime: 60_000,
   });
@@ -412,11 +327,17 @@ function ComplianceDeskPage() {
       toast.error("Type a question first.");
       return;
     }
-    setSubmitted({ query: q, constraints: extractConstraints(q) });
+    setSubmitted({ query: q });
+  };
+  // 🧹 Reset rule — empties results, unmounts cross-tab grid, restores tabs.
+  const resetAiSearch = () => {
+    setSubmitted(null);
+    qc.cancelQueries({ queryKey: ["evv-hybrid-search"] });
+    qc.removeQueries({ queryKey: ["evv-hybrid-search"] });
   };
   const clearAiSearch = () => {
     setAiInput("");
-    setSubmitted(null);
+    resetAiSearch();
   };
 
   const onGlobalUtahExport = () => {
@@ -480,8 +401,8 @@ function ComplianceDeskPage() {
               onChange={(e) => {
                 const val = e.target.value;
                 setAiInput(val);
-                if (val.trim().length === 0 && submitted !== null) {
-                  setSubmitted(null);
+                if (val.trim().length === 0) {
+                  resetAiSearch();
                 }
               }}
               onKeyDown={(e) => {
@@ -578,8 +499,8 @@ function ComplianceDeskPage() {
       {isSearching ? (
         <UnifiedSearchResults
           query={submitted!.query}
-          constraints={submitted!.constraints}
-          matches={vectorQ.data ?? []}
+          route={vectorQ.data?.route ?? null}
+          matches={vectorQ.data?.matches ?? []}
           pending={pendingQ.data ?? []}
           approved={approvedQ.data ?? []}
           loading={vectorQ.isFetching || pendingQ.isLoading || approvedQ.isLoading}
@@ -629,11 +550,18 @@ function ComplianceDeskPage() {
 // Receives the ranked id list from pgvector RPC and renders the corresponding
 // Row objects in the existing TSheets-style split-block layout.
 function UnifiedSearchResults({
-  query, constraints, matches, pending, approved, loading, error,
+  query, route, matches, pending, approved, loading, error,
   onMap, onEdit, onReason, onApprove, approving,
 }: {
   query: string;
-  constraints: StructuralConstraints;
+  route: {
+    caregiver_name: string | null;
+    client_name: string | null;
+    hour_min: number | null;
+    date_from: string | null;
+    date_to: string | null;
+    requires_semantic: boolean;
+  } | null;
   matches: Array<{ id: string; similarity: number }>;
   pending: Row[];
   approved: Row[];
@@ -671,17 +599,29 @@ function UnifiedSearchResults({
           <Badge variant="secondary" className="font-mono max-w-[260px] truncate" title={query}>
             🧠 {query}
           </Badge>
-          {constraints.dateFromIso && constraints.dateToIso && (
+          {route?.caregiver_name && (
+            <Badge variant="outline" className="font-mono">👤 {route.caregiver_name}</Badge>
+          )}
+          {route?.client_name && (
+            <Badge variant="outline" className="font-mono">🧑‍🤝‍🧑 {route.client_name}</Badge>
+          )}
+          {route?.date_from && route?.date_to && (
             <Badge variant="outline" className="font-mono">
-              📅 {new Date(constraints.dateFromIso).toLocaleDateString()} → {new Date(constraints.dateToIso).toLocaleDateString()}
+              📅 {new Date(route.date_from).toLocaleDateString()} → {new Date(route.date_to).toLocaleDateString()}
             </Badge>
           )}
-          {constraints.hourMin != null && (
-            <Badge variant="outline" className="font-mono">⏰ ≥ {constraints.hourMin}:00</Badge>
+          {route?.hour_min != null && (
+            <Badge variant="outline" className="font-mono">⏰ ≥ {route.hour_min}:00</Badge>
+          )}
+          {route && (
+            <Badge variant="outline" className="font-mono">
+              {route.requires_semantic ? "🧬 SEMANTIC + SQL" : "⚡ SQL ONLY"}
+            </Badge>
           )}
           <Badge variant="outline" className="font-mono">{ranked.length} match{ranked.length === 1 ? "" : "es"}</Badge>
         </div>
       </div>
+
 
       {error && (
         <div className="mb-3 rounded-md border border-rose-300/50 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">

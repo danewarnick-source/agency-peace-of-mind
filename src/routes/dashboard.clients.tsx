@@ -352,7 +352,9 @@ function ClientFormDialog({
             pcsp_goals: goals,
             job_code: jobCodes,
             medicaid_id: medicaidId.trim(),
+            geofence_radius_feet: radius,
           });
+
         }}
         className="grid gap-4"
       >

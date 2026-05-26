@@ -186,14 +186,21 @@ function ComplianceDeskPage() {
           onClick={() => setSub("pending")}
           className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "pending" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
-          📥 Pending Approvals Ledger
+          📥 Pending Review
         </button>
         <button
           type="button"
-          onClick={() => setSub("archive")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setSub("evv-archive")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
-          📁 Approved Timesheets Archive
+          📁 State EVV Archive
+        </button>
+        <button
+          type="button"
+          onClick={() => setSub("non-evv-archive")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "non-evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          💼 Internal / Non-EVV Archive
         </button>
       </nav>
 
@@ -207,9 +214,17 @@ function ComplianceDeskPage() {
           approving={approve.isPending}
           onReason={setReasonRow}
         />
+      ) : sub === "evv-archive" ? (
+        <ArchiveTable
+          variant="evv"
+          rows={(approvedQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
+          loading={approvedQ.isLoading}
+          onMap={setMapOpen}
+        />
       ) : (
         <ArchiveTable
-          rows={approvedQ.data ?? []}
+          variant="non-evv"
+          rows={(approvedQ.data ?? []).filter((r) => !isEvvLockedCode(r.service_type_code))}
           loading={approvedQ.isLoading}
           onMap={setMapOpen}
         />

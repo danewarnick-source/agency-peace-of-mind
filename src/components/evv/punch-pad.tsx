@@ -1011,6 +1011,8 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
               onChange={(e) => {
                 setNarrative(e.target.value);
                 if (showNarrativeError) setShowNarrativeError(false);
+                // Invalidate prior AI verdict so the next submit re-checks the new text.
+                if (aiCoach) setAiCoach(null);
               }}
               placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
               maxLength={5000}

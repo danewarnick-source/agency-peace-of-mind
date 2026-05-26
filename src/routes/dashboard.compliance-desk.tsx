@@ -569,7 +569,10 @@ function ArchiveTable({
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
-                  <TableCell className="font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
+                  <TableCell className="font-medium">
+                    {r.staff?.full_name ?? r.staff?.email ?? "—"}
+                    <EditedByAdminBadge row={r} />
+                  </TableCell>
                   <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                   <TableCell className="font-mono text-xs">{r.utah_medicaid_member_id}</TableCell>
                   <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>

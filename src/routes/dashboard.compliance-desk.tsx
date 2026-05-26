@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +76,13 @@ export const Route = createFileRoute("/dashboard/compliance-desk")({
 });
 
 type Coord = { latitude: number; longitude: number; accuracy_meters: number };
+type AuditEntry = {
+  timestamp: string;
+  admin: string;
+  field_changed: string;
+  old_value: string;
+  new_value: string;
+};
 type Row = {
   id: string;
   staff_id: string;
@@ -91,6 +99,9 @@ type Row = {
   gps_out_coordinates: Coord | null;
   outside_geofence_reason: string | null;
   status: string;
+  is_edited_by_admin: boolean;
+  edited_by_admin_name: string | null;
+  edit_audit_history_log: AuditEntry[];
   clients: { first_name: string; last_name: string; physical_address: string | null } | null;
   staff: { full_name: string | null; email: string | null } | null;
 };
@@ -105,7 +116,38 @@ function fmtDuration(inIso: string, outIso: string | null) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, clients(first_name,last_name,physical_address)";
+/** Strict OpenStreetMap deep-link: centered red marker pin at street-level zoom 17. */
+function osmPinLink(lat: number | null | undefined, lng: number | null | undefined): string | null {
+  if (lat == null || lng == null || Number.isNaN(Number(lat)) || Number.isNaN(Number(lng))) return null;
+  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
+}
+
+function EditedByAdminBadge({ row }: { row: Row }) {
+  if (!row.is_edited_by_admin) return null;
+  const log = row.edit_audit_history_log ?? [];
+  const last = log[log.length - 1];
+  const when = last ? new Date(last.timestamp).toLocaleString() : "";
+  const detail = last
+    ? `Modified by ${row.edited_by_admin_name ?? last.admin} on ${when}. Changed ${last.field_changed} from ${last.old_value} to ${last.new_value}.`
+    : `Modified by ${row.edited_by_admin_name ?? "Admin"}.`;
+  return (
+    <TooltipProvider delayDuration={120}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className="ml-2 inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+            style={{ backgroundColor: "rgba(251,191,36,0.25)", color: "#1f2937", borderColor: "rgba(217,119,6,0.55)" }}
+          >
+            ⚠️ EDITED BY ADMIN
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">{detail}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, clients(first_name,last_name,physical_address)";
 
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));
@@ -220,6 +262,7 @@ function ComplianceDeskPage() {
           rows={(approvedQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
           loading={approvedQ.isLoading}
           onMap={setMapOpen}
+          onEdit={setEditRow}
         />
       ) : (
         <ArchiveTable
@@ -227,6 +270,7 @@ function ComplianceDeskPage() {
           rows={(approvedQ.data ?? []).filter((r) => !isEvvLockedCode(r.service_type_code))}
           loading={approvedQ.isLoading}
           onMap={setMapOpen}
+          onEdit={setEditRow}
         />
       )}
 
@@ -273,7 +317,10 @@ function PendingTable({
               <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts. ✓</TableCell></TableRow>
             ) : rows.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
+                <TableCell className="font-medium">
+                  {r.staff?.full_name ?? r.staff?.email ?? "—"}
+                  <EditedByAdminBadge row={r} />
+                </TableCell>
                 <TableCell>
                   <div className="text-sm">{r.clients?.first_name} {r.clients?.last_name}</div>
                   <div className="text-[11px] text-muted-foreground">{r.clients?.physical_address ?? "—"}</div>
@@ -429,8 +476,8 @@ function buildPayrollCsv(rows: Row[]): string {
 }
 
 function ArchiveTable({
-  rows, loading, onMap, variant,
-}: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; variant: "evv" | "non-evv" }) {
+  rows, loading, onMap, onEdit, variant,
+}: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; onEdit: (r: Row) => void; variant: "evv" | "non-evv" }) {
   const [search, setSearch] = useState("");
   const [svc, setSvc] = useState<string>("all");
   const [from, setFrom] = useState<string>("");
@@ -512,20 +559,24 @@ function ArchiveTable({
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
               <TableHead>Geofence Validation Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
             ) : filtered.map((r) => {
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
-                  <TableCell className="font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
+                  <TableCell className="font-medium">
+                    {r.staff?.full_name ?? r.staff?.email ?? "—"}
+                    <EditedByAdminBadge row={r} />
+                  </TableCell>
                   <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                   <TableCell className="font-mono text-xs">{r.utah_medicaid_member_id}</TableCell>
                   <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
@@ -538,6 +589,11 @@ function ArchiveTable({
                   </TableCell>
                   <TableCell>
                     <GeofenceBadge reason={r.outside_geofence_reason} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="secondary" onClick={() => onEdit(r)}>
+                      <Pencil className="mr-1 h-3 w-3" /> Edit
+                    </Button>
                   </TableCell>
                 </TableRow>
               );
@@ -567,14 +623,14 @@ function ReasonDialog({ row, onClose }: { row: Row | null; onClose: () => void }
 }
 
 function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
-  const link = useMemo(() => {
-    if (!row) return "";
-    const a = row.gps_in_coordinates;
-    const b = row.gps_out_coordinates;
-    if (!a) return "";
-    if (!b) return `https://www.openstreetmap.org/?mlat=${a.latitude}&mlon=${a.longitude}#map=17/${a.latitude}/${a.longitude}`;
-    return `https://www.openstreetmap.org/?bbox=${Math.min(a.longitude,b.longitude)},${Math.min(a.latitude,b.latitude)},${Math.max(a.longitude,b.longitude)},${Math.max(a.latitude,b.latitude)}`;
-  }, [row]);
+  const inLink = useMemo(
+    () => (row ? osmPinLink(row.gps_in_coordinates?.latitude, row.gps_in_coordinates?.longitude) : null),
+    [row],
+  );
+  const outLink = useMemo(
+    () => (row?.gps_out_coordinates ? osmPinLink(row.gps_out_coordinates.latitude, row.gps_out_coordinates.longitude) : null),
+    [row],
+  );
 
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
@@ -592,6 +648,11 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
                 <span className="ml-2 text-muted-foreground">± {Math.round(row.gps_in_coordinates.accuracy_meters)}m</span>
               </div>
               <div className="text-[11px] text-muted-foreground">{new Date(row.clock_in_timestamp).toLocaleString()}</div>
+              {inLink && (
+                <a href={inLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
+                  🔗 Open clock-in pin in OpenStreetMap
+                </a>
+              )}
             </div>
             <div className="rounded-lg border border-border p-3">
               <div className="font-semibold text-rose-600">Clock-Out</div>
@@ -602,10 +663,14 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
                     <span className="ml-2 text-muted-foreground">± {Math.round(row.gps_out_coordinates.accuracy_meters)}m</span>
                   </div>
                   <div className="text-[11px] text-muted-foreground">{row.clock_out_timestamp ? new Date(row.clock_out_timestamp).toLocaleString() : ""}</div>
+                  {outLink && (
+                    <a href={outLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
+                      🔗 Open clock-out pin in OpenStreetMap
+                    </a>
+                  )}
                 </>
               ) : <div className="text-xs text-muted-foreground">Not captured</div>}
             </div>
-            {link && <Button asChild variant="outline" className="w-full"><a href={link} target="_blank" rel="noreferrer">Open in OpenStreetMap</a></Button>}
           </div>
         )}
         <DialogFooter><Button variant="ghost" onClick={onClose}>Close</Button></DialogFooter>
@@ -614,35 +679,117 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
   );
 }
 
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fmtAuditValue(field: string, v: unknown): string {
+  if (v == null || v === "") return "(empty)";
+  if (field === "rounded_clock_in" || field === "rounded_clock_out") {
+    return new Date(String(v)).toLocaleString();
+  }
+  return String(v);
+}
+
 function EditShiftDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [clockIn, setClockIn] = useState("");
   const [clockOut, setClockOut] = useState("");
   const [svc, setSvc] = useState("");
+  const [latIn, setLatIn] = useState("");
+  const [lngIn, setLngIn] = useState("");
+  const [latOut, setLatOut] = useState("");
+  const [lngOut, setLngOut] = useState("");
 
-  useMemo(() => {
-    if (row) {
-      setClockIn(row.clock_in_timestamp.slice(0, 16));
-      setClockOut(row.clock_out_timestamp ? row.clock_out_timestamp.slice(0, 16) : "");
-      setSvc(row.service_type_code);
-    }
+  useEffect(() => {
+    if (!row) return;
+    setClockIn(toLocalInput(row.rounded_clock_in ?? row.clock_in_timestamp));
+    setClockOut(toLocalInput(row.rounded_clock_out ?? row.clock_out_timestamp));
+    setSvc(row.service_type_code);
+    setLatIn(String(row.gps_in_coordinates?.latitude ?? ""));
+    setLngIn(String(row.gps_in_coordinates?.longitude ?? ""));
+    setLatOut(row.gps_out_coordinates ? String(row.gps_out_coordinates.latitude) : "");
+    setLngOut(row.gps_out_coordinates ? String(row.gps_out_coordinates.longitude) : "");
   }, [row]);
 
   const save = useMutation({
     mutationFn: async () => {
       if (!row) return;
+      const adminName =
+        (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Administrator";
+      const nowIso = new Date().toISOString();
+
+      const newRoundedIn = clockIn ? new Date(clockIn).toISOString() : null;
+      const newRoundedOut = clockOut ? new Date(clockOut).toISOString() : null;
+      const newLatIn = latIn === "" ? null : Number(latIn);
+      const newLngIn = lngIn === "" ? null : Number(lngIn);
+      const newLatOut = latOut === "" ? null : Number(latOut);
+      const newLngOut = lngOut === "" ? null : Number(lngOut);
+
+      const auditAdds: AuditEntry[] = [];
+      const pushDiff = (field: string, oldV: unknown, newV: unknown) => {
+        const a = oldV == null ? "" : String(oldV);
+        const b = newV == null ? "" : String(newV);
+        if (a !== b) {
+          auditAdds.push({
+            timestamp: nowIso,
+            admin: adminName,
+            field_changed: field,
+            old_value: fmtAuditValue(field, oldV),
+            new_value: fmtAuditValue(field, newV),
+          });
+        }
+      };
+      pushDiff("rounded_clock_in", row.rounded_clock_in ?? row.clock_in_timestamp, newRoundedIn);
+      pushDiff("rounded_clock_out", row.rounded_clock_out ?? row.clock_out_timestamp, newRoundedOut);
+      pushDiff("service_type_code", row.service_type_code, svc);
+      pushDiff("begin_geo_latitude", row.gps_in_coordinates?.latitude, newLatIn);
+      pushDiff("begin_geo_longitude", row.gps_in_coordinates?.longitude, newLngIn);
+      pushDiff("end_geo_latitude", row.gps_out_coordinates?.latitude ?? null, newLatOut);
+      pushDiff("end_geo_longitude", row.gps_out_coordinates?.longitude ?? null, newLngOut);
+
+      if (auditAdds.length === 0) {
+        toast.info("No changes to save.");
+        return;
+      }
+
+      const accIn = row.gps_in_coordinates?.accuracy_meters ?? 0;
+      const gpsIn = {
+        latitude: newLatIn ?? row.gps_in_coordinates?.latitude ?? 0,
+        longitude: newLngIn ?? row.gps_in_coordinates?.longitude ?? 0,
+        accuracy_meters: accIn,
+      };
+      const gpsOut = (newLatOut != null && newLngOut != null)
+        ? {
+            latitude: newLatOut,
+            longitude: newLngOut,
+            accuracy_meters: row.gps_out_coordinates?.accuracy_meters ?? 0,
+          }
+        : null;
+
+      const history = [...(row.edit_audit_history_log ?? []), ...auditAdds];
+
       const { error } = await supabase
         .from("evv_timesheets")
         .update({
-          clock_in_timestamp: new Date(clockIn).toISOString(),
-          clock_out_timestamp: clockOut ? new Date(clockOut).toISOString() : null,
+          rounded_clock_in: newRoundedIn,
+          rounded_clock_out: newRoundedOut,
           service_type_code: svc,
+          gps_in_coordinates: gpsIn,
+          gps_out_coordinates: gpsOut,
+          is_edited_by_admin: true,
+          edited_by_admin_name: adminName,
+          edit_audit_history_log: history,
         })
         .eq("id", row.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Shift adjusted.");
+      toast.success("Shift updated. Audit entry recorded.");
       qc.invalidateQueries({ queryKey: ["evv-pending"] });
       qc.invalidateQueries({ queryKey: ["evv-approved"] });
       onClose();
@@ -650,23 +797,27 @@ function EditShiftDialog({ row, onClose }: { row: Row | null; onClose: () => voi
     onError: (e) => toast.error((e as Error).message),
   });
 
+  const history = row?.edit_audit_history_log ?? [];
+
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Manual Adjustment</DialogTitle>
-          <DialogDescription>Update the shift timestamps or service code before approval.</DialogDescription>
+          <DialogTitle>✎ Administrative Shift Override</DialogTitle>
+          <DialogDescription>
+            Edits are logged with your name and timestamp to the immutable audit trail.
+          </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label>Clock-In</Label>
+            <Label>Rounded Clock-In</Label>
             <Input type="datetime-local" value={clockIn} onChange={(e) => setClockIn(e.target.value)} />
           </div>
           <div>
-            <Label>Clock-Out</Label>
+            <Label>Rounded Clock-Out</Label>
             <Input type="datetime-local" value={clockOut} onChange={(e) => setClockOut(e.target.value)} />
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <Label>Service Code</Label>
             <Select value={svc} onValueChange={setSvc}>
               <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
@@ -675,11 +826,43 @@ function EditShiftDialog({ row, onClose }: { row: Row | null; onClose: () => voi
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label>Begin Geo Latitude</Label>
+            <Input value={latIn} onChange={(e) => setLatIn(e.target.value)} placeholder="40.7608" />
+          </div>
+          <div>
+            <Label>Begin Geo Longitude</Label>
+            <Input value={lngIn} onChange={(e) => setLngIn(e.target.value)} placeholder="-111.8910" />
+          </div>
+          <div>
+            <Label>End Geo Latitude</Label>
+            <Input value={latOut} onChange={(e) => setLatOut(e.target.value)} placeholder="40.7608" />
+          </div>
+          <div>
+            <Label>End Geo Longitude</Label>
+            <Input value={lngOut} onChange={(e) => setLngOut(e.target.value)} placeholder="-111.8910" />
+          </div>
         </div>
+
+        {history.length > 0 && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-50/40 p-3 text-xs">
+            <div className="mb-1 flex items-center gap-1 font-semibold text-amber-900">
+              <AlertTriangle className="h-3 w-3" /> Prior Audit Trail ({history.length})
+            </div>
+            <ul className="max-h-32 space-y-1 overflow-auto">
+              {history.slice().reverse().map((h, i) => (
+                <li key={i} className="font-mono text-[11px] text-amber-950">
+                  {new Date(h.timestamp).toLocaleString()} · {h.admin} · {h.field_changed}: {h.old_value} → {h.new_value}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending}>
-            {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
+            {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save & Log Audit Entry"}
           </Button>
         </DialogFooter>
       </DialogContent>

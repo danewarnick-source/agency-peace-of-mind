@@ -438,7 +438,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
   }
 
-  async function submitCompliance() {
+  async function submitCompliance(opts?: { exception?: boolean }) {
     if (!user || !active) return;
     if (!hasGoalSelected) {
       toast.error("Select at least one PCSP goal or baseline monitoring.");
@@ -448,6 +448,58 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       setShowNarrativeError(true);
       return;
     }
+
+    // ── AI Documentation Coach intercept ─────────────────────────────
+    // Only call when the caregiver has NOT chosen the exception escape valve
+    // and we have not yet received a "Verified" verdict on the current text.
+    const isException = !!opts?.exception;
+    let aiVerdict: CoachResult | null = aiCoach;
+    let iterationsToPersist = aiIterations;
+
+    if (!isException && (!aiVerdict || aiVerdict.status !== "Verified")) {
+      setAiBusy(true);
+      try {
+        const selectedGoalsForAi = Object.entries(checkedGoals)
+          .filter(([, v]) => v)
+          .map(([k]) => k);
+        if (baselineChecked) selectedGoalsForAi.push("General baseline monitoring & safety oversight");
+        const clientFirst =
+          lockedClient?.name?.split(" ")?.[0] ??
+          caseload.find((c) => c.id === active.client_id)?.first_name ??
+          "the client";
+
+        const verdict = await evaluateShiftNote({
+          data: {
+            narrative: narrative.trim(),
+            goals: selectedGoalsForAi,
+            clientFirstName: clientFirst,
+          },
+        });
+        aiVerdict = verdict;
+        setAiCoach(verdict);
+        const nextIter = aiIterations + 1;
+        setAiIterations(nextIter);
+        iterationsToPersist = nextIter;
+
+        if (verdict.status === "Flagged") {
+          const nextFlags = aiFlagCount + 1;
+          setAiFlagCount(nextFlags);
+          if (nextFlags >= 2) setAllowException(true);
+          return; // Block submission — caregiver must revise.
+        }
+      } catch (e) {
+        toast.error((e as Error).message || "AI coach unavailable — please try again.");
+        return;
+      } finally {
+        setAiBusy(false);
+      }
+    }
+
+    const aiStatusForRow: "Verified" | "Exception" = isException ? "Exception" : "Verified";
+    const aiFeedbackForRow = isException
+      ? "🔴 Submitted with Exception Flag — AI coaching not satisfied; pending admin review."
+      : aiVerdict?.feedback ?? "Verified by AI Documentation Coach.";
+
     setBusy(true);
     try {
       // Same single-source cache as clock-in — never call getCurrentPosition again.
@@ -484,7 +536,12 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         }
       }
 
-      await finalizeClockOut({ pos });
+      await finalizeClockOut({
+        pos,
+        aiStatus: aiStatusForRow,
+        aiFeedback: aiFeedbackForRow,
+        aiIterationCount: iterationsToPersist,
+      });
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");
     } finally {

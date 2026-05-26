@@ -104,6 +104,9 @@ type Row = {
   is_edited_by_admin: boolean;
   edited_by_admin_name: string | null;
   edit_audit_history_log: AuditEntry[];
+  ai_compliance_status: string | null;
+  ai_coaching_iterations: number | null;
+  ai_compliance_feedback: string | null;
   clients: { first_name: string; last_name: string; physical_address: string | null } | null;
   staff: { full_name: string | null; email: string | null } | null;
 };

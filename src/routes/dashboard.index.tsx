@@ -32,24 +32,6 @@ function Overview() {
   const showAdmin = isManager && view === "admin";
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  const { data: stats } = useQuery({
-    enabled: !!org && showAdmin,
-    queryKey: ["overview-stats", org?.organization_id],
-    queryFn: async () => {
-      const [{ count: empCount }, { data: assigns }, { data: certs }] = await Promise.all([
-        supabase.from("organization_members").select("*", { count: "exact", head: true }).eq("organization_id", org!.organization_id).eq("active", true),
-        supabase.from("course_assignments").select("status").eq("organization_id", org!.organization_id),
-        supabase.from("certifications").select("expires_at").eq("organization_id", org!.organization_id),
-      ]);
-      const total = assigns?.length ?? 0;
-      const completed = assigns?.filter((a) => a.status === "completed").length ?? 0;
-      const overdue = assigns?.filter((a) => a.status === "overdue").length ?? 0;
-      const now = new Date();
-      const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      const expiringSoon = (certs ?? []).filter((c) => c.expires_at && new Date(c.expires_at) > now && new Date(c.expires_at) < soon).length;
-      return { employees: empCount ?? 0, completion: total ? Math.round((completed / total) * 100) : 0, expiringSoon, overdue };
-    },
-  });
 
   const { data: myAssigns } = useQuery({
     enabled: !!user && !showAdmin,

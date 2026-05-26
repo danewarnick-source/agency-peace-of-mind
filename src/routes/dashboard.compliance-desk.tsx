@@ -476,12 +476,12 @@ function ArchiveTable({
               const outIso = effectiveOut(r);
               return (
                 <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs">{fmtDate(inIso)}</TableCell>
+                  <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
                   <TableCell className="font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
                   <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                   <TableCell className="font-mono text-xs">{r.utah_medicaid_member_id}</TableCell>
                   <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
-                  <TableCell className="font-mono text-xs">{fmtTime12(inIso)} → {outIso ? fmtTime12(outIso) : "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{fmtTimeHMSAmPm(inIso)} → {outIso ? fmtTimeHMSAmPm(outIso) : "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{fmtDuration(inIso, outIso)}</TableCell>
                   <TableCell>
                     <Button variant="outline" size="sm" onClick={() => onMap(r)}>

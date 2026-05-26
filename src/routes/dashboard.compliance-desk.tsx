@@ -314,7 +314,10 @@ function PendingTable({
               <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts. ✓</TableCell></TableRow>
             ) : rows.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
+                <TableCell className="font-medium">
+                  {r.staff?.full_name ?? r.staff?.email ?? "—"}
+                  <EditedByAdminBadge row={r} />
+                </TableCell>
                 <TableCell>
                   <div className="text-sm">{r.clients?.first_name} {r.clients?.last_name}</div>
                   <div className="text-[11px] text-muted-foreground">{r.clients?.physical_address ?? "—"}</div>

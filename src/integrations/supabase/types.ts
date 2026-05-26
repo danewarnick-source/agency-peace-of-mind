@@ -303,6 +303,7 @@ export type Database = {
           account_status: string
           created_at: string
           first_name: string
+          geofence_radius_feet: number
           home_latitude: number | null
           home_longitude: number | null
           id: string
@@ -319,6 +320,7 @@ export type Database = {
           account_status?: string
           created_at?: string
           first_name: string
+          geofence_radius_feet?: number
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
@@ -335,6 +337,7 @@ export type Database = {
           account_status?: string
           created_at?: string
           first_name?: string
+          geofence_radius_feet?: number
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
@@ -806,11 +809,13 @@ export type Database = {
           gps_out_coordinates: Json | null
           id: string
           organization_id: string
+          outside_geofence_reason: string | null
           service_type_code: string
           shift_entry_type: string
           staff_id: string
           status: string
           tenant_id: string | null
+          timezone_setting: string
           updated_at: string
           utah_medicaid_member_id: string
           utah_medicaid_provider_id: string
@@ -824,11 +829,13 @@ export type Database = {
           gps_out_coordinates?: Json | null
           id?: string
           organization_id: string
+          outside_geofence_reason?: string | null
           service_type_code: string
           shift_entry_type: string
           staff_id: string
           status?: string
           tenant_id?: string | null
+          timezone_setting?: string
           updated_at?: string
           utah_medicaid_member_id: string
           utah_medicaid_provider_id: string
@@ -842,11 +849,13 @@ export type Database = {
           gps_out_coordinates?: Json | null
           id?: string
           organization_id?: string
+          outside_geofence_reason?: string | null
           service_type_code?: string
           shift_entry_type?: string
           staff_id?: string
           status?: string
           tenant_id?: string | null
+          timezone_setting?: string
           updated_at?: string
           utah_medicaid_member_id?: string
           utah_medicaid_provider_id?: string
@@ -2242,6 +2251,7 @@ export type Database = {
           account_status: string
           created_at: string
           first_name: string
+          geofence_radius_feet: number
           home_latitude: number | null
           home_longitude: number | null
           id: string

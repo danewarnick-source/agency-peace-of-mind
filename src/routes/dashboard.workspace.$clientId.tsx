@@ -37,10 +37,12 @@ import {
 } from "@/components/ui/tabs";
 import {
   ArrowLeft,
+  Clock,
   FileText,
   Pill,
   User,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import { AboutTab } from "@/components/workspace/about-tab";
 import { EmarTab } from "@/components/workspace/emar-tab";
@@ -117,26 +119,25 @@ function ClientWorkspace() {
           </div>
         </div>
 
-        {/* In-Chart EVV Punch Pad — client is permanently locked */}
-        <PunchPad
-          entryType="Client_Profile_Pass"
-          lockedClient={{
-            id: client.id,
-            name: `${client.first_name} ${client.last_name}`.trim(),
-            memberId: padMemberId(client.medicaid_id),
-            facility: client.physical_address,
-          }}
-        />
+
+
 
         <Tabs defaultValue="about" className="w-full">
           {/* Touch-friendly tab bar — mirrored across mobile and desktop */}
-          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1">
+          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 p-1">
             <TabsTrigger
               value="about"
               className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
             >
               <User className="h-4 w-4" />
               <span>About</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="clock-in"
+              className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
+            >
+              <Clock className="h-4 w-4" />
+              <span>Clock In</span>
             </TabsTrigger>
             <TabsTrigger
               value="emar"
@@ -158,6 +159,22 @@ function ClientWorkspace() {
             <AboutTab client={client} />
           </TabsContent>
 
+          <TabsContent value="clock-in" className="mt-5">
+            <PunchPad
+              entryType="Client_Profile_Pass"
+              lockedClient={{
+                id: client.id,
+                name: `${client.first_name} ${client.last_name}`.trim(),
+                memberId: padMemberId(client.medicaid_id),
+                facility: client.physical_address,
+                authorizedCodes: client.job_code ?? undefined,
+                homeLat: client.home_latitude,
+                homeLng: client.home_longitude,
+                geofenceRadiusFeet: client.geofence_radius_feet ?? 1000,
+              }}
+            />
+          </TabsContent>
+
           <TabsContent value="emar" className="mt-5">
             <EmarTab
               clientId={client.id}
@@ -172,6 +189,7 @@ function ClientWorkspace() {
             />
           </TabsContent>
         </Tabs>
+
       </div>
 
       {/* 3-minute shared-device idle lock — scoped to this route */}

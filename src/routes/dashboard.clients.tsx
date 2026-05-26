@@ -13,6 +13,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2 } from "lucide-react";
@@ -85,6 +89,7 @@ type Client = {
   pcsp_goals: string[];
   job_code: string[] | null;
   medicaid_id: string | null;
+  geofence_radius_feet?: number | null;
 };
 
 type ClientFormValues = {
@@ -95,7 +100,17 @@ type ClientFormValues = {
   pcsp_goals: string[];
   job_code: string[];
   medicaid_id: string;
+  geofence_radius_feet: number;
 };
+
+const GEOFENCE_OPTIONS: Array<{ v: number; l: string }> = [
+  { v: 250, l: "250 Feet (Strict In-Home Control)" },
+  { v: 500, l: "500 Feet (Standard Suburban Buffer)" },
+  { v: 1000, l: "1,000 Feet (Medicaid Default Baseline)" },
+  { v: 2500, l: "2,500 Feet (Community Outing Extension — 1/2 Mile)" },
+  { v: 5000, l: "5,000 Feet (Rural/Open Campus Margin — 1 Mile)" },
+];
+
 
 function ClientsPage() {
   const { data: org } = useCurrentOrg();
@@ -110,7 +125,7 @@ function ClientsPage() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, medicaid_id, account_status" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, medicaid_id, account_status, geofence_radius_feet" as any)
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
@@ -261,7 +276,9 @@ function ClientsPage() {
               pcsp_goals: editing.pcsp_goals ?? [],
               job_code: editing.job_code ?? [],
               medicaid_id: editing.medicaid_id ?? "",
+              geofence_radius_feet: editing.geofence_radius_feet ?? 1000,
             }}
+
             onSubmit={(v) => editMutation.mutate({ ...v, id: editing.id })}
             clientId={editing.id}
             organizationId={org?.organization_id}
@@ -292,6 +309,8 @@ function ClientFormDialog({
   const [goalInput, setGoalInput] = useState("");
   const [pinning, setPinning] = useState(false);
   const [goals, setGoals] = useState<string[]>(initial?.pcsp_goals ?? []);
+  const [radius, setRadius] = useState<number>(initial?.geofence_radius_feet ?? 1000);
+
 
   // Reset state when initial changes (e.g. opening Edit for a different row)
   useEffect(() => {
@@ -337,7 +356,9 @@ function ClientFormDialog({
             pcsp_goals: goals,
             job_code: jobCodes,
             medicaid_id: medicaidId.trim(),
+            geofence_radius_feet: radius,
           });
+
         }}
         className="grid gap-4"
       >
@@ -428,6 +449,25 @@ function ClientFormDialog({
             </div>
           )}
         </div>
+        {/* Admin-only EVV rules — always visible on the Edit form */}
+        <div className="grid gap-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <h3 className="text-sm font-semibold">📍 Administrative EVV Rules</h3>
+          <div className="grid gap-2">
+            <Label>Maximum Allowable Clock-In Radius</Label>
+            <Select value={String(radius)} onValueChange={(v) => setRadius(Number(v))}>
+              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {GEOFENCE_OPTIONS.map((o) => (
+                  <SelectItem key={o.v} value={String(o.v)}>{o.l}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Caregivers clocking in beyond this distance from the client's home pin must submit a variance justification.
+            </p>
+          </div>
+        </div>
+
         {clientId && (
           <>
             <CustomAttributesSection
@@ -448,6 +488,7 @@ function ClientFormDialog({
             />
           </>
         )}
+
         <DialogFooter>
           <Button type="submit" disabled={!canSubmit || pending}>
             {pending ? "Saving…" : submitLabel}

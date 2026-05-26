@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,14 +8,17 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Play, Square, MapPin, Lock, Loader2, AlertTriangle, CheckCircle2, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { EVV_SERVICE_CODES, padMemberId } from "@/lib/evv-codes";
+import { jobCodeLabel } from "@/lib/job-codes";
 
 type EntryType = "Client_Profile_Pass" | "General_Sidebar_Unscheduled";
 
@@ -24,6 +27,10 @@ type LockedClient = {
   name: string;
   memberId: string;
   facility?: string | null;
+  authorizedCodes?: string[];
+  homeLat?: number | null;
+  homeLng?: number | null;
+  geofenceRadiusFeet?: number | null;
 };
 
 type ActiveShift = {
@@ -35,6 +42,28 @@ type ActiveShift = {
   shift_entry_type: EntryType;
   client_name?: string;
 };
+
+const TIMEZONES = [
+  { v: "America/Denver", l: "Mountain (MST/MDT)" },
+  { v: "America/Los_Angeles", l: "Pacific" },
+  { v: "America/Phoenix", l: "Arizona (no DST)" },
+  { v: "America/Chicago", l: "Central" },
+  { v: "America/New_York", l: "Eastern" },
+];
+
+const EARTH_RADIUS_FEET = 20925525;
+
+function haversineFeet(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dPhi = toRad(b.lat - a.lat);
+  const dLam = toRad(b.lng - a.lng);
+  const p1 = toRad(a.lat);
+  const p2 = toRad(b.lat);
+  const x =
+    Math.sin(dPhi / 2) ** 2 +
+    Math.cos(p1) * Math.cos(p2) * Math.sin(dLam / 2) ** 2;
+  return 2 * EARTH_RADIUS_FEET * Math.asin(Math.min(1, Math.sqrt(x)));
+}
 
 function getPosition(): Promise<{ lat: number; lng: number; acc: number }> {
   return new Promise((resolve, reject) => {
@@ -62,12 +91,19 @@ function providerIdFromOrg(orgId: string | undefined): string {
 }
 
 export interface PunchPadProps {
-  /** Entry-point flag baked into every row. */
   entryType: EntryType;
-  /** When provided, the client field is locked (In-Chart Pass). */
   lockedClient?: LockedClient | null;
-  /** When entry is unscheduled, caller passes the caseload + facility list. */
-  caseload?: Array<{ id: string; first_name: string; last_name: string; medicaid_id: string | null; physical_address: string | null }>;
+  caseload?: Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    medicaid_id: string | null;
+    physical_address: string | null;
+    job_code?: string[] | null;
+    home_latitude?: number | null;
+    home_longitude?: number | null;
+    geofence_radius_feet?: number | null;
+  }>;
 }
 
 export function PunchPad({ entryType, lockedClient = null, caseload = [] }: PunchPadProps) {
@@ -78,12 +114,20 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const [serviceCode, setServiceCode] = useState<string>("");
   const [selectedClientId, setSelectedClientId] = useState<string>(lockedClient?.id ?? "");
   const [selectedFacility, setSelectedFacility] = useState<string>(lockedClient?.facility ?? "");
+  const [timezone, setTimezone] = useState<string>("America/Denver");
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
   const [success, setSuccess] = useState<null | { duration: string }>(null);
   const [now, setNow] = useState<number>(() => Date.now());
 
-  // Facility list from caseload distinct addresses.
+  // Geofence variance overlay state
+  const [variance, setVariance] = useState<null | {
+    distanceFeet: number;
+    limitFeet: number;
+    pos: { lat: number; lng: number; acc: number };
+  }>(null);
+  const [varianceReason, setVarianceReason] = useState("");
+
   const facilities = useMemo(() => {
     const set = new Set<string>();
     caseload.forEach((c) => {
@@ -93,7 +137,6 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     return Array.from(set).sort();
   }, [caseload]);
 
-  // ── Hydrate any existing OPEN shift for this user, so Clock Out always works ──
   const activeQuery = useQuery({
     enabled: !!user?.id,
     queryKey: ["evv-active", user?.id],
@@ -122,10 +165,8 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   });
 
   const active = activeQuery.data ?? null;
-  // Only show "active" in this widget if the locked-client matches (or no lock).
   const activeMatchesThisPad = active && (!lockedClient || active.client_id === lockedClient.id);
 
-  // Single, cleanly-cleared stopwatch interval (no infinite-loop hazards).
   useEffect(() => {
     if (!activeMatchesThisPad) return;
     setNow(Date.now());
@@ -133,8 +174,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     return () => clearInterval(t);
   }, [activeMatchesThisPad, active?.id]);
 
-  // --- Validation: are we ready to clock IN? ---
-  const clientForPunch = lockedClient
+  const clientForPunch: LockedClient | null = lockedClient
     ? lockedClient
     : (() => {
         const c = caseload.find((x) => x.id === selectedClientId);
@@ -144,8 +184,25 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
           name: `${c.first_name} ${c.last_name}`.trim(),
           memberId: padMemberId(c.medicaid_id),
           facility: c.physical_address,
-        } as LockedClient;
+          authorizedCodes: c.job_code ?? undefined,
+          homeLat: c.home_latitude ?? null,
+          homeLng: c.home_longitude ?? null,
+          geofenceRadiusFeet: c.geofence_radius_feet ?? null,
+        };
       })();
+
+  // Restrict service codes to those authorized on the client profile.
+  const codesForClient = useMemo(() => {
+    const authorized = clientForPunch?.authorizedCodes;
+    if (authorized && authorized.length) {
+      // Mix: prefer client's job codes (DSPD billing codes) — fall back to EVV labels if matched.
+      return authorized.map((code) => {
+        const evv = EVV_SERVICE_CODES.find((c) => c.code === code);
+        return { code, label: evv?.label ?? jobCodeLabel(code) ?? code };
+      });
+    }
+    return EVV_SERVICE_CODES.map((c) => ({ code: c.code, label: c.label }));
+  }, [clientForPunch?.authorizedCodes]);
 
   const requireFacility = entryType === "General_Sidebar_Unscheduled";
   const inReady =
@@ -153,6 +210,31 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     !!clientForPunch &&
     (!requireFacility || !!selectedFacility) &&
     !!org?.organization_id;
+
+  async function writeShift(args: {
+    pos: { lat: number; lng: number; acc: number };
+    outsideReason?: string;
+  }) {
+    if (!user || !org || !clientForPunch) return;
+    const payload = {
+      organization_id: org.organization_id,
+      staff_id: user.id,
+      client_id: clientForPunch.id,
+      utah_medicaid_provider_id: providerIdFromOrg(org.organization_id),
+      utah_medicaid_member_id: clientForPunch.memberId,
+      service_type_code: serviceCode,
+      gps_in_coordinates: { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc },
+      shift_entry_type: entryType,
+      status: "Active",
+      timezone_setting: timezone,
+      outside_geofence_reason: args.outsideReason ?? null,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from("evv_timesheets").insert(payload as any);
+    if (error) throw error;
+    toast.success("Shift started — GPS captured.");
+    await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
+  }
 
   async function handleClockIn() {
     if (!user || !org || !clientForPunch) return;
@@ -166,21 +248,39 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       try { pos = await getPosition(); }
       catch { setDenied(true); return; }
 
-      const payload = {
-        organization_id: org.organization_id,
-        staff_id: user.id,
-        client_id: clientForPunch.id,
-        utah_medicaid_provider_id: providerIdFromOrg(org.organization_id),
-        utah_medicaid_member_id: clientForPunch.memberId,
-        service_type_code: serviceCode,
-        gps_in_coordinates: { latitude: pos.lat, longitude: pos.lng, accuracy_meters: pos.acc },
-        shift_entry_type: entryType,
-        status: "Active",
-      };
-      const { error } = await supabase.from("evv_timesheets").insert(payload);
-      if (error) throw error;
-      toast.success("Shift started — GPS captured.");
-      await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
+      // Haversine geofence check (when client has a home pin + radius).
+      const lat = clientForPunch.homeLat;
+      const lng = clientForPunch.homeLng;
+      const radius = clientForPunch.geofenceRadiusFeet ?? 1000;
+      if (typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)) {
+        const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
+        if (dist > radius) {
+          setVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });
+          setVarianceReason("");
+          return; // BLOCK insert until justification submitted
+        }
+      }
+
+      await writeShift({ pos });
+    } catch (e) {
+      toast.error((e as Error).message || "Could not start shift.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitVariance() {
+    if (!variance) return;
+    const reason = varianceReason.trim();
+    if (reason.length < 5) {
+      toast.error("Please provide a variance justification.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await writeShift({ pos: variance.pos, outsideReason: reason });
+      setVariance(null);
+      setVarianceReason("");
     } catch (e) {
       toast.error((e as Error).message || "Could not start shift.");
     } finally {
@@ -242,7 +342,6 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </Badge>
       </header>
 
-      {/* Locked client display (In-Chart pass) */}
       {lockedClient ? (
         <div className="mb-4 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2">
           <p className="flex items-center gap-2 text-sm font-semibold">
@@ -250,11 +349,13 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             Verified Medicaid ID: <span className="font-mono">{lockedClient.memberId || "—"}</span>
+            {typeof lockedClient.geofenceRadiusFeet === "number" && (
+              <> · Geofence: <span className="font-mono">{lockedClient.geofenceRadiusFeet} ft</span></>
+            )}
           </p>
         </div>
       ) : null}
 
-      {/* Selectors */}
       <div className="grid gap-3">
         {entryType === "General_Sidebar_Unscheduled" && (
           <>
@@ -272,7 +373,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium">👤 Assign Client Individual</label>
-              <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={isRunning}>
+              <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setServiceCode(""); }} disabled={isRunning}>
                 <SelectTrigger className="h-11"><SelectValue placeholder="Select a client" /></SelectTrigger>
                 <SelectContent>
                   {caseload
@@ -295,19 +396,35 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         )}
 
         <div>
-          <label className="mb-1 block text-xs font-medium">💼 Assign Medicaid Billing Code</label>
-          <Select value={serviceCode} onValueChange={setServiceCode} disabled={isRunning}>
-            <SelectTrigger className="h-11"><SelectValue placeholder="Select service code" /></SelectTrigger>
+          <label className="mb-1 block text-xs font-medium">💼 Select Service Code</label>
+          <Select value={serviceCode} onValueChange={setServiceCode} disabled={isRunning || !clientForPunch}>
+            <SelectTrigger className="h-11"><SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} /></SelectTrigger>
             <SelectContent>
-              {EVV_SERVICE_CODES.map((c) => (
+              {codesForClient.length === 0 ? (
+                <SelectItem value="__none" disabled>No codes authorized</SelectItem>
+              ) : codesForClient.map((c) => (
                 <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          {clientForPunch?.authorizedCodes?.length ? (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Restricted to authorizations on {clientForPunch.name}'s profile.
+            </p>
+          ) : null}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium">🕐 Timezone</label>
+          <Select value={timezone} onValueChange={setTimezone} disabled={isRunning}>
+            <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TIMEZONES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Live timer */}
       <div className="mt-5 flex items-center justify-center rounded-xl border border-border bg-background/70 py-3">
         <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
         <span className="font-mono text-2xl font-bold tabular-nums tracking-tight">
@@ -315,7 +432,6 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </span>
       </div>
 
-      {/* Big circular action button */}
       <div className="mt-5 flex justify-center">
         {isRunning ? (
           <button
@@ -343,14 +459,13 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         {isRunning ? "⏹️ END EVV SHIFT" : "▶️ START EVV SHIFT"}
       </p>
 
-      {/* Origin / footer chip */}
       <p className="mt-3 flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
         <MapPin className="h-3 w-3" />
         Entry origin:&nbsp;
         <span className="font-mono">{entryType === "Client_Profile_Pass" ? "In-Chart" : "Sidebar Unscheduled"}</span>
       </p>
 
-      {/* GPS-denied overlay */}
+      {/* GPS-denied */}
       <Dialog open={denied} onOpenChange={setDenied}>
         <DialogContent>
           <DialogHeader>
@@ -369,7 +484,47 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </DialogContent>
       </Dialog>
 
-      {/* Success overlay */}
+      {/* Out-of-bounds variance */}
+      <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📍 Out-of-Bounds EVV Notice
+            </DialogTitle>
+            <DialogDescription>
+              You are currently located further away than the allowed limit set by your
+              Administrator for this client. State compliance requires a variance
+              justification.
+            </DialogDescription>
+          </DialogHeader>
+          {variance && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+              Measured distance: <span className="font-mono font-semibold">{variance.distanceFeet.toLocaleString()} ft</span>
+              {" "}· Allowed: <span className="font-mono font-semibold">{variance.limitFeet.toLocaleString()} ft</span>
+            </div>
+          )}
+          <div className="grid gap-2">
+            <Label htmlFor="variance-reason">Variance justification</Label>
+            <Textarea
+              id="variance-reason"
+              rows={4}
+              value={varianceReason}
+              onChange={(e) => setVarianceReason(e.target.value)}
+              placeholder="e.g. Community outing to the grocery store per PCSP goal."
+              maxLength={500}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setVariance(null); setVarianceReason(""); }}>Cancel</Button>
+            <Button onClick={submitVariance} disabled={busy || varianceReason.trim().length < 5}>
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Submit & Clock In
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success */}
       <Dialog open={!!success} onOpenChange={(o) => !o && setSuccess(null)}>
         <DialogContent>
           <DialogHeader>

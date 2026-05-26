@@ -25,6 +25,7 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?
 
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/timeclock", label: "General Time Clock", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/emar", label: "eMAR Pass", icon: Pill },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
@@ -32,6 +33,8 @@ const STAFF_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/timeclock", label: "General Time Clock", icon: Clock },
+  { to: "/dashboard/compliance-desk", label: "Compliance Desk", icon: ShieldCheck },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
   { to: "/dashboard/emar", label: "eMAR Pass", icon: Pill },

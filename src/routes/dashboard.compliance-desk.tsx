@@ -227,7 +227,7 @@ function ComplianceDeskPage() {
   });
 
   const approvedQ = useQuery({
-    enabled: !!org?.organization_id && sub !== "pending",
+    enabled: !!org?.organization_id,
     queryKey: ["evv-approved", org?.organization_id],
     queryFn: async (): Promise<Row[]> => {
       const { data, error } = await supabase

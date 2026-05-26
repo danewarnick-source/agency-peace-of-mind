@@ -272,7 +272,9 @@ function ClientsPage() {
               pcsp_goals: editing.pcsp_goals ?? [],
               job_code: editing.job_code ?? [],
               medicaid_id: editing.medicaid_id ?? "",
+              geofence_radius_feet: editing.geofence_radius_feet ?? 1000,
             }}
+
             onSubmit={(v) => editMutation.mutate({ ...v, id: editing.id })}
             clientId={editing.id}
             organizationId={org?.organization_id}

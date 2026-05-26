@@ -145,6 +145,7 @@ function ClientsPage() {
       const { error } = await supabase.from("clients").insert({
         organization_id: org!.organization_id,
         ...input,
+        authorized_dspd_codes: input.job_code,
         home_latitude: coords.lat,
         home_longitude: coords.lng,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -166,7 +167,7 @@ function ClientsPage() {
       const { error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({ ...rest, home_latitude: coords.lat, home_longitude: coords.lng } as any)
+        .update({ ...rest, authorized_dspd_codes: rest.job_code, home_latitude: coords.lat, home_longitude: coords.lng } as any)
         .eq("id", id);
       if (error) throw error;
     },

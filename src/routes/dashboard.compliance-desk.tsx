@@ -247,7 +247,7 @@ function PendingTable({
               <TableHead>Service</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
-              <TableHead>Variance</TableHead>
+              <TableHead>Geofence Validation Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>

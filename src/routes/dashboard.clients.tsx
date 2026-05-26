@@ -121,7 +121,7 @@ function ClientsPage() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, medicaid_id, account_status" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, medicaid_id, account_status, geofence_radius_feet" as any)
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;

@@ -77,16 +77,23 @@ export const saveEmarLog = createServerFn({ method: "POST" })
       isControlled: z.boolean().default(false),
       pillCountVerified: z.boolean().nullable().optional(),
       pillCountValue: z.number().int().nullable().optional(),
-      exceptionReason: z.string().max(500).nullable().optional(),
+      exceptionReason: z.string().max(2000).nullable().optional(),
+      varianceNote: z.string().max(2000).nullable().optional(),
+      isMedicationError: z.boolean().default(false),
+      attestationSigned: z.boolean().default(false),
       signatureAttestation: z.string().max(500).nullable().optional(),
       staffName: z.string().max(200).nullable().optional(),
     }).parse(i)
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!data.attestationSigned) throw new Error("Staff attestation checkbox is required before submitting any medication record.");
     if (data.isPrn && !data.prnReason) throw new Error("PRN reason required.");
     if (data.isControlled && data.status === "Passed" && !data.pillCountVerified) {
       throw new Error("Controlled substance requires pill count verification.");
+    }
+    if ((data.status !== "Passed" || data.isMedicationError) && !data.varianceNote) {
+      throw new Error("Clinical Variance & Administration Exception documentation is required.");
     }
     const { error, data: row } = await supabase
       .from("hhs_emar_logs" as never)
@@ -107,6 +114,9 @@ export const saveEmarLog = createServerFn({ method: "POST" })
         pill_count_verified: data.pillCountVerified ?? null,
         pill_count_value: data.pillCountValue ?? null,
         exception_reason: data.exceptionReason ?? null,
+        variance_note: data.varianceNote ?? null,
+        is_medication_error: data.isMedicationError,
+        attestation_signed: data.attestationSigned,
         signature_attestation: data.signatureAttestation ?? null,
         staff_name: data.staffName ?? null,
       } as never)

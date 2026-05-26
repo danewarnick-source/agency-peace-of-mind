@@ -19,7 +19,51 @@ import {
 } from "@/components/ui/select";
 import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { EVV_SERVICE_CODES, evvServiceLabel } from "@/lib/evv-codes";
+
+// Rendered as the dedicated "Geofence Validation Status" column on both
+// the Pending Approvals Ledger and the Approved Timesheets Archive.
+// Records with an empty/null `outside_geofence_reason` are treated as a
+// mathematical compliance MATCH (per the structural integration rule).
+function GeofenceBadge({ reason }: { reason: string | null }) {
+  const hasReason = !!(reason && reason.trim().length > 0);
+  if (!hasReason) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full border border-emerald-600/30 px-2.5 py-0.5 text-[11px] font-semibold"
+        style={{ backgroundColor: "#d1fae5", color: "#065f46" }}
+      >
+        🟢 MATCH
+      </span>
+    );
+  }
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className="inline-flex cursor-help items-center gap-1 rounded-full border border-rose-700/30 px-2.5 py-0.5 text-[11px] font-semibold"
+              style={{ backgroundColor: "#fee2e2", color: "#991b1b" }}
+            >
+              🔴 NO MATCH
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <span
+        className="max-w-[180px] truncate text-[10px] italic text-muted-foreground"
+        title={reason ?? ""}
+      >
+        {reason}
+      </span>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/dashboard/compliance-desk")({
   head: () => ({ meta: [{ title: "Compliance Desk — Care Academy" }] }),
@@ -203,7 +247,7 @@ function PendingTable({
               <TableHead>Service</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
-              <TableHead>Variance</TableHead>
+              <TableHead>Geofence Validation Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -232,12 +276,8 @@ function PendingTable({
                     <MapPin className="mr-1 h-3 w-3" /> View
                   </Button>
                 </TableCell>
-                <TableCell>
-                  {r.outside_geofence_reason ? (
-                    <Button variant="ghost" size="sm" className="text-amber-600" onClick={() => onReason(r)}>
-                      <AlertTriangle className="mr-1 h-3 w-3" /> Justified
-                    </Button>
-                  ) : <span className="text-[11px] text-muted-foreground">—</span>}
+                <TableCell onClick={() => r.outside_geofence_reason && onReason(r)} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
+                  <GeofenceBadge reason={r.outside_geofence_reason} />
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1.5">
@@ -264,49 +304,85 @@ function PendingTable({
   );
 }
 
-// === Utah DHHS CSV helpers ===
-function pad2(n: number) { return n < 10 ? `0${n}` : String(n); }
-function fmtDate(iso: string) {
+// === Utah DHHS 30-Column State Portal CSV ===
+// Header + cell formats lock to the uploaded EVV4_1.csv template verbatim.
+function fmtDateMDY(iso: string) {
+  // Strict M/D/YYYY (no leading zeros) — matches "3/19/2025".
   const d = new Date(iso);
-  return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}`;
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
-function fmtTime12(iso: string) {
+function pad2(n: number) { return n < 10 ? `0${n}` : String(n); }
+function fmtTimeHMSAmPm(iso: string) {
+  // Strict HH:MM:SS AM/PM with exactly one space — matches "01:03:00 PM".
   const d = new Date(iso);
   let h = d.getHours();
   const m = d.getMinutes();
+  const s = d.getSeconds();
   const ampm = h >= 12 ? "PM" : "AM";
   h = h % 12; if (h === 0) h = 12;
-  return `${pad2(h)}:${pad2(m)} ${ampm}`;
+  return `${pad2(h)}:${pad2(m)}:${pad2(s)} ${ampm}`;
 }
 function csvEscape(s: string) {
-  if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-function textQualified(s: string) {
-  // Wrap so spreadsheets don't strip leading zeroes: ="0012345678"
-  return `"=""${(s ?? "").replace(/"/g, "")}"""`;
+  const v = s ?? "";
+  if (v.includes(",") || v.includes('"') || v.includes("\n")) return `"${v.replace(/"/g, '""')}"`;
+  return v;
 }
 
+const UTAH_30_HEADER =
+  "Member ID (req),First name (req),Middle initial,Last name (req),Service code (req),Service description,Provider ID (req),Employee Performing Service (req),Begin date (req),Begin time (req),Begin address (req),Begin Apt/Suite/Floor,Begin City (req),Begin State,Begin Zip,Begin Geo Latitude,Begin Geo Longitude,End date (req),End time (req),End Address1,End Address2,End City,End State,End Zip,End Geo Latitude,End Geo Longitude,Orig_receipt_id (req if CORRECTION),Batch_id (req),Record_id (req),EVV Vendor (req)";
+
+const EVV_VENDOR_NAME = "Care Academy";
+
 function buildUtahCsv(rows: Row[]): string {
-  const header = "Provider ID,Member ID,Service Code,Begin Date,Begin Time,End Date,End Time,Original Receipt ID,Batch ID,Record ID";
-  const lines = rows.map((r) => {
+  // One incremental batch number per export (seconds since epoch keeps it
+  // sequential across exports without colliding within a single file).
+  const batchId = Math.floor(Date.now() / 1000).toString();
+
+  const lines = rows.map((r, idx) => {
     const inIso = effectiveIn(r);
     const outIso = effectiveOut(r) ?? inIso;
+    const latIn = r.gps_in_coordinates?.latitude ?? 0;
+    const lngIn = r.gps_in_coordinates?.longitude ?? 0;
+    const latOut = r.gps_out_coordinates?.latitude ?? 0;
+    const lngOut = r.gps_out_coordinates?.longitude ?? 0;
+    const employee = (r.staff?.full_name ?? r.staff?.email ?? "").trim();
+
     return [
-      textQualified(r.utah_medicaid_provider_id ?? ""),
-      textQualified(r.utah_medicaid_member_id ?? ""),
-      csvEscape(r.service_type_code ?? ""),
-      csvEscape(fmtDate(inIso)),
-      csvEscape(fmtTime12(inIso)),
-      csvEscape(fmtDate(outIso)),
-      csvEscape(fmtTime12(outIso)),
-      "",
-      "",
-      "",
+      "",                                       // Member ID (req) — empty per template
+      csvEscape(r.clients?.first_name ?? ""),   // First name (req)
+      "",                                       // Middle initial
+      csvEscape(r.clients?.last_name ?? ""),    // Last name (req)
+      csvEscape(r.service_type_code ?? ""),     // Service code (req)
+      "",                                       // Service description
+      csvEscape(r.utah_medicaid_provider_id ?? ""), // Provider ID (req)
+      csvEscape(employee),                      // Employee Performing Service (req)
+      csvEscape(fmtDateMDY(inIso)),             // Begin date (req)
+      csvEscape(fmtTimeHMSAmPm(inIso)),         // Begin time (req)
+      "",                                       // Begin address (req) — blank placeholder
+      "",                                       // Begin Apt/Suite/Floor
+      "",                                       // Begin City (req)
+      "",                                       // Begin State
+      "",                                       // Begin Zip
+      String(latIn),                            // Begin Geo Latitude
+      String(lngIn),                            // Begin Geo Longitude
+      csvEscape(fmtDateMDY(outIso)),            // End date (req)
+      csvEscape(fmtTimeHMSAmPm(outIso)),        // End time (req)
+      "",                                       // End Address1
+      "",                                       // End Address2
+      "",                                       // End City
+      "",                                       // End State
+      "",                                       // End Zip
+      String(latOut),                           // End Geo Latitude
+      String(lngOut),                           // End Geo Longitude
+      "",                                       // Orig_receipt_id (req if CORRECTION)
+      batchId,                                  // Batch_id (req)
+      String(idx + 1),                          // Record_id (req)
+      csvEscape(EVV_VENDOR_NAME),               // EVV Vendor (req)
     ].join(",");
   });
-  return [header, ...lines].join("\r\n");
+  return [UTAH_30_HEADER, ...lines].join("\r\n");
 }
+
 
 function downloadCsv(filename: string, body: string) {
   const blob = new Blob([body], { type: "text/csv;charset=utf-8" });
@@ -388,29 +464,33 @@ function ArchiveTable({
               <TableHead>In → Out (rounded)</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
+              <TableHead>Geofence Validation Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
             ) : filtered.map((r) => {
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
               return (
                 <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs">{fmtDate(inIso)}</TableCell>
+                  <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
                   <TableCell className="font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
                   <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                   <TableCell className="font-mono text-xs">{r.utah_medicaid_member_id}</TableCell>
                   <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
-                  <TableCell className="font-mono text-xs">{fmtTime12(inIso)} → {outIso ? fmtTime12(outIso) : "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{fmtTimeHMSAmPm(inIso)} → {outIso ? fmtTimeHMSAmPm(outIso) : "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{fmtDuration(inIso, outIso)}</TableCell>
                   <TableCell>
                     <Button variant="outline" size="sm" onClick={() => onMap(r)}>
                       <MapPin className="mr-1 h-3 w-3" /> View
                     </Button>
+                  </TableCell>
+                  <TableCell>
+                    <GeofenceBadge reason={r.outside_geofence_reason} />
                   </TableCell>
                 </TableRow>
               );

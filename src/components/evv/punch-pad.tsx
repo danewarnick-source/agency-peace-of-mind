@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { EVV_SERVICE_CODES, padMemberId } from "@/lib/evv-codes";
 import { jobCodeLabel } from "@/lib/job-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
+import { GeofenceMap } from "@/components/evv/geofence-map";
 
 type EntryType = "Client_Profile_Pass" | "General_Sidebar_Unscheduled";
 
@@ -122,6 +123,18 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const [denied, setDenied] = useState(false);
   const [success, setSuccess] = useState<null | { duration: string }>(null);
   const [now, setNow] = useState<number>(() => Date.now());
+  const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Live geolocation watch — feeds the map's blue dot.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) return;
+    const id = navigator.geolocation.watchPosition(
+      (p) => setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => { /* permission denied — map still renders with house + zone */ },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
 
   // Geofence variance overlay state
   const [variance, setVariance] = useState<null | {
@@ -214,6 +227,19 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     }
     return EVV_SERVICE_CODES.map((c) => ({ code: c.code, label: c.label }));
   }, [clientForPunch?.authorizedCodes]);
+
+  // Map / proximity derivation — shared by clock-in pad and clock-out modal.
+  const mapHome =
+    typeof clientForPunch?.homeLat === "number" &&
+    typeof clientForPunch?.homeLng === "number" &&
+    isFinite(clientForPunch.homeLat as number) &&
+    isFinite(clientForPunch.homeLng as number)
+      ? { lat: clientForPunch!.homeLat as number, lng: clientForPunch!.homeLng as number }
+      : null;
+  const mapRadiusFeet = clientForPunch?.geofenceRadiusFeet ?? 1000;
+  const insideZone = mapHome && livePos
+    ? haversineFeet(mapHome, livePos) <= mapRadiusFeet
+    : true;
 
   const requireFacility = entryType === "General_Sidebar_Unscheduled";
   const inReady =
@@ -483,6 +509,29 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </div>
       ) : null}
 
+      {/* Free OSM/Leaflet proximity map — pulls up the instant the Clock-In tab opens. */}
+      {!isRunning && mapHome && (
+        <div className="mb-4 space-y-1">
+          <GeofenceMap
+            homeLat={mapHome.lat}
+            homeLng={mapHome.lng}
+            radiusFeet={mapRadiusFeet}
+            caregiver={livePos}
+            insideZone={insideZone}
+            height={250}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            {livePos
+              ? insideZone
+                ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
+                : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
+              : "Awaiting browser location permission…"}
+          </p>
+        </div>
+      )}
+
+
+
       <div className="grid gap-3">
         {entryType === "General_Sidebar_Unscheduled" && (
           <>
@@ -744,6 +793,29 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             </span>
             <span className="font-mono text-lg font-bold tabular-nums">{elapsed}</span>
           </div>
+
+          {/* Proximity map — pulls up dynamically inside the clock-out modal */}
+          {mapHome && (
+            <div className="space-y-1">
+              <GeofenceMap
+                homeLat={mapHome.lat}
+                homeLng={mapHome.lng}
+                radiusFeet={mapRadiusFeet}
+                caregiver={livePos}
+                insideZone={insideZone}
+                height={220}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {livePos
+                  ? insideZone
+                    ? `🟢 Inside the ${mapRadiusFeet} ft zone — clean clock-out.`
+                    : `🔴 Outside the ${mapRadiusFeet} ft zone — a variance reason will be required.`
+                  : "Awaiting browser location permission…"}
+              </p>
+            </div>
+          )}
+
+
 
           {/* PCSP goals */}
           <div className="grid gap-2">

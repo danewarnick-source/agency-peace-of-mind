@@ -702,7 +702,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
                 radiusFeet={mapRadiusFeet}
                 caregiver={livePos}
                 insideZone={!serviceCode || !isEvvLockedCode(serviceCode) ? true : insideZone}
-                height={260}
+                height={200}
               />
               <p className="text-[11px] text-muted-foreground">
                 {!serviceCode
@@ -873,7 +873,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
 
       {/* Out-of-bounds variance */}
       <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); } }}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               ⚠️ Geofence Variance Notice
@@ -917,7 +917,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
 
       {/* Out-of-bounds variance — CLOCK-OUT (symmetric) */}
       <Dialog open={!!outVariance} onOpenChange={(o) => { if (!o) { setOutVariance(null); setOutVarianceReason(""); } }}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               📍 Out-of-Bounds EVV Exception Alert

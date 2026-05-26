@@ -320,8 +320,17 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
 
   const hasGoalSelected =
     baselineChecked || Object.values(checkedGoals).some(Boolean);
-  const narrativeOk = wordCount >= 100;
+  const NARRATIVE_MIN_WORDS = 50;
+  const narrativeOk = wordCount >= NARRATIVE_MIN_WORDS;
   const canSubmitCompliance = hasGoalSelected && narrativeOk && !busy;
+
+  // Out-of-bounds variance for the clock-OUT punch (mirrors clock-in flow)
+  const [outVariance, setOutVariance] = useState<null | {
+    distanceFeet: number;
+    limitFeet: number;
+    pos: { lat: number; lng: number; acc: number };
+  }>(null);
+  const [outVarianceReason, setOutVarianceReason] = useState("");
 
   function openCompliance() {
     if (!active) return;

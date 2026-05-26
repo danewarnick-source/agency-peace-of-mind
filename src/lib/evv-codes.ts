@@ -36,6 +36,7 @@ export const EVV_SERVICE_CODES: ReadonlyArray<ServiceCodeDef> = [
   { code: "EPR", label: "EPR — Employment Preparation Services", evvLock: false },
   { code: "MTP", label: "MTP — Motor Transportation Payment", evvLock: false },
   { code: "TFB", label: "TFB — Family & Individual Training", evvLock: false },
+  { code: "HHS", label: "HHS — Host Home Supports", evvLock: false },
   { code: "PBA", label: "PBA — Personal Budget Assistant", evvLock: false },
   { code: "PM1", label: "PM1 — Professional Medication Monitoring LPN", evvLock: false },
   { code: "PM2", label: "PM2 — Professional Medication Monitoring RN", evvLock: false },

@@ -67,9 +67,7 @@ export const getAgencyHealthSnapshot = createServerFn({ method: "POST" })
       .gte("created_at", since);
     const totalEvv = evv?.length ?? 0;
     const inFence = (evv ?? []).filter((e) => {
-      const r = e as { is_out_of_bounds?: boolean | null; outside_geofence_reason: string | null };
-      // Prefer the new explicit flag; fall back to legacy reason column for
-      // older rows that pre-date the column add.
+      const r = e as unknown as { is_out_of_bounds?: boolean | null; outside_geofence_reason: string | null };
       if (typeof r.is_out_of_bounds === "boolean") return !r.is_out_of_bounds;
       return !r.outside_geofence_reason;
     }).length;

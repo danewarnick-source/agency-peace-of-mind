@@ -300,7 +300,12 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       const lat = clientForPunch.homeLat;
       const lng = clientForPunch.homeLng;
       const radius = clientForPunch.geofenceRadiusFeet ?? 1000;
-      if (typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)) {
+      // Hidden Gatekeeper: only EVV-locked codes enforce the geofence wall.
+      // Non-EVV codes capture GPS passively into gps_in without blocking.
+      if (
+        isEvvLockedCode(serviceCode) &&
+        typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)
+      ) {
         const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
         if (dist > radius) {
           setVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });

@@ -553,15 +553,19 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
                 homeLng={mapHome.lng}
                 radiusFeet={mapRadiusFeet}
                 caregiver={livePos}
-                insideZone={insideZone}
+                insideZone={!serviceCode || !isEvvLockedCode(serviceCode) ? true : insideZone}
                 height={260}
               />
               <p className="text-[11px] text-muted-foreground">
-                {livePos
-                  ? insideZone
-                    ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
-                    : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
-                  : "Awaiting browser location permission…"}
+                {!serviceCode
+                  ? "Select a service code to determine geofence enforcement."
+                  : !isEvvLockedCode(serviceCode)
+                    ? `🛈 Non-EVV code (${serviceCode}) — GPS logged passively, geofence bypassed.`
+                    : livePos
+                      ? insideZone
+                        ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
+                        : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
+                      : "Awaiting browser location permission…"}
               </p>
             </>
           ) : !isRunning ? (

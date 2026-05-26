@@ -1400,6 +1400,8 @@ export type Database = {
           department: string | null
           email: string | null
           employee_id: string | null
+          evv_consent_timestamp: string | null
+          evv_gps_consent_status: string
           first_name: string | null
           full_name: string | null
           hire_date: string | null
@@ -1420,6 +1422,8 @@ export type Database = {
           department?: string | null
           email?: string | null
           employee_id?: string | null
+          evv_consent_timestamp?: string | null
+          evv_gps_consent_status?: string
           first_name?: string | null
           full_name?: string | null
           hire_date?: string | null
@@ -1440,6 +1444,8 @@ export type Database = {
           department?: string | null
           email?: string | null
           employee_id?: string | null
+          evv_consent_timestamp?: string | null
+          evv_gps_consent_status?: string
           first_name?: string | null
           full_name?: string | null
           hire_date?: string | null

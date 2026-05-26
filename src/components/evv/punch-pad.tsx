@@ -21,6 +21,7 @@ import { EVV_SERVICE_CODES, padMemberId } from "@/lib/evv-codes";
 import { jobCodeLabel } from "@/lib/job-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { GeofenceMap } from "@/components/evv/geofence-map";
+import { EvvConsentGate } from "@/components/evv/consent-gate";
 
 type EntryType = "Client_Profile_Pass" | "General_Sidebar_Unscheduled";
 
@@ -68,16 +69,9 @@ function haversineFeet(a: { lat: number; lng: number }, b: { lat: number; lng: n
   return 2 * EARTH_RADIUS_FEET * Math.asin(Math.min(1, Math.sqrt(x)));
 }
 
-function getPosition(): Promise<{ lat: number; lng: number; acc: number }> {
-  return new Promise((resolve, reject) => {
-    if (!("geolocation" in navigator)) return reject(new Error("Geolocation unsupported"));
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }),
-      (e) => reject(e),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-  });
-}
+// NOTE: Per Phase spec — DO NOT make a redundant getCurrentPosition() call on
+// punch. Use the already-cached `currentCaregiverCoords` (livePos) from the
+// live watchPosition feed that powers the blue dot on the map.
 
 function fmtElapsed(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -123,14 +117,25 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const [denied, setDenied] = useState(false);
   const [success, setSuccess] = useState<null | { duration: string }>(null);
   const [now, setNow] = useState<number>(() => Date.now());
-  const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
+  // `currentCaregiverCoords` — single shared cache fed by watchPosition.
+  // Same source as the blue dot on the Leaflet map; reused at punch time
+  // to avoid a redundant getCurrentPosition call that races permissions.
+  const [livePos, setLivePos] = useState<{ lat: number; lng: number; acc: number } | null>(null);
+  const [hardwareDenied, setHardwareDenied] = useState(false);
 
-  // Live geolocation watch — feeds the map's blue dot.
   useEffect(() => {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) return;
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      setHardwareDenied(true);
+      return;
+    }
     const id = navigator.geolocation.watchPosition(
-      (p) => setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => { /* permission denied — map still renders with house + zone */ },
+      (p) => {
+        setHardwareDenied(false);
+        setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) setHardwareDenied(true);
+      },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
     );
     return () => navigator.geolocation.clearWatch(id);
@@ -284,11 +289,15 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     }
     setBusy(true);
     try {
-      let pos;
-      try { pos = await getPosition(); }
-      catch { setDenied(true); return; }
+      // Use the cached coordinates from the live map feed — no redundant
+      // getCurrentPosition call that would race the permission state.
+      if (hardwareDenied) { setDenied(true); return; }
+      if (!livePos) {
+        toast.error("Still acquiring GPS — please wait a moment and try again.");
+        return;
+      }
+      const pos = livePos;
 
-      // Haversine geofence check (when client has a home pin + radius).
       const lat = clientForPunch.homeLat;
       const lng = clientForPunch.homeLng;
       const radius = clientForPunch.geofenceRadiusFeet ?? 1000;
@@ -297,7 +306,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         if (dist > radius) {
           setVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });
           setVarianceReason("");
-          return; // BLOCK insert until justification submitted
+          return;
         }
       }
 
@@ -418,9 +427,13 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     }
     setBusy(true);
     try {
-      let pos;
-      try { pos = await getPosition(); }
-      catch { setDenied(true); return; }
+      // Same single-source cache as clock-in — never call getCurrentPosition again.
+      if (hardwareDenied) { setDenied(true); return; }
+      if (!livePos) {
+        toast.error("Still acquiring GPS — please wait a moment and try again.");
+        return;
+      }
+      const pos = livePos;
 
       // Symmetric geofence check on clock-OUT
       const refClient = lockedClient ?? (() => {
@@ -476,9 +489,10 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const isRunning = !!activeMatchesThisPad;
 
   return (
+    <EvvConsentGate>
     <section
       aria-label="EVV Shift Punch Pad"
-      className="relative overflow-hidden rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-card to-primary/5 p-5 shadow-[var(--shadow-card)]"
+      className="relative overflow-hidden rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-card to-primary/5 p-4 shadow-[var(--shadow-card)] sm:p-5"
     >
       <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -509,26 +523,49 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </div>
       ) : null}
 
-      {/* Free OSM/Leaflet proximity map — pulls up the instant the Clock-In tab opens. */}
-      {!isRunning && mapHome && (
-        <div className="mb-4 space-y-1">
-          <GeofenceMap
-            homeLat={mapHome.lat}
-            homeLng={mapHome.lng}
-            radiusFeet={mapRadiusFeet}
-            caregiver={livePos}
-            insideZone={insideZone}
-            height={250}
-          />
-          <p className="text-[11px] text-muted-foreground">
-            {livePos
-              ? insideZone
-                ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
-                : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
-              : "Awaiting browser location permission…"}
-          </p>
+      {/* Responsive 2-col layout: map (left/top) + controls (right/bottom) */}
+      <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
+        {/* MAP COLUMN */}
+        <div className="space-y-2">
+          {hardwareDenied ? (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+              <p className="mb-1 font-semibold">⚠️ Hardware Permission Required</p>
+              <p>
+                You approved EVV consent on your profile, but your browser or
+                device settings are currently blocking location access. Please
+                open your device&apos;s system settings, authorize location
+                tracking for this web browser application, and refresh the
+                screen to unlock shift punches.
+              </p>
+            </div>
+          ) : !isRunning && mapHome ? (
+            <>
+              <GeofenceMap
+                homeLat={mapHome.lat}
+                homeLng={mapHome.lng}
+                radiusFeet={mapRadiusFeet}
+                caregiver={livePos}
+                insideZone={insideZone}
+                height={260}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {livePos
+                  ? insideZone
+                    ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
+                    : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
+                  : "Awaiting browser location permission…"}
+              </p>
+            </>
+          ) : !isRunning ? (
+            <div className="flex h-[260px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-xs text-muted-foreground">
+              No geofence configured for this client.
+            </div>
+          ) : null}
         </div>
-      )}
+
+        {/* CONTROLS COLUMN */}
+        <div className="flex flex-col">
+
 
 
 
@@ -538,7 +575,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             <div>
               <label className="mb-1 block text-xs font-medium">🏢 Assign Facility / House Site</label>
               <Select value={selectedFacility} onValueChange={setSelectedFacility} disabled={isRunning}>
-                <SelectTrigger className="h-11"><SelectValue placeholder="Select a facility" /></SelectTrigger>
+                <SelectTrigger className="h-12"><SelectValue placeholder="Select a facility" /></SelectTrigger>
                 <SelectContent>
                   {facilities.length === 0 && (
                     <SelectItem value="__none" disabled>No facilities on file</SelectItem>
@@ -550,7 +587,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             <div>
               <label className="mb-1 block text-xs font-medium">👤 Assign Client Individual</label>
               <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setServiceCode(""); }} disabled={isRunning}>
-                <SelectTrigger className="h-11"><SelectValue placeholder="Select a client" /></SelectTrigger>
+                <SelectTrigger className="h-12"><SelectValue placeholder="Select a client" /></SelectTrigger>
                 <SelectContent>
                   {caseload
                     .filter((c) => !selectedFacility || c.physical_address === selectedFacility)
@@ -574,7 +611,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         <div>
           <label className="mb-1 block text-xs font-medium">💼 Select Service Code</label>
           <Select value={serviceCode} onValueChange={setServiceCode} disabled={isRunning || !clientForPunch}>
-            <SelectTrigger className="h-11"><SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} /></SelectTrigger>
+            <SelectTrigger className="h-12"><SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} /></SelectTrigger>
             <SelectContent>
               {codesForClient.length === 0 ? (
                 <SelectItem value="__none" disabled>No codes authorized</SelectItem>
@@ -593,7 +630,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         <div>
           <label className="mb-1 block text-xs font-medium">🕐 Timezone</label>
           <Select value={timezone} onValueChange={setTimezone} disabled={isRunning}>
-            <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
             <SelectContent>
               {TIMEZONES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}
             </SelectContent>
@@ -651,6 +688,9 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         Entry origin:&nbsp;
         <span className="font-mono">{entryType === "Client_Profile_Pass" ? "In-Chart" : "Sidebar Unscheduled"}</span>
       </p>
+        </div>
+      </div>
+
 
       {/* GPS-denied */}
       <Dialog open={denied} onOpenChange={setDenied}>
@@ -924,5 +964,6 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </DialogContent>
       </Dialog>
     </section>
+    </EvvConsentGate>
   );
 }

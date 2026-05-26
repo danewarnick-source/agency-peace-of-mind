@@ -686,6 +686,9 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         Entry origin:&nbsp;
         <span className="font-mono">{entryType === "Client_Profile_Pass" ? "In-Chart" : "Sidebar Unscheduled"}</span>
       </p>
+        </div>
+      </div>
+
 
       {/* GPS-denied */}
       <Dialog open={denied} onOpenChange={setDenied}>

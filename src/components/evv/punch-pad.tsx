@@ -494,32 +494,43 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </span>
       </div>
 
-      <div className="mt-5 flex justify-center">
-        {isRunning ? (
+      {isRunning ? (
+        <div className="mt-5">
           <button
             type="button"
-            onClick={handleClockOut}
+            onClick={openCompliance}
             disabled={busy}
-            className="group flex h-32 w-32 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg shadow-rose-600/30 transition hover:scale-[1.02] hover:bg-rose-700 disabled:opacity-60"
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-rose-600 text-base font-bold uppercase tracking-wider text-white shadow-lg shadow-rose-600/30 transition hover:bg-rose-700 disabled:opacity-60"
             aria-label="End EVV Shift"
           >
-            {busy ? <Loader2 className="h-10 w-10 animate-spin" /> : <Square className="h-10 w-10 fill-current" />}
+            {busy ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <Square className="h-5 w-5 fill-current" />
+                ⏹️ END EVV SHIFT
+              </>
+            )}
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleClockIn}
-            disabled={busy || !inReady}
-            className="group flex h-32 w-32 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 transition hover:scale-[1.02] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label="Start EVV Shift"
-          >
-            {busy ? <Loader2 className="h-10 w-10 animate-spin" /> : <Play className="h-10 w-10 fill-current" />}
-          </button>
-        )}
-      </div>
-      <p className="mt-3 text-center text-sm font-semibold uppercase tracking-wider">
-        {isRunning ? "⏹️ END EVV SHIFT" : "▶️ START EVV SHIFT"}
-      </p>
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 flex justify-center">
+            <button
+              type="button"
+              onClick={handleClockIn}
+              disabled={busy || !inReady}
+              className="group flex h-32 w-32 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 transition hover:scale-[1.02] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Start EVV Shift"
+            >
+              {busy ? <Loader2 className="h-10 w-10 animate-spin" /> : <Play className="h-10 w-10 fill-current" />}
+            </button>
+          </div>
+          <p className="mt-3 text-center text-sm font-semibold uppercase tracking-wider">
+            ▶️ START EVV SHIFT
+          </p>
+        </>
+      )}
 
       <p className="mt-3 flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
         <MapPin className="h-3 w-3" />

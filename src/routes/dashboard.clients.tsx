@@ -449,6 +449,25 @@ function ClientFormDialog({
             </div>
           )}
         </div>
+        {/* Admin-only EVV rules — always visible on the Edit form */}
+        <div className="grid gap-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <h3 className="text-sm font-semibold">📍 Administrative EVV Rules</h3>
+          <div className="grid gap-2">
+            <Label>Maximum Allowable Clock-In Radius</Label>
+            <Select value={String(radius)} onValueChange={(v) => setRadius(Number(v))}>
+              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {GEOFENCE_OPTIONS.map((o) => (
+                  <SelectItem key={o.v} value={String(o.v)}>{o.l}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Caregivers clocking in beyond this distance from the client's home pin must submit a variance justification.
+            </p>
+          </div>
+        </div>
+
         {clientId && (
           <>
             <CustomAttributesSection
@@ -469,6 +488,7 @@ function ClientFormDialog({
             />
           </>
         )}
+
         <DialogFooter>
           <Button type="submit" disabled={!canSubmit || pending}>
             {pending ? "Saving…" : submitLabel}

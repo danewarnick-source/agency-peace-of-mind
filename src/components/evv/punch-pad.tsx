@@ -452,7 +452,11 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       const lat = refClient?.homeLat;
       const lng = refClient?.homeLng;
       const radius = refClient?.geofenceRadiusFeet ?? 1000;
-      if (typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)) {
+      // Mirror the Hidden Gatekeeper on clock-OUT: only EVV-locked codes block.
+      if (
+        isEvvLockedCode(active.service_type_code) &&
+        typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)
+      ) {
         const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
         if (dist > radius) {
           setOutVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });

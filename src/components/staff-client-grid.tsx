@@ -92,20 +92,22 @@ export function StaffClientGrid() {
             const codes = Array.isArray(c.job_code) ? c.job_code : [];
             const fullName = `${c.first_name} ${c.last_name}`.trim();
             const location = c.physical_address?.trim() || "No primary house on file";
+            const isHHS = codes.includes("HHS");
             return (
               <li key={c.id} className="relative">
                 <Link
-                  to="/dashboard/workspace/$clientId"
+                  to={isHHS ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
                   params={{ clientId: c.id }}
-                  aria-label={`Open shift profile for ${fullName}`}
+                  aria-label={`Open ${isHHS ? "host home client hub" : "shift profile"} for ${fullName}`}
                   className="group flex w-full flex-col gap-4 rounded-2xl border border-border bg-background p-5 text-left shadow-sm transition hover:border-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <div className="flex items-start gap-4">
-                    <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <span className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${isHHS ? "bg-amber-100 text-amber-700" : "bg-primary/10 text-primary"}`}>
                       <User className="h-7 w-7" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-lg font-semibold leading-tight">{fullName}</p>
+                      {isHHS && <Badge className="mt-1 bg-amber-500 hover:bg-amber-600">🏡 HHS — Host Home Supports</Badge>}
                       <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground">
                         <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
                         <span className="line-clamp-2">{location}</span>
@@ -129,7 +131,7 @@ export function StaffClientGrid() {
                     tabIndex={-1}
                   >
                     <span>
-                      <Rocket className="mr-2 h-5 w-5" /> Open Shift Profile
+                      <Rocket className="mr-2 h-5 w-5" /> {isHHS ? "🏡 Open Client Hub" : "Open Shift Profile"}
                     </span>
                   </Button>
                 </Link>

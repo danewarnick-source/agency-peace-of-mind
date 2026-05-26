@@ -273,9 +273,47 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
   const [prnReason, setPrnReason] = useState("");
   const [pillCount, setPillCount] = useState("");
   const [pillVerified, setPillVerified] = useState(false);
+  const [variance, setVariance] = useState("");
+  const [isMedError, setIsMedError] = useState(false);
+  const [attest, setAttest] = useState(false);
 
   const isPrn = useMemo(() => /prn/i.test(String(active?.frequency ?? "")) || /prn/i.test(String(active?.instructions ?? "")), [active]);
   const isControlled = useMemo(() => /schedule\s*(ii|iii|iv|2|3|4)/i.test(String(active?.instructions ?? "")), [active]);
+
+  // Query today's incident reports tagged 'Medication Error' — clears the daily-submission lock
+  const { data: medErrorIncidentCount = 0 } = useQuery({
+    queryKey: ["hhs-med-error-incidents", clientId, today()],
+    queryFn: async () => {
+      const t = today();
+      const { count } = await supabase
+        .from("hhs_incident_reports" as never)
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .gte("occurred_at", `${t}T00:00:00Z`)
+        .contains("incident_categories", ["Medication Error"]);
+      return count ?? 0;
+    },
+  });
+  const { data: hasUnresolvedMedError = false } = useQuery({
+    queryKey: ["hhs-emar-error-flag", clientId, today()],
+    queryFn: async () => {
+      const t = today();
+      const { count } = await supabase
+        .from("hhs_emar_logs" as never)
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .eq("is_medication_error", true)
+        .gte("created_at", `${t}T00:00:00Z`);
+      return (count ?? 0) > 0;
+    },
+  });
+  const qc = useQueryClient();
+  const errorLockActive = hasUnresolvedMedError && medErrorIncidentCount === 0;
+
+  const resetDialog = () => {
+    setActive(null); setPrnReason(""); setPillCount(""); setPillVerified(false);
+    setStatus("Passed"); setVariance(""); setIsMedError(false); setAttest(false);
+  };
 
   const submitMut = useMutation({
     mutationFn: async () => {
@@ -295,24 +333,44 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
           isControlled,
           pillCountVerified: isControlled ? pillVerified : null,
           pillCountValue: isControlled && pillCount ? parseInt(pillCount, 10) : null,
+          varianceNote: (status !== "Passed" || isMedError) ? variance : null,
+          isMedicationError: isMedError,
+          attestationSigned: attest,
           signatureAttestation: user?.email ?? "caregiver",
           staffName: user?.user_metadata?.full_name ?? user?.email ?? null,
         },
       });
     },
     onSuccess: () => {
-      toast.success(`Med ${status}.`);
-      setActive(null); setPrnReason(""); setPillCount(""); setPillVerified(false); setStatus("Passed");
+      toast.success(`Med ${status}${isMedError ? " — flagged as medication error" : ""}.`);
+      qc.invalidateQueries({ queryKey: ["hhs-emar-error-flag"] });
+      resetDialog();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const needsVariance = status !== "Passed" || isMedError;
+  const blockSubmit =
+    submitMut.isPending ||
+    !attest ||
+    (isPrn && !prnReason) ||
+    (isControlled && status === "Passed" && !pillVerified) ||
+    (needsVariance && variance.trim().length < 5);
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base">💊 Today's eMAR</CardTitle>
-        <Button size="sm" variant="destructive">⚠️ Report Medication Error</Button>
+        <Button size="sm" variant="destructive" onClick={() => {
+          if (meds.length === 0) return toast.error("No meds on file to flag.");
+          setActive(meds[0]); setIsMedError(true); setStatus("Missed");
+        }}>⚠️ Report Medication Error</Button>
       </CardHeader>
+      {errorLockActive && (
+        <div className="mx-4 mb-3 rounded-md border border-red-500 bg-red-100 dark:bg-red-950/40 p-3 text-sm text-red-900 dark:text-red-200">
+          🚨 <strong>Action Required:</strong> You must complete an internal Incident Report form under Tab 4 and call your agency manager immediately regarding this medication error. Daily submission is blocked until the Incident Form contains a completed record.
+        </div>
+      )}
       <CardContent className="space-y-2">
         {meds.length === 0 && <p className="text-sm text-muted-foreground">No active medications on file.</p>}
         {meds.map((m) => (
@@ -321,7 +379,7 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
               <div className="min-w-0 flex-1">
                 <div className="font-semibold">{String(m.medication_name)} <span className="text-xs text-muted-foreground">{String(m.dosage ?? "")}</span></div>
                 <div className="text-xs text-muted-foreground">Route: {String(m.route ?? "—")} · {String(m.frequency ?? "")}</div>
-                {m.instructions ? <div className="text-xs">{String(m.instructions)}</div> : null}
+                {m.instructions ? <div className="text-xs">Indication / Schedule: {String(m.instructions)}</div> : null}
                 <div className="mt-1 rounded bg-yellow-100 dark:bg-yellow-950/40 border border-yellow-300 px-2 py-1 text-[11px] text-yellow-900 dark:text-yellow-200">
                   ⚠️ Side-effects: monitor for drowsiness, swallowing/choking risk. Confirm upright posture.
                 </div>
@@ -332,8 +390,8 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
         ))}
       </CardContent>
 
-      <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>
-        <DialogContent className="max-w-md">
+      <Dialog open={!!active} onOpenChange={(o) => !o && resetDialog()}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{String(active?.medication_name ?? "")}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
@@ -364,15 +422,25 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
                 </label>
               </div>
             )}
+            {needsVariance && (
+              <div className="rounded border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1">
+                <Label className="text-amber-800">⚠️ Required Clinical Variance & Administration Exception Documentation</Label>
+                <Textarea rows={3} value={variance} onChange={(e) => setVariance(e.target.value)} placeholder="Describe what happened, observations, and resolution steps." />
+              </div>
+            )}
+            <label className="flex items-start gap-2 text-xs rounded border bg-muted/30 p-2">
+              <Checkbox checked={attest} onCheckedChange={(c) => setAttest(!!c)} />
+              <span>✍️ I formally attest that I am the logged-in authorized staff member physically observing or assisting with the administration of this medication according to the prescribed healthcare directive.</span>
+            </label>
+            {isMedError && (
+              <div className="rounded border-2 border-red-500 bg-red-50 dark:bg-red-950/40 p-2 text-xs text-red-800 dark:text-red-200">
+                🚨 This record will be flagged as a <strong>Medication Error</strong>. After saving, you must complete a Form C Incident Report under Tab 4 before any daily submissions can proceed.
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setActive(null)}>Cancel</Button>
-            <Button
-              onClick={() => submitMut.mutate()}
-              disabled={submitMut.isPending || (isPrn && !prnReason) || (isControlled && status === "Passed" && !pillVerified)}
-            >
-              Submit
-            </Button>
+            <Button variant="outline" onClick={resetDialog}>Cancel</Button>
+            <Button onClick={() => submitMut.mutate()} disabled={blockSubmit}>Submit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

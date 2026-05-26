@@ -426,9 +426,13 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     }
     setBusy(true);
     try {
-      let pos;
-      try { pos = await getPosition(); }
-      catch { setDenied(true); return; }
+      // Same single-source cache as clock-in — never call getCurrentPosition again.
+      if (hardwareDenied) { setDenied(true); return; }
+      if (!livePos) {
+        toast.error("Still acquiring GPS — please wait a moment and try again.");
+        return;
+      }
+      const pos = livePos;
 
       // Symmetric geofence check on clock-OUT
       const refClient = lockedClient ?? (() => {

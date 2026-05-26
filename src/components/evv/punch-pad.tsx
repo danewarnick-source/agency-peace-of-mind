@@ -21,6 +21,7 @@ import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { GeofenceMap } from "@/components/evv/geofence-map";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
+import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
 
 type EntryType = "Client_Profile_Pass" | "General_Sidebar_Unscheduled";
 

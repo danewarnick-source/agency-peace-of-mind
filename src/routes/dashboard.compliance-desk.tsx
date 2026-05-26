@@ -149,6 +149,43 @@ function EditedByAdminBadge({ row }: { row: Row }) {
   );
 }
 
+/** TSheets-style inline shift narrative + goals strip, rendered under every row. */
+function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
+  const note = (row.shift_note_text ?? "").trim();
+  const goals = row.goals_completed ?? [];
+  return (
+    <TableRow className="border-t-0 hover:bg-transparent">
+      <TableCell colSpan={colSpan} className="bg-muted/30 py-3">
+        <div className="rounded-lg border border-border bg-background/60 p-3 space-y-2.5">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+              💬 Shift Note
+            </div>
+            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">
+              {note.length > 0 ? note : <span className="italic text-muted-foreground">No narrative recorded.</span>}
+            </p>
+          </div>
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+              🎯 Goals Targeted
+            </div>
+            {goals.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {goals.map((g, i) => (
+                  <Badge key={`${row.id}-g-${i}`} variant="secondary" className="font-normal">
+                    {g}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-xs italic text-muted-foreground">No PCSP goals checkmarked.</p>
+            )}
+          </div>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+
 const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, clients(first_name,last_name,physical_address)";
 
 async function hydrateStaff(list: Row[]) {

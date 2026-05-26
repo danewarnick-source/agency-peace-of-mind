@@ -12,10 +12,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Award, AlertTriangle, TrendingUp, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
+import { AgencyHealthSnapshot } from "@/components/agency-health-snapshot";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 
@@ -31,24 +32,6 @@ function Overview() {
   const showAdmin = isManager && view === "admin";
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  const { data: stats } = useQuery({
-    enabled: !!org && showAdmin,
-    queryKey: ["overview-stats", org?.organization_id],
-    queryFn: async () => {
-      const [{ count: empCount }, { data: assigns }, { data: certs }] = await Promise.all([
-        supabase.from("organization_members").select("*", { count: "exact", head: true }).eq("organization_id", org!.organization_id).eq("active", true),
-        supabase.from("course_assignments").select("status").eq("organization_id", org!.organization_id),
-        supabase.from("certifications").select("expires_at").eq("organization_id", org!.organization_id),
-      ]);
-      const total = assigns?.length ?? 0;
-      const completed = assigns?.filter((a) => a.status === "completed").length ?? 0;
-      const overdue = assigns?.filter((a) => a.status === "overdue").length ?? 0;
-      const now = new Date();
-      const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      const expiringSoon = (certs ?? []).filter((c) => c.expires_at && new Date(c.expires_at) > now && new Date(c.expires_at) < soon).length;
-      return { employees: empCount ?? 0, completion: total ? Math.round((completed / total) * 100) : 0, expiringSoon, overdue };
-    },
-  });
 
   const { data: myAssigns } = useQuery({
     enabled: !!user && !showAdmin,
@@ -130,27 +113,7 @@ function Overview() {
         )}
       </div>
 
-      {showAdmin && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Active employees", value: String(stats?.employees ?? "—"), icon: Users },
-            { label: "Completion rate", value: stats ? `${stats.completion}%` : "—", icon: TrendingUp },
-            { label: "Overdue training", value: String(stats?.overdue ?? "—"), icon: AlertTriangle },
-            { label: "Expiring in 30 days", value: String(stats?.expiringSoon ?? "—"), icon: Award },
-          ].map((m) => {
-            const Icon = m.icon;
-            return (
-              <div key={m.label} className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{m.label}</p>
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="mt-3 text-3xl font-semibold tracking-tight">{m.value}</p>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {showAdmin && org && <AgencyHealthSnapshot organizationId={org.organization_id} />}
 
       {!showAdmin && (
         <div className="space-y-6">

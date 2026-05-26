@@ -121,14 +121,58 @@ function HhsClientHub() {
   );
 }
 
-// ============ Daily Note + AI Coach ============
+// ============ Daily Note + AI Coach + AI Interlock Gates ============
+const INCIDENT_RX = /\b(fell|fall|fainted|seizure|injur(y|ed|ies)|bleed|blood|hospital|ER|emergency|crisis|aggress|hit\s+(?:them|him|her)|self[- ]harm|elop(e|ed|ement)|abuse|neglect)\b/i;
+const MEDICAL_RX = /\b(appointment|appt|doctor|dr\.|dentist|dental|clinic|specialist|checkup|check[- ]up|seen by|visited (?:the )?(?:doctor|md|clinic|hospital))\b/i;
+const today = () => new Date().toISOString().slice(0, 10);
+
 function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) {
   const [note, setNote] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
   const [coach, setCoach] = useState<{ status: string; feedback: string } | null>(null);
+  const [interlock, setInterlock] = useState<{ kind: "incident" | "medical"; msg: string } | null>(null);
   const evalFn = useServerFn(evaluateShiftNote);
   const saveFn = useServerFn(saveDailyRecord);
   const pcsp = client.pcsp_goals ?? [];
+
+  const charCount = note.trim().length;
+  const remaining = Math.max(0, 50 - charCount);
+  const meetsMin = charCount >= 50;
+
+  const checkInterlocks = async (): Promise<boolean> => {
+    const t = today();
+    const hasIncidentLanguage = INCIDENT_RX.test(note);
+    const hasMedicalLanguage = MEDICAL_RX.test(note);
+    if (hasIncidentLanguage) {
+      const { count } = await supabase
+        .from("hhs_incident_reports" as never)
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", client.id)
+        .gte("occurred_at", `${t}T00:00:00Z`);
+      if (!count || count === 0) {
+        setInterlock({
+          kind: "incident",
+          msg: "⚠️ AI Compliance Lock: Your daily summary describes a critical event or injury. State regulations mandate an incident intake log. Please complete the Incident Report worksheet in Tab 4 to submit your daily records.",
+        });
+        return false;
+      }
+    }
+    if (hasMedicalLanguage) {
+      const { count } = await supabase
+        .from("hhs_medical_logs" as never)
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", client.id)
+        .gte("appointment_at", `${t}T00:00:00Z`);
+      if (!count || count === 0) {
+        setInterlock({
+          kind: "medical",
+          msg: "⚠️ AI Compliance Lock: Your note references a medical / specialist appointment. Please fill out the Medical Appointment Log form in Tab 4 before saving today's daily record.",
+        });
+        return false;
+      }
+    }
+    return true;
+  };
 
   const checkMut = useMutation({
     mutationFn: async () => evalFn({ data: { narrative: note, goals, clientFirstName: client.first_name } }),
@@ -137,23 +181,28 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
   });
 
   const saveMut = useMutation({
-    mutationFn: async () =>
-      saveFn({
+    mutationFn: async () => {
+      const ok = await checkInterlocks();
+      if (!ok) throw new Error("AI compliance lock");
+      return saveFn({
         data: {
           organizationId: orgId,
           clientId: client.id,
-          recordDate: new Date().toISOString().slice(0, 10),
+          recordDate: today(),
           narrative: note,
           pcspGoalsAddressed: goals,
           aiStatus: coach?.status ?? null,
           aiFeedback: coach?.feedback ?? null,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Daily progress note saved.");
       setNote(""); setGoals([]); setCoach(null);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      if (e.message !== "AI compliance lock") toast.error(e.message);
+    },
   });
 
   return (
@@ -178,6 +227,11 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
         <div>
           <Label>Narrative Summary</Label>
           <Textarea rows={6} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Describe support provided, behaviors observed, goal progress, ADLs…" />
+          <div className={`mt-1 text-xs ${meetsMin ? "text-green-700" : "text-amber-700"}`}>
+            {meetsMin
+              ? `✓ Clinical threshold met (${charCount} characters).`
+              : `Characters remaining to meet clinical threshold: ${remaining}`}
+          </div>
         </div>
         {coach && (
           <div className={`rounded-lg border p-3 text-sm ${coach.status === "Verified" ? "border-green-400 bg-green-50 dark:bg-green-950/30" : "border-amber-400 bg-amber-50 dark:bg-amber-950/30"}`}>
@@ -185,15 +239,27 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
             <p className="mt-1">{coach.feedback}</p>
           </div>
         )}
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => checkMut.mutate()} disabled={!note || checkMut.isPending}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => checkMut.mutate()} disabled={!meetsMin || checkMut.isPending}>
             {checkMut.isPending ? "Checking…" : "🤖 Run AI Coach Pre-Screen"}
           </Button>
-          <Button onClick={() => saveMut.mutate()} disabled={!note || saveMut.isPending}>
+          <Button onClick={() => saveMut.mutate()} disabled={!meetsMin || saveMut.isPending}>
             {saveMut.isPending ? "Saving…" : "Save Daily Note"}
           </Button>
         </div>
       </CardContent>
+
+      <Dialog open={!!interlock} onOpenChange={(o) => !o && setInterlock(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-amber-700">🚨 AI Compliance Lock</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm">{interlock?.msg}</p>
+          <DialogFooter>
+            <Button onClick={() => setInterlock(null)}>Open PRN Forms (Tab 4)</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

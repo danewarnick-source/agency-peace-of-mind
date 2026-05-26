@@ -808,10 +808,13 @@ export type Database = {
           clock_in_timestamp: string
           clock_out_timestamp: string | null
           created_at: string
+          edit_audit_history_log: Json
+          edited_by_admin_name: string | null
           goals_completed: Json
           gps_in_coordinates: Json
           gps_out_coordinates: Json | null
           id: string
+          is_edited_by_admin: boolean
           organization_id: string
           outside_geofence_reason: string | null
           raw_clock_in: string | null
@@ -834,10 +837,13 @@ export type Database = {
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
           created_at?: string
+          edit_audit_history_log?: Json
+          edited_by_admin_name?: string | null
           goals_completed?: Json
           gps_in_coordinates: Json
           gps_out_coordinates?: Json | null
           id?: string
+          is_edited_by_admin?: boolean
           organization_id: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
@@ -860,10 +866,13 @@ export type Database = {
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
           created_at?: string
+          edit_audit_history_log?: Json
+          edited_by_admin_name?: string | null
           goals_completed?: Json
           gps_in_coordinates?: Json
           gps_out_coordinates?: Json | null
           id?: string
+          is_edited_by_admin?: boolean
           organization_id?: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null

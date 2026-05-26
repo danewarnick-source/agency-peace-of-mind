@@ -830,6 +830,7 @@ export type Database = {
           staff_id: string
           status: string
           tenant_id: string | null
+          timesheet_embedding: string | null
           timezone_setting: string
           updated_at: string
           utah_medicaid_member_id: string
@@ -862,6 +863,7 @@ export type Database = {
           staff_id: string
           status?: string
           tenant_id?: string | null
+          timesheet_embedding?: string | null
           timezone_setting?: string
           updated_at?: string
           utah_medicaid_member_id: string
@@ -894,6 +896,7 @@ export type Database = {
           staff_id?: string
           status?: string
           tenant_id?: string | null
+          timesheet_embedding?: string | null
           timezone_setting?: string
           updated_at?: string
           utah_medicaid_member_id?: string
@@ -2332,6 +2335,20 @@ export type Database = {
       }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
       is_super_admin: { Args: { _user: string }; Returns: boolean }
+      match_timesheets: {
+        Args: {
+          _org?: string
+          date_from?: string
+          date_to?: string
+          hour_min?: number
+          match_count?: number
+          query_embedding: string
+        }
+        Returns: {
+          id: string
+          similarity: number
+        }[]
+      }
       user_org_ids: { Args: { _user: string }; Returns: string[] }
     }
     Enums: {

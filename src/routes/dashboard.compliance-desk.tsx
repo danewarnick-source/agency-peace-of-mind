@@ -304,49 +304,85 @@ function PendingTable({
   );
 }
 
-// === Utah DHHS CSV helpers ===
-function pad2(n: number) { return n < 10 ? `0${n}` : String(n); }
-function fmtDate(iso: string) {
+// === Utah DHHS 30-Column State Portal CSV ===
+// Header + cell formats lock to the uploaded EVV4_1.csv template verbatim.
+function fmtDateMDY(iso: string) {
+  // Strict M/D/YYYY (no leading zeros) — matches "3/19/2025".
   const d = new Date(iso);
-  return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}`;
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
-function fmtTime12(iso: string) {
+function pad2(n: number) { return n < 10 ? `0${n}` : String(n); }
+function fmtTimeHMSAmPm(iso: string) {
+  // Strict HH:MM:SS AM/PM with exactly one space — matches "01:03:00 PM".
   const d = new Date(iso);
   let h = d.getHours();
   const m = d.getMinutes();
+  const s = d.getSeconds();
   const ampm = h >= 12 ? "PM" : "AM";
   h = h % 12; if (h === 0) h = 12;
-  return `${pad2(h)}:${pad2(m)} ${ampm}`;
+  return `${pad2(h)}:${pad2(m)}:${pad2(s)} ${ampm}`;
 }
 function csvEscape(s: string) {
-  if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-function textQualified(s: string) {
-  // Wrap so spreadsheets don't strip leading zeroes: ="0012345678"
-  return `"=""${(s ?? "").replace(/"/g, "")}"""`;
+  const v = s ?? "";
+  if (v.includes(",") || v.includes('"') || v.includes("\n")) return `"${v.replace(/"/g, '""')}"`;
+  return v;
 }
 
+const UTAH_30_HEADER =
+  "Member ID (req),First name (req),Middle initial,Last name (req),Service code (req),Service description,Provider ID (req),Employee Performing Service (req),Begin date (req),Begin time (req),Begin address (req),Begin Apt/Suite/Floor,Begin City (req),Begin State,Begin Zip,Begin Geo Latitude,Begin Geo Longitude,End date (req),End time (req),End Address1,End Address2,End City,End State,End Zip,End Geo Latitude,End Geo Longitude,Orig_receipt_id (req if CORRECTION),Batch_id (req),Record_id (req),EVV Vendor (req)";
+
+const EVV_VENDOR_NAME = "Care Academy";
+
 function buildUtahCsv(rows: Row[]): string {
-  const header = "Provider ID,Member ID,Service Code,Begin Date,Begin Time,End Date,End Time,Original Receipt ID,Batch ID,Record ID";
-  const lines = rows.map((r) => {
+  // One incremental batch number per export (seconds since epoch keeps it
+  // sequential across exports without colliding within a single file).
+  const batchId = Math.floor(Date.now() / 1000).toString();
+
+  const lines = rows.map((r, idx) => {
     const inIso = effectiveIn(r);
     const outIso = effectiveOut(r) ?? inIso;
+    const latIn = r.gps_in_coordinates?.latitude ?? 0;
+    const lngIn = r.gps_in_coordinates?.longitude ?? 0;
+    const latOut = r.gps_out_coordinates?.latitude ?? 0;
+    const lngOut = r.gps_out_coordinates?.longitude ?? 0;
+    const employee = (r.staff?.full_name ?? r.staff?.email ?? "").trim();
+
     return [
-      textQualified(r.utah_medicaid_provider_id ?? ""),
-      textQualified(r.utah_medicaid_member_id ?? ""),
-      csvEscape(r.service_type_code ?? ""),
-      csvEscape(fmtDate(inIso)),
-      csvEscape(fmtTime12(inIso)),
-      csvEscape(fmtDate(outIso)),
-      csvEscape(fmtTime12(outIso)),
-      "",
-      "",
-      "",
+      "",                                       // Member ID (req) — empty per template
+      csvEscape(r.clients?.first_name ?? ""),   // First name (req)
+      "",                                       // Middle initial
+      csvEscape(r.clients?.last_name ?? ""),    // Last name (req)
+      csvEscape(r.service_type_code ?? ""),     // Service code (req)
+      "",                                       // Service description
+      csvEscape(r.utah_medicaid_provider_id ?? ""), // Provider ID (req)
+      csvEscape(employee),                      // Employee Performing Service (req)
+      csvEscape(fmtDateMDY(inIso)),             // Begin date (req)
+      csvEscape(fmtTimeHMSAmPm(inIso)),         // Begin time (req)
+      "",                                       // Begin address (req) — blank placeholder
+      "",                                       // Begin Apt/Suite/Floor
+      "",                                       // Begin City (req)
+      "",                                       // Begin State
+      "",                                       // Begin Zip
+      String(latIn),                            // Begin Geo Latitude
+      String(lngIn),                            // Begin Geo Longitude
+      csvEscape(fmtDateMDY(outIso)),            // End date (req)
+      csvEscape(fmtTimeHMSAmPm(outIso)),        // End time (req)
+      "",                                       // End Address1
+      "",                                       // End Address2
+      "",                                       // End City
+      "",                                       // End State
+      "",                                       // End Zip
+      String(latOut),                           // End Geo Latitude
+      String(lngOut),                           // End Geo Longitude
+      "",                                       // Orig_receipt_id (req if CORRECTION)
+      batchId,                                  // Batch_id (req)
+      String(idx + 1),                          // Record_id (req)
+      csvEscape(EVV_VENDOR_NAME),               // EVV Vendor (req)
     ].join(",");
   });
-  return [header, ...lines].join("\r\n");
+  return [UTAH_30_HEADER, ...lines].join("\r\n");
 }
+
 
 function downloadCsv(filename: string, body: string) {
   const blob = new Blob([body], { type: "text/csv;charset=utf-8" });

@@ -434,7 +434,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     setOutVariance(null);
     setOutVarianceReason("");
     setSuccess({ duration });
-    toast.success("✓ Shift successfully recorded. Timesheet submitted to the Compliance Desk for executive approval.");
+    toast.success("✓ Shift successfully recorded. Timesheet submitted to the EVV & Timesheet Control for executive approval.");
     await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
   }
 
@@ -887,7 +887,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
               Shift Saved
             </DialogTitle>
             <DialogDescription>
-              Submitted to the Compliance Desk for Administrative Sign-off.
+              Submitted to the EVV & Timesheet Control for Administrative Sign-off.
               {success ? <> Total duration: <strong className="font-mono">{success.duration}</strong>.</> : null}
             </DialogDescription>
           </DialogHeader>
@@ -1083,10 +1083,10 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
                 {aiBusy
                   ? "🧠 AI Coach reviewing your note…"
                   : aiCoach?.status === "Verified"
-                    ? "💾 Submit Final Timesheet to Compliance Desk"
+                    ? "💾 Submit Final Timesheet to EVV & Timesheet Control"
                     : aiCoach?.status === "Flagged"
                       ? "🔁 Re-Check with AI Coach"
-                      : "💾 Submit Final Timesheet to Compliance Desk"}
+                      : "💾 Submit Final Timesheet to EVV & Timesheet Control"}
               </Button>
             </div>
             {allowException && aiCoach?.status === "Flagged" && (

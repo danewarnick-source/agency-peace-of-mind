@@ -27,6 +27,8 @@ const MOCK_WORKSPACE_CLIENTS: Record<string, CaseloadClient> = {
   },
 };
 import { Badge } from "@/components/ui/badge";
+import { PunchPad } from "@/components/evv/punch-pad";
+import { padMemberId } from "@/lib/evv-codes";
 import {
   Tabs,
   TabsContent,
@@ -114,6 +116,17 @@ function ClientWorkspace() {
             </div>
           </div>
         </div>
+
+        {/* In-Chart EVV Punch Pad — client is permanently locked */}
+        <PunchPad
+          entryType="Client_Profile_Pass"
+          lockedClient={{
+            id: client.id,
+            name: `${client.first_name} ${client.last_name}`.trim(),
+            memberId: padMemberId(client.medicaid_id),
+            facility: client.physical_address,
+          }}
+        />
 
         <Tabs defaultValue="about" className="w-full">
           {/* Touch-friendly tab bar — mirrored across mobile and desktop */}

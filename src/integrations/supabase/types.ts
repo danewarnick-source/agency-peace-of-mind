@@ -796,6 +796,78 @@ export type Database = {
           },
         ]
       }
+      evv_timesheets: {
+        Row: {
+          client_id: string
+          clock_in_timestamp: string
+          clock_out_timestamp: string | null
+          created_at: string
+          gps_in_coordinates: Json
+          gps_out_coordinates: Json | null
+          id: string
+          organization_id: string
+          service_type_code: string
+          shift_entry_type: string
+          staff_id: string
+          status: string
+          tenant_id: string | null
+          updated_at: string
+          utah_medicaid_member_id: string
+          utah_medicaid_provider_id: string
+        }
+        Insert: {
+          client_id: string
+          clock_in_timestamp?: string
+          clock_out_timestamp?: string | null
+          created_at?: string
+          gps_in_coordinates: Json
+          gps_out_coordinates?: Json | null
+          id?: string
+          organization_id: string
+          service_type_code: string
+          shift_entry_type: string
+          staff_id: string
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          utah_medicaid_member_id: string
+          utah_medicaid_provider_id: string
+        }
+        Update: {
+          client_id?: string
+          clock_in_timestamp?: string
+          clock_out_timestamp?: string | null
+          created_at?: string
+          gps_in_coordinates?: Json
+          gps_out_coordinates?: Json | null
+          id?: string
+          organization_id?: string
+          service_type_code?: string
+          shift_entry_type?: string
+          staff_id?: string
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          utah_medicaid_member_id?: string
+          utah_medicaid_provider_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evv_timesheets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evv_timesheets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "provider_tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       external_certifications: {
         Row: {
           cert_name: string | null

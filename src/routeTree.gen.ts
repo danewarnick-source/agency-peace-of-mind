@@ -42,6 +42,7 @@ import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.emplo
 import { Route as DashboardEmarRouteImport } from './routes/dashboard.emar'
 import { Route as DashboardDspdControlsRouteImport } from './routes/dashboard.dspd-controls'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
+import { Route as DashboardComplianceDeskRouteImport } from './routes/dashboard.compliance-desk'
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
@@ -226,6 +227,11 @@ const DashboardDailyLogsRoute = DashboardDailyLogsRouteImport.update({
   path: '/daily-logs',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardComplianceDeskRoute = DashboardComplianceDeskRouteImport.update({
+  id: '/compliance-desk',
+  path: '/compliance-desk',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardClientsRoute = DashboardClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
@@ -338,6 +344,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
@@ -389,6 +396,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
@@ -442,6 +450,7 @@ export interface FileRoutesById {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
@@ -496,6 +505,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
+    | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/dspd-controls'
     | '/dashboard/emar'
@@ -547,6 +557,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
+    | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/dspd-controls'
     | '/dashboard/emar'
@@ -599,6 +610,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/clients'
+    | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/dspd-controls'
     | '/dashboard/emar'
@@ -885,6 +897,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardDailyLogsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/compliance-desk': {
+      id: '/dashboard/compliance-desk'
+      path: '/compliance-desk'
+      fullPath: '/dashboard/compliance-desk'
+      preLoaderRoute: typeof DashboardComplianceDeskRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/clients': {
       id: '/dashboard/clients'
       path: '/clients'
@@ -1060,6 +1079,7 @@ interface DashboardRouteChildren {
   DashboardBillingRoute: typeof DashboardBillingRoute
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientsRoute: typeof DashboardClientsRoute
+  DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardDspdControlsRoute: typeof DashboardDspdControlsRoute
   DashboardEmarRoute: typeof DashboardEmarRoute
@@ -1093,6 +1113,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBillingRoute: DashboardBillingRoute,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientsRoute: DashboardClientsRoute,
+  DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardDspdControlsRoute: DashboardDspdControlsRoute,
   DashboardEmarRoute: DashboardEmarRoute,

@@ -169,11 +169,51 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
 
   // Geofence variance overlay state
   const [variance, setVariance] = useState<null | {
-    distanceFeet: number;
-    limitFeet: number;
-    pos: { lat: number; lng: number; acc: number };
+    distanceFeet?: number;
+    limitFeet?: number;
+    pos: { lat: number; lng: number; acc: number } | null;
+    frameBlocked?: boolean;
   }>(null);
   const [varianceReason, setVarianceReason] = useState("");
+
+  // Active Proximity Echo — fire an immediate getCurrentPosition the moment
+  // the component mounts. If the browser frame blocks location, denies
+  // permission, or fails to produce coordinates within a strict 3-second
+  // window, we bypass the GPS lock and open the variance modal automatically
+  // so the caregiver is never trapped on a non-clickable button screen.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      setVariance({ frameBlocked: true, pos: null });
+      return;
+    }
+    let settled = false;
+    const failOpen = () => {
+      if (settled) return;
+      settled = true;
+      setVariance((v) => v ?? { frameBlocked: true, pos: null });
+    };
+    const hardDeadline = window.setTimeout(failOpen, 3000);
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(hardDeadline);
+          setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
+        },
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED || err.code === err.POSITION_UNAVAILABLE || err.code === err.TIMEOUT) {
+            failOpen();
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 3000 },
+      );
+    } catch {
+      failOpen();
+    }
+    return () => window.clearTimeout(hardDeadline);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Clock-out compliance modal state
   const [showCompliance, setShowCompliance] = useState(false);
@@ -286,7 +326,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     !!org?.organization_id;
 
   async function writeShift(args: {
-    pos: { lat: number; lng: number; acc: number };
+    pos: { lat: number; lng: number; acc: number } | null;
     outsideReason?: string;
   }) {
     if (!user || !org || !clientForPunch) return;
@@ -299,7 +339,9 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       utah_medicaid_provider_id: providerIdFromOrg(org.organization_id),
       utah_medicaid_member_id: clientForPunch.memberId,
       service_type_code: serviceCode,
-      gps_in_coordinates: { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc },
+      gps_in_coordinates: args.pos
+        ? { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc }
+        : { latitude: null, longitude: null, accuracy_meters: null },
       shift_entry_type: entryType,
       status: "Active",
       timezone_setting: timezone,
@@ -325,11 +367,11 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     }
     setBusy(true);
     try {
-      // Use the cached coordinates from the live map feed — no redundant
-      // getCurrentPosition call that would race the permission state.
-      if (hardwareDenied) { setDenied(true); return; }
-      if (!livePos) {
-        toast.error("Still acquiring GPS — please wait a moment and try again.");
+      // Frame-blocked or hardware-denied: bypass the GPS lock by opening the
+      // variance modal so the caregiver can clock in via manual justification.
+      if (hardwareDenied || !livePos) {
+        setVariance({ frameBlocked: true, pos: null });
+        setVarianceReason("");
         return;
       }
       const pos = livePos;
@@ -362,8 +404,8 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   async function submitVariance() {
     if (!variance) return;
     const reason = varianceReason.trim();
-    if (reason.length === 0) {
-      toast.error("Please provide a variance justification.");
+    if (reason.length < 10) {
+      toast.error("Please type at least 10 characters of justification.");
       return;
     }
     setBusy(true);
@@ -837,35 +879,37 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
               ⚠️ Geofence Variance Notice
             </DialogTitle>
             <DialogDescription>
-              Our system detects you are starting your shift outside the approved
-              client home perimeter. Please provide a brief justification explaining
-              why you are clocking in from this location (e.g., Community outing,
-              medical transit, network latency).
+              {variance?.frameBlocked
+                ? "Our system cannot verify your exact proximity to the approved client perimeter because mobile location access is restricted or unavailable on this browser frame. To proceed with clocking into this EVV Shift, state compliance requires a manual location justification."
+                : "Our system detects you are starting your shift outside the approved client home perimeter. Please provide a brief justification explaining why you are clocking in from this location (e.g., Community outing, medical transit, network latency)."}
             </DialogDescription>
           </DialogHeader>
-          {variance && (
+          {variance && typeof variance.distanceFeet === "number" && typeof variance.limitFeet === "number" && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
               Measured distance: <span className="font-mono font-semibold">{variance.distanceFeet.toLocaleString()} ft</span>
               {" "}· Allowed: <span className="font-mono font-semibold">{variance.limitFeet.toLocaleString()} ft</span>
             </div>
           )}
           <div className="grid gap-2">
-            <Label htmlFor="variance-reason">Variance justification</Label>
+            <Label htmlFor="variance-reason">Location variance justification</Label>
             <Textarea
               id="variance-reason"
               rows={4}
               value={varianceReason}
               onChange={(e) => setVarianceReason(e.target.value)}
-              placeholder="e.g. Community outing to the grocery store per PCSP goal."
+              placeholder="Provide a brief narrative reason explaining your location or device variance (e.g., Device location permissions restricted, starting shift at community job site, bad cell reception)."
               maxLength={500}
               required
             />
+            <p className="text-[11px] text-muted-foreground">
+              {varianceReason.trim().length}/10 characters minimum
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setVariance(null); setVarianceReason(""); }}>Cancel</Button>
-            <Button onClick={submitVariance} disabled={busy || varianceReason.trim().length === 0}>
+            <Button onClick={submitVariance} disabled={busy || varianceReason.trim().length < 10}>
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Confirm Clock In
+              Confirm Clock In &amp; Start Shift
             </Button>
           </DialogFooter>
         </DialogContent>

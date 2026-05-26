@@ -615,6 +615,138 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Clock-Out Compliance Modal */}
+      <Dialog
+        open={showCompliance}
+        onOpenChange={(o) => { if (!busy) setShowCompliance(o); }}
+      >
+        <DialogContent
+          className="max-h-[90vh] max-w-2xl overflow-y-auto"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>📋 Shift Verification &amp; Medicaid Compliance Form</DialogTitle>
+            <DialogDescription>
+              Complete the goals tracker and progress note below to submit your timesheet.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Live elapsed */}
+          <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-2">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Live Duration
+            </span>
+            <span className="font-mono text-lg font-bold tabular-nums">{elapsed}</span>
+          </div>
+
+          {/* PCSP goals */}
+          <div className="grid gap-2">
+            <h3 className="text-sm font-semibold">🎯 Person-Centered Support Plan (PCSP) Objectives Tracker</h3>
+            <div className="grid gap-1.5 rounded-md border border-border p-3">
+              {activeClientGoals.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No active PCSP goals on file for this individual.
+                </p>
+              )}
+              {activeClientGoals.map((goal, idx) => {
+                const id = `goal-${idx}`;
+                return (
+                  <label
+                    key={id}
+                    htmlFor={id}
+                    className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
+                  >
+                    <input
+                      id={id}
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
+                      checked={!!checkedGoals[goal]}
+                      onChange={(e) =>
+                        setCheckedGoals((p) => ({ ...p, [goal]: e.target.checked }))
+                      }
+                    />
+                    <span>{goal}</span>
+                  </label>
+                );
+              })}
+              <div className="my-1 border-t border-dashed border-border" />
+              <label
+                htmlFor="goal-baseline"
+                className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
+              >
+                <input
+                  id="goal-baseline"
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
+                  checked={baselineChecked}
+                  onChange={(e) => setBaselineChecked(e.target.checked)}
+                />
+                <span className="italic text-muted-foreground">
+                  General baseline monitoring &amp; safety oversight
+                </span>
+              </label>
+            </div>
+            {!hasGoalSelected && (
+              <p className="text-[11px] text-muted-foreground">
+                Select at least one goal worked on this shift.
+              </p>
+            )}
+          </div>
+
+          {/* Narrative */}
+          <div className="grid gap-2">
+            <Label htmlFor="evv-narrative">
+              📝 Mandatory Progress Note &amp; Narrative Log
+            </Label>
+            <Textarea
+              id="evv-narrative"
+              rows={7}
+              value={narrative}
+              onChange={(e) => {
+                setNarrative(e.target.value);
+                if (showNarrativeError) setShowNarrativeError(false);
+              }}
+              placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
+              maxLength={5000}
+            />
+            <div
+              className={`text-xs font-medium ${
+                narrativeOk ? "text-emerald-600" : "text-muted-foreground"
+              }`}
+            >
+              Word Count: {wordCount} / 100 words minimum
+            </div>
+            {showNarrativeError && !narrativeOk && (
+              <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
+                ⚠️ Compliance Failure: Your daily progress narrative must be at least
+                100 words in length to satisfy state Medicaid auditing and DSPD billing
+                validation criteria. Please provide additional detail regarding client
+                behaviors, choices, and goal responses.
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="mt-2">
+            <div
+              className="w-full"
+              onMouseEnter={() => { if (!narrativeOk) setShowNarrativeError(true); }}
+              onClick={() => { if (!narrativeOk) setShowNarrativeError(true); }}
+            >
+              <Button
+                type="button"
+                onClick={submitCompliance}
+                disabled={!canSubmitCompliance}
+                className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+              >
+                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                💾 Submit Final Timesheet to Compliance Desk
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

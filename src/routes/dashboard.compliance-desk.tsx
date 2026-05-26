@@ -393,6 +393,7 @@ function PendingTable({
             ) : rows.length === 0 ? (
               <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts. ✓</TableCell></TableRow>
             ) : rows.map((r) => (
+              <>
               <TableRow key={r.id}>
                 <TableCell className="font-medium">
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
@@ -435,6 +436,8 @@ function PendingTable({
                   </div>
                 </TableCell>
               </TableRow>
+              <InlineNotesRow row={r} colSpan={9} />
+              </>
             ))}
           </TableBody>
         </Table>

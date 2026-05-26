@@ -288,11 +288,15 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     }
     setBusy(true);
     try {
-      let pos;
-      try { pos = await getPosition(); }
-      catch { setDenied(true); return; }
+      // Use the cached coordinates from the live map feed — no redundant
+      // getCurrentPosition call that would race the permission state.
+      if (hardwareDenied) { setDenied(true); return; }
+      if (!livePos) {
+        toast.error("Still acquiring GPS — please wait a moment and try again.");
+        return;
+      }
+      const pos = livePos;
 
-      // Haversine geofence check (when client has a home pin + radius).
       const lat = clientForPunch.homeLat;
       const lng = clientForPunch.homeLng;
       const radius = clientForPunch.geofenceRadiusFeet ?? 1000;
@@ -301,7 +305,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         if (dist > radius) {
           setVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });
           setVarianceReason("");
-          return; // BLOCK insert until justification submitted
+          return;
         }
       }
 

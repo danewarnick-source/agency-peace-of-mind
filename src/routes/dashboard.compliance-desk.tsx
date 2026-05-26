@@ -500,31 +500,84 @@ function ComplianceDeskPage() {
         </div>
       </header>
 
-      <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1">
-        <button
-          type="button"
-          onClick={() => setSub("pending")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "pending" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+      {/* 🤖 AI Command Search — sits above the tab filters, intercepts cross-tab queries */}
+      <div className="space-y-1.5">
+        <div
+          className="group relative rounded-xl p-[1.5px] transition"
+          style={{
+            background: isSearching
+              ? "linear-gradient(135deg, hsl(var(--primary)/0.85), hsl(280 90% 60% / 0.85), hsl(190 95% 55% / 0.85))"
+              : "linear-gradient(135deg, hsl(var(--primary)/0.45), hsl(280 90% 60% / 0.35), hsl(190 95% 55% / 0.45))",
+          }}
         >
-          📥 Pending Review
-        </button>
-        <button
-          type="button"
-          onClick={() => setSub("evv-archive")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          📁 State EVV Archive
-        </button>
-        <button
-          type="button"
-          onClick={() => setSub("non-evv-archive")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "non-evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          💼 Internal / Non-EVV Archive
-        </button>
-      </nav>
+          <div className="flex items-center gap-2 rounded-[10px] bg-background px-3 py-2 shadow-sm focus-within:shadow-md">
+            <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+            <Input
+              value={aiQuery}
+              onChange={(e) => setAiQuery(e.target.value)}
+              placeholder="🤖 Search everything via AI... Try: 'Pull up all times Dane worked with John Smith from May to July after 3pm'"
+              className="h-9 flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
+            />
+            {isSearching && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={() => setAiQuery("")}
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+        {isSearching && (
+          <p className="px-1 text-xs font-medium text-muted-foreground">
+            📊 Showing cross-tab query results matching your criteria…
+          </p>
+        )}
+      </div>
 
-      {sub === "pending" ? (
+      {!isSearching && (
+        <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1">
+          <button
+            type="button"
+            onClick={() => setSub("pending")}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "pending" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            📥 Pending Review
+          </button>
+          <button
+            type="button"
+            onClick={() => setSub("evv-archive")}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            📁 State EVV Archive
+          </button>
+          <button
+            type="button"
+            onClick={() => setSub("non-evv-archive")}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "non-evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            💼 Internal / Non-EVV Archive
+          </button>
+        </nav>
+      )}
+
+      {isSearching ? (
+        <UnifiedSearchResults
+          query={aiQuery}
+          pending={pendingQ.data ?? []}
+          approved={approvedQ.data ?? []}
+          loading={pendingQ.isLoading || approvedQ.isLoading}
+          onMap={setMapOpen}
+          onEdit={setEditRow}
+          onReason={setReasonRow}
+          onApprove={(id) => approve.mutate(id)}
+          approving={approve.isPending}
+        />
+      ) : sub === "pending" ? (
         <PendingTable
           rows={pendingQ.data ?? []}
           loading={pendingQ.isLoading}

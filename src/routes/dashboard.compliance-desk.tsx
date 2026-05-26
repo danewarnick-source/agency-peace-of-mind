@@ -393,8 +393,8 @@ function PendingTable({
             ) : rows.length === 0 ? (
               <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts. ✓</TableCell></TableRow>
             ) : rows.map((r) => (
-              <>
-              <TableRow key={r.id}>
+              <Fragment key={r.id}>
+              <TableRow>
                 <TableCell className="font-medium">
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
                   <EditedByAdminBadge row={r} />

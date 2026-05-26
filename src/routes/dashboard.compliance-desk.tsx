@@ -474,8 +474,8 @@ function buildPayrollCsv(rows: Row[]): string {
 }
 
 function ArchiveTable({
-  rows, loading, onMap, variant,
-}: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; variant: "evv" | "non-evv" }) {
+  rows, loading, onMap, onEdit, variant,
+}: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; onEdit: (r: Row) => void; variant: "evv" | "non-evv" }) {
   const [search, setSearch] = useState("");
   const [svc, setSvc] = useState<string>("all");
   const [from, setFrom] = useState<string>("");

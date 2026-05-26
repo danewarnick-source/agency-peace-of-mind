@@ -805,6 +805,7 @@ export type Database = {
           clock_in_timestamp: string
           clock_out_timestamp: string | null
           created_at: string
+          goals_completed: Json
           gps_in_coordinates: Json
           gps_out_coordinates: Json | null
           id: string
@@ -812,6 +813,7 @@ export type Database = {
           outside_geofence_reason: string | null
           service_type_code: string
           shift_entry_type: string
+          shift_note_text: string | null
           staff_id: string
           status: string
           tenant_id: string | null
@@ -825,6 +827,7 @@ export type Database = {
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
           created_at?: string
+          goals_completed?: Json
           gps_in_coordinates: Json
           gps_out_coordinates?: Json | null
           id?: string
@@ -832,6 +835,7 @@ export type Database = {
           outside_geofence_reason?: string | null
           service_type_code: string
           shift_entry_type: string
+          shift_note_text?: string | null
           staff_id: string
           status?: string
           tenant_id?: string | null
@@ -845,6 +849,7 @@ export type Database = {
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
           created_at?: string
+          goals_completed?: Json
           gps_in_coordinates?: Json
           gps_out_coordinates?: Json | null
           id?: string
@@ -852,6 +857,7 @@ export type Database = {
           outside_geofence_reason?: string | null
           service_type_code?: string
           shift_entry_type?: string
+          shift_note_text?: string | null
           staff_id?: string
           status?: string
           tenant_id?: string | null

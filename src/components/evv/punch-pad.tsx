@@ -31,6 +31,7 @@ type LockedClient = {
   homeLat?: number | null;
   homeLng?: number | null;
   geofenceRadiusFeet?: number | null;
+  pcspGoals?: string[];
 };
 
 type ActiveShift = {
@@ -103,6 +104,7 @@ export interface PunchPadProps {
     home_latitude?: number | null;
     home_longitude?: number | null;
     geofence_radius_feet?: number | null;
+    pcsp_goals?: string[] | null;
   }>;
 }
 
@@ -127,6 +129,13 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     pos: { lat: number; lng: number; acc: number };
   }>(null);
   const [varianceReason, setVarianceReason] = useState("");
+
+  // Clock-out compliance modal state
+  const [showCompliance, setShowCompliance] = useState(false);
+  const [checkedGoals, setCheckedGoals] = useState<Record<string, boolean>>({});
+  const [baselineChecked, setBaselineChecked] = useState(false);
+  const [narrative, setNarrative] = useState("");
+  const [showNarrativeError, setShowNarrativeError] = useState(false);
 
   const facilities = useMemo(() => {
     const set = new Set<string>();
@@ -188,6 +197,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
           homeLat: c.home_latitude ?? null,
           homeLng: c.home_longitude ?? null,
           geofenceRadiusFeet: c.geofence_radius_feet ?? null,
+          pcspGoals: c.pcsp_goals ?? undefined,
         };
       })();
 
@@ -288,8 +298,46 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     }
   }
 
-  async function handleClockOut() {
+  // Goals for the currently-running shift's client
+  const activeClientGoals = useMemo<string[]>(() => {
+    if (!active) return [];
+    if (lockedClient && active.client_id === lockedClient.id) {
+      return lockedClient.pcspGoals ?? [];
+    }
+    const c = caseload.find((x) => x.id === active.client_id);
+    return c?.pcsp_goals ?? [];
+  }, [active, lockedClient, caseload]);
+
+  const wordCount = useMemo(() => {
+    const t = narrative.trim();
+    if (!t) return 0;
+    return t.split(/\s+/).filter(Boolean).length;
+  }, [narrative]);
+
+  const hasGoalSelected =
+    baselineChecked || Object.values(checkedGoals).some(Boolean);
+  const narrativeOk = wordCount >= 100;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && !busy;
+
+  function openCompliance() {
+    if (!active) return;
+    setCheckedGoals({});
+    setBaselineChecked(false);
+    setNarrative("");
+    setShowNarrativeError(false);
+    setShowCompliance(true);
+  }
+
+  async function submitCompliance() {
     if (!user || !active) return;
+    if (!hasGoalSelected) {
+      toast.error("Select at least one PCSP goal or baseline monitoring.");
+      return;
+    }
+    if (!narrativeOk) {
+      setShowNarrativeError(true);
+      return;
+    }
     setBusy(true);
     try {
       let pos;
@@ -297,17 +345,31 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       catch { setDenied(true); return; }
 
       const clockOut = new Date().toISOString();
+      const selectedGoals = Object.entries(checkedGoals)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
+      if (baselineChecked) selectedGoals.push("General baseline monitoring & safety oversight");
+
       const { error } = await supabase
         .from("evv_timesheets")
         .update({
           clock_out_timestamp: clockOut,
           gps_out_coordinates: { latitude: pos.lat, longitude: pos.lng, accuracy_meters: pos.acc },
           status: "Pending",
-        })
+          timezone_setting: "America/Denver",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          shift_note_text: narrative.trim(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          goals_completed: selectedGoals,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
         .eq("id", active.id);
       if (error) throw error;
+
       const duration = fmtElapsed(new Date(clockOut).getTime() - new Date(active.clock_in_timestamp).getTime());
+      setShowCompliance(false);
       setSuccess({ duration });
+      toast.success("✓ Shift successfully recorded. Timesheet submitted to the Compliance Desk for executive approval.");
       await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");
@@ -432,32 +494,43 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </span>
       </div>
 
-      <div className="mt-5 flex justify-center">
-        {isRunning ? (
+      {isRunning ? (
+        <div className="mt-5">
           <button
             type="button"
-            onClick={handleClockOut}
+            onClick={openCompliance}
             disabled={busy}
-            className="group flex h-32 w-32 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg shadow-rose-600/30 transition hover:scale-[1.02] hover:bg-rose-700 disabled:opacity-60"
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-rose-600 text-base font-bold uppercase tracking-wider text-white shadow-lg shadow-rose-600/30 transition hover:bg-rose-700 disabled:opacity-60"
             aria-label="End EVV Shift"
           >
-            {busy ? <Loader2 className="h-10 w-10 animate-spin" /> : <Square className="h-10 w-10 fill-current" />}
+            {busy ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <Square className="h-5 w-5 fill-current" />
+                ⏹️ END EVV SHIFT
+              </>
+            )}
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleClockIn}
-            disabled={busy || !inReady}
-            className="group flex h-32 w-32 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 transition hover:scale-[1.02] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label="Start EVV Shift"
-          >
-            {busy ? <Loader2 className="h-10 w-10 animate-spin" /> : <Play className="h-10 w-10 fill-current" />}
-          </button>
-        )}
-      </div>
-      <p className="mt-3 text-center text-sm font-semibold uppercase tracking-wider">
-        {isRunning ? "⏹️ END EVV SHIFT" : "▶️ START EVV SHIFT"}
-      </p>
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 flex justify-center">
+            <button
+              type="button"
+              onClick={handleClockIn}
+              disabled={busy || !inReady}
+              className="group flex h-32 w-32 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 transition hover:scale-[1.02] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Start EVV Shift"
+            >
+              {busy ? <Loader2 className="h-10 w-10 animate-spin" /> : <Play className="h-10 w-10 fill-current" />}
+            </button>
+          </div>
+          <p className="mt-3 text-center text-sm font-semibold uppercase tracking-wider">
+            ▶️ START EVV SHIFT
+          </p>
+        </>
+      )}
 
       <p className="mt-3 flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
         <MapPin className="h-3 w-3" />
@@ -540,6 +613,138 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
           <div className="flex justify-end">
             <Button onClick={() => setSuccess(null)}>Close</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clock-Out Compliance Modal */}
+      <Dialog
+        open={showCompliance}
+        onOpenChange={(o) => { if (!busy) setShowCompliance(o); }}
+      >
+        <DialogContent
+          className="max-h-[90vh] max-w-2xl overflow-y-auto"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>📋 Shift Verification &amp; Medicaid Compliance Form</DialogTitle>
+            <DialogDescription>
+              Complete the goals tracker and progress note below to submit your timesheet.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Live elapsed */}
+          <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-2">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Live Duration
+            </span>
+            <span className="font-mono text-lg font-bold tabular-nums">{elapsed}</span>
+          </div>
+
+          {/* PCSP goals */}
+          <div className="grid gap-2">
+            <h3 className="text-sm font-semibold">🎯 Person-Centered Support Plan (PCSP) Objectives Tracker</h3>
+            <div className="grid gap-1.5 rounded-md border border-border p-3">
+              {activeClientGoals.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No active PCSP goals on file for this individual.
+                </p>
+              )}
+              {activeClientGoals.map((goal, idx) => {
+                const id = `goal-${idx}`;
+                return (
+                  <label
+                    key={id}
+                    htmlFor={id}
+                    className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
+                  >
+                    <input
+                      id={id}
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
+                      checked={!!checkedGoals[goal]}
+                      onChange={(e) =>
+                        setCheckedGoals((p) => ({ ...p, [goal]: e.target.checked }))
+                      }
+                    />
+                    <span>{goal}</span>
+                  </label>
+                );
+              })}
+              <div className="my-1 border-t border-dashed border-border" />
+              <label
+                htmlFor="goal-baseline"
+                className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
+              >
+                <input
+                  id="goal-baseline"
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
+                  checked={baselineChecked}
+                  onChange={(e) => setBaselineChecked(e.target.checked)}
+                />
+                <span className="italic text-muted-foreground">
+                  General baseline monitoring &amp; safety oversight
+                </span>
+              </label>
+            </div>
+            {!hasGoalSelected && (
+              <p className="text-[11px] text-muted-foreground">
+                Select at least one goal worked on this shift.
+              </p>
+            )}
+          </div>
+
+          {/* Narrative */}
+          <div className="grid gap-2">
+            <Label htmlFor="evv-narrative">
+              📝 Mandatory Progress Note &amp; Narrative Log
+            </Label>
+            <Textarea
+              id="evv-narrative"
+              rows={7}
+              value={narrative}
+              onChange={(e) => {
+                setNarrative(e.target.value);
+                if (showNarrativeError) setShowNarrativeError(false);
+              }}
+              placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
+              maxLength={5000}
+            />
+            <div
+              className={`text-xs font-medium ${
+                narrativeOk ? "text-emerald-600" : "text-muted-foreground"
+              }`}
+            >
+              Word Count: {wordCount} / 100 words minimum
+            </div>
+            {showNarrativeError && !narrativeOk && (
+              <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
+                ⚠️ Compliance Failure: Your daily progress narrative must be at least
+                100 words in length to satisfy state Medicaid auditing and DSPD billing
+                validation criteria. Please provide additional detail regarding client
+                behaviors, choices, and goal responses.
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="mt-2">
+            <div
+              className="w-full"
+              onMouseEnter={() => { if (!narrativeOk) setShowNarrativeError(true); }}
+              onClick={() => { if (!narrativeOk) setShowNarrativeError(true); }}
+            >
+              <Button
+                type="button"
+                onClick={submitCompliance}
+                disabled={!canSubmitCompliance}
+                className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+              >
+                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                💾 Submit Final Timesheet to Compliance Desk
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </section>

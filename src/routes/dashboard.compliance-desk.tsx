@@ -262,6 +262,7 @@ function ComplianceDeskPage() {
           rows={(approvedQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
           loading={approvedQ.isLoading}
           onMap={setMapOpen}
+          onEdit={setEditRow}
         />
       ) : (
         <ArchiveTable
@@ -269,6 +270,7 @@ function ComplianceDeskPage() {
           rows={(approvedQ.data ?? []).filter((r) => !isEvvLockedCode(r.service_type_code))}
           loading={approvedQ.isLoading}
           onMap={setMapOpen}
+          onEdit={setEditRow}
         />
       )}
 

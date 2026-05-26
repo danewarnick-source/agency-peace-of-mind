@@ -85,6 +85,7 @@ type Client = {
   pcsp_goals: string[];
   job_code: string[] | null;
   medicaid_id: string | null;
+  geofence_radius_feet?: number | null;
 };
 
 type ClientFormValues = {
@@ -95,7 +96,17 @@ type ClientFormValues = {
   pcsp_goals: string[];
   job_code: string[];
   medicaid_id: string;
+  geofence_radius_feet: number;
 };
+
+const GEOFENCE_OPTIONS: Array<{ v: number; l: string }> = [
+  { v: 250, l: "250 Feet (Strict In-Home Control)" },
+  { v: 500, l: "500 Feet (Standard Suburban Buffer)" },
+  { v: 1000, l: "1,000 Feet (Medicaid Default Baseline)" },
+  { v: 2500, l: "2,500 Feet (Community Outing Extension — 1/2 Mile)" },
+  { v: 5000, l: "5,000 Feet (Rural/Open Campus Margin — 1 Mile)" },
+];
+
 
 function ClientsPage() {
   const { data: org } = useCurrentOrg();

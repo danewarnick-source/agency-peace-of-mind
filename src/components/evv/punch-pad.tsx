@@ -834,12 +834,13 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              📍 Out-of-Bounds EVV Notice
+              ⚠️ Geofence Variance Notice
             </DialogTitle>
             <DialogDescription>
-              You are currently located further away than the allowed limit set by your
-              Administrator for this client. State compliance requires a variance
-              justification.
+              Our system detects you are starting your shift outside the approved
+              client home perimeter. Please provide a brief justification explaining
+              why you are clocking in from this location (e.g., Community outing,
+              medical transit, network latency).
             </DialogDescription>
           </DialogHeader>
           {variance && (
@@ -857,13 +858,14 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
               onChange={(e) => setVarianceReason(e.target.value)}
               placeholder="e.g. Community outing to the grocery store per PCSP goal."
               maxLength={500}
+              required
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setVariance(null); setVarianceReason(""); }}>Cancel</Button>
-            <Button onClick={submitVariance} disabled={busy || varianceReason.trim().length < 5}>
+            <Button onClick={submitVariance} disabled={busy || varianceReason.trim().length === 0}>
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Submit & Clock In
+              Confirm Clock In
             </Button>
           </DialogFooter>
         </DialogContent>

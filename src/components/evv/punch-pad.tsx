@@ -963,5 +963,6 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         </DialogContent>
       </Dialog>
     </section>
+    </EvvConsentGate>
   );
 }

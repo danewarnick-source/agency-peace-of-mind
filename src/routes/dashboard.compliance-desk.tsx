@@ -75,6 +75,13 @@ export const Route = createFileRoute("/dashboard/compliance-desk")({
 });
 
 type Coord = { latitude: number; longitude: number; accuracy_meters: number };
+type AuditEntry = {
+  timestamp: string;
+  admin: string;
+  field_changed: string;
+  old_value: string;
+  new_value: string;
+};
 type Row = {
   id: string;
   staff_id: string;
@@ -91,6 +98,9 @@ type Row = {
   gps_out_coordinates: Coord | null;
   outside_geofence_reason: string | null;
   status: string;
+  is_edited_by_admin: boolean;
+  edited_by_admin_name: string | null;
+  edit_audit_history_log: AuditEntry[];
   clients: { first_name: string; last_name: string; physical_address: string | null } | null;
   staff: { full_name: string | null; email: string | null } | null;
 };
@@ -105,7 +115,38 @@ function fmtDuration(inIso: string, outIso: string | null) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, clients(first_name,last_name,physical_address)";
+/** Strict OpenStreetMap deep-link: centered red marker pin at street-level zoom 17. */
+function osmPinLink(lat: number | null | undefined, lng: number | null | undefined): string | null {
+  if (lat == null || lng == null || Number.isNaN(Number(lat)) || Number.isNaN(Number(lng))) return null;
+  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
+}
+
+function EditedByAdminBadge({ row }: { row: Row }) {
+  if (!row.is_edited_by_admin) return null;
+  const log = row.edit_audit_history_log ?? [];
+  const last = log[log.length - 1];
+  const when = last ? new Date(last.timestamp).toLocaleString() : "";
+  const detail = last
+    ? `Modified by ${row.edited_by_admin_name ?? last.admin} on ${when}. Changed ${last.field_changed} from ${last.old_value} to ${last.new_value}.`
+    : `Modified by ${row.edited_by_admin_name ?? "Admin"}.`;
+  return (
+    <TooltipProvider delayDuration={120}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className="ml-2 inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+            style={{ backgroundColor: "rgba(251,191,36,0.25)", color: "#1f2937", borderColor: "rgba(217,119,6,0.55)" }}
+          >
+            ⚠️ EDITED BY ADMIN
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">{detail}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, clients(first_name,last_name,physical_address)";
 
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));

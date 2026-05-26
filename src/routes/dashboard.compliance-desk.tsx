@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle } from "lucide-react";
+import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -225,6 +225,183 @@ async function hydrateStaff(list: Row[]) {
   return list;
 }
 
+// ============================================================
+// 🤖 Natural-language query parser for the AI Command Search bar
+// ============================================================
+type ParsedQuery = {
+  dateFrom: number | null;
+  dateTo: number | null;
+  hourMin: number | null;   // inclusive
+  hourMax: number | null;   // inclusive
+  nameTokens: string[];     // residual tokens after temporal/diurnal stripped
+  fullText: string;         // lowercased original
+};
+
+const MONTHS: Record<string, number> = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
+  may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7,
+  sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
+};
+
+function endOfMonth(y: number, m: number) {
+  return new Date(y, m + 1, 0, 23, 59, 59, 999).getTime();
+}
+function startOfMonth(y: number, m: number) {
+  return new Date(y, m, 1, 0, 0, 0, 0).getTime();
+}
+
+function parseNlQuery(raw: string): ParsedQuery {
+  const original = raw.trim();
+  const q = original.toLowerCase();
+  let dateFrom: number | null = null;
+  let dateTo: number | null = null;
+  let hourMin: number | null = null;
+  let hourMax: number | null = null;
+  let stripped = q;
+
+  const now = new Date();
+  const year = now.getFullYear();
+
+  // "from <month> to <month>" (assume current year)
+  const monthRange = q.match(/from\s+([a-z]+)\s+to\s+([a-z]+)/);
+  if (monthRange && MONTHS[monthRange[1]] != null && MONTHS[monthRange[2]] != null) {
+    const a = MONTHS[monthRange[1]];
+    const b = MONTHS[monthRange[2]];
+    dateFrom = startOfMonth(year, Math.min(a, b));
+    dateTo = endOfMonth(year, Math.max(a, b));
+    stripped = stripped.replace(monthRange[0], " ");
+  } else {
+    // single "in <month>" or "<month>"
+    const single = q.match(/(?:^|\s)(?:in\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?=\s|$)/);
+    if (single) {
+      const m = MONTHS[single[1]];
+      dateFrom = startOfMonth(year, m);
+      dateTo = endOfMonth(year, m);
+      stripped = stripped.replace(single[0], " ");
+    }
+  }
+
+  if (q.includes("last month")) {
+    const d = new Date(year, now.getMonth() - 1, 1);
+    dateFrom = startOfMonth(d.getFullYear(), d.getMonth());
+    dateTo = endOfMonth(d.getFullYear(), d.getMonth());
+    stripped = stripped.replace("last month", " ");
+  } else if (q.includes("this month")) {
+    dateFrom = startOfMonth(year, now.getMonth());
+    dateTo = endOfMonth(year, now.getMonth());
+    stripped = stripped.replace("this month", " ");
+  } else if (q.includes("this week")) {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - d.getDay());
+    dateFrom = d.getTime();
+    const end = new Date(d);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    dateTo = end.getTime();
+    stripped = stripped.replace("this week", " ");
+  } else if (q.includes("last week")) {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - d.getDay() - 7);
+    dateFrom = d.getTime();
+    const end = new Date(d);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    dateTo = end.getTime();
+    stripped = stripped.replace("last week", " ");
+  } else if (q.includes("yesterday")) {
+    const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 1);
+    dateFrom = d.getTime();
+    dateTo = d.getTime() + 86_399_999;
+    stripped = stripped.replace("yesterday", " ");
+  } else if (q.includes("today")) {
+    const d = new Date(now); d.setHours(0, 0, 0, 0);
+    dateFrom = d.getTime();
+    dateTo = d.getTime() + 86_399_999;
+    stripped = stripped.replace("today", " ");
+  }
+
+  // Diurnal: "after 3pm", "before 9am", "at 10"
+  const afterRe = q.match(/after\s+(\d{1,2})\s*(am|pm)?/);
+  if (afterRe) {
+    let h = parseInt(afterRe[1], 10);
+    if (afterRe[2] === "pm" && h < 12) h += 12;
+    if (afterRe[2] === "am" && h === 12) h = 0;
+    hourMin = h;
+    stripped = stripped.replace(afterRe[0], " ");
+  }
+  const beforeRe = q.match(/before\s+(\d{1,2})\s*(am|pm)?/);
+  if (beforeRe) {
+    let h = parseInt(beforeRe[1], 10);
+    if (beforeRe[2] === "pm" && h < 12) h += 12;
+    if (beforeRe[2] === "am" && h === 12) h = 0;
+    hourMax = h;
+    stripped = stripped.replace(beforeRe[0], " ");
+  }
+  if (q.includes("night shift")) {
+    hourMin = hourMin ?? 18;
+    stripped = stripped.replace("night shift", " ");
+  }
+  if (q.includes("morning")) {
+    hourMin = hourMin ?? 6;
+    hourMax = hourMax ?? 12;
+    stripped = stripped.replace("morning", " ");
+  }
+  if (q.includes("afternoon")) {
+    hourMin = hourMin ?? 12;
+    hourMax = hourMax ?? 17;
+    stripped = stripped.replace("afternoon", " ");
+  }
+  if (q.includes("evening")) {
+    hourMin = hourMin ?? 17;
+    hourMax = hourMax ?? 22;
+    stripped = stripped.replace("evening", " ");
+  }
+
+  // Tokenize residual for entity matching, dropping common stopwords / connectors
+  const STOP = new Set([
+    "with", "and", "the", "for", "all", "any", "shift", "shifts", "worked",
+    "pull", "up", "show", "me", "find", "list", "of", "from", "to", "on",
+    "in", "at", "by", "between", "around", "every", "times", "time",
+  ]);
+  const nameTokens = stripped
+    .split(/[^a-z0-9']+/i)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && !STOP.has(t.toLowerCase()) && !/^\d+$/.test(t));
+
+  return { dateFrom, dateTo, hourMin, hourMax, nameTokens, fullText: q };
+}
+
+function rowMatchesQuery(r: Row, p: ParsedQuery): boolean {
+  const inIso = effectiveIn(r);
+  const inDate = new Date(inIso);
+  const inMs = inDate.getTime();
+  if (p.dateFrom != null && inMs < p.dateFrom) return false;
+  if (p.dateTo != null && inMs > p.dateTo) return false;
+  const h = inDate.getHours();
+  if (p.hourMin != null && h < p.hourMin) return false;
+  if (p.hourMax != null && h > p.hourMax) return false;
+
+  const caregiver = (r.staff?.full_name ?? r.staff?.email ?? "").toLowerCase();
+  const client = `${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim().toLowerCase();
+  const haystack = [
+    caregiver, client,
+    (r.service_type_code ?? "").toLowerCase(),
+    (r.outside_geofence_reason ?? "").toLowerCase(),
+    (r.shift_note_text ?? "").toLowerCase(),
+    (r.utah_medicaid_member_id ?? "").toLowerCase(),
+  ].join(" \u0001 ");
+
+  if (p.nameTokens.length > 0) {
+    // Every residual token must appear somewhere in the row's text fields.
+    for (const tok of p.nameTokens) {
+      if (!haystack.includes(tok.toLowerCase())) return false;
+    }
+  }
+  return true;
+}
+
 function ComplianceDeskPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
@@ -232,6 +409,8 @@ function ComplianceDeskPage() {
   const [mapOpen, setMapOpen] = useState<Row | null>(null);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);
+  const [aiQuery, setAiQuery] = useState("");
+  const isSearching = aiQuery.trim().length > 0;
 
   const pendingQ = useQuery({
     enabled: !!org?.organization_id,
@@ -321,31 +500,84 @@ function ComplianceDeskPage() {
         </div>
       </header>
 
-      <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1">
-        <button
-          type="button"
-          onClick={() => setSub("pending")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "pending" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+      {/* 🤖 AI Command Search — sits above the tab filters, intercepts cross-tab queries */}
+      <div className="space-y-1.5">
+        <div
+          className="group relative rounded-xl p-[1.5px] transition"
+          style={{
+            background: isSearching
+              ? "linear-gradient(135deg, hsl(var(--primary)/0.85), hsl(280 90% 60% / 0.85), hsl(190 95% 55% / 0.85))"
+              : "linear-gradient(135deg, hsl(var(--primary)/0.45), hsl(280 90% 60% / 0.35), hsl(190 95% 55% / 0.45))",
+          }}
         >
-          📥 Pending Review
-        </button>
-        <button
-          type="button"
-          onClick={() => setSub("evv-archive")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          📁 State EVV Archive
-        </button>
-        <button
-          type="button"
-          onClick={() => setSub("non-evv-archive")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "non-evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          💼 Internal / Non-EVV Archive
-        </button>
-      </nav>
+          <div className="flex items-center gap-2 rounded-[10px] bg-background px-3 py-2 shadow-sm focus-within:shadow-md">
+            <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+            <Input
+              value={aiQuery}
+              onChange={(e) => setAiQuery(e.target.value)}
+              placeholder="🤖 Search everything via AI... Try: 'Pull up all times Dane worked with John Smith from May to July after 3pm'"
+              className="h-9 flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
+            />
+            {isSearching && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={() => setAiQuery("")}
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+        {isSearching && (
+          <p className="px-1 text-xs font-medium text-muted-foreground">
+            📊 Showing cross-tab query results matching your criteria…
+          </p>
+        )}
+      </div>
 
-      {sub === "pending" ? (
+      {!isSearching && (
+        <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1">
+          <button
+            type="button"
+            onClick={() => setSub("pending")}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "pending" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            📥 Pending Review
+          </button>
+          <button
+            type="button"
+            onClick={() => setSub("evv-archive")}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            📁 State EVV Archive
+          </button>
+          <button
+            type="button"
+            onClick={() => setSub("non-evv-archive")}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "non-evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            💼 Internal / Non-EVV Archive
+          </button>
+        </nav>
+      )}
+
+      {isSearching ? (
+        <UnifiedSearchResults
+          query={aiQuery}
+          pending={pendingQ.data ?? []}
+          approved={approvedQ.data ?? []}
+          loading={pendingQ.isLoading || approvedQ.isLoading}
+          onMap={setMapOpen}
+          onEdit={setEditRow}
+          onReason={setReasonRow}
+          onApprove={(id) => approve.mutate(id)}
+          approving={approve.isPending}
+        />
+      ) : sub === "pending" ? (
         <PendingTable
           rows={pendingQ.data ?? []}
           loading={pendingQ.isLoading}
@@ -379,6 +611,147 @@ function ComplianceDeskPage() {
     </div>
   );
 }
+
+// 🤖 Unified cross-tab AI search results — merges Pending + Approved (EVV + Non-EVV)
+function UnifiedSearchResults({
+  query, pending, approved, loading,
+  onMap, onEdit, onReason, onApprove, approving,
+}: {
+  query: string;
+  pending: Row[];
+  approved: Row[];
+  loading: boolean;
+  onMap: (r: Row) => void;
+  onEdit: (r: Row) => void;
+  onReason: (r: Row) => void;
+  onApprove: (id: string) => void;
+  approving: boolean;
+}) {
+  const parsed = useMemo(() => parseNlQuery(query), [query]);
+  const merged = useMemo(() => {
+    const all = [...pending, ...approved];
+    const seen = new Set<string>();
+    const dedup: Row[] = [];
+    for (const r of all) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      dedup.push(r);
+    }
+    return dedup
+      .filter((r) => rowMatchesQuery(r, parsed))
+      .sort((a, b) => new Date(effectiveIn(b)).getTime() - new Date(effectiveIn(a)).getTime());
+  }, [pending, approved, parsed]);
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          🤖 AI Cross-Tab Results
+        </h2>
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+          {parsed.dateFrom != null && parsed.dateTo != null && (
+            <Badge variant="outline" className="font-mono">
+              📅 {new Date(parsed.dateFrom).toLocaleDateString()} → {new Date(parsed.dateTo).toLocaleDateString()}
+            </Badge>
+          )}
+          {parsed.hourMin != null && (
+            <Badge variant="outline" className="font-mono">⏰ ≥ {parsed.hourMin}:00</Badge>
+          )}
+          {parsed.hourMax != null && (
+            <Badge variant="outline" className="font-mono">⏰ ≤ {parsed.hourMax}:00</Badge>
+          )}
+          {parsed.nameTokens.slice(0, 4).map((t) => (
+            <Badge key={t} variant="secondary" className="font-mono">🔎 {t}</Badge>
+          ))}
+          <Badge variant="outline" className="font-mono">{merged.length} match{merged.length === 1 ? "" : "es"}</Badge>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Caregiver</TableHead>
+              <TableHead>Client</TableHead>
+              <TableHead>Service</TableHead>
+              <TableHead>In → Out</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>GPS</TableHead>
+              <TableHead>Geofence Validation Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+            ) : merged.length === 0 ? (
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No shifts match your AI query.</TableCell></TableRow>
+            ) : merged.map((r) => {
+              const inIso = effectiveIn(r);
+              const outIso = effectiveOut(r);
+              const isPending = r.status === "Pending";
+              return (
+                <Fragment key={r.id}>
+                  <TableRow>
+                    <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
+                    <TableCell>
+                      <Badge variant={isPending ? "default" : "secondary"} className="text-[10px]">
+                        {isPending ? "PENDING" : "APPROVED"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {r.staff?.full_name ?? r.staff?.email ?? "—"}
+                      <EditedByAdminBadge row={r} />
+                    </TableCell>
+                    <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
+                    <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {fmtTimeHMSAmPm(inIso)} → {outIso ? fmtTimeHMSAmPm(outIso) : "—"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{fmtDuration(inIso, outIso)}</TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" onClick={() => onMap(r)}>
+                        <MapPin className="mr-1 h-3 w-3" /> View
+                      </Button>
+                    </TableCell>
+                    <TableCell
+                      onClick={() => r.outside_geofence_reason && onReason(r)}
+                      className={r.outside_geofence_reason ? "cursor-pointer" : ""}
+                    >
+                      <GeofenceBadge reason={r.outside_geofence_reason} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        {isPending && (
+                          <Button
+                            size="icon"
+                            className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700"
+                            onClick={() => onApprove(r.id)}
+                            disabled={approving}
+                            aria-label="Approve"
+                          >
+                            {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          </Button>
+                        )}
+                        <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => onEdit(r)} aria-label="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  <InlineNotesRow row={r} colSpan={10} />
+                </Fragment>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
+  );
+}
+
 
 function PendingTable({
   rows, loading, onMap, onEdit, onApprove, approving, onReason,

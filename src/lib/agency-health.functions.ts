@@ -58,16 +58,21 @@ export const getAgencyHealthSnapshot = createServerFn({ method: "POST" })
     const clientOverall = Math.round((dailyScore + medScore + attendanceScore) / 3);
 
     // ---- Employee Documentation Health ----
-    // 1) EVV geofence — punches without outside_geofence_reason
+    // 1) EVV geofence — punches flagged is_out_of_bounds=false count as validated
     const { data: evv } = await supabase
       .from("evv_timesheets")
-      .select("outside_geofence_reason")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("is_out_of_bounds, outside_geofence_reason" as any)
       .eq("organization_id", orgId)
       .gte("created_at", since);
     const totalEvv = evv?.length ?? 0;
-    const inFence = (evv ?? []).filter(
-      (e) => !(e as { outside_geofence_reason: string | null }).outside_geofence_reason,
-    ).length;
+    const inFence = (evv ?? []).filter((e) => {
+      const r = e as { is_out_of_bounds?: boolean | null; outside_geofence_reason: string | null };
+      // Prefer the new explicit flag; fall back to legacy reason column for
+      // older rows that pre-date the column add.
+      if (typeof r.is_out_of_bounds === "boolean") return !r.is_out_of_bounds;
+      return !r.outside_geofence_reason;
+    }).length;
     const geofenceScore = pct(inFence, totalEvv);
 
     // 2) eMAR administration accuracy — signed attestation present

@@ -14,6 +14,7 @@ export type CaseloadClient = {
   job_code: string[] | null;
   medicaid_id: string | null;
   physical_address: string | null;
+  geofence_radius_feet?: number | null;
 };
 
 /**
@@ -39,12 +40,13 @@ export function useCaseload() {
         const { data, error } = await supabase
           .from("clients")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code, medicaid_id, physical_address" as any)
+          .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code, medicaid_id, physical_address, geofence_radius_feet" as any)
           .eq("organization_id", org!.organization_id)
           .order("last_name");
         if (error) throw error;
         return (data ?? []) as unknown as CaseloadClient[];
       }
+
       // Staff: caseload resolver handles direct assignments + group-home override
       // (tenant-scoped via _org; RLS still applies to returned rows).
       const { data, error } = await supabase.rpc(

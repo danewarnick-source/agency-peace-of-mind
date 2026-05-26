@@ -794,6 +794,29 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             <span className="font-mono text-lg font-bold tabular-nums">{elapsed}</span>
           </div>
 
+          {/* Proximity map — pulls up dynamically inside the clock-out modal */}
+          {mapHome && (
+            <div className="space-y-1">
+              <GeofenceMap
+                homeLat={mapHome.lat}
+                homeLng={mapHome.lng}
+                radiusFeet={mapRadiusFeet}
+                caregiver={livePos}
+                insideZone={insideZone}
+                height={220}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {livePos
+                  ? insideZone
+                    ? `🟢 Inside the ${mapRadiusFeet} ft zone — clean clock-out.`
+                    : `🔴 Outside the ${mapRadiusFeet} ft zone — a variance reason will be required.`
+                  : "Awaiting browser location permission…"}
+              </p>
+            </div>
+          )}
+
+
+
           {/* PCSP goals */}
           <div className="grid gap-2">
             <h3 className="text-sm font-semibold">🎯 Person-Centered Support Plan (PCSP) Objectives Tracker</h3>

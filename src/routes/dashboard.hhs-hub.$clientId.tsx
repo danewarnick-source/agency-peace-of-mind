@@ -255,7 +255,7 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
               <div className="min-w-0 flex-1">
                 <div className="font-semibold">{String(m.medication_name)} <span className="text-xs text-muted-foreground">{String(m.dosage ?? "")}</span></div>
                 <div className="text-xs text-muted-foreground">Route: {String(m.route ?? "—")} · {String(m.frequency ?? "")}</div>
-                {m.instructions && <div className="text-xs">{String(m.instructions)}</div>}
+                {m.instructions ? <div className="text-xs">{String(m.instructions)}</div> : null}
                 <div className="mt-1 rounded bg-yellow-100 dark:bg-yellow-950/40 border border-yellow-300 px-2 py-1 text-[11px] text-yellow-900 dark:text-yellow-200">
                   ⚠️ Side-effects: monitor for drowsiness, swallowing/choking risk. Confirm upright posture.
                 </div>

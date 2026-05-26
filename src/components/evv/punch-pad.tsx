@@ -298,8 +298,46 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     }
   }
 
-  async function handleClockOut() {
+  // Goals for the currently-running shift's client
+  const activeClientGoals = useMemo<string[]>(() => {
+    if (!active) return [];
+    if (lockedClient && active.client_id === lockedClient.id) {
+      return lockedClient.pcspGoals ?? [];
+    }
+    const c = caseload.find((x) => x.id === active.client_id);
+    return c?.pcsp_goals ?? [];
+  }, [active, lockedClient, caseload]);
+
+  const wordCount = useMemo(() => {
+    const t = narrative.trim();
+    if (!t) return 0;
+    return t.split(/\s+/).filter(Boolean).length;
+  }, [narrative]);
+
+  const hasGoalSelected =
+    baselineChecked || Object.values(checkedGoals).some(Boolean);
+  const narrativeOk = wordCount >= 100;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && !busy;
+
+  function openCompliance() {
+    if (!active) return;
+    setCheckedGoals({});
+    setBaselineChecked(false);
+    setNarrative("");
+    setShowNarrativeError(false);
+    setShowCompliance(true);
+  }
+
+  async function submitCompliance() {
     if (!user || !active) return;
+    if (!hasGoalSelected) {
+      toast.error("Select at least one PCSP goal or baseline monitoring.");
+      return;
+    }
+    if (!narrativeOk) {
+      setShowNarrativeError(true);
+      return;
+    }
     setBusy(true);
     try {
       let pos;
@@ -307,17 +345,31 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       catch { setDenied(true); return; }
 
       const clockOut = new Date().toISOString();
+      const selectedGoals = Object.entries(checkedGoals)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
+      if (baselineChecked) selectedGoals.push("General baseline monitoring & safety oversight");
+
       const { error } = await supabase
         .from("evv_timesheets")
         .update({
           clock_out_timestamp: clockOut,
           gps_out_coordinates: { latitude: pos.lat, longitude: pos.lng, accuracy_meters: pos.acc },
           status: "Pending",
-        })
+          timezone_setting: "America/Denver",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          shift_note_text: narrative.trim(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          goals_completed: selectedGoals,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
         .eq("id", active.id);
       if (error) throw error;
+
       const duration = fmtElapsed(new Date(clockOut).getTime() - new Date(active.clock_in_timestamp).getTime());
+      setShowCompliance(false);
       setSuccess({ duration });
+      toast.success("✓ Shift successfully recorded. Timesheet submitted to the Compliance Desk for executive approval.");
       await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");

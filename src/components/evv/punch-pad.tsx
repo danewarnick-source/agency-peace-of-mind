@@ -130,6 +130,13 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   }>(null);
   const [varianceReason, setVarianceReason] = useState("");
 
+  // Clock-out compliance modal state
+  const [showCompliance, setShowCompliance] = useState(false);
+  const [checkedGoals, setCheckedGoals] = useState<Record<string, boolean>>({});
+  const [baselineChecked, setBaselineChecked] = useState(false);
+  const [narrative, setNarrative] = useState("");
+  const [showNarrativeError, setShowNarrativeError] = useState(false);
+
   const facilities = useMemo(() => {
     const set = new Set<string>();
     caseload.forEach((c) => {

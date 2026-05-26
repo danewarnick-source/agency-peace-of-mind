@@ -225,6 +225,183 @@ async function hydrateStaff(list: Row[]) {
   return list;
 }
 
+// ============================================================
+// 🤖 Natural-language query parser for the AI Command Search bar
+// ============================================================
+type ParsedQuery = {
+  dateFrom: number | null;
+  dateTo: number | null;
+  hourMin: number | null;   // inclusive
+  hourMax: number | null;   // inclusive
+  nameTokens: string[];     // residual tokens after temporal/diurnal stripped
+  fullText: string;         // lowercased original
+};
+
+const MONTHS: Record<string, number> = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
+  may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7,
+  sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
+};
+
+function endOfMonth(y: number, m: number) {
+  return new Date(y, m + 1, 0, 23, 59, 59, 999).getTime();
+}
+function startOfMonth(y: number, m: number) {
+  return new Date(y, m, 1, 0, 0, 0, 0).getTime();
+}
+
+function parseNlQuery(raw: string): ParsedQuery {
+  const original = raw.trim();
+  const q = original.toLowerCase();
+  let dateFrom: number | null = null;
+  let dateTo: number | null = null;
+  let hourMin: number | null = null;
+  let hourMax: number | null = null;
+  let stripped = q;
+
+  const now = new Date();
+  const year = now.getFullYear();
+
+  // "from <month> to <month>" (assume current year)
+  const monthRange = q.match(/from\s+([a-z]+)\s+to\s+([a-z]+)/);
+  if (monthRange && MONTHS[monthRange[1]] != null && MONTHS[monthRange[2]] != null) {
+    const a = MONTHS[monthRange[1]];
+    const b = MONTHS[monthRange[2]];
+    dateFrom = startOfMonth(year, Math.min(a, b));
+    dateTo = endOfMonth(year, Math.max(a, b));
+    stripped = stripped.replace(monthRange[0], " ");
+  } else {
+    // single "in <month>" or "<month>"
+    const single = q.match(/(?:^|\s)(?:in\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?=\s|$)/);
+    if (single) {
+      const m = MONTHS[single[1]];
+      dateFrom = startOfMonth(year, m);
+      dateTo = endOfMonth(year, m);
+      stripped = stripped.replace(single[0], " ");
+    }
+  }
+
+  if (q.includes("last month")) {
+    const d = new Date(year, now.getMonth() - 1, 1);
+    dateFrom = startOfMonth(d.getFullYear(), d.getMonth());
+    dateTo = endOfMonth(d.getFullYear(), d.getMonth());
+    stripped = stripped.replace("last month", " ");
+  } else if (q.includes("this month")) {
+    dateFrom = startOfMonth(year, now.getMonth());
+    dateTo = endOfMonth(year, now.getMonth());
+    stripped = stripped.replace("this month", " ");
+  } else if (q.includes("this week")) {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - d.getDay());
+    dateFrom = d.getTime();
+    const end = new Date(d);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    dateTo = end.getTime();
+    stripped = stripped.replace("this week", " ");
+  } else if (q.includes("last week")) {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - d.getDay() - 7);
+    dateFrom = d.getTime();
+    const end = new Date(d);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    dateTo = end.getTime();
+    stripped = stripped.replace("last week", " ");
+  } else if (q.includes("yesterday")) {
+    const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 1);
+    dateFrom = d.getTime();
+    dateTo = d.getTime() + 86_399_999;
+    stripped = stripped.replace("yesterday", " ");
+  } else if (q.includes("today")) {
+    const d = new Date(now); d.setHours(0, 0, 0, 0);
+    dateFrom = d.getTime();
+    dateTo = d.getTime() + 86_399_999;
+    stripped = stripped.replace("today", " ");
+  }
+
+  // Diurnal: "after 3pm", "before 9am", "at 10"
+  const afterRe = q.match(/after\s+(\d{1,2})\s*(am|pm)?/);
+  if (afterRe) {
+    let h = parseInt(afterRe[1], 10);
+    if (afterRe[2] === "pm" && h < 12) h += 12;
+    if (afterRe[2] === "am" && h === 12) h = 0;
+    hourMin = h;
+    stripped = stripped.replace(afterRe[0], " ");
+  }
+  const beforeRe = q.match(/before\s+(\d{1,2})\s*(am|pm)?/);
+  if (beforeRe) {
+    let h = parseInt(beforeRe[1], 10);
+    if (beforeRe[2] === "pm" && h < 12) h += 12;
+    if (beforeRe[2] === "am" && h === 12) h = 0;
+    hourMax = h;
+    stripped = stripped.replace(beforeRe[0], " ");
+  }
+  if (q.includes("night shift")) {
+    hourMin = hourMin ?? 18;
+    stripped = stripped.replace("night shift", " ");
+  }
+  if (q.includes("morning")) {
+    hourMin = hourMin ?? 6;
+    hourMax = hourMax ?? 12;
+    stripped = stripped.replace("morning", " ");
+  }
+  if (q.includes("afternoon")) {
+    hourMin = hourMin ?? 12;
+    hourMax = hourMax ?? 17;
+    stripped = stripped.replace("afternoon", " ");
+  }
+  if (q.includes("evening")) {
+    hourMin = hourMin ?? 17;
+    hourMax = hourMax ?? 22;
+    stripped = stripped.replace("evening", " ");
+  }
+
+  // Tokenize residual for entity matching, dropping common stopwords / connectors
+  const STOP = new Set([
+    "with", "and", "the", "for", "all", "any", "shift", "shifts", "worked",
+    "pull", "up", "show", "me", "find", "list", "of", "from", "to", "on",
+    "in", "at", "by", "between", "around", "every", "times", "time",
+  ]);
+  const nameTokens = stripped
+    .split(/[^a-z0-9']+/i)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && !STOP.has(t.toLowerCase()) && !/^\d+$/.test(t));
+
+  return { dateFrom, dateTo, hourMin, hourMax, nameTokens, fullText: q };
+}
+
+function rowMatchesQuery(r: Row, p: ParsedQuery): boolean {
+  const inIso = effectiveIn(r);
+  const inDate = new Date(inIso);
+  const inMs = inDate.getTime();
+  if (p.dateFrom != null && inMs < p.dateFrom) return false;
+  if (p.dateTo != null && inMs > p.dateTo) return false;
+  const h = inDate.getHours();
+  if (p.hourMin != null && h < p.hourMin) return false;
+  if (p.hourMax != null && h > p.hourMax) return false;
+
+  const caregiver = (r.staff?.full_name ?? r.staff?.email ?? "").toLowerCase();
+  const client = `${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim().toLowerCase();
+  const haystack = [
+    caregiver, client,
+    (r.service_type_code ?? "").toLowerCase(),
+    (r.outside_geofence_reason ?? "").toLowerCase(),
+    (r.shift_note_text ?? "").toLowerCase(),
+    (r.utah_medicaid_member_id ?? "").toLowerCase(),
+  ].join(" \u0001 ");
+
+  if (p.nameTokens.length > 0) {
+    // Every residual token must appear somewhere in the row's text fields.
+    for (const tok of p.nameTokens) {
+      if (!haystack.includes(tok.toLowerCase())) return false;
+    }
+  }
+  return true;
+}
+
 function ComplianceDeskPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();

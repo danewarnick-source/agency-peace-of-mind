@@ -33,9 +33,7 @@ const STAFF_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/timeclock", label: "General Time Clock", icon: Clock },
   { to: "/dashboard/compliance-desk", label: "EVV & Timesheet Control", icon: ShieldCheck },
-  { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/host-home-control", label: "🏡 Host Home Control", icon: Home },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
   { to: "/dashboard/emar", label: "eMAR Pass", icon: Pill },

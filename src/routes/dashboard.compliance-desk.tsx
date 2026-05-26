@@ -559,13 +559,14 @@ function ArchiveTable({
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
               <TableHead>Geofence Validation Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
             ) : filtered.map((r) => {
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
@@ -588,6 +589,11 @@ function ArchiveTable({
                   </TableCell>
                   <TableCell>
                     <GeofenceBadge reason={r.outside_geofence_reason} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="secondary" onClick={() => onEdit(r)}>
+                      <Pencil className="mr-1 h-3 w-3" /> Edit
+                    </Button>
                   </TableCell>
                 </TableRow>
               );

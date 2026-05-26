@@ -2329,6 +2329,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      hybrid_search_timesheets: {
+        Args: {
+          _org: string
+          caregiver_name: string
+          client_name: string
+          date_from: string
+          date_to: string
+          hour_min: number
+          match_count: number
+          query_embedding: string
+        }
+        Returns: {
+          id: string
+          similarity: number
+        }[]
+      }
       is_org_admin_or_manager: {
         Args: { _org: string; _user: string }
         Returns: boolean

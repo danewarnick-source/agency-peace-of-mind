@@ -488,9 +488,10 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const isRunning = !!activeMatchesThisPad;
 
   return (
+    <EvvConsentGate>
     <section
       aria-label="EVV Shift Punch Pad"
-      className="relative overflow-hidden rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-card to-primary/5 p-5 shadow-[var(--shadow-card)]"
+      className="relative overflow-hidden rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-card to-primary/5 p-4 shadow-[var(--shadow-card)] sm:p-5"
     >
       <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">

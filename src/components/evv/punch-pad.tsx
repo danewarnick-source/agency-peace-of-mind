@@ -169,11 +169,51 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
 
   // Geofence variance overlay state
   const [variance, setVariance] = useState<null | {
-    distanceFeet: number;
-    limitFeet: number;
-    pos: { lat: number; lng: number; acc: number };
+    distanceFeet?: number;
+    limitFeet?: number;
+    pos: { lat: number; lng: number; acc: number } | null;
+    frameBlocked?: boolean;
   }>(null);
   const [varianceReason, setVarianceReason] = useState("");
+
+  // Active Proximity Echo — fire an immediate getCurrentPosition the moment
+  // the component mounts. If the browser frame blocks location, denies
+  // permission, or fails to produce coordinates within a strict 3-second
+  // window, we bypass the GPS lock and open the variance modal automatically
+  // so the caregiver is never trapped on a non-clickable button screen.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      setVariance({ frameBlocked: true, pos: null });
+      return;
+    }
+    let settled = false;
+    const failOpen = () => {
+      if (settled) return;
+      settled = true;
+      setVariance((v) => v ?? { frameBlocked: true, pos: null });
+    };
+    const hardDeadline = window.setTimeout(failOpen, 3000);
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(hardDeadline);
+          setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
+        },
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED || err.code === err.POSITION_UNAVAILABLE || err.code === err.TIMEOUT) {
+            failOpen();
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 3000 },
+      );
+    } catch {
+      failOpen();
+    }
+    return () => window.clearTimeout(hardDeadline);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Clock-out compliance modal state
   const [showCompliance, setShowCompliance] = useState(false);

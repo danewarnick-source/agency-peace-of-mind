@@ -224,10 +224,10 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     const authorized = clientForPunch?.authorizedCodes;
     if (authorized && authorized.length) {
       // Mix: prefer client's job codes (DSPD billing codes) — fall back to EVV labels if matched.
-      return authorized.map((code) => {
-        const evv = EVV_SERVICE_CODES.find((c) => c.code === code);
-        return { code, label: evv?.label ?? jobCodeLabel(code) ?? code };
-      });
+      return authorized.map((code) => ({
+        code,
+        label: evvServiceLabel(code),
+      }));
     }
     return EVV_SERVICE_CODES.map((c) => ({ code: c.code, label: c.label }));
   }, [clientForPunch?.authorizedCodes]);

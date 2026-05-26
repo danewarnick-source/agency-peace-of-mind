@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle } from "lucide-react";
+import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,

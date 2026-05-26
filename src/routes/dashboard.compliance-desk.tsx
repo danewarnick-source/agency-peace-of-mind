@@ -437,7 +437,7 @@ function PendingTable({
                 </TableCell>
               </TableRow>
               <InlineNotesRow row={r} colSpan={9} />
-              </>
+              </Fragment>
             ))}
           </TableBody>
         </Table>

@@ -126,13 +126,15 @@ function ClientsPage() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, medicaid_id, account_status, geofence_radius_feet" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, account_status, geofence_radius_feet" as any)
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
       // Hide archived clients from active operational views.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return ((data ?? []) as any[]).filter((c) => (c.account_status ?? "active") !== "archived") as unknown as Client[];
+      return ((data ?? []) as any[])
+        .filter((c) => (c.account_status ?? "active") !== "archived")
+        .map((c) => ({ ...c, job_code: (c.authorized_dspd_codes && c.authorized_dspd_codes.length ? c.authorized_dspd_codes : c.job_code) ?? [] })) as unknown as Client[];
     },
   });
 

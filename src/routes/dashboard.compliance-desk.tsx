@@ -19,7 +19,51 @@ import {
 } from "@/components/ui/select";
 import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { EVV_SERVICE_CODES, evvServiceLabel } from "@/lib/evv-codes";
+
+// Rendered as the dedicated "Geofence Validation Status" column on both
+// the Pending Approvals Ledger and the Approved Timesheets Archive.
+// Records with an empty/null `outside_geofence_reason` are treated as a
+// mathematical compliance MATCH (per the structural integration rule).
+function GeofenceBadge({ reason }: { reason: string | null }) {
+  const hasReason = !!(reason && reason.trim().length > 0);
+  if (!hasReason) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full border border-emerald-600/30 px-2.5 py-0.5 text-[11px] font-semibold"
+        style={{ backgroundColor: "#d1fae5", color: "#065f46" }}
+      >
+        🟢 MATCH
+      </span>
+    );
+  }
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className="inline-flex cursor-help items-center gap-1 rounded-full border border-rose-700/30 px-2.5 py-0.5 text-[11px] font-semibold"
+              style={{ backgroundColor: "#fee2e2", color: "#991b1b" }}
+            >
+              🔴 NO MATCH
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <span
+        className="max-w-[180px] truncate text-[10px] italic text-muted-foreground"
+        title={reason ?? ""}
+      >
+        {reason}
+      </span>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/dashboard/compliance-desk")({
   head: () => ({ meta: [{ title: "Compliance Desk — Care Academy" }] }),

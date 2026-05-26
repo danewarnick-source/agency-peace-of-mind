@@ -21,6 +21,7 @@ import { EVV_SERVICE_CODES, padMemberId } from "@/lib/evv-codes";
 import { jobCodeLabel } from "@/lib/job-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { GeofenceMap } from "@/components/evv/geofence-map";
+import { EvvConsentGate } from "@/components/evv/consent-gate";
 
 type EntryType = "Client_Profile_Pass" | "General_Sidebar_Unscheduled";
 

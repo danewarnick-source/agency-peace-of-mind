@@ -570,8 +570,8 @@ function ComplianceDeskPage() {
       {isSearching ? (
         <UnifiedSearchResults
           query={submitted!.query}
-          constraints={submitted!.constraints}
-          matches={vectorQ.data ?? []}
+          route={vectorQ.data?.route ?? null}
+          matches={vectorQ.data?.matches ?? []}
           pending={pendingQ.data ?? []}
           approved={approvedQ.data ?? []}
           loading={vectorQ.isFetching || pendingQ.isLoading || approvedQ.isLoading}

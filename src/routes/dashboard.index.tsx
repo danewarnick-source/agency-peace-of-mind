@@ -131,27 +131,7 @@ function Overview() {
         )}
       </div>
 
-      {showAdmin && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Active employees", value: String(stats?.employees ?? "—"), icon: Users },
-            { label: "Completion rate", value: stats ? `${stats.completion}%` : "—", icon: TrendingUp },
-            { label: "Overdue training", value: String(stats?.overdue ?? "—"), icon: AlertTriangle },
-            { label: "Expiring in 30 days", value: String(stats?.expiringSoon ?? "—"), icon: Award },
-          ].map((m) => {
-            const Icon = m.icon;
-            return (
-              <div key={m.label} className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{m.label}</p>
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="mt-3 text-3xl font-semibold tracking-tight">{m.value}</p>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {showAdmin && org && <AgencyHealthSnapshot organizationId={org.organization_id} />}
 
       {!showAdmin && (
         <div className="space-y-6">

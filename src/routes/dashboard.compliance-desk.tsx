@@ -227,80 +227,9 @@ async function hydrateStaff(list: Row[]) {
   return list;
 }
 
-// ============================================================
-// 🤖 Structural constraint extractor — runs ONCE on submit only.
-// Pulls just the hard date/hour windows out of the prompt so we can
-// pass them into the pgvector RPC. All actual conceptual matching is
-// performed by the embedding model, not by string parsing.
-// ============================================================
-type StructuralConstraints = {
-  hourMin: number | null;
-  dateFromIso: string | null;
-  dateToIso: string | null;
-};
+// (Frontend regex constraint extractor removed — the hybrid LLM router on the
+// server now parses caregiver names, client names, dates, and times directly.)
 
-const MONTHS: Record<string, number> = {
-  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
-  may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7,
-  sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
-};
-function startOfMonth(y: number, m: number) {
-  return new Date(y, m, 1, 0, 0, 0, 0).toISOString();
-}
-function endOfMonth(y: number, m: number) {
-  return new Date(y, m + 1, 0, 23, 59, 59, 999).toISOString();
-}
-
-function extractConstraints(raw: string): StructuralConstraints {
-  const q = raw.trim().toLowerCase();
-  let dateFromIso: string | null = null;
-  let dateToIso: string | null = null;
-  let hourMin: number | null = null;
-  const now = new Date();
-  const year = now.getFullYear();
-
-  const monthRange = q.match(/from\s+([a-z]+)\s+to\s+([a-z]+)/);
-  if (monthRange && MONTHS[monthRange[1]] != null && MONTHS[monthRange[2]] != null) {
-    const a = MONTHS[monthRange[1]];
-    const b = MONTHS[monthRange[2]];
-    dateFromIso = startOfMonth(year, Math.min(a, b));
-    dateToIso = endOfMonth(year, Math.max(a, b));
-  } else {
-    const single = q.match(/(?:^|\s)(?:in\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?=\s|$)/);
-    if (single) {
-      const m = MONTHS[single[1]];
-      dateFromIso = startOfMonth(year, m);
-      dateToIso = endOfMonth(year, m);
-    }
-  }
-
-  if (q.includes("last summer")) {
-    dateFromIso = new Date(year - 1, 5, 1, 0, 0, 0, 0).toISOString();
-    dateToIso = new Date(year - 1, 7, 31, 23, 59, 59, 999).toISOString();
-  } else if (q.includes("this summer")) {
-    dateFromIso = new Date(year, 5, 1, 0, 0, 0, 0).toISOString();
-    dateToIso = new Date(year, 7, 31, 23, 59, 59, 999).toISOString();
-  } else if (q.includes("last month")) {
-    const d = new Date(year, now.getMonth() - 1, 1);
-    dateFromIso = startOfMonth(d.getFullYear(), d.getMonth());
-    dateToIso = endOfMonth(d.getFullYear(), d.getMonth());
-  } else if (q.includes("this month")) {
-    dateFromIso = startOfMonth(year, now.getMonth());
-    dateToIso = endOfMonth(year, now.getMonth());
-  }
-
-  const afterRe = q.match(/after\s+(\d{1,2})\s*(am|pm)?/);
-  if (afterRe) {
-    let h = parseInt(afterRe[1], 10);
-    if (afterRe[2] === "pm" && h < 12) h += 12;
-    if (afterRe[2] === "am" && h === 12) h = 0;
-    if (h >= 0 && h <= 23) hourMin = h;
-  }
-  if (hourMin == null && q.includes("night shift")) hourMin = 18;
-  if (hourMin == null && q.includes("evening")) hourMin = 17;
-
-  return { hourMin, dateFromIso, dateToIso };
-}
 
 
 function ComplianceDeskPage() {

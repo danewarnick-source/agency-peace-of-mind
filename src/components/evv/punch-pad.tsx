@@ -362,7 +362,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   async function submitVariance() {
     if (!variance) return;
     const reason = varianceReason.trim();
-    if (reason.length < 5) {
+    if (reason.length === 0) {
       toast.error("Please provide a variance justification.");
       return;
     }

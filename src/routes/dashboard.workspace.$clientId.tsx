@@ -37,10 +37,12 @@ import {
 } from "@/components/ui/tabs";
 import {
   ArrowLeft,
+  Clock,
   FileText,
   Pill,
   User,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import { AboutTab } from "@/components/workspace/about-tab";
 import { EmarTab } from "@/components/workspace/emar-tab";

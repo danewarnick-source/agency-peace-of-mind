@@ -1,0 +1,2 @@
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS authorized_dspd_codes text[] NOT NULL DEFAULT ARRAY[]::text[];
+UPDATE public.clients SET authorized_dspd_codes = COALESCE(job_code, ARRAY[]::text[]) WHERE (authorized_dspd_codes IS NULL OR cardinality(authorized_dspd_codes) = 0);

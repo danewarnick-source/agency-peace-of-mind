@@ -301,6 +301,7 @@ export type Database = {
       clients: {
         Row: {
           account_status: string
+          authorized_dspd_codes: string[]
           created_at: string
           first_name: string
           geofence_radius_feet: number
@@ -318,6 +319,7 @@ export type Database = {
         }
         Insert: {
           account_status?: string
+          authorized_dspd_codes?: string[]
           created_at?: string
           first_name: string
           geofence_radius_feet?: number
@@ -335,6 +337,7 @@ export type Database = {
         }
         Update: {
           account_status?: string
+          authorized_dspd_codes?: string[]
           created_at?: string
           first_name?: string
           geofence_radius_feet?: number
@@ -2273,6 +2276,7 @@ export type Database = {
         Args: { _org: string; _staff: string }
         Returns: {
           account_status: string
+          authorized_dspd_codes: string[]
           created_at: string
           first_name: string
           geofence_radius_feet: number

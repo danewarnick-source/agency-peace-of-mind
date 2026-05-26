@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { RequirePermission } from "@/components/rbac-guard";
@@ -18,12 +19,13 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X } from "lucide-react";
+import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X, Search, Database } from "lucide-react";
 import { toast } from "sonner";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode } from "@/lib/evv-codes";
+import { searchTimesheetsByVector, backfillTimesheetEmbeddings } from "@/lib/vector-search.functions";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
 // the Pending Approvals Ledger and the Approved Timesheets Archive.

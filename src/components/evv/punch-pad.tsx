@@ -31,6 +31,7 @@ type LockedClient = {
   homeLat?: number | null;
   homeLng?: number | null;
   geofenceRadiusFeet?: number | null;
+  pcspGoals?: string[];
 };
 
 type ActiveShift = {

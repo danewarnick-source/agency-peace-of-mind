@@ -11,7 +11,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings,
-  LogOut, Users, Building2, Contact2, ClipboardCheck, ShieldAlert, ShieldCheck, Wallet, Pill, Menu, Clock,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, ShieldAlert, ShieldCheck, Wallet, Pill, Menu, Clock, Home,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
@@ -36,6 +36,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/timeclock", label: "General Time Clock", icon: Clock },
   { to: "/dashboard/compliance-desk", label: "EVV & Timesheet Control", icon: ShieldCheck },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
+  { to: "/dashboard/host-home-control", label: "🏡 Host Home Control", icon: Home },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
   { to: "/dashboard/emar", label: "eMAR Pass", icon: Pill },
   { to: "/dashboard/admin/emar-audit", label: "eMAR Audit", icon: ShieldAlert },

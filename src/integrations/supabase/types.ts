@@ -1069,12 +1069,14 @@ export type Database = {
       hhs_emar_logs: {
         Row: {
           administered_at: string | null
+          attestation_signed: boolean
           client_id: string
           created_at: string
           dosage: string | null
           exception_reason: string | null
           id: string
           is_controlled: boolean
+          is_medication_error: boolean
           is_prn: boolean
           medication_id: string | null
           medication_name: string
@@ -1089,15 +1091,18 @@ export type Database = {
           signature_attestation: string | null
           staff_name: string | null
           status: string
+          variance_note: string | null
         }
         Insert: {
           administered_at?: string | null
+          attestation_signed?: boolean
           client_id: string
           created_at?: string
           dosage?: string | null
           exception_reason?: string | null
           id?: string
           is_controlled?: boolean
+          is_medication_error?: boolean
           is_prn?: boolean
           medication_id?: string | null
           medication_name: string
@@ -1112,15 +1117,18 @@ export type Database = {
           signature_attestation?: string | null
           staff_name?: string | null
           status: string
+          variance_note?: string | null
         }
         Update: {
           administered_at?: string | null
+          attestation_signed?: boolean
           client_id?: string
           created_at?: string
           dosage?: string | null
           exception_reason?: string | null
           id?: string
           is_controlled?: boolean
+          is_medication_error?: boolean
           is_prn?: boolean
           medication_id?: string | null
           medication_name?: string
@@ -1135,6 +1143,7 @@ export type Database = {
           signature_attestation?: string | null
           staff_name?: string | null
           status?: string
+          variance_note?: string | null
         }
         Relationships: []
       }
@@ -1184,9 +1193,16 @@ export type Database = {
           description: string
           guardian_contact_at: string | null
           guardian_contact_method: string | null
+          guardian_notified: boolean | null
           guardian_response: string | null
           id: string
+          incident_address: string | null
           incident_categories: string[]
+          incident_type_other: string | null
+          individuals_involved: Json
+          narrative_after: string | null
+          narrative_before: string | null
+          narrative_during: string | null
           occurred_at: string
           organization_id: string
           protective_actions: string | null
@@ -1203,9 +1219,16 @@ export type Database = {
           description: string
           guardian_contact_at?: string | null
           guardian_contact_method?: string | null
+          guardian_notified?: boolean | null
           guardian_response?: string | null
           id?: string
+          incident_address?: string | null
           incident_categories?: string[]
+          incident_type_other?: string | null
+          individuals_involved?: Json
+          narrative_after?: string | null
+          narrative_before?: string | null
+          narrative_during?: string | null
           occurred_at: string
           organization_id: string
           protective_actions?: string | null
@@ -1222,9 +1245,16 @@ export type Database = {
           description?: string
           guardian_contact_at?: string | null
           guardian_contact_method?: string | null
+          guardian_notified?: boolean | null
           guardian_response?: string | null
           id?: string
+          incident_address?: string | null
           incident_categories?: string[]
+          incident_type_other?: string | null
+          individuals_involved?: Json
+          narrative_after?: string | null
+          narrative_before?: string | null
+          narrative_during?: string | null
           occurred_at?: string
           organization_id?: string
           protective_actions?: string | null

@@ -121,14 +121,58 @@ function HhsClientHub() {
   );
 }
 
-// ============ Daily Note + AI Coach ============
+// ============ Daily Note + AI Coach + AI Interlock Gates ============
+const INCIDENT_RX = /\b(fell|fall|fainted|seizure|injur(y|ed|ies)|bleed|blood|hospital|ER|emergency|crisis|aggress|hit\s+(?:them|him|her)|self[- ]harm|elop(e|ed|ement)|abuse|neglect)\b/i;
+const MEDICAL_RX = /\b(appointment|appt|doctor|dr\.|dentist|dental|clinic|specialist|checkup|check[- ]up|seen by|visited (?:the )?(?:doctor|md|clinic|hospital))\b/i;
+const today = () => new Date().toISOString().slice(0, 10);
+
 function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) {
   const [note, setNote] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
   const [coach, setCoach] = useState<{ status: string; feedback: string } | null>(null);
+  const [interlock, setInterlock] = useState<{ kind: "incident" | "medical"; msg: string } | null>(null);
   const evalFn = useServerFn(evaluateShiftNote);
   const saveFn = useServerFn(saveDailyRecord);
   const pcsp = client.pcsp_goals ?? [];
+
+  const charCount = note.trim().length;
+  const remaining = Math.max(0, 50 - charCount);
+  const meetsMin = charCount >= 50;
+
+  const checkInterlocks = async (): Promise<boolean> => {
+    const t = today();
+    const hasIncidentLanguage = INCIDENT_RX.test(note);
+    const hasMedicalLanguage = MEDICAL_RX.test(note);
+    if (hasIncidentLanguage) {
+      const { count } = await supabase
+        .from("hhs_incident_reports" as never)
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", client.id)
+        .gte("occurred_at", `${t}T00:00:00Z`);
+      if (!count || count === 0) {
+        setInterlock({
+          kind: "incident",
+          msg: "⚠️ AI Compliance Lock: Your daily summary describes a critical event or injury. State regulations mandate an incident intake log. Please complete the Incident Report worksheet in Tab 4 to submit your daily records.",
+        });
+        return false;
+      }
+    }
+    if (hasMedicalLanguage) {
+      const { count } = await supabase
+        .from("hhs_medical_logs" as never)
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", client.id)
+        .gte("appointment_at", `${t}T00:00:00Z`);
+      if (!count || count === 0) {
+        setInterlock({
+          kind: "medical",
+          msg: "⚠️ AI Compliance Lock: Your note references a medical / specialist appointment. Please fill out the Medical Appointment Log form in Tab 4 before saving today's daily record.",
+        });
+        return false;
+      }
+    }
+    return true;
+  };
 
   const checkMut = useMutation({
     mutationFn: async () => evalFn({ data: { narrative: note, goals, clientFirstName: client.first_name } }),
@@ -137,23 +181,28 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
   });
 
   const saveMut = useMutation({
-    mutationFn: async () =>
-      saveFn({
+    mutationFn: async () => {
+      const ok = await checkInterlocks();
+      if (!ok) throw new Error("AI compliance lock");
+      return saveFn({
         data: {
           organizationId: orgId,
           clientId: client.id,
-          recordDate: new Date().toISOString().slice(0, 10),
+          recordDate: today(),
           narrative: note,
           pcspGoalsAddressed: goals,
           aiStatus: coach?.status ?? null,
           aiFeedback: coach?.feedback ?? null,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Daily progress note saved.");
       setNote(""); setGoals([]); setCoach(null);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      if (e.message !== "AI compliance lock") toast.error(e.message);
+    },
   });
 
   return (
@@ -178,6 +227,11 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
         <div>
           <Label>Narrative Summary</Label>
           <Textarea rows={6} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Describe support provided, behaviors observed, goal progress, ADLs…" />
+          <div className={`mt-1 text-xs ${meetsMin ? "text-green-700" : "text-amber-700"}`}>
+            {meetsMin
+              ? `✓ Clinical threshold met (${charCount} characters).`
+              : `Characters remaining to meet clinical threshold: ${remaining}`}
+          </div>
         </div>
         {coach && (
           <div className={`rounded-lg border p-3 text-sm ${coach.status === "Verified" ? "border-green-400 bg-green-50 dark:bg-green-950/30" : "border-amber-400 bg-amber-50 dark:bg-amber-950/30"}`}>
@@ -185,15 +239,27 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
             <p className="mt-1">{coach.feedback}</p>
           </div>
         )}
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => checkMut.mutate()} disabled={!note || checkMut.isPending}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => checkMut.mutate()} disabled={!meetsMin || checkMut.isPending}>
             {checkMut.isPending ? "Checking…" : "🤖 Run AI Coach Pre-Screen"}
           </Button>
-          <Button onClick={() => saveMut.mutate()} disabled={!note || saveMut.isPending}>
+          <Button onClick={() => saveMut.mutate()} disabled={!meetsMin || saveMut.isPending}>
             {saveMut.isPending ? "Saving…" : "Save Daily Note"}
           </Button>
         </div>
       </CardContent>
+
+      <Dialog open={!!interlock} onOpenChange={(o) => !o && setInterlock(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-amber-700">🚨 AI Compliance Lock</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm">{interlock?.msg}</p>
+          <DialogFooter>
+            <Button onClick={() => setInterlock(null)}>Open PRN Forms (Tab 4)</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -207,9 +273,47 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
   const [prnReason, setPrnReason] = useState("");
   const [pillCount, setPillCount] = useState("");
   const [pillVerified, setPillVerified] = useState(false);
+  const [variance, setVariance] = useState("");
+  const [isMedError, setIsMedError] = useState(false);
+  const [attest, setAttest] = useState(false);
 
   const isPrn = useMemo(() => /prn/i.test(String(active?.frequency ?? "")) || /prn/i.test(String(active?.instructions ?? "")), [active]);
   const isControlled = useMemo(() => /schedule\s*(ii|iii|iv|2|3|4)/i.test(String(active?.instructions ?? "")), [active]);
+
+  // Query today's incident reports tagged 'Medication Error' — clears the daily-submission lock
+  const { data: medErrorIncidentCount = 0 } = useQuery({
+    queryKey: ["hhs-med-error-incidents", clientId, today()],
+    queryFn: async () => {
+      const t = today();
+      const { count } = await supabase
+        .from("hhs_incident_reports" as never)
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .gte("occurred_at", `${t}T00:00:00Z`)
+        .contains("incident_categories", ["Medication Error"]);
+      return count ?? 0;
+    },
+  });
+  const { data: hasUnresolvedMedError = false } = useQuery({
+    queryKey: ["hhs-emar-error-flag", clientId, today()],
+    queryFn: async () => {
+      const t = today();
+      const { count } = await supabase
+        .from("hhs_emar_logs" as never)
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .eq("is_medication_error", true)
+        .gte("created_at", `${t}T00:00:00Z`);
+      return (count ?? 0) > 0;
+    },
+  });
+  const qc = useQueryClient();
+  const errorLockActive = hasUnresolvedMedError && medErrorIncidentCount === 0;
+
+  const resetDialog = () => {
+    setActive(null); setPrnReason(""); setPillCount(""); setPillVerified(false);
+    setStatus("Passed"); setVariance(""); setIsMedError(false); setAttest(false);
+  };
 
   const submitMut = useMutation({
     mutationFn: async () => {
@@ -229,24 +333,44 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
           isControlled,
           pillCountVerified: isControlled ? pillVerified : null,
           pillCountValue: isControlled && pillCount ? parseInt(pillCount, 10) : null,
+          varianceNote: (status !== "Passed" || isMedError) ? variance : null,
+          isMedicationError: isMedError,
+          attestationSigned: attest,
           signatureAttestation: user?.email ?? "caregiver",
           staffName: user?.user_metadata?.full_name ?? user?.email ?? null,
         },
       });
     },
     onSuccess: () => {
-      toast.success(`Med ${status}.`);
-      setActive(null); setPrnReason(""); setPillCount(""); setPillVerified(false); setStatus("Passed");
+      toast.success(`Med ${status}${isMedError ? " — flagged as medication error" : ""}.`);
+      qc.invalidateQueries({ queryKey: ["hhs-emar-error-flag"] });
+      resetDialog();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const needsVariance = status !== "Passed" || isMedError;
+  const blockSubmit =
+    submitMut.isPending ||
+    !attest ||
+    (isPrn && !prnReason) ||
+    (isControlled && status === "Passed" && !pillVerified) ||
+    (needsVariance && variance.trim().length < 5);
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base">💊 Today's eMAR</CardTitle>
-        <Button size="sm" variant="destructive">⚠️ Report Medication Error</Button>
+        <Button size="sm" variant="destructive" onClick={() => {
+          if (meds.length === 0) return toast.error("No meds on file to flag.");
+          setActive(meds[0]); setIsMedError(true); setStatus("Missed");
+        }}>⚠️ Report Medication Error</Button>
       </CardHeader>
+      {errorLockActive && (
+        <div className="mx-4 mb-3 rounded-md border border-red-500 bg-red-100 dark:bg-red-950/40 p-3 text-sm text-red-900 dark:text-red-200">
+          🚨 <strong>Action Required:</strong> You must complete an internal Incident Report form under Tab 4 and call your agency manager immediately regarding this medication error. Daily submission is blocked until the Incident Form contains a completed record.
+        </div>
+      )}
       <CardContent className="space-y-2">
         {meds.length === 0 && <p className="text-sm text-muted-foreground">No active medications on file.</p>}
         {meds.map((m) => (
@@ -255,7 +379,7 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
               <div className="min-w-0 flex-1">
                 <div className="font-semibold">{String(m.medication_name)} <span className="text-xs text-muted-foreground">{String(m.dosage ?? "")}</span></div>
                 <div className="text-xs text-muted-foreground">Route: {String(m.route ?? "—")} · {String(m.frequency ?? "")}</div>
-                {m.instructions ? <div className="text-xs">{String(m.instructions)}</div> : null}
+                {m.instructions ? <div className="text-xs">Indication / Schedule: {String(m.instructions)}</div> : null}
                 <div className="mt-1 rounded bg-yellow-100 dark:bg-yellow-950/40 border border-yellow-300 px-2 py-1 text-[11px] text-yellow-900 dark:text-yellow-200">
                   ⚠️ Side-effects: monitor for drowsiness, swallowing/choking risk. Confirm upright posture.
                 </div>
@@ -266,8 +390,8 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
         ))}
       </CardContent>
 
-      <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>
-        <DialogContent className="max-w-md">
+      <Dialog open={!!active} onOpenChange={(o) => !o && resetDialog()}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{String(active?.medication_name ?? "")}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
@@ -298,15 +422,25 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
                 </label>
               </div>
             )}
+            {needsVariance && (
+              <div className="rounded border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1">
+                <Label className="text-amber-800">⚠️ Required Clinical Variance & Administration Exception Documentation</Label>
+                <Textarea rows={3} value={variance} onChange={(e) => setVariance(e.target.value)} placeholder="Describe what happened, observations, and resolution steps." />
+              </div>
+            )}
+            <label className="flex items-start gap-2 text-xs rounded border bg-muted/30 p-2">
+              <Checkbox checked={attest} onCheckedChange={(c) => setAttest(!!c)} />
+              <span>✍️ I formally attest that I am the logged-in authorized staff member physically observing or assisting with the administration of this medication according to the prescribed healthcare directive.</span>
+            </label>
+            {isMedError && (
+              <div className="rounded border-2 border-red-500 bg-red-50 dark:bg-red-950/40 p-2 text-xs text-red-800 dark:text-red-200">
+                🚨 This record will be flagged as a <strong>Medication Error</strong>. After saving, you must complete a Form C Incident Report under Tab 4 before any daily submissions can proceed.
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setActive(null)}>Cancel</Button>
-            <Button
-              onClick={() => submitMut.mutate()}
-              disabled={submitMut.isPending || (isPrn && !prnReason) || (isControlled && status === "Passed" && !pillVerified)}
-            >
-              Submit
-            </Button>
+            <Button variant="outline" onClick={resetDialog}>Cancel</Button>
+            <Button onClick={() => submitMut.mutate()} disabled={blockSubmit}>Submit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -520,38 +654,74 @@ function PrnFormDialog({ kind, orgId, clientId, onClose }: { kind: Exclude<PrnKi
 
 function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clientId: string; onClose: () => void }) {
   const fn = useServerFn(saveIncidentReport);
+  const qc = useQueryClient();
+  const [date, setDate] = useState(today());
+  const [time, setTime] = useState("12:00");
+  const [address, setAddress] = useState("");
+  const [individuals, setIndividuals] = useState<string[]>([]);
+  const [individualDraft, setIndividualDraft] = useState("");
   const [cats, setCats] = useState<string[]>([]);
+  const [otherType, setOtherType] = useState("");
+  const [guardianYes, setGuardianYes] = useState<"yes" | "no" | null>(null);
   const [desc, setDesc] = useState("");
+  const [before, setBefore] = useState("");
+  const [during, setDuring] = useState("");
+  const [after, setAfter] = useState("");
   const [protective, setProtective] = useState("");
   const [method, setMethod] = useState("Telephone");
   const [contactAt, setContactAt] = useState("");
   const [response, setResponse] = useState("");
 
   const trigger = cats.some((c) => ["Abuse", "Neglect", "Exploitation", "Maltreatment"].includes(c));
+  const includesOther = cats.includes("Other");
+
+  const addIndividual = () => {
+    const v = individualDraft.trim();
+    if (!v) return;
+    setIndividuals((arr) => [...arr, v]);
+    setIndividualDraft("");
+  };
 
   const mut = useMutation({
-    mutationFn: async () =>
-      fn({
+    mutationFn: async () => {
+      const occurredAt = new Date(`${date}T${time}:00`).toISOString();
+      return fn({
         data: {
           organizationId: orgId,
           clientId,
-          occurredAt: new Date().toISOString(),
+          occurredAt,
+          incidentAddress: address || null,
+          individualsInvolved: individuals,
           incidentCategories: cats,
+          incidentTypeOther: includesOther ? otherType : null,
           description: desc,
+          narrativeBefore: before || null,
+          narrativeDuring: during || null,
+          narrativeAfter: after || null,
+          guardianNotified: guardianYes === null ? null : guardianYes === "yes",
           guardianContactMethod: method,
           guardianContactAt: contactAt ? new Date(contactAt).toISOString() : null,
           guardianResponse: response,
           protectiveActions: trigger ? protective : null,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Incident filed for admin review.");
+      qc.invalidateQueries({ queryKey: ["hhs-med-error-incidents"] });
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const categories = ["Injury", "Behavior", "Property Damage", "Medication Error", "Abuse", "Neglect", "Exploitation", "Maltreatment"];
+  const categories = ["Injury", "Behavior Crisis", "Property Damage", "Medical Emergency", "Medication Error", "Abuse", "Neglect", "Exploitation", "Maltreatment", "Other"];
+  const blockSubmit =
+    mut.isPending ||
+    !desc ||
+    cats.length === 0 ||
+    guardianYes === null ||
+    (includesOther && !otherType.trim()) ||
+    (trigger && !protective);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -561,8 +731,31 @@ function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clien
           <p className="text-xs text-amber-700">INTERNAL ASSISTANCE INTAKE for administration review. NOT a direct UPI state submission.</p>
         </DialogHeader>
         <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div><Label>Date of Incident</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div><Label>Time (military)</Label><Input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+          </div>
+          <div><Label>Address of Incident</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Physical location of event" /></div>
+
           <div>
-            <Label>Incident Categories</Label>
+            <Label>Individuals Involved</Label>
+            <div className="flex gap-2 mt-1">
+              <Input value={individualDraft} onChange={(e) => setIndividualDraft(e.target.value)} placeholder="Add name…" onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIndividual())} />
+              <Button type="button" size="sm" onClick={addIndividual}>Add</Button>
+            </div>
+            {individuals.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {individuals.map((n, i) => (
+                  <Badge key={i} variant="secondary" className="cursor-pointer" onClick={() => setIndividuals((arr) => arr.filter((_, idx) => idx !== i))}>
+                    {n} ✕
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <Label>Incident Type</Label>
             <div className="grid grid-cols-2 gap-1 mt-1">
               {categories.map((c) => (
                 <label key={c} className="flex items-center gap-1 text-xs">
@@ -571,8 +764,41 @@ function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clien
                 </label>
               ))}
             </div>
+            {includesOther && (
+              <div className="mt-2">
+                <Label>Specify Incident Type Classification *</Label>
+                <Input value={otherType} onChange={(e) => setOtherType(e.target.value)} />
+              </div>
+            )}
           </div>
-          <div><Label>Incident Description</Label><Textarea rows={4} value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
+
+          <div className="rounded border bg-muted/30 p-3 space-y-2">
+            <Label>Was the client's parent/legal guardian successfully notified of this event? *</Label>
+            <RadioGroup value={guardianYes ?? ""} onValueChange={(v) => setGuardianYes(v as "yes" | "no")} className="flex gap-4">
+              <label className="flex items-center gap-1 text-sm"><RadioGroupItem value="yes" /> Yes</label>
+              <label className="flex items-center gap-1 text-sm"><RadioGroupItem value="no" /> No</label>
+            </RadioGroup>
+          </div>
+
+          <div>
+            <Label>Brief Incident Description</Label>
+            <Textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} />
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <Label>🔍 1. What was happening BEFORE the incident? (Preceding triggers or environmental context)</Label>
+              <Textarea rows={3} value={before} onChange={(e) => setBefore(e.target.value)} />
+            </div>
+            <div>
+              <Label>⚠️ 2. What occurred DURING the incident? (Factual, objective sequence of events)</Label>
+              <Textarea rows={3} value={during} onChange={(e) => setDuring(e.target.value)} />
+            </div>
+            <div>
+              <Label>🩹 3. What steps were taken AFTER the incident? (First aid, behavioral interventions, de-escalation, immediate resolution status)</Label>
+              <Textarea rows={3} value={after} onChange={(e) => setAfter(e.target.value)} />
+            </div>
+          </div>
 
           {trigger && (
             <div className="rounded border border-red-400 bg-red-50 dark:bg-red-950/30 p-3">
@@ -582,7 +808,7 @@ function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clien
           )}
 
           <div className="rounded border bg-muted/30 p-3 space-y-2">
-            <div className="text-sm font-semibold flex items-center gap-1"><Phone className="h-4 w-4" />Guardian Notification</div>
+            <div className="text-sm font-semibold flex items-center gap-1"><Phone className="h-4 w-4" />Guardian Notification Details</div>
             <div>
               <Label>Contact Method</Label>
               <Select value={method} onValueChange={setMethod}>
@@ -600,7 +826,7 @@ function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clien
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => mut.mutate()} disabled={mut.isPending || !desc || (trigger && !protective)}>Submit for Admin Review</Button>
+          <Button onClick={() => mut.mutate()} disabled={blockSubmit}>Submit for Admin Review</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

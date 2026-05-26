@@ -305,6 +305,8 @@ function ClientFormDialog({
   const [goalInput, setGoalInput] = useState("");
   const [pinning, setPinning] = useState(false);
   const [goals, setGoals] = useState<string[]>(initial?.pcsp_goals ?? []);
+  const [radius, setRadius] = useState<number>(initial?.geofence_radius_feet ?? 1000);
+
 
   // Reset state when initial changes (e.g. opening Edit for a different row)
   useEffect(() => {

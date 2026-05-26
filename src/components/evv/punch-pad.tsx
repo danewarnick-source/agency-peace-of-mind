@@ -291,6 +291,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   }) {
     if (!user || !org || !clientForPunch) return;
     const nowIso = new Date().toISOString();
+    const isOutOfBounds = !!args.outsideReason;
     const payload = {
       organization_id: org.organization_id,
       staff_id: user.id,
@@ -303,6 +304,9 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       status: "Active",
       timezone_setting: timezone,
       outside_geofence_reason: args.outsideReason ?? null,
+      gps_validated: !isOutOfBounds,
+      is_out_of_bounds: isOutOfBounds,
+      geofence_variance_justification: args.outsideReason ?? null,
       raw_clock_in: nowIso,
       rounded_clock_in: roundToQuarterHourISO(nowIso),
     };

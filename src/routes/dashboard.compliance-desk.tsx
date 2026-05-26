@@ -409,6 +409,8 @@ function ComplianceDeskPage() {
   const [mapOpen, setMapOpen] = useState<Row | null>(null);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);
+  const [aiQuery, setAiQuery] = useState("");
+  const isSearching = aiQuery.trim().length > 0;
 
   const pendingQ = useQuery({
     enabled: !!org?.organization_id,

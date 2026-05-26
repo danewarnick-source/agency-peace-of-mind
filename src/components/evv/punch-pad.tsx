@@ -573,7 +573,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             <div>
               <label className="mb-1 block text-xs font-medium">🏢 Assign Facility / House Site</label>
               <Select value={selectedFacility} onValueChange={setSelectedFacility} disabled={isRunning}>
-                <SelectTrigger className="h-11"><SelectValue placeholder="Select a facility" /></SelectTrigger>
+                <SelectTrigger className="h-12"><SelectValue placeholder="Select a facility" /></SelectTrigger>
                 <SelectContent>
                   {facilities.length === 0 && (
                     <SelectItem value="__none" disabled>No facilities on file</SelectItem>
@@ -585,7 +585,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             <div>
               <label className="mb-1 block text-xs font-medium">👤 Assign Client Individual</label>
               <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setServiceCode(""); }} disabled={isRunning}>
-                <SelectTrigger className="h-11"><SelectValue placeholder="Select a client" /></SelectTrigger>
+                <SelectTrigger className="h-12"><SelectValue placeholder="Select a client" /></SelectTrigger>
                 <SelectContent>
                   {caseload
                     .filter((c) => !selectedFacility || c.physical_address === selectedFacility)
@@ -609,7 +609,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         <div>
           <label className="mb-1 block text-xs font-medium">💼 Select Service Code</label>
           <Select value={serviceCode} onValueChange={setServiceCode} disabled={isRunning || !clientForPunch}>
-            <SelectTrigger className="h-11"><SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} /></SelectTrigger>
+            <SelectTrigger className="h-12"><SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} /></SelectTrigger>
             <SelectContent>
               {codesForClient.length === 0 ? (
                 <SelectItem value="__none" disabled>No codes authorized</SelectItem>
@@ -628,7 +628,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         <div>
           <label className="mb-1 block text-xs font-medium">🕐 Timezone</label>
           <Select value={timezone} onValueChange={setTimezone} disabled={isRunning}>
-            <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
             <SelectContent>
               {TIMEZONES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}
             </SelectContent>

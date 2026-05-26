@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -99,6 +99,8 @@ type Row = {
   gps_out_coordinates: Coord | null;
   outside_geofence_reason: string | null;
   status: string;
+  shift_note_text: string | null;
+  goals_completed: string[] | null;
   is_edited_by_admin: boolean;
   edited_by_admin_name: string | null;
   edit_audit_history_log: AuditEntry[];
@@ -147,7 +149,47 @@ function EditedByAdminBadge({ row }: { row: Row }) {
   );
 }
 
-const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, clients(first_name,last_name,physical_address)";
+/** TSheets-style inline shift narrative + goals strip, rendered under every row. */
+function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
+  const note = (row.shift_note_text ?? "").trim();
+  const goals = row.goals_completed ?? [];
+  return (
+    <TableRow className="border-t-0 hover:bg-transparent">
+      <TableCell colSpan={colSpan} className="bg-muted/30 py-3">
+        <div className="rounded-lg border border-border bg-background/60 p-3 space-y-2.5">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+              💬 Shift Note
+            </div>
+            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">
+              {note.length > 0 ? note : <span className="italic text-muted-foreground">No narrative recorded.</span>}
+            </p>
+          </div>
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+              🎯 Goals Targeted
+            </div>
+            {goals.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {goals.map((g, i) => (
+                  <Badge key={`${row.id}-g-${i}`} variant="secondary" className="font-normal">
+                    {g}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-xs italic text-muted-foreground">No PCSP goals checkmarked.</p>
+            )}
+          </div>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+
+
+const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, clients(first_name,last_name,physical_address)";
 
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));
@@ -185,7 +227,7 @@ function ComplianceDeskPage() {
   });
 
   const approvedQ = useQuery({
-    enabled: !!org?.organization_id && sub !== "pending",
+    enabled: !!org?.organization_id,
     queryKey: ["evv-approved", org?.organization_id],
     queryFn: async (): Promise<Row[]> => {
       const { data, error } = await supabase
@@ -213,13 +255,48 @@ function ComplianceDeskPage() {
     onError: (e) => toast.error((e as Error).message),
   });
 
+  const onGlobalUtahExport = () => {
+    const all = approvedQ.data ?? [];
+    const eligible = all.filter((r) => isEvvLockedCode(r.service_type_code) && !r.outside_geofence_reason);
+    if (!eligible.length) { toast.error("No approved EVV-locked, in-bounds shifts to export."); return; }
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    downloadCsv(`utah_dhhs_evv_${stamp}.csv`, buildUtahCsv(eligible));
+    const skipped = all.length - eligible.length;
+    toast.success(`Exported ${eligible.length} shift${eligible.length === 1 ? "" : "s"}.${skipped > 0 ? ` Skipped ${skipped} (non-EVV or 🔴 NO MATCH).` : ""}`);
+  };
+  const onGlobalMasterExport = () => {
+    const all = approvedQ.data ?? [];
+    if (!all.length) { toast.error("No approved shifts to export."); return; }
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    downloadCsv(`master_agency_ledger_${stamp}.csv`, buildMasterLedgerCsv(all));
+    toast.success(`Exported ${all.length} shift${all.length === 1 ? "" : "s"} to Master Agency Ledger.`);
+  };
+
   return (
     <div className="space-y-4">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Compliance Desk</h1>
-        <p className="text-sm text-muted-foreground">
-          Approve EVV shifts, audit GPS punches, and export Utah DHHS billing files.
-        </p>
+      <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Compliance Desk</h1>
+          <p className="text-sm text-muted-foreground">
+            Approve EVV shifts, audit GPS punches, and export Utah DHHS billing files.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button
+            onClick={onGlobalUtahExport}
+            disabled={approvedQ.isLoading}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Download className="mr-2 h-4 w-4" /> 📥 Export Utah DHHS EVV CSV
+          </Button>
+          <Button
+            onClick={onGlobalMasterExport}
+            disabled={approvedQ.isLoading}
+            variant="secondary"
+          >
+            <Download className="mr-2 h-4 w-4" /> 📊 Export Master Agency Ledger CSV
+          </Button>
+        </div>
       </header>
 
       <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1">
@@ -316,7 +393,8 @@ function PendingTable({
             ) : rows.length === 0 ? (
               <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts. ✓</TableCell></TableRow>
             ) : rows.map((r) => (
-              <TableRow key={r.id}>
+              <Fragment key={r.id}>
+              <TableRow>
                 <TableCell className="font-medium">
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
                   <EditedByAdminBadge row={r} />
@@ -358,6 +436,8 @@ function PendingTable({
                   </div>
                 </TableCell>
               </TableRow>
+              <InlineNotesRow row={r} colSpan={9} />
+              </Fragment>
             ))}
           </TableBody>
         </Table>
@@ -475,6 +555,44 @@ function buildPayrollCsv(rows: Row[]): string {
   return [header, ...lines].join("\r\n");
 }
 
+// === Master Agency Ledger CSV (full clinical/audit payload) ===
+const MASTER_LEDGER_HEADER =
+  "Shift ID,Caregiver Name,Client Name,DSPD Service Code,Service Description,Raw Clock-In,Raw Clock-Out,Rounded Clock-In,Rounded Clock-Out,Total Calculated Hours,Geofence Status,Caregiver Location Exception Note,PCSP Goals Completed,Full Caregiver Shift Narrative,Is Admin Modified,Modified By Admin Name,Internal Audit Trail Log";
+
+function buildMasterLedgerCsv(rows: Row[]): string {
+  const lines = rows.map((r) => {
+    const inIso = effectiveIn(r);
+    const outIso = effectiveOut(r);
+    const ms = outIso ? new Date(outIso).getTime() - new Date(inIso).getTime() : 0;
+    const hours = (ms / 3_600_000).toFixed(2);
+    const geofence = r.outside_geofence_reason && r.outside_geofence_reason.trim().length > 0 ? "NO MATCH" : "MATCH";
+    const goals = (r.goals_completed ?? []).join(" | ");
+    const auditTrail = (r.edit_audit_history_log ?? [])
+      .map((a) => `[${a.timestamp}] ${a.admin}: ${a.field_changed} "${a.old_value}" → "${a.new_value}"`)
+      .join(" || ");
+    return [
+      csvEscape(r.id),
+      csvEscape(r.staff?.full_name ?? r.staff?.email ?? ""),
+      csvEscape(`${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim()),
+      csvEscape(r.service_type_code ?? ""),
+      csvEscape(evvServiceLabel(r.service_type_code)),
+      csvEscape(r.clock_in_timestamp ? new Date(r.clock_in_timestamp).toISOString() : ""),
+      csvEscape(r.clock_out_timestamp ? new Date(r.clock_out_timestamp).toISOString() : ""),
+      csvEscape(r.rounded_clock_in ? new Date(r.rounded_clock_in).toISOString() : ""),
+      csvEscape(r.rounded_clock_out ? new Date(r.rounded_clock_out).toISOString() : ""),
+      hours,
+      csvEscape(geofence),
+      csvEscape(r.outside_geofence_reason ?? ""),
+      csvEscape(goals),
+      csvEscape(r.shift_note_text ?? ""),
+      r.is_edited_by_admin ? "TRUE" : "FALSE",
+      csvEscape(r.edited_by_admin_name ?? ""),
+      csvEscape(auditTrail),
+    ].join(",");
+  });
+  return [MASTER_LEDGER_HEADER, ...lines].join("\r\n");
+}
+
 function ArchiveTable({
   rows, loading, onMap, onEdit, variant,
 }: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; onEdit: (r: Row) => void; variant: "evv" | "non-evv" }) {
@@ -571,7 +689,8 @@ function ArchiveTable({
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
               return (
-                <TableRow key={r.id}>
+                <Fragment key={r.id}>
+                <TableRow>
                   <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
                   <TableCell className="font-medium">
                     {r.staff?.full_name ?? r.staff?.email ?? "—"}
@@ -596,6 +715,8 @@ function ArchiveTable({
                     </Button>
                   </TableCell>
                 </TableRow>
+                <InlineNotesRow row={r} colSpan={10} />
+                </Fragment>
               );
             })}
           </TableBody>

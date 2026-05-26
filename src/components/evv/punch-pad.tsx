@@ -786,7 +786,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             {showNarrativeError && !narrativeOk && (
               <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
                 ⚠️ Compliance Failure: Your daily progress narrative must be at least
-                100 words in length to satisfy state Medicaid auditing and DSPD billing
+                50 words in length to satisfy state Medicaid auditing and DSPD billing
                 validation criteria. Please provide additional detail regarding client
                 behaviors, choices, and goal responses.
               </div>

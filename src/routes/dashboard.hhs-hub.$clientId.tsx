@@ -654,38 +654,74 @@ function PrnFormDialog({ kind, orgId, clientId, onClose }: { kind: Exclude<PrnKi
 
 function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clientId: string; onClose: () => void }) {
   const fn = useServerFn(saveIncidentReport);
+  const qc = useQueryClient();
+  const [date, setDate] = useState(today());
+  const [time, setTime] = useState("12:00");
+  const [address, setAddress] = useState("");
+  const [individuals, setIndividuals] = useState<string[]>([]);
+  const [individualDraft, setIndividualDraft] = useState("");
   const [cats, setCats] = useState<string[]>([]);
+  const [otherType, setOtherType] = useState("");
+  const [guardianYes, setGuardianYes] = useState<"yes" | "no" | null>(null);
   const [desc, setDesc] = useState("");
+  const [before, setBefore] = useState("");
+  const [during, setDuring] = useState("");
+  const [after, setAfter] = useState("");
   const [protective, setProtective] = useState("");
   const [method, setMethod] = useState("Telephone");
   const [contactAt, setContactAt] = useState("");
   const [response, setResponse] = useState("");
 
   const trigger = cats.some((c) => ["Abuse", "Neglect", "Exploitation", "Maltreatment"].includes(c));
+  const includesOther = cats.includes("Other");
+
+  const addIndividual = () => {
+    const v = individualDraft.trim();
+    if (!v) return;
+    setIndividuals((arr) => [...arr, v]);
+    setIndividualDraft("");
+  };
 
   const mut = useMutation({
-    mutationFn: async () =>
-      fn({
+    mutationFn: async () => {
+      const occurredAt = new Date(`${date}T${time}:00`).toISOString();
+      return fn({
         data: {
           organizationId: orgId,
           clientId,
-          occurredAt: new Date().toISOString(),
+          occurredAt,
+          incidentAddress: address || null,
+          individualsInvolved: individuals,
           incidentCategories: cats,
+          incidentTypeOther: includesOther ? otherType : null,
           description: desc,
+          narrativeBefore: before || null,
+          narrativeDuring: during || null,
+          narrativeAfter: after || null,
+          guardianNotified: guardianYes === null ? null : guardianYes === "yes",
           guardianContactMethod: method,
           guardianContactAt: contactAt ? new Date(contactAt).toISOString() : null,
           guardianResponse: response,
           protectiveActions: trigger ? protective : null,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Incident filed for admin review.");
+      qc.invalidateQueries({ queryKey: ["hhs-med-error-incidents"] });
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const categories = ["Injury", "Behavior", "Property Damage", "Medication Error", "Abuse", "Neglect", "Exploitation", "Maltreatment"];
+  const categories = ["Injury", "Behavior Crisis", "Property Damage", "Medical Emergency", "Medication Error", "Abuse", "Neglect", "Exploitation", "Maltreatment", "Other"];
+  const blockSubmit =
+    mut.isPending ||
+    !desc ||
+    cats.length === 0 ||
+    guardianYes === null ||
+    (includesOther && !otherType.trim()) ||
+    (trigger && !protective);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -695,8 +731,31 @@ function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clien
           <p className="text-xs text-amber-700">INTERNAL ASSISTANCE INTAKE for administration review. NOT a direct UPI state submission.</p>
         </DialogHeader>
         <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div><Label>Date of Incident</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div><Label>Time (military)</Label><Input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+          </div>
+          <div><Label>Address of Incident</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Physical location of event" /></div>
+
           <div>
-            <Label>Incident Categories</Label>
+            <Label>Individuals Involved</Label>
+            <div className="flex gap-2 mt-1">
+              <Input value={individualDraft} onChange={(e) => setIndividualDraft(e.target.value)} placeholder="Add name…" onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIndividual())} />
+              <Button type="button" size="sm" onClick={addIndividual}>Add</Button>
+            </div>
+            {individuals.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {individuals.map((n, i) => (
+                  <Badge key={i} variant="secondary" className="cursor-pointer" onClick={() => setIndividuals((arr) => arr.filter((_, idx) => idx !== i))}>
+                    {n} ✕
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <Label>Incident Type</Label>
             <div className="grid grid-cols-2 gap-1 mt-1">
               {categories.map((c) => (
                 <label key={c} className="flex items-center gap-1 text-xs">
@@ -705,8 +764,41 @@ function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clien
                 </label>
               ))}
             </div>
+            {includesOther && (
+              <div className="mt-2">
+                <Label>Specify Incident Type Classification *</Label>
+                <Input value={otherType} onChange={(e) => setOtherType(e.target.value)} />
+              </div>
+            )}
           </div>
-          <div><Label>Incident Description</Label><Textarea rows={4} value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
+
+          <div className="rounded border bg-muted/30 p-3 space-y-2">
+            <Label>Was the client's parent/legal guardian successfully notified of this event? *</Label>
+            <RadioGroup value={guardianYes ?? ""} onValueChange={(v) => setGuardianYes(v as "yes" | "no")} className="flex gap-4">
+              <label className="flex items-center gap-1 text-sm"><RadioGroupItem value="yes" /> Yes</label>
+              <label className="flex items-center gap-1 text-sm"><RadioGroupItem value="no" /> No</label>
+            </RadioGroup>
+          </div>
+
+          <div>
+            <Label>Brief Incident Description</Label>
+            <Textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} />
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <Label>🔍 1. What was happening BEFORE the incident? (Preceding triggers or environmental context)</Label>
+              <Textarea rows={3} value={before} onChange={(e) => setBefore(e.target.value)} />
+            </div>
+            <div>
+              <Label>⚠️ 2. What occurred DURING the incident? (Factual, objective sequence of events)</Label>
+              <Textarea rows={3} value={during} onChange={(e) => setDuring(e.target.value)} />
+            </div>
+            <div>
+              <Label>🩹 3. What steps were taken AFTER the incident? (First aid, behavioral interventions, de-escalation, immediate resolution status)</Label>
+              <Textarea rows={3} value={after} onChange={(e) => setAfter(e.target.value)} />
+            </div>
+          </div>
 
           {trigger && (
             <div className="rounded border border-red-400 bg-red-50 dark:bg-red-950/30 p-3">
@@ -716,7 +808,7 @@ function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clien
           )}
 
           <div className="rounded border bg-muted/30 p-3 space-y-2">
-            <div className="text-sm font-semibold flex items-center gap-1"><Phone className="h-4 w-4" />Guardian Notification</div>
+            <div className="text-sm font-semibold flex items-center gap-1"><Phone className="h-4 w-4" />Guardian Notification Details</div>
             <div>
               <Label>Contact Method</Label>
               <Select value={method} onValueChange={setMethod}>
@@ -734,7 +826,7 @@ function IncidentFormDialog({ orgId, clientId, onClose }: { orgId: string; clien
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => mut.mutate()} disabled={mut.isPending || !desc || (trigger && !protective)}>Submit for Admin Review</Button>
+          <Button onClick={() => mut.mutate()} disabled={blockSubmit}>Submit for Admin Review</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

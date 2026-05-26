@@ -621,11 +621,18 @@ function ComplianceDeskPage() {
 // Receives the ranked id list from pgvector RPC and renders the corresponding
 // Row objects in the existing TSheets-style split-block layout.
 function UnifiedSearchResults({
-  query, constraints, matches, pending, approved, loading, error,
+  query, route, matches, pending, approved, loading, error,
   onMap, onEdit, onReason, onApprove, approving,
 }: {
   query: string;
-  constraints: StructuralConstraints;
+  route: {
+    caregiver_name: string | null;
+    client_name: string | null;
+    hour_min: number | null;
+    date_from: string | null;
+    date_to: string | null;
+    requires_semantic: boolean;
+  } | null;
   matches: Array<{ id: string; similarity: number }>;
   pending: Row[];
   approved: Row[];
@@ -663,17 +670,29 @@ function UnifiedSearchResults({
           <Badge variant="secondary" className="font-mono max-w-[260px] truncate" title={query}>
             🧠 {query}
           </Badge>
-          {constraints.dateFromIso && constraints.dateToIso && (
+          {route?.caregiver_name && (
+            <Badge variant="outline" className="font-mono">👤 {route.caregiver_name}</Badge>
+          )}
+          {route?.client_name && (
+            <Badge variant="outline" className="font-mono">🧑‍🤝‍🧑 {route.client_name}</Badge>
+          )}
+          {route?.date_from && route?.date_to && (
             <Badge variant="outline" className="font-mono">
-              📅 {new Date(constraints.dateFromIso).toLocaleDateString()} → {new Date(constraints.dateToIso).toLocaleDateString()}
+              📅 {new Date(route.date_from).toLocaleDateString()} → {new Date(route.date_to).toLocaleDateString()}
             </Badge>
           )}
-          {constraints.hourMin != null && (
-            <Badge variant="outline" className="font-mono">⏰ ≥ {constraints.hourMin}:00</Badge>
+          {route?.hour_min != null && (
+            <Badge variant="outline" className="font-mono">⏰ ≥ {route.hour_min}:00</Badge>
+          )}
+          {route && (
+            <Badge variant="outline" className="font-mono">
+              {route.requires_semantic ? "🧬 SEMANTIC + SQL" : "⚡ SQL ONLY"}
+            </Badge>
           )}
           <Badge variant="outline" className="font-mono">{ranked.length} match{ranked.length === 1 ? "" : "es"}</Badge>
         </div>
       </div>
+
 
       {error && (
         <div className="mb-3 rounded-md border border-rose-300/50 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">

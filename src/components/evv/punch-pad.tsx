@@ -227,6 +227,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     outsideReason?: string;
   }) {
     if (!user || !org || !clientForPunch) return;
+    const nowIso = new Date().toISOString();
     const payload = {
       organization_id: org.organization_id,
       staff_id: user.id,
@@ -239,6 +240,8 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       status: "Active",
       timezone_setting: timezone,
       outside_geofence_reason: args.outsideReason ?? null,
+      raw_clock_in: nowIso,
+      rounded_clock_in: roundToQuarterHourISO(nowIso),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await supabase.from("evv_timesheets").insert(payload as any);

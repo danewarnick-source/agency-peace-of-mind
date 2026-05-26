@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, Search, MapPin, Rocket } from "lucide-react";
+import { User, Search, MapPin, Rocket, Clock, Home } from "lucide-react";
 
 // Local mobile fail-safe fixtures so frontline staff can test the workspace
 // even before an admin links them to real clients in the assignments table.
@@ -34,6 +34,108 @@ const MOCK_CLIENTS: CaseloadClient[] = [
   },
 ];
 
+// Service-mode pills shown directly under the address. Only codes that
+// represent a worker-facing "mode" (hourly EVV vs. residential HHS) are
+// rendered as interactive pills here.
+const MODE_CODES = ["SEI", "DSI", "HHS"] as const;
+type ModeCode = (typeof MODE_CODES)[number];
+
+function ClientCard({ c }: { c: CaseloadClient }) {
+  const allCodes = Array.isArray(c.job_code) ? c.job_code : [];
+  const availableModes = MODE_CODES.filter((m) => allCodes.includes(m));
+  // Fallback rule: when the card mounts, auto-select the first available
+  // service tag in the array. If the client has no mode-coded service, fall
+  // back to HHS-vs-hourly inference from the broader code list.
+  const initialMode: ModeCode =
+    availableModes[0] ?? (allCodes.includes("HHS") ? "HHS" : "SEI");
+  const [mode, setMode] = useState<ModeCode>(initialMode);
+
+  const fullName = `${c.first_name} ${c.last_name}`.trim();
+  const location = c.physical_address?.trim() || "No primary house on file";
+  const isHHS = mode === "HHS";
+
+  // Pills to render: prefer codes the client actually has; otherwise show
+  // the inferred default so the worker still sees an active mode chip.
+  const pills: ModeCode[] = availableModes.length ? availableModes : [initialMode];
+
+  return (
+    <li className="relative">
+      <div className="group flex w-full flex-col gap-4 rounded-2xl border border-border bg-background p-5 text-left shadow-sm transition hover:border-primary hover:shadow-md">
+        <div className="flex items-start gap-4">
+          <span
+            className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${
+              isHHS ? "bg-amber-100 text-amber-700" : "bg-primary/10 text-primary"
+            }`}
+          >
+            <User className="h-7 w-7" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-semibold leading-tight">{fullName}</p>
+            <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="line-clamp-2">{location}</span>
+            </p>
+
+            {/* Interactive service-mode pills (replaces the static tag row). */}
+            <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Service mode">
+              {pills.map((code) => {
+                const active = mode === code;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setMode(code)}
+                    aria-pressed={active}
+                    className={`min-h-[32px] rounded-full border px-3 py-1 font-mono text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                      active
+                        ? code === "HHS"
+                          ? "border-amber-500 bg-amber-100 text-amber-800 ring-2 ring-amber-300 shadow-sm dark:bg-amber-900/40 dark:text-amber-100"
+                          : "border-primary bg-primary/15 text-primary ring-2 ring-primary/30 shadow-sm"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    }`}
+                  >
+                    [{code}]
+                  </button>
+                );
+              })}
+              {/* Show any remaining non-mode codes as plain reference badges. */}
+              {allCodes
+                .filter((code) => !MODE_CODES.includes(code as ModeCode))
+                .slice(0, 4)
+                .map((code) => (
+                  <Badge key={code} variant="outline" className="font-mono text-[10px]">
+                    {code}
+                  </Badge>
+                ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic primary action — text + route follow selected pill. */}
+        <Button asChild size="lg" className="h-12 w-full text-base font-semibold">
+          <Link
+            to={isHHS ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
+            params={{ clientId: c.id }}
+            aria-label={`Open ${isHHS ? "host home client hub" : "hourly time clock"} for ${fullName}`}
+          >
+            {isHHS ? (
+              <>
+                <Rocket className="mr-1 h-5 w-5" />
+                <Home className="mr-2 h-5 w-5" /> 🚀 🏡 Open Client Hub
+              </>
+            ) : (
+              <>
+                <Rocket className="mr-1 h-5 w-5" />
+                <Clock className="mr-2 h-5 w-5" /> 🚀 🕒 Open Hourly Time Clock
+              </>
+            )}
+          </Link>
+        </Button>
+      </div>
+    </li>
+  );
+}
+
 export function StaffClientGrid() {
   const { data: caseload, isLoading } = useCaseload();
   const [q, setQ] = useState("");
@@ -58,7 +160,7 @@ export function StaffClientGrid() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight sm:text-xl">My Caseload</h2>
           <p className="text-xs text-muted-foreground sm:text-sm">
-            Tap a client to open their Unified Shift Profile.
+            Tap a service pill to switch modes, then open the matching workspace.
           </p>
         </div>
         <div className="relative w-full md:max-w-xs">
@@ -88,56 +190,9 @@ export function StaffClientGrid() {
         </Card>
       ) : (
         <ul className="mt-5 flex flex-col gap-3 md:grid md:grid-cols-2 xl:grid-cols-3">
-          {clients.map((c) => {
-            const codes = Array.isArray(c.job_code) ? c.job_code : [];
-            const fullName = `${c.first_name} ${c.last_name}`.trim();
-            const location = c.physical_address?.trim() || "No primary house on file";
-            const isHHS = codes.includes("HHS");
-            return (
-              <li key={c.id} className="relative">
-                <Link
-                  to={isHHS ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
-                  params={{ clientId: c.id }}
-                  aria-label={`Open ${isHHS ? "host home client hub" : "shift profile"} for ${fullName}`}
-                  className="group flex w-full flex-col gap-4 rounded-2xl border border-border bg-background p-5 text-left shadow-sm transition hover:border-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <div className="flex items-start gap-4">
-                    <span className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${isHHS ? "bg-amber-100 text-amber-700" : "bg-primary/10 text-primary"}`}>
-                      <User className="h-7 w-7" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-lg font-semibold leading-tight">{fullName}</p>
-                      {isHHS && <Badge className="mt-1 bg-amber-500 hover:bg-amber-600">🏡 HHS — Host Home Supports</Badge>}
-                      <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground">
-                        <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                        <span className="line-clamp-2">{location}</span>
-                      </p>
-                      {codes.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {codes.slice(0, 4).map((code) => (
-                            <Badge key={code} variant="outline" className="font-mono text-[10px]">
-                              {code}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <Button
-                    asChild
-                    size="lg"
-                    className="h-12 w-full text-base font-semibold"
-                    tabIndex={-1}
-                  >
-                    <span>
-                      <Rocket className="mr-2 h-5 w-5" /> {isHHS ? "🏡 Open Client Hub" : "Open Shift Profile"}
-                    </span>
-                  </Button>
-                </Link>
-              </li>
-            );
-          })}
+          {clients.map((c) => (
+            <ClientCard key={c.id} c={c} />
+          ))}
         </ul>
       )}
     </section>

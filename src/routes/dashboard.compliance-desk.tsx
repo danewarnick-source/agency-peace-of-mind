@@ -612,6 +612,147 @@ function ComplianceDeskPage() {
   );
 }
 
+// 🤖 Unified cross-tab AI search results — merges Pending + Approved (EVV + Non-EVV)
+function UnifiedSearchResults({
+  query, pending, approved, loading,
+  onMap, onEdit, onReason, onApprove, approving,
+}: {
+  query: string;
+  pending: Row[];
+  approved: Row[];
+  loading: boolean;
+  onMap: (r: Row) => void;
+  onEdit: (r: Row) => void;
+  onReason: (r: Row) => void;
+  onApprove: (id: string) => void;
+  approving: boolean;
+}) {
+  const parsed = useMemo(() => parseNlQuery(query), [query]);
+  const merged = useMemo(() => {
+    const all = [...pending, ...approved];
+    const seen = new Set<string>();
+    const dedup: Row[] = [];
+    for (const r of all) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      dedup.push(r);
+    }
+    return dedup
+      .filter((r) => rowMatchesQuery(r, parsed))
+      .sort((a, b) => new Date(effectiveIn(b)).getTime() - new Date(effectiveIn(a)).getTime());
+  }, [pending, approved, parsed]);
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          🤖 AI Cross-Tab Results
+        </h2>
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+          {parsed.dateFrom != null && parsed.dateTo != null && (
+            <Badge variant="outline" className="font-mono">
+              📅 {new Date(parsed.dateFrom).toLocaleDateString()} → {new Date(parsed.dateTo).toLocaleDateString()}
+            </Badge>
+          )}
+          {parsed.hourMin != null && (
+            <Badge variant="outline" className="font-mono">⏰ ≥ {parsed.hourMin}:00</Badge>
+          )}
+          {parsed.hourMax != null && (
+            <Badge variant="outline" className="font-mono">⏰ ≤ {parsed.hourMax}:00</Badge>
+          )}
+          {parsed.nameTokens.slice(0, 4).map((t) => (
+            <Badge key={t} variant="secondary" className="font-mono">🔎 {t}</Badge>
+          ))}
+          <Badge variant="outline" className="font-mono">{merged.length} match{merged.length === 1 ? "" : "es"}</Badge>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Caregiver</TableHead>
+              <TableHead>Client</TableHead>
+              <TableHead>Service</TableHead>
+              <TableHead>In → Out</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>GPS</TableHead>
+              <TableHead>Geofence Validation Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+            ) : merged.length === 0 ? (
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No shifts match your AI query.</TableCell></TableRow>
+            ) : merged.map((r) => {
+              const inIso = effectiveIn(r);
+              const outIso = effectiveOut(r);
+              const isPending = r.status === "Pending";
+              return (
+                <Fragment key={r.id}>
+                  <TableRow>
+                    <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
+                    <TableCell>
+                      <Badge variant={isPending ? "default" : "secondary"} className="text-[10px]">
+                        {isPending ? "PENDING" : "APPROVED"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {r.staff?.full_name ?? r.staff?.email ?? "—"}
+                      <EditedByAdminBadge row={r} />
+                    </TableCell>
+                    <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
+                    <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {fmtTimeHMSAmPm(inIso)} → {outIso ? fmtTimeHMSAmPm(outIso) : "—"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{fmtDuration(inIso, outIso)}</TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" onClick={() => onMap(r)}>
+                        <MapPin className="mr-1 h-3 w-3" /> View
+                      </Button>
+                    </TableCell>
+                    <TableCell
+                      onClick={() => r.outside_geofence_reason && onReason(r)}
+                      className={r.outside_geofence_reason ? "cursor-pointer" : ""}
+                    >
+                      <GeofenceBadge reason={r.outside_geofence_reason} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        {isPending && (
+                          <Button
+                            size="icon"
+                            className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700"
+                            onClick={() => onApprove(r.id)}
+                            disabled={approving}
+                            aria-label="Approve"
+                          >
+                            {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          </Button>
+                        )}
+                        <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => onEdit(r)} aria-label="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  <InlineNotesRow row={r} colSpan={10} />
+                </Fragment>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
+  );
+}
+
+
 function PendingTable({
   rows, loading, onMap, onEdit, onApprove, approving, onReason,
 }: {

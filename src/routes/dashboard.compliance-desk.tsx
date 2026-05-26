@@ -69,7 +69,7 @@ function GeofenceBadge({ reason }: { reason: string | null }) {
 }
 
 export const Route = createFileRoute("/dashboard/compliance-desk")({
-  head: () => ({ meta: [{ title: "Compliance Desk — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "EVV & Timesheet Control — Care Academy" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <ComplianceDeskPage />
@@ -361,7 +361,7 @@ function ComplianceDeskPage() {
     <div className="space-y-4">
       <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Compliance Desk</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">EVV & Timesheet Control</h1>
           <p className="text-sm text-muted-foreground">
             Approve EVV shifts, audit GPS punches, and export Utah DHHS billing files.
           </p>

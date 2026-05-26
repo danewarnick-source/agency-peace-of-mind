@@ -477,7 +477,13 @@ function ComplianceDeskPage() {
             <Sparkles className="h-4 w-4 shrink-0 text-primary" />
             <Input
               value={aiInput}
-              onChange={(e) => setAiInput(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setAiInput(val);
+                if (val.trim().length === 0 && submitted !== null) {
+                  setSubmitted(null);
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();

@@ -813,11 +813,14 @@ export type Database = {
           created_at: string
           edit_audit_history_log: Json
           edited_by_admin_name: string | null
+          geofence_variance_justification: string | null
           goals_completed: Json
           gps_in_coordinates: Json
           gps_out_coordinates: Json | null
+          gps_validated: boolean
           id: string
           is_edited_by_admin: boolean
+          is_out_of_bounds: boolean
           organization_id: string
           outside_geofence_reason: string | null
           raw_clock_in: string | null
@@ -846,11 +849,14 @@ export type Database = {
           created_at?: string
           edit_audit_history_log?: Json
           edited_by_admin_name?: string | null
+          geofence_variance_justification?: string | null
           goals_completed?: Json
           gps_in_coordinates: Json
           gps_out_coordinates?: Json | null
+          gps_validated?: boolean
           id?: string
           is_edited_by_admin?: boolean
+          is_out_of_bounds?: boolean
           organization_id: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
@@ -879,11 +885,14 @@ export type Database = {
           created_at?: string
           edit_audit_history_log?: Json
           edited_by_admin_name?: string | null
+          geofence_variance_justification?: string | null
           goals_completed?: Json
           gps_in_coordinates?: Json
           gps_out_coordinates?: Json | null
+          gps_validated?: boolean
           id?: string
           is_edited_by_admin?: boolean
+          is_out_of_bounds?: boolean
           organization_id?: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null

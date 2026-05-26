@@ -128,17 +128,43 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       setHardwareDenied(true);
       return;
     }
-    const id = navigator.geolocation.watchPosition(
-      (p) => {
-        setHardwareDenied(false);
-        setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) setHardwareDenied(true);
-      },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
+    // Two-stage GPS acquisition prevents the "infinite Acquiring GPS" trap on
+    // mobile browsers in cellular dead-zones:
+    //  - Stage 1: high-accuracy watch, capped at an 8-second timeout.
+    //  - Stage 2 (fallback): if no fix arrives within 4 seconds, also start a
+    //    low-accuracy watch so the device can still surface a coarse fix.
+    let watchHi: number | null = null;
+    let watchLo: number | null = null;
+    let gotFix = false;
+
+    const onPos = (p: GeolocationPosition) => {
+      gotFix = true;
+      setHardwareDenied(false);
+      setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
+    };
+    const onErr = (err: GeolocationPositionError) => {
+      if (err.code === err.PERMISSION_DENIED) setHardwareDenied(true);
+    };
+
+    watchHi = navigator.geolocation.watchPosition(onPos, onErr, {
+      enableHighAccuracy: true,
+      maximumAge: 10000,
+      timeout: 8000,
+    });
+    const fallbackTimer = window.setTimeout(() => {
+      if (gotFix) return;
+      watchLo = navigator.geolocation.watchPosition(onPos, onErr, {
+        enableHighAccuracy: false,
+        maximumAge: 30000,
+        timeout: 8000,
+      });
+    }, 4000);
+
+    return () => {
+      window.clearTimeout(fallbackTimer);
+      if (watchHi !== null) navigator.geolocation.clearWatch(watchHi);
+      if (watchLo !== null) navigator.geolocation.clearWatch(watchLo);
+    };
   }, []);
 
   // Geofence variance overlay state
@@ -265,6 +291,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   }) {
     if (!user || !org || !clientForPunch) return;
     const nowIso = new Date().toISOString();
+    const isOutOfBounds = !!args.outsideReason;
     const payload = {
       organization_id: org.organization_id,
       staff_id: user.id,
@@ -277,6 +304,9 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       status: "Active",
       timezone_setting: timezone,
       outside_geofence_reason: args.outsideReason ?? null,
+      gps_validated: !isOutOfBounds,
+      is_out_of_bounds: isOutOfBounds,
+      geofence_variance_justification: args.outsideReason ?? null,
       raw_clock_in: nowIso,
       rounded_clock_in: roundToQuarterHourISO(nowIso),
     };
@@ -332,7 +362,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   async function submitVariance() {
     if (!variance) return;
     const reason = varianceReason.trim();
-    if (reason.length < 5) {
+    if (reason.length === 0) {
       toast.error("Please provide a variance justification.");
       return;
     }
@@ -804,12 +834,13 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              📍 Out-of-Bounds EVV Notice
+              ⚠️ Geofence Variance Notice
             </DialogTitle>
             <DialogDescription>
-              You are currently located further away than the allowed limit set by your
-              Administrator for this client. State compliance requires a variance
-              justification.
+              Our system detects you are starting your shift outside the approved
+              client home perimeter. Please provide a brief justification explaining
+              why you are clocking in from this location (e.g., Community outing,
+              medical transit, network latency).
             </DialogDescription>
           </DialogHeader>
           {variance && (
@@ -827,13 +858,14 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
               onChange={(e) => setVarianceReason(e.target.value)}
               placeholder="e.g. Community outing to the grocery store per PCSP goal."
               maxLength={500}
+              required
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setVariance(null); setVarianceReason(""); }}>Cancel</Button>
-            <Button onClick={submitVariance} disabled={busy || varianceReason.trim().length < 5}>
+            <Button onClick={submitVariance} disabled={busy || varianceReason.trim().length === 0}>
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Submit & Clock In
+              Confirm Clock In
             </Button>
           </DialogFooter>
         </DialogContent>

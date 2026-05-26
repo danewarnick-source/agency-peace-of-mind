@@ -489,6 +489,9 @@ function ArchiveTable({
                       <MapPin className="mr-1 h-3 w-3" /> View
                     </Button>
                   </TableCell>
+                  <TableCell>
+                    <GeofenceBadge reason={r.outside_geofence_reason} />
+                  </TableCell>
                 </TableRow>
               );
             })}

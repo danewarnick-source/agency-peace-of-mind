@@ -150,10 +150,32 @@ export const setAttendance = createServerFn({ method: "POST" })
       recordDate: z.string(),
       presenceStatus: z.enum(["Present", "Away"]),
       awayReason: z.string().max(500).nullable().optional(),
+      awayCategory: z.enum(["Hospitalization", "Family Leave", "Unapproved Absence"]).nullable().optional(),
+      staffInitials: z.string().max(10).nullable().optional(),
+      attestationAccepted: z.boolean().default(false),
     }).parse(i)
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Court-admissible forensics: only required for "Present" billable nights
+    if (data.presenceStatus === "Present") {
+      if (!data.attestationAccepted) throw new Error("Legal attestation checkbox is required for billable overnight verification.");
+      if (!data.staffInitials || data.staffInitials.trim().length < 2) throw new Error("Typed staff initials are required.");
+    }
+    if (data.presenceStatus === "Away" && !data.awayCategory) {
+      throw new Error("Away category is required for unbillable absences.");
+    }
+    // Capture caller IP for tamper-evident audit trail
+    let ip: string | null = null;
+    try {
+      const { getRequestHeader } = await import("@tanstack/react-start/server");
+      ip =
+        getRequestHeader("cf-connecting-ip") ||
+        getRequestHeader("x-forwarded-for")?.split(",")[0]?.trim() ||
+        getRequestHeader("x-real-ip") ||
+        null;
+    } catch { /* ignore */ }
+
     const { error, data: row } = await supabase
       .from("hhs_monthly_attendance" as never)
       .upsert(
@@ -164,6 +186,12 @@ export const setAttendance = createServerFn({ method: "POST" })
           record_date: data.recordDate,
           presence_status: data.presenceStatus,
           away_reason: data.awayReason ?? null,
+          away_category: data.awayCategory ?? null,
+          staff_initials_signature: data.presenceStatus === "Present" ? (data.staffInitials ?? null) : null,
+          attestation_accepted: data.presenceStatus === "Present" ? data.attestationAccepted : false,
+          electronic_signature_timestamp: data.presenceStatus === "Present" ? new Date().toISOString() : null,
+          signee_user_id: data.presenceStatus === "Present" ? userId : null,
+          signee_ip_address: data.presenceStatus === "Present" ? ip : null,
         } as never,
         { onConflict: "organization_id,client_id,record_date" }
       )

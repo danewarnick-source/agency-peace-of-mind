@@ -1311,34 +1311,52 @@ export type Database = {
       }
       hhs_monthly_attendance: {
         Row: {
+          attestation_accepted: boolean
+          away_category: string | null
           away_reason: string | null
           client_id: string
           created_at: string
+          electronic_signature_timestamp: string | null
           id: string
           organization_id: string
           presence_status: string
           provider_id: string
           record_date: string
+          signee_ip_address: string | null
+          signee_user_id: string | null
+          staff_initials_signature: string | null
         }
         Insert: {
+          attestation_accepted?: boolean
+          away_category?: string | null
           away_reason?: string | null
           client_id: string
           created_at?: string
+          electronic_signature_timestamp?: string | null
           id?: string
           organization_id: string
           presence_status: string
           provider_id: string
           record_date: string
+          signee_ip_address?: string | null
+          signee_user_id?: string | null
+          staff_initials_signature?: string | null
         }
         Update: {
+          attestation_accepted?: boolean
+          away_category?: string | null
           away_reason?: string | null
           client_id?: string
           created_at?: string
+          electronic_signature_timestamp?: string | null
           id?: string
           organization_id?: string
           presence_status?: string
           provider_id?: string
           record_date?: string
+          signee_ip_address?: string | null
+          signee_user_id?: string | null
+          staff_initials_signature?: string | null
         }
         Relationships: []
       }

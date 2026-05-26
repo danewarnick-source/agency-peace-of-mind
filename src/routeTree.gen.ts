@@ -56,6 +56,7 @@ import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.trai
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
+import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
@@ -303,6 +304,11 @@ const DashboardProgramsProgramIdRoute =
     path: '/$programId',
     getParentRoute: () => DashboardProgramsRoute,
   } as any)
+const DashboardHhsHubClientIdRoute = DashboardHhsHubClientIdRouteImport.update({
+  id: '/hhs-hub/$clientId',
+  path: '/hhs-hub/$clientId',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardCoursesMindsmithRoute =
   DashboardCoursesMindsmithRouteImport.update({
     id: '/courses/mindsmith',
@@ -377,6 +383,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -430,6 +437,7 @@ export interface FileRoutesByTo {
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -485,6 +493,7 @@ export interface FileRoutesById {
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -541,6 +550,7 @@ export interface FileRouteTypes {
     | '/dashboard/admin/emar-audit'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/tracks/$trackSlug'
@@ -594,6 +604,7 @@ export interface FileRouteTypes {
     | '/dashboard/admin/emar-audit'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/tracks/$trackSlug'
@@ -648,6 +659,7 @@ export interface FileRouteTypes {
     | '/dashboard/admin/emar-audit'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/tracks/$trackSlug'
@@ -1008,6 +1020,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardProgramsProgramIdRouteImport
       parentRoute: typeof DashboardProgramsRoute
     }
+    '/dashboard/hhs-hub/$clientId': {
+      id: '/dashboard/hhs-hub/$clientId'
+      path: '/hhs-hub/$clientId'
+      fullPath: '/dashboard/hhs-hub/$clientId'
+      preLoaderRoute: typeof DashboardHhsHubClientIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/courses/mindsmith': {
       id: '/dashboard/courses/mindsmith'
       path: '/courses/mindsmith'
@@ -1123,6 +1142,7 @@ interface DashboardRouteChildren {
   DashboardAdminEmarAuditRoute: typeof DashboardAdminEmarAuditRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesMindsmithRoute: typeof DashboardCoursesMindsmithRoute
+  DashboardHhsHubClientIdRoute: typeof DashboardHhsHubClientIdRoute
   DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
   DashboardWorkspaceClientIdRoute: typeof DashboardWorkspaceClientIdRoute
   DashboardCoursesIndexRoute: typeof DashboardCoursesIndexRoute
@@ -1158,6 +1178,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAdminEmarAuditRoute: DashboardAdminEmarAuditRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesMindsmithRoute: DashboardCoursesMindsmithRoute,
+  DashboardHhsHubClientIdRoute: DashboardHhsHubClientIdRoute,
   DashboardTrainingIdRoute: DashboardTrainingIdRoute,
   DashboardWorkspaceClientIdRoute: DashboardWorkspaceClientIdRoute,
   DashboardCoursesIndexRoute: DashboardCoursesIndexRoute,

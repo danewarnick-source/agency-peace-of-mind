@@ -410,20 +410,11 @@ function ClientFormDialog({
           <p className="text-[11px] text-muted-foreground">Address is auto-geocoded via OpenStreetMap on save. Use Pin for desk testing.</p>
         </div>
         <div className="grid gap-2">
-          <Label>DSPD Authorization Billing Job Codes</Label>
-          <div className="grid grid-cols-1 gap-1.5 rounded-md border border-border p-3 sm:grid-cols-2">
-            {JOB_CODES.map((j) => (
-              <label key={j.code} className="flex cursor-pointer items-start gap-2 rounded p-1.5 text-sm hover:bg-accent">
-                <Checkbox
-                  checked={jobCodes.includes(j.code)}
-                  onCheckedChange={() => toggleCode(j.code)}
-                  className="mt-0.5"
-                />
-                <span><span className="font-mono font-medium">{j.code}</span> <span className="text-xs text-muted-foreground">— {j.label.split("— ")[1]}</span></span>
-              </label>
-            ))}
-          </div>
-          <p className="text-[11px] text-muted-foreground">Select all codes this individual is authorized for. Staff will pick one per shift at clock-in.</p>
+          <Label>💼 Authorized DSPD Billing Codes</Label>
+          <DspdCodesMultiSelect value={jobCodes} onChange={setJobCodes} />
+          <p className="text-[11px] text-muted-foreground">
+            Search the full Utah DSPD master list (35 codes, incl. HHS). Selected codes are saved to this client and become the only options shown in the caregiver's EVV time-clock dropdown.
+          </p>
         </div>
         <div className="grid gap-2">
           <Label>PCSP goals</Label>

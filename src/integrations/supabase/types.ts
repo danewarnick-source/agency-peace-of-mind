@@ -804,6 +804,9 @@ export type Database = {
       }
       evv_timesheets: {
         Row: {
+          ai_coaching_iterations: number
+          ai_compliance_feedback: string | null
+          ai_compliance_status: string | null
           client_id: string
           clock_in_timestamp: string
           clock_out_timestamp: string | null
@@ -833,6 +836,9 @@ export type Database = {
           utah_medicaid_provider_id: string
         }
         Insert: {
+          ai_coaching_iterations?: number
+          ai_compliance_feedback?: string | null
+          ai_compliance_status?: string | null
           client_id: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
@@ -862,6 +868,9 @@ export type Database = {
           utah_medicaid_provider_id: string
         }
         Update: {
+          ai_coaching_iterations?: number
+          ai_compliance_feedback?: string | null
+          ai_compliance_status?: string | null
           client_id?: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null

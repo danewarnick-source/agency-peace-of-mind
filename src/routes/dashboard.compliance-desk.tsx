@@ -472,8 +472,8 @@ function ComplianceDeskPage() {
               onChange={(e) => {
                 const val = e.target.value;
                 setAiInput(val);
-                if (val.trim().length === 0 && submitted !== null) {
-                  setSubmitted(null);
+                if (val.trim().length === 0) {
+                  resetAiSearch();
                 }
               }}
               onKeyDown={(e) => {

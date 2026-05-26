@@ -384,12 +384,19 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     setBaselineChecked(false);
     setNarrative("");
     setShowNarrativeError(false);
+    setAiCoach(null);
+    setAiIterations(0);
+    setAiFlagCount(0);
+    setAllowException(false);
     setShowCompliance(true);
   }
 
   async function finalizeClockOut(args: {
     pos: { lat: number; lng: number; acc: number };
     outsideReason?: string;
+    aiStatus?: "Verified" | "Flagged" | "Exception";
+    aiFeedback?: string;
+    aiIterationCount?: number;
   }) {
     if (!user || !active) return;
     const selectedGoals = Object.entries(checkedGoals)

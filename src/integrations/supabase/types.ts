@@ -976,6 +976,414 @@ export type Database = {
         }
         Relationships: []
       }
+      hhs_client_inventories: {
+        Row: {
+          added_on: string
+          asset_description: string
+          client_id: string
+          created_at: string
+          estimated_value: number
+          id: string
+          organization_id: string
+          provider_id: string
+          removal_reason: string | null
+          removal_signature: string | null
+          removed_on: string | null
+          status: string
+        }
+        Insert: {
+          added_on?: string
+          asset_description: string
+          client_id: string
+          created_at?: string
+          estimated_value: number
+          id?: string
+          organization_id: string
+          provider_id: string
+          removal_reason?: string | null
+          removal_signature?: string | null
+          removed_on?: string | null
+          status?: string
+        }
+        Update: {
+          added_on?: string
+          asset_description?: string
+          client_id?: string
+          created_at?: string
+          estimated_value?: number
+          id?: string
+          organization_id?: string
+          provider_id?: string
+          removal_reason?: string | null
+          removal_signature?: string | null
+          removed_on?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      hhs_daily_records: {
+        Row: {
+          ai_compliance_feedback: string | null
+          ai_compliance_status: string | null
+          client_id: string
+          created_at: string
+          id: string
+          narrative: string
+          organization_id: string
+          pcsp_goals_addressed: string[]
+          provider_id: string
+          record_date: string
+          signature_data_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_compliance_feedback?: string | null
+          ai_compliance_status?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          narrative: string
+          organization_id: string
+          pcsp_goals_addressed?: string[]
+          provider_id: string
+          record_date?: string
+          signature_data_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_compliance_feedback?: string | null
+          ai_compliance_status?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          narrative?: string
+          organization_id?: string
+          pcsp_goals_addressed?: string[]
+          provider_id?: string
+          record_date?: string
+          signature_data_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hhs_emar_logs: {
+        Row: {
+          administered_at: string | null
+          client_id: string
+          created_at: string
+          dosage: string | null
+          exception_reason: string | null
+          id: string
+          is_controlled: boolean
+          is_prn: boolean
+          medication_id: string | null
+          medication_name: string
+          organization_id: string
+          pill_count_value: number | null
+          pill_count_verified: boolean | null
+          prn_reason: string | null
+          provider_id: string
+          record_date: string
+          route: string | null
+          scheduled_for: string
+          signature_attestation: string | null
+          staff_name: string | null
+          status: string
+        }
+        Insert: {
+          administered_at?: string | null
+          client_id: string
+          created_at?: string
+          dosage?: string | null
+          exception_reason?: string | null
+          id?: string
+          is_controlled?: boolean
+          is_prn?: boolean
+          medication_id?: string | null
+          medication_name: string
+          organization_id: string
+          pill_count_value?: number | null
+          pill_count_verified?: boolean | null
+          prn_reason?: string | null
+          provider_id: string
+          record_date?: string
+          route?: string | null
+          scheduled_for: string
+          signature_attestation?: string | null
+          staff_name?: string | null
+          status: string
+        }
+        Update: {
+          administered_at?: string | null
+          client_id?: string
+          created_at?: string
+          dosage?: string | null
+          exception_reason?: string | null
+          id?: string
+          is_controlled?: boolean
+          is_prn?: boolean
+          medication_id?: string | null
+          medication_name?: string
+          organization_id?: string
+          pill_count_value?: number | null
+          pill_count_verified?: boolean | null
+          prn_reason?: string | null
+          provider_id?: string
+          record_date?: string
+          route?: string | null
+          scheduled_for?: string
+          signature_attestation?: string | null
+          staff_name?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      hhs_evacuation_drills: {
+        Row: {
+          client_id: string
+          created_at: string
+          drill_executed_at: string
+          evacuation_duration_seconds: number
+          id: string
+          notes: string | null
+          organization_id: string
+          provider_id: string
+          record_date: string
+          simulation_type: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          drill_executed_at: string
+          evacuation_duration_seconds: number
+          id?: string
+          notes?: string | null
+          organization_id: string
+          provider_id: string
+          record_date?: string
+          simulation_type: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          drill_executed_at?: string
+          evacuation_duration_seconds?: number
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          provider_id?: string
+          record_date?: string
+          simulation_type?: string
+        }
+        Relationships: []
+      }
+      hhs_incident_reports: {
+        Row: {
+          client_id: string
+          created_at: string
+          description: string
+          guardian_contact_at: string | null
+          guardian_contact_method: string | null
+          guardian_response: string | null
+          id: string
+          incident_categories: string[]
+          occurred_at: string
+          organization_id: string
+          protective_actions: string | null
+          provider_id: string
+          status: string
+          updated_at: string
+          upi_filed_at: string | null
+          upi_filed_by: string | null
+          upi_reference_number: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          description: string
+          guardian_contact_at?: string | null
+          guardian_contact_method?: string | null
+          guardian_response?: string | null
+          id?: string
+          incident_categories?: string[]
+          occurred_at: string
+          organization_id: string
+          protective_actions?: string | null
+          provider_id: string
+          status?: string
+          updated_at?: string
+          upi_filed_at?: string | null
+          upi_filed_by?: string | null
+          upi_reference_number?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          description?: string
+          guardian_contact_at?: string | null
+          guardian_contact_method?: string | null
+          guardian_response?: string | null
+          id?: string
+          incident_categories?: string[]
+          occurred_at?: string
+          organization_id?: string
+          protective_actions?: string | null
+          provider_id?: string
+          status?: string
+          updated_at?: string
+          upi_filed_at?: string | null
+          upi_filed_by?: string | null
+          upi_reference_number?: string | null
+        }
+        Relationships: []
+      }
+      hhs_medical_logs: {
+        Row: {
+          appointment_at: string
+          client_id: string
+          created_at: string
+          facility_name: string
+          follow_up_date: string | null
+          id: string
+          orders_changes: string | null
+          organization_id: string
+          provider_id: string
+          reason: string
+          record_date: string
+        }
+        Insert: {
+          appointment_at: string
+          client_id: string
+          created_at?: string
+          facility_name: string
+          follow_up_date?: string | null
+          id?: string
+          orders_changes?: string | null
+          organization_id: string
+          provider_id: string
+          reason: string
+          record_date?: string
+        }
+        Update: {
+          appointment_at?: string
+          client_id?: string
+          created_at?: string
+          facility_name?: string
+          follow_up_date?: string | null
+          id?: string
+          orders_changes?: string | null
+          organization_id?: string
+          provider_id?: string
+          reason?: string
+          record_date?: string
+        }
+        Relationships: []
+      }
+      hhs_monthly_attendance: {
+        Row: {
+          away_reason: string | null
+          client_id: string
+          created_at: string
+          id: string
+          organization_id: string
+          presence_status: string
+          provider_id: string
+          record_date: string
+        }
+        Insert: {
+          away_reason?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          presence_status: string
+          provider_id: string
+          record_date: string
+        }
+        Update: {
+          away_reason?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          presence_status?: string
+          provider_id?: string
+          record_date?: string
+        }
+        Relationships: []
+      }
+      hhs_monthly_summaries: {
+        Row: {
+          client_id: string
+          community_outings: Json
+          created_at: string
+          id: string
+          organization_id: string
+          pcsp_progress_narrative: string
+          provider_id: string
+          target_month: string
+        }
+        Insert: {
+          client_id: string
+          community_outings?: Json
+          created_at?: string
+          id?: string
+          organization_id: string
+          pcsp_progress_narrative: string
+          provider_id: string
+          target_month: string
+        }
+        Update: {
+          client_id?: string
+          community_outings?: Json
+          created_at?: string
+          id?: string
+          organization_id?: string
+          pcsp_progress_narrative?: string
+          provider_id?: string
+          target_month?: string
+        }
+        Relationships: []
+      }
+      hhs_transfer_logs: {
+        Row: {
+          client_id: string
+          communication_summary: string
+          created_at: string
+          id: string
+          organization_id: string
+          party_type: string
+          provider_id: string
+          receiving_party: string
+          record_date: string
+          transferred_at: string
+        }
+        Insert: {
+          client_id: string
+          communication_summary: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          party_type: string
+          provider_id: string
+          receiving_party: string
+          record_date?: string
+          transferred_at?: string
+        }
+        Update: {
+          client_id?: string
+          communication_summary?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          party_type?: string
+          provider_id?: string
+          receiving_party?: string
+          record_date?: string
+          transferred_at?: string
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           accepted_at: string | null

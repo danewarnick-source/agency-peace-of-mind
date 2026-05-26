@@ -255,13 +255,48 @@ function ComplianceDeskPage() {
     onError: (e) => toast.error((e as Error).message),
   });
 
+  const onGlobalUtahExport = () => {
+    const all = approvedQ.data ?? [];
+    const eligible = all.filter((r) => isEvvLockedCode(r.service_type_code) && !r.outside_geofence_reason);
+    if (!eligible.length) { toast.error("No approved EVV-locked, in-bounds shifts to export."); return; }
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    downloadCsv(`utah_dhhs_evv_${stamp}.csv`, buildUtahCsv(eligible));
+    const skipped = all.length - eligible.length;
+    toast.success(`Exported ${eligible.length} shift${eligible.length === 1 ? "" : "s"}.${skipped > 0 ? ` Skipped ${skipped} (non-EVV or 🔴 NO MATCH).` : ""}`);
+  };
+  const onGlobalMasterExport = () => {
+    const all = approvedQ.data ?? [];
+    if (!all.length) { toast.error("No approved shifts to export."); return; }
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    downloadCsv(`master_agency_ledger_${stamp}.csv`, buildMasterLedgerCsv(all));
+    toast.success(`Exported ${all.length} shift${all.length === 1 ? "" : "s"} to Master Agency Ledger.`);
+  };
+
   return (
     <div className="space-y-4">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Compliance Desk</h1>
-        <p className="text-sm text-muted-foreground">
-          Approve EVV shifts, audit GPS punches, and export Utah DHHS billing files.
-        </p>
+      <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Compliance Desk</h1>
+          <p className="text-sm text-muted-foreground">
+            Approve EVV shifts, audit GPS punches, and export Utah DHHS billing files.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button
+            onClick={onGlobalUtahExport}
+            disabled={approvedQ.isLoading}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Download className="mr-2 h-4 w-4" /> 📥 Export Utah DHHS EVV CSV
+          </Button>
+          <Button
+            onClick={onGlobalMasterExport}
+            disabled={approvedQ.isLoading}
+            variant="secondary"
+          >
+            <Download className="mr-2 h-4 w-4" /> 📊 Export Master Agency Ledger CSV
+          </Button>
+        </div>
       </header>
 
       <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1">

@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { EVV_SERVICE_CODES, evvServiceLabel } from "@/lib/evv-codes";
+import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode } from "@/lib/evv-codes";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
 // the Pending Approvals Ledger and the Approved Timesheets Archive.

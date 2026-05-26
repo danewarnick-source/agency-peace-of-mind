@@ -155,6 +155,12 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const [baselineChecked, setBaselineChecked] = useState(false);
   const [narrative, setNarrative] = useState("");
   const [showNarrativeError, setShowNarrativeError] = useState(false);
+  // AI Documentation Coach state
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiCoach, setAiCoach] = useState<CoachResult | null>(null);
+  const [aiIterations, setAiIterations] = useState(0);
+  const [aiFlagCount, setAiFlagCount] = useState(0);
+  const [allowException, setAllowException] = useState(false);
 
   const facilities = useMemo(() => {
     const set = new Set<string>();

@@ -128,17 +128,43 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       setHardwareDenied(true);
       return;
     }
-    const id = navigator.geolocation.watchPosition(
-      (p) => {
-        setHardwareDenied(false);
-        setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) setHardwareDenied(true);
-      },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
+    // Two-stage GPS acquisition prevents the "infinite Acquiring GPS" trap on
+    // mobile browsers in cellular dead-zones:
+    //  - Stage 1: high-accuracy watch, capped at an 8-second timeout.
+    //  - Stage 2 (fallback): if no fix arrives within 4 seconds, also start a
+    //    low-accuracy watch so the device can still surface a coarse fix.
+    let watchHi: number | null = null;
+    let watchLo: number | null = null;
+    let gotFix = false;
+
+    const onPos = (p: GeolocationPosition) => {
+      gotFix = true;
+      setHardwareDenied(false);
+      setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
+    };
+    const onErr = (err: GeolocationPositionError) => {
+      if (err.code === err.PERMISSION_DENIED) setHardwareDenied(true);
+    };
+
+    watchHi = navigator.geolocation.watchPosition(onPos, onErr, {
+      enableHighAccuracy: true,
+      maximumAge: 10000,
+      timeout: 8000,
+    });
+    const fallbackTimer = window.setTimeout(() => {
+      if (gotFix) return;
+      watchLo = navigator.geolocation.watchPosition(onPos, onErr, {
+        enableHighAccuracy: false,
+        maximumAge: 30000,
+        timeout: 8000,
+      });
+    }, 4000);
+
+    return () => {
+      window.clearTimeout(fallbackTimer);
+      if (watchHi !== null) navigator.geolocation.clearWatch(watchHi);
+      if (watchLo !== null) navigator.geolocation.clearWatch(watchLo);
+    };
   }, []);
 
   // Geofence variance overlay state

@@ -408,13 +408,38 @@ function downloadCsv(filename: string, body: string) {
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
+function buildPayrollCsv(rows: Row[]): string {
+  const header = "Date,Caregiver,Client,Service Code,Clock In,Clock Out,Rounded Hours";
+  const lines = rows.map((r) => {
+    const inIso = effectiveIn(r);
+    const outIso = effectiveOut(r);
+    const ms = outIso ? new Date(outIso).getTime() - new Date(inIso).getTime() : 0;
+    const hours = (ms / 3_600_000).toFixed(2);
+    return [
+      csvEscape(fmtDateMDY(inIso)),
+      csvEscape(r.staff?.full_name ?? r.staff?.email ?? ""),
+      csvEscape(`${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim()),
+      csvEscape(r.service_type_code ?? ""),
+      csvEscape(fmtTimeHMSAmPm(inIso)),
+      csvEscape(outIso ? fmtTimeHMSAmPm(outIso) : ""),
+      hours,
+    ].join(",");
+  });
+  return [header, ...lines].join("\r\n");
+}
+
 function ArchiveTable({
-  rows, loading, onMap,
-}: { rows: Row[]; loading: boolean; onMap: (r: Row) => void }) {
+  rows, loading, onMap, variant,
+}: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; variant: "evv" | "non-evv" }) {
   const [search, setSearch] = useState("");
   const [svc, setSvc] = useState<string>("all");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
+
+  const codeOptions = useMemo(
+    () => EVV_SERVICE_CODES.filter((c) => (variant === "evv" ? c.evvLock : !c.evvLock)),
+    [variant],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -439,18 +464,24 @@ function ArchiveTable({
 
   const onExport = () => {
     if (!filtered.length) { toast.error("No rows match the current filters."); return; }
-    const csv = buildUtahCsv(filtered);
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    downloadCsv(`utah_dhhs_evv_${stamp}.csv`, csv);
+    if (variant === "evv") {
+      downloadCsv(`utah_dhhs_evv_${stamp}.csv`, buildUtahCsv(filtered));
+    } else {
+      downloadCsv(`internal_payroll_${stamp}.csv`, buildPayrollCsv(filtered));
+    }
     toast.success(`Exported ${filtered.length} shift${filtered.length === 1 ? "" : "s"}.`);
   };
+
+  const heading = variant === "evv" ? "State EVV Archive (Geofence-Locked Codes)" : "Internal / Non-EVV Archive";
+  const exportLabel = variant === "evv" ? "📥 Export Utah DHHS EVV CSV" : "📥 Export Payroll CSV";
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Approved Timesheets Archive</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{heading}</h2>
         <Button onClick={onExport} className="bg-emerald-600 hover:bg-emerald-700">
-          <Download className="mr-2 h-4 w-4" /> 📥 Export Utah DHHS EVV CSV
+          <Download className="mr-2 h-4 w-4" /> {exportLabel}
         </Button>
       </div>
 
@@ -460,12 +491,13 @@ function ArchiveTable({
           <SelectTrigger><SelectValue placeholder="Service code" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All service codes</SelectItem>
-            {EVV_SERVICE_CODES.map((c) => <SelectItem key={c.code} value={c.code}>{evvServiceLabel(c.code)}</SelectItem>)}
+            {codeOptions.map((c) => <SelectItem key={c.code} value={c.code}>{evvServiceLabel(c.code)}</SelectItem>)}
           </SelectContent>
         </Select>
         <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
       </div>
+
 
       <div className="overflow-x-auto">
         <Table>

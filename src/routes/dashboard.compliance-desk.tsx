@@ -689,7 +689,8 @@ function ArchiveTable({
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
               return (
-                <TableRow key={r.id}>
+                <Fragment key={r.id}>
+                <TableRow>
                   <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
                   <TableCell className="font-medium">
                     {r.staff?.full_name ?? r.staff?.email ?? "—"}
@@ -714,6 +715,8 @@ function ArchiveTable({
                     </Button>
                   </TableCell>
                 </TableRow>
+                <InlineNotesRow row={r} colSpan={10} />
+                </Fragment>
               );
             })}
           </TableBody>

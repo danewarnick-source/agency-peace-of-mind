@@ -341,6 +341,45 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     setShowCompliance(true);
   }
 
+  async function finalizeClockOut(args: {
+    pos: { lat: number; lng: number; acc: number };
+    outsideReason?: string;
+  }) {
+    if (!user || !active) return;
+    const selectedGoals = Object.entries(checkedGoals)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    if (baselineChecked) selectedGoals.push("General baseline monitoring & safety oversight");
+
+    const clockOut = new Date().toISOString();
+    const update: Record<string, unknown> = {
+      clock_out_timestamp: clockOut,
+      gps_out_coordinates: { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc },
+      status: "Pending",
+      timezone_setting: "America/Denver",
+      shift_note_text: narrative.trim(),
+      goals_completed: selectedGoals,
+      raw_clock_out: clockOut,
+      rounded_clock_out: roundToQuarterHourISO(clockOut),
+    };
+    if (args.outsideReason) update.outside_geofence_reason = args.outsideReason;
+
+    const { error } = await supabase
+      .from("evv_timesheets")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .update(update as any)
+      .eq("id", active.id);
+    if (error) throw error;
+
+    const duration = fmtElapsed(new Date(clockOut).getTime() - new Date(active.clock_in_timestamp).getTime());
+    setShowCompliance(false);
+    setOutVariance(null);
+    setOutVarianceReason("");
+    setSuccess({ duration });
+    toast.success("✓ Shift successfully recorded. Timesheet submitted to the Compliance Desk for executive approval.");
+    await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
+  }
+
   async function submitCompliance() {
     if (!user || !active) return;
     if (!hasGoalSelected) {
@@ -357,33 +396,46 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       try { pos = await getPosition(); }
       catch { setDenied(true); return; }
 
-      const clockOut = new Date().toISOString();
-      const selectedGoals = Object.entries(checkedGoals)
-        .filter(([, v]) => v)
-        .map(([k]) => k);
-      if (baselineChecked) selectedGoals.push("General baseline monitoring & safety oversight");
+      // Symmetric geofence check on clock-OUT
+      const refClient = lockedClient ?? (() => {
+        const c = caseload.find((x) => x.id === active.client_id);
+        if (!c) return null;
+        return {
+          homeLat: c.home_latitude ?? null,
+          homeLng: c.home_longitude ?? null,
+          geofenceRadiusFeet: c.geofence_radius_feet ?? null,
+        } as Pick<LockedClient, "homeLat" | "homeLng" | "geofenceRadiusFeet">;
+      })();
+      const lat = refClient?.homeLat;
+      const lng = refClient?.homeLng;
+      const radius = refClient?.geofenceRadiusFeet ?? 1000;
+      if (typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)) {
+        const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
+        if (dist > radius) {
+          setOutVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });
+          setOutVarianceReason("");
+          return; // BLOCK update until justification
+        }
+      }
 
-      const { error } = await supabase
-        .from("evv_timesheets")
-        .update({
-          clock_out_timestamp: clockOut,
-          gps_out_coordinates: { latitude: pos.lat, longitude: pos.lng, accuracy_meters: pos.acc },
-          status: "Pending",
-          timezone_setting: "America/Denver",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          shift_note_text: narrative.trim(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          goals_completed: selectedGoals,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any)
-        .eq("id", active.id);
-      if (error) throw error;
+      await finalizeClockOut({ pos });
+    } catch (e) {
+      toast.error((e as Error).message || "Could not end shift.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
-      const duration = fmtElapsed(new Date(clockOut).getTime() - new Date(active.clock_in_timestamp).getTime());
-      setShowCompliance(false);
-      setSuccess({ duration });
-      toast.success("✓ Shift successfully recorded. Timesheet submitted to the Compliance Desk for executive approval.");
-      await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
+  async function submitOutVariance() {
+    if (!outVariance) return;
+    const reason = outVarianceReason.trim();
+    if (reason.length < 5) {
+      toast.error("Please provide a variance justification.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await finalizeClockOut({ pos: outVariance.pos, outsideReason: reason });
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");
     } finally {

@@ -614,13 +614,14 @@ function ReasonDialog({ row, onClose }: { row: Row | null; onClose: () => void }
 }
 
 function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
-  const link = useMemo(() => {
-    if (!row) return null;
-    const a = row.gps_in_coordinates;
-    if (!a) return null;
-    // Always drop a red marker pin at the clock-in coordinates (street-level zoom 17).
-    return osmPinLink(a.latitude, a.longitude);
-  }, [row]);
+  const inLink = useMemo(
+    () => (row ? osmPinLink(row.gps_in_coordinates?.latitude, row.gps_in_coordinates?.longitude) : null),
+    [row],
+  );
+  const outLink = useMemo(
+    () => (row?.gps_out_coordinates ? osmPinLink(row.gps_out_coordinates.latitude, row.gps_out_coordinates.longitude) : null),
+    [row],
+  );
 
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
@@ -638,6 +639,11 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
                 <span className="ml-2 text-muted-foreground">± {Math.round(row.gps_in_coordinates.accuracy_meters)}m</span>
               </div>
               <div className="text-[11px] text-muted-foreground">{new Date(row.clock_in_timestamp).toLocaleString()}</div>
+              {inLink && (
+                <a href={inLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
+                  🔗 Open clock-in pin in OpenStreetMap
+                </a>
+              )}
             </div>
             <div className="rounded-lg border border-border p-3">
               <div className="font-semibold text-rose-600">Clock-Out</div>
@@ -648,10 +654,14 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
                     <span className="ml-2 text-muted-foreground">± {Math.round(row.gps_out_coordinates.accuracy_meters)}m</span>
                   </div>
                   <div className="text-[11px] text-muted-foreground">{row.clock_out_timestamp ? new Date(row.clock_out_timestamp).toLocaleString() : ""}</div>
+                  {outLink && (
+                    <a href={outLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
+                      🔗 Open clock-out pin in OpenStreetMap
+                    </a>
+                  )}
                 </>
               ) : <div className="text-xs text-muted-foreground">Not captured</div>}
             </div>
-            {link && <Button asChild variant="outline" className="w-full"><a href={link} target="_blank" rel="noreferrer">Open in OpenStreetMap</a></Button>}
           </div>
         )}
         <DialogFooter><Button variant="ghost" onClick={onClose}>Close</Button></DialogFooter>
@@ -660,35 +670,117 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
   );
 }
 
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fmtAuditValue(field: string, v: unknown): string {
+  if (v == null || v === "") return "(empty)";
+  if (field === "rounded_clock_in" || field === "rounded_clock_out") {
+    return new Date(String(v)).toLocaleString();
+  }
+  return String(v);
+}
+
 function EditShiftDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [clockIn, setClockIn] = useState("");
   const [clockOut, setClockOut] = useState("");
   const [svc, setSvc] = useState("");
+  const [latIn, setLatIn] = useState("");
+  const [lngIn, setLngIn] = useState("");
+  const [latOut, setLatOut] = useState("");
+  const [lngOut, setLngOut] = useState("");
 
-  useMemo(() => {
-    if (row) {
-      setClockIn(row.clock_in_timestamp.slice(0, 16));
-      setClockOut(row.clock_out_timestamp ? row.clock_out_timestamp.slice(0, 16) : "");
-      setSvc(row.service_type_code);
-    }
+  useEffect(() => {
+    if (!row) return;
+    setClockIn(toLocalInput(row.rounded_clock_in ?? row.clock_in_timestamp));
+    setClockOut(toLocalInput(row.rounded_clock_out ?? row.clock_out_timestamp));
+    setSvc(row.service_type_code);
+    setLatIn(String(row.gps_in_coordinates?.latitude ?? ""));
+    setLngIn(String(row.gps_in_coordinates?.longitude ?? ""));
+    setLatOut(row.gps_out_coordinates ? String(row.gps_out_coordinates.latitude) : "");
+    setLngOut(row.gps_out_coordinates ? String(row.gps_out_coordinates.longitude) : "");
   }, [row]);
 
   const save = useMutation({
     mutationFn: async () => {
       if (!row) return;
+      const adminName =
+        (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Administrator";
+      const nowIso = new Date().toISOString();
+
+      const newRoundedIn = clockIn ? new Date(clockIn).toISOString() : null;
+      const newRoundedOut = clockOut ? new Date(clockOut).toISOString() : null;
+      const newLatIn = latIn === "" ? null : Number(latIn);
+      const newLngIn = lngIn === "" ? null : Number(lngIn);
+      const newLatOut = latOut === "" ? null : Number(latOut);
+      const newLngOut = lngOut === "" ? null : Number(lngOut);
+
+      const auditAdds: AuditEntry[] = [];
+      const pushDiff = (field: string, oldV: unknown, newV: unknown) => {
+        const a = oldV == null ? "" : String(oldV);
+        const b = newV == null ? "" : String(newV);
+        if (a !== b) {
+          auditAdds.push({
+            timestamp: nowIso,
+            admin: adminName,
+            field_changed: field,
+            old_value: fmtAuditValue(field, oldV),
+            new_value: fmtAuditValue(field, newV),
+          });
+        }
+      };
+      pushDiff("rounded_clock_in", row.rounded_clock_in ?? row.clock_in_timestamp, newRoundedIn);
+      pushDiff("rounded_clock_out", row.rounded_clock_out ?? row.clock_out_timestamp, newRoundedOut);
+      pushDiff("service_type_code", row.service_type_code, svc);
+      pushDiff("begin_geo_latitude", row.gps_in_coordinates?.latitude, newLatIn);
+      pushDiff("begin_geo_longitude", row.gps_in_coordinates?.longitude, newLngIn);
+      pushDiff("end_geo_latitude", row.gps_out_coordinates?.latitude ?? null, newLatOut);
+      pushDiff("end_geo_longitude", row.gps_out_coordinates?.longitude ?? null, newLngOut);
+
+      if (auditAdds.length === 0) {
+        toast.info("No changes to save.");
+        return;
+      }
+
+      const accIn = row.gps_in_coordinates?.accuracy_meters ?? 0;
+      const gpsIn = {
+        latitude: newLatIn ?? row.gps_in_coordinates?.latitude ?? 0,
+        longitude: newLngIn ?? row.gps_in_coordinates?.longitude ?? 0,
+        accuracy_meters: accIn,
+      };
+      const gpsOut = (newLatOut != null && newLngOut != null)
+        ? {
+            latitude: newLatOut,
+            longitude: newLngOut,
+            accuracy_meters: row.gps_out_coordinates?.accuracy_meters ?? 0,
+          }
+        : null;
+
+      const history = [...(row.edit_audit_history_log ?? []), ...auditAdds];
+
       const { error } = await supabase
         .from("evv_timesheets")
         .update({
-          clock_in_timestamp: new Date(clockIn).toISOString(),
-          clock_out_timestamp: clockOut ? new Date(clockOut).toISOString() : null,
+          rounded_clock_in: newRoundedIn,
+          rounded_clock_out: newRoundedOut,
           service_type_code: svc,
+          gps_in_coordinates: gpsIn,
+          gps_out_coordinates: gpsOut,
+          is_edited_by_admin: true,
+          edited_by_admin_name: adminName,
+          edit_audit_history_log: history,
         })
         .eq("id", row.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Shift adjusted.");
+      toast.success("Shift updated. Audit entry recorded.");
       qc.invalidateQueries({ queryKey: ["evv-pending"] });
       qc.invalidateQueries({ queryKey: ["evv-approved"] });
       onClose();
@@ -696,23 +788,27 @@ function EditShiftDialog({ row, onClose }: { row: Row | null; onClose: () => voi
     onError: (e) => toast.error((e as Error).message),
   });
 
+  const history = row?.edit_audit_history_log ?? [];
+
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Manual Adjustment</DialogTitle>
-          <DialogDescription>Update the shift timestamps or service code before approval.</DialogDescription>
+          <DialogTitle>✎ Administrative Shift Override</DialogTitle>
+          <DialogDescription>
+            Edits are logged with your name and timestamp to the immutable audit trail.
+          </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label>Clock-In</Label>
+            <Label>Rounded Clock-In</Label>
             <Input type="datetime-local" value={clockIn} onChange={(e) => setClockIn(e.target.value)} />
           </div>
           <div>
-            <Label>Clock-Out</Label>
+            <Label>Rounded Clock-Out</Label>
             <Input type="datetime-local" value={clockOut} onChange={(e) => setClockOut(e.target.value)} />
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <Label>Service Code</Label>
             <Select value={svc} onValueChange={setSvc}>
               <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
@@ -721,11 +817,43 @@ function EditShiftDialog({ row, onClose }: { row: Row | null; onClose: () => voi
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label>Begin Geo Latitude</Label>
+            <Input value={latIn} onChange={(e) => setLatIn(e.target.value)} placeholder="40.7608" />
+          </div>
+          <div>
+            <Label>Begin Geo Longitude</Label>
+            <Input value={lngIn} onChange={(e) => setLngIn(e.target.value)} placeholder="-111.8910" />
+          </div>
+          <div>
+            <Label>End Geo Latitude</Label>
+            <Input value={latOut} onChange={(e) => setLatOut(e.target.value)} placeholder="40.7608" />
+          </div>
+          <div>
+            <Label>End Geo Longitude</Label>
+            <Input value={lngOut} onChange={(e) => setLngOut(e.target.value)} placeholder="-111.8910" />
+          </div>
         </div>
+
+        {history.length > 0 && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-50/40 p-3 text-xs">
+            <div className="mb-1 flex items-center gap-1 font-semibold text-amber-900">
+              <AlertTriangle className="h-3 w-3" /> Prior Audit Trail ({history.length})
+            </div>
+            <ul className="max-h-32 space-y-1 overflow-auto">
+              {history.slice().reverse().map((h, i) => (
+                <li key={i} className="font-mono text-[11px] text-amber-950">
+                  {new Date(h.timestamp).toLocaleString()} · {h.admin} · {h.field_changed}: {h.old_value} → {h.new_value}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending}>
-            {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
+            {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save & Log Audit Entry"}
           </Button>
         </DialogFooter>
       </DialogContent>

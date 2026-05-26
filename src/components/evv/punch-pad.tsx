@@ -1032,7 +1032,40 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             )}
           </div>
 
-          <DialogFooter className="mt-2">
+          {/* 💡 AI Documentation Coach Suggestions */}
+          {(aiBusy || aiCoach) && (
+            <div
+              className={`rounded-lg border-2 px-4 py-3 ${
+                aiCoach?.status === "Verified"
+                  ? "border-emerald-500/40 bg-emerald-500/10"
+                  : "border-amber-500/40 bg-amber-500/10"
+              }`}
+            >
+              <div className="mb-1 flex items-center gap-2 text-sm font-bold">
+                💡 AI Documentation Coach Suggestions
+                {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+              </div>
+              {aiCoach && (
+                <p
+                  className={`text-xs leading-relaxed ${
+                    aiCoach.status === "Verified"
+                      ? "text-emerald-800 dark:text-emerald-200"
+                      : "text-amber-900 dark:text-amber-100"
+                  }`}
+                >
+                  {aiCoach.status === "Verified" ? "🟢 AI CLEARED — " : "⚠️ "}
+                  {aiCoach.feedback}
+                </p>
+              )}
+              {aiCoach?.status === "Flagged" && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Edit your narrative above based on the tip, then re-submit. Iteration {aiIterations}.
+                </p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="mt-2 flex flex-col gap-2 sm:flex-col">
             <div
               className="w-full"
               onMouseEnter={() => { if (!narrativeOk) setShowNarrativeError(true); }}
@@ -1040,14 +1073,31 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             >
               <Button
                 type="button"
-                onClick={submitCompliance}
-                disabled={!canSubmitCompliance}
+                onClick={() => submitCompliance()}
+                disabled={!canSubmitCompliance || aiBusy}
                 className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               >
-                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                💾 Submit Final Timesheet to Compliance Desk
+                {busy || aiBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {aiBusy
+                  ? "🧠 AI Coach reviewing your note…"
+                  : aiCoach?.status === "Verified"
+                    ? "💾 Submit Final Timesheet to Compliance Desk"
+                    : aiCoach?.status === "Flagged"
+                      ? "🔁 Re-Check with AI Coach"
+                      : "💾 Submit Final Timesheet to Compliance Desk"}
               </Button>
             </div>
+            {allowException && aiCoach?.status === "Flagged" && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => submitCompliance({ exception: true })}
+                disabled={busy || aiBusy}
+                className="w-full border-rose-500/50 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300"
+              >
+                🚩 Submit with Exception Flag
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -104,6 +104,7 @@ export interface PunchPadProps {
     home_latitude?: number | null;
     home_longitude?: number | null;
     geofence_radius_feet?: number | null;
+    pcsp_goals?: string[] | null;
   }>;
 }
 

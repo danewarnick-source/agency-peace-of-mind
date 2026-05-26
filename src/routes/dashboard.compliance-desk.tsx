@@ -311,15 +311,11 @@ function ComplianceDeskPage() {
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);
 
-  // 🤖 AI Vector Search — fully decoupled from keystrokes.
-  // `aiInput` is the controlled text box. `submitted` is the locked-in
-  // query that triggers the vector pipeline. Nothing fires until the
-  // admin clicks "Ask AI" or presses Enter.
+  // 🤖 Hybrid AI Search — LLM routes the query into SQL filters
+  // (+ optional vector match). Submission is decoupled from keystrokes:
+  // nothing fires until the admin clicks "Ask AI" or presses Enter.
   const [aiInput, setAiInput] = useState("");
-  const [submitted, setSubmitted] = useState<{
-    query: string;
-    constraints: StructuralConstraints;
-  } | null>(null);
+  const [submitted, setSubmitted] = useState<{ query: string } | null>(null);
   const isSearching = submitted !== null;
 
   const runVectorSearch = useServerFn(searchTimesheetsByVector);
@@ -358,26 +354,16 @@ function ComplianceDeskPage() {
 
   const vectorQ = useQuery({
     enabled: isSearching && !!org?.organization_id,
-    queryKey: [
-      "evv-vector-search",
-      org?.organization_id,
-      submitted?.query,
-      submitted?.constraints.hourMin,
-      submitted?.constraints.dateFromIso,
-      submitted?.constraints.dateToIso,
-    ],
+    queryKey: ["evv-hybrid-search", org?.organization_id, submitted?.query],
     queryFn: async () => {
       const res = await runVectorSearch({
         data: {
           query: submitted!.query,
           organizationId: org!.organization_id,
-          hourMin: submitted!.constraints.hourMin,
-          dateFrom: submitted!.constraints.dateFromIso,
-          dateTo: submitted!.constraints.dateToIso,
           matchCount: 50,
         },
       });
-      return res.matches;
+      return res;
     },
     staleTime: 60_000,
   });
@@ -412,11 +398,17 @@ function ComplianceDeskPage() {
       toast.error("Type a question first.");
       return;
     }
-    setSubmitted({ query: q, constraints: extractConstraints(q) });
+    setSubmitted({ query: q });
+  };
+  // 🧹 Reset rule — empties results, unmounts cross-tab grid, restores tabs.
+  const resetAiSearch = () => {
+    setSubmitted(null);
+    qc.cancelQueries({ queryKey: ["evv-hybrid-search"] });
+    qc.removeQueries({ queryKey: ["evv-hybrid-search"] });
   };
   const clearAiSearch = () => {
     setAiInput("");
-    setSubmitted(null);
+    resetAiSearch();
   };
 
   const onGlobalUtahExport = () => {

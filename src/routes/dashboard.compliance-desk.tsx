@@ -99,6 +99,8 @@ type Row = {
   gps_out_coordinates: Coord | null;
   outside_geofence_reason: string | null;
   status: string;
+  shift_note_text: string | null;
+  goals_completed: string[] | null;
   is_edited_by_admin: boolean;
   edited_by_admin_name: string | null;
   edit_audit_history_log: AuditEntry[];

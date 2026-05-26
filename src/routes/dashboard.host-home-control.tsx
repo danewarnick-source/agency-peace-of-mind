@@ -188,50 +188,121 @@ function EmarMatrixTab({ orgId, clientMap }: { orgId?: string; clientMap?: Map<s
 function AttendanceGridTab({ orgId, clientMap }: { orgId?: string; clientMap?: Map<string, ClientLite> }) {
   const fn = useServerFn(listAttendance);
   const today = new Date();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  const daysInMonth = monthEnd.getDate();
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const [expanded, setExpanded] = useState<string | null>(null);
+
   const { data: rows = [] } = useQuery({
     enabled: !!orgId,
     queryKey: ["hhs-attendance", orgId, fmt(monthStart)],
     queryFn: () => fn({ data: { organizationId: orgId!, monthStart: fmt(monthStart), monthEnd: fmt(monthEnd) } }),
   });
 
-  // group by client
-  const grouped = new Map<string, Map<string, string>>();
-  (rows as Array<Record<string, unknown>>).forEach((r) => {
-    const cid = String(r.client_id);
-    if (!grouped.has(cid)) grouped.set(cid, new Map());
-    grouped.get(cid)!.set(String(r.record_date), String(r.presence_status));
-  });
+  const grouped = useMemo(() => {
+    const g = new Map<string, Map<string, Record<string, unknown>>>();
+    (rows as Array<Record<string, unknown>>).forEach((r) => {
+      const cid = String(r.client_id);
+      if (!g.has(cid)) g.set(cid, new Map());
+      g.get(cid)!.set(String(r.record_date), r);
+    });
+    return g;
+  }, [rows]);
 
-  const daysInMonth = monthEnd.getDate();
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Monthly Attendance — {today.toLocaleString(undefined, { month: "long", year: "numeric" })}</CardTitle>
+        <CardTitle className="text-base">Executive Billing & Verification — {today.toLocaleString(undefined, { month: "long", year: "numeric" })}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          {Array.from(grouped.entries()).length === 0 && <p className="text-sm text-muted-foreground">No attendance recorded this month.</p>}
-          {Array.from(grouped.entries()).map(([cid, days]) => (
-            <div key={cid} className="mb-4">
-              <div className="text-sm font-medium mb-1">{name(clientMap, cid)}</div>
-              <div className="flex flex-wrap gap-1">
-                {Array.from({ length: daysInMonth }, (_, i) => {
-                  const d = new Date(today.getFullYear(), today.getMonth(), i + 1);
-                  const status = days.get(fmt(d));
-                  const color = status === "Present" ? "bg-green-500" : status === "Away" ? "bg-yellow-400" : "bg-muted";
-                  return (
-                    <div key={i} className={`h-8 w-8 rounded text-[10px] text-white flex items-center justify-center ${color}`} title={`Day ${i + 1}: ${status ?? "no record"}`}>
-                      {i + 1}
-                    </div>
-                  );
-                })}
+      <CardContent className="space-y-4">
+        {Array.from(grouped.entries()).length === 0 && <p className="text-sm text-muted-foreground">No attendance recorded this month.</p>}
+        {Array.from(grouped.entries()).map(([cid, days]) => {
+          let present = 0, away = 0;
+          days.forEach((r) => {
+            if (r.presence_status === "Present") present++;
+            else if (r.presence_status === "Away") away++;
+          });
+          const isOpen = expanded === cid;
+          return (
+            <div key={cid} className="rounded-lg border">
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-sm">{name(clientMap, cid)}</span>
+                  <Badge className="bg-green-600">📊 {today.toLocaleString(undefined, { month: "long" })}: {present} Days Present (Billable)</Badge>
+                  <Badge className="bg-amber-500">{away} Days Away (Unbillable)</Badge>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setExpanded(isOpen ? null : cid)}>
+                  🔍 {isOpen ? "Hide" : "View"} Signed Attendance Ledger
+                </Button>
               </div>
+              {isOpen && (
+                <div className="border-t p-3 space-y-3">
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {["S","M","T","W","T","F","S"].map((d, i) => (
+                      <div key={i} className="text-center text-[10px] font-medium text-muted-foreground">{d}</div>
+                    ))}
+                    {Array.from({ length: monthStart.getDay() }).map((_, i) => <div key={`pad-${i}`} />)}
+                    {Array.from({ length: daysInMonth }, (_, i) => {
+                      const day = i + 1;
+                      const rec = days.get(fmt(new Date(year, month, day)));
+                      const status = rec ? String(rec.presence_status) : null;
+                      const init = rec ? String(rec.staff_initials_signature ?? "") : "";
+                      const cls = status === "Present"
+                        ? "bg-green-200 dark:bg-green-900/40 border-green-400"
+                        : status === "Away"
+                          ? "bg-amber-200 dark:bg-amber-900/40 border-amber-400"
+                          : "bg-muted/30";
+                      return (
+                        <div key={day} className={`relative h-12 rounded border text-xs flex items-start justify-start p-1 ${cls}`}>
+                          <span className="font-medium">{day}</span>
+                          {init && <span className="absolute bottom-0.5 right-1 text-[9px] font-bold">{init}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded border-2 border-slate-300 bg-slate-50 dark:bg-slate-900/40 p-3 space-y-2">
+                    <div className="text-xs font-bold uppercase tracking-wide">⚖️ Legal Audit Panel — Court-Admissible Forensics</div>
+                    <p className="text-[11px] italic">
+                      Attestation accepted by signer for each green tile:
+                      "I hereby certify and formally attest under penalty of Medicaid fraud and perjury that the information recorded for this calendar date is true, accurate, and complete. I verify that the client slept overnight under my direct supervision in a certified Host Home setting, and I understand that falsification of this billing data is subject to state and federal criminal prosecution."
+                    </p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[11px]">
+                        <thead className="text-muted-foreground">
+                          <tr className="border-b">
+                            <th className="text-left py-1">Date</th>
+                            <th className="text-left">Status</th>
+                            <th className="text-left">Initials</th>
+                            <th className="text-left">Signee UUID</th>
+                            <th className="text-left">Signature Timestamp</th>
+                            <th className="text-left">IP Address</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from(days.values())
+                            .sort((a, b) => String(a.record_date).localeCompare(String(b.record_date)))
+                            .map((r) => (
+                              <tr key={String(r.id)} className="border-b">
+                                <td className="py-1">{String(r.record_date)}</td>
+                                <td>{String(r.presence_status)}{r.away_category ? ` · ${String(r.away_category)}` : ""}</td>
+                                <td className="font-bold">{String(r.staff_initials_signature ?? "—")}</td>
+                                <td className="font-mono">{r.signee_user_id ? String(r.signee_user_id) : "—"}</td>
+                                <td>{r.electronic_signature_timestamp ? new Date(String(r.electronic_signature_timestamp)).toLocaleString() : "—"}</td>
+                                <td className="font-mono">{String(r.signee_ip_address ?? "—")}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
+          );
+        })}
       </CardContent>
     </Card>
   );

@@ -17,8 +17,7 @@ import {
   Play, Square, MapPin, Lock, Loader2, AlertTriangle, CheckCircle2, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
-import { EVV_SERVICE_CODES, padMemberId } from "@/lib/evv-codes";
-import { jobCodeLabel } from "@/lib/job-codes";
+import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from "@/lib/evv-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { GeofenceMap } from "@/components/evv/geofence-map";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
@@ -225,10 +224,10 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
     const authorized = clientForPunch?.authorizedCodes;
     if (authorized && authorized.length) {
       // Mix: prefer client's job codes (DSPD billing codes) — fall back to EVV labels if matched.
-      return authorized.map((code) => {
-        const evv = EVV_SERVICE_CODES.find((c) => c.code === code);
-        return { code, label: evv?.label ?? jobCodeLabel(code) ?? code };
-      });
+      return authorized.map((code) => ({
+        code,
+        label: evvServiceLabel(code),
+      }));
     }
     return EVV_SERVICE_CODES.map((c) => ({ code: c.code, label: c.label }));
   }, [clientForPunch?.authorizedCodes]);
@@ -301,7 +300,12 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       const lat = clientForPunch.homeLat;
       const lng = clientForPunch.homeLng;
       const radius = clientForPunch.geofenceRadiusFeet ?? 1000;
-      if (typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)) {
+      // Hidden Gatekeeper: only EVV-locked codes enforce the geofence wall.
+      // Non-EVV codes capture GPS passively into gps_in without blocking.
+      if (
+        isEvvLockedCode(serviceCode) &&
+        typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)
+      ) {
         const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
         if (dist > radius) {
           setVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });
@@ -448,7 +452,11 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
       const lat = refClient?.homeLat;
       const lng = refClient?.homeLng;
       const radius = refClient?.geofenceRadiusFeet ?? 1000;
-      if (typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)) {
+      // Mirror the Hidden Gatekeeper on clock-OUT: only EVV-locked codes block.
+      if (
+        isEvvLockedCode(active.service_type_code) &&
+        typeof lat === "number" && typeof lng === "number" && isFinite(lat) && isFinite(lng)
+      ) {
         const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
         if (dist > radius) {
           setOutVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });
@@ -545,15 +553,19 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
                 homeLng={mapHome.lng}
                 radiusFeet={mapRadiusFeet}
                 caregiver={livePos}
-                insideZone={insideZone}
+                insideZone={!serviceCode || !isEvvLockedCode(serviceCode) ? true : insideZone}
                 height={260}
               />
               <p className="text-[11px] text-muted-foreground">
-                {livePos
-                  ? insideZone
-                    ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
-                    : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
-                  : "Awaiting browser location permission…"}
+                {!serviceCode
+                  ? "Select a service code to determine geofence enforcement."
+                  : !isEvvLockedCode(serviceCode)
+                    ? `🛈 Non-EVV code (${serviceCode}) — GPS logged passively, geofence bypassed.`
+                    : livePos
+                      ? insideZone
+                        ? `🟢 You are within the ${mapRadiusFeet} ft compliance zone.`
+                        : `🔴 Outside the ${mapRadiusFeet} ft zone — a justification will be required.`
+                      : "Awaiting browser location permission…"}
               </p>
             </>
           ) : !isRunning ? (

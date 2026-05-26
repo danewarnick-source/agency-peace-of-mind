@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { EVV_SERVICE_CODES, evvServiceLabel } from "@/lib/evv-codes";
+import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode } from "@/lib/evv-codes";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
 // the Pending Approvals Ledger and the Approved Timesheets Archive.
@@ -122,7 +122,7 @@ async function hydrateStaff(list: Row[]) {
 function ComplianceDeskPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
-  const [sub, setSub] = useState<"pending" | "archive">("pending");
+  const [sub, setSub] = useState<"pending" | "evv-archive" | "non-evv-archive">("pending");
   const [mapOpen, setMapOpen] = useState<Row | null>(null);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);
@@ -143,7 +143,7 @@ function ComplianceDeskPage() {
   });
 
   const approvedQ = useQuery({
-    enabled: !!org?.organization_id && sub === "archive",
+    enabled: !!org?.organization_id && sub !== "pending",
     queryKey: ["evv-approved", org?.organization_id],
     queryFn: async (): Promise<Row[]> => {
       const { data, error } = await supabase
@@ -186,14 +186,21 @@ function ComplianceDeskPage() {
           onClick={() => setSub("pending")}
           className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "pending" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
-          📥 Pending Approvals Ledger
+          📥 Pending Review
         </button>
         <button
           type="button"
-          onClick={() => setSub("archive")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setSub("evv-archive")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
-          📁 Approved Timesheets Archive
+          📁 State EVV Archive
+        </button>
+        <button
+          type="button"
+          onClick={() => setSub("non-evv-archive")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "non-evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          💼 Internal / Non-EVV Archive
         </button>
       </nav>
 
@@ -207,9 +214,17 @@ function ComplianceDeskPage() {
           approving={approve.isPending}
           onReason={setReasonRow}
         />
+      ) : sub === "evv-archive" ? (
+        <ArchiveTable
+          variant="evv"
+          rows={(approvedQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
+          loading={approvedQ.isLoading}
+          onMap={setMapOpen}
+        />
       ) : (
         <ArchiveTable
-          rows={approvedQ.data ?? []}
+          variant="non-evv"
+          rows={(approvedQ.data ?? []).filter((r) => !isEvvLockedCode(r.service_type_code))}
           loading={approvedQ.isLoading}
           onMap={setMapOpen}
         />
@@ -393,13 +408,38 @@ function downloadCsv(filename: string, body: string) {
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
+function buildPayrollCsv(rows: Row[]): string {
+  const header = "Date,Caregiver,Client,Service Code,Clock In,Clock Out,Rounded Hours";
+  const lines = rows.map((r) => {
+    const inIso = effectiveIn(r);
+    const outIso = effectiveOut(r);
+    const ms = outIso ? new Date(outIso).getTime() - new Date(inIso).getTime() : 0;
+    const hours = (ms / 3_600_000).toFixed(2);
+    return [
+      csvEscape(fmtDateMDY(inIso)),
+      csvEscape(r.staff?.full_name ?? r.staff?.email ?? ""),
+      csvEscape(`${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim()),
+      csvEscape(r.service_type_code ?? ""),
+      csvEscape(fmtTimeHMSAmPm(inIso)),
+      csvEscape(outIso ? fmtTimeHMSAmPm(outIso) : ""),
+      hours,
+    ].join(",");
+  });
+  return [header, ...lines].join("\r\n");
+}
+
 function ArchiveTable({
-  rows, loading, onMap,
-}: { rows: Row[]; loading: boolean; onMap: (r: Row) => void }) {
+  rows, loading, onMap, variant,
+}: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; variant: "evv" | "non-evv" }) {
   const [search, setSearch] = useState("");
   const [svc, setSvc] = useState<string>("all");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
+
+  const codeOptions = useMemo(
+    () => EVV_SERVICE_CODES.filter((c) => (variant === "evv" ? c.evvLock : !c.evvLock)),
+    [variant],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -424,18 +464,24 @@ function ArchiveTable({
 
   const onExport = () => {
     if (!filtered.length) { toast.error("No rows match the current filters."); return; }
-    const csv = buildUtahCsv(filtered);
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    downloadCsv(`utah_dhhs_evv_${stamp}.csv`, csv);
+    if (variant === "evv") {
+      downloadCsv(`utah_dhhs_evv_${stamp}.csv`, buildUtahCsv(filtered));
+    } else {
+      downloadCsv(`internal_payroll_${stamp}.csv`, buildPayrollCsv(filtered));
+    }
     toast.success(`Exported ${filtered.length} shift${filtered.length === 1 ? "" : "s"}.`);
   };
+
+  const heading = variant === "evv" ? "State EVV Archive (Geofence-Locked Codes)" : "Internal / Non-EVV Archive";
+  const exportLabel = variant === "evv" ? "📥 Export Utah DHHS EVV CSV" : "📥 Export Payroll CSV";
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Approved Timesheets Archive</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{heading}</h2>
         <Button onClick={onExport} className="bg-emerald-600 hover:bg-emerald-700">
-          <Download className="mr-2 h-4 w-4" /> 📥 Export Utah DHHS EVV CSV
+          <Download className="mr-2 h-4 w-4" /> {exportLabel}
         </Button>
       </div>
 
@@ -445,12 +491,13 @@ function ArchiveTable({
           <SelectTrigger><SelectValue placeholder="Service code" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All service codes</SelectItem>
-            {EVV_SERVICE_CODES.map((c) => <SelectItem key={c.code} value={c.code}>{evvServiceLabel(c.code)}</SelectItem>)}
+            {codeOptions.map((c) => <SelectItem key={c.code} value={c.code}>{evvServiceLabel(c.code)}</SelectItem>)}
           </SelectContent>
         </Select>
         <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
       </div>
+
 
       <div className="overflow-x-auto">
         <Table>

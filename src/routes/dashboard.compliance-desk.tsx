@@ -552,6 +552,44 @@ function buildPayrollCsv(rows: Row[]): string {
   return [header, ...lines].join("\r\n");
 }
 
+// === Master Agency Ledger CSV (full clinical/audit payload) ===
+const MASTER_LEDGER_HEADER =
+  "Shift ID,Caregiver Name,Client Name,DSPD Service Code,Service Description,Raw Clock-In,Raw Clock-Out,Rounded Clock-In,Rounded Clock-Out,Total Calculated Hours,Geofence Status,Caregiver Location Exception Note,PCSP Goals Completed,Full Caregiver Shift Narrative,Is Admin Modified,Modified By Admin Name,Internal Audit Trail Log";
+
+function buildMasterLedgerCsv(rows: Row[]): string {
+  const lines = rows.map((r) => {
+    const inIso = effectiveIn(r);
+    const outIso = effectiveOut(r);
+    const ms = outIso ? new Date(outIso).getTime() - new Date(inIso).getTime() : 0;
+    const hours = (ms / 3_600_000).toFixed(2);
+    const geofence = r.outside_geofence_reason && r.outside_geofence_reason.trim().length > 0 ? "NO MATCH" : "MATCH";
+    const goals = (r.goals_completed ?? []).join(" | ");
+    const auditTrail = (r.edit_audit_history_log ?? [])
+      .map((a) => `[${a.timestamp}] ${a.admin}: ${a.field_changed} "${a.old_value}" → "${a.new_value}"`)
+      .join(" || ");
+    return [
+      csvEscape(r.id),
+      csvEscape(r.staff?.full_name ?? r.staff?.email ?? ""),
+      csvEscape(`${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim()),
+      csvEscape(r.service_type_code ?? ""),
+      csvEscape(evvServiceLabel(r.service_type_code)),
+      csvEscape(r.clock_in_timestamp ? new Date(r.clock_in_timestamp).toISOString() : ""),
+      csvEscape(r.clock_out_timestamp ? new Date(r.clock_out_timestamp).toISOString() : ""),
+      csvEscape(r.rounded_clock_in ? new Date(r.rounded_clock_in).toISOString() : ""),
+      csvEscape(r.rounded_clock_out ? new Date(r.rounded_clock_out).toISOString() : ""),
+      hours,
+      csvEscape(geofence),
+      csvEscape(r.outside_geofence_reason ?? ""),
+      csvEscape(goals),
+      csvEscape(r.shift_note_text ?? ""),
+      r.is_edited_by_admin ? "TRUE" : "FALSE",
+      csvEscape(r.edited_by_admin_name ?? ""),
+      csvEscape(auditTrail),
+    ].join(",");
+  });
+  return [MASTER_LEDGER_HEADER, ...lines].join("\r\n");
+}
+
 function ArchiveTable({
   rows, loading, onMap, onEdit, variant,
 }: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; onEdit: (r: Row) => void; variant: "evv" | "non-evv" }) {

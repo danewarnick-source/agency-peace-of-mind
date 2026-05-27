@@ -252,14 +252,16 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
-      const c = (data as { clients?: { first_name?: string; last_name?: string } | null }).clients ?? null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = data as any;
+      const c = (d.clients ?? null) as { first_name?: string; last_name?: string } | null;
       return {
-        id: data.id,
-        client_id: data.client_id,
-        clock_in_timestamp: data.clock_in_timestamp,
-        service_type_code: data.service_type_code,
-        utah_medicaid_member_id: data.utah_medicaid_member_id,
-        shift_entry_type: data.shift_entry_type as EntryType,
+        id: d.id,
+        client_id: d.client_id,
+        clock_in_timestamp: d.clock_in_timestamp,
+        service_type_code: d.service_type_code,
+        utah_medicaid_member_id: d.utah_medicaid_member_id,
+        shift_entry_type: d.shift_entry_type as EntryType,
         client_name: c ? `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() : undefined,
       };
     },

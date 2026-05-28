@@ -31,21 +31,7 @@ export function FormsHubTab({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {CARDS.map((c) => {
-          return (
-            <button
-              key={c.type}
-              type="button"
-              onClick={() => setActive(c.type)}
-              className={`group flex min-h-[44px] flex-col rounded-2xl border-2 p-5 text-left shadow-sm transition hover:shadow-md ${c.accent}`}
-            >
-              <p className="font-semibold leading-tight">{c.title}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{c.desc}</p>
-            </button>
-          );
-        })}
-      </div>
+      <FormCardGrid onSelect={(type) => setActive(type as FormType)} />
       <FormDialog
         type={active}
         clientId={clientId}

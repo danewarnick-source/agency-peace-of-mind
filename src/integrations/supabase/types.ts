@@ -243,6 +243,7 @@ export type Database = {
           client_id: string
           created_at: string
           created_by: string | null
+          diagnosis: string | null
           discontinued_at: string | null
           discontinued_by: string | null
           dosage: string | null
@@ -251,10 +252,18 @@ export type Database = {
           id: string
           instructions: string | null
           is_active: boolean
+          is_controlled: boolean
+          is_prn: boolean
           medication_name: string
           organization_id: string
+          pharmacy: string | null
+          pill_count_current: number | null
+          pill_count_updated_at: string | null
           prescriber: string | null
+          prn_instructions: string | null
+          refill_date: string | null
           route: string | null
+          rx_number: string | null
           scheduled_times: string[]
           start_date: string | null
         }
@@ -262,6 +271,7 @@ export type Database = {
           client_id: string
           created_at?: string
           created_by?: string | null
+          diagnosis?: string | null
           discontinued_at?: string | null
           discontinued_by?: string | null
           dosage?: string | null
@@ -270,10 +280,18 @@ export type Database = {
           id?: string
           instructions?: string | null
           is_active?: boolean
+          is_controlled?: boolean
+          is_prn?: boolean
           medication_name: string
           organization_id: string
+          pharmacy?: string | null
+          pill_count_current?: number | null
+          pill_count_updated_at?: string | null
           prescriber?: string | null
+          prn_instructions?: string | null
+          refill_date?: string | null
           route?: string | null
+          rx_number?: string | null
           scheduled_times?: string[]
           start_date?: string | null
         }
@@ -281,6 +299,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           created_by?: string | null
+          diagnosis?: string | null
           discontinued_at?: string | null
           discontinued_by?: string | null
           dosage?: string | null
@@ -289,10 +308,18 @@ export type Database = {
           id?: string
           instructions?: string | null
           is_active?: boolean
+          is_controlled?: boolean
+          is_prn?: boolean
           medication_name?: string
           organization_id?: string
+          pharmacy?: string | null
+          pill_count_current?: number | null
+          pill_count_updated_at?: string | null
           prescriber?: string | null
+          prn_instructions?: string | null
+          refill_date?: string | null
           route?: string | null
+          rx_number?: string | null
           scheduled_times?: string[]
           start_date?: string | null
         }
@@ -787,49 +814,85 @@ export type Database = {
       }
       emar_logs: {
         Row: {
+          admin_review_notes: string | null
+          admin_reviewed: boolean
+          admin_reviewed_at: string | null
+          admin_reviewed_by: string | null
           administered_at: string | null
           client_id: string
           created_at: string
+          error_description: string | null
           exception_reason: string | null
           id: string
+          is_controlled: boolean
+          is_medication_error: boolean
+          is_prn: boolean
           medication_id: string
           notes: string | null
           organization_id: string
+          pill_count_value: number | null
+          pill_count_verified: boolean | null
+          prn_reason: string | null
           scheduled_for: string
           scheduled_time_label: string | null
           signature_attestation: string | null
+          signature_data_url: string | null
           staff_id: string | null
           staff_name: string | null
           status: string
         }
         Insert: {
+          admin_review_notes?: string | null
+          admin_reviewed?: boolean
+          admin_reviewed_at?: string | null
+          admin_reviewed_by?: string | null
           administered_at?: string | null
           client_id: string
           created_at?: string
+          error_description?: string | null
           exception_reason?: string | null
           id?: string
+          is_controlled?: boolean
+          is_medication_error?: boolean
+          is_prn?: boolean
           medication_id: string
           notes?: string | null
           organization_id: string
+          pill_count_value?: number | null
+          pill_count_verified?: boolean | null
+          prn_reason?: string | null
           scheduled_for: string
           scheduled_time_label?: string | null
           signature_attestation?: string | null
+          signature_data_url?: string | null
           staff_id?: string | null
           staff_name?: string | null
           status: string
         }
         Update: {
+          admin_review_notes?: string | null
+          admin_reviewed?: boolean
+          admin_reviewed_at?: string | null
+          admin_reviewed_by?: string | null
           administered_at?: string | null
           client_id?: string
           created_at?: string
+          error_description?: string | null
           exception_reason?: string | null
           id?: string
+          is_controlled?: boolean
+          is_medication_error?: boolean
+          is_prn?: boolean
           medication_id?: string
           notes?: string | null
           organization_id?: string
+          pill_count_value?: number | null
+          pill_count_verified?: boolean | null
+          prn_reason?: string | null
           scheduled_for?: string
           scheduled_time_label?: string | null
           signature_attestation?: string | null
+          signature_data_url?: string | null
           staff_id?: string | null
           staff_name?: string | null
           status?: string
@@ -3111,6 +3174,17 @@ export type Database = {
           p_client_name: string
           p_deadline: string
           p_incident_id: string
+          p_organization_id: string
+          p_reporter_name: string
+        }
+        Returns: undefined
+      }
+      notify_medication_error: {
+        Args: {
+          p_client_name: string
+          p_description: string
+          p_emar_log_id: string
+          p_med_name: string
           p_organization_id: string
           p_reporter_name: string
         }

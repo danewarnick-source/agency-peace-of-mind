@@ -214,30 +214,7 @@ function Overview() {
       {!showAdmin && (
         <div className="space-y-6">
           <StaffClientGrid />
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-            <h2 className="text-base font-semibold">My active training</h2>
-            {!myAssigns?.length ? (
-              <div className="mt-6 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                <p>You don't have any assigned training yet.</p>
-                <p className="mt-1">Open <Link to="/dashboard/courses" className="font-medium text-accent hover:underline">My Trainings</Link> to start your compliance roadmap.</p>
-              </div>
-            ) : (
-              <ul className="mt-4 divide-y divide-border">
-                {myAssigns.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between gap-4 py-3 text-sm">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{(a.courses as { title: string } | null)?.title}</p>
-                      <p className="text-xs text-muted-foreground">{(a.courses as { category: string } | null)?.category} · {a.status.replace("_", " ")}</p>
-                    </div>
-                    <div className="w-28 shrink-0">
-                      <div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full bg-[image:var(--gradient-brand)]" style={{ width: `${a.progress}%` }} /></div>
-                      <p className="mt-1 text-right text-[11px] text-muted-foreground">{a.progress}%</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <ComplianceInbox />
         </div>
       )}
     </div>

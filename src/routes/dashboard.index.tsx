@@ -57,9 +57,9 @@ function ComplianceInbox() {
         .eq("staff_id", user!.id)
         .eq("status", "Active")
         .is("clock_out_timestamp", null)
-        .lt("clock_in_timestamp", cutoff)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .lt("clock_in_timestamp", cutoff) as any;
+      return (data ?? []) as Array<{
         id: string; client_id: string; clock_in_timestamp: string;
         service_type_code: string;
         clients: { first_name: string; last_name: string } | null;

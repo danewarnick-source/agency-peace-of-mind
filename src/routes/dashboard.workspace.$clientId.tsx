@@ -128,7 +128,6 @@ function ClientWorkspace() {
               <Pill className="h-4 w-4" />
               <span>MAR</span>
             </TabsTrigger>
-            </TabsTrigger>
             <TabsTrigger
               value="forms"
               className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"

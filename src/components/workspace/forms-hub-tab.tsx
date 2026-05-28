@@ -289,64 +289,120 @@ function FormDialog({
           {type === "medical" && (
             <>
               <div className="grid gap-1.5">
-                <Label htmlFor="prov">Provider / clinic</Label>
-                <Input
-                  id="prov"
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                  maxLength={120}
-                />
+                <Label htmlFor="prov">Provider / Clinic</Label>
+                <Input id="prov" value={provider} onChange={(e) => setProvider(e.target.value)} maxLength={120} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="bp">Blood pressure</Label>
-                  <Input
-                    id="bp"
-                    value={bp}
-                    onChange={(e) => setBp(e.target.value)}
-                    placeholder="120/80"
-                    maxLength={20}
-                  />
+                  <Label htmlFor="bp">Blood Pressure</Label>
+                  <Input id="bp" value={bp} onChange={(e) => setBp(e.target.value)} placeholder="120/80" maxLength={20} />
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="pulse">Pulse (bpm)</Label>
-                  <Input
-                    id="pulse"
-                    value={pulse}
-                    onChange={(e) => setPulse(e.target.value)}
-                    inputMode="numeric"
-                    maxLength={5}
-                  />
+                  <Input id="pulse" value={pulse} onChange={(e) => setPulse(e.target.value)} inputMode="numeric" maxLength={5} />
                 </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="orders">Physician Orders / Care Plan Changes</Label>
+                <Textarea id="orders" rows={3} value={ordersChanges} onChange={(e) => setOrdersChanges(e.target.value)} placeholder="Note any new orders, medication changes, or care plan updates from this visit." />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="followup">Follow-Up Date</Label>
+                <Input id="followup" type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
               </div>
             </>
           )}
 
           {type === "behavior" && (
-            <div className="grid grid-cols-2 gap-3">
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="kind">Type</Label>
+                  <select id="kind" value={behaviorKind} onChange={(e) => setBehaviorKind(e.target.value)}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                    <option value="behavior">Behavioral Episode</option>
+                    <option value="seizure">Seizure</option>
+                  </select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="dur">Duration (minutes)</Label>
+                  <Input id="dur" value={duration} onChange={(e) => setDuration(e.target.value)} inputMode="decimal" maxLength={6} />
+                </div>
+              </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="kind">Kind</Label>
-                <select
-                  id="kind"
-                  value={behaviorKind}
-                  onChange={(e) => setBehaviorKind(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="behavior">Behavior</option>
-                  <option value="seizure">Seizure</option>
+                <Label htmlFor="ante">Antecedent — What happened before?</Label>
+                <Textarea id="ante" rows={2} value={antecedent} onChange={(e) => setAntecedent(e.target.value)} placeholder="Environment, triggers, preceding activity…" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="consq">Consequence — What happened after / how was it resolved?</Label>
+                <Textarea id="consq" rows={2} value={consequence} onChange={(e) => setConsequence(e.target.value)} placeholder="Staff response, de-escalation steps, outcome…" />
+              </div>
+            </>
+          )}
+
+          {type === "summary" && (
+            <>
+              <div className="grid gap-1.5">
+                <Label htmlFor="month">Target Month</Label>
+                <Input id="month" type="month" value={targetMonth} onChange={(e) => setTargetMonth(e.target.value)} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="outings">Community Outings (one per line)</Label>
+                <Textarea id="outings" rows={3} value={communityOutings} onChange={(e) => setCommunityOutings(e.target.value)} placeholder={"Grocery store visit — May 3\nLibrary outing — May 10\nPark walk — May 15"} />
+              </div>
+            </>
+          )}
+
+          {type === "inventory" && (
+            <>
+              <div className="grid gap-1.5">
+                <Label htmlFor="asset">Asset Description</Label>
+                <Input id="asset" value={assetDescription} onChange={(e) => setAssetDescription(e.target.value)} placeholder="e.g., iPad Pro 12.9-inch, silver case" maxLength={200} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="val">Estimated Value (USD)</Label>
+                <Input id="val" type="number" step="0.01" min="50" value={assetValue} onChange={(e) => setAssetValue(e.target.value)} placeholder="0.00" />
+              </div>
+            </>
+          )}
+
+          {type === "drill" && (
+            <>
+              <div className="grid gap-1.5">
+                <Label htmlFor="drilltype">Drill Type</Label>
+                <select id="drilltype" value={drillType} onChange={(e) => setDrillType(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="Fire">Fire</option>
+                  <option value="Earthquake">Earthquake</option>
+                  <option value="Severe Weather">Severe Weather</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="dur">Duration (min)</Label>
-                <Input
-                  id="dur"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  inputMode="decimal"
-                  maxLength={6}
-                />
+                <Label htmlFor="evactime">Total Evacuation Duration (seconds)</Label>
+                <Input id="evactime" type="number" min="0" value={evacuationDuration} onChange={(e) => setEvacuationDuration(e.target.value)} placeholder="e.g., 90" />
               </div>
-            </div>
+            </>
+          )}
+
+          {type === "transfer" && (
+            <>
+              <div className="grid gap-1.5">
+                <Label htmlFor="party">Receiving Party Name</Label>
+                <Input id="party" value={receivingParty} onChange={(e) => setReceivingParty(e.target.value)} placeholder="e.g., Valley Day Program" maxLength={150} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="partytype">Party Type</Label>
+                <select id="partytype" value={partyType} onChange={(e) => setPartyType(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="School">School</option>
+                  <option value="Day Program">Day Program</option>
+                  <option value="Respite">Respite</option>
+                  <option value="Medical Transport">Medical Transport</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </>
           )}
 
           <div className="grid gap-1.5">

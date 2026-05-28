@@ -949,6 +949,36 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     refetchInterval: 300_000,
   });
 
+  const { data: medErrors = [] } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["cmd-med-errors", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("emar_logs")
+        .select(`
+          id, client_id, medication_id, scheduled_for, status,
+          exception_reason, notes, staff_name, is_medication_error,
+          admin_reviewed, created_at,
+          clients:client_id (first_name, last_name)
+        `)
+        .eq("organization_id", orgId)
+        .eq("is_medication_error", true)
+        .eq("admin_reviewed", false)
+        .order("created_at", { ascending: false })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .limit(50) as any;
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; client_id: string; medication_id: string;
+        scheduled_for: string; status: string; exception_reason: string | null;
+        notes: string | null; staff_name: string | null;
+        is_medication_error: boolean; admin_reviewed: boolean; created_at: string;
+        clients: { first_name: string; last_name: string } | null;
+      }>;
+    },
+    refetchInterval: 60_000,
+  });
+
   // ── Mutations ────────────────────────────────────────────────────────────────
 
   const submitToStateMut = useMutation({
@@ -1051,7 +1081,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
 
   const urgentIncidents  = incidents.filter((i) => i.status === "Pending_Admin_Review");
   const urgentTimesheets = pendingTimesheets.filter((t) => t.ai_compliance_status === "Exception" || t.is_out_of_bounds);
-  const urgentCount      = urgentIncidents.length + urgentTimesheets.length + openShifts.length;
+  const urgentCount      = urgentIncidents.length + urgentTimesheets.length + openShifts.length + medErrors.length;
   const rejectedCount    = rejectedTimesheets.length + rejectedLogs.length;
   const pendingCount     = pendingTimesheets.length + pendingLogs.length + urgentIncidents.length;
 
@@ -1231,6 +1261,54 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
                         </ExpandableRow>
                       );
                     })}
+                  </div>
+                </section>
+              )}
+
+              {medErrors.length > 0 && (
+                <section>
+                  <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-rose-600">
+                    <AlertTriangle className="h-4 w-4" /> Medication Errors — Admin Review Required
+                  </h2>
+                  <div className="space-y-2">
+                    {medErrors.map((err) => (
+                      <Card key={err.id} className="border-l-4 border-l-rose-500 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold">
+                              {err.clients ? `${err.clients.first_name} ${err.clients.last_name}` : "—"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Reported by {err.staff_name ?? "staff"} ·{" "}
+                              {new Date(err.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                            {err.exception_reason && (
+                              <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">{err.exception_reason}</p>
+                            )}
+                            {err.notes && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{err.notes}</p>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              const { error } = await supabase
+                                .from("emar_logs")
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                .update({ admin_reviewed: true, admin_reviewed_by: user!.id, admin_reviewed_at: new Date().toISOString() } as any)
+                                .eq("id", err.id);
+                              if (error) { toast.error(error.message); return; }
+                              toast.success("Medication error marked as reviewed.");
+                              qc.invalidateQueries({ queryKey: ["cmd-med-errors", orgId] });
+                              qc.invalidateQueries({ queryKey: ["notifications", orgId] });
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          >
+                            ✅ Mark Reviewed
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
                   </div>
                 </section>
               )}

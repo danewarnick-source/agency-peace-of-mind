@@ -1,5 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
+import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,8 +25,10 @@ import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { saveDailyRecord, saveEmarLog, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
 
+const hhsSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
   head: () => ({ meta: [{ title: "Host Home Client Hub — Care Academy" }] }),
+  validateSearch: hhsSearch,
   component: HhsClientHub,
 });
 
@@ -40,6 +44,9 @@ function HhsClientHub() {
   const { clientId } = Route.useParams();
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
+  const { tab: tabParam } = Route.useSearch();
+  const navigate = useNavigate();
+
 
   const { data: client, isLoading } = useQuery({
     enabled: !!clientId,
@@ -96,10 +103,13 @@ function HhsClientHub() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="note">
+      <Tabs
+        value={tabParam ?? "note"}
+        onValueChange={(val) => navigate({ to: ".", search: { tab: val }, replace: true })}
+      >
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-1 p-1">
           <TabsTrigger value="note" className="h-11 text-xs sm:text-sm"><FileText className="h-4 w-4 mr-1" />Daily Note</TabsTrigger>
-          <TabsTrigger value="emar" className="h-11 text-xs sm:text-sm"><Pill className="h-4 w-4 mr-1" />eMAR</TabsTrigger>
+          <TabsTrigger value="emar" className="h-11 text-xs sm:text-sm"><Pill className="h-4 w-4 mr-1" />MAR</TabsTrigger>
           <TabsTrigger value="att" className="h-11 text-xs sm:text-sm"><Calendar className="h-4 w-4 mr-1" />Attendance</TabsTrigger>
           <TabsTrigger value="prn" className="h-11 text-xs sm:text-sm"><ClipboardList className="h-4 w-4 mr-1" />PRN Forms</TabsTrigger>
         </TabsList>
@@ -108,7 +118,10 @@ function HhsClientHub() {
           <DailyNoteTab orgId={orgId} client={client} />
         </TabsContent>
         <TabsContent value="emar" className="mt-4">
-          <EmarTab orgId={orgId} clientId={client.id} meds={meds as Array<Record<string, unknown>>} />
+          <MarEmarTab
+            clientId={client.id}
+            clientName={`${client.first_name} ${client.last_name}`}
+          />
         </TabsContent>
         <TabsContent value="att" className="mt-4">
           <AttendanceTab orgId={orgId} clientId={client.id} />
@@ -128,6 +141,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [note, setNote] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
   const [coach, setCoach] = useState<{ status: string; feedback: string } | null>(null);
@@ -399,7 +413,10 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           <DialogHeader><DialogTitle className="text-amber-700">🚨 AI Compliance Lock</DialogTitle></DialogHeader>
           <p className="text-sm">{interlock?.msg}</p>
           <DialogFooter>
-            <Button onClick={() => setInterlock(null)}>Go to PRN Forms</Button>
+            <Button onClick={() => {
+              setInterlock(null);
+              navigate({ to: ".", search: { tab: "prn" }, replace: true });
+            }}>Go to PRN Forms</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

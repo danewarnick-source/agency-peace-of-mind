@@ -103,10 +103,13 @@ function HhsClientHub() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="note">
+      <Tabs
+        value={tabParam ?? "note"}
+        onValueChange={(val) => navigate({ to: ".", search: { tab: val }, replace: true })}
+      >
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-1 p-1">
           <TabsTrigger value="note" className="h-11 text-xs sm:text-sm"><FileText className="h-4 w-4 mr-1" />Daily Note</TabsTrigger>
-          <TabsTrigger value="emar" className="h-11 text-xs sm:text-sm"><Pill className="h-4 w-4 mr-1" />eMAR</TabsTrigger>
+          <TabsTrigger value="emar" className="h-11 text-xs sm:text-sm"><Pill className="h-4 w-4 mr-1" />MAR</TabsTrigger>
           <TabsTrigger value="att" className="h-11 text-xs sm:text-sm"><Calendar className="h-4 w-4 mr-1" />Attendance</TabsTrigger>
           <TabsTrigger value="prn" className="h-11 text-xs sm:text-sm"><ClipboardList className="h-4 w-4 mr-1" />PRN Forms</TabsTrigger>
         </TabsList>
@@ -115,7 +118,10 @@ function HhsClientHub() {
           <DailyNoteTab orgId={orgId} client={client} />
         </TabsContent>
         <TabsContent value="emar" className="mt-4">
-          <EmarTab orgId={orgId} clientId={client.id} meds={meds as Array<Record<string, unknown>>} />
+          <MarEmarTab
+            clientId={client.id}
+            clientName={`${client.first_name} ${client.last_name}`}
+          />
         </TabsContent>
         <TabsContent value="att" className="mt-4">
           <AttendanceTab orgId={orgId} clientId={client.id} />

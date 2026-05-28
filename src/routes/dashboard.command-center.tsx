@@ -1052,6 +1052,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
   const urgentIncidents  = incidents.filter((i) => i.status === "Pending_Admin_Review");
   const urgentTimesheets = pendingTimesheets.filter((t) => t.ai_compliance_status === "Exception" || t.is_out_of_bounds);
   const urgentCount      = urgentIncidents.length + urgentTimesheets.length + openShifts.length;
+  const rejectedCount    = rejectedTimesheets.length + rejectedLogs.length;
   const pendingCount     = pendingTimesheets.length + pendingLogs.length + urgentIncidents.length;
 
   const q = search.toLowerCase().trim();

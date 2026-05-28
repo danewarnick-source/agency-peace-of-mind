@@ -7,32 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { User, Search, MapPin, Rocket, Clock, Home } from "lucide-react";
 
-// Local mobile fail-safe fixtures so frontline staff can test the workspace
-// even before an admin links them to real clients in the assignments table.
-const MOCK_CLIENTS: CaseloadClient[] = [
-  {
-    id: "mock-client-john-smith",
-    first_name: "John",
-    last_name: "Smith",
-    home_latitude: null,
-    home_longitude: null,
-    pcsp_goals: [],
-    job_code: ["T2017"],
-    medicaid_id: null,
-    physical_address: "Maple House — 412 N Main St",
-  },
-  {
-    id: "mock-client-jane-doe",
-    first_name: "Jane",
-    last_name: "Doe",
-    home_latitude: null,
-    home_longitude: null,
-    pcsp_goals: [],
-    job_code: ["S5125"],
-    medicaid_id: null,
-    physical_address: "Oak House — 88 Willow Ln",
-  },
-];
 
 // Service-mode pills shown directly under the address. Only codes that
 // represent a worker-facing "mode" (hourly EVV vs. residential HHS) are

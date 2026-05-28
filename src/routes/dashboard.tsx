@@ -11,7 +11,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings,
-  LogOut, Users, Building2, Contact2, ClipboardCheck, ShieldAlert, ShieldCheck, Wallet, Pill, Menu, Clock, Home,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, ShieldCheck, Wallet, Pill, Menu, Clock, Home,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";

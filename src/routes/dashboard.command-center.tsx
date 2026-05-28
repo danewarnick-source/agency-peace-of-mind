@@ -991,6 +991,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
       if (error) throw error;
       toast.success("Timesheet returned to staff.");
       qc.invalidateQueries({ queryKey: ["cmd-timesheets-pending", orgId] });
+      qc.invalidateQueries({ queryKey: ["cmd-timesheets-rejected", orgId] });
     };
     const unapprove = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

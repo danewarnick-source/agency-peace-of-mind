@@ -23,12 +23,14 @@ import {
 
 import { toast } from "sonner";
 import { AboutTab } from "@/components/workspace/about-tab";
-import { EmarTab } from "@/components/workspace/emar-tab";
+import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
 import { FormsHubTab } from "@/components/workspace/forms-hub-tab";
 import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
 
+const workspaceSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — Care Academy" }] }),
+  validateSearch: workspaceSearch,
   component: ClientWorkspace,
 });
 
@@ -36,25 +38,23 @@ function ClientWorkspace() {
   const { clientId } = Route.useParams();
   const { data: caseload, isLoading } = useCaseload();
   const navigate = useNavigate();
+  const { tab: tabParam } = Route.useSearch();
 
-  const isMock = clientId.startsWith("mock-client-");
   const client = useMemo(() => {
-    if (isMock) return MOCK_WORKSPACE_CLIENTS[clientId] ?? null;
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;
-  }, [caseload, clientId, isMock]);
+  }, [caseload, clientId]);
 
-  // Security guard: if not in caseload (and not a mock test client), deny access.
   useEffect(() => {
-    if (isMock) return;
     if (!isLoading && caseload && !client) {
       toast.error("You are not assigned to this individual.");
       navigate({ to: "/dashboard" });
     }
-  }, [isLoading, caseload, client, navigate, isMock]);
+  }, [isLoading, caseload, client, navigate]);
 
-  if ((!isMock && isLoading) || !client) {
+  if (isLoading || !client) {
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   }
+
 
   const codes = Array.isArray(client.job_code) ? client.job_code : [];
 

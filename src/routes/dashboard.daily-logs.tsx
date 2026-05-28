@@ -353,8 +353,8 @@ function DailyLogDialog({
   const drawingRef  = useRef(false);
   const hasSigRef   = useRef(false);
 
-  const coachFn = useServerFnHook(evaluateShiftNote);
-  const scanFn  = useServerFnHook(scanNoteForTriggers);
+  const coachFn = useServerFn(evaluateShiftNote);
+  const scanFn  = useServerFn(scanNoteForTriggers);
 
   const isBackdated = !!date;
   const logDate = date ?? new Date().toISOString().split("T")[0];
@@ -791,7 +791,7 @@ function DailyLogDialog({
                 setShowIncidentModal(false);
                 onClose();
                 // Navigate to incident report form
-                window.location.href = "/dashboard/incident-reports/new";
+                window.location.href = "" + "/dashboard/hhs-hub/" + (client?.id ?? "")";
               }}>
               🚨 File Critical Event Report Now
             </Button>

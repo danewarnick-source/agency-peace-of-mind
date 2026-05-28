@@ -1026,6 +1026,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
       if (error) throw error;
       toast.success("Daily log returned to caregiver.");
       qc.invalidateQueries({ queryKey: ["cmd-logs-pending", orgId] });
+      qc.invalidateQueries({ queryKey: ["cmd-logs-rejected", orgId] });
     };
     const unapprove = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

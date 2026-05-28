@@ -159,7 +159,7 @@ function ClientWorkspace() {
           </TabsContent>
 
           <TabsContent value="emar" className="mt-5">
-            <EmarTab
+            <MarEmarTab
               clientId={client.id}
               clientName={`${client.first_name} ${client.last_name}`}
             />

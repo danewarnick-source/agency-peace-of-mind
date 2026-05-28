@@ -156,11 +156,12 @@ function FormDialog({
     setTitle("");
     setNarrative("");
     setSeverity("low");
-    setProvider("");
-    setBp("");
-    setPulse("");
-    setBehaviorKind("behavior");
-    setDuration("");
+    setProvider(""); setBp(""); setPulse(""); setFollowUpDate(""); setOrdersChanges("");
+    setBehaviorKind("behavior"); setAntecedent(""); setConsequence(""); setDuration("");
+    setTargetMonth(new Date().toISOString().slice(0, 7));
+    setCommunityOutings(""); setAssetDescription(""); setAssetValue("");
+    setDrillType("Fire"); setEvacuationDuration("");
+    setReceivingParty(""); setPartyType("School");
     setOccurredAt(new Date().toISOString().slice(0, 16));
   }, [type]);
 

@@ -25,8 +25,10 @@ import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { saveDailyRecord, saveEmarLog, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
 
+const hhsSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
   head: () => ({ meta: [{ title: "Host Home Client Hub — Care Academy" }] }),
+  validateSearch: hhsSearch,
   component: HhsClientHub,
 });
 

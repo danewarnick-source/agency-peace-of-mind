@@ -141,6 +141,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [note, setNote] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
   const [coach, setCoach] = useState<{ status: string; feedback: string } | null>(null);

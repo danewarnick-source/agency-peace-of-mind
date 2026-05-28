@@ -154,7 +154,7 @@ export function StaffClientGrid() {
         <p className="mt-6 text-sm text-muted-foreground">Loading caseload…</p>
       ) : !clients.length ? (
         <Card className="mt-6 p-8 text-center text-sm text-muted-foreground">
-          {q ? "No matches in your caseload." : "No individuals currently assigned to you."}
+          {q ? "No matches in your caseload." : "No clients assigned yet — contact your administrator to be assigned to individuals on your caseload."}
         </Card>
       ) : (
         <ul className="mt-5 flex flex-col gap-3 md:grid md:grid-cols-2 xl:grid-cols-3">

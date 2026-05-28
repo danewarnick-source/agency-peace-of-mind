@@ -36,8 +36,6 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/compliance-desk", label: "EVV & Timesheet Control", icon: ShieldCheck },
   { to: "/dashboard/host-home-control", label: "🏡 Host Home Control", icon: Home },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
-  { to: "/dashboard/emar", label: "eMAR Pass", icon: Pill },
-  { to: "/dashboard/admin/emar-audit", label: "eMAR Audit", icon: ShieldAlert },
   { to: "/dashboard/pba-ledger", label: "PBA Trust Ledger", icon: Wallet },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },

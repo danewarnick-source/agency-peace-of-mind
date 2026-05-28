@@ -1079,7 +1079,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "urgent",    label: "🚨 Urgent",         count: urgentCount  },
-    { id: "pending",   label: "📋 Pending Review",  count: pendingCount },
+    { id: "pending",   label: "📋 Pending Review",  count: pendingCount + rejectedCount },
     { id: "approved",  label: "✅ Approved Archive"                      },
     { id: "analytics", label: "📊 Analytics"                             },
   ];

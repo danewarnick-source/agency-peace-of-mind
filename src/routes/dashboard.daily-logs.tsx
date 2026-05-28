@@ -32,7 +32,7 @@ import {
   evaluateShiftNote, scanNoteForTriggers,
   type CoachResult, type ScanResult,
 } from "@/lib/ai-coach.functions";
-import { useServerFn as useServerFnHook } from "@tanstack/react-start";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
   head: () => ({ meta: [{ title: "Daily Logs — Care Academy" }] }),

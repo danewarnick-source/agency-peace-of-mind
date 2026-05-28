@@ -96,9 +96,8 @@ function staffName(r: { profiles: { full_name: string | null; email: string | nu
 function CommandCenter() {
   const { data: org } = useCurrentOrg();
   return (
-    <RequirePermission permission="manage_users" fallback={
-      <div className="grid place-items-center py-24 text-sm text-muted-foreground">Admin access required.</div>
-    }>
+    <RequirePermission perm="manage_users">
+
       {org && <CommandCenterInner orgId={org.organization_id} />}
     </RequirePermission>
   );

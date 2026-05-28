@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ArrowLeft, FileText, Pill, Calendar, ClipboardList, AlertTriangle, Phone, Stethoscope, Box, Flame, Repeat, BookOpen,
+  ArrowLeft, FileText, Pill, Calendar, ClipboardList, AlertTriangle, Phone, Stethoscope, Box, Flame, Repeat, BookOpen, Eraser, CheckCircle2, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";

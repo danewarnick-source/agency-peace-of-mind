@@ -412,7 +412,10 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           <DialogHeader><DialogTitle className="text-amber-700">🚨 AI Compliance Lock</DialogTitle></DialogHeader>
           <p className="text-sm">{interlock?.msg}</p>
           <DialogFooter>
-            <Button onClick={() => setInterlock(null)}>Go to PRN Forms</Button>
+            <Button onClick={() => {
+              setInterlock(null);
+              navigate({ to: ".", search: { tab: "prn" }, replace: true });
+            }}>Go to PRN Forms</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

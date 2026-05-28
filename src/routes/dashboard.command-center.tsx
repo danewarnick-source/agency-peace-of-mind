@@ -979,7 +979,6 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
       if (error) throw error;
       toast.success("Timesheet approved.");
       qc.invalidateQueries({ queryKey: ["cmd-timesheets-pending", orgId] });
-      qc.invalidateQueries({ queryKey: ["cmd-timesheets-rejected", orgId] });
       qc.invalidateQueries({ queryKey: ["cmd-timesheets-approved", orgId] });
     };
     const deny = async () => {

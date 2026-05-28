@@ -19,8 +19,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ArrowLeft, FileText, Pill, Calendar, ClipboardList, AlertTriangle, Phone, Stethoscope, Box, Flame, Repeat, BookOpen, Eraser, CheckCircle2, Loader2,
+  ArrowLeft, FileText, Pill, Calendar, ClipboardList, AlertTriangle, Phone, Stethoscope, Eraser, CheckCircle2, Loader2,
 } from "lucide-react";
+import { FormCardGrid } from "@/components/workspace/FormCardGrid";
+import type { FormType } from "@/components/workspace/shared-form-cards";
 import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { saveDailyRecord, saveEmarLog, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
@@ -793,40 +795,36 @@ type PrnKind = "medical" | "summary" | "inventory" | "drill" | "transfer" | "inc
 
 function PrnFormsTab({ orgId, clientId }: { orgId: string; clientId: string }) {
   const [open, setOpen] = useState<PrnKind | null>(null);
-  const items: { kind: PrnKind; icon: React.ReactNode; title: string; desc: string }[] = [
-    { kind: "medical", icon: <Stethoscope className="h-5 w-5" />, title: "🩺 Medical & Specialist Appointment Log", desc: "Record an appointment visit and orders." },
-    { kind: "summary", icon: <BookOpen className="h-5 w-5" />, title: "📈 Comprehensive Monthly Review Summary", desc: "Monthly PCSP narrative and community outings." },
-    { kind: "inventory", icon: <Box className="h-5 w-5" />, title: "💎 $50+ Valuables Inventory", desc: "Register or remove client high-value belongings." },
-    { kind: "drill", icon: <Flame className="h-5 w-5" />, title: "🔥 Quarterly Evacuation Drill Record", desc: "Log fire / earthquake / weather drills." },
-    { kind: "transfer", icon: <Repeat className="h-5 w-5" />, title: "🔄 Cross-Agency Transfer Log", desc: "Communication log to school, day program, respite." },
-    { kind: "incident", icon: <AlertTriangle className="h-5 w-5 text-destructive" />, title: "🚨 Form C — Critical Incident Report", desc: "INTERNAL intake for admin review (NOT direct UPI)." },
-  ];
+
   return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">📋 PRN / As-Needed Forms</CardTitle></CardHeader>
-      <CardContent className="space-y-2">
-        {items.map((it) => (
-          <button
-            key={it.kind}
-            onClick={() => setOpen(it.kind)}
-            className="flex w-full items-start gap-3 rounded-lg border p-3 text-left hover:bg-muted/50 transition"
-          >
-            <div className="mt-0.5">{it.icon}</div>
-            <div className="flex-1">
-              <div className="font-medium text-sm">{it.title}</div>
-              <div className="text-xs text-muted-foreground">{it.desc}</div>
-            </div>
-          </button>
-        ))}
-      </CardContent>
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-base font-semibold">📋 PRN / As-Needed Forms</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Tap a form to open it. The Critical Incident Report is always first — use it immediately after any reportable event.
+        </p>
+      </div>
+
+      <FormCardGrid
+        onSelect={(type) => setOpen(type as PrnKind)}
+      />
 
       {open && open !== "incident" && (
-        <PrnFormDialog kind={open} orgId={orgId} clientId={clientId} onClose={() => setOpen(null)} />
+        <PrnFormDialog
+          kind={open as Exclude<PrnKind, "incident">}
+          orgId={orgId}
+          clientId={clientId}
+          onClose={() => setOpen(null)}
+        />
       )}
       {open === "incident" && (
-        <IncidentFormDialog orgId={orgId} clientId={clientId} onClose={() => setOpen(null)} />
+        <IncidentFormDialog
+          orgId={orgId}
+          clientId={clientId}
+          onClose={() => setOpen(null)}
+        />
       )}
-    </Card>
+    </div>
   );
 }
 

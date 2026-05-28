@@ -153,9 +153,13 @@ function FormDialog({
   }, [type]);
 
   const headings: Record<FormType, string> = {
-    incident_report: "Critical / Non-Critical Incident Report",
-    medical_summary: "Medical Appointment Log",
-    behavior_tracking: "Behavior / Seizure Data Sheet",
+    incident: "🚨 Critical Incident Report",
+    medical: "🩺 Medical & Specialist Appointment Log",
+    behavior: "🧠 Behavior / Seizure Data Sheet",
+    summary: "📈 Comprehensive Monthly Review Summary",
+    inventory: "💎 $50+ Valuables Inventory",
+    drill: "🔥 Quarterly Evacuation Drill Record",
+    transfer: "🔄 Cross-Agency Transfer Log",
   };
 
   async function submit() {
@@ -167,13 +171,13 @@ function FormDialog({
     setBusy(true);
     try {
       const payload: Record<string, unknown> = {};
-      if (type === "incident_report") payload.severity = severity;
-      if (type === "medical_summary") {
+      if (type === "incident") payload.severity = severity;
+      if (type === "medical") {
         payload.provider = provider;
         payload.bp = bp;
         payload.pulse = pulse;
       }
-      if (type === "behavior_tracking") {
+      if (type === "behavior") {
         payload.kind = behaviorKind;
         payload.duration_minutes = parseFloat(duration) || 0;
       }

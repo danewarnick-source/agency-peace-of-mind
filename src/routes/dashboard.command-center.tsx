@@ -949,6 +949,37 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     refetchInterval: 300_000,
   });
 
+  const { data: medErrors = [] } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["cmd-med-errors", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("emar_logs")
+        .select(`
+          id, client_id, medication_id, scheduled_for, status,
+          exception_reason, notes, staff_name, is_medication_error,
+          admin_reviewed, created_at,
+          clients:client_id (first_name, last_name)
+        `)
+        .eq("organization_id", orgId)
+        .eq("is_medication_error", true)
+        .eq("admin_reviewed", false)
+        .order("created_at", { ascending: false })
+        .limit(50)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        as any;
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; client_id: string; medication_id: string;
+        scheduled_for: string; status: string; exception_reason: string | null;
+        notes: string | null; staff_name: string | null;
+        is_medication_error: boolean; admin_reviewed: boolean; created_at: string;
+        clients: { first_name: string; last_name: string } | null;
+      }>;
+    },
+    refetchInterval: 60_000,
+  });
+
   // ── Mutations ────────────────────────────────────────────────────────────────
 
   const submitToStateMut = useMutation({

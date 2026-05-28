@@ -100,7 +100,11 @@ function ClientWorkspace() {
 
 
 
-        <Tabs defaultValue="about" className="w-full">
+        <Tabs
+          value={tabParam ?? "about"}
+          onValueChange={(val) => navigate({ to: ".", search: { tab: val }, replace: true })}
+          className="w-full"
+        >
           {/* Touch-friendly tab bar — mirrored across mobile and desktop */}
           <TabsList className="grid h-auto w-full grid-cols-4 gap-1 p-1">
             <TabsTrigger

@@ -189,10 +189,32 @@ function FormDialog({
         payload.provider = provider;
         payload.bp = bp;
         payload.pulse = pulse;
+        payload.follow_up_date = followUpDate || null;
+        payload.orders_changes = ordersChanges || null;
       }
       if (type === "behavior") {
         payload.kind = behaviorKind;
+        payload.antecedent = antecedent;
+        payload.consequence = consequence;
         payload.duration_minutes = parseFloat(duration) || 0;
+      }
+      if (type === "summary") {
+        payload.target_month = targetMonth;
+        payload.community_outings = communityOutings
+          ? communityOutings.split("\n").filter(Boolean)
+          : [];
+      }
+      if (type === "inventory") {
+        payload.asset_description = assetDescription;
+        payload.estimated_value = parseFloat(assetValue) || 0;
+      }
+      if (type === "drill") {
+        payload.simulation_type = drillType;
+        payload.evacuation_duration_seconds = parseInt(evacuationDuration) || 0;
+      }
+      if (type === "transfer") {
+        payload.receiving_party = receivingParty;
+        payload.party_type = partyType;
       }
       const { error } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

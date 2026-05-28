@@ -520,9 +520,8 @@ function MarCalendarView({ clientId }: { clientId: string }) {
         .select("id, medication_id, scheduled_for, administered_at, status, exception_reason, notes, staff_name, signature_attestation, is_medication_error, admin_reviewed")
         .eq("client_id", clientId)
         .gte("scheduled_for", start)
-        .lt("scheduled_for", end)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        as any;
+        .lt("scheduled_for", end) as any;
       if (error) throw error;
       return (data as unknown as EmarLog[]) ?? [];
     },

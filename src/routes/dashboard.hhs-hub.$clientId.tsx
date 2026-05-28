@@ -44,6 +44,9 @@ function HhsClientHub() {
   const { clientId } = Route.useParams();
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
+  const { tab: tabParam } = Route.useSearch();
+  const navigate = useNavigate();
+
 
   const { data: client, isLoading } = useQuery({
     enabled: !!clientId,

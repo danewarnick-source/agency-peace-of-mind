@@ -114,8 +114,8 @@ export function StaffClientGrid() {
   const { data: caseload, isLoading } = useCaseload();
   const [q, setQ] = useState("");
 
-  const usingMock = !isLoading && (caseload?.length ?? 0) === 0;
-  const source = usingMock ? MOCK_CLIENTS : (caseload ?? []);
+  const usingMock = false;
+  const source = caseload ?? [];
 
   const clients = useMemo(() => {
     const t = q.trim().toLowerCase();

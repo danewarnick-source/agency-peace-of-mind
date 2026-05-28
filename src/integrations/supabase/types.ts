@@ -850,6 +850,8 @@ export type Database = {
           ai_compliance_feedback: string | null
           ai_compliance_status: string | null
           ai_trigger_reasons: string[] | null
+          approved_at: string | null
+          approved_by: string | null
           client_id: string
           clock_in_timestamp: string
           clock_out_timestamp: string | null
@@ -894,6 +896,8 @@ export type Database = {
           ai_compliance_feedback?: string | null
           ai_compliance_status?: string | null
           ai_trigger_reasons?: string[] | null
+          approved_at?: string | null
+          approved_by?: string | null
           client_id: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
@@ -938,6 +942,8 @@ export type Database = {
           ai_compliance_feedback?: string | null
           ai_compliance_status?: string | null
           ai_trigger_reasons?: string[] | null
+          approved_at?: string | null
+          approved_by?: string | null
           client_id?: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null

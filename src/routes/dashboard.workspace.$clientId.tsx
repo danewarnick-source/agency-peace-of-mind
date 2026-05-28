@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
+import { z } from "zod";
+import { useCaseload } from "@/hooks/use-caseload";
+
 
 const MOCK_WORKSPACE_CLIENTS: Record<string, CaseloadClient> = {
   "mock-client-john-smith": {

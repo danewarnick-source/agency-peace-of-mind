@@ -149,12 +149,6 @@ export function StaffClientGrid() {
         </div>
       </div>
 
-      {usingMock && (
-        <div className="mt-4 rounded-lg border border-dashed border-amber-400/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          <strong>Test Clients:</strong> No live assignments found yet. These
-          sample cards let you tap through and verify the Shift Profile flow.
-        </div>
-      )}
 
       {isLoading ? (
         <p className="mt-6 text-sm text-muted-foreground">Loading caseload…</p>

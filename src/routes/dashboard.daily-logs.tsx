@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -32,7 +32,7 @@ import {
   evaluateShiftNote, scanNoteForTriggers,
   type CoachResult, type ScanResult,
 } from "@/lib/ai-coach.functions";
-import { useServerFn as useServerFnHook } from "@tanstack/react-start";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
   head: () => ({ meta: [{ title: "Daily Logs — Care Academy" }] }),
@@ -353,8 +353,8 @@ function DailyLogDialog({
   const drawingRef  = useRef(false);
   const hasSigRef   = useRef(false);
 
-  const coachFn = useServerFnHook(evaluateShiftNote);
-  const scanFn  = useServerFnHook(scanNoteForTriggers);
+  const coachFn = useServerFn(evaluateShiftNote);
+  const scanFn  = useServerFn(scanNoteForTriggers);
 
   const isBackdated = !!date;
   const logDate = date ?? new Date().toISOString().split("T")[0];
@@ -791,7 +791,7 @@ function DailyLogDialog({
                 setShowIncidentModal(false);
                 onClose();
                 // Navigate to incident report form
-                window.location.href = "/dashboard/incident-reports/new";
+                window.location.href = "/dashboard/hhs-hub/" + (client?.id ?? "");
               }}>
               🚨 File Critical Event Report Now
             </Button>

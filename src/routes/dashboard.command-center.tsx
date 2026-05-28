@@ -890,6 +890,33 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     },
   });
 
+  const { data: rejectedTimesheets = [] } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["cmd-timesheets-rejected", orgId],
+    queryFn: async (): Promise<Timesheet[]> => {
+      const { data, error } = await supabase
+        .from("evv_timesheets").select(tsSelect)
+        .eq("organization_id", orgId).eq("status", "Rejected")
+        .order("clock_in_timestamp", { ascending: false }).limit(100);
+      if (error) throw error;
+      return (data ?? []) as unknown as Timesheet[];
+    },
+  });
+
+  const { data: rejectedLogs = [] } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["cmd-logs-rejected", orgId],
+    queryFn: async (): Promise<DailyLog[]> => {
+      const { data, error } = await supabase
+        .from("daily_logs").select(dlSelect)
+        .eq("organization_id", orgId).eq("status", "rejected")
+        .order("log_date", { ascending: false }).limit(100);
+      if (error) throw error;
+      return (data ?? []) as unknown as DailyLog[];
+    },
+  });
+
+
   const { data: approvedLogs = [] } = useQuery({
     enabled: !!orgId && tab === "approved",
     queryKey: ["cmd-logs-approved", orgId],
@@ -964,6 +991,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
       if (error) throw error;
       toast.success("Timesheet returned to staff.");
       qc.invalidateQueries({ queryKey: ["cmd-timesheets-pending", orgId] });
+      qc.invalidateQueries({ queryKey: ["cmd-timesheets-rejected", orgId] });
     };
     const unapprove = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -998,6 +1026,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
       if (error) throw error;
       toast.success("Daily log returned to caregiver.");
       qc.invalidateQueries({ queryKey: ["cmd-logs-pending", orgId] });
+      qc.invalidateQueries({ queryKey: ["cmd-logs-rejected", orgId] });
     };
     const unapprove = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1023,6 +1052,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
   const urgentIncidents  = incidents.filter((i) => i.status === "Pending_Admin_Review");
   const urgentTimesheets = pendingTimesheets.filter((t) => t.ai_compliance_status === "Exception" || t.is_out_of_bounds);
   const urgentCount      = urgentIncidents.length + urgentTimesheets.length + openShifts.length;
+  const rejectedCount    = rejectedTimesheets.length + rejectedLogs.length;
   const pendingCount     = pendingTimesheets.length + pendingLogs.length + urgentIncidents.length;
 
   const q = search.toLowerCase().trim();
@@ -1049,7 +1079,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "urgent",    label: "🚨 Urgent",         count: urgentCount  },
-    { id: "pending",   label: "📋 Pending Review",  count: pendingCount },
+    { id: "pending",   label: "📋 Pending Review",  count: pendingCount + rejectedCount },
     { id: "approved",  label: "✅ Approved Archive"                      },
     { id: "analytics", label: "📊 Analytics"                             },
   ];
@@ -1332,6 +1362,87 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
                         onDeny={() => withLoading(l.id, "deny", deny)}
                         approving={!!loadingIds[`${l.id}-approve`]}
                         denying={!!loadingIds[`${l.id}-deny`]}
+                        denialReason={denialReasons[l.id] ?? ""}
+                        setDenialReason={(v) => setDenial(l.id, v)}
+                      />
+                    </ExpandableRow>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Returned to Staff — rejected records awaiting correction */}
+          {rejectedCount > 0 && (pendingFilter === "all" || pendingFilter === "timesheets" || pendingFilter === "daily_logs") && (
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Returned to Staff — Awaiting Correction ({rejectedCount})
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                These records were denied and returned. They will reappear in Pending Review once staff resubmit.
+              </p>
+              <div className="space-y-2">
+                {(pendingFilter === "all" || pendingFilter === "timesheets") && filterBySearch(rejectedTimesheets).map((t) => {
+                  const { unapprove } = makeTsMutations(t.id);
+                  return (
+                    <ExpandableRow key={t.id} id={t.id}
+                      summary={
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-sm">{staffName(t)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {clientName(t)} · {t.service_type_code} · {fmtDate(t.clock_in_timestamp)}
+                            </p>
+                            {t.denial_reason && (
+                              <p className="mt-0.5 text-xs text-rose-600 dark:text-rose-400">
+                                Returned: {t.denial_reason}
+                              </p>
+                            )}
+                          </div>
+                          <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-500/15 dark:text-rose-200">
+                            Returned to Staff
+                          </Badge>
+                        </div>
+                      }>
+                      <TimesheetDetail row={t}
+                        onApprove={() => {}}
+                        onDeny={() => {}}
+                        onUnapprove={() => withLoading(t.id, "unapprove", unapprove)}
+                        approving={false} denying={false}
+                        denialReason={denialReasons[t.id] ?? ""}
+                        setDenialReason={(v) => setDenial(t.id, v)}
+                      />
+                    </ExpandableRow>
+                  );
+                })}
+                {(pendingFilter === "all" || pendingFilter === "daily_logs") && filterBySearch(rejectedLogs).map((l) => {
+                  const { unapprove } = makeDlMutations(l.id);
+                  return (
+                    <ExpandableRow key={l.id} id={l.id}
+                      summary={
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-sm">{staffName(l)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {clientName(l)} · {fmtDate(l.log_date)}
+                            </p>
+                            {l.denial_reason && (
+                              <p className="mt-0.5 text-xs text-rose-600 dark:text-rose-400">
+                                Returned: {l.denial_reason}
+                              </p>
+                            )}
+                          </div>
+                          <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-500/15 dark:text-rose-200">
+                            Returned to Caregiver
+                          </Badge>
+                        </div>
+                      }>
+                      <DailyLogDetail row={l}
+                        onApprove={() => {}}
+                        onDeny={() => {}}
+                        onUnapprove={() => withLoading(l.id, "unapprove", unapprove)}
+                        approving={false} denying={false}
                         denialReason={denialReasons[l.id] ?? ""}
                         setDenialReason={(v) => setDenial(l.id, v)}
                       />

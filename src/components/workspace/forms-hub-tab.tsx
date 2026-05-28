@@ -136,8 +136,20 @@ function FormDialog({
   const [provider, setProvider] = useState("");
   const [bp, setBp] = useState("");
   const [pulse, setPulse] = useState("");
+  const [followUpDate, setFollowUpDate] = useState("");
+  const [ordersChanges, setOrdersChanges] = useState("");
   const [behaviorKind, setBehaviorKind] = useState("behavior");
+  const [antecedent, setAntecedent] = useState("");
+  const [consequence, setConsequence] = useState("");
   const [duration, setDuration] = useState("");
+  const [targetMonth, setTargetMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [communityOutings, setCommunityOutings] = useState("");
+  const [assetDescription, setAssetDescription] = useState("");
+  const [assetValue, setAssetValue] = useState("");
+  const [drillType, setDrillType] = useState("Fire");
+  const [evacuationDuration, setEvacuationDuration] = useState("");
+  const [receivingParty, setReceivingParty] = useState("");
+  const [partyType, setPartyType] = useState("School");
 
   useEffect(() => {
     if (!type) return;

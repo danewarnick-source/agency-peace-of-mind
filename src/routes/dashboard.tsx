@@ -198,6 +198,7 @@ function DashboardLayout() {
               </div>
             </div>
 
+            {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
             <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
               <LogOut className="h-4 w-4" />
             </Button>

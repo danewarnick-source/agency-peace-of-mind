@@ -702,9 +702,8 @@ export function MarEmarTab({
         .select("id, medication_name, dosage, frequency, route, scheduled_times, instructions, prescriber, is_active, is_controlled, is_prn, prn_instructions, pharmacy, rx_number, pill_count_current")
         .eq("client_id", clientId)
         .eq("is_active", true)
-        .order("medication_name")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        as any;
+        .order("medication_name") as any;
       if (error) throw error;
       return (data ?? []) as unknown as Medication[];
     },

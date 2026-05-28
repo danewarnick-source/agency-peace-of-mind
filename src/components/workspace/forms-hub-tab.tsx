@@ -23,38 +23,55 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-type FormType = "incident_report" | "medical_summary" | "behavior_tracking";
+type FormType = "incident" | "medical" | "behavior" | "summary" | "inventory" | "drill" | "transfer";
 
 const CARDS: {
   type: FormType;
   title: string;
   desc: string;
-  icon: typeof AlertOctagon;
   accent: string;
 }[] = [
   {
-    type: "incident_report",
-    title: "Critical / Non-Critical Incident Report",
-    desc: "Utah DHHS-style incident reporting with severity, response, and notifications.",
-    icon: AlertOctagon,
-    accent:
-      "border-rose-200 hover:border-rose-400 bg-rose-50/40 dark:bg-rose-950/10",
+    type: "incident",
+    title: "🚨 Critical Incident Report",
+    desc: "INTERNAL intake for admin review — injury, behavior crisis, medication error, abuse, neglect.",
+    accent: "border-rose-200 hover:border-rose-400 bg-rose-50/40 dark:bg-rose-950/10",
   },
   {
-    type: "medical_summary",
-    title: "Medical Appointment Log",
-    desc: "Doctor instructions, vitals, prescriptions, and follow-up tracking.",
-    icon: Stethoscope,
-    accent:
-      "border-blue-200 hover:border-blue-400 bg-blue-50/40 dark:bg-blue-950/10",
+    type: "medical",
+    title: "🩺 Medical & Specialist Appointment Log",
+    desc: "Record an appointment visit, physician orders, and follow-up.",
+    accent: "border-blue-200 hover:border-blue-400 bg-blue-50/40 dark:bg-blue-950/10",
   },
   {
-    type: "behavior_tracking",
-    title: "Behavior / Seizure Data Sheet",
+    type: "behavior",
+    title: "🧠 Behavior / Seizure Data Sheet",
     desc: "Antecedent, behavior, consequence + seizure type, duration, and recovery.",
-    icon: Activity,
-    accent:
-      "border-violet-200 hover:border-violet-400 bg-violet-50/40 dark:bg-violet-950/10",
+    accent: "border-violet-200 hover:border-violet-400 bg-violet-50/40 dark:bg-violet-950/10",
+  },
+  {
+    type: "summary",
+    title: "📈 Comprehensive Monthly Review Summary",
+    desc: "Monthly PCSP narrative and community outings.",
+    accent: "border-teal-200 hover:border-teal-400 bg-teal-50/40 dark:bg-teal-950/10",
+  },
+  {
+    type: "inventory",
+    title: "💎 $50+ Valuables Inventory",
+    desc: "Register or remove client high-value belongings.",
+    accent: "border-amber-200 hover:border-amber-400 bg-amber-50/40 dark:bg-amber-950/10",
+  },
+  {
+    type: "drill",
+    title: "🔥 Quarterly Evacuation Drill Record",
+    desc: "Log fire, earthquake, or severe weather drills.",
+    accent: "border-orange-200 hover:border-orange-400 bg-orange-50/40 dark:bg-orange-950/10",
+  },
+  {
+    type: "transfer",
+    title: "🔄 Cross-Agency Transfer Log",
+    desc: "Communication log to school, day program, or respite.",
+    accent: "border-slate-200 hover:border-slate-400 bg-slate-50/40 dark:bg-slate-950/10",
   },
 ];
 
@@ -71,7 +88,6 @@ export function FormsHubTab({
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {CARDS.map((c) => {
-          const Icon = c.icon;
           return (
             <button
               key={c.type}
@@ -79,10 +95,6 @@ export function FormsHubTab({
               onClick={() => setActive(c.type)}
               className={`group flex min-h-[44px] flex-col rounded-2xl border-2 p-5 text-left shadow-sm transition hover:shadow-md ${c.accent}`}
             >
-              <Icon
-                className="mb-3 h-7 w-7 text-foreground/70 transition group-hover:scale-110"
-                aria-hidden="true"
-              />
               <p className="font-semibold leading-tight">{c.title}</p>
               <p className="mt-1 text-xs text-muted-foreground">{c.desc}</p>
             </button>
@@ -141,9 +153,13 @@ function FormDialog({
   }, [type]);
 
   const headings: Record<FormType, string> = {
-    incident_report: "Critical / Non-Critical Incident Report",
-    medical_summary: "Medical Appointment Log",
-    behavior_tracking: "Behavior / Seizure Data Sheet",
+    incident: "🚨 Critical Incident Report",
+    medical: "🩺 Medical & Specialist Appointment Log",
+    behavior: "🧠 Behavior / Seizure Data Sheet",
+    summary: "📈 Comprehensive Monthly Review Summary",
+    inventory: "💎 $50+ Valuables Inventory",
+    drill: "🔥 Quarterly Evacuation Drill Record",
+    transfer: "🔄 Cross-Agency Transfer Log",
   };
 
   async function submit() {
@@ -155,13 +171,13 @@ function FormDialog({
     setBusy(true);
     try {
       const payload: Record<string, unknown> = {};
-      if (type === "incident_report") payload.severity = severity;
-      if (type === "medical_summary") {
+      if (type === "incident") payload.severity = severity;
+      if (type === "medical") {
         payload.provider = provider;
         payload.bp = bp;
         payload.pulse = pulse;
       }
-      if (type === "behavior_tracking") {
+      if (type === "behavior") {
         payload.kind = behaviorKind;
         payload.duration_minutes = parseFloat(duration) || 0;
       }
@@ -218,7 +234,7 @@ function FormDialog({
             />
           </div>
 
-          {type === "incident_report" && (
+          {type === "incident" && (
             <div className="grid gap-1.5">
               <Label htmlFor="sev">Severity</Label>
               <select
@@ -235,7 +251,7 @@ function FormDialog({
             </div>
           )}
 
-          {type === "medical_summary" && (
+          {type === "medical" && (
             <>
               <div className="grid gap-1.5">
                 <Label htmlFor="prov">Provider / clinic</Label>
@@ -271,7 +287,7 @@ function FormDialog({
             </>
           )}
 
-          {type === "behavior_tracking" && (
+          {type === "behavior" && (
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="kind">Kind</Label>

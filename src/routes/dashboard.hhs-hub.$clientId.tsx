@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ArrowLeft, FileText, Pill, Calendar, ClipboardList, AlertTriangle, Phone, Stethoscope, Box, Flame, Repeat, BookOpen,
+  ArrowLeft, FileText, Pill, Calendar, ClipboardList, AlertTriangle, Phone, Stethoscope, Box, Flame, Repeat, BookOpen, Eraser, CheckCircle2, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
@@ -127,136 +127,279 @@ const MEDICAL_RX = /\b(appointment|appt|doctor|dr\.|dentist|dental|clinic|specia
 const today = () => new Date().toISOString().slice(0, 10);
 
 function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) {
+  const { user } = useAuth();
   const [note, setNote] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
   const [coach, setCoach] = useState<{ status: string; feedback: string } | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiFlagCount, setAiFlagCount] = useState(0);
+  const [aiIterations, setAiIterations] = useState(0);
+  const [allowException, setAllowException] = useState(false);
   const [interlock, setInterlock] = useState<{ kind: "incident" | "medical"; msg: string } | null>(null);
+  const [showNarrativeError, setShowNarrativeError] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  // Signature canvas
+  const canvasRef  = useRef<HTMLCanvasElement | null>(null);
+  const drawingRef = useRef(false);
+  const hasSigRef  = useRef(false);
+
   const evalFn = useServerFn(evaluateShiftNote);
   const saveFn = useServerFn(saveDailyRecord);
-  const pcsp = client.pcsp_goals ?? [];
+  const pcsp   = client.pcsp_goals ?? [];
 
-  const charCount = note.trim().length;
-  const remaining = Math.max(0, 50 - charCount);
-  const meetsMin = charCount >= 50;
+  const MIN_WORDS = 50;
+  const words     = note.trim().split(/\s+/).filter(Boolean).length;
+  const narrativeOk = words >= MIN_WORDS;
+  const hasGoal     = goals.length > 0;
+
+  useEffect(() => {
+    setTimeout(() => clearCanvas(), 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function getCtx() { return canvasRef.current?.getContext("2d") ?? null; }
+  function clearCanvas() {
+    const c = canvasRef.current; const ctx = getCtx();
+    if (!c || !ctx) return;
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    hasSigRef.current = false;
+  }
+  function pointerPos(e: React.PointerEvent<HTMLCanvasElement>) {
+    const c = canvasRef.current!; const rect = c.getBoundingClientRect();
+    return { x: ((e.clientX - rect.left) / rect.width) * c.width, y: ((e.clientY - rect.top) / rect.height) * c.height };
+  }
+  function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    const ctx = getCtx(); if (!ctx) return;
+    drawingRef.current = true;
+    const { x, y } = pointerPos(e); ctx.beginPath(); ctx.moveTo(x, y);
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+  }
+  function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
+    const ctx = getCtx(); if (!ctx) return;
+    const { x, y } = pointerPos(e); ctx.lineTo(x, y); ctx.stroke();
+    hasSigRef.current = true;
+  }
+  function onPointerUp() { drawingRef.current = false; }
 
   const checkInterlocks = async (): Promise<boolean> => {
     const t = today();
-    const hasIncidentLanguage = INCIDENT_RX.test(note);
-    const hasMedicalLanguage = MEDICAL_RX.test(note);
-    if (hasIncidentLanguage) {
+    if (INCIDENT_RX.test(note)) {
       const { count } = await supabase
         .from("hhs_incident_reports" as never)
         .select("id", { count: "exact", head: true })
         .eq("client_id", client.id)
         .gte("occurred_at", `${t}T00:00:00Z`);
       if (!count || count === 0) {
-        setInterlock({
-          kind: "incident",
-          msg: "⚠️ AI Compliance Lock: Your daily summary describes a critical event or injury. State regulations mandate an incident intake log. Please complete the Incident Report worksheet in Tab 4 to submit your daily records.",
-        });
+        setInterlock({ kind: "incident", msg: "⚠️ AI Compliance Lock: Your daily summary describes a critical event or injury. State regulations mandate an incident intake log. Please complete the Incident Report in the PRN Forms tab before saving." });
         return false;
       }
     }
-    if (hasMedicalLanguage) {
+    if (MEDICAL_RX.test(note)) {
       const { count } = await supabase
         .from("hhs_medical_logs" as never)
         .select("id", { count: "exact", head: true })
         .eq("client_id", client.id)
         .gte("appointment_at", `${t}T00:00:00Z`);
       if (!count || count === 0) {
-        setInterlock({
-          kind: "medical",
-          msg: "⚠️ AI Compliance Lock: Your note references a medical / specialist appointment. Please fill out the Medical Appointment Log form in Tab 4 before saving today's daily record.",
-        });
+        setInterlock({ kind: "medical", msg: "⚠️ AI Compliance Lock: Your note references a medical appointment. Please complete the Medical Appointment Log in the PRN Forms tab first." });
         return false;
       }
     }
     return true;
   };
 
-  const checkMut = useMutation({
-    mutationFn: async () => evalFn({ data: { narrative: note, goals, clientFirstName: client.first_name } }),
-    onSuccess: (r) => setCoach(r),
-    onError: (e: Error) => toast.error(e.message),
-  });
+  async function handleSubmit(opts?: { exception?: boolean }) {
+    if (!hasGoal) { toast.error("Select at least one PCSP goal."); return; }
+    if (!narrativeOk) { setShowNarrativeError(true); return; }
+    if (!hasSigRef.current) { toast.error("Please sign the daily note before saving."); return; }
 
-  const saveMut = useMutation({
-    mutationFn: async () => {
-      const ok = await checkInterlocks();
-      if (!ok) throw new Error("AI compliance lock");
-      return saveFn({
+    const isException = !!opts?.exception;
+    let verdict = coach;
+    let iters   = aiIterations;
+
+    if (!isException && (!verdict || verdict.status !== "Verified")) {
+      setAiBusy(true);
+      try {
+        const result = await evalFn({ data: { narrative: note, goals, clientFirstName: client.first_name } });
+        verdict = result; setCoach(result);
+        iters += 1; setAiIterations(iters);
+        if (result.status === "Flagged") {
+          const next = aiFlagCount + 1; setAiFlagCount(next);
+          if (next >= 2) setAllowException(true);
+          setAiBusy(false); return;
+        }
+      } catch (e) {
+        toast.error((e as Error).message || "AI coach unavailable."); setAiBusy(false); return;
+      }
+      setAiBusy(false);
+    }
+
+    const ok = await checkInterlocks();
+    if (!ok) return;
+
+    const signature = canvasRef.current?.toDataURL("image/png") ?? null;
+
+    try {
+      await saveFn({
         data: {
           organizationId: orgId,
           clientId: client.id,
           recordDate: today(),
           narrative: note,
           pcspGoalsAddressed: goals,
-          aiStatus: coach?.status ?? null,
-          aiFeedback: coach?.feedback ?? null,
+          aiStatus: isException ? "Exception" : (verdict?.status ?? null),
+          aiFeedback: isException
+            ? "🔴 Submitted with Exception Flag — pending admin review."
+            : (verdict?.feedback ?? null),
+          signatureDataUrl: signature,
         },
       });
-    },
-    onSuccess: () => {
+      setSuccess(true);
       toast.success("Daily progress note saved.");
-      setNote(""); setGoals([]); setCoach(null);
-    },
-    onError: (e: Error) => {
-      if (e.message !== "AI compliance lock") toast.error(e.message);
-    },
-  });
+      setNote(""); setGoals([]); setCoach(null); setAiIterations(0);
+      setAiFlagCount(0); setAllowException(false); setShowNarrativeError(false);
+      hasSigRef.current = false; clearCanvas();
+    } catch (e) {
+      toast.error((e as Error).message || "Could not save note.");
+    }
+  }
+
+  if (success) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center space-y-3">
+          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+          <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">✅ Daily Note Submitted</p>
+          <p className="text-sm text-muted-foreground">Your progress note and signature have been saved and submitted for administrative approval.</p>
+          <Button onClick={() => setSuccess(false)}>Submit Another Note</Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
       <CardHeader><CardTitle className="text-base">📝 24-Hour Daily Progress Note</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
+
+        {/* PCSP Goals */}
         <div>
           <Label>PCSP Goals Addressed Today</Label>
-          <div className="mt-1 space-y-1">
-            {pcsp.length === 0 && <p className="text-xs text-muted-foreground">No PCSP goals on file for this client.</p>}
+          <div className="mt-2 space-y-1.5">
+            {pcsp.length === 0 && <p className="text-xs text-muted-foreground">No PCSP goals on file.</p>}
             {pcsp.map((g) => (
-              <label key={g} className="flex items-start gap-2 text-sm">
+              <label key={g} className="flex items-start gap-2 text-sm cursor-pointer">
                 <Checkbox
                   checked={goals.includes(g)}
-                  onCheckedChange={(c) => setGoals(c ? [...goals, g] : goals.filter((x) => x !== g))}
+                  onCheckedChange={(c) => {
+                    setGoals(c ? [...goals, g] : goals.filter((x) => x !== g));
+                    if (coach) setCoach(null);
+                  }}
                 />
                 {g}
               </label>
             ))}
           </div>
         </div>
+
+        {/* Narrative */}
         <div>
           <Label>Narrative Summary</Label>
-          <Textarea rows={6} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Describe support provided, behaviors observed, goal progress, ADLs…" />
-          <div className={`mt-1 text-xs ${meetsMin ? "text-green-700" : "text-amber-700"}`}>
-            {meetsMin
-              ? `✓ Clinical threshold met (${charCount} characters).`
-              : `Characters remaining to meet clinical threshold: ${remaining}`}
+          <Textarea
+            rows={7}
+            value={note}
+            onChange={(e) => {
+              setNote(e.target.value);
+              if (showNarrativeError) setShowNarrativeError(false);
+              if (coach) setCoach(null);
+            }}
+            placeholder="Describe support provided, behaviors observed, goal progress, ADLs, community activities…"
+            className="mt-1"
+          />
+          <div className="mt-1.5 flex items-center justify-between text-xs">
+            <span className={narrativeOk ? "text-emerald-600" : "text-amber-600"}>
+              {narrativeOk ? `✓ Minimum met` : `${Math.max(0, MIN_WORDS - words)} more words required`}
+            </span>
+            <span className="font-mono text-muted-foreground">{words} / {MIN_WORDS} words</span>
           </div>
+          {showNarrativeError && !narrativeOk && (
+            <div className="mt-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
+              ⚠️ Your narrative must be at least {MIN_WORDS} words to meet DSPD Medicaid documentation requirements.
+            </div>
+          )}
         </div>
-        {coach && (
-          <div className={`rounded-lg border p-3 text-sm ${coach.status === "Verified" ? "border-green-400 bg-green-50 dark:bg-green-950/30" : "border-amber-400 bg-amber-50 dark:bg-amber-950/30"}`}>
-            <strong>{coach.status === "Verified" ? "✓ AI Coach: Verified" : "⚠ AI Coach: Flagged"}</strong>
-            <p className="mt-1">{coach.feedback}</p>
+
+        {/* AI Coach */}
+        {(aiBusy || coach) && (
+          <div className={`rounded-lg border-2 px-4 py-3 ${coach?.status === "Verified" ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
+            <div className="mb-1 flex items-center gap-2 text-sm font-bold">
+              💡 AI Documentation Coach
+              {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            </div>
+            {coach && (
+              <p className={`text-xs leading-relaxed ${coach.status === "Verified" ? "text-emerald-800 dark:text-emerald-200" : "text-amber-900 dark:text-amber-100"}`}>
+                {coach.status === "Verified" ? "🟢 AI CLEARED — " : "⚠️ "}{coach.feedback}
+              </p>
+            )}
+            {coach?.status === "Flagged" && (
+              <p className="mt-1 text-[11px] text-muted-foreground">Edit your narrative and re-submit. Iteration {aiIterations}.</p>
+            )}
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => checkMut.mutate()} disabled={!meetsMin || checkMut.isPending}>
-            {checkMut.isPending ? "Checking…" : "🤖 Run AI Coach Pre-Screen"}
+
+        {/* Signature */}
+        <div>
+          <Label>Caregiver Signature</Label>
+          <div className="mt-1 overflow-hidden rounded-xl border-2 border-slate-300 bg-white p-1 shadow-inner dark:border-slate-700">
+            <canvas
+              ref={canvasRef} width={600} height={140}
+              onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
+              className="block w-full touch-none rounded-lg bg-white"
+              style={{ height: 140 }}
+            />
+          </div>
+          <div className="mt-1.5 flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Sign with your finger or mouse to attest this entry.</span>
+            <button type="button" onClick={clearCanvas}
+              className="inline-flex items-center gap-1 font-medium text-slate-500 hover:text-slate-900 hover:underline dark:hover:text-slate-100">
+              <Eraser className="h-3 w-3" /> Clear
+            </button>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="space-y-2"
+          onMouseEnter={() => { if (!narrativeOk) setShowNarrativeError(true); }}
+          onClick={() => { if (!narrativeOk) setShowNarrativeError(true); }}>
+          <Button
+            className="h-12 w-full bg-emerald-600 text-base font-semibold hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+            onClick={() => handleSubmit()}
+            disabled={!hasGoal || !narrativeOk || aiBusy}>
+            {aiBusy
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />AI reviewing your note…</>
+              : coach?.status === "Flagged"
+              ? "🔁 Re-Check with AI Coach"
+              : <><CheckCircle2 className="mr-2 h-4 w-4" />Save Daily Note</>}
           </Button>
-          <Button onClick={() => saveMut.mutate()} disabled={!meetsMin || saveMut.isPending}>
-            {saveMut.isPending ? "Saving…" : "Save Daily Note"}
-          </Button>
+          {allowException && coach?.status === "Flagged" && (
+            <Button variant="outline" className="w-full border-rose-500/50 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300"
+              onClick={() => handleSubmit({ exception: true })} disabled={aiBusy}>
+              🚩 Submit with Exception Flag
+            </Button>
+          )}
         </div>
       </CardContent>
 
       <Dialog open={!!interlock} onOpenChange={(o) => !o && setInterlock(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-amber-700">🚨 AI Compliance Lock</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="text-amber-700">🚨 AI Compliance Lock</DialogTitle></DialogHeader>
           <p className="text-sm">{interlock?.msg}</p>
           <DialogFooter>
-            <Button onClick={() => setInterlock(null)}>Open PRN Forms (Tab 4)</Button>
+            <Button onClick={() => setInterlock(null)}>Go to PRN Forms</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

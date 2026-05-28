@@ -151,7 +151,7 @@ function ClientWorkspace() {
               className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
             >
               <FileText className="h-4 w-4" />
-              <span>Forms</span>
+              <span>Forms & Reports</span>
             </TabsTrigger>
           </TabsList>
 

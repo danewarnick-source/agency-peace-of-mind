@@ -642,49 +642,91 @@ export type Database = {
       }
       daily_logs: {
         Row: {
+          ai_coaching_iterations: number
+          ai_compliance_feedback: string | null
+          ai_compliance_status: string | null
+          ai_trigger_reasons: string[] | null
           approved_at: string | null
           approved_by: string | null
+          backdated: boolean
           client_id: string
           created_at: string
+          denial_reason: string | null
+          denied_at: string | null
+          denied_by: string | null
+          followup_form_types: string[] | null
           id: string
+          late_submission_reason: string | null
           log_date: string
           narrative: string
           organization_id: string
+          original_due_date: string | null
           pcsp_goals_addressed: string[]
+          requires_followup_form: boolean
           signature_data_url: string | null
           status: string
           submitted_at: string
+          submitted_late: boolean
           user_id: string
+          word_count: number | null
         }
         Insert: {
+          ai_coaching_iterations?: number
+          ai_compliance_feedback?: string | null
+          ai_compliance_status?: string | null
+          ai_trigger_reasons?: string[] | null
           approved_at?: string | null
           approved_by?: string | null
+          backdated?: boolean
           client_id: string
           created_at?: string
+          denial_reason?: string | null
+          denied_at?: string | null
+          denied_by?: string | null
+          followup_form_types?: string[] | null
           id?: string
+          late_submission_reason?: string | null
           log_date?: string
           narrative: string
           organization_id: string
+          original_due_date?: string | null
           pcsp_goals_addressed?: string[]
+          requires_followup_form?: boolean
           signature_data_url?: string | null
           status?: string
           submitted_at?: string
+          submitted_late?: boolean
           user_id: string
+          word_count?: number | null
         }
         Update: {
+          ai_coaching_iterations?: number
+          ai_compliance_feedback?: string | null
+          ai_compliance_status?: string | null
+          ai_trigger_reasons?: string[] | null
           approved_at?: string | null
           approved_by?: string | null
+          backdated?: boolean
           client_id?: string
           created_at?: string
+          denial_reason?: string | null
+          denied_at?: string | null
+          denied_by?: string | null
+          followup_form_types?: string[] | null
           id?: string
+          late_submission_reason?: string | null
           log_date?: string
           narrative?: string
           organization_id?: string
+          original_due_date?: string | null
           pcsp_goals_addressed?: string[]
+          requires_followup_form?: boolean
           signature_data_url?: string | null
           status?: string
           submitted_at?: string
+          submitted_late?: boolean
           user_id?: string
+          word_count?: number | null
         }
         Relationships: [
           {
@@ -807,12 +849,14 @@ export type Database = {
           ai_coaching_iterations: number
           ai_compliance_feedback: string | null
           ai_compliance_status: string | null
+          ai_trigger_reasons: string[] | null
           client_id: string
           clock_in_timestamp: string
           clock_out_timestamp: string | null
           created_at: string
           edit_audit_history_log: Json
           edited_by_admin_name: string | null
+          followup_form_types: string[] | null
           geofence_variance_justification: string | null
           goals_completed: Json
           gps_in_coordinates: Json
@@ -821,10 +865,12 @@ export type Database = {
           id: string
           is_edited_by_admin: boolean
           is_out_of_bounds: boolean
+          late_submission_reason: string | null
           organization_id: string
           outside_geofence_reason: string | null
           raw_clock_in: string | null
           raw_clock_out: string | null
+          requires_followup_form: boolean
           rounded_clock_in: string | null
           rounded_clock_out: string | null
           service_type_code: string
@@ -832,6 +878,7 @@ export type Database = {
           shift_note_text: string | null
           staff_id: string
           status: string
+          submitted_late: boolean
           tenant_id: string | null
           timesheet_embedding: string | null
           timezone_setting: string
@@ -843,12 +890,14 @@ export type Database = {
           ai_coaching_iterations?: number
           ai_compliance_feedback?: string | null
           ai_compliance_status?: string | null
+          ai_trigger_reasons?: string[] | null
           client_id: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
           created_at?: string
           edit_audit_history_log?: Json
           edited_by_admin_name?: string | null
+          followup_form_types?: string[] | null
           geofence_variance_justification?: string | null
           goals_completed?: Json
           gps_in_coordinates: Json
@@ -857,10 +906,12 @@ export type Database = {
           id?: string
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
+          late_submission_reason?: string | null
           organization_id: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
           raw_clock_out?: string | null
+          requires_followup_form?: boolean
           rounded_clock_in?: string | null
           rounded_clock_out?: string | null
           service_type_code: string
@@ -868,6 +919,7 @@ export type Database = {
           shift_note_text?: string | null
           staff_id: string
           status?: string
+          submitted_late?: boolean
           tenant_id?: string | null
           timesheet_embedding?: string | null
           timezone_setting?: string
@@ -879,12 +931,14 @@ export type Database = {
           ai_coaching_iterations?: number
           ai_compliance_feedback?: string | null
           ai_compliance_status?: string | null
+          ai_trigger_reasons?: string[] | null
           client_id?: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
           created_at?: string
           edit_audit_history_log?: Json
           edited_by_admin_name?: string | null
+          followup_form_types?: string[] | null
           geofence_variance_justification?: string | null
           goals_completed?: Json
           gps_in_coordinates?: Json
@@ -893,10 +947,12 @@ export type Database = {
           id?: string
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
+          late_submission_reason?: string | null
           organization_id?: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
           raw_clock_out?: string | null
+          requires_followup_form?: boolean
           rounded_clock_in?: string | null
           rounded_clock_out?: string | null
           service_type_code?: string
@@ -904,6 +960,7 @@ export type Database = {
           shift_note_text?: string | null
           staff_id?: string
           status?: string
+          submitted_late?: boolean
           tenant_id?: string | null
           timesheet_embedding?: string | null
           timezone_setting?: string
@@ -1441,6 +1498,162 @@ export type Database = {
         }
         Relationships: []
       }
+      incident_reports: {
+        Row: {
+          additional_client_ids: string[] | null
+          ai_trigger_reasons: string[] | null
+          amendment_reason: string | null
+          aps_notified: boolean | null
+          client_id: string
+          created_at: string
+          family_name: string | null
+          family_notified: boolean | null
+          family_notified_at: string | null
+          filed_at: string
+          id: string
+          immediate_actions: string
+          incident_address: string | null
+          incident_city: string | null
+          incident_date: string
+          incident_state: string | null
+          incident_time: string
+          incident_types: string[]
+          incident_zip: string | null
+          law_enforcement_called: boolean | null
+          location_detail: string | null
+          location_type: string | null
+          medical_attention_required: boolean | null
+          medical_facility: string | null
+          medical_outcome: string | null
+          medical_response_type: string | null
+          narrative_after: string
+          narrative_before: string
+          narrative_during: string
+          organization_id: string
+          other_individuals: Json | null
+          report_number: string
+          reported_by: string
+          reporter_title: string | null
+          staff_involved: Json | null
+          staff_signature_url: string | null
+          state_confirmation_number: string | null
+          state_submission_deadline: string | null
+          state_submitted_at: string | null
+          state_submitted_by: string | null
+          status: string
+          submitted_at: string
+          supervisor_name: string | null
+          supervisor_notified: boolean | null
+          supervisor_notified_at: string | null
+          triggered_by_note_id: string | null
+          triggered_by_note_type: string | null
+          updated_at: string
+          witnesses: Json | null
+        }
+        Insert: {
+          additional_client_ids?: string[] | null
+          ai_trigger_reasons?: string[] | null
+          amendment_reason?: string | null
+          aps_notified?: boolean | null
+          client_id: string
+          created_at?: string
+          family_name?: string | null
+          family_notified?: boolean | null
+          family_notified_at?: string | null
+          filed_at?: string
+          id?: string
+          immediate_actions?: string
+          incident_address?: string | null
+          incident_city?: string | null
+          incident_date: string
+          incident_state?: string | null
+          incident_time: string
+          incident_types?: string[]
+          incident_zip?: string | null
+          law_enforcement_called?: boolean | null
+          location_detail?: string | null
+          location_type?: string | null
+          medical_attention_required?: boolean | null
+          medical_facility?: string | null
+          medical_outcome?: string | null
+          medical_response_type?: string | null
+          narrative_after?: string
+          narrative_before?: string
+          narrative_during?: string
+          organization_id: string
+          other_individuals?: Json | null
+          report_number: string
+          reported_by: string
+          reporter_title?: string | null
+          staff_involved?: Json | null
+          staff_signature_url?: string | null
+          state_confirmation_number?: string | null
+          state_submission_deadline?: string | null
+          state_submitted_at?: string | null
+          state_submitted_by?: string | null
+          status?: string
+          submitted_at?: string
+          supervisor_name?: string | null
+          supervisor_notified?: boolean | null
+          supervisor_notified_at?: string | null
+          triggered_by_note_id?: string | null
+          triggered_by_note_type?: string | null
+          updated_at?: string
+          witnesses?: Json | null
+        }
+        Update: {
+          additional_client_ids?: string[] | null
+          ai_trigger_reasons?: string[] | null
+          amendment_reason?: string | null
+          aps_notified?: boolean | null
+          client_id?: string
+          created_at?: string
+          family_name?: string | null
+          family_notified?: boolean | null
+          family_notified_at?: string | null
+          filed_at?: string
+          id?: string
+          immediate_actions?: string
+          incident_address?: string | null
+          incident_city?: string | null
+          incident_date?: string
+          incident_state?: string | null
+          incident_time?: string
+          incident_types?: string[]
+          incident_zip?: string | null
+          law_enforcement_called?: boolean | null
+          location_detail?: string | null
+          location_type?: string | null
+          medical_attention_required?: boolean | null
+          medical_facility?: string | null
+          medical_outcome?: string | null
+          medical_response_type?: string | null
+          narrative_after?: string
+          narrative_before?: string
+          narrative_during?: string
+          organization_id?: string
+          other_individuals?: Json | null
+          report_number?: string
+          reported_by?: string
+          reporter_title?: string | null
+          staff_involved?: Json | null
+          staff_signature_url?: string | null
+          state_confirmation_number?: string | null
+          state_submission_deadline?: string | null
+          state_submitted_at?: string | null
+          state_submitted_by?: string | null
+          status?: string
+          submitted_at?: string
+          supervisor_name?: string | null
+          supervisor_notified?: boolean | null
+          supervisor_notified_at?: string | null
+          triggered_by_note_id?: string | null
+          triggered_by_note_type?: string | null
+          updated_at?: string
+          witnesses?: Json | null
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -1663,6 +1876,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string
+          dismissed_at: string | null
+          id: string
+          link_to: string | null
+          organization_id: string
+          read_at: string | null
+          recipient_role: string
+          related_id: string | null
+          related_type: string | null
+          title: string
+          type: string
+          urgency: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          link_to?: string | null
+          organization_id: string
+          read_at?: string | null
+          recipient_role?: string
+          related_id?: string | null
+          related_type?: string | null
+          title: string
+          type: string
+          urgency?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          link_to?: string | null
+          organization_id?: string
+          read_at?: string | null
+          recipient_role?: string
+          related_id?: string | null
+          related_type?: string | null
+          title?: string
+          type?: string
+          urgency?: string
+        }
+        Relationships: []
       }
       organization_members: {
         Row: {
@@ -2829,6 +3090,16 @@ export type Database = {
           id: string
           similarity: number
         }[]
+      }
+      notify_incident_filed: {
+        Args: {
+          p_client_name: string
+          p_deadline: string
+          p_incident_id: string
+          p_organization_id: string
+          p_reporter_name: string
+        }
+        Returns: undefined
       }
       user_org_ids: { Args: { _user: string }; Returns: string[] }
     }

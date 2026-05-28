@@ -1264,6 +1264,54 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
                   </div>
                 </section>
               )}
+
+              {medErrors.length > 0 && (
+                <section>
+                  <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-rose-600">
+                    <AlertTriangle className="h-4 w-4" /> Medication Errors — Admin Review Required
+                  </h2>
+                  <div className="space-y-2">
+                    {medErrors.map((err) => (
+                      <Card key={err.id} className="border-l-4 border-l-rose-500 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold">
+                              {err.clients ? `${err.clients.first_name} ${err.clients.last_name}` : "—"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Reported by {err.staff_name ?? "staff"} ·{" "}
+                              {new Date(err.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                            {err.exception_reason && (
+                              <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">{err.exception_reason}</p>
+                            )}
+                            {err.notes && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{err.notes}</p>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              const { error } = await supabase
+                                .from("emar_logs")
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                .update({ admin_reviewed: true, admin_reviewed_by: user!.id, admin_reviewed_at: new Date().toISOString() } as any)
+                                .eq("id", err.id);
+                              if (error) { toast.error(error.message); return; }
+                              toast.success("Medication error marked as reviewed.");
+                              qc.invalidateQueries({ queryKey: ["cmd-med-errors", orgId] });
+                              qc.invalidateQueries({ queryKey: ["notifications", orgId] });
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          >
+                            ✅ Mark Reviewed
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </section>
+              )}
             </>
           )}
         </div>

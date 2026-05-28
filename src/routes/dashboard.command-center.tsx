@@ -890,6 +890,33 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     },
   });
 
+  const { data: rejectedTimesheets = [] } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["cmd-timesheets-rejected", orgId],
+    queryFn: async (): Promise<Timesheet[]> => {
+      const { data, error } = await supabase
+        .from("evv_timesheets").select(tsSelect)
+        .eq("organization_id", orgId).eq("status", "Rejected")
+        .order("clock_in_timestamp", { ascending: false }).limit(100);
+      if (error) throw error;
+      return (data ?? []) as unknown as Timesheet[];
+    },
+  });
+
+  const { data: rejectedLogs = [] } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["cmd-logs-rejected", orgId],
+    queryFn: async (): Promise<DailyLog[]> => {
+      const { data, error } = await supabase
+        .from("daily_logs").select(dlSelect)
+        .eq("organization_id", orgId).eq("status", "rejected")
+        .order("log_date", { ascending: false }).limit(100);
+      if (error) throw error;
+      return (data ?? []) as unknown as DailyLog[];
+    },
+  });
+
+
   const { data: approvedLogs = [] } = useQuery({
     enabled: !!orgId && tab === "approved",
     queryKey: ["cmd-logs-approved", orgId],

@@ -135,7 +135,7 @@ function StaffDailyJournal() {
         .eq("user_id", user!.id)
         .gte("log_date", since.toISOString().split("T")[0])
         .neq("status", "rejected");
-      return (data ?? []) as { log_date: string; client_id: string }[];
+      return (data ?? []) as unknown as { log_date: string; client_id: string }[];
     },
   });
 

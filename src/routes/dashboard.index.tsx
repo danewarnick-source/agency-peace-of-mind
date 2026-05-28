@@ -113,7 +113,21 @@ function Overview() {
         )}
       </div>
 
-      {showAdmin && org && <AgencyHealthSnapshot organizationId={org.organization_id} />}
+      {showAdmin && org && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 text-center space-y-2">
+          <p className="text-base font-semibold">Admin tools have moved</p>
+          <p className="text-sm text-muted-foreground">
+            The Agency Command Center is your new daily triage desk — urgent items,
+            pending reviews, approved records, and analytics all in one place.
+          </p>
+          <a
+            href="/dashboard/command-center"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition mt-2"
+          >
+            🏢 Open Agency Command Center →
+          </a>
+        </div>
+      )}
 
       {!showAdmin && (
         <div className="space-y-6">

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Care Academy" }] }),
@@ -32,7 +33,7 @@ const STAFF_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/command-center", label: "🏢 Command Center", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/compliance-desk", label: "EVV & Timesheet Control", icon: ShieldCheck },
   { to: "/dashboard/host-home-control", label: "🏡 Host Home Control", icon: Home },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
@@ -197,6 +198,7 @@ function DashboardLayout() {
               </div>
             </div>
 
+            {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
             <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
               <LogOut className="h-4 w-4" />
             </Button>

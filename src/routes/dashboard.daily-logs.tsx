@@ -791,7 +791,7 @@ function DailyLogDialog({
                 setShowIncidentModal(false);
                 onClose();
                 // Navigate to incident report form
-                window.location.href = "" + "/dashboard/hhs-hub/" + (client?.id ?? "")";
+                window.location.href = "/dashboard/hhs-hub/" + (client?.id ?? "");
               }}>
               🚨 File Critical Event Report Now
             </Button>

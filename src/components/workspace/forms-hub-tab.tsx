@@ -88,7 +88,6 @@ export function FormsHubTab({
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {CARDS.map((c) => {
-          const Icon = c.icon;
           return (
             <button
               key={c.type}
@@ -96,10 +95,6 @@ export function FormsHubTab({
               onClick={() => setActive(c.type)}
               className={`group flex min-h-[44px] flex-col rounded-2xl border-2 p-5 text-left shadow-sm transition hover:shadow-md ${c.accent}`}
             >
-              <Icon
-                className="mb-3 h-7 w-7 text-foreground/70 transition group-hover:scale-110"
-                aria-hidden="true"
-              />
               <p className="font-semibold leading-tight">{c.title}</p>
               <p className="mt-1 text-xs text-muted-foreground">{c.desc}</p>
             </button>

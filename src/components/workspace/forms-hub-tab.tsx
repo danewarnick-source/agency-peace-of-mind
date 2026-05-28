@@ -234,7 +234,7 @@ function FormDialog({
             />
           </div>
 
-          {type === "incident_report" && (
+          {type === "incident" && (
             <div className="grid gap-1.5">
               <Label htmlFor="sev">Severity</Label>
               <select
@@ -251,7 +251,7 @@ function FormDialog({
             </div>
           )}
 
-          {type === "medical_summary" && (
+          {type === "medical" && (
             <>
               <div className="grid gap-1.5">
                 <Label htmlFor="prov">Provider / clinic</Label>
@@ -287,7 +287,7 @@ function FormDialog({
             </>
           )}
 
-          {type === "behavior_tracking" && (
+          {type === "behavior" && (
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="kind">Kind</Label>

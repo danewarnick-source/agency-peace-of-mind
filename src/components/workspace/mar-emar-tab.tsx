@@ -503,7 +503,7 @@ function MarCalendarView({ clientId }: { clientId: string }) {
         .from("client_medications")
         .select("id, medication_name, dosage, scheduled_times, is_active, is_controlled, is_prn")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .eq("client_id", clientId) as any);
+        .eq("client_id", clientId) as any;
 
       if (error) throw error;
       return (data as unknown as Medication[]) ?? [];

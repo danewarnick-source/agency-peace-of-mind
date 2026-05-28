@@ -854,6 +854,9 @@ export type Database = {
           clock_in_timestamp: string
           clock_out_timestamp: string | null
           created_at: string
+          denial_reason: string | null
+          denied_at: string | null
+          denied_by: string | null
           edit_audit_history_log: Json
           edited_by_admin_name: string | null
           followup_form_types: string[] | null
@@ -895,6 +898,9 @@ export type Database = {
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
           created_at?: string
+          denial_reason?: string | null
+          denied_at?: string | null
+          denied_by?: string | null
           edit_audit_history_log?: Json
           edited_by_admin_name?: string | null
           followup_form_types?: string[] | null
@@ -936,6 +942,9 @@ export type Database = {
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
           created_at?: string
+          denial_reason?: string | null
+          denied_at?: string | null
+          denied_by?: string | null
           edit_audit_history_log?: Json
           edited_by_admin_name?: string | null
           followup_form_types?: string[] | null

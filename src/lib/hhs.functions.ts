@@ -269,3 +269,76 @@ export const saveIncidentReport = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return row;
   });
+
+// ---------- Preserved listing helpers (restored to keep imports working) ----------
+export const listEmarLogs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => OrgInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("hhs_emar_logs" as never)
+      .select("*")
+      .eq("organization_id", data.organizationId)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const listPrnForms = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => OrgInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const [med, sum, inv, dr, tr] = await Promise.all([
+      sb.from("hhs_medical_logs" as never).select("*").eq("organization_id", data.organizationId).order("created_at", { ascending: false }).limit(200),
+      sb.from("hhs_monthly_summaries" as never).select("*").eq("organization_id", data.organizationId).order("created_at", { ascending: false }).limit(200),
+      sb.from("hhs_client_inventories" as never).select("*").eq("organization_id", data.organizationId).order("created_at", { ascending: false }).limit(200),
+      sb.from("hhs_evacuation_drills" as never).select("*").eq("organization_id", data.organizationId).order("created_at", { ascending: false }).limit(200),
+      sb.from("hhs_transfer_logs" as never).select("*").eq("organization_id", data.organizationId).order("created_at", { ascending: false }).limit(200),
+    ]);
+    return {
+      medical: med.data ?? [],
+      summary: sum.data ?? [],
+      inventory: inv.data ?? [],
+      drill: dr.data ?? [],
+      transfer: tr.data ?? [],
+    };
+  });
+
+export const listIncidents = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => OrgInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("hhs_incident_reports" as never)
+      .select("*")
+      .eq("organization_id", data.organizationId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const markIncidentFiled = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      incidentId: z.string().uuid(),
+      upiReferenceNumber: z.string().min(1).max(100),
+    }).parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase
+      .from("hhs_incident_reports" as never)
+      .update({
+        status: "upi_filed",
+        upi_reference_number: data.upiReferenceNumber,
+        upi_filed_at: new Date().toISOString(),
+        upi_filed_by: userId,
+      } as never)
+      .eq("id", data.incidentId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

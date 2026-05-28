@@ -36,9 +36,8 @@ function ComplianceInbox() {
         .eq("user_id", user!.id)
         .eq("status", "rejected")
         .order("log_date", { ascending: false })
-        .limit(10)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        as any;
+        .limit(10) as any;
       return (data ?? []) as Array<{
         id: string; client_id: string; log_date: string;
         denial_reason: string | null;

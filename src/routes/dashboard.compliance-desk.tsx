@@ -563,32 +563,35 @@ function UnifiedSearchResults({
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          🤖 Vector AI Cross-Tab Results
+        <h2 className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <Bot className="h-4 w-4" /> Vector AI Cross-Tab Results
         </h2>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <Badge variant="secondary" className="font-mono max-w-[260px] truncate" title={query}>
-            🧠 {query}
+            {query}
           </Badge>
           {route?.caregiver_name && (
-            <Badge variant="outline" className="font-mono">👤 {route.caregiver_name}</Badge>
+            <Badge variant="outline" className="font-mono gap-1"><UserIcon className="h-3 w-3" />{route.caregiver_name}</Badge>
           )}
           {route?.client_name && (
-            <Badge variant="outline" className="font-mono">🧑‍🤝‍🧑 {route.client_name}</Badge>
+            <Badge variant="outline" className="font-mono gap-1"><Users className="h-3 w-3" />{route.client_name}</Badge>
           )}
           {route?.date_from && route?.date_to && (
-            <Badge variant="outline" className="font-mono">
-              📅 {new Date(route.date_from).toLocaleDateString()} → {new Date(route.date_to).toLocaleDateString()}
+            <Badge variant="outline" className="font-mono gap-1">
+              <Calendar className="h-3 w-3" />
+              {new Date(route.date_from).toLocaleDateString()} → {new Date(route.date_to).toLocaleDateString()}
             </Badge>
           )}
           {route?.hour_min != null && (
-            <Badge variant="outline" className="font-mono">⏰ ≥ {route.hour_min}:00</Badge>
+            <Badge variant="outline" className="font-mono gap-1"><Clock className="h-3 w-3" />≥ {route.hour_min}:00</Badge>
           )}
           {route && (
-            <Badge variant="outline" className="font-mono">
-              {route.requires_semantic ? "🧬 SEMANTIC + SQL" : "⚡ SQL ONLY"}
+            <Badge variant="outline" className="font-mono gap-1">
+              {route.requires_semantic ? <><Dna className="h-3 w-3" /> Semantic + SQL</> : <><Zap className="h-3 w-3" /> SQL only</>}
             </Badge>
           )}
+          <Badge variant="outline" className="font-mono">{ranked.length} match{ranked.length === 1 ? "" : "es"}</Badge>
+        </div>
           <Badge variant="outline" className="font-mono">{ranked.length} match{ranked.length === 1 ? "" : "es"}</Badge>
         </div>
       </div>

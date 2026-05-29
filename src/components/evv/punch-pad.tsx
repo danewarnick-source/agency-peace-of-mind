@@ -108,11 +108,21 @@ export interface PunchPadProps {
     geofence_radius_feet?: number | null;
     pcsp_goals?: string[] | null;
   }>;
+  /** Pre-fill the service code dropdown (e.g. from scheduled shift). */
+  presetServiceCode?: string;
+  /** When true with presetServiceCode, the code dropdown is read-only. */
+  lockServiceCode?: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function PunchPad({ entryType, lockedClient = null, caseload = [] }: PunchPadProps) {
+export function PunchPad({
+  entryType,
+  lockedClient = null,
+  caseload = [],
+  presetServiceCode,
+  lockServiceCode = false,
+}: PunchPadProps) {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();

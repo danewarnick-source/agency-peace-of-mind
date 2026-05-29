@@ -307,6 +307,48 @@ function ShiftFormDialog({
           </div>
 
           <div className="grid gap-1.5">
+            <Label className="text-xs">Authorized Billing Code *</Label>
+            <Select
+              value={serviceCode}
+              onValueChange={setServiceCode}
+              disabled={!clientId || authorizedCodes.length === 0}
+            >
+              <SelectTrigger className="text-sm">
+                <SelectValue
+                  placeholder={
+                    !clientId
+                      ? "Select a client first"
+                      : authorizedCodes.length === 0
+                      ? "No authorized codes"
+                      : "Select billing code"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {authorizedCodes.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    <span className="font-mono text-xs mr-2">{code}</span>
+                    {evvServiceLabel(code).replace(`${code} — `, "")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {clientId && authorizedCodes.length === 0 ? (
+              <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  No authorized billing codes found for this client. Please update the Client
+                  Profile first.
+                </span>
+              </p>
+            ) : clientId && serviceCode ? (
+              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Lock className="h-3 w-3" />
+                Staff will be locked to <span className="font-mono">{serviceCode}</span> at clock-in.
+              </p>
+            ) : null}
+
+          <div className="grid gap-1.5">
             <Label className="text-xs">Service Type *</Label>
             <Select value={shiftType} onValueChange={setShiftType}>
               <SelectTrigger className="text-sm">

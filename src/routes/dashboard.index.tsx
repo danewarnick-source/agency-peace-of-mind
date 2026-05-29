@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
 import { AgencyHealthSnapshot } from "@/components/agency-health-snapshot";
+import { TodayShiftBanner } from "@/components/today-shift-banner";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 

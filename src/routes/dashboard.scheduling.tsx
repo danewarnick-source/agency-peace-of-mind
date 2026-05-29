@@ -275,7 +275,7 @@ function ShiftFormDialog({
           <DialogDescription>All starred fields are required.</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-2">
+        <div className="grid gap-4 py-2 overflow-y-auto max-h-[60vh] pr-1">
           <div className="grid gap-1.5">
             <Label className="text-xs">Caregiver *</Label>
             <Select value={staffId} onValueChange={setStaffId}>

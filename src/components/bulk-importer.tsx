@@ -143,13 +143,13 @@ export function BulkImporter({
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>(defaultKind);
+  const [mode, setMode] = useState<"sheet" | "pdf">("sheet");
   const [step, setStep] = useState<Step>("upload");
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [mapping, setMapping] = useState<Record<string, MappingEntry>>({});
   const [pasteText, setPasteText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
   const importFn = useServerFn(bulkImportRoster);
   const qc = useQueryClient();
 

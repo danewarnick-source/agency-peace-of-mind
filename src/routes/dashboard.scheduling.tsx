@@ -206,6 +206,14 @@ function ShiftFormDialog({
       toast.error("Fill in all required fields.");
       return;
     }
+    if (!serviceCode) {
+      toast.error("Select an authorized billing code for this client.");
+      return;
+    }
+    if (!authorizedCodes.includes(serviceCode)) {
+      toast.error("Selected code is not authorized for this client.");
+      return;
+    }
     if (new Date(endsAt) <= new Date(startsAt)) {
       toast.error("End must be after start.");
       return;
@@ -216,7 +224,7 @@ function ShiftFormDialog({
         organization_id: orgId,
         staff_id: staffId,
         client_id: clientId,
-        job_code: shiftType,
+        job_code: serviceCode,
         shift_type: shiftType,
         starts_at: new Date(startsAt).toISOString(),
         ends_at: new Date(endsAt).toISOString(),

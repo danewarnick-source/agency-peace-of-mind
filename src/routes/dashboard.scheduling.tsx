@@ -347,6 +347,8 @@ function ShiftFormDialog({
                 Staff will be locked to <span className="font-mono">{serviceCode}</span> at clock-in.
               </p>
             ) : null}
+          </div>
+
 
           <div className="grid gap-1.5">
             <Label className="text-xs">Service Type *</Label>

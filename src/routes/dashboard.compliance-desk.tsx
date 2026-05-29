@@ -991,14 +991,14 @@ function ArchiveTable({
   };
 
   const heading = variant === "evv" ? "State EVV Archive (Geofence-Locked Codes)" : "Internal / Non-EVV Archive";
-  const exportLabel = variant === "evv" ? "📥 Export Utah DHHS EVV CSV" : "📥 Export Payroll CSV";
+  const exportLabel = variant === "evv" ? "Export Utah DHHS EVV CSV" : "Export Payroll CSV";
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{heading}</h2>
-        <Button onClick={onExport} className="bg-emerald-600 hover:bg-emerald-700">
-          <Download className="mr-2 h-4 w-4" /> {exportLabel}
+        <Button onClick={onExport}>
+          <Download /> {exportLabel}
         </Button>
       </div>
 
@@ -1015,8 +1015,7 @@ function ArchiveTable({
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
       </div>
 
-
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -1025,10 +1024,10 @@ function ArchiveTable({
               <TableHead>Client</TableHead>
               <TableHead>Member ID</TableHead>
               <TableHead>Service</TableHead>
-              <TableHead>In → Out (rounded)</TableHead>
+              <TableHead>In → Out</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
-              <TableHead>Geofence Validation Status</TableHead>
+              <TableHead>Geofence Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -1043,19 +1042,19 @@ function ArchiveTable({
               return (
                 <Fragment key={r.id}>
                 <TableRow>
-                  <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
+                  <TableCell className="whitespace-nowrap font-medium">
                     {r.staff?.full_name ?? r.staff?.email ?? "—"}
                     <EditedByAdminBadge row={r} />
                   </TableCell>
-                  <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.utah_medicaid_member_id}</TableCell>
-                  <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
-                  <TableCell className="font-mono text-xs">{fmtTimeHMSAmPm(inIso)} → {outIso ? fmtTimeHMSAmPm(outIso) : "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{fmtDuration(inIso, outIso)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono">{r.utah_medicaid_member_id}</TableCell>
+                  <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
+                  <TableCell className="whitespace-nowrap font-mono">{fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono">{fmtDuration(inIso, outIso)}</TableCell>
                   <TableCell>
                     <Button variant="outline" size="sm" onClick={() => onMap(r)}>
-                      <MapPin className="mr-1 h-3 w-3" /> View
+                      <MapPin /> View
                     </Button>
                   </TableCell>
                   <TableCell>
@@ -1063,7 +1062,7 @@ function ArchiveTable({
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="secondary" onClick={() => onEdit(r)}>
-                      <Pencil className="mr-1 h-3 w-3" /> Edit
+                      <Pencil /> Edit
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -1074,6 +1073,9 @@ function ArchiveTable({
           </TableBody>
         </Table>
       </div>
+    </section>
+  );
+}
     </section>
   );
 }

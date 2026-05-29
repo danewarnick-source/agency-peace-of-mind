@@ -36,10 +36,7 @@ export function SectionHeader({
         {icon && (
           <span
             className={cn(
-              "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-accent-foreground",
-              tone === "life"
-                ? "bg-gradient-life text-white shadow-soft"
-                : "bg-accent/12 text-accent",
+              "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent",
             )}
             aria-hidden="true"
           >

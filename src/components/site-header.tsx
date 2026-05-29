@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Menu } from "lucide-react";
+import { Hexagon, Menu } from "lucide-react";
+
 import { useState } from "react";
 
 export function SiteHeader() {

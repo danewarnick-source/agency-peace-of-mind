@@ -191,17 +191,16 @@ function ShiftFormDialog({
     initial?.recurrence_end_date?.split("T")[0] ?? ""
   );
   const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<"draft" | "publish" | null>(null);
   const selectedClient = clients.find((c) => c.id === clientId);
   const authorizedCodes = selectedClient?.job_code ?? [];
 
   // Reset code when client changes and current code is not authorized
   if (clientId && serviceCode && !authorizedCodes.includes(serviceCode)) {
-    // Don't auto-reset on first render for edit mode; only clear if user changed client
-    // Safe: setState during render is allowed when conditional + setting different value
     setServiceCode("");
   }
 
-  async function save() {
+  async function save(publish: boolean) {
     if (!staffId || !clientId || !startsAt || !endsAt) {
       toast.error("Fill in all required fields.");
       return;
@@ -219,6 +218,7 @@ function ShiftFormDialog({
       return;
     }
     setBusy(true);
+    setBusyAction(publish ? "publish" : "draft");
     try {
       const payload: Record<string, unknown> = {
         organization_id: orgId,
@@ -236,7 +236,7 @@ function ShiftFormDialog({
             ? new Date(recurrenceEnd).toISOString()
             : null,
         status: initial?.status ?? "pending",
-        published: initial?.published ?? true,
+        published: publish,
         created_by: userId,
       };
       if (isEdit) {
@@ -245,11 +245,11 @@ function ShiftFormDialog({
           .update(payload)
           .eq("id", initial!.id);
         if (error) throw error;
-        toast.success("Shift updated.");
+        toast.success(publish ? "Shift published." : "Draft saved.");
       } else {
         const { error } = await (supabase as any).from("scheduled_shifts").insert(payload);
         if (error) throw error;
-        toast.success("Shift created.");
+        toast.success(publish ? "Shift published." : "Draft saved.");
       }
       onSaved();
       onClose();
@@ -257,8 +257,10 @@ function ShiftFormDialog({
       toast.error((e as Error).message || "Could not save shift.");
     } finally {
       setBusy(false);
+      setBusyAction(null);
     }
   }
+
 
   return (
     <Dialog
@@ -439,15 +441,20 @@ function ShiftFormDialog({
             />
           </div>
         </div>
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <Button variant="outline" onClick={onClose} disabled={busy} className="sm:mr-auto">
             Cancel
           </Button>
-          <Button onClick={save} disabled={busy}>
-            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEdit ? "Save Changes" : "Create Shift"}
+          <Button variant="secondary" onClick={() => save(false)} disabled={busy}>
+            {busyAction === "draft" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Draft
+          </Button>
+          <Button onClick={() => save(true)} disabled={busy}>
+            {busyAction === "publish" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEdit ? "Save & Publish" : "Publish"}
           </Button>
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );

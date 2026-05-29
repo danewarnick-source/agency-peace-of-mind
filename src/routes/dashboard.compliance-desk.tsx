@@ -699,9 +699,6 @@ function UnifiedSearchResults({
     </section>
   );
 }
-    </section>
-  );
-}
 
 
 

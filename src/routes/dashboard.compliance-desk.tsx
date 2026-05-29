@@ -419,9 +419,8 @@ function ComplianceDeskPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-          {isSearching ? (
             <p className="text-xs font-medium text-muted-foreground">
-              📊 Showing cross-tab query results matching your criteria…
+              Showing cross-tab query results matching your criteria…
             </p>
           ) : (
             <p className="text-[11px] text-muted-foreground">

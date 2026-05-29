@@ -352,19 +352,11 @@ function ComplianceDeskPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button
-            onClick={onGlobalUtahExport}
-            disabled={approvedQ.isLoading}
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
-            <Download className="mr-2 h-4 w-4" /> 📥 Export Utah DHHS EVV CSV
+          <Button onClick={onGlobalUtahExport} disabled={approvedQ.isLoading}>
+            <Download /> Export Utah DHHS EVV CSV
           </Button>
-          <Button
-            onClick={onGlobalMasterExport}
-            disabled={approvedQ.isLoading}
-            variant="secondary"
-          >
-            <Download className="mr-2 h-4 w-4" /> 📊 Export Master Agency Ledger CSV
+          <Button onClick={onGlobalMasterExport} disabled={approvedQ.isLoading} variant="secondary">
+            <Download /> Export Master Agency Ledger CSV
           </Button>
         </div>
       </header>

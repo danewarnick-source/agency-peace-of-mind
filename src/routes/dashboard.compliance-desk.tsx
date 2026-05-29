@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X, Search, Database } from "lucide-react";
+import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X, Search, Database, Inbox, FolderArchive, Briefcase, MessageSquare, Target, CheckCircle2, ShieldCheck, ShieldAlert, Bot, Calendar, User as UserIcon, Users, Zap, Dna, Filter } from "lucide-react";
 import { toast } from "sonner";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -35,36 +35,22 @@ function GeofenceBadge({ reason }: { reason: string | null }) {
   const hasReason = !!(reason && reason.trim().length > 0);
   if (!hasReason) {
     return (
-      <span
-        className="inline-flex items-center gap-1 rounded-full border border-emerald-600/30 px-2.5 py-0.5 text-[11px] font-semibold"
-        style={{ backgroundColor: "#d1fae5", color: "#065f46" }}
-      >
-        🟢 MATCH
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
+        <ShieldCheck className="h-3.5 w-3.5" /> MATCH
       </span>
     );
   }
   return (
-    <div className="flex flex-col items-start gap-0.5">
-      <TooltipProvider delayDuration={150}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              className="inline-flex cursor-help items-center gap-1 rounded-full border border-rose-700/30 px-2.5 py-0.5 text-[11px] font-semibold"
-              style={{ backgroundColor: "#fee2e2", color: "#991b1b" }}
-            >
-              🔴 NO MATCH
-            </span>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <span
-        className="max-w-[180px] truncate text-[10px] italic text-muted-foreground"
-        title={reason ?? ""}
-      >
-        {reason}
-      </span>
-    </div>
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive">
+            <ShieldAlert className="h-3.5 w-3.5" /> NO MATCH
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -141,11 +127,8 @@ function EditedByAdminBadge({ row }: { row: Row }) {
     <TooltipProvider delayDuration={120}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span
-            className="ml-2 inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-            style={{ backgroundColor: "rgba(251,191,36,0.25)", color: "#1f2937", borderColor: "rgba(217,119,6,0.55)" }}
-          >
-            ⚠️ EDITED BY ADMIN
+          <span className="ml-2 inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-warning/15 px-2 py-0.5 text-[13px] font-medium leading-none text-warning-foreground">
+            <AlertTriangle className="h-3.5 w-3.5" /> Edited by admin
           </span>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs text-xs">{detail}</TooltipContent>
@@ -163,14 +146,15 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
       <TableCell colSpan={colSpan} className="bg-muted/30 py-3">
         <div className="rounded-lg border border-border bg-background/60 p-3 space-y-2.5">
           <div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-foreground">
-              💬 Shift Note
+            <div className="flex flex-wrap items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              Shift Note
               {row.ai_compliance_status === "Verified" && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-md border border-emerald-500/50 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300"
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success"
                   title={row.ai_compliance_feedback ?? "AI Documentation Coach cleared this note."}
                 >
-                  🟢 AI CLEARED
+                  <CheckCircle2 className="h-3.5 w-3.5" /> AI cleared
                   {row.ai_coaching_iterations && row.ai_coaching_iterations > 1
                     ? ` · ${row.ai_coaching_iterations}×`
                     : ""}
@@ -178,20 +162,21 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
               )}
               {row.ai_compliance_status === "Exception" && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-md border border-rose-500/50 bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-300"
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive"
                   title={row.ai_compliance_feedback ?? "Submitted with Exception Flag — review required."}
                 >
-                  🔴 AI FLAG
+                  <AlertTriangle className="h-3.5 w-3.5" /> AI flag
                 </span>
               )}
             </div>
-            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
               {note.length > 0 ? note : <span className="italic text-muted-foreground">No narrative recorded.</span>}
             </p>
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-foreground">
-              🎯 Goals Targeted
+            <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              Goals Targeted
             </div>
             {goals.length > 0 ? (
               <div className="mt-1 flex flex-wrap gap-1.5">
@@ -347,7 +332,7 @@ function ComplianceDeskPage() {
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     downloadCsv(`utah_dhhs_evv_${stamp}.csv`, buildUtahCsv(eligible));
     const skipped = all.length - eligible.length;
-    toast.success(`Exported ${eligible.length} shift${eligible.length === 1 ? "" : "s"}.${skipped > 0 ? ` Skipped ${skipped} (non-EVV or 🔴 NO MATCH).` : ""}`);
+    toast.success(`Exported ${eligible.length} shift${eligible.length === 1 ? "" : "s"}.${skipped > 0 ? ` Skipped ${skipped} (non-EVV or NO MATCH).` : ""}`);
   };
   const onGlobalMasterExport = () => {
     const all = approvedQ.data ?? [];
@@ -367,19 +352,11 @@ function ComplianceDeskPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button
-            onClick={onGlobalUtahExport}
-            disabled={approvedQ.isLoading}
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
-            <Download className="mr-2 h-4 w-4" /> 📥 Export Utah DHHS EVV CSV
+          <Button onClick={onGlobalUtahExport} disabled={approvedQ.isLoading}>
+            <Download /> Export Utah DHHS EVV CSV
           </Button>
-          <Button
-            onClick={onGlobalMasterExport}
-            disabled={approvedQ.isLoading}
-            variant="secondary"
-          >
-            <Download className="mr-2 h-4 w-4" /> 📊 Export Master Agency Ledger CSV
+          <Button onClick={onGlobalMasterExport} disabled={approvedQ.isLoading} variant="secondary">
+            <Download /> Export Master Agency Ledger CSV
           </Button>
         </div>
       </header>
@@ -411,7 +388,7 @@ function ComplianceDeskPage() {
                   submitAiSearch();
                 }
               }}
-              placeholder="🤖 Search intent via Vector AI... Try: 'Find shifts where they practiced money skills after 3pm last summer'"
+              placeholder="Search intent via Vector AI… Try: 'Find shifts where they practiced money skills after 3pm last summer'"
               className="h-9 flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
             />
             {aiInput.length > 0 && (
@@ -437,14 +414,14 @@ function ComplianceDeskPage() {
               ) : (
                 <Search className="mr-1.5 h-3.5 w-3.5" />
               )}
-              🔍 Ask AI
+              Ask AI
             </Button>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
           {isSearching ? (
             <p className="text-xs font-medium text-muted-foreground">
-              📊 Showing cross-tab query results matching your criteria…
+              Showing cross-tab query results matching your criteria…
             </p>
           ) : (
             <p className="text-[11px] text-muted-foreground">
@@ -471,28 +448,22 @@ function ComplianceDeskPage() {
       </div>
 
       {!isSearching && (
-        <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1">
-          <button
-            type="button"
-            onClick={() => setSub("pending")}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "pending" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            📥 Pending Review
-          </button>
-          <button
-            type="button"
-            onClick={() => setSub("evv-archive")}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            📁 State EVV Archive
-          </button>
-          <button
-            type="button"
-            onClick={() => setSub("non-evv-archive")}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "non-evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            💼 Internal / Non-EVV Archive
-          </button>
+        <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1 shadow-soft">
+          {[
+            { id: "pending" as const, label: "Pending Review", Icon: Inbox },
+            { id: "evv-archive" as const, label: "State EVV Archive", Icon: FolderArchive },
+            { id: "non-evv-archive" as const, label: "Internal / Non-EVV Archive", Icon: Briefcase },
+          ].map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSub(id)}
+              className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition ${sub === id ? "bg-accent text-accent-foreground shadow-soft" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
         </nav>
       )}
 
@@ -592,30 +563,31 @@ function UnifiedSearchResults({
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          🤖 Vector AI Cross-Tab Results
+        <h2 className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <Bot className="h-4 w-4" /> Vector AI Cross-Tab Results
         </h2>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <Badge variant="secondary" className="font-mono max-w-[260px] truncate" title={query}>
-            🧠 {query}
+            {query}
           </Badge>
           {route?.caregiver_name && (
-            <Badge variant="outline" className="font-mono">👤 {route.caregiver_name}</Badge>
+            <Badge variant="outline" className="font-mono gap-1"><UserIcon className="h-3 w-3" />{route.caregiver_name}</Badge>
           )}
           {route?.client_name && (
-            <Badge variant="outline" className="font-mono">🧑‍🤝‍🧑 {route.client_name}</Badge>
+            <Badge variant="outline" className="font-mono gap-1"><Users className="h-3 w-3" />{route.client_name}</Badge>
           )}
           {route?.date_from && route?.date_to && (
-            <Badge variant="outline" className="font-mono">
-              📅 {new Date(route.date_from).toLocaleDateString()} → {new Date(route.date_to).toLocaleDateString()}
+            <Badge variant="outline" className="font-mono gap-1">
+              <Calendar className="h-3 w-3" />
+              {new Date(route.date_from).toLocaleDateString()} → {new Date(route.date_to).toLocaleDateString()}
             </Badge>
           )}
           {route?.hour_min != null && (
-            <Badge variant="outline" className="font-mono">⏰ ≥ {route.hour_min}:00</Badge>
+            <Badge variant="outline" className="font-mono gap-1"><Clock className="h-3 w-3" />≥ {route.hour_min}:00</Badge>
           )}
           {route && (
-            <Badge variant="outline" className="font-mono">
-              {route.requires_semantic ? "🧬 SEMANTIC + SQL" : "⚡ SQL ONLY"}
+            <Badge variant="outline" className="font-mono gap-1">
+              {route.requires_semantic ? <><Dna className="h-3 w-3" /> Semantic + SQL</> : <><Zap className="h-3 w-3" /> SQL only</>}
             </Badge>
           )}
           <Badge variant="outline" className="font-mono">{ranked.length} match{ranked.length === 1 ? "" : "es"}</Badge>
@@ -624,12 +596,12 @@ function UnifiedSearchResults({
 
 
       {error && (
-        <div className="mb-3 rounded-md border border-rose-300/50 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
-          ⚠️ {error.message}
+        <div className="mb-3 flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <AlertTriangle className="h-3.5 w-3.5" /> {error.message}
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -642,13 +614,12 @@ function UnifiedSearchResults({
               <TableHead>In → Out</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
-              <TableHead>Geofence Validation Status</TableHead>
+              <TableHead>Geofence Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              // 🦴 Loading skeleton across the cards grid while the vector pipeline runs.
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={`sk-${i}`}>
                   <TableCell colSpan={11} className="py-3">
@@ -670,29 +641,29 @@ function UnifiedSearchResults({
                 <Fragment key={r.id}>
                   <TableRow>
                     <TableCell>
-                      <Badge variant="outline" className="font-mono text-[10px]">
+                      <Badge variant="outline" className="font-mono text-[11px]">
                         {(similarity * 100).toFixed(0)}%
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
+                    <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
                     <TableCell>
-                      <Badge variant={isPending ? "default" : "secondary"} className="text-[10px]">
-                        {isPending ? "PENDING" : "APPROVED"}
+                      <Badge variant={isPending ? "default" : "secondary"} className="text-[11px]">
+                        {isPending ? "Pending" : "Approved"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-medium">
+                    <TableCell className="whitespace-nowrap font-medium">
                       {r.staff?.full_name ?? r.staff?.email ?? "—"}
                       <EditedByAdminBadge row={r} />
                     </TableCell>
-                    <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
-                    <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {fmtTimeHMSAmPm(inIso)} → {outIso ? fmtTimeHMSAmPm(outIso) : "—"}
+                    <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
+                    <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
+                    <TableCell className="whitespace-nowrap font-mono">
+                      {fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{fmtDuration(inIso, outIso)}</TableCell>
+                    <TableCell className="whitespace-nowrap font-mono">{fmtDuration(inIso, outIso)}</TableCell>
                     <TableCell>
                       <Button variant="outline" size="sm" onClick={() => onMap(r)}>
-                        <MapPin className="mr-1 h-3 w-3" /> View
+                        <MapPin /> View
                       </Button>
                     </TableCell>
                     <TableCell
@@ -706,16 +677,15 @@ function UnifiedSearchResults({
                         {isPending && (
                           <Button
                             size="icon"
-                            className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700"
                             onClick={() => onApprove(r.id)}
                             disabled={approving}
                             aria-label="Approve"
                           >
-                            {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            {approving ? <Loader2 className="animate-spin" /> : <Check />}
                           </Button>
                         )}
-                        <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => onEdit(r)} aria-label="Edit">
-                          <Pencil className="h-4 w-4" />
+                        <Button size="icon" variant="secondary" onClick={() => onEdit(r)} aria-label="Edit">
+                          <Pencil />
                         </Button>
                       </div>
                     </TableCell>
@@ -747,7 +717,7 @@ function PendingTable({
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Pending EVV Shifts</h2>
         <Badge variant="outline" className="font-mono text-[10px]">{rows.length} pending</Badge>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -758,7 +728,7 @@ function PendingTable({
               <TableHead>Service</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
-              <TableHead>Geofence Validation Status</TableHead>
+              <TableHead>Geofence Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -766,29 +736,29 @@ function PendingTable({
             {loading ? (
               <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : rows.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts. ✓</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts.</TableCell></TableRow>
             ) : rows.map((r) => (
               <Fragment key={r.id}>
               <TableRow>
-                <TableCell className="font-medium">
+                <TableCell className="whitespace-nowrap font-medium">
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
                   <EditedByAdminBadge row={r} />
                 </TableCell>
                 <TableCell>
-                  <div className="text-sm">{r.clients?.first_name} {r.clients?.last_name}</div>
-                  <div className="text-[11px] text-muted-foreground">{r.clients?.physical_address ?? "—"}</div>
+                  <div className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</div>
+                  <div className="text-xs text-muted-foreground">{r.clients?.physical_address ?? "—"}</div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={r.shift_entry_type === "Client_Profile_Pass" ? "default" : "secondary"}>
                     {r.shift_entry_type === "Client_Profile_Pass" ? "In-Chart" : "Sidebar"}
                   </Badge>
                 </TableCell>
-                <TableCell className="font-mono text-xs">{r.utah_medicaid_member_id}</TableCell>
-                <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
-                <TableCell className="font-mono text-xs"><Clock className="mr-1 inline h-3 w-3" />{fmtDuration(effectiveIn(r), effectiveOut(r))}</TableCell>
+                <TableCell className="whitespace-nowrap font-mono">{r.utah_medicaid_member_id}</TableCell>
+                <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
+                <TableCell className="whitespace-nowrap font-mono"><Clock className="mr-1 inline h-3.5 w-3.5" />{fmtDuration(effectiveIn(r), effectiveOut(r))}</TableCell>
                 <TableCell>
                   <Button variant="outline" size="sm" onClick={() => onMap(r)}>
-                    <MapPin className="mr-1 h-3 w-3" /> View
+                    <MapPin /> View
                   </Button>
                 </TableCell>
                 <TableCell onClick={() => r.outside_geofence_reason && onReason(r)} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
@@ -798,15 +768,14 @@ function PendingTable({
                   <div className="flex justify-end gap-1.5">
                     <Button
                       size="icon"
-                      className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700"
                       onClick={() => onApprove(r.id)}
                       disabled={approving}
                       aria-label="Approve"
                     >
-                      {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      {approving ? <Loader2 className="animate-spin" /> : <Check />}
                     </Button>
-                    <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => onEdit(r)} aria-label="Edit">
-                      <Pencil className="h-4 w-4" />
+                    <Button size="icon" variant="secondary" onClick={() => onEdit(r)} aria-label="Edit">
+                      <Pencil />
                     </Button>
                   </div>
                 </TableCell>
@@ -838,6 +807,15 @@ function fmtTimeHMSAmPm(iso: string) {
   const ampm = h >= 12 ? "PM" : "AM";
   h = h % 12; if (h === 0) h = 12;
   return `${pad2(h)}:${pad2(m)}:${pad2(s)} ${ampm}`;
+}
+/** Compact "1:19 AM" — UI use only, no seconds, no leading zero on hour. */
+function fmtTimeAmPm(iso: string) {
+  const d = new Date(iso);
+  let h = d.getHours();
+  const m = d.getMinutes();
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12; if (h === 0) h = 12;
+  return `${h}:${pad2(m)} ${ampm}`;
 }
 function csvEscape(s: string) {
   const v = s ?? "";
@@ -1014,14 +992,14 @@ function ArchiveTable({
   };
 
   const heading = variant === "evv" ? "State EVV Archive (Geofence-Locked Codes)" : "Internal / Non-EVV Archive";
-  const exportLabel = variant === "evv" ? "📥 Export Utah DHHS EVV CSV" : "📥 Export Payroll CSV";
+  const exportLabel = variant === "evv" ? "Export Utah DHHS EVV CSV" : "Export Payroll CSV";
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{heading}</h2>
-        <Button onClick={onExport} className="bg-emerald-600 hover:bg-emerald-700">
-          <Download className="mr-2 h-4 w-4" /> {exportLabel}
+        <Button onClick={onExport}>
+          <Download /> {exportLabel}
         </Button>
       </div>
 
@@ -1038,8 +1016,7 @@ function ArchiveTable({
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
       </div>
 
-
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -1048,10 +1025,10 @@ function ArchiveTable({
               <TableHead>Client</TableHead>
               <TableHead>Member ID</TableHead>
               <TableHead>Service</TableHead>
-              <TableHead>In → Out (rounded)</TableHead>
+              <TableHead>In → Out</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
-              <TableHead>Geofence Validation Status</TableHead>
+              <TableHead>Geofence Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -1066,19 +1043,19 @@ function ArchiveTable({
               return (
                 <Fragment key={r.id}>
                 <TableRow>
-                  <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
+                  <TableCell className="whitespace-nowrap font-medium">
                     {r.staff?.full_name ?? r.staff?.email ?? "—"}
                     <EditedByAdminBadge row={r} />
                   </TableCell>
-                  <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.utah_medicaid_member_id}</TableCell>
-                  <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
-                  <TableCell className="font-mono text-xs">{fmtTimeHMSAmPm(inIso)} → {outIso ? fmtTimeHMSAmPm(outIso) : "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{fmtDuration(inIso, outIso)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono">{r.utah_medicaid_member_id}</TableCell>
+                  <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
+                  <TableCell className="whitespace-nowrap font-mono">{fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono">{fmtDuration(inIso, outIso)}</TableCell>
                   <TableCell>
                     <Button variant="outline" size="sm" onClick={() => onMap(r)}>
-                      <MapPin className="mr-1 h-3 w-3" /> View
+                      <MapPin /> View
                     </Button>
                   </TableCell>
                   <TableCell>
@@ -1086,7 +1063,7 @@ function ArchiveTable({
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="secondary" onClick={() => onEdit(r)}>
-                      <Pencil className="mr-1 h-3 w-3" /> Edit
+                      <Pencil /> Edit
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -1106,7 +1083,7 @@ function ReasonDialog({ row, onClose }: { row: Row | null; onClose: () => void }
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>📍 Geofence Variance Justification</DialogTitle>
+          <DialogTitle>Geofence Variance Justification</DialogTitle>
           <DialogDescription>Caregiver-submitted reason for an out-of-bounds punch.</DialogDescription>
         </DialogHeader>
         <p className="whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-3 text-sm">
@@ -1132,7 +1109,7 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>📍 GPS Map Match</DialogTitle>
+          <DialogTitle>GPS Map Match</DialogTitle>
           <DialogDescription>Precise punch-in vs punch-out coordinates.</DialogDescription>
         </DialogHeader>
         {row && (
@@ -1146,7 +1123,7 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
               <div className="text-[11px] text-muted-foreground">{new Date(row.clock_in_timestamp).toLocaleString()}</div>
               {inLink && (
                 <a href={inLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
-                  🔗 Open clock-in pin in OpenStreetMap
+                  Open clock-in pin in OpenStreetMap
                 </a>
               )}
             </div>
@@ -1161,7 +1138,7 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
                   <div className="text-[11px] text-muted-foreground">{row.clock_out_timestamp ? new Date(row.clock_out_timestamp).toLocaleString() : ""}</div>
                   {outLink && (
                     <a href={outLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
-                      🔗 Open clock-out pin in OpenStreetMap
+                      Open clock-out pin in OpenStreetMap
                     </a>
                   )}
                 </>

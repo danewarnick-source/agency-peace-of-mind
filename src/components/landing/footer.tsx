@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { GraduationCap } from "lucide-react";
+import { Hexagon } from "lucide-react";
+
 
 export function Footer() {
   return (

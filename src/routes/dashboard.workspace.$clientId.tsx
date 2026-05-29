@@ -27,7 +27,7 @@ import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
 import { FormsHubTab } from "@/components/workspace/forms-hub-tab";
 import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
 
-const workspaceSearch = z.object({ tab: z.string().optional() });
+const workspaceSearch = z.object({ tab: z.string().optional(), code: z.string().optional() });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — HIVE" }] }),
   validateSearch: workspaceSearch,
@@ -38,7 +38,7 @@ function ClientWorkspace() {
   const { clientId } = Route.useParams();
   const { data: caseload, isLoading } = useCaseload();
   const navigate = useNavigate();
-  const { tab: tabParam } = Route.useSearch();
+  const { tab: tabParam, code: presetCode } = Route.useSearch();
 
   const client = useMemo(() => {
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;
@@ -155,6 +155,8 @@ function ClientWorkspace() {
                 geofenceRadiusFeet: client.geofence_radius_feet ?? 1000,
                 pcspGoals: client.pcsp_goals ?? [],
               }}
+              presetServiceCode={presetCode}
+              lockServiceCode={!!presetCode}
             />
           </TabsContent>
 

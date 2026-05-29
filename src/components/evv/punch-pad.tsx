@@ -108,11 +108,21 @@ export interface PunchPadProps {
     geofence_radius_feet?: number | null;
     pcsp_goals?: string[] | null;
   }>;
+  /** Pre-fill the service code dropdown (e.g. from scheduled shift). */
+  presetServiceCode?: string;
+  /** When true with presetServiceCode, the code dropdown is read-only. */
+  lockServiceCode?: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function PunchPad({ entryType, lockedClient = null, caseload = [] }: PunchPadProps) {
+export function PunchPad({
+  entryType,
+  lockedClient = null,
+  caseload = [],
+  presetServiceCode,
+  lockServiceCode = false,
+}: PunchPadProps) {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
@@ -174,7 +184,12 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   }, []);
 
   // ── Form state ──────────────────────────────────────────────────────────────
-  const [serviceCode, setServiceCode]           = useState("");
+  const [serviceCode, setServiceCode]           = useState(presetServiceCode ?? "");
+
+  // Keep preset code in sync if the parent (route search) changes it.
+  useEffect(() => {
+    if (presetServiceCode) setServiceCode(presetServiceCode);
+  }, [presetServiceCode]);
   const [selectedClientId, setSelectedClientId] = useState(lockedClient?.id ?? "");
   const [selectedFacility, setSelectedFacility] = useState(lockedClient?.facility ?? "");
   const [timezone, setTimezone]                 = useState("America/Denver");
@@ -806,7 +821,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
             <Select
               value={serviceCode}
               onValueChange={setServiceCode}
-              disabled={isRunning || !clientForPunch}
+              disabled={isRunning || !clientForPunch || (lockServiceCode && !!presetServiceCode)}
             >
               <SelectTrigger className="h-12">
                 <SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} />
@@ -819,7 +834,12 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
                 ))}
               </SelectContent>
             </Select>
-            {clientForPunch?.authorizedCodes?.length ? (
+            {lockServiceCode && presetServiceCode ? (
+              <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
+                <Lock className="h-3 w-3" />
+                Locked from today&apos;s schedule — prevents billing errors.
+              </p>
+            ) : clientForPunch?.authorizedCodes?.length ? (
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Restricted to authorizations on {clientForPunch.name}&apos;s profile.
               </p>

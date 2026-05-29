@@ -810,6 +810,15 @@ function fmtTimeHMSAmPm(iso: string) {
   h = h % 12; if (h === 0) h = 12;
   return `${pad2(h)}:${pad2(m)}:${pad2(s)} ${ampm}`;
 }
+/** Compact "1:19 AM" — UI use only, no seconds, no leading zero on hour. */
+function fmtTimeAmPm(iso: string) {
+  const d = new Date(iso);
+  let h = d.getHours();
+  const m = d.getMinutes();
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12; if (h === 0) h = 12;
+  return `${h}:${pad2(m)} ${ampm}`;
+}
 function csvEscape(s: string) {
   const v = s ?? "";
   if (v.includes(",") || v.includes('"') || v.includes("\n")) return `"${v.replace(/"/g, '""')}"`;

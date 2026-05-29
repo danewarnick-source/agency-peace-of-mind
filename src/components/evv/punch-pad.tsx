@@ -184,7 +184,12 @@ export function PunchPad({
   }, []);
 
   // ── Form state ──────────────────────────────────────────────────────────────
-  const [serviceCode, setServiceCode]           = useState("");
+  const [serviceCode, setServiceCode]           = useState(presetServiceCode ?? "");
+
+  // Keep preset code in sync if the parent (route search) changes it.
+  useEffect(() => {
+    if (presetServiceCode) setServiceCode(presetServiceCode);
+  }, [presetServiceCode]);
   const [selectedClientId, setSelectedClientId] = useState(lockedClient?.id ?? "");
   const [selectedFacility, setSelectedFacility] = useState(lockedClient?.facility ?? "");
   const [timezone, setTimezone]                 = useState("America/Denver");

@@ -103,7 +103,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
             <Hexagon className="h-4 w-4" strokeWidth={2.5} />
           </span>
-          <span>HIVE <span className="ml-1 text-xs font-normal text-white/60">— powered by NECTAR</span></span>
+          <span>HIVE <span className="ml-1 text-xs font-normal text-white/60">— powered by NECTAR™</span></span>
         </Link>
 
         <div className="max-w-md">

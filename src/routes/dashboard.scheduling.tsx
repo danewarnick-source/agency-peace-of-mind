@@ -41,6 +41,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { evvServiceLabel } from "@/lib/evv-codes";
+import { AlertTriangle, Lock } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/scheduling")({
   head: () => ({ meta: [{ title: "Scheduling" }] }),
@@ -180,6 +182,7 @@ function ShiftFormDialog({
   const [staffId, setStaffId] = useState<string>(initial?.staff_id ?? "");
   const [clientId, setClientId] = useState<string>(initial?.client_id ?? "");
   const [shiftType, setShiftType] = useState<string>(initial?.shift_type ?? "hourly");
+  const [serviceCode, setServiceCode] = useState<string>(initial?.job_code ?? "");
   const [startsAt, setStartsAt] = useState<string>(localDT(initial?.starts_at));
   const [endsAt, setEndsAt] = useState<string>(localDT(initial?.ends_at));
   const [notes, setNotes] = useState<string>(initial?.notes ?? "");
@@ -189,10 +192,26 @@ function ShiftFormDialog({
   );
   const [busy, setBusy] = useState(false);
   const selectedClient = clients.find((c) => c.id === clientId);
+  const authorizedCodes = selectedClient?.job_code ?? [];
+
+  // Reset code when client changes and current code is not authorized
+  if (clientId && serviceCode && !authorizedCodes.includes(serviceCode)) {
+    // Don't auto-reset on first render for edit mode; only clear if user changed client
+    // Safe: setState during render is allowed when conditional + setting different value
+    setServiceCode("");
+  }
 
   async function save() {
     if (!staffId || !clientId || !startsAt || !endsAt) {
       toast.error("Fill in all required fields.");
+      return;
+    }
+    if (!serviceCode) {
+      toast.error("Select an authorized billing code for this client.");
+      return;
+    }
+    if (!authorizedCodes.includes(serviceCode)) {
+      toast.error("Selected code is not authorized for this client.");
       return;
     }
     if (new Date(endsAt) <= new Date(startsAt)) {
@@ -205,7 +224,7 @@ function ShiftFormDialog({
         organization_id: orgId,
         staff_id: staffId,
         client_id: clientId,
-        job_code: shiftType,
+        job_code: serviceCode,
         shift_type: shiftType,
         starts_at: new Date(startsAt).toISOString(),
         ends_at: new Date(endsAt).toISOString(),
@@ -286,6 +305,50 @@ function ShiftFormDialog({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Authorized Billing Code *</Label>
+            <Select
+              value={serviceCode}
+              onValueChange={setServiceCode}
+              disabled={!clientId || authorizedCodes.length === 0}
+            >
+              <SelectTrigger className="text-sm">
+                <SelectValue
+                  placeholder={
+                    !clientId
+                      ? "Select a client first"
+                      : authorizedCodes.length === 0
+                      ? "No authorized codes"
+                      : "Select billing code"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {authorizedCodes.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    <span className="font-mono text-xs mr-2">{code}</span>
+                    {evvServiceLabel(code).replace(`${code} — `, "")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {clientId && authorizedCodes.length === 0 ? (
+              <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  No authorized billing codes found for this client. Please update the Client
+                  Profile first.
+                </span>
+              </p>
+            ) : clientId && serviceCode ? (
+              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Lock className="h-3 w-3" />
+                Staff will be locked to <span className="font-mono">{serviceCode}</span> at clock-in.
+              </p>
+            ) : null}
+          </div>
+
 
           <div className="grid gap-1.5">
             <Label className="text-xs">Service Type *</Label>

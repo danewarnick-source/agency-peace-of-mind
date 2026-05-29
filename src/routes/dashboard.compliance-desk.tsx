@@ -592,8 +592,6 @@ function UnifiedSearchResults({
           )}
           <Badge variant="outline" className="font-mono">{ranked.length} match{ranked.length === 1 ? "" : "es"}</Badge>
         </div>
-          <Badge variant="outline" className="font-mono">{ranked.length} match{ranked.length === 1 ? "" : "es"}</Badge>
-        </div>
       </div>
 
 

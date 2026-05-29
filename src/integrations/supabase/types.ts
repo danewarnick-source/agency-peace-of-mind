@@ -3190,6 +3190,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      restore_my_admin_role: { Args: never; Returns: undefined }
       user_org_ids: { Args: { _user: string }; Returns: string[] }
       verify_certification: {
         Args: { _code: string }

@@ -84,12 +84,13 @@ function DashboardLayout() {
 
   const SidebarBody = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
-      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-semibold">
+      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-display text-lg font-bold tracking-tight">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <GraduationCap className="h-4 w-4" />
+          <Hexagon className="h-4 w-4" strokeWidth={2.5} />
         </span>
         HIVE
       </div>
+
 
       {isAdminCapable && (
         <div className="border-b border-sidebar-border px-4 py-4">

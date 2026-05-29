@@ -146,14 +146,15 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
       <TableCell colSpan={colSpan} className="bg-muted/30 py-3">
         <div className="rounded-lg border border-border bg-background/60 p-3 space-y-2.5">
           <div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-foreground">
-              💬 Shift Note
+            <div className="flex flex-wrap items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              Shift Note
               {row.ai_compliance_status === "Verified" && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-md border border-emerald-500/50 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300"
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success"
                   title={row.ai_compliance_feedback ?? "AI Documentation Coach cleared this note."}
                 >
-                  🟢 AI CLEARED
+                  <CheckCircle2 className="h-3.5 w-3.5" /> AI cleared
                   {row.ai_coaching_iterations && row.ai_coaching_iterations > 1
                     ? ` · ${row.ai_coaching_iterations}×`
                     : ""}
@@ -161,20 +162,21 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
               )}
               {row.ai_compliance_status === "Exception" && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-md border border-rose-500/50 bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-300"
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive"
                   title={row.ai_compliance_feedback ?? "Submitted with Exception Flag — review required."}
                 >
-                  🔴 AI FLAG
+                  <AlertTriangle className="h-3.5 w-3.5" /> AI flag
                 </span>
               )}
             </div>
-            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
               {note.length > 0 ? note : <span className="italic text-muted-foreground">No narrative recorded.</span>}
             </p>
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-foreground">
-              🎯 Goals Targeted
+            <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              Goals Targeted
             </div>
             {goals.length > 0 ? (
               <div className="mt-1 flex flex-wrap gap-1.5">

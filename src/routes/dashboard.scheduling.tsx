@@ -41,6 +41,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { evvServiceLabel } from "@/lib/evv-codes";
+import { AlertTriangle, Lock } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/scheduling")({
   head: () => ({ meta: [{ title: "Scheduling" }] }),

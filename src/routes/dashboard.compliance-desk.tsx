@@ -332,7 +332,7 @@ function ComplianceDeskPage() {
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     downloadCsv(`utah_dhhs_evv_${stamp}.csv`, buildUtahCsv(eligible));
     const skipped = all.length - eligible.length;
-    toast.success(`Exported ${eligible.length} shift${eligible.length === 1 ? "" : "s"}.${skipped > 0 ? ` Skipped ${skipped} (non-EVV or 🔴 NO MATCH).` : ""}`);
+    toast.success(`Exported ${eligible.length} shift${eligible.length === 1 ? "" : "s"}.${skipped > 0 ? ` Skipped ${skipped} (non-EVV or NO MATCH).` : ""}`);
   };
   const onGlobalMasterExport = () => {
     const all = approvedQ.data ?? [];
@@ -1083,7 +1083,7 @@ function ReasonDialog({ row, onClose }: { row: Row | null; onClose: () => void }
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>📍 Geofence Variance Justification</DialogTitle>
+          <DialogTitle>Geofence Variance Justification</DialogTitle>
           <DialogDescription>Caregiver-submitted reason for an out-of-bounds punch.</DialogDescription>
         </DialogHeader>
         <p className="whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-3 text-sm">
@@ -1109,7 +1109,7 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>📍 GPS Map Match</DialogTitle>
+          <DialogTitle>GPS Map Match</DialogTitle>
           <DialogDescription>Precise punch-in vs punch-out coordinates.</DialogDescription>
         </DialogHeader>
         {row && (
@@ -1123,7 +1123,7 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
               <div className="text-[11px] text-muted-foreground">{new Date(row.clock_in_timestamp).toLocaleString()}</div>
               {inLink && (
                 <a href={inLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
-                  🔗 Open clock-in pin in OpenStreetMap
+                  Open clock-in pin in OpenStreetMap
                 </a>
               )}
             </div>
@@ -1138,7 +1138,7 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
                   <div className="text-[11px] text-muted-foreground">{row.clock_out_timestamp ? new Date(row.clock_out_timestamp).toLocaleString() : ""}</div>
                   {outLink && (
                     <a href={outLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
-                      🔗 Open clock-out pin in OpenStreetMap
+                      Open clock-out pin in OpenStreetMap
                     </a>
                   )}
                 </>

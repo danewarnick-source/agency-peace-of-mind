@@ -17,7 +17,8 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[image:var(--gradient-brand)] text-primary-foreground">
-            <GraduationCap className="h-4 w-4" />
+            <Hexagon className="h-4 w-4" strokeWidth={2.5} />
+
           </span>
           HIVE
         </Link>

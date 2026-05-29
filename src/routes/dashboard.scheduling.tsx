@@ -261,7 +261,6 @@ function ShiftFormDialog({
     }
   }
 
-  }
 
   return (
     <Dialog

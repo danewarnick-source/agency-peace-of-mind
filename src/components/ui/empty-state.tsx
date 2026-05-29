@@ -28,7 +28,7 @@ export function EmptyState({
       {...props}
     >
       {icon && (
-        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-life text-white shadow-soft">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10 text-accent">
           {icon}
         </span>
       )}

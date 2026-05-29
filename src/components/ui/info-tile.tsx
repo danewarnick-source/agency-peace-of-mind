@@ -35,9 +35,11 @@ export function InfoTile({
   const t = toneStyles[tone];
   return (
     <div
+      className={cn(
         "group relative flex items-start gap-3 rounded-lg border border-border bg-card p-4 shadow-card transition-all duration-150 hover:shadow-glow",
         t.ring,
         className,
+      )}
       {...props}
     >
       {icon && (

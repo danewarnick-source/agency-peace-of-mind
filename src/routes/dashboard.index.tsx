@@ -222,6 +222,7 @@ function Overview() {
 
       {!showAdmin && (
         <div className="space-y-6">
+          <TodayShiftBanner />
           <StaffClientGrid />
           <ComplianceInbox />
         </div>

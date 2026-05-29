@@ -16,59 +16,58 @@ export function FixAdmin() {
 
   async function fix() {
     if (!user) return;
-    setStatus("Working…");
+    setStatus("Restoring role via secure function…");
 
     localStorage.setItem("portal-view", "admin");
     window.dispatchEvent(new Event("portal-view-change"));
 
-    const { error } = await supabase
-      .from("organization_members")
-      .update({ role: "super_admin" as never, active: true })
-      .eq("user_id", user.id);
+    const { error } = await supabase.rpc("restore_my_admin_role" as never);
 
     if (error) {
-      setStatus("⚠️ Could not update role — but portal view is set to Admin. Reloading…");
-    } else {
-      setStatus("✅ Role restored to super_admin and portal set to Admin. Reloading…");
+      setStatus(`❌ Error: ${error.message}`);
+      return;
     }
 
+    setStatus("✅ Role restored to super_admin! Reloading dashboard…");
     setDone(true);
     setTimeout(() => { window.location.href = "/dashboard"; }, 1500);
   }
 
   if (!session) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full text-center">
-          <CardHeader>
-            <CardTitle>Log in first</CardTitle>
-          </CardHeader>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <h2 className="text-xl font-bold mb-4">Log in first</h2>
+            <Button onClick={() => window.location.href = "/login"}>
+              Go to Login
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh] p-4">
-      <Card className="max-w-md w-full">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>🔧 Admin Access Restore</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1 text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground space-y-1">
             <p><strong>Email:</strong> {user?.email}</p>
             <p><strong>User ID:</strong> {user?.id}</p>
           </div>
 
-          <p className="text-sm text-muted-foreground">
-            Click below to restore your super admin role and switch the portal to Admin view.
+          <p className="text-sm">
+            Click below to restore your super admin role using a secure database function.
           </p>
 
           {status && (
-            <div className="p-3 rounded-md bg-primary/10 text-primary text-sm">
-              {status}
-            </div>
+            <div className="p-3 bg-muted rounded text-sm">{status}</div>
           )}
+
           {!done && (
             <Button onClick={fix} className="w-full">
               ✅ Restore My Admin Access

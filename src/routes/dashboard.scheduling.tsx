@@ -191,15 +191,15 @@ function ShiftFormDialog({
     initial?.recurrence_end_date?.split("T")[0] ?? ""
   );
   const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<"draft" | "publish" | null>(null);
   const selectedClient = clients.find((c) => c.id === clientId);
   const authorizedCodes = selectedClient?.job_code ?? [];
 
   // Reset code when client changes and current code is not authorized
   if (clientId && serviceCode && !authorizedCodes.includes(serviceCode)) {
-    // Don't auto-reset on first render for edit mode; only clear if user changed client
-    // Safe: setState during render is allowed when conditional + setting different value
     setServiceCode("");
   }
+
 
   async function save() {
     if (!staffId || !clientId || !startsAt || !endsAt) {

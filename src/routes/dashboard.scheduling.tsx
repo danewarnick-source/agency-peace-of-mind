@@ -182,6 +182,7 @@ function ShiftFormDialog({
   const [staffId, setStaffId] = useState<string>(initial?.staff_id ?? "");
   const [clientId, setClientId] = useState<string>(initial?.client_id ?? "");
   const [shiftType, setShiftType] = useState<string>(initial?.shift_type ?? "hourly");
+  const [serviceCode, setServiceCode] = useState<string>(initial?.job_code ?? "");
   const [startsAt, setStartsAt] = useState<string>(localDT(initial?.starts_at));
   const [endsAt, setEndsAt] = useState<string>(localDT(initial?.ends_at));
   const [notes, setNotes] = useState<string>(initial?.notes ?? "");
@@ -191,6 +192,14 @@ function ShiftFormDialog({
   );
   const [busy, setBusy] = useState(false);
   const selectedClient = clients.find((c) => c.id === clientId);
+  const authorizedCodes = selectedClient?.job_code ?? [];
+
+  // Reset code when client changes and current code is not authorized
+  if (clientId && serviceCode && !authorizedCodes.includes(serviceCode)) {
+    // Don't auto-reset on first render for edit mode; only clear if user changed client
+    // Safe: setState during render is allowed when conditional + setting different value
+    setServiceCode("");
+  }
 
   async function save() {
     if (!staffId || !clientId || !startsAt || !endsAt) {

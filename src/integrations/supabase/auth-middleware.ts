@@ -9,44 +9,26 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-      throw new Error('Missing Supabase environment variables. Connect Supabase in Lovable Cloud.');
+      throw new Error('Missing Supabase environment variables.');
     }
 
     const request = getRequest();
-    if (!request?.headers) {
-      throw new Error('Unauthorized: No request headers available');
-    }
+    const authHeader = request?.headers?.get('authorization');
 
-    const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      throw new Error('Unauthorized: Missing or invalid authorization header');
+      throw new Error('Unauthorized');
     }
 
     const token = authHeader.replace('Bearer ', '');
-    if (!token) {
-      throw new Error('Unauthorized: No token provided');
-    }
 
-    const supabase = createClient<Database>(
-      SUPABASE_URL,
-      SUPABASE_PUBLISHABLE_KEY,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-        auth: {
-          storage: undefined,
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      }
-    );
+    const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+    });
 
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data?.user) {
-      throw new Error('Unauthorized: Invalid or expired token');
+      throw new Error('Unauthorized');
     }
 
     return next({
@@ -58,3 +40,4 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     });
   },
 );
+

@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, ShieldCheck, Wallet, Pill, Menu, Clock, Home,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, ShieldCheck, Wallet, Pill, Menu, Clock, Home, CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
@@ -38,6 +38,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/host-home-control", label: "Host Home Control", icon: Home },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
   { to: "/dashboard/pba-ledger", label: "PBA Trust Ledger", icon: Wallet },
+  { to: "/dashboard/scheduling", label: "📅 Scheduling", icon: CalendarDays },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },

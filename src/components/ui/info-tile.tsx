@@ -11,11 +11,11 @@ interface InfoTileProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const toneStyles: Record<NonNullable<InfoTileProps["tone"]>, { iconBg: string; ring: string }> = {
-  default: { iconBg: "bg-accent/12 text-accent", ring: "" },
-  success: { iconBg: "bg-success/15 text-success", ring: "" },
+  default: { iconBg: "bg-accent/10 text-accent", ring: "" },
+  success: { iconBg: "bg-success/12 text-success", ring: "" },
   warning: { iconBg: "bg-warning/15 text-warning-foreground", ring: "" },
-  danger:  { iconBg: "bg-destructive/12 text-destructive", ring: "" },
-  life:    { iconBg: "bg-gradient-life text-white shadow-soft", ring: "ring-life" },
+  danger:  { iconBg: "bg-destructive/10 text-destructive", ring: "" },
+  life:    { iconBg: "bg-accent/10 text-accent", ring: "" },
 };
 
 /**
@@ -35,17 +35,15 @@ export function InfoTile({
   const t = toneStyles[tone];
   return (
     <div
-      className={cn(
-        "group relative flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-card transition-all duration-150 hover:shadow-glow hover:-translate-y-px",
+        "group relative flex items-start gap-3 rounded-lg border border-border bg-card p-4 shadow-card transition-all duration-150 hover:shadow-glow",
         t.ring,
         className,
-      )}
       {...props}
     >
       {icon && (
         <span
           className={cn(
-            "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+            "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
             t.iconBg,
           )}
           aria-hidden="true"
@@ -54,7 +52,7 @@ export function InfoTile({
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="text-xs font-medium text-muted-foreground">
           {label}
         </p>
         <p className="mt-0.5 font-display text-2xl font-semibold tracking-tight tabular-nums">

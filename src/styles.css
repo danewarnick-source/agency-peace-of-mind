@@ -72,73 +72,80 @@
   /* Raised surface #F1F5F9 */
   --surface-warm: oklch(0.97 0.008 247);
 
-  --card: oklch(1 0 0);
+:root {
   --radius: 0.5rem;
+
+  /* === HIVE — powered by NECTAR === */
+  /* Brand palette (raw) */
+  --hive-navy: #1C2A5E;
+  --nectar-gold: #F5A623;
+  --nectar-violet: #6C2BB3;
+  --hive-teal: #1B9DB5;
+
+  /* Canvas: Ice-blue off-white */
+  --background: oklch(0.985 0.005 245);
+  --foreground: oklch(0.23 0.08 264); /* near hive-navy text */
+
+  /* Raised surface */
+  --surface-warm: oklch(0.97 0.008 247);
+
+  --card: oklch(1 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.04 256);
+  --popover-foreground: oklch(0.23 0.08 264);
 
-  /* Primary: Deep Indigo Navy #0F172A — structural anchor */
-  --primary: oklch(0.22 0.04 258);
-  --primary-foreground: oklch(0.985 0.005 245);
+  /* Primary: HIVE Navy #1C2A5E — structural anchor + primary buttons */
+  --primary: oklch(0.28 0.1 268);
+  --primary-foreground: oklch(0.99 0.005 245);
 
-  /* Accent: Electric Cobalt #2563EB — primary action */
-  --accent: oklch(0.55 0.22 264);
+  /* Accent (primary action) = navy as well; gold is reserved for highlights */
+  --accent: oklch(0.28 0.1 268);
   --accent-foreground: oklch(0.99 0.005 245);
 
-  /* Tonal supports */
-  --accent-2: oklch(0.62 0.2 258);  /* lighter cobalt #3B82F6 */
-  --accent-3: oklch(0.45 0.04 257); /* slate #475569 */
+  /* Categorical accents (sparing use only) */
+  --accent-2: oklch(0.74 0.16 75);    /* NECTAR Gold #F5A623 */
+  --accent-3: oklch(0.45 0.21 305);   /* NECTAR Violet #6C2BB3 */
 
   --secondary: oklch(0.95 0.008 247);
-  --secondary-foreground: oklch(0.28 0.04 258);
+  --secondary-foreground: oklch(0.28 0.1 268);
 
   --muted: oklch(0.96 0.006 247);
   --muted-foreground: oklch(0.48 0.03 257);
 
-  /* Cool destructive #DC2626 */
   --destructive: oklch(0.58 0.22 27);
   --destructive-foreground: oklch(0.99 0.005 245);
 
-  /* Cool success #059669 */
   --success: oklch(0.6 0.14 160);
   --success-foreground: oklch(0.99 0.005 245);
-  --warning: oklch(0.7 0.16 60);
-  --warning-foreground: oklch(0.22 0.04 60);
+  --warning: oklch(0.74 0.16 75);
+  --warning-foreground: oklch(0.28 0.08 75);
 
-  /* Steel blue borders #64748B at low opacity */
   --border: oklch(0.9 0.012 250);
   --input: oklch(0.9 0.012 250);
-  --ring: oklch(0.55 0.22 264);
+  --ring: oklch(0.28 0.1 268);
 
-  /* Subtle navy→cobalt gradients (low intensity, kept for utility compatibility) */
-  --gradient-hero: linear-gradient(135deg, oklch(0.22 0.04 258) 0%, oklch(0.32 0.12 262) 60%, oklch(0.55 0.22 264) 100%);
-  --gradient-brand: linear-gradient(135deg, oklch(0.55 0.22 264), oklch(0.62 0.2 258));
-  --gradient-life: linear-gradient(120deg, oklch(0.55 0.22 264) 0%, oklch(0.62 0.2 258) 100%);
-  --gradient-soft: linear-gradient(135deg, color-mix(in oklab, oklch(0.55 0.22 264) 6%, white), color-mix(in oklab, oklch(0.62 0.2 258) 4%, white));
+  /* Navy → deeper navy gradients (replace prior blue gradients) */
+  --gradient-hero: linear-gradient(135deg, oklch(0.22 0.08 268) 0%, oklch(0.28 0.1 268) 60%, oklch(0.36 0.12 268) 100%);
+  --gradient-brand: linear-gradient(135deg, oklch(0.28 0.1 268), oklch(0.36 0.12 268));
+  --gradient-life: linear-gradient(120deg, oklch(0.28 0.1 268) 0%, oklch(0.36 0.12 268) 100%);
+  --gradient-soft: linear-gradient(135deg, color-mix(in oklab, oklch(0.28 0.1 268) 6%, white), color-mix(in oklab, oklch(0.36 0.12 268) 4%, white));
 
   /* Premium ambient shadows — low-opacity navy */
-  --shadow-elegant: 0 1px 2px color-mix(in oklab, oklch(0.22 0.04 258) 6%, transparent);
-  --shadow-card: 0 1px 2px color-mix(in oklab, oklch(0.22 0.04 258) 4%, transparent);
-  --shadow-soft: 0 1px 1px color-mix(in oklab, oklch(0.22 0.04 258) 3%, transparent);
-  --shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(0.55 0.22 264) 18%, transparent);
+  --shadow-elegant: 0 1px 2px color-mix(in oklab, oklch(0.22 0.08 268) 8%, transparent);
+  --shadow-card: 0 1px 2px color-mix(in oklab, oklch(0.22 0.08 268) 5%, transparent);
+  --shadow-soft: 0 1px 1px color-mix(in oklab, oklch(0.22 0.08 268) 4%, transparent);
+  --shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(0.74 0.16 75) 22%, transparent);
 
-  /* Sidebar: Deep Indigo Navy */
-  --sidebar: oklch(0.22 0.04 258);
-  --sidebar-foreground: oklch(0.93 0.01 247);
-  --sidebar-primary: oklch(0.55 0.22 264);
-  --sidebar-primary-foreground: oklch(0.99 0.005 245);
-  --sidebar-accent: oklch(0.28 0.04 258);
+  /* Sidebar: HIVE Navy chrome; active item highlights with NECTAR Gold */
+  --sidebar: oklch(0.22 0.08 268);
+  --sidebar-foreground: oklch(0.94 0.01 247);
+  --sidebar-primary: oklch(0.74 0.16 75);            /* NECTAR Gold for active state */
+  --sidebar-primary-foreground: oklch(0.22 0.08 268);
+  --sidebar-accent: oklch(0.28 0.08 268);
   --sidebar-accent-foreground: oklch(0.98 0.005 247);
-  --sidebar-border: oklch(0.32 0.04 258);
-  --sidebar-ring: oklch(0.55 0.22 264);
+  --sidebar-border: oklch(0.32 0.08 268);
+  --sidebar-ring: oklch(0.74 0.16 75);
 }
 
-.dark {
-  --background: oklch(0.16 0.03 258);
-  --foreground: oklch(0.97 0.008 247);
-  --surface-warm: oklch(0.22 0.04 258);
-  --card: oklch(0.22 0.04 258);
-  --card-foreground: oklch(0.97 0.008 247);
   --popover: oklch(0.22 0.04 258);
   --popover-foreground: oklch(0.97 0.008 247);
   --primary: oklch(0.62 0.2 258);

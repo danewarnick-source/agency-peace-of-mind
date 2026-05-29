@@ -134,7 +134,7 @@ function HhsClientHub() {
   );
 }
 
-// ============ Daily Note + AI Coach + AI Interlock Gates ============
+// ============ Daily Note + NECTAR Coach + AI Interlock Gates ============
 const INCIDENT_RX = /\b(fell|fall|fainted|seizure|injur(y|ed|ies)|bleed|blood|hospital|ER|emergency|crisis|aggress|hit\s+(?:them|him|her)|self[- ]harm|elop(e|ed|ement)|abuse|neglect)\b/i;
 const MEDICAL_RX = /\b(appointment|appt|doctor|dr\.|dentist|dental|clinic|specialist|checkup|check[- ]up|seen by|visited (?:the )?(?:doctor|md|clinic|hospital))\b/i;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -207,7 +207,7 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
         .eq("client_id", client.id)
         .gte("occurred_at", `${t}T00:00:00Z`);
       if (!count || count === 0) {
-        setInterlock({ kind: "incident", msg: "⚠️ AI Compliance Lock: Your daily summary describes a critical event or injury. State regulations mandate an incident intake log. Please complete the Incident Report in the PRN Forms tab before saving." });
+        setInterlock({ kind: "incident", msg: "⚠️ NECTAR Compliance Lock: Your daily summary describes a critical event or injury. State regulations mandate an incident intake log. Please complete the Incident Report in the PRN Forms tab before saving." });
         return false;
       }
     }
@@ -218,7 +218,7 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
         .eq("client_id", client.id)
         .gte("appointment_at", `${t}T00:00:00Z`);
       if (!count || count === 0) {
-        setInterlock({ kind: "medical", msg: "⚠️ AI Compliance Lock: Your note references a medical appointment. Please complete the Medical Appointment Log in the PRN Forms tab first." });
+        setInterlock({ kind: "medical", msg: "⚠️ NECTAR Compliance Lock: Your note references a medical appointment. Please complete the Medical Appointment Log in the PRN Forms tab first." });
         return false;
       }
     }
@@ -246,7 +246,7 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           setAiBusy(false); return;
         }
       } catch (e) {
-        toast.error((e as Error).message || "AI coach unavailable."); setAiBusy(false); return;
+        toast.error((e as Error).message || "NECTAR coach unavailable."); setAiBusy(false); return;
       }
       setAiBusy(false);
     }
@@ -346,16 +346,16 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           )}
         </div>
 
-        {/* AI Coach */}
+        {/* NECTAR Coach */}
         {(aiBusy || coach) && (
           <div className={`rounded-lg border-2 px-4 py-3 ${coach?.status === "Verified" ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
             <div className="mb-1 flex items-center gap-2 text-sm font-bold">
-              💡 AI Documentation Coach
+              💡 NECTAR Documentation Coach
               {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
             </div>
             {coach && (
               <p className={`text-xs leading-relaxed ${coach.status === "Verified" ? "text-emerald-800 dark:text-emerald-200" : "text-amber-900 dark:text-amber-100"}`}>
-                {coach.status === "Verified" ? "🟢 AI CLEARED — " : "⚠️ "}{coach.feedback}
+                {coach.status === "Verified" ? "🟢 NECTAR CLEARED — " : "⚠️ "}{coach.feedback}
               </p>
             )}
             {coach?.status === "Flagged" && (
@@ -394,9 +394,9 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
             onClick={() => handleSubmit()}
             disabled={!hasGoal || !narrativeOk || aiBusy}>
             {aiBusy
-              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />AI reviewing your note…</>
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />NECTAR reviewing your note…</>
               : coach?.status === "Flagged"
-              ? "🔁 Re-Check with AI Coach"
+              ? "🔁 Re-Check with NECTAR Coach"
               : <><CheckCircle2 className="mr-2 h-4 w-4" />Save Daily Note</>}
           </Button>
           {allowException && coach?.status === "Flagged" && (
@@ -410,7 +410,7 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
 
       <Dialog open={!!interlock} onOpenChange={(o) => !o && setInterlock(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="text-amber-700">🚨 AI Compliance Lock</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-amber-700">🚨 NECTAR Compliance Lock</DialogTitle></DialogHeader>
           <p className="text-sm">{interlock?.msg}</p>
           <DialogFooter>
             <Button onClick={() => {

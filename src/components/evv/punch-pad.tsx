@@ -217,7 +217,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
   const [narrative, setNarrative]               = useState("");
   const [showNarrativeError, setShowNarrativeError] = useState(false);
 
-  // ── AI Documentation Coach state ────────────────────────────────────────────
+  // ── NECTAR Documentation Coach state ────────────────────────────────────────────
   const [aiBusy, setAiBusy]               = useState(false);
   const [aiCoach, setAiCoach]             = useState<CoachResult | null>(null);
   const [aiIterations, setAiIterations]   = useState(0);
@@ -595,7 +595,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
           return;
         }
       } catch (e) {
-        toast.error((e as Error).message || "AI coach unavailable — please try again.");
+        toast.error((e as Error).message || "NECTAR coach unavailable — please try again.");
         return;
       } finally {
         setAiBusy(false);
@@ -604,8 +604,8 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
 
     const aiStatusForRow: "Verified" | "Exception" = isException ? "Exception" : "Verified";
     const aiFeedbackForRow = isException
-      ? "🔴 Submitted with Exception Flag — AI coaching not satisfied; pending admin review."
-      : aiVerdict?.feedback ?? "Verified by AI Documentation Coach.";
+      ? "🔴 Submitted with Exception Flag — NECTAR coaching not satisfied; pending admin review."
+      : aiVerdict?.feedback ?? "Verified by NECTAR Documentation Coach.";
 
     setBusy(true);
     try {
@@ -1171,7 +1171,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
               )}
             </div>
 
-            {/* AI Documentation Coach */}
+            {/* NECTAR Documentation Coach */}
             {(aiBusy || aiCoach) && (
               <div className={`rounded-lg border-2 px-4 py-3 ${
                 aiCoach?.status === "Verified"
@@ -1179,7 +1179,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
                   : "border-amber-500/40 bg-amber-500/10"
               }`}>
                 <div className="mb-1 flex items-center gap-2 text-sm font-bold">
-                  💡 AI Documentation Coach
+                  💡 NECTAR Documentation Coach
                   {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                 </div>
                 {aiCoach && (
@@ -1188,7 +1188,7 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
                       ? "text-emerald-800 dark:text-emerald-200"
                       : "text-amber-900 dark:text-amber-100"
                   }`}>
-                    {aiCoach.status === "Verified" ? "🟢 AI CLEARED — " : "⚠️ "}
+                    {aiCoach.status === "Verified" ? "🟢 NECTAR CLEARED — " : "⚠️ "}
                     {aiCoach.feedback}
                   </p>
                 )}
@@ -1214,9 +1214,9 @@ export function PunchPad({ entryType, lockedClient = null, caseload = [] }: Punc
                 >
                   {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {aiBusy
-                    ? "🧠 AI Coach reviewing your note…"
+                    ? "🧠 NECTAR Coach reviewing your note…"
                     : aiCoach?.status === "Flagged"
-                    ? "🔁 Re-Check with AI Coach"
+                    ? "🔁 Re-Check with NECTAR Coach"
                     : "💾 Submit Final Timesheet to EVV & Timesheet Control"}
                 </Button>
               </div>

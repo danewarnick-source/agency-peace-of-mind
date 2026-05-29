@@ -177,9 +177,9 @@ function AiBadge({ status, feedback, iterations }: {
 }) {
   if (!status) return null;
   const cfg = {
-    Verified: { cls: "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-200", label: "🟢 AI Verified" },
-    Exception: { cls: "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/15 dark:text-rose-200", label: "🔴 AI Exception" },
-    Flagged:   { cls: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/15 dark:text-amber-200", label: "⚠️ AI Flagged" },
+    Verified: { cls: "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-200", label: "🟢 NECTAR Verified" },
+    Exception: { cls: "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/15 dark:text-rose-200", label: "🔴 NECTAR Exception" },
+    Flagged:   { cls: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/15 dark:text-amber-200", label: "⚠️ NECTAR Flagged" },
   }[status] ?? { cls: "bg-muted text-muted-foreground border-border", label: status };
 
   return (
@@ -310,7 +310,7 @@ function TimesheetDetail({
         </DetailBlock>
       </DetailSection>
 
-      {/* AI coach */}
+      {/* NECTAR coach */}
       <AiBadge
         status={row.ai_compliance_status}
         feedback={row.ai_compliance_feedback}
@@ -467,7 +467,7 @@ function DailyLogDetail({
         </p>
       </DetailSection>
 
-      {/* AI coach */}
+      {/* NECTAR coach */}
       <AiBadge
         status={row.ai_compliance_status}
         feedback={row.ai_compliance_feedback}
@@ -1246,7 +1246,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
                               </div>
                               <div className="flex gap-1.5">
                                 {t.is_out_of_bounds && <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-500/15 dark:text-rose-200">Out of Bounds</Badge>}
-                                {t.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">AI Exception</Badge>}
+                                {t.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">NECTAR Exception</Badge>}
                               </div>
                             </div>
                           }>
@@ -1387,7 +1387,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
                           </div>
                           <div className="flex gap-1.5">
                             {t.is_out_of_bounds && <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-500/15 dark:text-rose-200">OOB</Badge>}
-                            {t.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">AI Exception</Badge>}
+                            {t.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">NECTAR Exception</Badge>}
                             {t.submitted_late && <Badge className="bg-blue-100 text-blue-800 text-[10px]">Late</Badge>}
                             <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-500/15 dark:text-amber-200">Pending</Badge>
                           </div>
@@ -1430,7 +1430,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
                           <div className="flex gap-1.5">
                             {l.submitted_late && <Badge className="bg-blue-100 text-blue-800 text-[10px]">Late</Badge>}
                             {l.backdated && <Badge className="bg-purple-100 text-purple-800 text-[10px]">Backdated</Badge>}
-                            {l.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">AI Exception</Badge>}
+                            {l.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">NECTAR Exception</Badge>}
                             <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-500/15 dark:text-amber-200">Pending</Badge>
                           </div>
                         </div>

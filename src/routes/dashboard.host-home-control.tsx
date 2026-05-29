@@ -123,7 +123,7 @@ function DailyNotesTab({ orgId, clientMap }: { orgId?: string; clientMap?: Map<s
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <Badge variant="outline">{name(clientMap, String(r.client_id))}</Badge>
                 <span>{String(r.record_date)}</span>
-                {r.ai_compliance_status === "Verified" && <Badge className="bg-green-600">✓ AI Verified</Badge>}
+                {r.ai_compliance_status === "Verified" && <Badge className="bg-green-600">✓ NECTAR Verified</Badge>}
                 {r.ai_compliance_status === "Flagged" && <Badge variant="destructive">⚠ Flagged</Badge>}
               </div>
               <p className="mt-2 text-sm whitespace-pre-wrap">{String(r.narrative)}</p>

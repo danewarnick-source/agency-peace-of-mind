@@ -245,12 +245,12 @@ export function BulkImporter({
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
       <DialogTrigger asChild>
         <Button variant="outline" className="border-primary/40 text-primary hover:bg-primary/5">
-          <Sparkles className="mr-2 h-4 w-4" /> AI Bulk Import (CSV, Excel, or PDF)
+          <Sparkles className="mr-2 h-4 w-4" /> NECTAR Bulk Import (CSV, Excel, or PDF)
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> AI Bulk Importer</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> NECTAR Bulk Importer</DialogTitle>
           <DialogDescription>
             Drop your roster — AI auto-maps known fields and spins up custom attributes for anything new.
           </DialogDescription>

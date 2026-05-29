@@ -152,9 +152,9 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
               {row.ai_compliance_status === "Verified" && (
                 <span
                   className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success"
-                  title={row.ai_compliance_feedback ?? "AI Documentation Coach cleared this note."}
+                  title={row.ai_compliance_feedback ?? "NECTAR Documentation Coach cleared this note."}
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5" /> AI cleared
+                  <CheckCircle2 className="h-3.5 w-3.5" /> NECTAR cleared
                   {row.ai_coaching_iterations && row.ai_coaching_iterations > 1
                     ? ` · ${row.ai_coaching_iterations}×`
                     : ""}
@@ -165,7 +165,7 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
                   className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive"
                   title={row.ai_compliance_feedback ?? "Submitted with Exception Flag — review required."}
                 >
-                  <AlertTriangle className="h-3.5 w-3.5" /> AI flag
+                  <AlertTriangle className="h-3.5 w-3.5" /> NECTAR flag
                 </span>
               )}
             </div>
@@ -227,7 +227,7 @@ function ComplianceDeskPage() {
 
   // 🤖 Hybrid AI Search — LLM routes the query into SQL filters
   // (+ optional vector match). Submission is decoupled from keystrokes:
-  // nothing fires until the admin clicks "Ask AI" or presses Enter.
+  // nothing fires until the admin clicks "Ask NECTAR" or presses Enter.
   const [aiInput, setAiInput] = useState("");
   const [submitted, setSubmitted] = useState<{ query: string } | null>(null);
   const isSearching = submitted !== null;
@@ -388,7 +388,7 @@ function ComplianceDeskPage() {
                   submitAiSearch();
                 }
               }}
-              placeholder="Search intent via Vector AI… Try: 'Find shifts where they practiced money skills after 3pm last summer'"
+              placeholder="Search intent via Vector NECTAR… Try: 'Find shifts where they practiced money skills after 3pm last summer'"
               className="h-9 flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
             />
             {aiInput.length > 0 && (
@@ -414,7 +414,7 @@ function ComplianceDeskPage() {
               ) : (
                 <Search className="mr-1.5 h-3.5 w-3.5" />
               )}
-              Ask AI
+              Ask NECTAR
             </Button>
           </div>
         </div>
@@ -425,7 +425,7 @@ function ComplianceDeskPage() {
             </p>
           ) : (
             <p className="text-[11px] text-muted-foreground">
-              Vector AI scans every shift's narrative, PCSP goals, and geofence notes by meaning — no keyword match required.
+              Vector NECTAR scans every shift's narrative, PCSP goals, and geofence notes by meaning — no keyword match required.
             </p>
           )}
           <Button
@@ -564,7 +564,7 @@ function UnifiedSearchResults({
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          <Bot className="h-4 w-4" /> Vector AI Cross-Tab Results
+          <Bot className="h-4 w-4" /> Vector NECTAR Cross-Tab Results
         </h2>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <Badge variant="secondary" className="font-mono max-w-[260px] truncate" title={query}>

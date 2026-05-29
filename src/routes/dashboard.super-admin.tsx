@@ -500,7 +500,7 @@ const PLATFORM_FEATURES: { key: string; label: string; category: string }[] = [
   { key: "employees", label: "👥 Employees Registry", category: "Registry" },
   { key: "clients", label: "👥 Clients Registry", category: "Registry" },
   { key: "teams_homes", label: "🏠 Teams & Homes", category: "Registry" },
-  { key: "ai_assistance", label: "🤖 AI Importer & Assistance", category: "Intelligence" },
+  { key: "ai_assistance", label: "🤖 NECTAR Importer & Assistance", category: "Intelligence" },
 ];
 
 function TenantFeatureRegistry({ tenantId }: { tenantId: string }) {

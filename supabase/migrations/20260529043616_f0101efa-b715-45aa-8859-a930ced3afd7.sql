@@ -1,0 +1,2 @@
+ALTER TABLE public.hhs_monthly_attendance
+ADD CONSTRAINT hhs_monthly_attendance_client_date_unique UNIQUE (client_id, record_date);

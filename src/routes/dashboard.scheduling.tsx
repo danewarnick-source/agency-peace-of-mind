@@ -236,7 +236,7 @@ function ShiftFormDialog({
             ? new Date(recurrenceEnd).toISOString()
             : null,
         status: initial?.status ?? "pending",
-        published: initial?.published ?? false,
+        published: initial?.published ?? true,
         created_by: userId,
       };
       if (isEdit) {

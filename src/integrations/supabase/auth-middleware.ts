@@ -41,15 +41,3 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
   },
 );
 
-      throw new Error('Unauthorized: Invalid or expired token');
-    }
-
-    return next({
-      context: {
-        supabase,
-        userId: data.user.id,
-        claims: data.user,
-      },
-    });
-  },
-);

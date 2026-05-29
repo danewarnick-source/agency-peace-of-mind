@@ -2558,6 +2558,71 @@ export type Database = {
           },
         ]
       }
+      scheduled_shifts: {
+        Row: {
+          client_id: string
+          created_at: string
+          ends_at: string
+          id: string
+          is_recurring: boolean
+          job_code: string | null
+          notes: string | null
+          organization_id: string
+          published: boolean
+          recurrence_end_date: string | null
+          recurrence_rule: string | null
+          shift_type: string
+          staff_id: string
+          starts_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          ends_at: string
+          id?: string
+          is_recurring?: boolean
+          job_code?: string | null
+          notes?: string | null
+          organization_id: string
+          published?: boolean
+          recurrence_end_date?: string | null
+          recurrence_rule?: string | null
+          shift_type?: string
+          staff_id: string
+          starts_at: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          ends_at?: string
+          id?: string
+          is_recurring?: boolean
+          job_code?: string | null
+          notes?: string | null
+          organization_id?: string
+          published?: boolean
+          recurrence_end_date?: string | null
+          recurrence_rule?: string | null
+          shift_type?: string
+          staff_id?: string
+          starts_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_shifts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_assignments: {
         Row: {
           client_id: string

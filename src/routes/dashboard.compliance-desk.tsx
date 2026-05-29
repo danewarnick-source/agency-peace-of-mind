@@ -630,7 +630,7 @@ function UnifiedSearchResults({
             ) : ranked.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">
-                  No conceptually similar shifts. If you just added shifts, click <span className="font-semibold">Index embeddings</span> above so the AI can read them.
+                  No conceptually similar shifts. If you just added shifts, click <span className="font-semibold">Index embeddings</span> above so NECTAR can read them.
                 </TableCell>
               </TableRow>
             ) : ranked.map(({ row: r, similarity }) => {

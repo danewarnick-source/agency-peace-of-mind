@@ -416,7 +416,7 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 backdrop-blur-sm">
             <div className="flex items-center gap-2 rounded-full border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-700 dark:text-sky-300">
               <Loader2 className="h-4 w-4 animate-spin" />
-              🤖 AI is reading receipt telemetry and parsing data…
+              NECTAR is reading receipt telemetry and parsing data…
             </div>
           </div>
         )}

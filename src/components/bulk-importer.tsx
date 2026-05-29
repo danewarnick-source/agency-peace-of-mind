@@ -252,7 +252,7 @@ export function BulkImporter({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> NECTAR Bulk Importer</DialogTitle>
           <DialogDescription>
-            Drop your roster — AI auto-maps known fields and spins up custom attributes for anything new.
+            Drop your roster — NECTAR auto-maps known fields and spins up custom attributes for anything new.
           </DialogDescription>
         </DialogHeader>
 
@@ -280,7 +280,7 @@ export function BulkImporter({
               <Upload className="h-10 w-10 text-muted-foreground" />
               <div>
                 <p className="font-medium">Drop CSV / Excel here</p>
-                <p className="text-xs text-muted-foreground">.csv, .xlsx, .xls supported · AI auto-builds custom fields</p>
+                <p className="text-xs text-muted-foreground">.csv, .xlsx, .xls supported · NECTAR auto-builds custom fields</p>
               </div>
               <Label htmlFor="bulk-file" className="cursor-pointer">
                 <span className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">

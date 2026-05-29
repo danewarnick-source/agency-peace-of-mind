@@ -306,7 +306,7 @@ function AIImportDialog({
             ) : (
               <><Upload className="mx-auto h-6 w-6 text-muted-foreground" />
                 <p className="mt-2 text-sm font-medium">Drop physician order, MAR, or pharmacy list</p>
-                <p className="text-xs text-muted-foreground">PDF, image, CSV, or text — AI extracts meds, dose, route, frequency, times.</p></>
+                <p className="text-xs text-muted-foreground">PDF, image, CSV, or text — NECTAR extracts meds, dose, route, frequency, times.</p></>
             )}
             <input
               ref={fileRef} type="file" className="hidden"

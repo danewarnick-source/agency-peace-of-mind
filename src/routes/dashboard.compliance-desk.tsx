@@ -35,36 +35,22 @@ function GeofenceBadge({ reason }: { reason: string | null }) {
   const hasReason = !!(reason && reason.trim().length > 0);
   if (!hasReason) {
     return (
-      <span
-        className="inline-flex items-center gap-1 rounded-full border border-emerald-600/30 px-2.5 py-0.5 text-[11px] font-semibold"
-        style={{ backgroundColor: "#d1fae5", color: "#065f46" }}
-      >
-        🟢 MATCH
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
+        <ShieldCheck className="h-3.5 w-3.5" /> MATCH
       </span>
     );
   }
   return (
-    <div className="flex flex-col items-start gap-0.5">
-      <TooltipProvider delayDuration={150}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              className="inline-flex cursor-help items-center gap-1 rounded-full border border-rose-700/30 px-2.5 py-0.5 text-[11px] font-semibold"
-              style={{ backgroundColor: "#fee2e2", color: "#991b1b" }}
-            >
-              🔴 NO MATCH
-            </span>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <span
-        className="max-w-[180px] truncate text-[10px] italic text-muted-foreground"
-        title={reason ?? ""}
-      >
-        {reason}
-      </span>
-    </div>
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive">
+            <ShieldAlert className="h-3.5 w-3.5" /> NO MATCH
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

@@ -154,11 +154,9 @@ export const setAttendance = createServerFn({ method: "POST" })
         away_category:           data.awayCategory ?? null,
         staff_initials_signature: data.staffInitials ?? null,
         attestation_accepted:    data.attestationAccepted,
-        recorded_by:             userId,
+        provider_id:             userId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as never, { onConflict: "client_id,record_date" })
-      .select()
-      .single();
     if (error) throw new Error(error.message);
     return row;
   });

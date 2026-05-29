@@ -414,7 +414,7 @@ function ComplianceDeskPage() {
               ) : (
                 <Search className="mr-1.5 h-3.5 w-3.5" />
               )}
-              🔍 Ask AI
+              Ask AI
             </Button>
           </div>
         </div>

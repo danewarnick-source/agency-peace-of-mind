@@ -498,13 +498,18 @@ function SchedulerInner({ orgId }: { orgId: string }) {
     enabled: !!orgId,
     queryKey: ["sched-staff", orgId],
     queryFn: async (): Promise<StaffMember[]> => {
+      // profiles has no organization_id; resolve org members via organization_members join
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
-        .from("profiles")
-        .select("id, full_name, email")
-        .eq("organization_id", orgId);
+        .from("organization_members")
+        .select("user_id, profiles:user_id(id, full_name, email)")
+        .eq("organization_id", orgId)
+        .eq("active", true);
       if (error) throw error;
-      return (data ?? []) as unknown as StaffMember[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ((data ?? []) as any[])
+        .map((r) => r.profiles)
+        .filter((p): p is StaffMember => !!p && !!p.id);
     },
   });
 
@@ -517,7 +522,7 @@ function SchedulerInner({ orgId }: { orgId: string }) {
         .from("clients")
         .select("id, first_name, last_name, physical_address, job_code")
         .eq("organization_id", orgId)
-        .eq("status", "Active");
+        .eq("account_status", "active");
       if (error) throw error;
       return (data ?? []) as unknown as Client[];
     },

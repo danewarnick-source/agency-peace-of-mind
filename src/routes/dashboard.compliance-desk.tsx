@@ -595,12 +595,12 @@ function UnifiedSearchResults({
 
 
       {error && (
-        <div className="mb-3 rounded-md border border-rose-300/50 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
-          ⚠️ {error.message}
+        <div className="mb-3 flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <AlertTriangle className="h-3.5 w-3.5" /> {error.message}
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -613,13 +613,12 @@ function UnifiedSearchResults({
               <TableHead>In → Out</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
-              <TableHead>Geofence Validation Status</TableHead>
+              <TableHead>Geofence Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              // 🦴 Loading skeleton across the cards grid while the vector pipeline runs.
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={`sk-${i}`}>
                   <TableCell colSpan={11} className="py-3">
@@ -641,29 +640,29 @@ function UnifiedSearchResults({
                 <Fragment key={r.id}>
                   <TableRow>
                     <TableCell>
-                      <Badge variant="outline" className="font-mono text-[10px]">
+                      <Badge variant="outline" className="font-mono text-[11px]">
                         {(similarity * 100).toFixed(0)}%
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{fmtDateMDY(inIso)}</TableCell>
+                    <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
                     <TableCell>
-                      <Badge variant={isPending ? "default" : "secondary"} className="text-[10px]">
-                        {isPending ? "PENDING" : "APPROVED"}
+                      <Badge variant={isPending ? "default" : "secondary"} className="text-[11px]">
+                        {isPending ? "Pending" : "Approved"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-medium">
+                    <TableCell className="whitespace-nowrap font-medium">
                       {r.staff?.full_name ?? r.staff?.email ?? "—"}
                       <EditedByAdminBadge row={r} />
                     </TableCell>
-                    <TableCell>{r.clients?.first_name} {r.clients?.last_name}</TableCell>
-                    <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {fmtTimeHMSAmPm(inIso)} → {outIso ? fmtTimeHMSAmPm(outIso) : "—"}
+                    <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
+                    <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
+                    <TableCell className="whitespace-nowrap font-mono">
+                      {fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{fmtDuration(inIso, outIso)}</TableCell>
+                    <TableCell className="whitespace-nowrap font-mono">{fmtDuration(inIso, outIso)}</TableCell>
                     <TableCell>
                       <Button variant="outline" size="sm" onClick={() => onMap(r)}>
-                        <MapPin className="mr-1 h-3 w-3" /> View
+                        <MapPin /> View
                       </Button>
                     </TableCell>
                     <TableCell
@@ -677,16 +676,15 @@ function UnifiedSearchResults({
                         {isPending && (
                           <Button
                             size="icon"
-                            className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700"
                             onClick={() => onApprove(r.id)}
                             disabled={approving}
                             aria-label="Approve"
                           >
-                            {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            {approving ? <Loader2 className="animate-spin" /> : <Check />}
                           </Button>
                         )}
-                        <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => onEdit(r)} aria-label="Edit">
-                          <Pencil className="h-4 w-4" />
+                        <Button size="icon" variant="secondary" onClick={() => onEdit(r)} aria-label="Edit">
+                          <Pencil />
                         </Button>
                       </div>
                     </TableCell>
@@ -698,6 +696,9 @@ function UnifiedSearchResults({
           </TableBody>
         </Table>
       </div>
+    </section>
+  );
+}
     </section>
   );
 }

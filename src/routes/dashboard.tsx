@@ -201,7 +201,8 @@ function DashboardLayout() {
             </Button>
           </header>
 
-          <main className="flex-1 bg-secondary/40 p-6 md:p-8">
+          <main className="flex-1 bg-secondary/40 px-8 py-6">
+
             <Outlet />
           </main>
         </div>

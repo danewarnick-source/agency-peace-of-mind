@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus } from "lucide-react";
+import { UserPlus, AlertTriangle, Clock, FileText, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
@@ -71,51 +71,59 @@ function ComplianceInbox() {
   if (totalItems === 0) return null;
 
   return (
-    <div className="rounded-2xl border-2 border-amber-500/40 bg-amber-50 p-5 dark:bg-amber-950/20">
-      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-amber-800 dark:text-amber-200">
-        ⚠️ Needs Your Attention ({totalItems})
+    <div className="rounded-lg border border-warning/40 bg-warning/5 p-4">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <AlertTriangle className="h-4 w-4 text-warning-foreground" />
+        Needs Your Attention ({totalItems})
       </h2>
       <ul className="space-y-2">
         {openShifts.map((s) => (
           <li key={s.id}
-            className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-white px-3 py-2.5 dark:bg-amber-950/30">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                🕐 Open shift — {s.clients ? `${s.clients.first_name} ${s.clients.last_name}` : "Unknown client"}
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                Clocked in {new Date(s.clock_in_timestamp).toLocaleDateString()} — never clocked out
-              </p>
+            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
+            <div className="min-w-0 flex items-start gap-2">
+              <Clock className="h-4 w-4 mt-0.5 shrink-0 text-warning-foreground" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  Open shift — {s.clients ? `${s.clients.first_name} ${s.clients.last_name}` : "Unknown client"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Clocked in {new Date(s.clock_in_timestamp).toLocaleDateString()} — never clocked out
+                </p>
+              </div>
             </div>
             <Button size="sm" variant="outline"
-              className="shrink-0 border-amber-500/50 text-amber-800 hover:bg-amber-100 dark:text-amber-200"
+              className="shrink-0"
               onClick={() => navigate({ to: "/dashboard/timeclock" })}>
-              Fix Now →
+              Fix Now <ArrowRight />
             </Button>
           </li>
         ))}
         {rejectedLogs.map((l) => (
           <li key={l.id}
-            className="flex items-center justify-between gap-3 rounded-lg border border-rose-500/30 bg-white px-3 py-2.5 dark:bg-rose-950/30">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-rose-900 dark:text-rose-100">
-                📋 Daily log returned — {l.clients ? `${l.clients.first_name} ${l.clients.last_name}` : "Unknown"} ·{" "}
-                {new Date(l.log_date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-              </p>
-              {l.denial_reason && (
-                <p className="text-xs text-rose-700 dark:text-rose-300">Admin note: {l.denial_reason}</p>
-              )}
+            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
+            <div className="min-w-0 flex items-start gap-2">
+              <FileText className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  Daily log returned — {l.clients ? `${l.clients.first_name} ${l.clients.last_name}` : "Unknown"} ·{" "}
+                  {new Date(l.log_date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </p>
+                {l.denial_reason && (
+                  <p className="text-xs text-muted-foreground">Admin note: {l.denial_reason}</p>
+                )}
+              </div>
             </div>
             <Button size="sm" variant="outline"
-              className="shrink-0 border-rose-500/50 text-rose-800 hover:bg-rose-100 dark:text-rose-200"
+              className="shrink-0"
               onClick={() => navigate({ to: "/dashboard/daily-logs" })}>
-              Fix Now →
+              Fix Now <ArrowRight />
             </Button>
           </li>
         ))}
       </ul>
     </div>
   );
+}
 }
 
 function Overview() {

@@ -442,15 +442,20 @@ function ShiftFormDialog({
             />
           </div>
         </div>
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <Button variant="outline" onClick={onClose} disabled={busy} className="sm:mr-auto">
             Cancel
           </Button>
-          <Button onClick={save} disabled={busy}>
-            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEdit ? "Save Changes" : "Create Shift"}
+          <Button variant="secondary" onClick={() => save(false)} disabled={busy}>
+            {busyAction === "draft" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Draft
+          </Button>
+          <Button onClick={() => save(true)} disabled={busy}>
+            {busyAction === "publish" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEdit ? "Save & Publish" : "Publish"}
           </Button>
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );

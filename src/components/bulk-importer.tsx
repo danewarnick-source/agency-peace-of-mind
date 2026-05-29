@@ -9,14 +9,14 @@ import { Switch } from "@/components/ui/switch";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Sparkles, Upload, FileSpreadsheet, Loader2, CheckCircle2, Wand2 } from "lucide-react";
+import { Sparkles, Upload, FileSpreadsheet, Loader2, CheckCircle2, Wand2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { useServerFn } from "@tanstack/react-start";
 import { bulkImportRoster } from "@/lib/bulk-import.functions";
 import { useQueryClient } from "@tanstack/react-query";
-
+import { AiPdfImporter } from "@/components/ai-pdf-importer";
 type Kind = "employee" | "client";
 type DataType = "text" | "number" | "boolean" | "date";
 
@@ -143,13 +143,13 @@ export function BulkImporter({
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>(defaultKind);
+  const [mode, setMode] = useState<"sheet" | "pdf">("sheet");
   const [step, setStep] = useState<Step>("upload");
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [mapping, setMapping] = useState<Record<string, MappingEntry>>({});
   const [pasteText, setPasteText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
   const importFn = useServerFn(bulkImportRoster);
   const qc = useQueryClient();
 
@@ -248,7 +248,8 @@ export function BulkImporter({
           <Sparkles className="mr-2 h-4 w-4" /> NECTAR Bulk Import (CSV, Excel, or PDF)
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
+
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> NECTAR Bulk Importer</DialogTitle>
           <DialogDescription>
@@ -269,6 +270,32 @@ export function BulkImporter({
           >Client Roster</button>
         </div>
 
+        {kind === "client" && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border p-1 w-fit">
+            <button
+              type="button"
+              onClick={() => setMode("sheet")}
+              className={`inline-flex h-9 min-w-[44px] items-center gap-1.5 px-3 text-xs rounded-md transition ${mode === "sheet" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" /> CSV / Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("pdf")}
+              className={`inline-flex h-9 min-w-[44px] items-center gap-1.5 px-3 text-xs rounded-md transition ${mode === "pdf" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            >
+              <Sparkles className="h-3.5 w-3.5" /> AI PDF Import
+            </button>
+          </div>
+        )}
+
+        {kind === "client" && mode === "pdf" ? (
+          <AiPdfImporter
+            organizationId={organizationId}
+            onDone={() => setOpen(false)}
+          />
+        ) : (
+          <>
         {step === "upload" && (
           <div className="space-y-4">
             <div
@@ -400,6 +427,8 @@ export function BulkImporter({
               </Button>
             </DialogFooter>
           </div>
+        )}
+          </>
         )}
       </DialogContent>
     </Dialog>

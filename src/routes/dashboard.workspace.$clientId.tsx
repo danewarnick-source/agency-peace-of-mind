@@ -27,7 +27,7 @@ import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
 import { FormsHubTab } from "@/components/workspace/forms-hub-tab";
 import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
 
-const workspaceSearch = z.object({ tab: z.string().optional() });
+const workspaceSearch = z.object({ tab: z.string().optional(), code: z.string().optional() });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — HIVE" }] }),
   validateSearch: workspaceSearch,

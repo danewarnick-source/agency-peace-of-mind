@@ -448,28 +448,22 @@ function ComplianceDeskPage() {
       </div>
 
       {!isSearching && (
-        <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1">
-          <button
-            type="button"
-            onClick={() => setSub("pending")}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "pending" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            📥 Pending Review
-          </button>
-          <button
-            type="button"
-            onClick={() => setSub("evv-archive")}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            📁 State EVV Archive
-          </button>
-          <button
-            type="button"
-            onClick={() => setSub("non-evv-archive")}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition ${sub === "non-evv-archive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            💼 Internal / Non-EVV Archive
-          </button>
+        <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1 shadow-soft">
+          {[
+            { id: "pending" as const, label: "Pending Review", Icon: Inbox },
+            { id: "evv-archive" as const, label: "State EVV Archive", Icon: FolderArchive },
+            { id: "non-evv-archive" as const, label: "Internal / Non-EVV Archive", Icon: Briefcase },
+          ].map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSub(id)}
+              className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition ${sub === id ? "bg-accent text-accent-foreground shadow-soft" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
         </nav>
       )}
 

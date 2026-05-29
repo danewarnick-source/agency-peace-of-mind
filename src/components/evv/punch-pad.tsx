@@ -821,7 +821,7 @@ export function PunchPad({
             <Select
               value={serviceCode}
               onValueChange={setServiceCode}
-              disabled={isRunning || !clientForPunch}
+              disabled={isRunning || !clientForPunch || (lockServiceCode && !!presetServiceCode)}
             >
               <SelectTrigger className="h-12">
                 <SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} />
@@ -834,7 +834,12 @@ export function PunchPad({
                 ))}
               </SelectContent>
             </Select>
-            {clientForPunch?.authorizedCodes?.length ? (
+            {lockServiceCode && presetServiceCode ? (
+              <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
+                <Lock className="h-3 w-3" />
+                Locked from today&apos;s schedule — prevents billing errors.
+              </p>
+            ) : clientForPunch?.authorizedCodes?.length ? (
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Restricted to authorizations on {clientForPunch.name}&apos;s profile.
               </p>

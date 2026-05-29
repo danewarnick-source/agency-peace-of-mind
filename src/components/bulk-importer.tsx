@@ -427,6 +427,8 @@ export function BulkImporter({
             </DialogFooter>
           </div>
         )}
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

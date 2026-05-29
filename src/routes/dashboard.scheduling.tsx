@@ -498,11 +498,11 @@ function SchedulerInner({ orgId }: { orgId: string }) {
     enabled: !!orgId,
     queryKey: ["sched-staff", orgId],
     queryFn: async (): Promise<StaffMember[]> => {
-      const { data, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("profiles")
         .select("id, full_name, email")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .eq("organization_id", orgId) as any;
+        .eq("organization_id", orgId);
       if (error) throw error;
       return (data ?? []) as unknown as StaffMember[];
     },
@@ -512,12 +512,12 @@ function SchedulerInner({ orgId }: { orgId: string }) {
     enabled: !!orgId,
     queryKey: ["sched-clients", orgId],
     queryFn: async (): Promise<Client[]> => {
-      const { data, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("clients")
         .select("id, first_name, last_name, physical_address, job_code")
         .eq("organization_id", orgId)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .eq("status", "Active") as any;
+        .eq("status", "Active");
       if (error) throw error;
       return (data ?? []) as unknown as Client[];
     },

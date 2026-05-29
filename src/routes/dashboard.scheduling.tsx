@@ -372,7 +372,7 @@ function ShiftFormDialog({
           {/* Duration preview */}
           {startsAt && endsAt && new Date(endsAt) > new Date(startsAt) && (
             <p className="text-xs text-emerald-600 dark:text-emerald-400">
-              ✓ Duration: {shiftDuration(new Date(startsAt).toISOString(), new Date(endsAt).toISOString())}
+              Duration: {shiftDuration(new Date(startsAt).toISOString(), new Date(endsAt).toISOString())}
             </p>
           )}
 
@@ -584,7 +584,7 @@ function SchedulerInner({ orgId }: { orgId: string }) {
         .update({ published: true } as any)
         .in("id", unpublished);
       if (error) throw error;
-      toast.success(`✅ ${unpublished.length} shift${unpublished.length > 1 ? "s" : ""} published to staff.`);
+      toast.success(`${unpublished.length} shift${unpublished.length > 1 ? "s" : ""} published to staff.`);
       qc.invalidateQueries({ queryKey: ["shifts", orgId, year, month] });
     } catch (e) {
       toast.error((e as Error).message);
@@ -621,7 +621,7 @@ function SchedulerInner({ orgId }: { orgId: string }) {
       {/* Page header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">📅 Scheduling</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Scheduling</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Manage caregiver shifts, publish schedules, and track status.
           </p>

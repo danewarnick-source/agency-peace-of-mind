@@ -38,7 +38,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/host-home-control", label: "Host Home Control", icon: Home },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
   { to: "/dashboard/pba-ledger", label: "PBA Trust Ledger", icon: Wallet },
-  { to: "/dashboard/scheduling", label: "📅 Scheduling", icon: CalendarDays },
+  { to: "/dashboard/scheduling", label: "Scheduling", icon: CalendarDays },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },

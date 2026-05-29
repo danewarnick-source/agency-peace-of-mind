@@ -1076,9 +1076,6 @@ function ArchiveTable({
     </section>
   );
 }
-    </section>
-  );
-}
 
 function ReasonDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
   return (

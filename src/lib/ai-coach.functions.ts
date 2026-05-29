@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,7 +91,6 @@ async function callAI(system: string, user: string): Promise<string> {
 // ─── Documentation Quality Coach ─────────────────────────────────────────────
 
 export const evaluateShiftNote = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator(validateCoach)
   .handler(async ({ data }): Promise<CoachResult> => {
     const system = `You are an encouraging, professional Medicaid DSPD Documentation Coach reviewing a caregiver's end-of-shift progress note.
@@ -143,7 +141,6 @@ ${data.narrative}
 // Returns structured JSON so the client can decide which modal to show.
 
 export const scanNoteForTriggers = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator(validateScan)
   .handler(async ({ data }): Promise<ScanResult> => {
     const system = `You are a compliance trigger scanner for a Medicaid DSPD caregiving platform. 

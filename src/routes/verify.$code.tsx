@@ -18,9 +18,12 @@ function VerifyPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["verify", code],
     queryFn: async () => {
-      const { data } = await supabase.rpc("verify_certification", { _code: code });
-      const row = Array.isArray(data) ? data[0] : data;
-      return row ?? null;
+      const { data } = await supabase
+        .from("certifications")
+        .select("verification_code, recipient_name, course_title, issued_at, expires_at")
+        .eq("verification_code", code)
+        .maybeSingle();
+      return data;
     },
   });
 

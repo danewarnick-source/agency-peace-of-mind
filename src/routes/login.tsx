@@ -35,8 +35,8 @@ function LoginPage() {
     let email = identifier;
     if (!identifier.includes("@")) {
       try {
-        const r = await resolveUsername({ data: { username: identifier, password } });
-        if (!r.email) { setBusy(false); return toast.error("Invalid username or password"); }
+        const r = await resolveUsername({ data: { username: identifier } });
+        if (!r.email) { setBusy(false); return toast.error("No account with that username"); }
         email = r.email;
       } catch (err) {
         setBusy(false);

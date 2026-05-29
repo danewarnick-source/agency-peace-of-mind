@@ -15,10 +15,65 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import {
+  Activity,
+  AlertOctagon,
+  Loader2,
+  Stethoscope,
+} from "lucide-react";
 import { toast } from "sonner";
-import { FormCardGrid } from "./FormCardGrid";
-import type { FormType } from "./shared-form-cards";
+
+type FormType = "incident" | "medical" | "behavior" | "summary" | "inventory" | "drill" | "transfer";
+
+const CARDS: {
+  type: FormType;
+  title: string;
+  desc: string;
+  accent: string;
+}[] = [
+  {
+    type: "incident",
+    title: "🚨 Critical Incident Report",
+    desc: "INTERNAL intake for admin review — injury, behavior crisis, medication error, abuse, neglect.",
+    accent: "border-rose-200 hover:border-rose-400 bg-rose-50/40 dark:bg-rose-950/10",
+  },
+  {
+    type: "medical",
+    title: "🩺 Medical & Specialist Appointment Log",
+    desc: "Record an appointment visit, physician orders, and follow-up.",
+    accent: "border-blue-200 hover:border-blue-400 bg-blue-50/40 dark:bg-blue-950/10",
+  },
+  {
+    type: "behavior",
+    title: "🧠 Behavior / Seizure Data Sheet",
+    desc: "Antecedent, behavior, consequence + seizure type, duration, and recovery.",
+    accent: "border-violet-200 hover:border-violet-400 bg-violet-50/40 dark:bg-violet-950/10",
+  },
+  {
+    type: "summary",
+    title: "📈 Comprehensive Monthly Review Summary",
+    desc: "Monthly PCSP narrative and community outings.",
+    accent: "border-teal-200 hover:border-teal-400 bg-teal-50/40 dark:bg-teal-950/10",
+  },
+  {
+    type: "inventory",
+    title: "💎 $50+ Valuables Inventory",
+    desc: "Register or remove client high-value belongings.",
+    accent: "border-amber-200 hover:border-amber-400 bg-amber-50/40 dark:bg-amber-950/10",
+  },
+  {
+    type: "drill",
+    title: "🔥 Quarterly Evacuation Drill Record",
+    desc: "Log fire, earthquake, or severe weather drills.",
+    accent: "border-orange-200 hover:border-orange-400 bg-orange-50/40 dark:bg-orange-950/10",
+  },
+  {
+    type: "transfer",
+    title: "🔄 Cross-Agency Transfer Log",
+    desc: "Communication log to school, day program, or respite.",
+    accent: "border-slate-200 hover:border-slate-400 bg-slate-50/40 dark:bg-slate-950/10",
+  },
+];
 
 export function FormsHubTab({
   clientId,
@@ -31,7 +86,21 @@ export function FormsHubTab({
 
   return (
     <>
-      <FormCardGrid onSelect={(type) => setActive(type as FormType)} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {CARDS.map((c) => {
+          return (
+            <button
+              key={c.type}
+              type="button"
+              onClick={() => setActive(c.type)}
+              className={`group flex min-h-[44px] flex-col rounded-2xl border-2 p-5 text-left shadow-sm transition hover:shadow-md ${c.accent}`}
+            >
+              <p className="font-semibold leading-tight">{c.title}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{c.desc}</p>
+            </button>
+          );
+        })}
+      </div>
       <FormDialog
         type={active}
         clientId={clientId}

@@ -1,9 +1,31 @@
 import { useEffect, useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { z } from "zod";
-import { useCaseload } from "@/hooks/use-caseload";
+import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 
-
+const MOCK_WORKSPACE_CLIENTS: Record<string, CaseloadClient> = {
+  "mock-client-john-smith": {
+    id: "mock-client-john-smith",
+    first_name: "John",
+    last_name: "Smith",
+    home_latitude: null,
+    home_longitude: null,
+    pcsp_goals: ["Practice grocery budgeting", "Community outing 1x/week"],
+    job_code: ["T2017"],
+    medicaid_id: null,
+    physical_address: "Maple House — 412 N Main St",
+  },
+  "mock-client-jane-doe": {
+    id: "mock-client-jane-doe",
+    first_name: "Jane",
+    last_name: "Doe",
+    home_latitude: null,
+    home_longitude: null,
+    pcsp_goals: ["Morning hygiene routine", "Prepare lunch independently"],
+    job_code: ["S5125"],
+    medicaid_id: null,
+    physical_address: "Oak House — 88 Willow Ln",
+  },
+};
 import { Badge } from "@/components/ui/badge";
 import { PunchPad } from "@/components/evv/punch-pad";
 import { padMemberId } from "@/lib/evv-codes";
@@ -23,14 +45,12 @@ import {
 
 import { toast } from "sonner";
 import { AboutTab } from "@/components/workspace/about-tab";
-import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
+import { EmarTab } from "@/components/workspace/emar-tab";
 import { FormsHubTab } from "@/components/workspace/forms-hub-tab";
 import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
 
-const workspaceSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — Care Academy" }] }),
-  validateSearch: workspaceSearch,
   component: ClientWorkspace,
 });
 
@@ -38,23 +58,25 @@ function ClientWorkspace() {
   const { clientId } = Route.useParams();
   const { data: caseload, isLoading } = useCaseload();
   const navigate = useNavigate();
-  const { tab: tabParam } = Route.useSearch();
 
+  const isMock = clientId.startsWith("mock-client-");
   const client = useMemo(() => {
+    if (isMock) return MOCK_WORKSPACE_CLIENTS[clientId] ?? null;
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;
-  }, [caseload, clientId]);
+  }, [caseload, clientId, isMock]);
 
+  // Security guard: if not in caseload (and not a mock test client), deny access.
   useEffect(() => {
+    if (isMock) return;
     if (!isLoading && caseload && !client) {
       toast.error("You are not assigned to this individual.");
       navigate({ to: "/dashboard" });
     }
-  }, [isLoading, caseload, client, navigate]);
+  }, [isLoading, caseload, client, navigate, isMock]);
 
-  if (isLoading || !client) {
+  if ((!isMock && isLoading) || !client) {
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   }
-
 
   const codes = Array.isArray(client.job_code) ? client.job_code : [];
 
@@ -100,11 +122,7 @@ function ClientWorkspace() {
 
 
 
-        <Tabs
-          value={tabParam ?? "about"}
-          onValueChange={(val) => navigate({ to: ".", search: { tab: val }, replace: true })}
-          className="w-full"
-        >
+        <Tabs defaultValue="about" className="w-full">
           {/* Touch-friendly tab bar — mirrored across mobile and desktop */}
           <TabsList className="grid h-auto w-full grid-cols-4 gap-1 p-1">
             <TabsTrigger
@@ -126,7 +144,7 @@ function ClientWorkspace() {
               className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
             >
               <Pill className="h-4 w-4" />
-              <span>MAR</span>
+              <span>eMAR</span>
             </TabsTrigger>
             <TabsTrigger
               value="forms"
@@ -159,7 +177,7 @@ function ClientWorkspace() {
           </TabsContent>
 
           <TabsContent value="emar" className="mt-5">
-            <MarEmarTab
+            <EmarTab
               clientId={client.id}
               clientName={`${client.first_name} ${client.last_name}`}
             />

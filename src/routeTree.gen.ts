@@ -61,6 +61,7 @@ import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
+import { Route as ApiPublicSeedStaffRouteImport } from './routes/api/public/seed-staff'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
@@ -331,6 +332,11 @@ const DashboardAdminEmarAuditRoute = DashboardAdminEmarAuditRouteImport.update({
   path: '/admin/emar-audit',
   getParentRoute: () => DashboardRoute,
 } as any)
+const ApiPublicSeedStaffRoute = ApiPublicSeedStaffRouteImport.update({
+  id: '/api/public/seed-staff',
+  path: '/api/public/seed-staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardCoursesCourseIdEditRoute =
   DashboardCoursesCourseIdEditRouteImport.update({
     id: '/edit',
@@ -380,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
@@ -434,6 +441,7 @@ export interface FileRoutesByTo {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
@@ -490,6 +498,7 @@ export interface FileRoutesById {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
@@ -547,6 +556,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
+    | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
@@ -601,6 +611,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard'
+    | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
@@ -656,6 +667,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
+    | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
@@ -686,6 +698,7 @@ export interface RootRouteChildren {
   UnauthorizedRoute: typeof UnauthorizedRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
+  ApiPublicSeedStaffRoute: typeof ApiPublicSeedStaffRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1054,6 +1067,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminEmarAuditRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/api/public/seed-staff': {
+      id: '/api/public/seed-staff'
+      path: '/api/public/seed-staff'
+      fullPath: '/api/public/seed-staff'
+      preLoaderRoute: typeof ApiPublicSeedStaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/courses/$courseId/edit': {
       id: '/dashboard/courses/$courseId/edit'
       path: '/edit'
@@ -1206,6 +1226,7 @@ const rootRouteChildren: RootRouteChildren = {
   UnauthorizedRoute: UnauthorizedRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
+  ApiPublicSeedStaffRoute: ApiPublicSeedStaffRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

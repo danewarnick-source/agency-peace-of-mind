@@ -10,12 +10,8 @@ import { Badge } from "@/components/ui/badge";
 
 type Urgency = "normal" | "urgent" | "critical";
 type NotificationType =
-  | "incident_report_filed"
-  | "incident_deadline_warning"
-  | "timesheet_exception"
-  | "daily_log_exception"
-  | "open_shift_warning"
-  | "medication_error";
+  | "incident_report_filed" | "incident_deadline_warning"
+  | "timesheet_exception" | "daily_log_exception" | "open_shift_warning";
 
 type AppNotification = {
   id: string; organization_id: string; type: NotificationType;

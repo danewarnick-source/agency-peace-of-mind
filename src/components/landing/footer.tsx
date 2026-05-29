@@ -14,7 +14,7 @@ export function Footer() {
               </span>
               HIVE
             </Link>
-            <p className="mt-3 max-w-sm text-sm text-muted-foreground">HIVE — powered by NECTAR. Modern workforce intelligence for care teams that take compliance seriously.</p>
+            <p className="mt-3 max-w-sm text-sm text-muted-foreground">HIVE — powered by NECTAR™. Modern workforce intelligence for care teams that take compliance seriously.</p>
 
           </div>
           <div className="grid grid-cols-2 gap-x-12 gap-y-3 text-sm md:grid-cols-3">

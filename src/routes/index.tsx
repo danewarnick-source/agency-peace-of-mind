@@ -35,13 +35,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "HIVE unifies scheduling, EVV, eMAR, billing and compliance for HCBS and home-care agencies. Powered by NECTAR, the intelligence layer that turns every shift into audit-ready proof.",
+          "HIVE unifies scheduling, EVV, eMAR, billing and compliance for HCBS and home-care agencies. Powered by NECTAR™, the intelligence layer that turns every shift into audit-ready proof.",
       },
       { property: "og:title", content: "HIVE — Run your whole agency from one hive" },
       {
         property: "og:description",
         content:
-          "One platform for care, compliance and operations. Powered by NECTAR.",
+          "One platform for care, compliance and operations. Powered by NECTAR™.",
       },
     ],
   }),
@@ -91,7 +91,7 @@ function HiveLandingPage() {
             <div className="leading-none">
               <div className="font-display text-lg font-bold tracking-tight">HIVE</div>
               <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                Powered by NECTAR
+                Powered by NECTAR™
               </div>
             </div>
           </Link>
@@ -101,7 +101,7 @@ function HiveLandingPage() {
               Platform
             </a>
             <a href="#nectar" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-              NECTAR
+              NECTAR™
             </a>
             <a href="#compliance" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               Compliance
@@ -143,7 +143,7 @@ function HiveLandingPage() {
             <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
               {[
                 ["#modules", "Platform"],
-                ["#nectar", "NECTAR"],
+                ["#nectar", "NECTAR™"],
                 ["#compliance", "Compliance"],
                 ["#faq", "FAQ"],
               ].map(([href, label]) => (
@@ -186,7 +186,7 @@ function HiveLandingPage() {
         <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-12 lg:px-8 lg:py-28">
           <div className="lg:col-span-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-nectar-gold-300 backdrop-blur">
-              <Sparkles className="h-3.5 w-3.5" /> Powered by NECTAR — the intelligence layer for care
+              <Sparkles className="h-3.5 w-3.5" /> Powered by NECTAR™ — the intelligence layer for care
             </div>
             <h1 className="font-display mt-6 text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
               Run your whole agency
@@ -195,7 +195,7 @@ function HiveLandingPage() {
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/75">
               HIVE unifies scheduling, EVV, eMAR, billing and compliance into a single
-              workflow. NECTAR turns every visit, signature and note into audit-ready proof —
+              workflow. NECTAR™ turns every visit, signature and note into audit-ready proof —
               automatically.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -355,7 +355,7 @@ function HiveLandingPage() {
         <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-12 lg:items-center lg:px-8 lg:py-24">
           <div className="lg:col-span-6">
             <span className="inline-flex items-center gap-2 rounded-full bg-nectar-gold-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-nectar-gold-300">
-              <Sparkles className="h-3.5 w-3.5" /> NECTAR
+              <Sparkles className="h-3.5 w-3.5" /> NECTAR™
             </span>
             <h2 className="font-display mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
               The intelligence layer that turns
@@ -363,7 +363,7 @@ function HiveLandingPage() {
               messy care data into proof.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-white/75">
-              NECTAR reads every shift, signature, note and pass — and quietly produces the
+              NECTAR™ reads every shift, signature, note and pass — and quietly produces the
               paperwork the state actually asks for. No new screens for your staff. No
               month-end scramble for your QA team.
             </p>
@@ -390,7 +390,7 @@ function HiveLandingPage() {
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-nectar-gold-400" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
-                    NECTAR · Live feed
+                    NECTAR™ · Live feed
                   </span>
                 </div>
                 <span className="text-[10px] text-white/40">just now</span>
@@ -540,8 +540,8 @@ function HiveLandingPage() {
                 a: "Yes. HIVE captures all six federally required EVV data points and supports GPS, biometric, and FOB modes. We integrate with state aggregators and reconcile every punch to an active authorization.",
               },
               {
-                q: "What is NECTAR, exactly?",
-                a: "NECTAR is the intelligence layer inside HIVE. It reads operational signals — EVV punches, MAR entries, goal progress, signatures — and continuously assembles the documentation auditors expect. Your staff don't learn a new tool; the proof just appears.",
+                q: "What is NECTAR™, exactly?",
+                a: "NECTAR™ is the intelligence layer inside HIVE. It reads operational signals — EVV punches, MAR entries, goal progress, signatures — and continuously assembles the documentation auditors expect. Your staff don't learn a new tool; the proof just appears.",
               },
               {
                 q: "How long does implementation take?",

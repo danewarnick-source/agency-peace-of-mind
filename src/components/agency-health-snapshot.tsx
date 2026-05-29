@@ -3,51 +3,58 @@ import { useServerFn } from "@tanstack/react-start";
 import { getAgencyHealthSnapshot } from "@/lib/agency-health.functions";
 import { CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
 
-type Tier = { label: string; ring: string; text: string; bg: string; border: string; badge: string };
+type Tier = {
+  label: string;
+  ring: string;
+  text: string;
+  bg: string;
+  border: string;
+  badge: string;
+};
 
 function tierFor(score: number): Tier {
   if (score >= 90)
     return {
-      label: "🟢 OPTIMAL",
-      ring: "stroke-emerald-500",
-      text: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-500/10",
-      border: "border-emerald-500/30",
-      badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+      label: "Optimal",
+      ring: "stroke-success",
+      text: "text-success",
+      bg: "bg-success/8",
+      border: "border-success/25",
+      badge: "bg-success/12 text-success border-success/25",
     };
   if (score >= 80)
     return {
-      label: "🟡 WARNING",
-      ring: "stroke-amber-500",
-      text: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/10",
-      border: "border-amber-500/30",
-      badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+      label: "Warning",
+      ring: "stroke-warning",
+      text: "text-warning-foreground",
+      bg: "bg-warning/8",
+      border: "border-warning/25",
+      badge: "bg-warning/15 text-warning-foreground border-warning/25",
     };
   return {
-    label: "🚨 CRITICAL RISK",
-    ring: "stroke-rose-500",
-    text: "text-rose-600 dark:text-rose-400",
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/30",
-    badge: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+    label: "Critical Risk",
+    ring: "stroke-destructive",
+    text: "text-destructive",
+    bg: "bg-destructive/8",
+    border: "border-destructive/25",
+    badge: "bg-destructive/12 text-destructive border-destructive/25",
   };
 }
 
 function RadialRing({ score, tier }: { score: number; tier: Tier }) {
-  const r = 56;
+  const r = 58;
   const c = 2 * Math.PI * r;
   const offset = c - (Math.min(100, Math.max(0, score)) / 100) * c;
   return (
     <div className="relative grid h-36 w-36 place-items-center">
       <svg viewBox="0 0 140 140" className="h-36 w-36 -rotate-90">
-        <circle cx="70" cy="70" r={r} className="fill-none stroke-muted" strokeWidth="12" />
+        <circle cx="70" cy="70" r={r} className="fill-none stroke-border" strokeWidth="6" />
         <circle
           cx="70"
           cy="70"
           r={r}
           className={`fill-none ${tier.ring} transition-all duration-700`}
-          strokeWidth="12"
+          strokeWidth="6"
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={offset}
@@ -55,7 +62,7 @@ function RadialRing({ score, tier }: { score: number; tier: Tier }) {
       </svg>
       <div className="absolute inset-0 grid place-items-center">
         <div className="text-center">
-          <div className={`text-3xl font-bold tabular-nums ${tier.text}`}>{score}%</div>
+          <div className={`text-3xl font-semibold tabular-nums ${tier.text}`}>{score}%</div>
         </div>
       </div>
     </div>
@@ -66,12 +73,14 @@ function MetricRow({ label, score, detail }: { label: string; score: number; det
   const t = tierFor(score);
   const Icon = score >= 90 ? CheckCircle2 : score >= 80 ? AlertTriangle : ShieldAlert;
   return (
-    <li className="flex items-start gap-3 rounded-md border border-border bg-card/50 p-3">
-      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${t.text}`} />
+    <li className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${t.text}`} strokeWidth={1.75} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium leading-tight">{label}</p>
-          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${t.badge}`}>
+          <p className="text-sm font-medium leading-tight text-foreground">{label}</p>
+          <span
+            className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${t.badge}`}
+          >
             {score}%
           </span>
         </div>
@@ -83,19 +92,28 @@ function MetricRow({ label, score, detail }: { label: string; score: number; det
 
 function Column({
   title,
+  icon,
   overall,
   items,
 }: {
   title: string;
+  icon: React.ReactNode;
   overall: number;
   items: { label: string; score: number; detail: string }[];
 }) {
   const t = tierFor(overall);
   return (
-    <div className={`flex flex-col gap-4 rounded-xl border ${t.border} ${t.bg} p-5`}>
+    <div className={`flex flex-col gap-4 rounded-lg border ${t.border} ${t.bg} p-5`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
-        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${t.badge}`}>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-accent/10 text-accent">
+            {icon}
+          </span>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+        </div>
+        <span
+          className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide ${t.badge}`}
+        >
           {t.label}
         </span>
       </div>
@@ -119,22 +137,33 @@ export function AgencyHealthSnapshot({ organizationId }: { organizationId: strin
   });
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+    <section className="rounded-lg border border-border bg-card p-5 shadow-card">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold tracking-tight">🛡️ Your Agency Health Snapshot</h2>
-        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Global · last 30 days</span>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-accent/10 text-accent">
+            <ShieldAlert className="h-4 w-4" strokeWidth={1.75} />
+          </span>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            Agency Health Snapshot
+          </h2>
+        </div>
+        <span className="text-[11px] text-muted-foreground">Global · last 30 days</span>
       </div>
 
       {isLoading || !data ? (
         <div className="grid gap-4 md:grid-cols-2">
           {[0, 1].map((i) => (
-            <div key={i} className="h-[420px] animate-pulse rounded-xl border border-border bg-muted/40" />
+            <div
+              key={i}
+              className="h-[420px] animate-pulse rounded-lg border border-border bg-muted/40"
+            />
           ))}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           <Column
-            title="👤 Client Records Health"
+            title="Client Records Health"
+            icon={<CheckCircle2 className="h-4 w-4" strokeWidth={1.75} />}
             overall={data.client.overall}
             items={[
               {
@@ -155,7 +184,8 @@ export function AgencyHealthSnapshot({ organizationId }: { organizationId: strin
             ]}
           />
           <Column
-            title="👥 Employee Documentation Health"
+            title="Employee Documentation Health"
+            icon={<CheckCircle2 className="h-4 w-4" strokeWidth={1.75} />}
             overall={data.employee.overall}
             items={[
               {

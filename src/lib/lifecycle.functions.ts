@@ -135,10 +135,3 @@ export const deleteEntity = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const getAccountStatus = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ userId: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
-    const { data: row } = await supabaseAdmin
-      .from("profiles").select("account_status").eq("id", data.userId).maybeSingle();
-    return { status: (row?.account_status as string | null) ?? "active" };
-  });

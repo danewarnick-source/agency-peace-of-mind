@@ -3191,6 +3191,16 @@ export type Database = {
         Returns: undefined
       }
       user_org_ids: { Args: { _user: string }; Returns: string[] }
+      verify_certification: {
+        Args: { _code: string }
+        Returns: {
+          course_title: string
+          expires_at: string
+          issued_at: string
+          recipient_name: string
+          verification_code: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "employee" | "super_admin"

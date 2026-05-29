@@ -716,7 +716,7 @@ function PendingTable({
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Pending EVV Shifts</h2>
         <Badge variant="outline" className="font-mono text-[10px]">{rows.length} pending</Badge>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -727,7 +727,7 @@ function PendingTable({
               <TableHead>Service</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
-              <TableHead>Geofence Validation Status</TableHead>
+              <TableHead>Geofence Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -735,29 +735,29 @@ function PendingTable({
             {loading ? (
               <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : rows.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts. ✓</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts.</TableCell></TableRow>
             ) : rows.map((r) => (
               <Fragment key={r.id}>
               <TableRow>
-                <TableCell className="font-medium">
+                <TableCell className="whitespace-nowrap font-medium">
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
                   <EditedByAdminBadge row={r} />
                 </TableCell>
                 <TableCell>
-                  <div className="text-sm">{r.clients?.first_name} {r.clients?.last_name}</div>
-                  <div className="text-[11px] text-muted-foreground">{r.clients?.physical_address ?? "—"}</div>
+                  <div className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</div>
+                  <div className="text-xs text-muted-foreground">{r.clients?.physical_address ?? "—"}</div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={r.shift_entry_type === "Client_Profile_Pass" ? "default" : "secondary"}>
                     {r.shift_entry_type === "Client_Profile_Pass" ? "In-Chart" : "Sidebar"}
                   </Badge>
                 </TableCell>
-                <TableCell className="font-mono text-xs">{r.utah_medicaid_member_id}</TableCell>
-                <TableCell><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
-                <TableCell className="font-mono text-xs"><Clock className="mr-1 inline h-3 w-3" />{fmtDuration(effectiveIn(r), effectiveOut(r))}</TableCell>
+                <TableCell className="whitespace-nowrap font-mono">{r.utah_medicaid_member_id}</TableCell>
+                <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
+                <TableCell className="whitespace-nowrap font-mono"><Clock className="mr-1 inline h-3.5 w-3.5" />{fmtDuration(effectiveIn(r), effectiveOut(r))}</TableCell>
                 <TableCell>
                   <Button variant="outline" size="sm" onClick={() => onMap(r)}>
-                    <MapPin className="mr-1 h-3 w-3" /> View
+                    <MapPin /> View
                   </Button>
                 </TableCell>
                 <TableCell onClick={() => r.outside_geofence_reason && onReason(r)} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
@@ -767,15 +767,14 @@ function PendingTable({
                   <div className="flex justify-end gap-1.5">
                     <Button
                       size="icon"
-                      className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700"
                       onClick={() => onApprove(r.id)}
                       disabled={approving}
                       aria-label="Approve"
                     >
-                      {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      {approving ? <Loader2 className="animate-spin" /> : <Check />}
                     </Button>
-                    <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => onEdit(r)} aria-label="Edit">
-                      <Pencil className="h-4 w-4" />
+                    <Button size="icon" variant="secondary" onClick={() => onEdit(r)} aria-label="Edit">
+                      <Pencil />
                     </Button>
                   </div>
                 </TableCell>

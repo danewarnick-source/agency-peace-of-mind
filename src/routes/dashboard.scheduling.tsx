@@ -531,17 +531,29 @@ function SchedulerInner({ orgId }: { orgId: string }) {
     enabled: !!orgId,
     queryKey: ["sched-staff", orgId],
     queryFn: async (): Promise<StaffMember[]> => {
-      const { data, error } = await (supabase as any)
+      const { data: members, error } = await (supabase as any)
         .from("organization_members")
-        .select("profiles:user_id(id, full_name, email)")
-        .eq("organization_id", orgId)
-        .eq("active", true);
+        .select("user_id, active")
+        .eq("organization_id", orgId);
       if (error) throw error;
-      return ((data ?? []) as any[])
-        .map((r: any) => r.profiles)
-        .filter((p: any) => !!p?.id);
+      const userIds = ((members ?? []) as any[])
+        .filter((m) => m.active !== false)
+        .map((m) => m.user_id)
+        .filter(Boolean);
+      if (userIds.length === 0) return [];
+      const { data: profs, error: pErr } = await (supabase as any)
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", userIds);
+      if (pErr) throw pErr;
+      return ((profs ?? []) as any[])
+        .filter((p) => !!p?.id)
+        .sort((a, b) =>
+          (a.full_name ?? a.email ?? "").localeCompare(b.full_name ?? b.email ?? "")
+        );
     },
   });
+
 
   const { data: clientList = [] } = useQuery({
     enabled: !!orgId,

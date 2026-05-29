@@ -9,14 +9,14 @@ import { Switch } from "@/components/ui/switch";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Sparkles, Upload, FileSpreadsheet, Loader2, CheckCircle2, Wand2 } from "lucide-react";
+import { Sparkles, Upload, FileSpreadsheet, Loader2, CheckCircle2, Wand2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { useServerFn } from "@tanstack/react-start";
 import { bulkImportRoster } from "@/lib/bulk-import.functions";
 import { useQueryClient } from "@tanstack/react-query";
-
+import { AiPdfImporter } from "@/components/ai-pdf-importer";
 type Kind = "employee" | "client";
 type DataType = "text" | "number" | "boolean" | "date";
 

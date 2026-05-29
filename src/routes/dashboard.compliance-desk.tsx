@@ -388,7 +388,7 @@ function ComplianceDeskPage() {
                   submitAiSearch();
                 }
               }}
-              placeholder="🤖 Search intent via Vector AI... Try: 'Find shifts where they practiced money skills after 3pm last summer'"
+              placeholder="Search intent via Vector AI… Try: 'Find shifts where they practiced money skills after 3pm last summer'"
               className="h-9 flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
             />
             {aiInput.length > 0 && (

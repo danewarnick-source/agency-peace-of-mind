@@ -9,20 +9,20 @@ interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "ti
 }
 
 /**
- * Warm, on-brand empty state. Replaces "no data" gray boxes everywhere.
+ * On-brand empty state. Replaces "no data" gray boxes everywhere.
  */
 export function EmptyState({
   icon,
   title,
   description,
+  action,
+  className,
+  ...props
+}: EmptyStateProps) {
+  return (
     <div
       className={cn(
         "flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface-warm px-6 py-10 text-center",
-        className,
-      )}
-    <div
-      className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-surface-warm px-6 py-10 text-center",
         className,
       )}
       {...props}

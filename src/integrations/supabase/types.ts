@@ -2562,6 +2562,7 @@ export type Database = {
         Row: {
           client_id: string
           created_at: string
+          created_by: string | null
           ends_at: string
           id: string
           is_recurring: boolean
@@ -2580,6 +2581,7 @@ export type Database = {
         Insert: {
           client_id: string
           created_at?: string
+          created_by?: string | null
           ends_at: string
           id?: string
           is_recurring?: boolean
@@ -2598,6 +2600,7 @@ export type Database = {
         Update: {
           client_id?: string
           created_at?: string
+          created_by?: string | null
           ends_at?: string
           id?: string
           is_recurring?: boolean
@@ -2615,10 +2618,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "scheduled_shifts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "scheduled_shifts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_shifts_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

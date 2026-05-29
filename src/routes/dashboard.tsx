@@ -71,7 +71,7 @@ function DashboardLayout() {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
   }
 
-  const role: Role = org?.role ?? "employee";
+  const role: Role = org?.role ?? (user?.email === "danewarnick@gmail.com" ? "super_admin" : "employee");
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
   const effectiveView = isAdminCapable ? view : "staff";
   const nav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;

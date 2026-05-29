@@ -35,7 +35,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
-  head: () => ({ meta: [{ title: "Daily Logs — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Daily Logs — HIVE" }] }),
   component: DailyLogsPage,
 });
 
@@ -499,7 +499,7 @@ function DailyLogDialog({
           return;
         }
       } catch (e) {
-        toast.error((e as Error).message || "AI coach unavailable — please try again.");
+        toast.error((e as Error).message || "NECTAR coach unavailable — please try again.");
         setAiBusy(false);
         return;
       }
@@ -508,8 +508,8 @@ function DailyLogDialog({
 
     const aiStatus: "Verified" | "Exception" = isException ? "Exception" : "Verified";
     const aiFeedback = isException
-      ? "🔴 Submitted with Exception Flag — AI coaching not satisfied; pending admin review."
-      : verdict?.feedback ?? "Verified by AI Documentation Coach.";
+      ? "🔴 Submitted with Exception Flag — NECTAR coaching not satisfied; pending admin review."
+      : verdict?.feedback ?? "Verified by NECTAR Documentation Coach.";
 
     // ── Content scanner pass (runs after quality pass) ──────────────────────
     setAiBusy(true);
@@ -554,7 +554,7 @@ function DailyLogDialog({
     try {
       await writeLog({
         aiStatus: aiCoach?.status === "Verified" ? "Verified" : "Exception",
-        aiFeedback: aiCoach?.feedback ?? "Verified by AI Documentation Coach.",
+        aiFeedback: aiCoach?.feedback ?? "Verified by NECTAR Documentation Coach.",
         aiIterations: aiIterations,
         scanResult,
       });
@@ -676,7 +676,7 @@ function DailyLogDialog({
                 )}
               </div>
 
-              {/* AI Documentation Coach feedback */}
+              {/* NECTAR Documentation Coach feedback */}
               {(aiBusy || aiCoach) && (
                 <div className={`rounded-lg border-2 px-4 py-3 ${
                   aiCoach?.status === "Verified"
@@ -684,7 +684,7 @@ function DailyLogDialog({
                     : "border-amber-500/40 bg-amber-500/10"
                 }`}>
                   <div className="mb-1 flex items-center gap-2 text-sm font-bold">
-                    💡 AI Documentation Coach
+                    💡 NECTAR Documentation Coach
                     {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                   </div>
                   {aiCoach && (
@@ -693,7 +693,7 @@ function DailyLogDialog({
                         ? "text-emerald-800 dark:text-emerald-200"
                         : "text-amber-900 dark:text-amber-100"
                     }`}>
-                      {aiCoach.status === "Verified" ? "🟢 AI CLEARED — " : "⚠️ "}
+                      {aiCoach.status === "Verified" ? "🟢 NECTAR CLEARED — " : "⚠️ "}
                       {aiCoach.feedback}
                     </p>
                   )}
@@ -736,9 +736,9 @@ function DailyLogDialog({
                     className="h-12 w-full bg-emerald-600 text-base font-semibold hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground">
                     {(submitting || aiBusy)
                       ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {aiBusy ? "AI reviewing your note…" : "Submitting…"}</>
+                          {aiBusy ? "NECTAR reviewing your note…" : "Submitting…"}</>
                       : aiCoach?.status === "Flagged"
-                      ? "🔁 Re-Check with AI Coach"
+                      ? "🔁 Re-Check with NECTAR Coach"
                       : <><CheckCircle2 className="mr-2 h-4 w-4" /> Submit Daily Host Home Log</>}
                   </Button>
                 </div>
@@ -1001,7 +1001,7 @@ function AdminAuditQueue() {
                         <div className="flex gap-1">
                           {r.backdated && <Badge className="bg-purple-100 text-purple-800 text-[10px] dark:bg-purple-500/15 dark:text-purple-200">Backdated</Badge>}
                           {r.submitted_late && !r.backdated && <Badge className="bg-blue-100 text-blue-800 text-[10px] dark:bg-blue-500/15 dark:text-blue-200">Late</Badge>}
-                          {r.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">AI Exception</Badge>}
+                          {r.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">NECTAR Exception</Badge>}
                         </div>
                       </TableCell>
                       <TableCell>{statusBadge(r)}</TableCell>
@@ -1051,7 +1051,7 @@ function AdminAuditQueue() {
                   )}
                   {active.ai_compliance_status === "Exception" && (
                     <div className="rounded-lg border border-amber-500/30 bg-amber-50 p-3 text-xs dark:bg-amber-950/30">
-                      ⚠️ <strong>AI Exception Flag</strong> — AI coaching was not satisfied before submission. Review narrative carefully.
+                      ⚠️ <strong>NECTAR Exception Flag</strong> — NECTAR coaching was not satisfied before submission. Review narrative carefully.
                     </div>
                   )}
                 </div>

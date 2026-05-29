@@ -16,7 +16,7 @@ export function CertBenefits() {
             <p className="text-sm font-semibold uppercase tracking-wider text-accent">Certification tracking</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Compliance evidence at your fingertips</h2>
             <p className="mt-4 text-muted-foreground">
-              Care Academy stores every certificate, every completion date, and every renewal in one
+              HIVE stores every certificate, every completion date, and every renewal in one
               tamper-evident log — so you can prove compliance in minutes, not days.
             </p>
             <ul className="mt-6 space-y-3 text-sm">

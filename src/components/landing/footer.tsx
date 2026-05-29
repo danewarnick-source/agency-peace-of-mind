@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { GraduationCap } from "lucide-react";
+import { Hexagon } from "lucide-react";
+
 
 export function Footer() {
   return (
@@ -9,11 +10,12 @@ export function Footer() {
           <div>
             <Link to="/" className="flex items-center gap-2 font-semibold">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[image:var(--gradient-brand)] text-primary-foreground">
-                <GraduationCap className="h-4 w-4" />
+                <Hexagon className="h-4 w-4" strokeWidth={2.5} />
               </span>
-              Care Academy
+              HIVE
             </Link>
-            <p className="mt-3 max-w-sm text-sm text-muted-foreground">Modern employee training and certification for teams that care about compliance.</p>
+            <p className="mt-3 max-w-sm text-sm text-muted-foreground">HIVE — powered by NECTAR. Modern workforce intelligence for care teams that take compliance seriously.</p>
+
           </div>
           <div className="grid grid-cols-2 gap-x-12 gap-y-3 text-sm md:grid-cols-3">
             <Link to="/pricing" className="text-muted-foreground hover:text-foreground">Pricing</Link>
@@ -22,7 +24,7 @@ export function Footer() {
             <Link to="/signup" className="text-muted-foreground hover:text-foreground">Sign up</Link>
           </div>
         </div>
-        <p className="mt-10 text-xs text-muted-foreground">© {new Date().getFullYear()} Care Academy. All rights reserved.</p>
+        <p className="mt-10 text-xs text-muted-foreground">© {new Date().getFullYear()} HIVE. All rights reserved.</p>
       </div>
     </footer>
   );

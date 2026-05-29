@@ -16,7 +16,7 @@ import { Pill, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/emar")({
-  head: () => ({ meta: [{ title: "eMAR Pass — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "eMAR Pass — HIVE" }] }),
   component: EmarPage,
 });
 

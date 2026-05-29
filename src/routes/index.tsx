@@ -12,9 +12,9 @@ import { Footer } from "@/components/landing/footer";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Care Academy — Employee training & certification platform" },
+      { title: "HIVE — Employee training & certification platform" },
       { name: "description", content: "Modern training and certification for teams. Assign courses, track progress, and issue verifiable certificates — all in one place." },
-      { property: "og:title", content: "Care Academy — Train, certify, stay audit-ready" },
+      { property: "og:title", content: "HIVE — Train, certify, stay audit-ready" },
       { property: "og:description", content: "Modern training and certification platform for teams that take compliance seriously." },
     ],
   }),

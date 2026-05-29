@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
-  LayoutDashboard, GraduationCap, Settings,
+  LayoutDashboard, GraduationCap, Settings, Hexagon,
+
   LogOut, Users, Building2, Contact2, ClipboardCheck, ShieldCheck, Wallet, Pill, Menu, Clock, Home,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,7 +19,7 @@ import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
 
 export const Route = createFileRoute("/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — HIVE" }] }),
   component: DashboardLayout,
 });
 
@@ -84,12 +85,13 @@ function DashboardLayout() {
 
   const SidebarBody = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
-      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-semibold">
+      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-display text-lg font-bold tracking-tight">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <GraduationCap className="h-4 w-4" />
+          <Hexagon className="h-4 w-4" strokeWidth={2.5} />
         </span>
-        Care Academy
+        HIVE
       </div>
+
 
       {isAdminCapable && (
         <div className="border-b border-sidebar-border px-4 py-4">

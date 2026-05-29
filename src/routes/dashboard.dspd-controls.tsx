@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { Package, Home, Clock3, Plus, Signature, AlertTriangle, ShieldCheck, Eraser } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/dspd-controls")({
-  head: () => ({ meta: [{ title: "DSPD Controls — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "DSPD Controls — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <DspdControlsPage />

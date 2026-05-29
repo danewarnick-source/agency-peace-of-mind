@@ -126,7 +126,7 @@ export function MedicationsManager({
           </Button>
           <Dialog open={importOpen} onOpenChange={setImportOpen}>
             <DialogTrigger asChild>
-              <Button type="button" size="sm" variant="outline"><Sparkles className="mr-1.5 h-3.5 w-3.5" />⚡ AI Import Medications</Button>
+              <Button type="button" size="sm" variant="outline"><Sparkles className="mr-1.5 h-3.5 w-3.5" />⚡ NECTAR Import Medications</Button>
             </DialogTrigger>
             <AIImportDialog
               onParse={async (payload) => {
@@ -284,7 +284,7 @@ function AIImportDialog({
         const m = await onParse({ text: t });
         setRows(m);
       }
-      toast.success(`AI extracted ${rows.length} medications`);
+      toast.success(`NECTAR extracted ${rows.length} medications`);
     } catch (e) {
       toast.error((e as Error).message);
     } finally { setParsing(false); }
@@ -292,7 +292,7 @@ function AIImportDialog({
 
   return (
     <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
-      <DialogHeader><DialogTitle>⚡ AI Medication Importer</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>⚡ NECTAR Medication Importer</DialogTitle></DialogHeader>
       {!rows.length ? (
         <div className="space-y-3">
           <div
@@ -302,11 +302,11 @@ function AIImportDialog({
             className="cursor-pointer rounded-lg border-2 border-dashed border-border p-8 text-center hover:bg-accent/30"
           >
             {parsing ? (
-              <><Loader2 className="mx-auto h-6 w-6 animate-spin" /><p className="mt-2 text-sm">Parsing with AI…</p></>
+              <><Loader2 className="mx-auto h-6 w-6 animate-spin" /><p className="mt-2 text-sm">Parsing with NECTAR…</p></>
             ) : (
               <><Upload className="mx-auto h-6 w-6 text-muted-foreground" />
                 <p className="mt-2 text-sm font-medium">Drop physician order, MAR, or pharmacy list</p>
-                <p className="text-xs text-muted-foreground">PDF, image, CSV, or text — AI extracts meds, dose, route, frequency, times.</p></>
+                <p className="text-xs text-muted-foreground">PDF, image, CSV, or text — NECTAR extracts meds, dose, route, frequency, times.</p></>
             )}
             <input
               ref={fileRef} type="file" className="hidden"

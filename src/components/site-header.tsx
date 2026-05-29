@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Menu } from "lucide-react";
+import { Hexagon, Menu } from "lucide-react";
+
 import { useState } from "react";
 
 export function SiteHeader() {
@@ -16,9 +17,10 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[image:var(--gradient-brand)] text-primary-foreground">
-            <GraduationCap className="h-4 w-4" />
+            <Hexagon className="h-4 w-4" strokeWidth={2.5} />
+
           </span>
-          Care Academy
+          HIVE
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">

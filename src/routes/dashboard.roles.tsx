@@ -15,7 +15,7 @@ import { ShieldCheck, Search } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/roles")({
-  head: () => ({ meta: [{ title: "Roles & permissions — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Roles & permissions — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_roles">
       <RolesPage />

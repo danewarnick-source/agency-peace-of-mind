@@ -19,7 +19,7 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/teams")({
-  head: () => ({ meta: [{ title: "Teams & Group Homes — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Teams & Group Homes — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <TeamsPage />

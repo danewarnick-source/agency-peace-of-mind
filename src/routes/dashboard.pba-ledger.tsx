@@ -18,7 +18,7 @@ import { Wallet, Plus, ShieldAlert, Receipt, CheckCircle2, Shuffle, Upload, Spar
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/pba-ledger")({
-  head: () => ({ meta: [{ title: "PBA Trust Ledger — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "PBA Trust Ledger — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <PbaLedgerPage />
@@ -323,9 +323,9 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
       if (d?.merchant_name) setCounterparty(d.merchant_name);
       if (d?.transaction_date) setDate(d.transaction_date);
       flagAutoFilled({ amount: d?.total_amount != null, counterparty: !!d?.merchant_name, date: !!d?.transaction_date });
-      toast.success("AI extracted receipt details");
+      toast.success("NECTAR extracted receipt details");
     } catch (e) {
-      toast.error(`AI parsing failed: ${(e as Error).message}`);
+      toast.error(`NECTAR parsing failed: ${(e as Error).message}`);
     } finally {
       setParsing(false);
     }
@@ -360,7 +360,7 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
       setMemo((prev) => prev || `Mock receipt — ${m.merchant_name}`);
       flagAutoFilled({ amount: true, counterparty: true, date: true }, true);
       setParsing(false);
-      toast.success(`Simulated AI extraction · ${m.merchant_name}`);
+      toast.success(`Simulated NECTAR extraction · ${m.merchant_name}`);
     }, 900);
   };
 
@@ -416,7 +416,7 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 backdrop-blur-sm">
             <div className="flex items-center gap-2 rounded-full border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-700 dark:text-sky-300">
               <Loader2 className="h-4 w-4 animate-spin" />
-              🤖 AI is reading receipt telemetry and parsing data…
+              NECTAR is reading receipt telemetry and parsing data…
             </div>
           </div>
         )}
@@ -447,7 +447,7 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
             <ImageIcon className="h-4 w-4 text-sky-600" />
             📸 Upload or Drag Receipt Snapshot (Auto-Extract Details)
           </div>
-          <p className="text-[11px] text-muted-foreground">PNG · JPG · PDF — uploads to secure receipt vault then runs AI vision OCR</p>
+          <p className="text-[11px] text-muted-foreground">PNG · JPG · PDF — uploads to secure receipt vault then runs NECTAR vision OCR</p>
           {uploading && <p className="text-[11px] text-sky-600">Uploading securely…</p>}
         </label>
 
@@ -547,7 +547,7 @@ function AutoBadge({ green }: { green?: boolean }) {
           : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
       )}
     >
-      <Sparkles className="h-2.5 w-2.5" /> Auto-filled by AI
+      <Sparkles className="h-2.5 w-2.5" /> Auto-filled by NECTAR
     </span>
   );
 }
@@ -628,7 +628,7 @@ function MockReceiptDeck({ onSimulate }: { onSimulate: (m: MockReceipt) => void 
               </ul>
             </div>
             <Button size="sm" variant="outline" className="mt-auto" onClick={() => onSimulate(m)}>
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> 🤖 Test AI Extraction
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> 🤖 Test NECTAR Extraction
             </Button>
           </div>
         ))}

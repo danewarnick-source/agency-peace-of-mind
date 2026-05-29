@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Download, ShieldAlert } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/admin/emar-audit")({
-  head: () => ({ meta: [{ title: "eMAR Audit — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "eMAR Audit — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <AuditPage />

@@ -100,10 +100,11 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
     <div className="grid min-h-screen md:grid-cols-2">
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-[image:var(--gradient-hero)] p-12 text-white md:flex">
         <Link to="/" className="flex items-center gap-2 font-semibold">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
-            <GraduationCap className="h-4 w-4" />
+            <Hexagon className="h-4 w-4" strokeWidth={2.5} />
           </span>
-          HIVE
+          <span>HIVE <span className="ml-1 text-xs font-normal text-white/60">— powered by NECTAR</span></span>
+        </Link>
+
         </Link>
         <div className="max-w-md">
           <h2 className="text-3xl font-semibold leading-tight">"Onboarding a new hire went from two weeks of paperwork to two clicks."</h2>

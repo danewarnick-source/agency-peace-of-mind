@@ -1,50 +1,39 @@
+## Goal
+Restore your super admin dashboard access without broad changes or another bulk security pass.
 
-## What's going on
-
-**1. "No code in my Supabase account"**
-
-This is expected, not a bug. Your project runs on **Lovable Cloud**, which provisions a managed backend (database, auth, storage) behind the scenes. You won't see your app's source code in any Supabase dashboard — application code lives only in Lovable. What's stored on the backend side is the **database** (tables, RLS policies, functions) and **auth users**, which you can view via the Cloud panel in Lovable.
-
-So nothing is missing or unlinked. The link indicator in Lovable is correct.
-
-**2. "Try to fix all" disabled your super admin access**
-
-The bulk security fix rewrote RLS policies on `organization_members` in a way that conflicted with the existing ones, and in the process your row's role got knocked off `super_admin`. We've already pushed several recovery migrations this session, but you're still locked out, so the safest path is one clean, idempotent reset.
+## What’s broken
+Your account is correctly marked as `super_admin` on both organizations, and login succeeds. The failure is happening after login:
+- the app requests organization/member data
+- those queries hit RLS helper functions
+- the backend returns 403 errors like `permission denied for function has_org_role` and `permission denied for function is_org_admin_or_manager`
+- because membership/permission queries fail, the UI falls back to employee behavior and hides admin features
 
 ## Plan
+1. **Fix backend function permissions with a focused migration**
+   - Update the helper functions used by RLS (`has_org_role`, `is_org_admin_or_manager`, `is_super_admin`, and any other directly referenced role-check helpers if needed).
+   - Grant execution to signed-in users where required by policies.
+   - Revoke anonymous execution if it’s currently too open.
+   - Keep the change limited to function permissions and function definitions only if needed.
 
-### Step 1 — Run a single recovery migration
+2. **Verify the backend behavior immediately after the migration**
+   - Confirm your user still has both `super_admin` memberships.
+   - Confirm signed-in users can execute the helper functions.
+   - Re-run the relevant read queries to ensure `organization_members` and admin-scoped data no longer return 403.
 
-One migration that does all of the following atomically:
+3. **Validate the dashboard gating path**
+   - Re-check the role-loading hooks and guards already in the app (`useCurrentOrg`, `usePermissions`, dashboard layout, and super-admin guard).
+   - Only if necessary, make a minimal code fix so the UI waits for role data instead of dropping to employee mode when membership data is temporarily unavailable.
 
-- Wipes every existing policy on `public.organization_members` (loop over `pg_policies`)
-- Recreates the minimum two policies needed:
-  - `read own or org members` — SELECT where `user_id = auth.uid()`
-  - `admins manage members` — FOR ALL using `user_id = auth.uid()` OR `has_org_role(...)` OR `is_super_admin(...)`
-- Re-grants `SELECT, INSERT, UPDATE, DELETE` on `organization_members` to `authenticated` and `ALL` to `service_role` (in case grants were dropped)
-- Ensures `public.is_super_admin(uuid)` and `public.has_org_role(uuid, uuid, app_role)` exist as SECURITY DEFINER functions
-- Forces your account back to `super_admin` + `active = true`:
-  ```sql
-  UPDATE public.organization_members
-  SET role = 'super_admin', active = true
-  WHERE user_id = (SELECT id FROM auth.users WHERE email = 'danewarnick@gmail.com');
-  ```
-- Keeps `restore_my_admin_role()` in place as a safety hatch
+4. **Test the actual super-admin experience**
+   - Sign-in flow should land with admin-capable membership data available.
+   - Admin sidebar options should render.
+   - `/dashboard/super-admin` should no longer redirect or hide behind employee-only gating.
 
-### Step 2 — Verify in the database
+## Technical details
+- Current evidence shows this is primarily a backend access-control regression, not a bad role assignment.
+- The critical symptom is missing routine grants for role-check functions in the exposed schema.
+- The highest-probability fix is a migration that restores execute privileges for authenticated users on the RLS helper functions used inside policies.
+- If the UI still misbehaves after that, the fallback path in `useCurrentOrg` / `usePermissions` / `RequirePermission` is the next place to patch surgically.
 
-After the migration runs, query `organization_members` for your user to confirm `role = 'super_admin'` and `active = true`, and confirm exactly two policies remain on the table.
-
-### Step 3 — Log out and back in
-
-Sign out fully (clears the cached session/role in the browser) and sign back in. The dashboard should resolve your role to `super_admin`, the admin sidebar should return, and all admin routes should unlock.
-
-### Step 4 — Re-run the security scan, but fix findings one at a time
-
-The remaining real findings in your scan (AI Coach endpoints, receipt OCR auth, public seed-staff route, custom-fields cross-org access, username/email enumeration, unauthenticated account-status lookup) are legitimate and worth fixing — but **do not use "Try to fix all" again**. Each one touches different files and different RLS surfaces; fixing them in a batch is what broke things. We'll address them individually in follow-up turns so each change is reviewable and reversible.
-
-## Notes
-
-- No application code needs to change for Step 1 — this is purely a database recovery migration.
-- If after Step 3 you still can't see admin routes, the issue is client-side cache and a hard refresh (or clearing localStorage `portal-view`) will resolve it.
-- Want me to proceed with Step 1 now?
+## Expected outcome
+After this fix, your account should load as `super_admin`, the admin sidebar should return, and the super-admin dashboard/features should be accessible again.

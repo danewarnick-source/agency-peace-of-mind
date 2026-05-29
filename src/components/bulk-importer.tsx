@@ -269,6 +269,32 @@ export function BulkImporter({
           >Client Roster</button>
         </div>
 
+        {kind === "client" && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border p-1 w-fit">
+            <button
+              type="button"
+              onClick={() => setMode("sheet")}
+              className={`inline-flex h-9 min-w-[44px] items-center gap-1.5 px-3 text-xs rounded-md transition ${mode === "sheet" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" /> CSV / Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("pdf")}
+              className={`inline-flex h-9 min-w-[44px] items-center gap-1.5 px-3 text-xs rounded-md transition ${mode === "pdf" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            >
+              <Sparkles className="h-3.5 w-3.5" /> AI PDF Import
+            </button>
+          </div>
+        )}
+
+        {kind === "client" && mode === "pdf" ? (
+          <AiPdfImporter
+            organizationId={organizationId}
+            onDone={() => setOpen(false)}
+          />
+        ) : (
+          <>
         {step === "upload" && (
           <div className="space-y-4">
             <div

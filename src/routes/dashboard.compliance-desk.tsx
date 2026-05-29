@@ -127,11 +127,8 @@ function EditedByAdminBadge({ row }: { row: Row }) {
     <TooltipProvider delayDuration={120}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span
-            className="ml-2 inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-            style={{ backgroundColor: "rgba(251,191,36,0.25)", color: "#1f2937", borderColor: "rgba(217,119,6,0.55)" }}
-          >
-            ⚠️ EDITED BY ADMIN
+          <span className="ml-2 inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-warning/15 px-2 py-0.5 text-[13px] font-medium leading-none text-warning-foreground">
+            <AlertTriangle className="h-3.5 w-3.5" /> Edited by admin
           </span>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs text-xs">{detail}</TooltipContent>

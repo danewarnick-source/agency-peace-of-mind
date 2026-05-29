@@ -3,7 +3,7 @@ import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/unauthorized")({
-  head: () => ({ meta: [{ title: "Unauthorized — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Unauthorized — HIVE" }] }),
   component: UnauthorizedPage,
 });
 

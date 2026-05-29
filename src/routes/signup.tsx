@@ -13,7 +13,7 @@ import { AuthShell } from "./login";
 interface SignupSearch { invite?: string }
 
 export const Route = createFileRoute("/signup")({
-  head: () => ({ meta: [{ title: "Start free trial — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Start free trial — HIVE" }] }),
   validateSearch: (s: Record<string, unknown>): SignupSearch => ({
     invite: typeof s.invite === "string" ? s.invite : undefined,
   }),
@@ -101,7 +101,7 @@ function SignupPage() {
     if (sessionData.session && invite) {
       try { await acceptInvite(invite); } catch (e) { toast.error((e as Error).message); }
     }
-    toast.success("Account created — welcome to Care Academy!");
+    toast.success("Account created — welcome to HIVE!");
     navigate({ to: "/dashboard" });
   };
 

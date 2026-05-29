@@ -25,7 +25,7 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/command-center")({
-  head: () => ({ meta: [{ title: "Agency Command Center — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Agency Command Center — HIVE" }] }),
   component: CommandCenter,
 });
 

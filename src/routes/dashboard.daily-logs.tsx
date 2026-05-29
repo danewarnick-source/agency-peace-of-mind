@@ -35,7 +35,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
-  head: () => ({ meta: [{ title: "Daily Logs — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Daily Logs — HIVE" }] }),
   component: DailyLogsPage,
 });
 

@@ -3,7 +3,7 @@ import { PunchPad } from "@/components/evv/punch-pad";
 import { useCaseload } from "@/hooks/use-caseload";
 
 export const Route = createFileRoute("/dashboard/timeclock")({
-  head: () => ({ meta: [{ title: "General Time Clock — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "General Time Clock — HIVE" }] }),
   component: TimeClockPage,
 });
 

@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/permissions")({
-  head: () => ({ meta: [{ title: "Permissions — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Permissions — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_roles">
       <PermissionsPage />

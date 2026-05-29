@@ -12,7 +12,7 @@ import { lookupEmailByUsername } from "@/lib/login.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign in — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Sign in — HIVE" }] }),
   component: LoginPage,
 });
 
@@ -70,7 +70,7 @@ function LoginPage() {
   };
 
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to your Care Academy dashboard.">
+    <AuthShell title="Welcome back" subtitle="Sign in to your HIVE dashboard.">
       <form onSubmit={onSubmit} className="grid gap-4">
         <div className="grid gap-2"><Label htmlFor="identifier">Email or username</Label><Input id="identifier" name="identifier" type="text" autoComplete="username" required /></div>
         <div className="grid gap-2">
@@ -102,7 +102,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
             <GraduationCap className="h-4 w-4" />
           </span>
-          Care Academy
+          HIVE
         </Link>
         <div className="max-w-md">
           <h2 className="text-3xl font-semibold leading-tight">"Onboarding a new hire went from two weeks of paperwork to two clicks."</h2>

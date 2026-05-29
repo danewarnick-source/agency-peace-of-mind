@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/dashboard/settings/bank-mapping")({
-  head: () => ({ meta: [{ title: "Bank Mapping — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Bank Mapping — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <BankMappingPage />

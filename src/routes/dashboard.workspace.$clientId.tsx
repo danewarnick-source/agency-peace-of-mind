@@ -29,7 +29,7 @@ import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
 
 const workspaceSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
-  head: () => ({ meta: [{ title: "Client Workspace — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Client Workspace — HIVE" }] }),
   validateSearch: workspaceSearch,
   component: ClientWorkspace,
 });

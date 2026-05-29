@@ -73,7 +73,7 @@ async function resolveCoords(addr: string): Promise<{ lat: number | null; lng: n
 }
 
 export const Route = createFileRoute("/dashboard/clients")({
-  head: () => ({ meta: [{ title: "Clients — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Clients — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <ClientsPage />

@@ -6,9 +6,9 @@ import { Footer } from "@/components/landing/footer";
 export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
-      { title: "Contact — Care Academy" },
-      { name: "description", content: "Get in touch with the Care Academy team about pricing, custom training, and enterprise rollouts." },
-      { property: "og:title", content: "Contact — Care Academy" },
+      { title: "Contact — HIVE" },
+      { name: "description", content: "Get in touch with the HIVE team about pricing, custom training, and enterprise rollouts." },
+      { property: "og:title", content: "Contact — HIVE" },
       { property: "og:description", content: "Talk to our team about training, certification, and enterprise plans." },
     ],
   }),

@@ -18,7 +18,7 @@ import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
 
 export const Route = createFileRoute("/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — HIVE" }] }),
   component: DashboardLayout,
 });
 
@@ -88,7 +88,7 @@ function DashboardLayout() {
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
           <GraduationCap className="h-4 w-4" />
         </span>
-        Care Academy
+        HIVE
       </div>
 
       {isAdminCapable && (

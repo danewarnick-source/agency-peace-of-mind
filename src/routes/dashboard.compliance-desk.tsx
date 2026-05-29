@@ -55,7 +55,7 @@ function GeofenceBadge({ reason }: { reason: string | null }) {
 }
 
 export const Route = createFileRoute("/dashboard/compliance-desk")({
-  head: () => ({ meta: [{ title: "EVV & Timesheet Control — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "EVV & Timesheet Control — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <ComplianceDeskPage />
@@ -826,7 +826,7 @@ function csvEscape(s: string) {
 const UTAH_30_HEADER =
   "Member ID (req),First name (req),Middle initial,Last name (req),Service code (req),Service description,Provider ID (req),Employee Performing Service (req),Begin date (req),Begin time (req),Begin address (req),Begin Apt/Suite/Floor,Begin City (req),Begin State,Begin Zip,Begin Geo Latitude,Begin Geo Longitude,End date (req),End time (req),End Address1,End Address2,End City,End State,End Zip,End Geo Latitude,End Geo Longitude,Orig_receipt_id (req if CORRECTION),Batch_id (req),Record_id (req),EVV Vendor (req)";
 
-const EVV_VENDOR_NAME = "Care Academy";
+const EVV_VENDOR_NAME = "HIVE";
 
 function buildUtahCsv(rows: Row[]): string {
   // One incremental batch number per export (seconds since epoch keeps it

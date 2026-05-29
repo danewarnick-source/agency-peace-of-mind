@@ -7,9 +7,9 @@ import { Footer } from "@/components/landing/footer";
 export const Route = createFileRoute("/pricing")({
   head: () => ({
     meta: [
-      { title: "Pricing — Care Academy" },
+      { title: "Pricing — HIVE" },
       { name: "description", content: "Simple per-employee pricing. $25 per active employee per month. No setup fees, cancel anytime." },
-      { property: "og:title", content: "Pricing — Care Academy" },
+      { property: "og:title", content: "Pricing — HIVE" },
       { property: "og:description", content: "Per-seat training and certification platform pricing." },
     ],
   }),

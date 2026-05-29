@@ -13,7 +13,7 @@ import { Users, Loader2, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/assignments")({
-  head: () => ({ meta: [{ title: "Caseloads — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Caseloads — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <AssignmentsPage />

@@ -18,7 +18,7 @@ import { Wallet, Plus, ShieldAlert, Receipt, CheckCircle2, Shuffle, Upload, Spar
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/pba-ledger")({
-  head: () => ({ meta: [{ title: "PBA Trust Ledger — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "PBA Trust Ledger — HIVE" }] }),
   component: () => (
     <RequirePermission perm="manage_users">
       <PbaLedgerPage />

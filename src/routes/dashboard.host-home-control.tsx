@@ -23,7 +23,7 @@ import {
 } from "@/lib/hhs.functions";
 
 export const Route = createFileRoute("/dashboard/host-home-control")({
-  head: () => ({ meta: [{ title: "Host Home Control — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Host Home Control — HIVE" }] }),
   component: HostHomeControl,
 });
 

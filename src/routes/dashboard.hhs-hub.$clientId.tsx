@@ -27,7 +27,7 @@ import { saveDailyRecord, saveEmarLog, setAttendance, savePrnForm, saveIncidentR
 
 const hhsSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
-  head: () => ({ meta: [{ title: "Host Home Client Hub — Care Academy" }] }),
+  head: () => ({ meta: [{ title: "Host Home Client Hub — HIVE" }] }),
   validateSearch: hhsSearch,
   component: HhsClientHub,
 });

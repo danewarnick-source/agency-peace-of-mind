@@ -22,7 +22,7 @@ export function Hero() {
             </span>
           </h1>
           <p className="mt-6 text-pretty text-lg leading-relaxed text-white/80 md:text-xl">
-            Care Academy is the modern training platform for teams that take compliance seriously.
+            HIVE is the modern training platform for teams that take compliance seriously.
             Assign courses, monitor progress, and issue verifiable certificates — all in one place.
           </p>
 

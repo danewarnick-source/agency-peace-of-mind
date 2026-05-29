@@ -18,7 +18,7 @@ export function SiteHeader() {
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[image:var(--gradient-brand)] text-primary-foreground">
             <GraduationCap className="h-4 w-4" />
           </span>
-          Care Academy
+          HIVE
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">

@@ -487,9 +487,8 @@ function SchedulerInner({ orgId }: { orgId: string }) {
         .eq("organization_id", orgId)
         .gte("starts_at", monthStart.toISOString())
         .lte("starts_at", monthEnd.toISOString())
-        .order("starts_at")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        as any;
+        .order("starts_at") as any;
       if (error) throw error;
       return (data ?? []) as unknown as Shift[];
     },
@@ -502,9 +501,8 @@ function SchedulerInner({ orgId }: { orgId: string }) {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, email")
-        .eq("organization_id", orgId)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        as any;
+        .eq("organization_id", orgId) as any;
       if (error) throw error;
       return (data ?? []) as unknown as StaffMember[];
     },
@@ -518,9 +516,8 @@ function SchedulerInner({ orgId }: { orgId: string }) {
         .from("clients")
         .select("id, first_name, last_name, physical_address, job_code")
         .eq("organization_id", orgId)
-        .eq("status", "Active")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        as any;
+        .eq("status", "Active") as any;
       if (error) throw error;
       return (data ?? []) as unknown as Client[];
     },

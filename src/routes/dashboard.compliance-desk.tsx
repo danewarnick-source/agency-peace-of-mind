@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X, Search, Database } from "lucide-react";
+import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X, Search, Database, Inbox, FolderArchive, Briefcase, MessageSquare, Target, CheckCircle2, ShieldCheck, ShieldAlert, Bot, Calendar, User as UserIcon, Users, Zap, Dna, Filter } from "lucide-react";
 import { toast } from "sonner";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,

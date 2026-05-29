@@ -124,7 +124,6 @@ function ComplianceInbox() {
     </div>
   );
 }
-}
 
 function Overview() {
   const { user } = useAuth();

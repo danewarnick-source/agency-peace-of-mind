@@ -11,7 +11,7 @@ export const Route = createFileRoute("/fix-admin")({
 
 export function FixAdmin() {
   const { user, session } = useAuth();
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   async function fix() {

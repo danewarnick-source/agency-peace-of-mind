@@ -32,9 +32,9 @@ const STAFF_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { to: "/dashboard/command-center", label: "🏢 Command Center", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/command-center", label: "Command Center", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/compliance-desk", label: "EVV & Timesheet Control", icon: ShieldCheck },
-  { to: "/dashboard/host-home-control", label: "🏡 Host Home Control", icon: Home },
+  { to: "/dashboard/host-home-control", label: "Host Home Control", icon: Home },
   { to: "/dashboard/dspd-controls", label: "DSPD Controls", icon: ShieldCheck },
   { to: "/dashboard/pba-ledger", label: "PBA Trust Ledger", icon: Wallet },
   { to: "/dashboard/employees", label: "Employees", icon: Users },
@@ -201,7 +201,8 @@ function DashboardLayout() {
             </Button>
           </header>
 
-          <main className="flex-1 bg-secondary/40 p-6 md:p-8">
+          <main className="flex-1 bg-secondary/40 px-8 py-6">
+
             <Outlet />
           </main>
         </div>

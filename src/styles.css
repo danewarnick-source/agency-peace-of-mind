@@ -73,7 +73,7 @@
   --surface-warm: oklch(0.97 0.008 247);
 
   --card: oklch(1 0 0);
-  --radius: 0.75rem;
+  --radius: 0.5rem;
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.21 0.04 256);
 
@@ -117,10 +117,10 @@
   --gradient-soft: linear-gradient(135deg, color-mix(in oklab, oklch(0.55 0.22 264) 6%, white), color-mix(in oklab, oklch(0.62 0.2 258) 4%, white));
 
   /* Premium ambient shadows — low-opacity navy */
-  --shadow-elegant: 0 8px 24px -10px color-mix(in oklab, oklch(0.22 0.04 258) 22%, transparent);
-  --shadow-card: 0 1px 2px color-mix(in oklab, oklch(0.22 0.04 258) 4%, transparent), 0 1px 3px color-mix(in oklab, oklch(0.22 0.04 258) 6%, transparent);
-  --shadow-soft: 0 1px 2px color-mix(in oklab, oklch(0.22 0.04 258) 5%, transparent);
-  --shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(0.55 0.22 264) 25%, transparent), 0 4px 16px -6px color-mix(in oklab, oklch(0.55 0.22 264) 28%, transparent);
+  --shadow-elegant: 0 1px 2px color-mix(in oklab, oklch(0.22 0.04 258) 6%, transparent);
+  --shadow-card: 0 1px 2px color-mix(in oklab, oklch(0.22 0.04 258) 4%, transparent);
+  --shadow-soft: 0 1px 1px color-mix(in oklab, oklch(0.22 0.04 258) 3%, transparent);
+  --shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(0.55 0.22 264) 18%, transparent);
 
   /* Sidebar: Deep Indigo Navy */
   --sidebar: oklch(0.22 0.04 258);

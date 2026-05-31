@@ -4,7 +4,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, Upload, X, FileText, CheckCircle2, Trash2, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Sparkles, Upload, X, FileText, CheckCircle2, Trash2, Plus, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
@@ -14,6 +29,59 @@ import {
   type ExtractedClient,
 } from "@/lib/pdf-import.functions";
 import { EVV_SERVICE_CODES, evvServiceLabel } from "@/lib/evv-codes";
+
+type RouteTarget =
+  | "first_name"
+  | "last_name"
+  | "medicaid_id"
+  | "date_of_birth"
+  | "pcsp_goal"
+  | "discard";
+
+const ROUTE_OPTIONS: { value: RouteTarget; label: string }[] = [
+  { value: "first_name", label: "First Name" },
+  { value: "last_name", label: "Last Name" },
+  { value: "medicaid_id", label: "Individual Medicaid ID" },
+  { value: "date_of_birth", label: "Date of Birth (YYYY-MM-DD)" },
+  { value: "pcsp_goal", label: "Append as PCSP Goal" },
+  { value: "discard", label: "Discard / Ignore" },
+];
+
+type UnresolvedItem = { id: string; text: string; reason: string };
+
+const ACCEPT_EXT = [".pdf", ".docx", ".png"];
+const ACCEPT_MIME = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/png",
+];
+
+function isAcceptedFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return (
+    ACCEPT_EXT.some((ext) => name.endsWith(ext)) ||
+    ACCEPT_MIME.includes(file.type)
+  );
+}
+
+function detectAmbiguities(d: ExtractedClient): UnresolvedItem[] {
+  const out: UnresolvedItem[] = [];
+  if (d.date_of_birth && !/^\d{4}-\d{2}-\d{2}$/.test(d.date_of_birth.trim())) {
+    out.push({
+      id: `dob-${Date.now()}`,
+      text: d.date_of_birth.trim(),
+      reason: "Ambiguous date format detected by the Nectar engine.",
+    });
+  }
+  if (d.medicaid_id && (d.medicaid_id.length < 8 || d.medicaid_id.length > 12)) {
+    out.push({
+      id: `med-${Date.now()}`,
+      text: d.medicaid_id,
+      reason: "Medicaid ID length is outside the expected 8–12 digit range.",
+    });
+  }
+  return out;
+}
 
 async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer();

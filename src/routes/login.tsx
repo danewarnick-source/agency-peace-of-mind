@@ -1,9 +1,8 @@
 import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Hexagon } from "lucide-react";
+import { ArrowRight, Hexagon, Sparkles } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -17,11 +16,68 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+const JAKARTA = '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif';
+const NAVY_BG =
+  "radial-gradient(1000px 600px at 80% 110%, rgba(244,169,58,0.18), transparent 60%), linear-gradient(140deg, #141a3d 0%, #0d112b 100%)";
+
+function HexPattern() {
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.05]"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <pattern id="hex" width="80" height="92" patternUnits="userSpaceOnUse" patternTransform="scale(1.4)">
+          <polygon
+            points="40,2 78,24 78,68 40,90 2,68 2,24"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="1"
+          />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#hex)" />
+    </svg>
+  );
+}
+
+function BrandLogo({ className = "" }: { className?: string }) {
+  return (
+    <Link to="/" className={`flex items-center gap-2.5 font-semibold text-white ${className}`} style={{ fontFamily: JAKARTA }}>
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] backdrop-blur">
+        <Hexagon className="h-4 w-4 text-[#f4a93a]" strokeWidth={2.5} />
+      </span>
+      <span className="text-[15px] tracking-tight">
+        HIVE <span className="ml-1 text-xs font-normal text-white/55">— powered by NECTAR™</span>
+      </span>
+    </Link>
+  );
+}
+
+function NectarPill() {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+      style={{
+        fontFamily: JAKARTA,
+        background: "rgba(244,169,58,0.12)",
+        borderColor: "rgba(244,169,58,0.35)",
+        color: "#f7c172",
+      }}
+    >
+      <Sparkles className="h-3 w-3" />
+      Powered by NECTAR™ — the intelligence layer for care
+    </span>
+  );
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
   const [busy, setBusy] = useState(false);
   const resolveUsername = useServerFn(lookupEmailByUsername);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     if (!loading && session) navigate({ to: "/dashboard" });
@@ -46,7 +102,6 @@ function LoginPage() {
     }
     const { data: signIn, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setBusy(false); return toast.error(error.message); }
-    // Block archived accounts immediately
     if (signIn.user) {
       const { data: prof } = await supabase
         .from("profiles")
@@ -70,69 +125,156 @@ function LoginPage() {
     if (r.error) toast.error("Google sign-in failed");
   };
 
-  return (
-    <AuthShell title="Welcome back" subtitle="Sign in to your HIVE dashboard.">
-      <form onSubmit={onSubmit} className="grid gap-4">
-        <div className="grid gap-2"><Label htmlFor="identifier">Email or username</Label><Input id="identifier" name="identifier" type="text" autoComplete="username" required /></div>
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link to="/forgot-password" className="text-xs text-accent hover:underline">Forgot?</Link>
-          </div>
-          <Input id="password" name="password" type="password" required />
-        </div>
-        <Button type="submit" disabled={busy} className="bg-[image:var(--gradient-brand)] text-primary-foreground">
-          {busy ? "Signing in…" : "Sign in"}
-        </Button>
-      </form>
-      <Divider />
-      <Button variant="outline" onClick={google} className="w-full">Continue with Google</Button>
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        New here? <Link to="/signup" className="font-medium text-accent hover:underline">Start a free trial</Link>
-      </p>
-    </AuthShell>
-  );
-}
+  const inputStyle: React.CSSProperties = {
+    fontFamily: JAKARTA,
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.11)",
+    color: "#ffffff",
+  };
 
-export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
-    <div className="grid min-h-screen md:grid-cols-2">
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[image:var(--gradient-hero)] p-12 text-white md:flex">
-        <Link to="/" className="flex items-center gap-2 font-semibold">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
-            <Hexagon className="h-4 w-4" strokeWidth={2.5} />
-          </span>
-          <span>HIVE <span className="ml-1 text-xs font-normal text-white/60">— powered by NECTAR™</span></span>
-        </Link>
+    <div
+      className="relative min-h-screen overflow-hidden text-white"
+      style={{ background: NAVY_BG, fontFamily: JAKARTA }}
+    >
+      <HexPattern />
 
-        <div className="max-w-md">
-          <h2 className="text-3xl font-semibold leading-tight">"Onboarding a new hire went from two weeks of paperwork to two clicks."</h2>
-          <p className="mt-4 text-white/70">— Marcus Liu, HR Lead at Northbay Support Services</p>
-        </div>
-        <p className="text-xs text-white/50">Trusted by modern training teams</p>
-      </aside>
-      <div className="flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 text-center md:text-left">
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      <div className="relative grid min-h-screen md:grid-cols-2">
+        {/* Left panel */}
+        <aside className="relative hidden flex-col justify-between p-12 md:flex">
+          <BrandLogo />
+
+          <div className="max-w-md space-y-6">
+            <NectarPill />
+            <h2
+              className="text-3xl leading-tight text-white md:text-[2rem]"
+              style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.02em" }}
+            >
+              "Onboarding a new hire went from two weeks of paperwork to two clicks."
+            </h2>
+            <p className="text-white/65" style={{ fontFamily: JAKARTA }}>
+              — Marcus Liu, HR Lead at Northbay Support Services
+            </p>
           </div>
-          {children}
-          <p className="mt-8 text-center text-xs text-muted-foreground md:text-left">
-            <Link to="/" className="hover:underline">← Back to site</Link> · {pathname}
+
+          <p className="text-xs text-white/45" style={{ fontFamily: JAKARTA }}>
+            Trusted by modern training teams
           </p>
+        </aside>
+
+        {/* Right panel — form */}
+        <div className="flex items-center justify-center px-6 py-12">
+          <div className="w-full max-w-sm">
+            <div className="mb-6 flex justify-center md:hidden">
+              <BrandLogo />
+            </div>
+
+            <div
+              className="rounded-2xl p-7 shadow-2xl backdrop-blur-xl"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.11)",
+              }}
+            >
+              <div className="mb-7 text-center md:text-left">
+                <h1
+                  className="text-2xl tracking-tight text-white"
+                  style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.01em" }}
+                >
+                  Welcome back
+                </h1>
+                <p className="mt-1.5 text-sm text-white/60" style={{ fontFamily: JAKARTA }}>
+                  Sign in to your HIVE dashboard.
+                </p>
+              </div>
+
+              <form onSubmit={onSubmit} className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="identifier" className="text-white/80" style={{ fontFamily: JAKARTA }}>
+                    Email or username
+                  </Label>
+                  <input
+                    id="identifier"
+                    name="identifier"
+                    type="text"
+                    autoComplete="username"
+                    required
+                    className="flex h-10 w-full rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+                    style={inputStyle}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password" className="text-white/80" style={{ fontFamily: JAKARTA }}>
+                      Password
+                    </Label>
+                    <Link to="/forgot-password" className="text-xs font-medium text-[#f4a93a] hover:text-[#f7c172] hover:underline">
+                      Forgot?
+                    </Link>
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    className="flex h-10 w-full rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  className="group h-11 w-full border-0 text-[#1a1208] shadow-lg shadow-amber-900/20 hover:brightness-105"
+                  style={{
+                    fontFamily: JAKARTA,
+                    fontWeight: 700,
+                    backgroundImage: "linear-gradient(135deg, #f4a93a 0%, #f59324 100%)",
+                  }}
+                >
+                  {busy ? "Signing in…" : (
+                    <>
+                      Sign in
+                      <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </Button>
+              </form>
+
+              <div className="relative my-6 text-center text-[11px] uppercase tracking-[0.18em] text-white/40">
+                <div className="absolute inset-x-0 top-1/2 h-px bg-white/10" />
+                <span className="relative px-3" style={{ background: "transparent" }}>
+                  <span className="rounded bg-[#141a3d] px-2">or</span>
+                </span>
+              </div>
+
+              <Button
+                variant="ghost"
+                onClick={google}
+                className="h-11 w-full border bg-transparent text-white hover:bg-white/[0.06] hover:text-white"
+                style={{
+                  fontFamily: JAKARTA,
+                  fontWeight: 600,
+                  borderColor: "rgba(255,255,255,0.18)",
+                }}
+              >
+                Continue with Google
+              </Button>
+
+              <p className="mt-6 text-center text-sm text-white/60" style={{ fontFamily: JAKARTA }}>
+                New here?{" "}
+                <Link to="/signup" className="font-semibold text-[#f4a93a] hover:text-[#f7c172] hover:underline">
+                  Start a free trial
+                </Link>
+              </p>
+            </div>
+
+            <p className="mt-6 text-center text-xs text-white/40" style={{ fontFamily: JAKARTA }}>
+              <Link to="/" className="hover:text-white/70 hover:underline">← Back to site</Link> · {pathname}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Divider() {
-  return (
-    <div className="relative my-6 text-center text-xs uppercase tracking-wider text-muted-foreground">
-      <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
-      <span className="relative bg-background px-3">or</span>
     </div>
   );
 }

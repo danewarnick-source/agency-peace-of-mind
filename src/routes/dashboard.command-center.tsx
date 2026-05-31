@@ -29,7 +29,7 @@ export const Route = createFileRoute("/dashboard/command-center")({
   component: CommandCenter,
 });
 
-export { CommandCenter };
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -783,7 +783,7 @@ function ExpandableRow({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-function CommandCenter() {
+export function CommandCenter() {
   const { data: org } = useCurrentOrg();
   return (
     <RequirePermission perm="manage_users">

@@ -38,6 +38,11 @@ interface ClientFull {
   last_name: string;
   pcsp_goals: string[] | null;
   physical_address: string | null;
+  special_directions: string | null;
+  profile_photo_url: string | null;
+  geofence_radius_feet: number | null;
+  authorized_dspd_codes: string[] | null;
+  feature_config: Record<string, boolean> | null;
 }
 
 function HhsClientHub() {

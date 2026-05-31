@@ -63,6 +63,14 @@ export const Route = createFileRoute("/dashboard/compliance-desk")({
   ),
 });
 
+export function ComplianceDeskWrapped() {
+  return (
+    <RequirePermission perm="manage_users">
+      <ComplianceDeskPage />
+    </RequirePermission>
+  );
+}
+
 type Coord = { latitude: number; longitude: number; accuracy_meters: number };
 type AuditEntry = {
   timestamp: string;

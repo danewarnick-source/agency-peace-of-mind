@@ -7,11 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pill, Plus, Upload, X, Loader2, Sparkles } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogTrigger, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table, TableBody, TableCell, TableHead,
+  TableHeader, TableRow,
+} from "@/components/ui/table";
+import { Pill, Plus, Upload, X, Loader2, Sparkles, Pencil, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { parseMedicationsAI } from "@/lib/medications.functions";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type Medication = {
   id: string;
@@ -24,17 +33,68 @@ export type Medication = {
   prescriber: string | null;
   is_active: boolean;
   discontinued_at: string | null;
+  // Contract compliance fields
+  purpose: string | null;
+  adverse_effects: string | null;
+  choking_risk: boolean;
+  choking_risk_details: string | null;
+  is_controlled: boolean;
+  is_prn: boolean;
+  prn_instructions: string | null;
+  pharmacy: string | null;
+  rx_number: string | null;
 };
 
 type FormVals = {
-  medication_name: string; dosage: string; frequency: string; route: string;
-  scheduled_times: string[]; instructions: string; prescriber: string;
+  medication_name: string;
+  dosage: string;
+  frequency: string;
+  route: string;
+  scheduled_times: string[];
+  instructions: string;
+  prescriber: string;
+  // Contract compliance fields
+  purpose: string;
+  adverse_effects: string;
+  choking_risk: boolean;
+  choking_risk_details: string;
+  is_controlled: boolean;
+  is_prn: boolean;
+  prn_instructions: string;
+  pharmacy: string;
+  rx_number: string;
 };
 
 const EMPTY: FormVals = {
   medication_name: "", dosage: "", frequency: "", route: "PO",
   scheduled_times: [], instructions: "", prescriber: "",
+  purpose: "", adverse_effects: "", choking_risk: false,
+  choking_risk_details: "", is_controlled: false, is_prn: false,
+  prn_instructions: "", pharmacy: "", rx_number: "",
 };
+
+function medToForm(m: Medication): FormVals {
+  return {
+    medication_name:    m.medication_name,
+    dosage:             m.dosage ?? "",
+    frequency:          m.frequency ?? "",
+    route:              m.route ?? "PO",
+    scheduled_times:    m.scheduled_times ?? [],
+    instructions:       m.instructions ?? "",
+    prescriber:         m.prescriber ?? "",
+    purpose:            m.purpose ?? "",
+    adverse_effects:    m.adverse_effects ?? "",
+    choking_risk:       m.choking_risk ?? false,
+    choking_risk_details: m.choking_risk_details ?? "",
+    is_controlled:      m.is_controlled ?? false,
+    is_prn:             m.is_prn ?? false,
+    prn_instructions:   m.prn_instructions ?? "",
+    pharmacy:           m.pharmacy ?? "",
+    rx_number:          m.rx_number ?? "",
+  };
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
 
 export function MedicationsManager({
   clientId, organizationId,
@@ -44,52 +104,100 @@ export function MedicationsManager({
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [editMed, setEditMed] = useState<Medication | null>(null);
 
   const { data: meds, isLoading } = useQuery({
     queryKey: ["client-medications", clientId],
     queryFn: async (): Promise<Medication[]> => {
-      const { data, error } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("client_medications" as any)
-        .select("id, medication_name, dosage, frequency, route, scheduled_times, instructions, prescriber, is_active, discontinued_at")
+      const { data, error } = await (supabase as any)
+        .from("client_medications")
+        .select(`id, medication_name, dosage, frequency, route, scheduled_times,
+          instructions, prescriber, is_active, discontinued_at,
+          purpose, adverse_effects, choking_risk, choking_risk_details,
+          is_controlled, is_prn, prn_instructions, pharmacy, rx_number`)
         .eq("client_id", clientId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data as unknown as Medication[]) ?? [];
+      return (data ?? []) as Medication[];
     },
   });
 
   const insertMut = useMutation({
     mutationFn: async (v: FormVals) => {
       if (!organizationId) throw new Error("Missing organization");
-      const { error } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("client_medications" as any).insert({
-          organization_id: organizationId, client_id: clientId, ...v,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+      const { error } = await (supabase as any).from("client_medications").insert({
+        organization_id:     organizationId,
+        client_id:           clientId,
+        medication_name:     v.medication_name.trim(),
+        dosage:              v.dosage.trim() || null,
+        frequency:           v.frequency.trim() || null,
+        route:               v.route.trim() || null,
+        scheduled_times:     v.scheduled_times,
+        instructions:        v.instructions.trim() || null,
+        prescriber:          v.prescriber.trim() || null,
+        purpose:             v.purpose.trim() || null,
+        adverse_effects:     v.adverse_effects.trim() || null,
+        choking_risk:        v.choking_risk,
+        choking_risk_details: v.choking_risk_details.trim() || null,
+        is_controlled:       v.is_controlled,
+        is_prn:              v.is_prn,
+        prn_instructions:    v.prn_instructions.trim() || null,
+        pharmacy:            v.pharmacy.trim() || null,
+        rx_number:           v.rx_number.trim() || null,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Medication added");
+      toast.success("Medication added.");
       qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
+      qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
       setAddOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: async ({ id, v }: { id: string; v: FormVals }) => {
+      const { error } = await (supabase as any).from("client_medications").update({
+        medication_name:     v.medication_name.trim(),
+        dosage:              v.dosage.trim() || null,
+        frequency:           v.frequency.trim() || null,
+        route:               v.route.trim() || null,
+        scheduled_times:     v.scheduled_times,
+        instructions:        v.instructions.trim() || null,
+        prescriber:          v.prescriber.trim() || null,
+        purpose:             v.purpose.trim() || null,
+        adverse_effects:     v.adverse_effects.trim() || null,
+        choking_risk:        v.choking_risk,
+        choking_risk_details: v.choking_risk_details.trim() || null,
+        is_controlled:       v.is_controlled,
+        is_prn:              v.is_prn,
+        prn_instructions:    v.prn_instructions.trim() || null,
+        pharmacy:            v.pharmacy.trim() || null,
+        rx_number:           v.rx_number.trim() || null,
+      }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Medication updated.");
+      qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
+      qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
+      setEditMed(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const discontinueMut = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("client_medications" as any)
+      const { error } = await (supabase as any).from("client_medications")
         .update({ is_active: false, discontinued_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Marked inactive (history preserved)");
+      toast.success("Medication discontinued. Record preserved.");
       qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
+      qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -97,13 +205,24 @@ export function MedicationsManager({
   const bulkInsertMut = useMutation({
     mutationFn: async (rows: FormVals[]) => {
       if (!organizationId) throw new Error("Missing organization");
-      const payload = rows.map((r) => ({ organization_id: organizationId, client_id: clientId, ...r }));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase.from("client_medications" as any).insert(payload as any);
+      const payload = rows.map((r) => ({
+        organization_id: organizationId,
+        client_id: clientId,
+        medication_name: r.medication_name,
+        dosage: r.dosage || null,
+        frequency: r.frequency || null,
+        route: r.route || null,
+        scheduled_times: r.scheduled_times,
+        instructions: r.instructions || null,
+        prescriber: r.prescriber || null,
+        purpose: null, adverse_effects: null, choking_risk: false,
+        is_controlled: false, is_prn: false,
+      }));
+      const { error } = await (supabase as any).from("client_medications").insert(payload);
       if (error) throw error;
     },
     onSuccess: (_d, rows) => {
-      toast.success(`Imported ${rows.length} medication${rows.length === 1 ? "" : "s"}`);
+      toast.success(`Imported ${rows.length} medication${rows.length === 1 ? "" : "s"}.`);
       qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
       setImportOpen(false);
     },
@@ -111,150 +230,464 @@ export function MedicationsManager({
   });
 
   const visible = (meds ?? []).filter((m) => showInactive || m.is_active);
+  const hasChokingRisk = visible.some((m) => m.choking_risk);
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Pill className="h-4 w-4 text-primary" />
-          <h3 className="font-semibold text-sm">Active prescriptions</h3>
-          <Badge variant="outline">{visible.length}</Badge>
+    <div className="space-y-3">
+
+      {/* Choking risk system alert */}
+      {hasChokingRisk && (
+        <div className="flex items-start gap-2 rounded-lg border-2 border-rose-500 bg-rose-50 px-3 py-2.5 dark:bg-rose-950/20">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+          <div>
+            <p className="text-xs font-bold text-rose-800 dark:text-rose-200">
+              Choking / Swallowing Risk on File
+            </p>
+            <p className="text-[11px] text-rose-700 dark:text-rose-300">
+              One or more medications are flagged for choking or swallowing risk. Confirm upright posture and
+              crushed-med policy per care plan before every medication pass.
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button type="button" size="sm" variant="ghost" onClick={() => setShowInactive((v) => !v)}>
-            {showInactive ? "Hide inactive" : "Show inactive"}
-          </Button>
-          <Dialog open={importOpen} onOpenChange={setImportOpen}>
-            <DialogTrigger asChild>
-              <Button type="button" size="sm" variant="outline"><Sparkles className="mr-1.5 h-3.5 w-3.5" />⚡ NECTAR Import Medications</Button>
-            </DialogTrigger>
-            <AIImportDialog
-              onParse={async (payload) => {
-                const r = await parseAI({ data: payload });
-                return r.medications as unknown as FormVals[];
-              }}
-              onCommit={(rows) => bulkInsertMut.mutate(rows)}
-              committing={bulkInsertMut.isPending}
-            />
-          </Dialog>
-          <Dialog open={addOpen} onOpenChange={setAddOpen}>
-            <DialogTrigger asChild>
-              <Button type="button" size="sm"><Plus className="mr-1.5 h-3.5 w-3.5" />Add Medication</Button>
-            </DialogTrigger>
-            <MedFormDialog title="Add medication" onSubmit={(v) => insertMut.mutate(v)} pending={insertMut.isPending} />
-          </Dialog>
+      )}
+
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Pill className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">Active prescriptions</h3>
+            <Badge variant="outline">{visible.length}</Badge>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button type="button" size="sm" variant="ghost"
+              onClick={() => setShowInactive((v) => !v)}>
+              {showInactive ? "Hide inactive" : "Show inactive"}
+            </Button>
+            <Dialog open={importOpen} onOpenChange={setImportOpen}>
+              <DialogTrigger asChild>
+                <Button type="button" size="sm" variant="outline">
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  NECTAR Import
+                </Button>
+              </DialogTrigger>
+              <AIImportDialog
+                onParse={async (payload) => {
+                  const r = await parseAI({ data: payload });
+                  return r.medications as unknown as FormVals[];
+                }}
+                onCommit={(rows) => bulkInsertMut.mutate(rows)}
+                committing={bulkInsertMut.isPending}
+              />
+            </Dialog>
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogTrigger asChild>
+                <Button type="button" size="sm">
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Medication
+                </Button>
+              </DialogTrigger>
+              <MedFormDialog
+                title="Add Medication"
+                onSubmit={(v) => insertMut.mutate(v)}
+                pending={insertMut.isPending}
+              />
+            </Dialog>
+          </div>
         </div>
+
+        {/* Table */}
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Loading medications...</p>
+        ) : !visible.length ? (
+          <p className="text-xs text-muted-foreground">No medications recorded. Click Add Medication to begin.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Medication</TableHead>
+                <TableHead>Dose</TableHead>
+                <TableHead>Route</TableHead>
+                <TableHead>Frequency</TableHead>
+                <TableHead>Times</TableHead>
+                <TableHead>Flags</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visible.map((m) => (
+                <TableRow
+                  key={m.id}
+                  className={`cursor-pointer hover:bg-muted/40 ${!m.is_active ? "opacity-50" : ""}`}
+                  onClick={() => setEditMed(m)}
+                >
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      {m.choking_risk && (
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+                      )}
+                      {m.medication_name}
+                    </div>
+                    {m.prescriber && (
+                      <div className="text-[10px] text-muted-foreground">Rx: {m.prescriber}</div>
+                    )}
+                    {m.purpose && (
+                      <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">{m.purpose}</div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">{m.dosage || "—"}</TableCell>
+                  <TableCell className="text-xs">{m.route || "—"}</TableCell>
+                  <TableCell className="text-xs">{m.frequency || "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {(m.scheduled_times ?? []).map((t) => (
+                        <Badge key={t} variant="secondary" className="font-mono text-[10px]">{t}</Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {m.is_controlled && (
+                        <Badge className="bg-purple-100 text-purple-800 text-[10px] dark:bg-purple-950/40 dark:text-purple-200">Controlled</Badge>
+                      )}
+                      {m.is_prn && (
+                        <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">PRN</Badge>
+                      )}
+                      {m.choking_risk && (
+                        <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-950/40 dark:text-rose-200">Choking Risk</Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {m.is_active
+                      ? <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200">Active</Badge>
+                      : <Badge variant="outline">Discontinued</Badge>}
+                  </TableCell>
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        type="button" variant="ghost" size="sm"
+                        onClick={(e) => { e.stopPropagation(); setEditMed(m); }}
+                        className="h-7 px-2"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      {m.is_active && (
+                        <Button
+                          type="button" variant="ghost" size="sm"
+                          onClick={(e) => { e.stopPropagation(); discontinueMut.mutate(m.id); }}
+                          className="h-7 px-2 text-muted-foreground hover:text-rose-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
-      {isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
-      ) : !visible.length ? (
-        <p className="text-xs text-muted-foreground">No medications recorded.</p>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Medication</TableHead>
-              <TableHead>Dose</TableHead>
-              <TableHead>Route</TableHead>
-              <TableHead>Frequency</TableHead>
-              <TableHead>Times</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.map((m) => (
-              <TableRow key={m.id} className={!m.is_active ? "opacity-50" : ""}>
-                <TableCell className="font-medium">
-                  {m.medication_name}
-                  {m.prescriber && <div className="text-[10px] text-muted-foreground">Rx: {m.prescriber}</div>}
-                </TableCell>
-                <TableCell className="text-xs">{m.dosage || "—"}</TableCell>
-                <TableCell className="text-xs">{m.route || "—"}</TableCell>
-                <TableCell className="text-xs">{m.frequency || "—"}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {(m.scheduled_times ?? []).map((t) => (
-                      <Badge key={t} variant="secondary" className="font-mono text-[10px]">{t}</Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {m.is_active
-                    ? <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Active</Badge>
-                    : <Badge variant="outline">Discontinued</Badge>}
-                </TableCell>
-                <TableCell className="text-right">
-                  {m.is_active && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => discontinueMut.mutate(m.id)}>
-                      <X className="mr-1 h-3 w-3" /> Discontinue
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+      {/* Edit dialog */}
+      <Dialog open={!!editMed} onOpenChange={(o) => { if (!o) setEditMed(null); }}>
+        {editMed && (
+          <MedFormDialog
+            title={`Edit — ${editMed.medication_name}`}
+            initial={medToForm(editMed)}
+            onSubmit={(v) => updateMut.mutate({ id: editMed.id, v })}
+            pending={updateMut.isPending}
+            showDiscontinue={editMed.is_active}
+            onDiscontinue={() => { discontinueMut.mutate(editMed.id); setEditMed(null); }}
+          />
+        )}
+      </Dialog>
+
+      {/* Import dialog */}
     </div>
   );
 }
 
+// ─── Medication Form Dialog ────────────────────────────────────────────────────
+
 function MedFormDialog({
-  title, initial, onSubmit, pending,
-}: { title: string; initial?: FormVals; onSubmit: (v: FormVals) => void; pending: boolean }) {
+  title,
+  initial,
+  onSubmit,
+  pending,
+  showDiscontinue,
+  onDiscontinue,
+}: {
+  title: string;
+  initial?: FormVals;
+  onSubmit: (v: FormVals) => void;
+  pending: boolean;
+  showDiscontinue?: boolean;
+  onDiscontinue?: () => void;
+}) {
   const [v, setV] = useState<FormVals>(initial ?? EMPTY);
   const [timeInput, setTimeInput] = useState("");
-  const addTime = () => {
+
+  function addTime() {
     const t = timeInput.trim();
-    if (!/^\d{2}:\d{2}$/.test(t)) { toast.error("Use HH:MM"); return; }
+    if (!/^\d{2}:\d{2}$/.test(t)) { toast.error("Use HH:MM format (e.g. 08:00)"); return; }
     if (v.scheduled_times.includes(t)) return;
     setV({ ...v, scheduled_times: [...v.scheduled_times, t].sort() });
     setTimeInput("");
-  };
+  }
+
   return (
-    <DialogContent className="max-h-[85vh] overflow-y-auto">
-      <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
-      <div className="grid gap-3">
-        <div className="grid gap-2"><Label>Medication name *</Label>
-          <Input value={v.medication_name} onChange={(e) => setV({ ...v, medication_name: e.target.value })} maxLength={200} /></div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="grid gap-2"><Label>Dosage</Label>
-            <Input value={v.dosage} onChange={(e) => setV({ ...v, dosage: e.target.value })} placeholder="10 mg" /></div>
-          <div className="grid gap-2"><Label>Route</Label>
-            <Input value={v.route} onChange={(e) => setV({ ...v, route: e.target.value })} placeholder="PO" /></div>
-          <div className="grid gap-2"><Label>Frequency</Label>
-            <Input value={v.frequency} onChange={(e) => setV({ ...v, frequency: e.target.value })} placeholder="BID" /></div>
-        </div>
+    <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Pill className="h-4 w-4 text-primary" />
+          {title}
+        </DialogTitle>
+      </DialogHeader>
+
+      <div className="space-y-4">
+
+        {/* Core prescription fields */}
         <div className="grid gap-2">
-          <Label>Scheduled times (24h)</Label>
+          <Label className="text-xs font-semibold">Medication Name *</Label>
+          <Input
+            value={v.medication_name}
+            onChange={(e) => setV({ ...v, medication_name: e.target.value })}
+            placeholder="e.g., Hydroxyzine HCl"
+            maxLength={200}
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="grid gap-2">
+            <Label className="text-xs font-semibold">Dosage</Label>
+            <Input
+              value={v.dosage}
+              onChange={(e) => setV({ ...v, dosage: e.target.value })}
+              placeholder="10 mg"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label className="text-xs font-semibold">Route</Label>
+            <Input
+              value={v.route}
+              onChange={(e) => setV({ ...v, route: e.target.value })}
+              placeholder="PO"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label className="text-xs font-semibold">Frequency</Label>
+            <Input
+              value={v.frequency}
+              onChange={(e) => setV({ ...v, frequency: e.target.value })}
+              placeholder="BID"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <Label className="text-xs font-semibold">Scheduled Times (24h)</Label>
           <div className="flex gap-2">
-            <Input type="time" value={timeInput} onChange={(e) => setTimeInput(e.target.value)} />
-            <Button type="button" variant="outline" onClick={addTime}>Add</Button>
+            <Input
+              type="time"
+              value={timeInput}
+              onChange={(e) => setTimeInput(e.target.value)}
+              className="w-36"
+            />
+            <Button type="button" variant="outline" onClick={addTime}>Add Time</Button>
           </div>
           <div className="flex flex-wrap gap-1">
             {v.scheduled_times.map((t) => (
-              <Badge key={t} variant="secondary" className="gap-1 font-mono">{t}
-                <button type="button" onClick={() => setV({ ...v, scheduled_times: v.scheduled_times.filter((x) => x !== t) })}>
-                  <X className="h-3 w-3" /></button>
+              <Badge key={t} variant="secondary" className="gap-1 font-mono">
+                {t}
+                <button
+                  type="button"
+                  onClick={() => setV({ ...v, scheduled_times: v.scheduled_times.filter((x) => x !== t) })}
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </Badge>
             ))}
           </div>
         </div>
-        <div className="grid gap-2"><Label>Prescriber</Label>
-          <Input value={v.prescriber} onChange={(e) => setV({ ...v, prescriber: e.target.value })} /></div>
-        <div className="grid gap-2"><Label>Special instructions</Label>
-          <Textarea value={v.instructions} onChange={(e) => setV({ ...v, instructions: e.target.value })} rows={2} /></div>
+
+        <div className="grid gap-2">
+          <Label className="text-xs font-semibold">Prescriber</Label>
+          <Input
+            value={v.prescriber}
+            onChange={(e) => setV({ ...v, prescriber: e.target.value })}
+            placeholder="Dr. Name"
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <Label className="text-xs font-semibold">Administration Instructions</Label>
+          <Textarea
+            value={v.instructions}
+            onChange={(e) => setV({ ...v, instructions: e.target.value })}
+            rows={2}
+            placeholder="Special instructions for staff..."
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-2">
+            <Label className="text-xs font-semibold">Pharmacy</Label>
+            <Input
+              value={v.pharmacy}
+              onChange={(e) => setV({ ...v, pharmacy: e.target.value })}
+              placeholder="Pharmacy name"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label className="text-xs font-semibold">Rx Number</Label>
+            <Input
+              value={v.rx_number}
+              onChange={(e) => setV({ ...v, rx_number: e.target.value })}
+              placeholder="Prescription number"
+            />
+          </div>
+        </div>
+
+        {/* Contract compliance fields */}
+        <div className="border-t border-border pt-4">
+          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            State Contract Compliance — Required Fields
+          </p>
+
+          <div className="space-y-4">
+
+            {/* (1) Clinical purpose */}
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold">
+                Clinical Purpose *
+                <span className="ml-1 font-normal text-muted-foreground">(Contract Req. 1)</span>
+              </Label>
+              <Textarea
+                rows={2}
+                value={v.purpose}
+                onChange={(e) => setV({ ...v, purpose: e.target.value })}
+                placeholder="What condition or symptom does this medication treat? Why is this person taking it?"
+              />
+            </div>
+
+            {/* (3) Adverse effects */}
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold">
+                Adverse Effects & Side Effects *
+                <span className="ml-1 font-normal text-muted-foreground">(Contract Req. 3)</span>
+              </Label>
+              <Textarea
+                rows={3}
+                value={v.adverse_effects}
+                onChange={(e) => setV({ ...v, adverse_effects: e.target.value })}
+                placeholder="Known side effects, signs of adverse reaction, and what staff should watch for..."
+              />
+            </div>
+
+            {/* Choking risk — Contract Req. 3 specifically calls this out */}
+            <div className={`rounded-lg border-2 p-3 space-y-2 ${v.choking_risk ? "border-rose-500 bg-rose-50 dark:bg-rose-950/20" : "border-border bg-muted/20"}`}>
+              <label className="flex cursor-pointer items-center gap-2">
+                <Checkbox
+                  checked={v.choking_risk}
+                  onCheckedChange={(c) => setV({ ...v, choking_risk: !!c })}
+                />
+                <span className={`text-sm font-semibold ${v.choking_risk ? "text-rose-800 dark:text-rose-200" : "text-foreground"}`}>
+                  This medication may contribute to swallowing difficulties or enhance the prospects of choking
+                </span>
+              </label>
+              <p className="ml-6 text-[11px] text-muted-foreground">
+                Required disclosure per state contract. Checking this displays a choking risk alert at every medication pass.
+              </p>
+              {v.choking_risk && (
+                <Textarea
+                  rows={2}
+                  value={v.choking_risk_details}
+                  onChange={(e) => setV({ ...v, choking_risk_details: e.target.value })}
+                  placeholder="Describe the choking or swallowing risk and any required precautions (e.g., crush medication, upright position required)..."
+                  className="ml-6 text-sm bg-white dark:bg-slate-900"
+                />
+              )}
+            </div>
+
+            {/* PRN and Controlled flags */}
+            <div className="grid grid-cols-2 gap-3">
+              <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 transition ${
+                v.is_controlled
+                  ? "border-purple-500 bg-purple-50 dark:bg-purple-950/20"
+                  : "border-border hover:bg-muted/40"
+              }`}>
+                <Checkbox
+                  checked={v.is_controlled}
+                  onCheckedChange={(c) => setV({ ...v, is_controlled: !!c })}
+                />
+                <div>
+                  <p className={`text-sm font-medium ${v.is_controlled ? "text-purple-800 dark:text-purple-200" : ""}`}>
+                    Controlled Substance
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Requires pill count verification</p>
+                </div>
+              </label>
+              <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 transition ${
+                v.is_prn
+                  ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20"
+                  : "border-border hover:bg-muted/40"
+              }`}>
+                <Checkbox
+                  checked={v.is_prn}
+                  onCheckedChange={(c) => setV({ ...v, is_prn: !!c })}
+                />
+                <div>
+                  <p className={`text-sm font-medium ${v.is_prn ? "text-amber-800 dark:text-amber-200" : ""}`}>
+                    PRN / As Needed
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Reason required at each administration</p>
+                </div>
+              </label>
+            </div>
+
+            {v.is_prn && (
+              <div className="grid gap-2">
+                <Label className="text-xs font-semibold">PRN Administration Instructions</Label>
+                <Textarea
+                  rows={2}
+                  value={v.prn_instructions}
+                  onChange={(e) => setV({ ...v, prn_instructions: e.target.value })}
+                  placeholder="When and under what circumstances should this PRN medication be administered?"
+                />
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-      <DialogFooter>
-        <Button type="button" disabled={!v.medication_name.trim() || pending} onClick={() => onSubmit(v)}>
-          {pending ? "Saving…" : "Save medication"}
+
+      <DialogFooter className="flex-col gap-2 sm:flex-row">
+        {showDiscontinue && onDiscontinue && (
+          <Button
+            type="button" variant="outline"
+            onClick={onDiscontinue}
+            className="border-rose-500/50 text-rose-700 hover:bg-rose-50 dark:text-rose-300 sm:mr-auto"
+          >
+            <X className="mr-1.5 h-3.5 w-3.5" /> Discontinue
+          </Button>
+        )}
+        <Button
+          type="button"
+          disabled={!v.medication_name.trim() || pending}
+          onClick={() => onSubmit(v)}
+        >
+          {pending
+            ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+            : "Save Medication"}
         </Button>
       </DialogFooter>
     </DialogContent>
   );
 }
+
+// ─── AI Import Dialog ─────────────────────────────────────────────────────────
 
 function AIImportDialog({
   onParse, onCommit, committing,
@@ -284,29 +717,33 @@ function AIImportDialog({
         const m = await onParse({ text: t });
         setRows(m);
       }
-      toast.success(`NECTAR extracted ${rows.length} medications`);
+      toast.success("Medications extracted. Review before saving.");
     } catch (e) {
       toast.error((e as Error).message);
-    } finally { setParsing(false); }
+    } finally {
+      setParsing(false);
+    }
   };
 
   return (
     <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
-      <DialogHeader><DialogTitle>⚡ NECTAR Medication Importer</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>NECTAR Medication Importer</DialogTitle>
+      </DialogHeader>
       {!rows.length ? (
         <div className="space-y-3">
           <div
             onClick={() => fileRef.current?.click()}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
-            className="cursor-pointer rounded-lg border-2 border-dashed border-border p-8 text-center hover:bg-accent/30"
+            className="cursor-pointer rounded-lg border-2 border-dashed border-border p-8 text-center hover:bg-accent/30 transition"
           >
             {parsing ? (
-              <><Loader2 className="mx-auto h-6 w-6 animate-spin" /><p className="mt-2 text-sm">Parsing with NECTAR…</p></>
+              <><Loader2 className="mx-auto h-6 w-6 animate-spin" /><p className="mt-2 text-sm">Parsing with NECTAR...</p></>
             ) : (
               <><Upload className="mx-auto h-6 w-6 text-muted-foreground" />
                 <p className="mt-2 text-sm font-medium">Drop physician order, MAR, or pharmacy list</p>
-                <p className="text-xs text-muted-foreground">PDF, image, CSV, or text — NECTAR extracts meds, dose, route, frequency, times.</p></>
+                <p className="text-xs text-muted-foreground">PDF, image, CSV, or text supported</p></>
             )}
             <input
               ref={fileRef} type="file" className="hidden"
@@ -315,45 +752,71 @@ function AIImportDialog({
             />
           </div>
           <div className="text-center text-xs text-muted-foreground">or paste order text</div>
-          <Textarea rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste physician order text here…" />
+          <Textarea rows={4} value={text} onChange={(e) => setText(e.target.value)}
+            placeholder="Paste physician order text here..." />
           <Button type="button" disabled={!text.trim() || parsing} onClick={async () => {
             setParsing(true);
             try { setRows(await onParse({ text })); } catch (e) { toast.error((e as Error).message); }
             finally { setParsing(false); }
-          }}>{parsing ? "Parsing…" : "Parse text"}</Button>
+          }}>
+            {parsing ? "Parsing..." : "Parse Text"}
+          </Button>
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">Review and edit before committing. Highlighted fields are missing.</p>
-          <div className="rounded-md border border-border max-h-[420px] overflow-auto">
+          <p className="text-xs text-muted-foreground">
+            Review before committing. Note: compliance fields (purpose, adverse effects) must be completed manually after import.
+          </p>
+          <div className="rounded-md border border-border max-h-[400px] overflow-auto">
             <Table>
-              <TableHeader><TableRow>
-                <TableHead>Medication</TableHead><TableHead>Dose</TableHead><TableHead>Route</TableHead>
-                <TableHead>Frequency</TableHead><TableHead>Times</TableHead><TableHead></TableHead>
-              </TableRow></TableHeader>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Medication</TableHead>
+                  <TableHead>Dose</TableHead>
+                  <TableHead>Route</TableHead>
+                  <TableHead>Frequency</TableHead>
+                  <TableHead>Times</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
                 {rows.map((r, i) => (
                   <TableRow key={i}>
-                    <TableCell><Input value={r.medication_name} className={!r.medication_name ? "border-rose-400" : ""}
-                      onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, medication_name: e.target.value } : x))} /></TableCell>
-                    <TableCell><Input value={r.dosage || ""} className={!r.dosage ? "border-rose-300" : ""}
-                      onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, dosage: e.target.value } : x))} /></TableCell>
-                    <TableCell><Input value={r.route || ""}
-                      onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, route: e.target.value } : x))} /></TableCell>
-                    <TableCell><Input value={r.frequency || ""}
-                      onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, frequency: e.target.value } : x))} /></TableCell>
-                    <TableCell className="font-mono text-xs">{(r.scheduled_times || []).join(", ") || "—"}</TableCell>
-                    <TableCell><Button variant="ghost" size="sm" onClick={() => setRows(rows.filter((_, j) => j !== i))}>
-                      <X className="h-3 w-3" /></Button></TableCell>
+                    <TableCell>
+                      <Input value={r.medication_name}
+                        className={!r.medication_name ? "border-rose-400" : ""}
+                        onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, medication_name: e.target.value } : x))} />
+                    </TableCell>
+                    <TableCell>
+                      <Input value={r.dosage || ""}
+                        onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, dosage: e.target.value } : x))} />
+                    </TableCell>
+                    <TableCell>
+                      <Input value={r.route || ""}
+                        onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, route: e.target.value } : x))} />
+                    </TableCell>
+                    <TableCell>
+                      <Input value={r.frequency || ""}
+                        onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, frequency: e.target.value } : x))} />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {(r.scheduled_times || []).join(", ") || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm"
+                        onClick={() => setRows(rows.filter((_, j) => j !== i))}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRows([])}>Start over</Button>
+            <Button variant="outline" onClick={() => setRows([])}>Start Over</Button>
             <Button disabled={!rows.length || committing} onClick={() => onCommit(rows)}>
-              {committing ? "Saving…" : `Finalize & Save ${rows.length}`}
+              {committing ? "Saving..." : `Save ${rows.length} Medication${rows.length === 1 ? "" : "s"}`}
             </Button>
           </DialogFooter>
         </div>

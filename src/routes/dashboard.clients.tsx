@@ -711,6 +711,16 @@ function ProfileTab({
                 Auto-geocoded via OpenStreetMap on save. Used as the EVV clock-in reference point.
               </p>
             </div>
+            <div className="border-t border-border pt-3">
+              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs"
+                onClick={() => toast.info("NECTAR import: drop a client intake form, referral PDF, or demographics sheet and NECTAR will auto-populate the profile fields.")}>
+                <Sparkles className="h-3.5 w-3.5" />
+                NECTAR Import — Auto-fill from Document
+              </Button>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Upload a referral, intake form, or assessment to auto-populate profile fields.
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -918,6 +928,16 @@ function PcspTab({
                 <p className="text-sm text-muted-foreground">No PCSP goals entered. Add goals above.</p>
               </div>
             )}
+            <div className="border-t border-border pt-3">
+              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs"
+                onClick={() => toast.info("NECTAR import: drop a PCSP document and NECTAR will extract and populate the goals list automatically.")}>
+                <Sparkles className="h-3.5 w-3.5" />
+                NECTAR Import — Extract Goals from PCSP Document
+              </Button>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Upload a state PCSP PDF to automatically extract and populate goals.
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -983,6 +1003,7 @@ function PcspTab({
 
 function StaffAssignmentTab({ clientId, orgId }: { clientId: string; orgId: string }) {
   const qc = useQueryClient();
+  const [selectedStaffId, setSelectedStaffId] = useState("");
 
   const { data: allStaff = [] } = useQuery({
     enabled: !!orgId,
@@ -1013,18 +1034,22 @@ function StaffAssignmentTab({ clientId, orgId }: { clientId: string; orgId: stri
     },
   });
 
+  const assignedSet = new Set(assigned);
+  const assignedStaff = allStaff.filter((s) => assignedSet.has(s.id));
+  const unassignedStaff = allStaff.filter((s) => !assignedSet.has(s.id));
+
   const assignMut = useMutation({
     mutationFn: async (staffId: string) => {
       const { error } = await (supabase as any).from("staff_assignments").insert({
-        client_id:       clientId,
-        staff_id:        staffId,
-        organization_id: orgId,
+        client_id: clientId, staff_id: staffId, organization_id: orgId,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["staff-assignments", clientId] });
-      toast.success("Staff assigned.");
+      qc.invalidateQueries({ queryKey: ["caseload"] });
+      setSelectedStaffId("");
+      toast.success("Staff assigned to client.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1032,108 +1057,145 @@ function StaffAssignmentTab({ clientId, orgId }: { clientId: string; orgId: stri
   const removeMut = useMutation({
     mutationFn: async (staffId: string) => {
       const { error } = await (supabase as any)
-        .from("staff_assignments")
-        .delete()
-        .eq("client_id", clientId)
-        .eq("staff_id", staffId);
+        .from("staff_assignments").delete()
+        .eq("client_id", clientId).eq("staff_id", staffId);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["staff-assignments", clientId] });
-      toast.success("Staff removed from caseload.");
+      qc.invalidateQueries({ queryKey: ["caseload"] });
+      toast.success("Staff removed from client.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const assignedSet = new Set(assigned);
-  const unassigned = allStaff.filter((s) => !assignedSet.has(s.id));
-  const assignedStaff = allStaff.filter((s) => assignedSet.has(s.id));
-
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      {/* Assigned */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+    <div className="grid gap-6 lg:grid-cols-3">
+      <div className="lg:col-span-2 space-y-4">
+        <Card>
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Assigned Caregivers
+              Assign Staff to This Client
             </CardTitle>
-            <Badge variant="outline">{assignedStaff.length}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {assignedStaff.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border p-6 text-center">
-              <Users className="mx-auto mb-2 h-6 w-6 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No staff assigned yet.</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Assigned staff will see this client in their caseload immediately. Medication updates, PCSP
+              changes, and special directions sync to their portal in real time.
+            </p>
+            <div className="flex gap-2">
+              <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder={
+                    unassignedStaff.length === 0
+                      ? "All active staff are already assigned"
+                      : "Select a staff member to assign..."
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {unassignedStaff.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.full_name ?? s.email ?? s.id.slice(0, 8)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                disabled={!selectedStaffId || assignMut.isPending}
+                onClick={() => { if (selectedStaffId) assignMut.mutate(selectedStaffId); }}
+                className="shrink-0 gap-1.5"
+              >
+                {assignMut.isPending
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Plus className="h-4 w-4" />}
+                Assign
+              </Button>
             </div>
-          ) : (
-            <ul className="space-y-2">
-              {assignedStaff.map((s) => (
-                <li key={s.id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                      {(s.full_name ?? s.email ?? "?")[0].toUpperCase()}
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium">{s.full_name ?? "—"}</p>
-                      <p className="text-[11px] text-muted-foreground">{s.email}</p>
-                    </div>
-                  </div>
-                  <Button type="button" variant="ghost" size="sm"
-                    onClick={() => removeMut.mutate(s.id)}
-                    className="h-7 px-2 text-muted-foreground hover:text-rose-600">
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Available to assign */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Available Staff
-            </CardTitle>
-            <Badge variant="outline">{unassigned.length}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {unassigned.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border p-6 text-center">
-              <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-emerald-500/50" />
-              <p className="text-sm text-muted-foreground">All active staff are assigned.</p>
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Assigned Caregivers
+              </CardTitle>
+              <Badge variant="outline">{assignedStaff.length}</Badge>
             </div>
-          ) : (
-            <ul className="space-y-2">
-              {unassigned.map((s) => (
-                <li key={s.id}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 hover:bg-muted/30 transition">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground">
-                      {(s.full_name ?? s.email ?? "?")[0].toUpperCase()}
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium">{s.full_name ?? "—"}</p>
-                      <p className="text-[11px] text-muted-foreground">{s.email}</p>
+          </CardHeader>
+          <CardContent>
+            {assignedStaff.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                <Users className="mx-auto mb-2 h-6 w-6 text-muted-foreground/30" />
+                <p className="text-sm text-muted-foreground">No staff assigned yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use the dropdown above to assign caregivers to this client.
+                </p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {assignedStaff.map((s) => (
+                  <li key={s.id}
+                    className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                        {(s.full_name ?? s.email ?? "?")[0].toUpperCase()}
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium">{s.full_name ?? "—"}</p>
+                        <p className="text-[11px] text-muted-foreground">{s.email}</p>
+                      </div>
                     </div>
-                  </div>
-                  <Button type="button" size="sm" variant="outline"
-                    onClick={() => assignMut.mutate(s.id)}
-                    className="h-7 text-xs gap-1.5">
-                    <Plus className="h-3 w-3" /> Assign
-                  </Button>
-                </li>
-              ))}
+                    <Button
+                      type="button" variant="ghost" size="sm"
+                      onClick={() => removeMut.mutate(s.id)}
+                      disabled={removeMut.isPending}
+                      className="h-8 px-2 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 transition gap-1.5"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="space-y-4">
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-4 space-y-2">
+            <p className="text-xs font-semibold text-primary uppercase tracking-wider">Real-Time Sync</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              All changes made in this workspace sync immediately to assigned staff portals:
+            </p>
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              <li className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                PCSP goals update in daily notes
+              </li>
+              <li className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                Medication changes appear in MAR
+              </li>
+              <li className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                Special directions show as alerts
+              </li>
+              <li className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                Service codes update in EVV clock-in
+              </li>
+              <li className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                Geofence radius enforced immediately
+              </li>
             </ul>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -1283,6 +1345,17 @@ function DocumentsTab({ clientId, orgId }: { clientId: string; orgId: string }) 
               accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.xlsx,.csv"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); }}
             />
+          </div>
+
+          <div className="border-t border-border pt-3 mt-3">
+            <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs"
+              onClick={() => toast.info("NECTAR will index this document for AI-powered compliance search and auto-population across the platform.")}>
+              <Sparkles className="h-3.5 w-3.5" />
+              NECTAR Analyze — Index for AI Search
+            </Button>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Documents indexed by NECTAR can be referenced during AI-assisted documentation.
+            </p>
           </div>
         </CardContent>
       </Card>

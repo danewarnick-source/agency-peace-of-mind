@@ -587,10 +587,3 @@ export function AiPdfImporter({
     </div>
   );
 }
-
-          Finalize &amp; Save to Profile
-        </Button>
-      </div>
-    </div>
-  );
-}

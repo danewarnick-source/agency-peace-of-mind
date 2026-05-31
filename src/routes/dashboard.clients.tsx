@@ -1346,6 +1346,17 @@ function DocumentsTab({ clientId, orgId }: { clientId: string; orgId: string }) 
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); }}
             />
           </div>
+
+          <div className="border-t border-border pt-3 mt-3">
+            <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs"
+              onClick={() => toast.info("NECTAR will index this document for AI-powered compliance search and auto-population across the platform.")}>
+              <Sparkles className="h-3.5 w-3.5" />
+              NECTAR Analyze — Index for AI Search
+            </Button>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Documents indexed by NECTAR can be referenced during AI-assisted documentation.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

@@ -627,6 +627,40 @@ function ProfileTab({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  className="relative h-16 w-16 rounded-full overflow-hidden border-2 border-border hover:border-primary transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  title="Upload profile photo"
+                >
+                  {photoUrl ? (
+                    <img src={photoUrl} alt="Profile" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary">
+                      {client.first_name[0]}{client.last_name[0]}
+                    </span>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition">
+                    {photoUploading
+                      ? <Loader2 className="h-5 w-5 animate-spin text-white" />
+                      : <Camera className="h-5 w-5 text-white" />}
+                  </div>
+                </button>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); }}
+                />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{client.first_name} {client.last_name}</h3>
+                <p className="text-xs text-muted-foreground">Click photo to update. JPEG or PNG, max 5MB.</p>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
                 <Label className="text-xs font-semibold">First Name *</Label>

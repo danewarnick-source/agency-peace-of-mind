@@ -108,40 +108,74 @@ export function AiPdfImporter({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>("");
   const [extracting, setExtracting] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [data, setData] = useState<ExtractedClient | null>(null);
+  const [unresolved, setUnresolved] = useState<UnresolvedItem[]>([]);
+  const [routeChoice, setRouteChoice] = useState<RouteTarget>("pcsp_goal");
+
+  const activeUnresolved = unresolved[0] ?? null;
 
   const reset = useCallback(() => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     setPdfUrl(null);
+    setFileName("");
     setData(null);
+    setUnresolved([]);
   }, [pdfUrl]);
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
-        toast.error("Please upload a PDF file.");
+      if (!isAcceptedFile(file)) {
+        toast.error("Nectar accepts .pdf, .docx, or .png files.");
         return;
       }
       if (file.size > 15 * 1024 * 1024) {
-        toast.error("PDF is larger than 15 MB — please split or compress it.");
+        toast.error("File is larger than 15 MB — please split or compress it.");
         return;
       }
       reset();
       const url = URL.createObjectURL(file);
       setPdfUrl(url);
+      setFileName(file.name);
       setExtracting(true);
+
+      const isPdf =
+        file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
       try {
-        const b64 = await fileToBase64(file);
-        const result = await extractFn({ data: { pdfBase64: b64 } });
-        setData(result);
-        toast.success("AI extraction complete — review before saving.");
+        if (isPdf) {
+          const b64 = await fileToBase64(file);
+          const result = await extractFn({ data: { pdfBase64: b64 } });
+          setData(result);
+          const flags = detectAmbiguities(result);
+          if (flags.length) setUnresolved(flags);
+          toast.success(
+            flags.length
+              ? `Nectar parsed the document — ${flags.length} item${flags.length === 1 ? "" : "s"} need routing.`
+              : "Nectar extraction complete — review before saving.",
+          );
+        } else {
+          // .docx / .png: Nectar simulation — no automatic field extraction yet.
+          // Admin reviews + fills the form manually; warn so the flow is explicit.
+          setData({
+            first_name: "",
+            last_name: "",
+            medicaid_id: "",
+            date_of_birth: "",
+            authorized_codes: [],
+            pcsp_goals: [],
+            prompting_levels: [],
+          });
+          toast.message("Nectar simulation engaged for non-PDF asset — please verify each field manually.");
+        }
       } catch (e) {
         toast.error((e as Error).message);
         URL.revokeObjectURL(url);
         setPdfUrl(null);
+        setFileName("");
       } finally {
         setExtracting(false);
       }
@@ -158,6 +192,33 @@ export function AiPdfImporter({
     },
     [handleFile],
   );
+
+  const resolveCurrent = useCallback(() => {
+    if (!activeUnresolved) return;
+    const text = activeUnresolved.text;
+    setData((cur) => {
+      if (!cur) return cur;
+      switch (routeChoice) {
+        case "first_name":
+          return { ...cur, first_name: text };
+        case "last_name":
+          return { ...cur, last_name: text };
+        case "medicaid_id":
+          return { ...cur, medicaid_id: text.replace(/\D+/g, "") };
+        case "date_of_birth":
+          return { ...cur, date_of_birth: text };
+        case "pcsp_goal":
+          return { ...cur, pcsp_goals: [...cur.pcsp_goals, text] };
+        case "discard":
+        default:
+          return cur;
+      }
+    });
+    setUnresolved((q) => q.slice(1));
+    setRouteChoice("pcsp_goal");
+    toast.success("Nectar ingestion path confirmed.");
+  }, [activeUnresolved, routeChoice]);
+
 
   const finalize = useCallback(async () => {
     if (!data || !organizationId) return;

@@ -106,8 +106,19 @@ function ClientWorkspace() {
           </div>
         </div>
 
-
-
+        {client.special_directions && (
+          <div className="flex items-start gap-3 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-3 dark:bg-amber-950/20">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+                Special Directions & Clinical Alerts
+              </p>
+              <p className="mt-0.5 text-sm text-amber-700 dark:text-amber-300 whitespace-pre-wrap">
+                {client.special_directions}
+              </p>
+            </div>
+          </div>
+        )}
 
         <Tabs
           value={tabParam ?? "about"}

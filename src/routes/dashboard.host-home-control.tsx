@@ -27,6 +27,8 @@ export const Route = createFileRoute("/dashboard/host-home-control")({
   component: HostHomeControl,
 });
 
+export { HostHomeControl };
+
 type ClientLite = { id: string; first_name: string; last_name: string };
 
 function useClientMap(orgId?: string) {

@@ -60,6 +60,7 @@ type Client = {
   emergency_contact_phone: string | null;
   // feature toggles stored as JSON
   feature_config: Record<string, boolean> | null;
+  profile_photo_url: string | null;
 };
 
 type ClientFormValues = {

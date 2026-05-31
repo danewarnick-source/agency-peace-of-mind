@@ -360,17 +360,30 @@ export function AiPdfImporter({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Left: PDF preview */}
-        <div className="rounded-lg border bg-muted/30">
+        {/* Left: file preview */}
+        <div className="rounded-lg border border-primary/20 bg-muted/30">
           <div className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
-            <FileText className="h-3.5 w-3.5" /> Uploaded PDF
+            <FileText className="h-3.5 w-3.5" /> {fileName || "Uploaded file"}
           </div>
-          <iframe
-            title="PCSP preview"
-            src={pdfUrl}
-            className="h-[60vh] w-full rounded-b-lg bg-background"
-          />
+          {fileName.toLowerCase().endsWith(".png") ? (
+            <img
+              src={pdfUrl}
+              alt={fileName}
+              className="h-[60vh] w-full rounded-b-lg bg-background object-contain"
+            />
+          ) : fileName.toLowerCase().endsWith(".docx") ? (
+            <div className="flex h-[60vh] w-full items-center justify-center rounded-b-lg bg-background p-6 text-center text-sm text-muted-foreground">
+              DOCX preview is not embedded. Nectar will route content based on your manual confirmations.
+            </div>
+          ) : (
+            <iframe
+              title="Asset preview"
+              src={pdfUrl}
+              className="h-[60vh] w-full rounded-b-lg bg-background"
+            />
+          )}
         </div>
+
 
         {/* Right: editable form */}
         <div className="space-y-4">

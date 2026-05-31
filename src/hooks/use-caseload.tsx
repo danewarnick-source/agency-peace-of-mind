@@ -12,9 +12,13 @@ export type CaseloadClient = {
   home_longitude: number | null;
   pcsp_goals: string[];
   job_code: string[] | null;
+  authorized_dspd_codes: string[] | null;
   medicaid_id: string | null;
   physical_address: string | null;
   geofence_radius_feet?: number | null;
+  special_directions: string | null;
+  profile_photo_url: string | null;
+  feature_config: Record<string, boolean> | null;
 };
 
 /**

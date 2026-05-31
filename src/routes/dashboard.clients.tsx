@@ -499,7 +499,7 @@ function ClientWorkspace({
 
         {/* ── PROFILE TAB ── */}
         <TabsContent value="profile" className="mt-5">
-          <ProfileTab client={client} onSave={onSave} saving={saving} />
+          <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
         </TabsContent>
 
         {/* ── PCSP TAB ── */}

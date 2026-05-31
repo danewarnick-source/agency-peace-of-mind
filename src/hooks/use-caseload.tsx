@@ -12,9 +12,13 @@ export type CaseloadClient = {
   home_longitude: number | null;
   pcsp_goals: string[];
   job_code: string[] | null;
+  authorized_dspd_codes: string[] | null;
   medicaid_id: string | null;
   physical_address: string | null;
   geofence_radius_feet?: number | null;
+  special_directions: string | null;
+  profile_photo_url: string | null;
+  feature_config: Record<string, boolean> | null;
 };
 
 /**
@@ -40,7 +44,7 @@ export function useCaseload() {
         const { data, error } = await supabase
           .from("clients")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code, medicaid_id, physical_address, geofence_radius_feet" as any)
+          .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, physical_address, geofence_radius_feet, special_directions, profile_photo_url, feature_config" as any)
           .eq("organization_id", org!.organization_id)
           .order("last_name");
         if (error) throw error;

@@ -38,6 +38,11 @@ interface ClientFull {
   last_name: string;
   pcsp_goals: string[] | null;
   physical_address: string | null;
+  special_directions: string | null;
+  profile_photo_url: string | null;
+  geofence_radius_feet: number | null;
+  authorized_dspd_codes: string[] | null;
+  feature_config: Record<string, boolean> | null;
 }
 
 function HhsClientHub() {
@@ -54,7 +59,7 @@ function HhsClientHub() {
     queryFn: async () => {
       const { data } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, pcsp_goals, physical_address")
+        .select("id, first_name, last_name, pcsp_goals, physical_address, special_directions, profile_photo_url, geofence_radius_feet, authorized_dspd_codes, feature_config" as any)
         .eq("id", clientId)
         .maybeSingle();
       return data as ClientFull | null;
@@ -102,6 +107,22 @@ function HhsClientHub() {
           </div>
         </CardContent>
       </Card>
+
+      {client.special_directions && (
+        <div className="flex items-start gap-3 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-3 dark:bg-amber-950/20">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div>
+            <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+              Special Directions & Clinical Alerts
+            </p>
+            <p className="mt-0.5 text-sm text-amber-700 dark:text-amber-300 whitespace-pre-wrap">
+              {client.special_directions}
+            </p>
+          </div>
+        </div>
+      )}
+
+
 
       <Tabs
         value={tabParam ?? "note"}

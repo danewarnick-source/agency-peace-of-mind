@@ -29,7 +29,7 @@ import {
   Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2,
   User, FileText, Pill, Shield, Settings2, ChevronRight,
   Upload, Trash2, CheckCircle2, AlertTriangle, Search,
-  ArrowLeft, Users,
+  ArrowLeft, Users, Camera, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
@@ -60,6 +60,7 @@ type Client = {
   emergency_contact_phone: string | null;
   // feature toggles stored as JSON
   feature_config: Record<string, boolean> | null;
+  profile_photo_url: string | null;
 };
 
 type ClientFormValues = {
@@ -75,6 +76,7 @@ type ClientFormValues = {
   date_of_birth: string;
   emergency_contact_name: string;
   emergency_contact_phone: string;
+  profile_photo_url: string;
 };
 
 type StaffMember = {
@@ -191,7 +193,7 @@ function ClientsPage() {
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await (supabase as any)
         .from("clients")
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, account_status, geofence_radius_feet, special_directions, date_of_birth, emergency_contact_name, emergency_contact_phone, feature_config")
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, account_status, geofence_radius_feet, special_directions, date_of_birth, emergency_contact_name, emergency_contact_phone, feature_config, profile_photo_url")
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
@@ -255,6 +257,7 @@ function ClientsPage() {
           date_of_birth:        rest.date_of_birth || null,
           emergency_contact_name:  rest.emergency_contact_name || null,
           emergency_contact_phone: rest.emergency_contact_phone || null,
+          profile_photo_url:    input.profile_photo_url ?? null,
           home_latitude:        coords.lat,
           home_longitude:       coords.lng,
         })
@@ -497,7 +500,7 @@ function ClientWorkspace({
 
         {/* ── PROFILE TAB ── */}
         <TabsContent value="profile" className="mt-5">
-          <ProfileTab client={client} onSave={onSave} saving={saving} />
+          <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
         </TabsContent>
 
         {/* ── PCSP TAB ── */}
@@ -539,8 +542,9 @@ function ClientWorkspace({
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 
 function ProfileTab({
-  client, onSave, saving,
-}: { client: Client; onSave: (v: ClientFormValues) => void; saving: boolean }) {
+  client, orgId, onSave, saving,
+}: { client: Client; orgId: string; onSave: (v: ClientFormValues) => void; saving: boolean }) {
+  const qc = useQueryClient();
   const [first, setFirst]               = useState(client.first_name);
   const [last, setLast]                 = useState(client.last_name);
   const [phone, setPhone]               = useState(client.phone_number ?? "");
@@ -554,6 +558,31 @@ function ProfileTab({
   const [pinning, setPinning]           = useState(false);
   const [goals]                         = useState<string[]>(client.pcsp_goals ?? []);
   const [specialDir]                    = useState(client.special_directions ?? "");
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [photoUrl, setPhotoUrl] = useState(client.profile_photo_url ?? "");
+
+  async function handlePhotoUpload(file: File) {
+    setPhotoUploading(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${orgId}/${client.id}/profile.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("client-photos")
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("client-photos").getPublicUrl(path);
+      setPhotoUrl(urlData.publicUrl);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("clients").update({ profile_photo_url: urlData.publicUrl }).eq("id", client.id);
+      toast.success("Profile photo updated.");
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    } catch (e) {
+      toast.error((e as Error).message ?? "Photo upload failed.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
 
   const dirty = useMemo(() => (
     first !== client.first_name ||
@@ -582,6 +611,7 @@ function ProfileTab({
       date_of_birth: dob,
       emergency_contact_name: ecName.trim(),
       emergency_contact_phone: ecPhone.trim(),
+      profile_photo_url: photoUrl,
     });
   }
 
@@ -597,6 +627,40 @@ function ProfileTab({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  className="relative h-16 w-16 rounded-full overflow-hidden border-2 border-border hover:border-primary transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  title="Upload profile photo"
+                >
+                  {photoUrl ? (
+                    <img src={photoUrl} alt="Profile" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary">
+                      {client.first_name[0]}{client.last_name[0]}
+                    </span>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition">
+                    {photoUploading
+                      ? <Loader2 className="h-5 w-5 animate-spin text-white" />
+                      : <Camera className="h-5 w-5 text-white" />}
+                  </div>
+                </button>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); }}
+                />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{client.first_name} {client.last_name}</h3>
+                <p className="text-xs text-muted-foreground">Click photo to update. JPEG or PNG, max 5MB.</p>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
                 <Label className="text-xs font-semibold">First Name *</Label>
@@ -799,6 +863,7 @@ function PcspTab({
       date_of_birth:           client.date_of_birth ?? "",
       emergency_contact_name:  client.emergency_contact_name ?? "",
       emergency_contact_phone: client.emergency_contact_phone ?? "",
+      profile_photo_url:       client.profile_photo_url ?? "",
     });
   }
 
@@ -1471,6 +1536,7 @@ function AddClientDialog({
             medicaid_id: medicaidId.trim(), geofence_radius_feet: radius,
             special_directions: "", date_of_birth: "",
             emergency_contact_name: "", emergency_contact_phone: "",
+            profile_photo_url: "",
           })}
           disabled={!canSubmit || pending}
         >

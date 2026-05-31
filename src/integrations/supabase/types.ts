@@ -408,6 +408,7 @@ export type Database = {
           pcsp_goals: string[]
           phone_number: string | null
           physical_address: string | null
+          profile_photo_url: string | null
           special_directions: string | null
           team_id: string | null
         }
@@ -431,6 +432,7 @@ export type Database = {
           pcsp_goals?: string[]
           phone_number?: string | null
           physical_address?: string | null
+          profile_photo_url?: string | null
           special_directions?: string | null
           team_id?: string | null
         }
@@ -454,6 +456,7 @@ export type Database = {
           pcsp_goals?: string[]
           phone_number?: string | null
           physical_address?: string | null
+          profile_photo_url?: string | null
           special_directions?: string | null
           team_id?: string | null
         }
@@ -3278,6 +3281,7 @@ export type Database = {
           pcsp_goals: string[]
           phone_number: string | null
           physical_address: string | null
+          profile_photo_url: string | null
           special_directions: string | null
           team_id: string | null
         }[]

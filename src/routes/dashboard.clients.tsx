@@ -928,6 +928,16 @@ function PcspTab({
                 <p className="text-sm text-muted-foreground">No PCSP goals entered. Add goals above.</p>
               </div>
             )}
+            <div className="border-t border-border pt-3">
+              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs"
+                onClick={() => toast.info("NECTAR import: drop a PCSP document and NECTAR will extract and populate the goals list automatically.")}>
+                <Sparkles className="h-3.5 w-3.5" />
+                NECTAR Import — Extract Goals from PCSP Document
+              </Button>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Upload a state PCSP PDF to automatically extract and populate goals.
+              </p>
+            </div>
           </CardContent>
         </Card>
 

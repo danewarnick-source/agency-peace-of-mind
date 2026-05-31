@@ -52,27 +52,19 @@ export const Route = createFileRoute("/")({
 function HiveMark({ className = "h-9 w-9" }: { className?: string }) {
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-lg bg-[image:var(--gradient-brand)] text-primary-foreground shadow-soft ${className}`}
+      className={`inline-flex items-center justify-center rounded-lg border border-[color:var(--border-light)] bg-white text-[color:var(--navy-800)] shadow-sm ${className}`}
     >
-      <Hexagon className="h-4 w-4" strokeWidth={2.5} />
+      <Hexagon className="h-4 w-4 text-[color:var(--amber-500)]" strokeWidth={2.5} />
     </span>
   );
 }
 
-/* Decorative honeycomb backdrop using clip-hex */
+/* Subtle hex outline pattern + amber glow — for dark hero bands only */
+import { HexBackdrop } from "@/components/brand/hex-backdrop";
 function Honeycomb({ className = "" }: { className?: string }) {
-  const cells = Array.from({ length: 18 });
   return (
     <div className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`} aria-hidden>
-      <div className="absolute inset-0 grid grid-cols-6 gap-3 opacity-[0.07]">
-        {cells.map((_, i) => (
-          <div
-            key={i}
-            className="clip-hex aspect-[1/1.15] bg-nectar-gold-500"
-            style={{ transform: i % 2 ? "translateY(20%)" : "translateY(0)" }}
-          />
-        ))}
-      </div>
+      <HexBackdrop opacity={0.05} />
     </div>
   );
 }

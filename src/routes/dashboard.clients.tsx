@@ -828,6 +828,7 @@ function PcspTab({
       date_of_birth:           client.date_of_birth ?? "",
       emergency_contact_name:  client.emergency_contact_name ?? "",
       emergency_contact_phone: client.emergency_contact_phone ?? "",
+      profile_photo_url:       client.profile_photo_url ?? "",
     });
   }
 

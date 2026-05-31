@@ -541,8 +541,9 @@ function ClientWorkspace({
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 
 function ProfileTab({
-  client, onSave, saving,
-}: { client: Client; onSave: (v: ClientFormValues) => void; saving: boolean }) {
+  client, orgId, onSave, saving,
+}: { client: Client; orgId: string; onSave: (v: ClientFormValues) => void; saving: boolean }) {
+  const qc = useQueryClient();
   const [first, setFirst]               = useState(client.first_name);
   const [last, setLast]                 = useState(client.last_name);
   const [phone, setPhone]               = useState(client.phone_number ?? "");
@@ -556,6 +557,31 @@ function ProfileTab({
   const [pinning, setPinning]           = useState(false);
   const [goals]                         = useState<string[]>(client.pcsp_goals ?? []);
   const [specialDir]                    = useState(client.special_directions ?? "");
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [photoUrl, setPhotoUrl] = useState(client.profile_photo_url ?? "");
+
+  async function handlePhotoUpload(file: File) {
+    setPhotoUploading(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${orgId}/${client.id}/profile.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("client-photos")
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("client-photos").getPublicUrl(path);
+      setPhotoUrl(urlData.publicUrl);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("clients").update({ profile_photo_url: urlData.publicUrl }).eq("id", client.id);
+      toast.success("Profile photo updated.");
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    } catch (e) {
+      toast.error((e as Error).message ?? "Photo upload failed.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
 
   const dirty = useMemo(() => (
     first !== client.first_name ||
@@ -584,6 +610,7 @@ function ProfileTab({
       date_of_birth: dob,
       emergency_contact_name: ecName.trim(),
       emergency_contact_phone: ecPhone.trim(),
+      profile_photo_url: photoUrl,
     });
   }
 

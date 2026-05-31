@@ -76,6 +76,7 @@ type ClientFormValues = {
   date_of_birth: string;
   emergency_contact_name: string;
   emergency_contact_phone: string;
+  profile_photo_url: string;
 };
 
 type StaffMember = {

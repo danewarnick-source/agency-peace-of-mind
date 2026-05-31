@@ -19,6 +19,7 @@ import {
   FileText,
   Pill,
   User,
+  AlertTriangle,
 } from "lucide-react";
 
 import { toast } from "sonner";

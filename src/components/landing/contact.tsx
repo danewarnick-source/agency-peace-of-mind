@@ -31,24 +31,24 @@ export function Contact() {
   };
 
   return (
-    <section id="contact" className="bg-secondary/40 py-24">
+    <section id="contact" className="bg-[color:var(--surface-2)] py-24">
       <div className="mx-auto grid max-w-5xl gap-12 px-6 lg:grid-cols-2">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-accent">Contact</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Talk to our team</h2>
-          <p className="mt-4 text-muted-foreground">Questions about a rollout, custom training, or enterprise pricing? We typically reply within one business day.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--amber-600)]">Contact</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-[color:var(--navy-900)] md:text-4xl">Talk to our team</h2>
+          <p className="mt-4 text-[color:var(--text-soft)]">Questions about a rollout, custom training, or enterprise pricing? We typically reply within one business day.</p>
           <dl className="mt-8 space-y-3 text-sm">
-            <div><dt className="font-medium">Email</dt><dd className="text-muted-foreground">hello@careacademy.example</dd></div>
-            <div><dt className="font-medium">Hours</dt><dd className="text-muted-foreground">Mon–Fri · 9am–6pm ET</dd></div>
+            <div><dt className="font-semibold text-[color:var(--navy-900)]">Email</dt><dd className="text-[color:var(--text-soft)]">hello@careacademy.example</dd></div>
+            <div><dt className="font-semibold text-[color:var(--navy-900)]">Hours</dt><dd className="text-[color:var(--text-soft)]">Mon–Fri · 9am–6pm ET</dd></div>
           </dl>
         </div>
-        <form onSubmit={onSubmit} className="rounded-2xl border border-border bg-card p-7 shadow-[var(--shadow-card)]">
+        <form onSubmit={onSubmit} className="rounded-2xl border border-[color:var(--border-light)] bg-white p-7 shadow-[var(--shadow-card)]">
           <div className="grid gap-4">
             <div className="grid gap-2"><Label htmlFor="name">Full name</Label><Input id="name" name="name" required /></div>
             <div className="grid gap-2"><Label htmlFor="email">Work email</Label><Input id="email" name="email" type="email" required /></div>
             <div className="grid gap-2"><Label htmlFor="company">Company</Label><Input id="company" name="company" /></div>
             <div className="grid gap-2"><Label htmlFor="message">Message</Label><Textarea id="message" name="message" rows={5} required /></div>
-            <Button type="submit" disabled={busy} className="bg-[image:var(--gradient-brand)] text-primary-foreground">{busy ? "Sending…" : "Send message"}</Button>
+            <Button type="submit" disabled={busy} size="lg">{busy ? "Sending…" : "Send message"}</Button>
           </div>
         </form>
       </div>

@@ -34,6 +34,7 @@ import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settin
 import { Route as DashboardSchedulingRouteImport } from './routes/dashboard.scheduling'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
+import { Route as DashboardRecordsDeskRouteImport } from './routes/dashboard.records-desk'
 import { Route as DashboardProgramsAdminRouteImport } from './routes/dashboard.programs-admin'
 import { Route as DashboardProgramsRouteImport } from './routes/dashboard.programs'
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
@@ -43,7 +44,6 @@ import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardEmarRouteImport } from './routes/dashboard.emar'
-import { Route as DashboardDspdControlsRouteImport } from './routes/dashboard.dspd-controls'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
 import { Route as DashboardComplianceDeskRouteImport } from './routes/dashboard.compliance-desk'
 import { Route as DashboardCommandCenterRouteImport } from './routes/dashboard.command-center'
@@ -191,6 +191,11 @@ const DashboardReportsRoute = DashboardReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardRecordsDeskRoute = DashboardRecordsDeskRouteImport.update({
+  id: '/records-desk',
+  path: '/records-desk',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardProgramsAdminRoute = DashboardProgramsAdminRouteImport.update({
   id: '/programs-admin',
   path: '/programs-admin',
@@ -236,11 +241,6 @@ const DashboardEmployeesRoute = DashboardEmployeesRouteImport.update({
 const DashboardEmarRoute = DashboardEmarRouteImport.update({
   id: '/emar',
   path: '/emar',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardDspdControlsRoute = DashboardDspdControlsRouteImport.update({
-  id: '/dspd-controls',
-  path: '/dspd-controls',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardDailyLogsRoute = DashboardDailyLogsRouteImport.update({
@@ -379,7 +379,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
-  '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
@@ -389,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
+  '/dashboard/records-desk': typeof DashboardRecordsDeskRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
@@ -436,7 +436,6 @@ export interface FileRoutesByTo {
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
-  '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
@@ -446,6 +445,7 @@ export interface FileRoutesByTo {
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
+  '/dashboard/records-desk': typeof DashboardRecordsDeskRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
@@ -495,7 +495,6 @@ export interface FileRoutesById {
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
-  '/dashboard/dspd-controls': typeof DashboardDspdControlsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
@@ -505,6 +504,7 @@ export interface FileRoutesById {
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
+  '/dashboard/records-desk': typeof DashboardRecordsDeskRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
@@ -555,7 +555,6 @@ export interface FileRouteTypes {
     | '/dashboard/command-center'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
-    | '/dashboard/dspd-controls'
     | '/dashboard/emar'
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
@@ -565,6 +564,7 @@ export interface FileRouteTypes {
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
+    | '/dashboard/records-desk'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/scheduling'
@@ -612,7 +612,6 @@ export interface FileRouteTypes {
     | '/dashboard/command-center'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
-    | '/dashboard/dspd-controls'
     | '/dashboard/emar'
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
@@ -622,6 +621,7 @@ export interface FileRouteTypes {
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
+    | '/dashboard/records-desk'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/scheduling'
@@ -670,7 +670,6 @@ export interface FileRouteTypes {
     | '/dashboard/command-center'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
-    | '/dashboard/dspd-controls'
     | '/dashboard/emar'
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
@@ -680,6 +679,7 @@ export interface FileRouteTypes {
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
+    | '/dashboard/records-desk'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/scheduling'
@@ -903,6 +903,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardReportsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/records-desk': {
+      id: '/dashboard/records-desk'
+      path: '/records-desk'
+      fullPath: '/dashboard/records-desk'
+      preLoaderRoute: typeof DashboardRecordsDeskRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/programs-admin': {
       id: '/dashboard/programs-admin'
       path: '/programs-admin'
@@ -964,13 +971,6 @@ declare module '@tanstack/react-router' {
       path: '/emar'
       fullPath: '/dashboard/emar'
       preLoaderRoute: typeof DashboardEmarRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/dspd-controls': {
-      id: '/dashboard/dspd-controls'
-      path: '/dspd-controls'
-      fullPath: '/dashboard/dspd-controls'
-      preLoaderRoute: typeof DashboardDspdControlsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/daily-logs': {
@@ -1179,7 +1179,6 @@ interface DashboardRouteChildren {
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
-  DashboardDspdControlsRoute: typeof DashboardDspdControlsRoute
   DashboardEmarRoute: typeof DashboardEmarRoute
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
@@ -1189,6 +1188,7 @@ interface DashboardRouteChildren {
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
   DashboardProgramsRoute: typeof DashboardProgramsRouteWithChildren
   DashboardProgramsAdminRoute: typeof DashboardProgramsAdminRoute
+  DashboardRecordsDeskRoute: typeof DashboardRecordsDeskRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardSchedulingRoute: typeof DashboardSchedulingRoute
@@ -1217,7 +1217,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
-  DashboardDspdControlsRoute: DashboardDspdControlsRoute,
   DashboardEmarRoute: DashboardEmarRoute,
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
@@ -1227,6 +1226,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardPermissionsRoute: DashboardPermissionsRoute,
   DashboardProgramsRoute: DashboardProgramsRouteWithChildren,
   DashboardProgramsAdminRoute: DashboardProgramsAdminRoute,
+  DashboardRecordsDeskRoute: DashboardRecordsDeskRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,
   DashboardSchedulingRoute: DashboardSchedulingRoute,

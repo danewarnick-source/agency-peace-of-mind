@@ -29,6 +29,8 @@ export const Route = createFileRoute("/dashboard/command-center")({
   component: CommandCenter,
 });
 
+export { CommandCenter };
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type IncidentReport = {

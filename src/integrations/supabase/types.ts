@@ -238,6 +238,56 @@ export type Database = {
         }
         Relationships: []
       }
+      client_documents: {
+        Row: {
+          client_id: string
+          document_type: string
+          file_name: string
+          file_size_bytes: number | null
+          file_url: string
+          id: string
+          organization_id: string
+          storage_path: string | null
+          uploaded_at: string
+          uploaded_by: string | null
+          uploaded_by_name: string | null
+        }
+        Insert: {
+          client_id: string
+          document_type: string
+          file_name: string
+          file_size_bytes?: number | null
+          file_url: string
+          id?: string
+          organization_id: string
+          storage_path?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          uploaded_by_name?: string | null
+        }
+        Update: {
+          client_id?: string
+          document_type?: string
+          file_name?: string
+          file_size_bytes?: number | null
+          file_url?: string
+          id?: string
+          organization_id?: string
+          storage_path?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          uploaded_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_medications: {
         Row: {
           adverse_effects: string | null
@@ -342,6 +392,10 @@ export type Database = {
           account_status: string
           authorized_dspd_codes: string[]
           created_at: string
+          date_of_birth: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          feature_config: Json | null
           first_name: string
           geofence_radius_feet: number
           home_latitude: number | null
@@ -354,12 +408,17 @@ export type Database = {
           pcsp_goals: string[]
           phone_number: string | null
           physical_address: string | null
+          special_directions: string | null
           team_id: string | null
         }
         Insert: {
           account_status?: string
           authorized_dspd_codes?: string[]
           created_at?: string
+          date_of_birth?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          feature_config?: Json | null
           first_name: string
           geofence_radius_feet?: number
           home_latitude?: number | null
@@ -372,12 +431,17 @@ export type Database = {
           pcsp_goals?: string[]
           phone_number?: string | null
           physical_address?: string | null
+          special_directions?: string | null
           team_id?: string | null
         }
         Update: {
           account_status?: string
           authorized_dspd_codes?: string[]
           created_at?: string
+          date_of_birth?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          feature_config?: Json | null
           first_name?: string
           geofence_radius_feet?: number
           home_latitude?: number | null
@@ -390,6 +454,7 @@ export type Database = {
           pcsp_goals?: string[]
           phone_number?: string | null
           physical_address?: string | null
+          special_directions?: string | null
           team_id?: string | null
         }
         Relationships: [
@@ -3197,6 +3262,10 @@ export type Database = {
           account_status: string
           authorized_dspd_codes: string[]
           created_at: string
+          date_of_birth: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          feature_config: Json | null
           first_name: string
           geofence_radius_feet: number
           home_latitude: number | null
@@ -3209,6 +3278,7 @@ export type Database = {
           pcsp_goals: string[]
           phone_number: string | null
           physical_address: string | null
+          special_directions: string | null
           team_id: string | null
         }[]
         SetofOptions: {

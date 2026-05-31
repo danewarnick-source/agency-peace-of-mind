@@ -265,16 +265,22 @@ export function AiPdfImporter({
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
           className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition ${
-            dragging ? "border-primary bg-primary/5" : "border-border"
+            extracting
+              ? "border-primary/60 bg-primary/5"
+              : dragging
+                ? "border-primary bg-primary/5"
+                : "border-primary/30"
           }`}
         >
           {extracting ? (
             <>
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
               <div>
-                <p className="font-medium">AI is reading the PCSP…</p>
+                <p className="font-medium tracking-tight">
+                  Nectar Intelligence Engine: Filtering and Mapping Core Assets...
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Locating goals, Medicaid ID, and authorized service codes.
+                  Parsing identity tokens, billing configurations, and clinical elements.
                 </p>
               </div>
             </>
@@ -282,20 +288,20 @@ export function AiPdfImporter({
             <>
               <Sparkles className="h-10 w-10 text-primary" />
               <div>
-                <p className="font-medium">Drop a PCSP / client-profile PDF</p>
+                <p className="font-medium">Drop a client asset for Nectar Import</p>
                 <p className="text-xs text-muted-foreground">
-                  AI extracts identity, authorized codes, and goals — you review before saving.
+                  Accepts PDF, DOCX, and PNG. Nectar splits content into the correct profile fields and flags anything ambiguous.
                 </p>
               </div>
               <Label htmlFor="ai-pdf-file" className="cursor-pointer">
-                <span className="inline-flex h-11 min-w-[44px] items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
-                  <Upload className="h-4 w-4" /> Browse PDF
+                <span className="inline-flex h-11 min-w-[44px] items-center gap-2 rounded-md border border-primary/40 bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
+                  <Upload className="h-4 w-4" /> Browse File
                 </span>
                 <input
                   id="ai-pdf-file"
                   ref={fileInputRef}
                   type="file"
-                  accept="application/pdf,.pdf"
+                  accept=".pdf,.docx,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -307,11 +313,13 @@ export function AiPdfImporter({
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          PDFs up to 15 MB. Scanned image-only PDFs are not yet supported.
+          Files up to 15 MB. Scanned image-only PDFs are not yet supported.
         </p>
       </div>
     );
   }
+
+
 
   // --- Review state -------------------------------------------------
   const setField = <K extends keyof ExtractedClient>(k: K, v: ExtractedClient[K]) =>

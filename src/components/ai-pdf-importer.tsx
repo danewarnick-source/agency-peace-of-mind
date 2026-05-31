@@ -4,7 +4,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, Upload, X, FileText, CheckCircle2, Trash2, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Sparkles, Upload, X, FileText, CheckCircle2, Trash2, Plus, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
@@ -14,6 +29,59 @@ import {
   type ExtractedClient,
 } from "@/lib/pdf-import.functions";
 import { EVV_SERVICE_CODES, evvServiceLabel } from "@/lib/evv-codes";
+
+type RouteTarget =
+  | "first_name"
+  | "last_name"
+  | "medicaid_id"
+  | "date_of_birth"
+  | "pcsp_goal"
+  | "discard";
+
+const ROUTE_OPTIONS: { value: RouteTarget; label: string }[] = [
+  { value: "first_name", label: "First Name" },
+  { value: "last_name", label: "Last Name" },
+  { value: "medicaid_id", label: "Individual Medicaid ID" },
+  { value: "date_of_birth", label: "Date of Birth (YYYY-MM-DD)" },
+  { value: "pcsp_goal", label: "Append as PCSP Goal" },
+  { value: "discard", label: "Discard / Ignore" },
+];
+
+type UnresolvedItem = { id: string; text: string; reason: string };
+
+const ACCEPT_EXT = [".pdf", ".docx", ".png"];
+const ACCEPT_MIME = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/png",
+];
+
+function isAcceptedFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return (
+    ACCEPT_EXT.some((ext) => name.endsWith(ext)) ||
+    ACCEPT_MIME.includes(file.type)
+  );
+}
+
+function detectAmbiguities(d: ExtractedClient): UnresolvedItem[] {
+  const out: UnresolvedItem[] = [];
+  if (d.date_of_birth && !/^\d{4}-\d{2}-\d{2}$/.test(d.date_of_birth.trim())) {
+    out.push({
+      id: `dob-${Date.now()}`,
+      text: d.date_of_birth.trim(),
+      reason: "Ambiguous date format detected by the Nectar engine.",
+    });
+  }
+  if (d.medicaid_id && (d.medicaid_id.length < 8 || d.medicaid_id.length > 12)) {
+    out.push({
+      id: `med-${Date.now()}`,
+      text: d.medicaid_id,
+      reason: "Medicaid ID length is outside the expected 8–12 digit range.",
+    });
+  }
+  return out;
+}
 
 async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
@@ -40,40 +108,74 @@ export function AiPdfImporter({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>("");
   const [extracting, setExtracting] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [data, setData] = useState<ExtractedClient | null>(null);
+  const [unresolved, setUnresolved] = useState<UnresolvedItem[]>([]);
+  const [routeChoice, setRouteChoice] = useState<RouteTarget>("pcsp_goal");
+
+  const activeUnresolved = unresolved[0] ?? null;
 
   const reset = useCallback(() => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     setPdfUrl(null);
+    setFileName("");
     setData(null);
+    setUnresolved([]);
   }, [pdfUrl]);
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
-        toast.error("Please upload a PDF file.");
+      if (!isAcceptedFile(file)) {
+        toast.error("Nectar accepts .pdf, .docx, or .png files.");
         return;
       }
       if (file.size > 15 * 1024 * 1024) {
-        toast.error("PDF is larger than 15 MB — please split or compress it.");
+        toast.error("File is larger than 15 MB — please split or compress it.");
         return;
       }
       reset();
       const url = URL.createObjectURL(file);
       setPdfUrl(url);
+      setFileName(file.name);
       setExtracting(true);
+
+      const isPdf =
+        file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
       try {
-        const b64 = await fileToBase64(file);
-        const result = await extractFn({ data: { pdfBase64: b64 } });
-        setData(result);
-        toast.success("AI extraction complete — review before saving.");
+        if (isPdf) {
+          const b64 = await fileToBase64(file);
+          const result = await extractFn({ data: { pdfBase64: b64 } });
+          setData(result);
+          const flags = detectAmbiguities(result);
+          if (flags.length) setUnresolved(flags);
+          toast.success(
+            flags.length
+              ? `Nectar parsed the document — ${flags.length} item${flags.length === 1 ? "" : "s"} need routing.`
+              : "Nectar extraction complete — review before saving.",
+          );
+        } else {
+          // .docx / .png: Nectar simulation — no automatic field extraction yet.
+          // Admin reviews + fills the form manually; warn so the flow is explicit.
+          setData({
+            first_name: "",
+            last_name: "",
+            medicaid_id: "",
+            date_of_birth: "",
+            authorized_codes: [],
+            pcsp_goals: [],
+            prompting_levels: [],
+          });
+          toast.message("Nectar simulation engaged for non-PDF asset — please verify each field manually.");
+        }
       } catch (e) {
         toast.error((e as Error).message);
         URL.revokeObjectURL(url);
         setPdfUrl(null);
+        setFileName("");
       } finally {
         setExtracting(false);
       }
@@ -90,6 +192,33 @@ export function AiPdfImporter({
     },
     [handleFile],
   );
+
+  const resolveCurrent = useCallback(() => {
+    if (!activeUnresolved) return;
+    const text = activeUnresolved.text;
+    setData((cur) => {
+      if (!cur) return cur;
+      switch (routeChoice) {
+        case "first_name":
+          return { ...cur, first_name: text };
+        case "last_name":
+          return { ...cur, last_name: text };
+        case "medicaid_id":
+          return { ...cur, medicaid_id: text.replace(/\D+/g, "") };
+        case "date_of_birth":
+          return { ...cur, date_of_birth: text };
+        case "pcsp_goal":
+          return { ...cur, pcsp_goals: [...cur.pcsp_goals, text] };
+        case "discard":
+        default:
+          return cur;
+      }
+    });
+    setUnresolved((q) => q.slice(1));
+    setRouteChoice("pcsp_goal");
+    toast.success("Nectar ingestion path confirmed.");
+  }, [activeUnresolved, routeChoice]);
+
 
   const finalize = useCallback(async () => {
     if (!data || !organizationId) return;
@@ -136,16 +265,22 @@ export function AiPdfImporter({
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
           className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition ${
-            dragging ? "border-primary bg-primary/5" : "border-border"
+            extracting
+              ? "border-primary/60 bg-primary/5"
+              : dragging
+                ? "border-primary bg-primary/5"
+                : "border-primary/30"
           }`}
         >
           {extracting ? (
             <>
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
               <div>
-                <p className="font-medium">AI is reading the PCSP…</p>
+                <p className="font-medium tracking-tight">
+                  Nectar Intelligence Engine: Filtering and Mapping Core Assets...
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Locating goals, Medicaid ID, and authorized service codes.
+                  Parsing identity tokens, billing configurations, and clinical elements.
                 </p>
               </div>
             </>
@@ -153,20 +288,20 @@ export function AiPdfImporter({
             <>
               <Sparkles className="h-10 w-10 text-primary" />
               <div>
-                <p className="font-medium">Drop a PCSP / client-profile PDF</p>
+                <p className="font-medium">Drop a client asset for Nectar Import</p>
                 <p className="text-xs text-muted-foreground">
-                  AI extracts identity, authorized codes, and goals — you review before saving.
+                  Accepts PDF, DOCX, and PNG. Nectar splits content into the correct profile fields and flags anything ambiguous.
                 </p>
               </div>
               <Label htmlFor="ai-pdf-file" className="cursor-pointer">
-                <span className="inline-flex h-11 min-w-[44px] items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
-                  <Upload className="h-4 w-4" /> Browse PDF
+                <span className="inline-flex h-11 min-w-[44px] items-center gap-2 rounded-md border border-primary/40 bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
+                  <Upload className="h-4 w-4" /> Browse File
                 </span>
                 <input
                   id="ai-pdf-file"
                   ref={fileInputRef}
                   type="file"
-                  accept="application/pdf,.pdf"
+                  accept=".pdf,.docx,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -178,11 +313,13 @@ export function AiPdfImporter({
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          PDFs up to 15 MB. Scanned image-only PDFs are not yet supported.
+          Files up to 15 MB. Scanned image-only PDFs are not yet supported.
         </p>
       </div>
     );
   }
+
+
 
   // --- Review state -------------------------------------------------
   const setField = <K extends keyof ExtractedClient>(k: K, v: ExtractedClient[K]) =>
@@ -223,17 +360,30 @@ export function AiPdfImporter({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Left: PDF preview */}
-        <div className="rounded-lg border bg-muted/30">
+        {/* Left: file preview */}
+        <div className="rounded-lg border border-primary/20 bg-muted/30">
           <div className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
-            <FileText className="h-3.5 w-3.5" /> Uploaded PDF
+            <FileText className="h-3.5 w-3.5" /> {fileName || "Uploaded file"}
           </div>
-          <iframe
-            title="PCSP preview"
-            src={pdfUrl}
-            className="h-[60vh] w-full rounded-b-lg bg-background"
-          />
+          {fileName.toLowerCase().endsWith(".png") ? (
+            <img
+              src={pdfUrl}
+              alt={fileName}
+              className="h-[60vh] w-full rounded-b-lg bg-background object-contain"
+            />
+          ) : fileName.toLowerCase().endsWith(".docx") ? (
+            <div className="flex h-[60vh] w-full items-center justify-center rounded-b-lg bg-background p-6 text-center text-sm text-muted-foreground">
+              DOCX preview is not embedded. Nectar will route content based on your manual confirmations.
+            </div>
+          ) : (
+            <iframe
+              title="Asset preview"
+              src={pdfUrl}
+              className="h-[60vh] w-full rounded-b-lg bg-background"
+            />
+          )}
         </div>
+
 
         {/* Right: editable form */}
         <div className="space-y-4">
@@ -364,7 +514,7 @@ export function AiPdfImporter({
         <Button variant="ghost" onClick={reset} disabled={committing} className="h-11">
           Cancel
         </Button>
-        <Button onClick={finalize} disabled={committing} className="h-11">
+        <Button onClick={finalize} disabled={committing || unresolved.length > 0} className="h-11">
           {committing ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -373,6 +523,67 @@ export function AiPdfImporter({
           Finalize &amp; Save to Profile
         </Button>
       </div>
+
+      {unresolved.length > 0 && (
+        <div className="rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
+          {unresolved.length} item{unresolved.length === 1 ? "" : "s"} require Nectar mapping resolution before saving.
+        </div>
+      )}
+
+      <Dialog
+        open={activeUnresolved !== null}
+        onOpenChange={(open) => {
+          if (!open) setUnresolved((q) => q.slice(1));
+        }}
+      >
+        <DialogContent className="border-amber-400/60 sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Nectar Mapping Resolution Required
+            </DialogTitle>
+            <DialogDescription>
+              {activeUnresolved?.reason ?? ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          {activeUnresolved && (
+            <div className="space-y-4">
+              <div className="rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                Reviewing Text: &ldquo;{activeUnresolved.text}&rdquo;
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label className="text-xs">
+                  Where should this piece of information be routed within the Client Profile?
+                </Label>
+                <Select
+                  value={routeChoice}
+                  onValueChange={(v) => setRouteChoice(v as RouteTarget)}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROUTE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button onClick={resolveCurrent} className="h-11">
+              Confirm Ingestion Path
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

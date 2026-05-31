@@ -278,3 +278,60 @@ function LoginPage() {
     </div>
   );
 }
+
+/**
+ * Shared dark auth shell used by forgot-password / reset-password / signup.
+ * Matches the new login page visual language.
+ */
+export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  return (
+    <div
+      className="relative min-h-screen overflow-hidden text-white"
+      style={{ background: NAVY_BG, fontFamily: JAKARTA }}
+    >
+      <HexPattern />
+      <div className="relative grid min-h-screen md:grid-cols-2">
+        <aside className="relative hidden flex-col justify-between p-12 md:flex">
+          <BrandLogo />
+          <div className="max-w-md space-y-6">
+            <NectarPill />
+            <h2
+              className="text-3xl leading-tight text-white md:text-[2rem]"
+              style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.02em" }}
+            >
+              "Onboarding a new hire went from two weeks of paperwork to two clicks."
+            </h2>
+            <p className="text-white/65">— Marcus Liu, HR Lead at Northbay Support Services</p>
+          </div>
+          <p className="text-xs text-white/45">Trusted by modern training teams</p>
+        </aside>
+
+        <div className="flex items-center justify-center px-6 py-12">
+          <div className="w-full max-w-sm">
+            <div className="mb-6 flex justify-center md:hidden"><BrandLogo /></div>
+            <div
+              className="rounded-2xl p-7 shadow-2xl backdrop-blur-xl"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.11)" }}
+            >
+              <div className="mb-7 text-center md:text-left">
+                <h1
+                  className="text-2xl tracking-tight text-white"
+                  style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.01em" }}
+                >
+                  {title}
+                </h1>
+                <p className="mt-1.5 text-sm text-white/60">{subtitle}</p>
+              </div>
+              {children}
+            </div>
+            <p className="mt-6 text-center text-xs text-white/40">
+              <Link to="/" className="hover:text-white/70 hover:underline">← Back to site</Link> · {pathname}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

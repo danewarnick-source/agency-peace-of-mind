@@ -240,6 +240,9 @@ export type Database = {
       }
       client_medications: {
         Row: {
+          adverse_effects: string | null
+          choking_risk: boolean
+          choking_risk_details: string | null
           client_id: string
           created_at: string
           created_by: string | null
@@ -261,6 +264,7 @@ export type Database = {
           pill_count_updated_at: string | null
           prescriber: string | null
           prn_instructions: string | null
+          purpose: string | null
           refill_date: string | null
           route: string | null
           rx_number: string | null
@@ -268,6 +272,9 @@ export type Database = {
           start_date: string | null
         }
         Insert: {
+          adverse_effects?: string | null
+          choking_risk?: boolean
+          choking_risk_details?: string | null
           client_id: string
           created_at?: string
           created_by?: string | null
@@ -289,6 +296,7 @@ export type Database = {
           pill_count_updated_at?: string | null
           prescriber?: string | null
           prn_instructions?: string | null
+          purpose?: string | null
           refill_date?: string | null
           route?: string | null
           rx_number?: string | null
@@ -296,6 +304,9 @@ export type Database = {
           start_date?: string | null
         }
         Update: {
+          adverse_effects?: string | null
+          choking_risk?: boolean
+          choking_risk_details?: string | null
           client_id?: string
           created_at?: string
           created_by?: string | null
@@ -317,6 +328,7 @@ export type Database = {
           pill_count_updated_at?: string | null
           prescriber?: string | null
           prn_instructions?: string | null
+          purpose?: string | null
           refill_date?: string | null
           route?: string | null
           rx_number?: string | null

@@ -514,12 +514,80 @@ export function AiPdfImporter({
         <Button variant="ghost" onClick={reset} disabled={committing} className="h-11">
           Cancel
         </Button>
-        <Button onClick={finalize} disabled={committing} className="h-11">
+        <Button onClick={finalize} disabled={committing || unresolved.length > 0} className="h-11">
           {committing ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <CheckCircle2 className="mr-2 h-4 w-4" />
           )}
+          Finalize &amp; Save to Profile
+        </Button>
+      </div>
+
+      {unresolved.length > 0 && (
+        <div className="rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
+          {unresolved.length} item{unresolved.length === 1 ? "" : "s"} require Nectar mapping resolution before saving.
+        </div>
+      )}
+
+      <Dialog
+        open={activeUnresolved !== null}
+        onOpenChange={(open) => {
+          if (!open) setUnresolved((q) => q.slice(1));
+        }}
+      >
+        <DialogContent className="border-amber-400/60 sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Nectar Mapping Resolution Required
+            </DialogTitle>
+            <DialogDescription>
+              {activeUnresolved?.reason ?? ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          {activeUnresolved && (
+            <div className="space-y-4">
+              <div className="rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                Reviewing Text: &ldquo;{activeUnresolved.text}&rdquo;
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label className="text-xs">
+                  Where should this piece of information be routed within the Client Profile?
+                </Label>
+                <Select
+                  value={routeChoice}
+                  onValueChange={(v) => setRouteChoice(v as RouteTarget)}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROUTE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button onClick={resolveCurrent} className="h-11">
+              Confirm Ingestion Path
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
           Finalize &amp; Save to Profile
         </Button>
       </div>

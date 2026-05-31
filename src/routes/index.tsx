@@ -61,7 +61,6 @@ function HiveMark({ className = "h-9 w-9" }: { className?: string }) {
 }
 
 /* Subtle hex outline pattern + amber glow — for dark hero bands only */
-import { HexBackdrop } from "@/components/brand/hex-backdrop";
 function Honeycomb({ className = "" }: { className?: string }) {
   return (
     <div className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`} aria-hidden>

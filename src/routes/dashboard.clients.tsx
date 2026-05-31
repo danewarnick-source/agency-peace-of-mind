@@ -29,7 +29,7 @@ import {
   Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2,
   User, FileText, Pill, Shield, Settings2, ChevronRight,
   Upload, Trash2, CheckCircle2, AlertTriangle, Search,
-  ArrowLeft, Users,
+  ArrowLeft, Users, Camera, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";

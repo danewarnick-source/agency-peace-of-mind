@@ -1501,6 +1501,7 @@ function AddClientDialog({
             medicaid_id: medicaidId.trim(), geofence_radius_feet: radius,
             special_directions: "", date_of_birth: "",
             emergency_contact_name: "", emergency_contact_phone: "",
+            profile_photo_url: "",
           })}
           disabled={!canSubmit || pending}
         >

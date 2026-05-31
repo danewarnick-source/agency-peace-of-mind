@@ -70,9 +70,17 @@ function ClientWorkspace() {
             <ArrowLeft className="h-3.5 w-3.5" /> Back to my caseload
           </Link>
           <div className="mt-2 flex flex-col items-start gap-4 sm:flex-row">
-            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <User className="h-7 w-7" />
-            </span>
+            {client.profile_photo_url ? (
+              <img
+                src={client.profile_photo_url}
+                alt={`${client.first_name} ${client.last_name}`}
+                className="h-10 w-10 rounded-full object-cover border-2 border-border"
+              />
+            ) : (
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                {client.first_name[0]}{client.last_name[0]}
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-semibold tracking-tight">
                 {client.first_name} {client.last_name}

@@ -34,6 +34,7 @@ import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settin
 import { Route as DashboardSchedulingRouteImport } from './routes/dashboard.scheduling'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
+import { Route as DashboardRecordsDeskRouteImport } from './routes/dashboard.records-desk'
 import { Route as DashboardProgramsAdminRouteImport } from './routes/dashboard.programs-admin'
 import { Route as DashboardProgramsRouteImport } from './routes/dashboard.programs'
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
@@ -188,6 +189,11 @@ const DashboardRolesRoute = DashboardRolesRouteImport.update({
 const DashboardReportsRoute = DashboardReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardRecordsDeskRoute = DashboardRecordsDeskRouteImport.update({
+  id: '/records-desk',
+  path: '/records-desk',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardProgramsAdminRoute = DashboardProgramsAdminRouteImport.update({
@@ -382,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
+  '/dashboard/records-desk': typeof DashboardRecordsDeskRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
@@ -438,6 +445,7 @@ export interface FileRoutesByTo {
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
+  '/dashboard/records-desk': typeof DashboardRecordsDeskRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
@@ -496,6 +504,7 @@ export interface FileRoutesById {
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
+  '/dashboard/records-desk': typeof DashboardRecordsDeskRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
@@ -555,6 +564,7 @@ export interface FileRouteTypes {
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
+    | '/dashboard/records-desk'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/scheduling'
@@ -611,6 +621,7 @@ export interface FileRouteTypes {
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
+    | '/dashboard/records-desk'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/scheduling'
@@ -668,6 +679,7 @@ export interface FileRouteTypes {
     | '/dashboard/permissions'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
+    | '/dashboard/records-desk'
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/scheduling'
@@ -889,6 +901,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/dashboard/reports'
       preLoaderRoute: typeof DashboardReportsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/records-desk': {
+      id: '/dashboard/records-desk'
+      path: '/records-desk'
+      fullPath: '/dashboard/records-desk'
+      preLoaderRoute: typeof DashboardRecordsDeskRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/programs-admin': {
@@ -1169,6 +1188,7 @@ interface DashboardRouteChildren {
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
   DashboardProgramsRoute: typeof DashboardProgramsRouteWithChildren
   DashboardProgramsAdminRoute: typeof DashboardProgramsAdminRoute
+  DashboardRecordsDeskRoute: typeof DashboardRecordsDeskRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardSchedulingRoute: typeof DashboardSchedulingRoute
@@ -1206,6 +1226,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardPermissionsRoute: DashboardPermissionsRoute,
   DashboardProgramsRoute: DashboardProgramsRouteWithChildren,
   DashboardProgramsAdminRoute: DashboardProgramsAdminRoute,
+  DashboardRecordsDeskRoute: DashboardRecordsDeskRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,
   DashboardSchedulingRoute: DashboardSchedulingRoute,

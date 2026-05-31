@@ -64,7 +64,7 @@ function HiveMark({ className = "h-9 w-9" }: { className?: string }) {
 function Honeycomb({ className = "" }: { className?: string }) {
   return (
     <div className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`} aria-hidden>
-      <HexBackdrop opacity={0.05} />
+      <HexBg opacity={0.05} />
     </div>
   );
 }

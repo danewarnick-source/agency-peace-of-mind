@@ -783,7 +783,7 @@ function ExpandableRow({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-function CommandCenter() {
+export function CommandCenter() {
   const { data: org } = useCurrentOrg();
   return (
     <RequirePermission perm="manage_users">

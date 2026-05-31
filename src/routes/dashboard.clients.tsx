@@ -257,6 +257,7 @@ function ClientsPage() {
           date_of_birth:        rest.date_of_birth || null,
           emergency_contact_name:  rest.emergency_contact_name || null,
           emergency_contact_phone: rest.emergency_contact_phone || null,
+          profile_photo_url:    input.profile_photo_url ?? null,
           home_latitude:        coords.lat,
           home_longitude:       coords.lng,
         })

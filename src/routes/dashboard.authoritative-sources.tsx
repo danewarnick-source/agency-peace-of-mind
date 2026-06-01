@@ -104,14 +104,17 @@ function AuthoritativeSourcesPage() {
           Your contracts &amp; State SOW power everything NECTAR shows
         </h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Upload the documents that define what's required of your agency. NECTAR
-          reads from these as the source of truth — every checklist item, audit
-          requirement, and obligation HIVE surfaces traces back to a clause you
-          uploaded. Items without a traced source are flagged{" "}
+          External authority documents only — SOW, contracts, DSPD/DHS requirement
+          documents, and public-record requirements. NECTAR reads from these as the
+          source of truth; every checklist item, audit requirement, and obligation
+          HIVE surfaces traces back to a clause you uploaded. Items without a traced
+          source are flagged{" "}
           <span className="font-medium text-amber-700 dark:text-amber-300">
             Unverified
           </span>{" "}
-          so authority is never implied.
+          so authority is never implied. Client- and staff-specific files (PCSPs,
+          1056 budgets, certifications, training records) belong in{" "}
+          <span className="font-medium">Company Docs</span>.
         </p>
       </header>
 

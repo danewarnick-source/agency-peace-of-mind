@@ -1076,26 +1076,38 @@ function RequirementsPanel({
 function DocumentRequirementGroup({
   group,
   orgId,
+  applicByReq,
   highlight = false,
   forceOpen = false,
 }: {
   group: ReqGroup;
   orgId: string;
+  applicByReq: Map<string, ApplicStats>;
   highlight?: boolean;
   forceOpen?: boolean;
 }) {
   const counts = useMemo(() => {
-    let confirmed = 0;
+    let fullyConfirmed = 0;
+    let scopePending = 0;
     let needs = 0;
     let removed = 0;
     for (const i of group.items) {
       const s = statusOf(i);
-      if (s === "confirmed") confirmed += 1;
-      else if (s === "removed") removed += 1;
+      if (s === "confirmed") {
+        if (isScopeReady(applicByReq.get(i.id))) fullyConfirmed += 1;
+        else scopePending += 1;
+      } else if (s === "removed") removed += 1;
       else needs += 1;
     }
-    return { total: group.items.length, confirmed, needs, removed };
-  }, [group.items]);
+    return {
+      total: group.items.length,
+      confirmed: fullyConfirmed + scopePending,
+      fullyConfirmed,
+      scopePending,
+      needs,
+      removed,
+    };
+  }, [group.items, applicByReq]);
 
   // Default: expand if there's anything still needing attention.
   const [open, setOpen] = useState(counts.needs > 0);

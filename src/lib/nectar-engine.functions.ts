@@ -188,7 +188,9 @@ DESCRIPTION: ${reqDescription ?? "—"}
 CITATION: ${citation ?? "—"}
 
 PROVIDER ENTITIES:
-- Active service codes: ${facts.codes.length ? facts.codes.join(", ") : "(none configured)"}
+- Contracted service codes (active OR dormant — coverage applies to both): ${facts.codes.length ? facts.codes.join(", ") : "(none configured)"}
+  · Active (in use today): ${facts.activeCodes.length ? facts.activeCodes.join(", ") : "(none)"}
+  · Dormant (authorized, not currently used — still must be covered): ${facts.dormantCodes.length ? facts.dormantCodes.join(", ") : "(none)"}
 - Staff roles/credentials present: ${facts.roles.length ? facts.roles.join(", ") : "(none configured)"}
 - Client count: ${facts.clientCount}
 - Jurisdictions: ${facts.jurisdictions.join(", ")}`;

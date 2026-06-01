@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { AttestationBanner } from "@/components/nectar/attestation-banner";
 import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
+import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
 import { ingestDocument } from "@/lib/nectar-documents.functions";
 import {
   listAuthoritativeSources,
@@ -92,8 +93,9 @@ async function fileToBase64(file: File): Promise<string> {
 function AuthoritativeSourcesPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
+  const qc = useQueryClient();
 
-  return (
+  const content = (
     <div className="space-y-6">
       <header className="flex flex-col gap-2">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -115,6 +117,10 @@ function AuthoritativeSourcesPage() {
           so authority is never implied. Client- and staff-specific files (PCSPs,
           1056 budgets, certifications, training records) belong in{" "}
           <span className="font-medium">Company Docs</span>.
+        </p>
+        <p className="rounded-lg border border-dashed border-[color:var(--amber-400,#f4a93a)]/60 bg-[color:var(--amber-50,#fffbeb)]/60 px-3 py-2 text-xs text-[color:var(--amber-800,#92400e)]">
+          Tip — drop a PDF, scan, Word, or spreadsheet anywhere on this page and
+          NECTAR will propose a label before saving it into the source-of-truth set.
         </p>
       </header>
 
@@ -150,6 +156,18 @@ function AuthoritativeSourcesPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+
+  if (!orgId) return content;
+  return (
+    <AuthoritativeSourceDrop
+      orgId={orgId}
+      onUploaded={() =>
+        qc.invalidateQueries({ queryKey: ["auth-sources", orgId] })
+      }
+    >
+      {content}
+    </AuthoritativeSourceDrop>
   );
 }
 

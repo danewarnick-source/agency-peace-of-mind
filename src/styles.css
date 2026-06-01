@@ -223,8 +223,8 @@
   --warning: oklch(0.78 0.158 70);
   --warning-foreground: oklch(0.22 0.06 75);
 
-  --border: oklch(0.925 0.01 250);                  /* ~#e4e7ef */
-  --input: oklch(0.925 0.01 250);
+  --border: oklch(0.87 0.012 255);                 /* ~#d7dae3 */
+  --input: oklch(0.87 0.012 255);
   --ring: oklch(0.78 0.158 70);                     /* amber focus ring */
 
   /* Hero/dark gradients */

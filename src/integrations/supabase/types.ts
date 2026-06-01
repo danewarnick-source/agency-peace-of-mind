@@ -307,6 +307,10 @@ export type Database = {
           organization_id: string
           provider_approver_email: string | null
           rate_per_unit: number
+          rate_source: string | null
+          rate_source_at: string | null
+          rate_source_document_id: string | null
+          rate_source_plan_number: string | null
           sce: string | null
           service_code: string
           service_end_date: string | null
@@ -324,6 +328,10 @@ export type Database = {
           organization_id: string
           provider_approver_email?: string | null
           rate_per_unit?: number
+          rate_source?: string | null
+          rate_source_at?: string | null
+          rate_source_document_id?: string | null
+          rate_source_plan_number?: string | null
           sce?: string | null
           service_code: string
           service_end_date?: string | null
@@ -341,6 +349,10 @@ export type Database = {
           organization_id?: string
           provider_approver_email?: string | null
           rate_per_unit?: number
+          rate_source?: string | null
+          rate_source_at?: string | null
+          rate_source_document_id?: string | null
+          rate_source_plan_number?: string | null
           sce?: string | null
           service_code?: string
           service_end_date?: string | null
@@ -355,6 +367,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_billing_codes_rate_source_document_id_fkey"
+            columns: ["rate_source_document_id"]
+            isOneToOne: false
+            referencedRelation: "client_documents"
             referencedColumns: ["id"]
           },
         ]

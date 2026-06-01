@@ -19,6 +19,9 @@ export type CaseloadClient = {
   special_directions: string | null;
   profile_photo_url: string | null;
   feature_config: Record<string, boolean> | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  date_of_birth?: string | null;
 };
 
 /**

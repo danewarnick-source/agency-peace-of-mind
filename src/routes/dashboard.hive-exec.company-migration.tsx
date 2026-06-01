@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { NectarGuidanceStrip } from "@/components/nectar/nectar-guidance-strip";
 
-export const Route = createFileRoute("/dashboard/company-migration")({
+export const Route = createFileRoute("/dashboard/hive-exec/company-migration")({
   head: () => ({
     meta: [
       { title: "Company Migration — HIVE" },

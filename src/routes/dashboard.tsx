@@ -57,7 +57,6 @@ const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/nectar-docs", label: "Company Docs", icon: Database },
   { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
   { to: "/dashboard/authoritative-sources", label: "Authoritative Sources", icon: ShieldCheck },
-  { to: "/dashboard/company-migration", label: "Company Migration", icon: ArrowRightLeft },
 ];
 
 function DashboardLayout() {
@@ -108,6 +107,7 @@ function DashboardLayout() {
     { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
     { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },
     { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },
+    { to: "/dashboard/hive-exec/company-migration", label: "Company Migration", icon: ArrowRightLeft },
   ];
 
   const signOut = async () => {

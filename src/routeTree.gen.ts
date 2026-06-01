@@ -51,7 +51,6 @@ import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.emplo
 import { Route as DashboardEmarRouteImport } from './routes/dashboard.emar'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
 import { Route as DashboardComplianceDeskRouteImport } from './routes/dashboard.compliance-desk'
-import { Route as DashboardCompanyMigrationRouteImport } from './routes/dashboard.company-migration'
 import { Route as DashboardCommandCenterRouteImport } from './routes/dashboard.command-center'
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardClientBillingCodesRouteImport } from './routes/dashboard.client-billing-codes'
@@ -75,6 +74,7 @@ import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboa
 import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
 import { Route as DashboardHiveExecPlansRouteImport } from './routes/dashboard.hive-exec.plans'
 import { Route as DashboardHiveExecHealthRouteImport } from './routes/dashboard.hive-exec.health'
+import { Route as DashboardHiveExecCompanyMigrationRouteImport } from './routes/dashboard.hive-exec.company-migration'
 import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
@@ -300,12 +300,6 @@ const DashboardComplianceDeskRoute = DashboardComplianceDeskRouteImport.update({
   path: '/compliance-desk',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardCompanyMigrationRoute =
-  DashboardCompanyMigrationRouteImport.update({
-    id: '/company-migration',
-    path: '/company-migration',
-    getParentRoute: () => DashboardRoute,
-  } as any)
 const DashboardCommandCenterRoute = DashboardCommandCenterRouteImport.update({
   id: '/command-center',
   path: '/command-center',
@@ -429,6 +423,12 @@ const DashboardHiveExecHealthRoute = DashboardHiveExecHealthRouteImport.update({
   path: '/health',
   getParentRoute: () => DashboardHiveExecRoute,
 } as any)
+const DashboardHiveExecCompanyMigrationRoute =
+  DashboardHiveExecCompanyMigrationRouteImport.update({
+    id: '/company-migration',
+    path: '/company-migration',
+    getParentRoute: () => DashboardHiveExecRoute,
+  } as any)
 const DashboardHiveExecOrgIdRoute = DashboardHiveExecOrgIdRouteImport.update({
   id: '/$orgId',
   path: '/$orgId',
@@ -521,7 +521,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
-  '/dashboard/company-migration': typeof DashboardCompanyMigrationRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
@@ -559,6 +558,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
@@ -599,7 +599,6 @@ export interface FileRoutesByTo {
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
-  '/dashboard/company-migration': typeof DashboardCompanyMigrationRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
@@ -636,6 +635,7 @@ export interface FileRoutesByTo {
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
@@ -679,7 +679,6 @@ export interface FileRoutesById {
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
-  '/dashboard/company-migration': typeof DashboardCompanyMigrationRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
@@ -717,6 +716,7 @@ export interface FileRoutesById {
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
@@ -761,7 +761,6 @@ export interface FileRouteTypes {
     | '/dashboard/client-billing-codes'
     | '/dashboard/clients'
     | '/dashboard/command-center'
-    | '/dashboard/company-migration'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/emar'
@@ -799,6 +798,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/tickets'
@@ -839,7 +839,6 @@ export interface FileRouteTypes {
     | '/dashboard/client-billing-codes'
     | '/dashboard/clients'
     | '/dashboard/command-center'
-    | '/dashboard/company-migration'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/emar'
@@ -876,6 +875,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/tickets'
@@ -918,7 +918,6 @@ export interface FileRouteTypes {
     | '/dashboard/client-billing-codes'
     | '/dashboard/clients'
     | '/dashboard/command-center'
-    | '/dashboard/company-migration'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/emar'
@@ -956,6 +955,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/tickets'
@@ -1291,13 +1291,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardComplianceDeskRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/company-migration': {
-      id: '/dashboard/company-migration'
-      path: '/company-migration'
-      fullPath: '/dashboard/company-migration'
-      preLoaderRoute: typeof DashboardCompanyMigrationRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/dashboard/command-center': {
       id: '/dashboard/command-center'
       path: '/command-center'
@@ -1459,6 +1452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHiveExecHealthRouteImport
       parentRoute: typeof DashboardHiveExecRoute
     }
+    '/dashboard/hive-exec/company-migration': {
+      id: '/dashboard/hive-exec/company-migration'
+      path: '/company-migration'
+      fullPath: '/dashboard/hive-exec/company-migration'
+      preLoaderRoute: typeof DashboardHiveExecCompanyMigrationRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
     '/dashboard/hive-exec/$orgId': {
       id: '/dashboard/hive-exec/$orgId'
       path: '/$orgId'
@@ -1567,6 +1567,7 @@ const DashboardBillingRouteWithChildren =
 
 interface DashboardHiveExecRouteChildren {
   DashboardHiveExecOrgIdRoute: typeof DashboardHiveExecOrgIdRoute
+  DashboardHiveExecCompanyMigrationRoute: typeof DashboardHiveExecCompanyMigrationRoute
   DashboardHiveExecHealthRoute: typeof DashboardHiveExecHealthRoute
   DashboardHiveExecPlansRoute: typeof DashboardHiveExecPlansRoute
   DashboardHiveExecTicketsRoute: typeof DashboardHiveExecTicketsRoute
@@ -1575,6 +1576,8 @@ interface DashboardHiveExecRouteChildren {
 
 const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
   DashboardHiveExecOrgIdRoute: DashboardHiveExecOrgIdRoute,
+  DashboardHiveExecCompanyMigrationRoute:
+    DashboardHiveExecCompanyMigrationRoute,
   DashboardHiveExecHealthRoute: DashboardHiveExecHealthRoute,
   DashboardHiveExecPlansRoute: DashboardHiveExecPlansRoute,
   DashboardHiveExecTicketsRoute: DashboardHiveExecTicketsRoute,
@@ -1644,7 +1647,6 @@ interface DashboardRouteChildren {
   DashboardClientBillingCodesRoute: typeof DashboardClientBillingCodesRoute
   DashboardClientsRoute: typeof DashboardClientsRoute
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
-  DashboardCompanyMigrationRoute: typeof DashboardCompanyMigrationRoute
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardEmarRoute: typeof DashboardEmarRoute
@@ -1691,7 +1693,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardClientBillingCodesRoute: DashboardClientBillingCodesRoute,
   DashboardClientsRoute: DashboardClientsRoute,
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,
-  DashboardCompanyMigrationRoute: DashboardCompanyMigrationRoute,
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardEmarRoute: DashboardEmarRoute,

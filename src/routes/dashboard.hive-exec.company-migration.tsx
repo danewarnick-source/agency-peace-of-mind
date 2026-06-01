@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowRightLeft,
   CheckCircle2,
@@ -13,27 +15,44 @@ import {
   Receipt,
   ClipboardCheck,
   AlertTriangle,
+  Briefcase,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NectarGuidanceStrip } from "@/components/nectar/nectar-guidance-strip";
+import { RequireHiveExecutive } from "@/components/hive-executive-guard";
+import { listCompanies, type CompanyRow } from "@/lib/hive-exec.functions";
 
-export const Route = createFileRoute("/dashboard/company-migration")({
+export const Route = createFileRoute("/dashboard/hive-exec/company-migration")({
   head: () => ({
     meta: [
-      { title: "Company Migration — HIVE" },
+      { title: "Company Migration — HIVE Executive" },
       {
         name: "description",
         content:
-          "Transfer your entire operation into HIVE. NECTAR parses your exports and proposes the mapping — you confirm before anything commits.",
+          "HIVE-staff migration service: ingest a customer's prior-platform export and have NECTAR auto-populate clients, staff, billing codes, and documents into their account.",
       },
     ],
   }),
-  component: CompanyMigrationPage,
+  component: () => (
+    <RequireHiveExecutive>
+      <CompanyMigrationPage />
+    </RequireHiveExecutive>
+  ),
 });
+
+type EngagementStatus = "quoted" | "in_progress" | "review" | "complete";
+const ENGAGEMENT_STEPS: { value: EngagementStatus; label: string }[] = [
+  { value: "quoted", label: "Quoted" },
+  { value: "in_progress", label: "In progress" },
+  { value: "review", label: "Customer review" },
+  { value: "complete", label: "Complete" },
+];
 
 type EntityKind = "clients" | "staff" | "teams" | "billing" | "documents" | "history";
 
@@ -63,6 +82,9 @@ function classifyFile(name: string): StagedFile["kind"] {
 }
 
 function CompanyMigrationPage() {
+  const [targetOrgId, setTargetOrgId] = useState<string>("");
+  const [engagementStatus, setEngagementStatus] = useState<EngagementStatus>("quoted");
+  const [quoteAmount, setQuoteAmount] = useState<string>("2000");
   const [files, setFiles] = useState<StagedFile[]>([]);
   const [phase, setPhase] = useState<"idle" | "analyzing" | "preview" | "importing" | "done">("idle");
   const [progress, setProgress] = useState(0);
@@ -75,6 +97,14 @@ function CompanyMigrationPage() {
     documents: true,
     history: true,
   });
+
+  const listCompaniesFn = useServerFn(listCompanies);
+  const companiesQ = useQuery<CompanyRow[]>({
+    queryKey: ["hive-exec-companies-migration"],
+    queryFn: () => listCompaniesFn(),
+    staleTime: 60_000,
+  });
+  const targetCompany = companiesQ.data?.find((c) => c.organization_id === targetOrgId) ?? null;
 
   const onPickFiles = (list: FileList | null) => {
     if (!list) return;
@@ -93,10 +123,15 @@ function CompanyMigrationPage() {
   const totalBytes = useMemo(() => files.reduce((s, f) => s + f.size, 0), [files]);
 
   const analyze = async () => {
+    if (!targetOrgId) {
+      toast.error("Pick the target company first.");
+      return;
+    }
     if (files.length === 0) {
       toast.error("Add at least one export file first.");
       return;
     }
+    setEngagementStatus((s) => (s === "quoted" ? "in_progress" : s));
     setPhase("analyzing");
     setProgress(10);
     // Heuristic-only proposal: NECTAR would normally read the files. We surface
@@ -174,34 +209,109 @@ function CompanyMigrationPage() {
       setProgress(i);
     }
     setPhase("done");
-    toast.success("Migration committed. Items needing attention sent to NECTAR Task Center.");
+    setEngagementStatus("review");
+    toast.success(
+      targetCompany
+        ? `Migration committed to ${targetCompany.name}. Flagged items sent to their NECTAR Task Center.`
+        : "Migration committed. Flagged items sent to the NECTAR Task Center.",
+    );
   };
 
   return (
     <div className="space-y-5">
       <header className="space-y-1">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-          <ArrowRightLeft className="h-3.5 w-3.5" /> NECTAR · Company Migration
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#fed7aa]">
+          <ArrowRightLeft className="h-3.5 w-3.5" /> HIVE Executive · Company Migration Service
         </div>
-        <h1 className="text-2xl font-semibold">Move your whole operation into HIVE</h1>
+        <h1 className="text-2xl font-semibold">Migrate a customer onto HIVE</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Upload your exports from another platform — CSV/Excel rosters, PDF document batches, rate sheets,
-          historical records. NECTAR maps them into clients, staff, teams, billing codes, and documents,
-          and shows you the proposal. Nothing commits until you confirm.
+          Paid onboarding service performed by HIVE staff. Pick the receiving company,
+          ingest their export from the prior platform, and have NECTAR auto-populate clients,
+          staff, teams, billing codes, documents, and historical records into{" "}
+          <span className="font-medium">their</span> account. Customer companies never see this tool.
         </p>
       </header>
+
+      {/* Engagement */}
+      <Card className="border-[#fed7aa] bg-gradient-to-br from-[#fff7ed] to-card/40 p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <Briefcase className="h-4 w-4 text-[#d97a1c]" /> Billable engagement
+        </div>
+        <div className="grid gap-3 md:grid-cols-[2fr,1fr,1fr]">
+          <div className="space-y-1">
+            <Label htmlFor="target-company">Target company</Label>
+            <Select value={targetOrgId} onValueChange={setTargetOrgId}>
+              <SelectTrigger id="target-company">
+                <SelectValue placeholder={companiesQ.isLoading ? "Loading companies…" : "Select a company"} />
+              </SelectTrigger>
+              <SelectContent>
+                {(companiesQ.data ?? []).map((c) => (
+                  <SelectItem key={c.organization_id} value={c.organization_id}>
+                    {c.name} · {c.staff_count} staff · {c.client_count} clients
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="quote">Quote (USD)</Label>
+            <div className="flex items-center rounded-md border border-input bg-background px-2">
+              <span className="text-sm text-muted-foreground">$</span>
+              <input
+                id="quote"
+                type="number"
+                min="0"
+                step="100"
+                value={quoteAmount}
+                onChange={(e) => setQuoteAmount(e.target.value)}
+                className="w-full bg-transparent px-2 py-2 text-sm outline-none"
+                placeholder="2000"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="status">Status</Label>
+            <Select value={engagementStatus} onValueChange={(v) => setEngagementStatus(v as EngagementStatus)}>
+              <SelectTrigger id="status"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ENGAGEMENT_STEPS.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+          {ENGAGEMENT_STEPS.map((s, i) => {
+            const reached = ENGAGEMENT_STEPS.findIndex((x) => x.value === engagementStatus) >= i;
+            return (
+              <span
+                key={s.value}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${
+                  reached
+                    ? "bg-[#d97a1c] text-white"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {reached && <CheckCircle2 className="h-3 w-3" />} {s.label}
+              </span>
+            );
+          })}
+        </div>
+      </Card>
 
       <NectarGuidanceStrip
         title="Propose, then confirm — bad data is hard to scrub later"
         message={
           <>
             NECTAR reads every file, proposes a mapping with source attribution, and flags anything
-            ambiguous. You review the preview ("we found 42 clients, 18 staff, these rates from these
+            ambiguous. Review the preview ("42 clients, 18 staff, these rates from these
             documents"), correct as needed, then commit. Skipped or flagged items become tasks in the
-            NECTAR Task Center.
+            receiving company's NECTAR Task Center.
           </>
         }
       />
+
 
       {/* Upload */}
       <Card className="border-border/60 bg-card/40 p-5 backdrop-blur-md">

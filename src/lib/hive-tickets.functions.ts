@@ -114,12 +114,13 @@ export async function reportPlatformEvent(input: {
       status: "new",
       source: "auto",
       event_kind: input.eventKind,
-      event_ref: input.eventRef,
+      event_ref: input.eventRef as unknown as Json,
       dedupe_key: input.dedupeKey,
       affected_orgs: 1,
-      resolution,
-      audit,
+      resolution: resolution as unknown as Json,
+      audit: audit as unknown as Json,
     });
+
   } catch {
     // NEVER block the company-side flow on a HIVE-queue write failure.
     // Auto-tickets are an observability nicety; the user's action must

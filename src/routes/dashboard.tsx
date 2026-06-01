@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -50,10 +50,14 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
   { to: "/dashboard/billing", label: "Billing", icon: Receipt, perm: "view_billing" },
   { to: "/dashboard/audit", label: "Audit", icon: FolderArchive },
-  { to: "/dashboard/authoritative-sources", label: "Authoritative Sources", icon: ShieldCheck },
-  { to: "/dashboard/nectar-docs", label: "NECTAR Docs", icon: Database },
-  { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
+];
+
+const NECTAR_NAV: NavItem[] = [
+  { to: "/dashboard/nectar-docs", label: "Company Docs", icon: Database },
+  { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
+  { to: "/dashboard/authoritative-sources", label: "Authoritative Sources", icon: ShieldCheck },
+  { to: "/dashboard/company-migration", label: "Company Migration", icon: ArrowRightLeft },
 ];
 
 function DashboardLayout() {
@@ -187,6 +191,38 @@ function DashboardLayout() {
           );
         })}
 
+        {effectiveView === "admin" && (
+          <div className="mt-4 border-t border-sidebar-border pt-4">
+            <div className="mb-1 flex items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]">
+              <Hexagon className="h-3 w-3 fill-[#fed7aa]/20" />
+              <span>NECTAR</span>
+            </div>
+            <p className="mb-2 px-3 text-[10px] text-sidebar-foreground/50">
+              The brain. Tabs below feed it the data the rest of HIVE reads from.
+            </p>
+            {NECTAR_NAV.map((item) => {
+              const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+              const Icon = item.icon;
+              const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={onNavigate}
+                  data-tour={`nav.${slug}`}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                    active
+                      ? "bg-[#d97a1c] text-white shadow-sm"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" /> {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
         {showExecSection && (
           <div className="mt-4 border-t border-sidebar-border pt-4">
             <div className="mb-1 flex items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]">
@@ -241,7 +277,8 @@ function DashboardLayout() {
     </>
   );
 
-  const allNav = showExecSection ? [...nav, ...execNav] : nav;
+  const nectarNavForView = effectiveView === "admin" ? NECTAR_NAV : [];
+  const allNav = showExecSection ? [...nav, ...nectarNavForView, ...execNav] : [...nav, ...nectarNavForView];
   const pageTitle =
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
   const isStaffView = effectiveView === "staff";

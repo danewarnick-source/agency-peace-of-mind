@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Shield, Building2, LifeBuoy, ShieldAlert, CreditCard, Activity, ArrowRightLeft, Plus, UserCog } from "lucide-react";
+import { Shield, Building2, LifeBuoy, ShieldAlert, CreditCard, Activity, ArrowRightLeft, Plus, UserCog, Hexagon } from "lucide-react";
 import { RequireHiveExecutive } from "@/components/hive-executive-guard";
 
 export const Route = createFileRoute("/dashboard/hive-exec")({
@@ -18,6 +18,7 @@ const TABS = [
   { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
   { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },
   { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },
+  { to: "/dashboard/hive-exec/nectar", label: "NECTAR", icon: Hexagon },
   { to: "/dashboard/hive-exec/company-migration", label: "Company Migration", icon: ArrowRightLeft },
 ];
 

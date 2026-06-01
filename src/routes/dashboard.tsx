@@ -74,7 +74,9 @@ function DashboardLayout() {
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
-  const effectiveView = isAdminCapable ? view : "staff";
+  const rawView = isAdminCapable ? view : "staff";
+  const isMobilePreview = rawView === "staff_mobile";
+  const effectiveView: "staff" | "admin" = rawView === "admin" ? "admin" : "staff";
   const nav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
   const signOut = async () => {
     await supabase.auth.signOut();

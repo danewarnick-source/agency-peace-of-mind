@@ -12,6 +12,13 @@ type Attention = {
   claimsReady: number;
   pendingPayroll: number;
   clientsOffPace: number;
+  // Platform-wide additions sourced from the Task Center surface:
+  requirementsNeedingReview: number;
+  engineMappingGaps: number;
+  pendingBillingWarnings: number;
+  pendingReimbursements: number;
+  unacceptedShifts: number;
+  auditorSharesExpiring: number;
 };
 
 type Celebration = {

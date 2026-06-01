@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
-export type GeneralCategory = "Training" | "Admin" | "Travel" | "Meeting";
+// Free-form so it accepts both built-in (Training/Admin/Travel/Meeting/Other)
+// and any custom categories an admin adds in Time & Pay settings.
+export type GeneralCategory = string;
 
 export type GeneralShift = {
   category: GeneralCategory;

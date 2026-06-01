@@ -2323,6 +2323,7 @@ export type Database = {
           team_id: string | null
           tenant_id: string | null
           username: string | null
+          worker_type: string
         }
         Insert: {
           account_status?: string
@@ -2346,6 +2347,7 @@ export type Database = {
           team_id?: string | null
           tenant_id?: string | null
           username?: string | null
+          worker_type?: string
         }
         Update: {
           account_status?: string
@@ -2369,6 +2371,7 @@ export type Database = {
           team_id?: string | null
           tenant_id?: string | null
           username?: string | null
+          worker_type?: string
         }
         Relationships: [
           {
@@ -2987,6 +2990,84 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      time_pay_categories: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          id: string
+          is_builtin: boolean
+          label: string
+          organization_id: string
+          requires_description: boolean
+          sort_order: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          id?: string
+          is_builtin?: boolean
+          label: string
+          organization_id: string
+          requires_description?: boolean
+          sort_order?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          id?: string
+          is_builtin?: boolean
+          label?: string
+          organization_id?: string
+          requires_description?: boolean
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      time_pay_settings: {
+        Row: {
+          allow_non_client_clockins: boolean
+          contractor_period_anchor: string
+          contractor_schedule: string
+          created_at: string
+          organization_id: string
+          pay_between_clients: boolean
+          updated_at: string
+          updated_by: string | null
+          w2_period_anchor: string
+          w2_schedule: string
+        }
+        Insert: {
+          allow_non_client_clockins?: boolean
+          contractor_period_anchor?: string
+          contractor_schedule?: string
+          created_at?: string
+          organization_id: string
+          pay_between_clients?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          w2_period_anchor?: string
+          w2_schedule?: string
+        }
+        Update: {
+          allow_non_client_clockins?: boolean
+          contractor_period_anchor?: string
+          contractor_schedule?: string
+          created_at?: string
+          organization_id?: string
+          pay_between_clients?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          w2_period_anchor?: string
+          w2_schedule?: string
+        }
+        Relationships: []
       }
       track_assignments: {
         Row: {

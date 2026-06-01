@@ -37,7 +37,8 @@ const STAFF_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { to: "/dashboard/records-desk", label: "Records Desk", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Company Overview", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/records-desk", label: "Records Desk", icon: ClipboardCheck },
   { to: "/dashboard/pba-ledger", label: "PBA Trust Ledger", icon: Wallet },
   { to: "/dashboard/scheduling", label: "Scheduling", icon: CalendarDays },
   { to: "/dashboard/employees", label: "Employees", icon: Users },

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Landmark, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 
 export const Route = createFileRoute("/dashboard/settings")({ component: SettingsPage });
 
@@ -71,6 +72,10 @@ function SettingsPage() {
           </div>
         </form>
       )}
+      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+        <CompanyOverviewSettings />
+      )}
+
 
       {org?.role === "admin" && (
         <Link to="/dashboard/settings/bank-mapping" className="group lg:col-span-2">

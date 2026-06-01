@@ -351,8 +351,9 @@ export function AuthoritativeSourceDrop({
               Drop to add to Authoritative Sources
             </div>
             <p className="max-w-sm text-sm text-muted-foreground">
-              NECTAR will read each document, propose a label, and add it to the
-              source-of-truth set the rest of HIVE reads from.
+              Drop a PDF, scan, Word, or spreadsheet — NECTAR will read each
+              document, propose a label, and add it to the source-of-truth set
+              the rest of HIVE reads from.
             </p>
           </div>
         </div>

@@ -198,8 +198,11 @@ function LoginPage() {
                     name="identifier"
                     type="text"
                     autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    inputMode="email"
                     required
-                    className="flex h-10 w-full rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+                    className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
                     style={inputStyle}
                   />
                 </div>
@@ -216,8 +219,9 @@ function LoginPage() {
                     id="password"
                     name="password"
                     type="password"
+                    autoComplete="current-password"
                     required
-                    className="flex h-10 w-full rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+                    className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
                     style={inputStyle}
                   />
                 </div>

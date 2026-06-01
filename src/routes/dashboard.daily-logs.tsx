@@ -228,7 +228,7 @@ function StaffDailyJournal() {
             <CalendarClock className="h-4 w-4" />
             {missingEntries.length} Missing Entr{missingEntries.length === 1 ? "y" : "ies"} — Last {LOOKBACK_DAYS} Days
           </p>
-          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:grid-cols-3">
             {missingEntries.slice(0, 12).map(({ client, date }) => (
               <button
                 key={`${client.id}-${date}`}
@@ -260,7 +260,7 @@ function StaffDailyJournal() {
           No HHS clients currently assigned to your caseload. Please contact an Administrator.
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {hhsClients.map((c) => {
             if (!allowedIds.has(c.id)) return null;
             const todayStr = new Date().toISOString().split("T")[0];

@@ -109,10 +109,10 @@ export function StaffClientGrid() {
       aria-label="My Caseload"
       className="rounded-lg border border-border bg-card p-4"
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="sticky top-14 z-10 -mx-4 flex flex-col gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:flex-row md:items-center md:justify-between md:border-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold tracking-tight">My Caseload</h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="hidden text-xs text-muted-foreground md:block">
             Tap a service pill to switch modes, then open the matching workspace.
           </p>
         </div>
@@ -122,7 +122,7 @@ export function StaffClientGrid() {
             placeholder="Search by name…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="pl-9"
+            className="h-11 pl-9 text-base md:h-10 md:text-sm"
             inputMode="search"
           />
         </div>

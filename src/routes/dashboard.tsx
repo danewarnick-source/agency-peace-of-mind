@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
+import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — HIVE" }] }),
@@ -160,11 +161,29 @@ function DashboardLayout() {
     </>
   );
 
+  const pageTitle =
+    nav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
+  const isStaffView = effectiveView === "staff";
+
   return (
     <div className="flex min-h-screen flex-col">
       <ImpersonationBanner />
 
-      <div className="grid flex-1 md:grid-cols-[260px_1fr]">
+      {/* Mobile shell — staff view only (below md) */}
+      {isStaffView && (
+        <div className="md:hidden">
+          <StaffMobileShell title={pageTitle}>
+            <main className="bg-secondary/40 px-3 py-4">
+              <Outlet />
+            </main>
+          </StaffMobileShell>
+        </div>
+      )}
+
+      {/* Desktop layout (md+) — unchanged. Also used on mobile for Admin View. */}
+      <div
+        className={`grid flex-1 md:grid-cols-[260px_1fr] ${isStaffView ? "hidden md:grid" : ""}`}
+      >
         <aside className="hidden flex-col bg-sidebar text-sidebar-foreground md:flex">
           <SidebarBody />
         </aside>
@@ -187,7 +206,7 @@ function DashboardLayout() {
               </Sheet>
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-semibold tracking-tight">
-                  {nav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard"}
+                  {pageTitle}
                 </h1>
                 <p className="truncate text-xs text-muted-foreground">
                   {org?.organization_name ?? "Workspace"} · {ROLE_LABEL[role]}
@@ -201,7 +220,7 @@ function DashboardLayout() {
             </Button>
           </header>
 
-          <main className="flex-1 bg-secondary/40 px-8 py-6">
+          <main className="flex-1 bg-secondary/40 px-4 py-6 md:px-8">
 
             <Outlet />
           </main>

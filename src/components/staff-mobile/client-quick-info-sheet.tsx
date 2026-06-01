@@ -196,7 +196,7 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
             title="Key IDs & Address"
           >
             <KvRow k="Medicaid ID" v={client.medicaid_id ?? "—"} mono />
-            <KvRow k="Date of birth" v={fmtDate(client.date_of_birth)} />
+            <KvRow k="Date of birth" v={fmtDate(client.date_of_birth ?? null)} />
             <KvRow k="Address" v={client.physical_address ?? "—"} />
           </Section>
         </div>

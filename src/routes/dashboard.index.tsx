@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePortalView } from "@/hooks/use-portal-view";
+import { Button } from "@/components/ui/button";
 import { AlertTriangle, Clock, FileText, ArrowRight } from "lucide-react";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
@@ -11,8 +12,6 @@ import { TodayShiftBanner } from "@/components/today-shift-banner";
 import { CompanyOverview } from "@/components/company-overview";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
-
-type Role = "admin" | "manager" | "employee";
 
 function ComplianceInbox() {
   const { user } = useAuth();
@@ -118,72 +117,14 @@ function ComplianceInbox() {
 }
 
 function Overview() {
-  const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { view } = usePortalView();
-  const qc = useQueryClient();
 
   const isManager = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
   const showAdmin = isManager && view === "admin";
-  const [inviteOpen, setInviteOpen] = useState(false);
-
-
-  const inviteMutation = useMutation({
-    mutationFn: async (input: { email: string; role: Role }) => {
-      const { error } = await supabase.from("invitations").insert({
-        organization_id: org!.organization_id, email: input.email, role: input.role, invited_by: user!.id,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Invitation created");
-      qc.invalidateQueries({ queryKey: ["invites"] });
-      setInviteOpen(false);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   return (
     <div className="space-y-8">
-      {showAdmin && (
-        <div className="flex items-start justify-end">
-          <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="shrink-0">
-                <UserPlus className="mr-2 h-4 w-4" /> Invite employee
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Invite an employee</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                inviteMutation.mutate({ email: String(fd.get("email")), role: String(fd.get("role")) as Role });
-              }} className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email address</Label>
-                  <Input id="email" name="email" type="email" required />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select name="role" defaultValue="employee">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="employee">Employee</SelectItem>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={inviteMutation.isPending}>Create invitation</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-
       {showAdmin && <CompanyOverview />}
 
       {!showAdmin && (

@@ -407,9 +407,14 @@ function SourceRow({
 }) {
   const qc = useQueryClient();
   const genFn = useServerFn(generateRequirementsFromSource);
+  const [progress, setProgress] = useState(0);
   const generate = useMutation({
     mutationFn: () => genFn({ data: { documentId: source.id } }),
+    onMutate: () => {
+      setProgress(4);
+    },
     onSuccess: (r) => {
+      setProgress(100);
       const inserted = (r as { inserted: number }).inserted ?? 0;
       const message = (r as { message?: string }).message;
       if (inserted > 0) {
@@ -419,14 +424,36 @@ function SourceRow({
       } else {
         toast.warning(
           message ??
-            "NECTAR couldn't draft any requirements from this source. You can add them by hand from the Requirements tab.",
+            "NECTAR read the document but didn't find clear requirement language. You can add them by hand from the Requirements tab.",
           { duration: 9000 },
         );
       }
       qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      // Let the bar reach 100% briefly before resetting
+      window.setTimeout(() => setProgress(0), 600);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      setProgress(0);
+      toast.error(e.message);
+    },
   });
+
+  // Simulated progress while NECTAR works server-side. Creeps toward 92%
+  // and snaps to 100% on completion — gives the admin honest "still working"
+  // feedback on long documents without claiming false precision.
+  useEffect(() => {
+    if (!generate.isPending) return;
+    const id = window.setInterval(() => {
+      setProgress((p) => {
+        if (p >= 92) return p;
+        // Slower as we approach the ceiling
+        const step = p < 30 ? 6 : p < 60 ? 3 : p < 80 ? 1.5 : 0.6;
+        return Math.min(92, p + step);
+      });
+    }, 450);
+    return () => window.clearInterval(id);
+  }, [generate.isPending]);
+
 
   const hasDraft = !!stats && stats.total > 0;
 

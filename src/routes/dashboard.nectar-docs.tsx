@@ -153,7 +153,7 @@ function NectarDocsPage() {
         </div>
         <h1 className="text-2xl font-semibold">Company Docs</h1>
         <p className="text-sm text-muted-foreground">
-          Internal client and staff records — PCSPs, 1056 budgets, intake/referrals, assessments, certifications, training records, and other client/staff-specific files. State and contract authority documents live in <span className="font-medium">Authoritative Sources</span>.
+          Aggregated view of every client and staff document in the workspace. Files uploaded on a <span className="font-medium text-foreground">client</span> or <span className="font-medium text-foreground">staff profile</span> appear here automatically — no duplicate upload. State and contract authority documents live in <span className="font-medium">Authoritative Sources</span>.
         </p>
       </header>
 

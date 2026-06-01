@@ -51,6 +51,7 @@ import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.emplo
 import { Route as DashboardEmarRouteImport } from './routes/dashboard.emar'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
 import { Route as DashboardComplianceDeskRouteImport } from './routes/dashboard.compliance-desk'
+import { Route as DashboardCompanyMigrationRouteImport } from './routes/dashboard.company-migration'
 import { Route as DashboardCommandCenterRouteImport } from './routes/dashboard.command-center'
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardClientBillingCodesRouteImport } from './routes/dashboard.client-billing-codes'
@@ -299,6 +300,12 @@ const DashboardComplianceDeskRoute = DashboardComplianceDeskRouteImport.update({
   path: '/compliance-desk',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardCompanyMigrationRoute =
+  DashboardCompanyMigrationRouteImport.update({
+    id: '/company-migration',
+    path: '/company-migration',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardCommandCenterRoute = DashboardCommandCenterRouteImport.update({
   id: '/command-center',
   path: '/command-center',
@@ -514,6 +521,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
+  '/dashboard/company-migration': typeof DashboardCompanyMigrationRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
@@ -591,6 +599,7 @@ export interface FileRoutesByTo {
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
+  '/dashboard/company-migration': typeof DashboardCompanyMigrationRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
@@ -670,6 +679,7 @@ export interface FileRoutesById {
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
+  '/dashboard/company-migration': typeof DashboardCompanyMigrationRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
@@ -751,6 +761,7 @@ export interface FileRouteTypes {
     | '/dashboard/client-billing-codes'
     | '/dashboard/clients'
     | '/dashboard/command-center'
+    | '/dashboard/company-migration'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/emar'
@@ -828,6 +839,7 @@ export interface FileRouteTypes {
     | '/dashboard/client-billing-codes'
     | '/dashboard/clients'
     | '/dashboard/command-center'
+    | '/dashboard/company-migration'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/emar'
@@ -906,6 +918,7 @@ export interface FileRouteTypes {
     | '/dashboard/client-billing-codes'
     | '/dashboard/clients'
     | '/dashboard/command-center'
+    | '/dashboard/company-migration'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/emar'
@@ -1278,6 +1291,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardComplianceDeskRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/company-migration': {
+      id: '/dashboard/company-migration'
+      path: '/company-migration'
+      fullPath: '/dashboard/company-migration'
+      preLoaderRoute: typeof DashboardCompanyMigrationRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/command-center': {
       id: '/dashboard/command-center'
       path: '/command-center'
@@ -1624,6 +1644,7 @@ interface DashboardRouteChildren {
   DashboardClientBillingCodesRoute: typeof DashboardClientBillingCodesRoute
   DashboardClientsRoute: typeof DashboardClientsRoute
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
+  DashboardCompanyMigrationRoute: typeof DashboardCompanyMigrationRoute
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardEmarRoute: typeof DashboardEmarRoute
@@ -1670,6 +1691,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardClientBillingCodesRoute: DashboardClientBillingCodesRoute,
   DashboardClientsRoute: DashboardClientsRoute,
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,
+  DashboardCompanyMigrationRoute: DashboardCompanyMigrationRoute,
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardEmarRoute: DashboardEmarRoute,

@@ -35,7 +35,7 @@ type Row = Tables<"activity_reimbursement_requests"> & {
 
 function ReimbursementApprovalsPage() {
   return (
-    <RequirePermission allow={["admin", "super_admin", "manager"]}>
+    <RequirePermission perm="manage_users">
       <ApprovalsBody />
     </RequirePermission>
   );

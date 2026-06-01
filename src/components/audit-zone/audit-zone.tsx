@@ -443,7 +443,7 @@ function AuditFileDialog({
       const periodEnd = format(next, "yyyy-MM-dd");
 
       // Find typical audit artifacts for the month
-      const [ts, bs, ir] = await Promise.all([
+      const [ts, bs, ir, cs] = await Promise.all([
         supabase
           .from("evv_timesheets")
           .select("id, clock_in_timestamp")
@@ -464,6 +464,13 @@ function AuditFileDialog({
           .gte("submitted_at", periodStart)
           .lt("submitted_at", periodEnd)
           .limit(50),
+        supabase
+          .from("client_spending_log")
+          .select("id, amount, spent_at")
+          .eq("organization_id", orgId)
+          .gte("spent_at", periodStart)
+          .lt("spent_at", periodEnd)
+          .limit(500),
       ]);
 
       const rows: Array<Omit<AuditDoc, "id" | "created_at">> = [];

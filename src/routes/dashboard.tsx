@@ -26,7 +26,8 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
 });
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+import type { Permission } from "@/lib/rbac";
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm?: Permission };
 
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },

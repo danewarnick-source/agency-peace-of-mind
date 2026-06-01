@@ -570,6 +570,21 @@ function PacketDetail({
           ))}
         </CardContent>
       </Card>
+
+      {packet && (
+        <Card className="bg-card/60 backdrop-blur border-[color:var(--border-light)]">
+          <CardHeader>
+            <CardTitle className="text-sm">Auditor Access Portal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AuditorShareManager
+              packetId={packetId}
+              packetName={packet.name}
+              organizationId={orgId}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

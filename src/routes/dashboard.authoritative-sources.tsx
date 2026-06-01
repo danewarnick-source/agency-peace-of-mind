@@ -443,14 +443,14 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
   });
 
   const grouped = useMemo(() => {
-    const buckets: Record<"document" | "suggestion" | "manual", typeof data.requirements> = {
+    const buckets: { document: any[]; suggestion: any[]; manual: any[] } = {
       document: [],
       suggestion: [],
       manual: [],
-    } as never;
+    };
     for (const r of data?.requirements ?? []) {
       const k = (r.origin as "document" | "suggestion" | "manual") ?? "manual";
-      (buckets[k] ??= []).push(r);
+      buckets[k].push(r);
     }
     return buckets;
   }, [data]);

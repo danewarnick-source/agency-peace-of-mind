@@ -56,6 +56,7 @@ import { Route as DashboardClientBillingCodesRouteImport } from './routes/dashbo
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBilling520RouteImport } from './routes/dashboard.billing-520'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
+import { Route as DashboardAuthoritativeSourcesRouteImport } from './routes/dashboard.authoritative-sources'
 import { Route as DashboardAuditRouteImport } from './routes/dashboard.audit'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
@@ -323,6 +324,12 @@ const DashboardBillingRoute = DashboardBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardAuthoritativeSourcesRoute =
+  DashboardAuthoritativeSourcesRouteImport.update({
+    id: '/authoritative-sources',
+    path: '/authoritative-sources',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardAuditRoute = DashboardAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -493,6 +500,7 @@ export interface FileRoutesByFullPath {
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
+  '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
   '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
@@ -569,6 +577,7 @@ export interface FileRoutesByTo {
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
+  '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
@@ -645,6 +654,7 @@ export interface FileRoutesById {
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
+  '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
   '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
@@ -724,6 +734,7 @@ export interface FileRouteTypes {
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/audit'
+    | '/dashboard/authoritative-sources'
     | '/dashboard/billing'
     | '/dashboard/billing-520'
     | '/dashboard/certifications'
@@ -800,6 +811,7 @@ export interface FileRouteTypes {
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/audit'
+    | '/dashboard/authoritative-sources'
     | '/dashboard/billing-520'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
@@ -875,6 +887,7 @@ export interface FileRouteTypes {
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/audit'
+    | '/dashboard/authoritative-sources'
     | '/dashboard/billing'
     | '/dashboard/billing-520'
     | '/dashboard/certifications'
@@ -1287,6 +1300,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBillingRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/authoritative-sources': {
+      id: '/dashboard/authoritative-sources'
+      path: '/authoritative-sources'
+      fullPath: '/dashboard/authoritative-sources'
+      preLoaderRoute: typeof DashboardAuthoritativeSourcesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/audit': {
       id: '/dashboard/audit'
       path: '/audit'
@@ -1577,6 +1597,7 @@ const DashboardCoursesCourseIdRouteWithChildren =
 interface DashboardRouteChildren {
   DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
   DashboardAuditRoute: typeof DashboardAuditRoute
+  DashboardAuthoritativeSourcesRoute: typeof DashboardAuthoritativeSourcesRoute
   DashboardBillingRoute: typeof DashboardBillingRouteWithChildren
   DashboardBilling520Route: typeof DashboardBilling520Route
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
@@ -1622,6 +1643,7 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAssignmentsRoute: DashboardAssignmentsRoute,
   DashboardAuditRoute: DashboardAuditRoute,
+  DashboardAuthoritativeSourcesRoute: DashboardAuthoritativeSourcesRoute,
   DashboardBillingRoute: DashboardBillingRouteWithChildren,
   DashboardBilling520Route: DashboardBilling520Route,
   DashboardCertificationsRoute: DashboardCertificationsRoute,

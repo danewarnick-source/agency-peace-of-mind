@@ -23,7 +23,7 @@ import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
-import { draftShiftNote } from "@/lib/ai-coach.functions";
+import { draftShiftNote, draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
 

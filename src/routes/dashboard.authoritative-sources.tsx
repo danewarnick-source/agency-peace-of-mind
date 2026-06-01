@@ -1467,6 +1467,15 @@ function RequirementRow({
               Low confidence
             </Badge>
           )}
+          {isRemoved && (
+            <Badge
+              variant="outline"
+              className="text-[10px] text-red-700 dark:text-red-300"
+            >
+              Removed — not tracked for audit
+            </Badge>
+          )}
+
 
         </div>
         {req.description && (

@@ -875,12 +875,25 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     } catch (err) {
       // Surface AI errors as a soft failure (e.g. rate-limit/credits) so the
       // user can retry rather than seeing a silent 0.
+      const msg = (err as Error).message;
+      await reportPlatformEvent({
+        eventKind: "ai_error",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Requirements extractor failed on "${(doc.title as string) ?? doc.file_name}"`,
+        detail: `AI extraction call threw while drafting from document ${doc.id}. Message: ${msg.slice(0, 600)}`,
+        category: "parsing_failure",
+        severity: "medium",
+        dedupeKey: `ai_error:${doc.id}`,
+        eventRef: { documentId: doc.id, error: msg.slice(0, 400) },
+      });
       return {
         inserted: 0,
         reason: "ai_error" as const,
-        message: (err as Error).message,
+        message: msg,
       };
     }
+
 
     // 2. Legacy fallback — any sow_clause fields the generic extractor caught
     const { data: fields } = await supabase

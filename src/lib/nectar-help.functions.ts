@@ -32,36 +32,19 @@ ADMIN AREA (admin/manager/super_admin):
 - /dashboard/assignments — Caseload Assignment Center: per staff × client × service-code toggles.
 - /dashboard/billing — Billing hub (admin-only, never visible to staff):
     · /dashboard/billing                 — Overview list of clients with annual vs used units.
-    · /dashboard/billing/$clientId       — Per-client billing detail: edit Client Billing Codes (annual unit authorization, rate per unit, unit type, MONTHLY MAX UNITS, service start/end / renewal date) and view live budget bars.
-    · /dashboard/billing/nectar          — NECTAR utilization alerts + Ask NECTAR report builder (data queries: shifts, hours by client/staff/code, budget status, exports to CSV).
-    · /dashboard/billing/form520         — 520 billing view/export (Utah Medicaid columns).
+    · /dashboard/billing/$clientId       — Per-client billing detail: Client Billing Codes (annual unit authorization, rate, unit type, MONTHLY MAX UNITS, renewal date) and live budget bars.
+    · /dashboard/billing/nectar          — NECTAR utilization alerts + Ask NECTAR report builder.
+    · /dashboard/billing/form520         — 520 billing view/export.
     · /dashboard/billing/imports         — Bulk-import authorizations from 520 paste.
-    · /dashboard/billing/subscription    — HIVE subscription / company billing for the agency.
 - /dashboard/settings — Settings: time & pay categories, rounding rules, org-wide preferences.
 
 STAFF AREA (employee/host_family):
-- /dashboard                 — My Caseload (assigned clients only, hours-this-period, NECTAR pay estimate).
-- /dashboard/timeclock       — General Time Clock for clocking in/out on assigned hourly codes.
-- /dashboard/daily-logs      — Daily logs and host-home daily workflow (for assigned daily codes only).
+- /dashboard                 — My Caseload.
+- /dashboard/timeclock       — General Time Clock.
+- /dashboard/daily-logs      — Daily logs and host-home daily workflow.
 - /dashboard/courses         — My Trainings.
 
-KEY WORKFLOWS:
-- Set a client's MONTHLY UNIT CAP → /dashboard/billing/<clientId> → Client Billing Codes → "Monthly max units" on the relevant service code.
-- Add a staff member → /dashboard/employees → "Add employee" (invite by email, assign role + pay rates).
-- Assign a caseload → /dashboard/assignments → expand the client row under a staff member → check each authorized service code.
-- Clock-out paperwork → staff finishes a shift on /dashboard/timeclock → NECTAR DocCoach evaluates the shift note → required follow-up forms (incident / medical / eMAR) appear automatically.
-- HHS host-home month-end paperwork → /dashboard/hhs-hub/<clientId> for that client.
-- Pull a 520 → /dashboard/billing/form520 (admin/manager only).
-- Investigate "where did my unit budget go?" → /dashboard/billing/<clientId> shows live used vs remaining per code; /dashboard/billing/nectar surfaces over/under-utilization alerts.
-
-ROLE RULES (respect when answering):
-- Staff & host-family NEVER see billing rates, dollar amounts, the 520 view, or other clients' data. Steer them to time/units-only views (their caseload, daily logs, time clock).
-- Admin/manager/super_admin see everything in the admin area above.
-- If a user asks about a screen their role can't reach, gently say so and point to the closest screen they can use.
-
-DATA QUESTIONS vs HELP QUESTIONS:
-- Help questions ("where do I…", "how do I…", "how does X work") — answer with steps and a deep link.
-- Data questions ("show me John's shifts last month", "total DSI hours per client") — set isDataRequest=true and suggest the user open Ask NECTAR on /dashboard/billing/nectar (admin/manager only).`;
+ROLE RULES: Staff & host-family NEVER see billing rates, dollar amounts, the 520 view, or other clients' data.`;
 
 async function callAI(system: string, user: string): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
@@ -93,28 +76,23 @@ export const askNectarHelp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data }): Promise<NectarHelpReply> => {
-    const system = `You are NECTAR, HIVE's friendly in-app product guide for caregiving agencies.
+    const system = `You are NECTAR, HIVE's friendly in-app product guide.
 
-PERSONALITY: warm, encouraging, plain-language, patient. Never condescending or punitive — never imply the user "should already know" something. Short, friendly answers with one clear next step. Use the user's words back to them. Avoid jargon; when you must use a term (e.g. "unit", "520"), explain it briefly. 1–4 short sentences max for the answer.
+PERSONALITY: warm, encouraging, plain-language, patient. Never condescending. Short, friendly answers with one clear next step. 1–4 short sentences.
 
-GROUNDING: Only describe screens, paths, and features that exist in the navigation map below. If you don't know where something lives, say so honestly and offer the closest related screen. Never invent menu items, buttons, or settings.
+GROUNDING: Only describe screens in the navigation map below. If unsure, say so honestly and offer the closest related screen.
 
-ROLE-AWARENESS: The current user's role is "${data.role}". Tailor the guidance to what that role can actually see and do.
+ROLE-AWARENESS: Current user role: "${data.role}".
 
 ${HIVE_NAV_GUIDE}
 
-OUTPUT FORMAT — return STRICT JSON only, no markdown, no code fences:
+OUTPUT FORMAT — return STRICT JSON only:
 {
-  "answer": "<warm, plain-language answer, 1–4 short sentences. If you give a path, format it like Billing → Client → Billing Codes.>",
+  "answer": "<warm, 1–4 sentences>",
   "deepLink": { "path": "/dashboard/...", "label": "Take me to <screen>" } | null,
   "isDataRequest": true | false,
-  "followUps": ["<short follow-up question>", "<another>"]
-}
-
-Rules:
-- Set deepLink to the most relevant path from the navigation map when one applies. Use $clientId literally if a specific client is required — the UI will prompt the admin to pick one.
-- Set isDataRequest to true only when the user is asking for actual records/totals (e.g. "show me John's shifts"). In that case, route them to /dashboard/billing/nectar (Ask NECTAR report builder) instead of inventing a screen.
-- followUps: 2 short, useful next questions a real admin might ask. Keep each under 60 chars.`;
+  "followUps": ["<short follow-up>", "<another>"]
+}`;
 
     const raw = await callAI(system, data.question);
     let parsed: Partial<NectarHelpReply> = {};
@@ -142,4 +120,77 @@ Rules:
       isDataRequest: !!parsed.isDataRequest,
       followUps,
     };
+  });
+
+// ─── Escalation to HIVE team ───────────────────────────────────────────────
+
+interface EscalateInput {
+  question: string;
+  context: string;
+}
+
+function validateEscalate(input: unknown): EscalateInput {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const question = typeof i.question === "string" ? i.question.trim() : "";
+  const context = typeof i.context === "string" ? i.context.trim() : "";
+  if (question.length < 2 || question.length > 2000) {
+    throw new Error("Question must be 2–2000 characters.");
+  }
+  return { question, context: context.slice(0, 8000) };
+}
+
+export const escalateHelpToHive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validateEscalate)
+  .handler(async ({ data, context }): Promise<{ ticketId: string; status: string }> => {
+    const { supabase, userId } = context;
+
+    const { data: memberships } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .limit(1);
+    const orgId = memberships?.[0]?.organization_id;
+    if (!orgId) throw new Error("No active organization membership.");
+
+    const subject = data.question.length > 120 ? data.question.slice(0, 117) + "…" : data.question;
+
+    const { data: inserted, error } = await supabase
+      .from("org_support_tickets")
+      .insert({
+        organization_id: orgId,
+        opened_by: userId,
+        source: "nectar_help",
+        subject,
+        body: data.context ? `${data.question}\n\n— Recent NECTAR context —\n${data.context}` : data.question,
+        status: "submitted",
+        severity: "normal",
+      })
+      .select("id, status")
+      .single();
+    if (error) throw error;
+
+    return { ticketId: inserted.id, status: inserted.status };
+  });
+
+interface TicketStatusInput { ticketId: string }
+function validateStatusInput(input: unknown): TicketStatusInput {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const ticketId = typeof i.ticketId === "string" ? i.ticketId : "";
+  if (!/^[0-9a-f-]{36}$/i.test(ticketId)) throw new Error("Invalid ticket id.");
+  return { ticketId };
+}
+
+export const getHelpTicketStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validateStatusInput)
+  .handler(async ({ data, context }): Promise<{ status: string; updated_at: string } | null> => {
+    const { supabase } = context;
+    const { data: t } = await supabase
+      .from("org_support_tickets")
+      .select("status, updated_at")
+      .eq("id", data.ticketId)
+      .maybeSingle();
+    return t ?? null;
   });

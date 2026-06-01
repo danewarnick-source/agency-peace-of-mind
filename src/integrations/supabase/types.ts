@@ -1718,6 +1718,60 @@ export type Database = {
         }
         Relationships: []
       }
+      hive_executive_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          id: string
+          summary: string | null
+          target_org_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          id?: string
+          summary?: string | null
+          target_org_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          id?: string
+          summary?: string | null
+          target_org_id?: string | null
+        }
+        Relationships: []
+      }
+      hive_executives: {
+        Row: {
+          active: boolean
+          granted_at: string
+          granted_by: string | null
+          id: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       incident_reports: {
         Row: {
           additional_client_ids: string[] | null
@@ -2097,6 +2151,144 @@ export type Database = {
           },
         ]
       }
+      nectar_report_runs: {
+        Row: {
+          csv_url: string | null
+          error: string | null
+          id: string
+          ran_at: string
+          row_count: number | null
+          saved_report_id: string
+        }
+        Insert: {
+          csv_url?: string | null
+          error?: string | null
+          id?: string
+          ran_at?: string
+          row_count?: number | null
+          saved_report_id: string
+        }
+        Update: {
+          csv_url?: string | null
+          error?: string | null
+          id?: string
+          ran_at?: string
+          row_count?: number | null
+          saved_report_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_report_runs_saved_report_id_fkey"
+            columns: ["saved_report_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_saved_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nectar_report_schedules: {
+        Row: {
+          active: boolean
+          cadence: Database["public"]["Enums"]["report_cadence"]
+          created_at: string
+          day_of_month: number | null
+          day_of_week: number | null
+          deliver_email: boolean
+          deliver_save: boolean
+          hour: number
+          id: string
+          last_run_at: string | null
+          next_run_at: string | null
+          recipients: string[]
+          saved_report_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          cadence: Database["public"]["Enums"]["report_cadence"]
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          deliver_email?: boolean
+          deliver_save?: boolean
+          hour?: number
+          id?: string
+          last_run_at?: string | null
+          next_run_at?: string | null
+          recipients?: string[]
+          saved_report_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          cadence?: Database["public"]["Enums"]["report_cadence"]
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          deliver_email?: boolean
+          deliver_save?: boolean
+          hour?: number
+          id?: string
+          last_run_at?: string | null
+          next_run_at?: string | null
+          recipients?: string[]
+          saved_report_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_report_schedules_saved_report_id_fkey"
+            columns: ["saved_report_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_saved_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nectar_saved_reports: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+          owner_user_id: string
+          pinned: boolean
+          plan: Json | null
+          prompt: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+          owner_user_id: string
+          pinned?: boolean
+          plan?: Json | null
+          prompt: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          owner_user_id?: string
+          pinned?: boolean
+          plan?: Json | null
+          prompt?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_saved_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string
@@ -2144,6 +2336,115 @@ export type Database = {
           urgency?: string
         }
         Relationships: []
+      }
+      org_subscriptions: {
+        Row: {
+          canceled_at: string | null
+          created_at: string
+          id: string
+          mrr_cents: number
+          notes: string | null
+          organization_id: string
+          plan: Database["public"]["Enums"]["sub_plan"]
+          renewal_date: string | null
+          started_at: string
+          status: Database["public"]["Enums"]["sub_status"]
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          canceled_at?: string | null
+          created_at?: string
+          id?: string
+          mrr_cents?: number
+          notes?: string | null
+          organization_id: string
+          plan?: Database["public"]["Enums"]["sub_plan"]
+          renewal_date?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["sub_status"]
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          canceled_at?: string | null
+          created_at?: string
+          id?: string
+          mrr_cents?: number
+          notes?: string | null
+          organization_id?: string
+          plan?: Database["public"]["Enums"]["sub_plan"]
+          renewal_date?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["sub_status"]
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_support_tickets: {
+        Row: {
+          assignee_user_id: string | null
+          body: string | null
+          conversation: Json
+          created_at: string
+          id: string
+          opened_by: string
+          organization_id: string
+          resolved_at: string | null
+          severity: Database["public"]["Enums"]["ticket_severity"]
+          source: string
+          status: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_user_id?: string | null
+          body?: string | null
+          conversation?: Json
+          created_at?: string
+          id?: string
+          opened_by: string
+          organization_id: string
+          resolved_at?: string | null
+          severity?: Database["public"]["Enums"]["ticket_severity"]
+          source?: string
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_user_id?: string | null
+          body?: string | null
+          conversation?: Json
+          created_at?: string
+          id?: string
+          opened_by?: string
+          organization_id?: string
+          resolved_at?: string | null
+          severity?: Database["public"]["Enums"]["ticket_severity"]
+          source?: string
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_support_tickets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_members: {
         Row: {
@@ -3486,6 +3787,7 @@ export type Database = {
           similarity: number
         }[]
       }
+      is_hive_executive: { Args: { _user: string }; Returns: boolean }
       is_org_admin_or_manager: {
         Args: { _org: string; _user: string }
         Returns: boolean
@@ -3545,6 +3847,16 @@ export type Database = {
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
       invitation_status: "pending" | "accepted" | "revoked"
+      report_cadence: "weekly" | "monthly"
+      sub_plan: "starter" | "pro" | "enterprise" | "custom"
+      sub_status: "trial" | "active" | "past_due" | "canceled" | "paused"
+      ticket_severity: "low" | "normal" | "high" | "urgent"
+      ticket_status:
+        | "submitted"
+        | "in_progress"
+        | "waiting_customer"
+        | "resolved"
+        | "closed"
       track_type:
         | "onboarding_30"
         | "certification_90"
@@ -3683,6 +3995,17 @@ export const Constants = {
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
       invitation_status: ["pending", "accepted", "revoked"],
+      report_cadence: ["weekly", "monthly"],
+      sub_plan: ["starter", "pro", "enterprise", "custom"],
+      sub_status: ["trial", "active", "past_due", "canceled", "paused"],
+      ticket_severity: ["low", "normal", "high", "urgent"],
+      ticket_status: [
+        "submitted",
+        "in_progress",
+        "waiting_customer",
+        "resolved",
+        "closed",
+      ],
       track_type: [
         "onboarding_30",
         "certification_90",

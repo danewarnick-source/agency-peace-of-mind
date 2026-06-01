@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { User, Search, Clock, Home, Info } from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period-card";
+import { ClientCapBars } from "@/components/staff-mobile/client-cap-bars";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
@@ -175,6 +176,9 @@ function ClientCard({
           })}
         </div>
       </div>
+
+      <ClientCapBars clientId={c.id} codes={codes} />
+
 
       <div className="mt-4">
         <Button

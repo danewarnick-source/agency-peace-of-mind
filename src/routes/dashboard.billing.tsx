@@ -37,8 +37,10 @@ function BillingLayout() {
           </p>
         </div>
       </header>
+      <NectarBillingReadinessBar />
 
       <nav className="flex flex-wrap gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
+
         {TABS.map((t) => {
           const active = t.exact ? pathname === t.to : pathname.startsWith(t.to);
           const Icon = t.icon;

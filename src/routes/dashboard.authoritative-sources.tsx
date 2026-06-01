@@ -623,11 +623,13 @@ function SourceRow({
             size="sm"
             variant="outline"
             onClick={() => generate.mutate()}
-            disabled={generate.isPending || source.parse_status !== "parsed"}
+            disabled={generate.isPending || source.parse_status !== "parsed" || !canDraft}
             title={
-              source.parse_status === "parsed"
-                ? "Use NECTAR to draft checklist items from clauses found in this document"
-                : "Parsing must finish before requirements can be drafted"
+              !canDraft
+                ? "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to draft from authoritative sources."
+                : source.parse_status === "parsed"
+                  ? "Use NECTAR to draft checklist items from clauses found in this document"
+                  : "Parsing must finish before requirements can be drafted"
             }
             className={
               generate.isPending
@@ -642,6 +644,7 @@ function SourceRow({
             )}
             {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Draft requirements"}
           </Button>
+
           {generate.isPending && (
             <div
               className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--amber-100,#fef3c7)] sm:w-44"

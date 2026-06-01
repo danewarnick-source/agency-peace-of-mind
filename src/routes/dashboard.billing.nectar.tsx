@@ -258,7 +258,38 @@ function ReportBuilder() {
           {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           Run
         </button>
+        <button
+          type="button"
+          onClick={() => { setSaveName(prompt.slice(0, 60)); setSaveOpen(true); }}
+          disabled={prompt.trim().length < 3}
+          className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" /> Save
+        </button>
       </div>
+
+      {saveOpen && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-3">
+          <input
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            placeholder="Name this report (e.g. Weekly DSI hours)"
+            className="flex-1 min-w-[200px] rounded-md border border-border bg-background px-2 py-1 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => saveName.trim() && saveM.mutate(saveName.trim())}
+            disabled={saveM.isPending || saveName.trim().length === 0}
+            className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {saveM.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            Save &amp; pin
+          </button>
+          <button type="button" onClick={() => setSaveOpen(false)} className="inline-flex items-center rounded-md border border-border p-1 text-xs">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {history.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">

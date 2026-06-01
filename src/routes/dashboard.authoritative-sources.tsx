@@ -1325,9 +1325,14 @@ function RequirementRow({
           </>
         )}
       </div>
+      </div>
+      {!isRemoved && (
+        <ApplicabilityPanel orgId={orgId} requirementId={req.id} />
+      )}
     </li>
   );
 }
+
 
 
 

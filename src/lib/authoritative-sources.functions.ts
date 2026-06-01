@@ -475,7 +475,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
       .select(
-        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, parse_status, file_name, mime_type",
+        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, parse_status, file_name, mime_type, source, external_ids",
       )
       .eq("id", data.documentId)
       .single();

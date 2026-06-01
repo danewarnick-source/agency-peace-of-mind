@@ -30,7 +30,6 @@ import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timec
 import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
-import { Route as DashboardStaffMobilePreviewRouteImport } from './routes/dashboard.staff-mobile-preview'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardSchedulingRouteImport } from './routes/dashboard.scheduling'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
@@ -172,12 +171,6 @@ const DashboardSuperAdminRoute = DashboardSuperAdminRouteImport.update({
   path: '/super-admin',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardStaffMobilePreviewRoute =
-  DashboardStaffMobilePreviewRouteImport.update({
-    id: '/staff-mobile-preview',
-    path: '/staff-mobile-preview',
-    getParentRoute: () => DashboardRoute,
-  } as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -400,7 +393,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/staff-mobile-preview': typeof DashboardStaffMobilePreviewRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -458,7 +450,6 @@ export interface FileRoutesByTo {
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/staff-mobile-preview': typeof DashboardStaffMobilePreviewRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -518,7 +509,6 @@ export interface FileRoutesById {
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/staff-mobile-preview': typeof DashboardStaffMobilePreviewRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -579,7 +569,6 @@ export interface FileRouteTypes {
     | '/dashboard/roles'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
-    | '/dashboard/staff-mobile-preview'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -637,7 +626,6 @@ export interface FileRouteTypes {
     | '/dashboard/roles'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
-    | '/dashboard/staff-mobile-preview'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -696,7 +684,6 @@ export interface FileRouteTypes {
     | '/dashboard/roles'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
-    | '/dashboard/staff-mobile-preview'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -886,13 +873,6 @@ declare module '@tanstack/react-router' {
       path: '/super-admin'
       fullPath: '/dashboard/super-admin'
       preLoaderRoute: typeof DashboardSuperAdminRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/staff-mobile-preview': {
-      id: '/dashboard/staff-mobile-preview'
-      path: '/staff-mobile-preview'
-      fullPath: '/dashboard/staff-mobile-preview'
-      preLoaderRoute: typeof DashboardStaffMobilePreviewRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/settings': {
@@ -1213,7 +1193,6 @@ interface DashboardRouteChildren {
   DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardSchedulingRoute: typeof DashboardSchedulingRoute
   DashboardSettingsRoute: typeof DashboardSettingsRouteWithChildren
-  DashboardStaffMobilePreviewRoute: typeof DashboardStaffMobilePreviewRoute
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
   DashboardTeamsRoute: typeof DashboardTeamsRoute
@@ -1252,7 +1231,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardRolesRoute: DashboardRolesRoute,
   DashboardSchedulingRoute: DashboardSchedulingRoute,
   DashboardSettingsRoute: DashboardSettingsRouteWithChildren,
-  DashboardStaffMobilePreviewRoute: DashboardStaffMobilePreviewRoute,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
   DashboardTeamsRoute: DashboardTeamsRoute,

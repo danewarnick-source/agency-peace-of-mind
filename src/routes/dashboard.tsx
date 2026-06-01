@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, Smartphone,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
@@ -41,7 +41,6 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
-  { to: "/dashboard/staff-mobile-preview", label: "Staff Mobile Preview", icon: Smartphone },
 ];
 
 function DashboardLayout() {
@@ -74,9 +73,7 @@ function DashboardLayout() {
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
-  const forceStaffPreview =
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("staffPreview") === "1";
-  const effectiveView = forceStaffPreview ? "staff" : (isAdminCapable ? view : "staff");
+  const effectiveView = isAdminCapable ? view : "staff";
   const nav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
   const signOut = async () => {
     await supabase.auth.signOut();

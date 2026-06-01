@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -26,7 +26,8 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
 });
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+import type { Permission } from "@/lib/rbac";
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm?: Permission };
 
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
@@ -44,6 +45,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
+  { to: "/dashboard/billing", label: "Billing", icon: Receipt, perm: "view_billing" },
   { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
@@ -82,7 +84,8 @@ function DashboardLayout() {
   const rawView = isAdminCapable ? view : "staff";
   const isMobilePreview = rawView === "staff_mobile";
   const effectiveView: "staff" | "admin" = rawView === "admin" ? "admin" : "staff";
-  const nav: NavItem[] = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
+  const baseNav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
+  const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");
   const showExecSection = isExecutive && effectiveView === "admin";
   const execNav: NavItem[] = [
     { to: "/dashboard/hive-exec", label: "Companies", icon: Building2, exact: true },

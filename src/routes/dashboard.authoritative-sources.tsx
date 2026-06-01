@@ -1654,7 +1654,34 @@ function RequirementRow({
               Removed — not tracked for audit
             </Badge>
           )}
-
+          {classification === "external" ? (
+            <Badge
+              variant="outline"
+              className="text-[10px] border-sky-500/40 text-sky-700 dark:text-sky-300"
+              title={`External action${externalSystem ? ` — happens in ${externalSystem}` : ""}. HIVE tracks your attestation; the action itself happens outside HIVE.`}
+            >
+              <ExternalLinkIcon className="mr-1 h-3 w-3" />
+              External{externalSystem ? ` · ${externalSystem}` : ""}
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="text-[10px] border-slate-500/30 text-muted-foreground"
+              title="HIVE produces and holds evidence for this requirement internally."
+            >
+              <Building className="mr-1 h-3 w-3" />
+              Internal
+            </Badge>
+          )}
+          {renewalDueAt && (
+            <Badge
+              variant="outline"
+              className="text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-300"
+              title={`Next renewal: ${new Date(renewalDueAt).toLocaleDateString()}`}
+            >
+              Renewal {new Date(renewalDueAt).toLocaleDateString()}
+            </Badge>
+          )}
 
         </div>
         {req.description && (

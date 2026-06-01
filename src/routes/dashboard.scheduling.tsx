@@ -39,10 +39,15 @@ import {
   Clock,
   MapPin,
   RefreshCw,
+  Sparkles,
+  ShieldCheck,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { evvServiceLabel } from "@/lib/evv-codes";
 import { AlertTriangle, Lock } from "lucide-react";
+import { NectarGuidanceStrip } from "@/components/nectar/nectar-guidance-strip";
+import { NectarAutoAssignDialog } from "@/components/nectar/nectar-auto-assign-dialog";
 
 export const Route = createFileRoute("/dashboard/scheduling")({
   head: () => ({ meta: [{ title: "Scheduling" }] }),

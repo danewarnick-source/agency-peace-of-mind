@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Hexagon, Send, Loader2, ArrowRight, BarChart3, Sparkles, RotateCcw, LifeBuoy, CheckCircle2 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { askNectarHelp, escalateHelpToHive, getHelpTicketStatus, type NectarHelpReply } from "@/lib/nectar-help.functions";
+import { NectarBadge, NectarMark, NectarButton } from "@/components/nectar/nectar-brand";
 
 export const Route = createFileRoute("/dashboard/help")({
   head: () => ({ meta: [{ title: "Need help? — NECTAR" }] }),

@@ -30,7 +30,7 @@ const FireInput = z.object({
   eventKey: z.string().min(1).max(120),
   scopeUserId: z.string().uuid().nullable().optional(),
   tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  payload: z.record(z.string(), z.unknown()).optional(),
+  payload: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
 });
 
 /** Idempotent insert; returns whether the celebration actually fired. */
@@ -124,7 +124,7 @@ export const listActiveCelebrations = createServerFn({ method: "POST" })
       })
       .map((e: {
         id: string; organization_id: string; event_key: string;
-        scope_user_id: string | null; tier: CelebrationTier; payload: Record<string, unknown>;
+        scope_user_id: string | null; tier: CelebrationTier; payload: CelebrationPayload | null;
         created_at: string;
       }) => ({
         id: e.id,
@@ -132,7 +132,7 @@ export const listActiveCelebrations = createServerFn({ method: "POST" })
         eventKey: e.event_key,
         tier: e.tier,
         scopeUserId: e.scope_user_id,
-        payload: e.payload ?? {},
+        payload: (e.payload ?? {}) as CelebrationPayload,
         createdAt: e.created_at,
       }));
 

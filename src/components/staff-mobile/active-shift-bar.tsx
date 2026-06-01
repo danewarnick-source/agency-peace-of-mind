@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useActiveShift } from "@/hooks/use-active-shift";
+import { useGeneralShift } from "@/hooks/use-general-shift";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
@@ -12,38 +13,50 @@ function fmtElapsed(ms: number) {
 }
 
 /**
- * Persistent "clocked-in" status bar. Renders only while an EVV shift is
- * active. Anchored above the bottom tab bar via its parent shell (no fixed
- * positioning here), so page content scrolls above it naturally.
+ * Persistent "clocked-in" status bar. Surfaces either an EVV client shift
+ * (from `evv_timesheets`) or a non-client general work shift (localStorage).
+ * Rendered just above the bottom tab bar via the staff mobile shell or the
+ * desktop preview frame.
  */
 export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
   const { data: active } = useActiveShift();
+  const { shift: general } = useGeneralShift();
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now());
 
+  const isClient = !!active;
+  const isGeneral = !active && !!general;
+  const showing = isClient || isGeneral;
+
   useEffect(() => {
-    if (!active) return;
+    if (!showing) return;
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
-  }, [active]);
+  }, [showing]);
 
-  if (!active) return null;
+  if (!showing) return null;
 
-  const elapsed = fmtElapsed(now - new Date(active.clock_in_timestamp).getTime());
+  const startIso = isClient ? active!.clock_in_timestamp : general!.start_iso;
+  const elapsed = fmtElapsed(now - new Date(startIso).getTime());
+  const title = isClient ? `Clocked in · ${active!.client_name}` : `Clocked in · ${general!.category}`;
+  const subtitle = isClient
+    ? `${active!.evv_live ? "EVV live" : "EVV pending"} · ${active!.service_type_code}`
+    : "Non-client work · no EVV";
 
-  const openTimeClock = () =>
-    navigate({
-      to: "/dashboard/workspace/$clientId",
-      params: { clientId: active.client_id },
-    });
-
-  const handleClockOut = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (window.confirm(`End shift for ${active.client_name}?`)) {
-      // The real clock-out flow (GPS + narrative + compliance) lives on the
-      // Time Clock screen. Route the user there to complete the punch-out.
-      openTimeClock();
+  const open = () => {
+    if (isClient) {
+      navigate({
+        to: "/dashboard/workspace/$clientId",
+        params: { clientId: active!.client_id },
+      });
+    } else {
+      navigate({ to: "/dashboard/timeclock" });
     }
+  };
+
+  const onClockOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    open();
   };
 
   const positioning = framed
@@ -67,22 +80,17 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
     >
       <button
         type="button"
-        onClick={openTimeClock}
+        onClick={open}
         className="flex w-full items-center gap-3 px-3 py-2 text-left active:bg-[#0f6b48]"
       >
-        {/* Pulsing live dot */}
         <span className="relative inline-flex h-2.5 w-2.5 shrink-0">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#15a06a] opacity-75" />
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#15a06a] ring-2 ring-white/70" />
         </span>
 
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-[13px] font-semibold">
-            Clocked in · {active.client_name}
-          </p>
-          <p className="truncate text-[11px] text-white/80">
-            {active.evv_live ? "EVV live" : "EVV pending"} · {active.service_type_code}
-          </p>
+          <p className="truncate text-[13px] font-semibold">{title}</p>
+          <p className="truncate text-[11px] text-white/80">{subtitle}</p>
         </div>
 
         <span className="shrink-0 font-mono text-base font-semibold tabular-nums">
@@ -92,15 +100,15 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
         <span
           role="button"
           tabIndex={0}
-          onClick={handleClockOut}
+          onClick={onClockOut}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              handleClockOut(e as unknown as React.MouseEvent);
+              onClockOut(e as unknown as React.MouseEvent);
             }
           }}
           className="ml-1 inline-flex min-h-[36px] shrink-0 cursor-pointer items-center rounded-md bg-white/15 px-3 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-          aria-label={`Clock out of shift for ${active.client_name}`}
+          aria-label="Clock out of current shift"
         >
           Clock out
         </span>

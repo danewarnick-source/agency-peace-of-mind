@@ -42,12 +42,27 @@ export const Route = createFileRoute("/dashboard/workspace/$clientId")({
 function ClientWorkspace() {
   const { clientId } = Route.useParams();
   const { data: caseload, isLoading } = useCaseload();
+  const { data: assignments } = useMyAssignments();
   const navigate = useNavigate();
   const { tab: tabParam, code: presetCode } = Route.useSearch();
 
   const client = useMemo(() => {
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;
   }, [caseload, clientId]);
+
+  const clientCodes = useMemo(
+    () => (client && Array.isArray(client.job_code) ? client.job_code : []),
+    [client],
+  );
+  const allowedCodes = useMemo(
+    () => (client ? allowedCodesFor(assignments, client.id, clientCodes) : []),
+    [client, assignments, clientCodes],
+  );
+  // EVV workspace is the hourly surface — needs at least one hourly assigned code.
+  const allowedHourly = useMemo(
+    () => allowedCodes.filter(isHourlyServiceCode),
+    [allowedCodes],
+  );
 
   useEffect(() => {
     if (!isLoading && caseload && !client) {
@@ -56,12 +71,19 @@ function ClientWorkspace() {
     }
   }, [isLoading, caseload, client, navigate]);
 
+  useEffect(() => {
+    if (!isLoading && client && assignments && !allowedHourly.length) {
+      toast.error("You are not assigned to any hourly services for this individual.");
+      navigate({ to: "/dashboard" });
+    }
+  }, [isLoading, client, assignments, allowedHourly.length, navigate]);
+
   if (isLoading || !client) {
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   }
 
 
-  const codes = Array.isArray(client.job_code) ? client.job_code : [];
+  const codes = allowedHourly.length ? allowedHourly : clientCodes;
 
   return (
     <>

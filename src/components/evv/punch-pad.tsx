@@ -1664,8 +1664,8 @@ export function PunchPad({
 
                 {/* NECTAR Completeness Check */}
                 <NectarInfusionLock
-                  feature="Pre-submit completeness check"
-                  pitch="NECTAR cross-checks your shift before submit — purchases mentioned vs spending log, approved reimbursements vs receipts, EVV consistency — so issues get fixed before they become audit flags."
+                  featureName="Pre-submit completeness check"
+                  benefit="NECTAR cross-checks your shift before submit — purchases mentioned vs spending log, approved reimbursements vs receipts, EVV consistency — so issues get fixed before they become audit flags."
                 >
                   <div className="rounded-lg border-2 border-[color:var(--amber-400)]/50 bg-white/60 px-3 py-3 shadow-sm backdrop-blur sm:px-4">
                     <div className="mb-2 flex items-center justify-between gap-2">

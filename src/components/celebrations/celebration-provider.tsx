@@ -57,7 +57,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: true,
   });
 
-  const celebrations = useMemo(() => data?.celebrations ?? [], [data]);
+  const celebrations: ActiveCelebration[] = useMemo(() => data?.celebrations ?? [], [data]);
 
   const markShownPersistent = (id: string) => {
     setShownIds((cur) => {
@@ -108,19 +108,16 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (activeModal) return;
     const next = celebrations.find(
-      (c) => c.tier === 3 && !dismissed.has(c.id) && !shownIds.has(c.id),
+      (c: ActiveCelebration) => c.tier === 3 && !dismissed.has(c.id) && !shownIds.has(c.id),
     );
     if (next) setActiveModal(next);
   }, [celebrations, activeModal, dismissed, shownIds]);
 
-  // Tier 2 banners are exposed via context — but to keep wiring simple we expose a
-  // window-level event consumers can listen to. Anywhere in the dashboard can render
-  // <CelebrationBannerStack /> below to surface them.
   return (
     <>
       {children}
       <CelebrationBannerPortal
-        items={celebrations.filter((c) => c.tier === 2 && !dismissed.has(c.id))}
+        items={celebrations.filter((c: ActiveCelebration) => c.tier === 2 && !dismissed.has(c.id))}
         onDismiss={handleAck}
       />
       {activeModal && (

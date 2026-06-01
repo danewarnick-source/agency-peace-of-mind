@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_reimbursement_requests: {
+        Row: {
+          activity_description: string
+          client_id: string | null
+          created_at: string
+          estimated_cost: number
+          event_summary: string | null
+          id: string
+          organization_id: string
+          reason: string
+          receipt_paths: string[]
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shift_id: string
+          staff_id: string
+          status: string
+          summary_submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          activity_description: string
+          client_id?: string | null
+          created_at?: string
+          estimated_cost: number
+          event_summary?: string | null
+          id?: string
+          organization_id: string
+          reason: string
+          receipt_paths?: string[]
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shift_id: string
+          staff_id: string
+          status?: string
+          summary_submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activity_description?: string
+          client_id?: string | null
+          created_at?: string
+          estimated_cost?: number
+          event_summary?: string | null
+          id?: string
+          organization_id?: string
+          reason?: string
+          receipt_paths?: string[]
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shift_id?: string
+          staff_id?: string
+          status?: string
+          summary_submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_reimbursement_requests_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "evv_timesheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agency_bank_accounts: {
         Row: {
           account_type: string

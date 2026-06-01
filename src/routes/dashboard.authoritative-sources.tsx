@@ -17,6 +17,7 @@ import {
   Globe,
   Info,
   Upload,
+  ChevronDown,
 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";

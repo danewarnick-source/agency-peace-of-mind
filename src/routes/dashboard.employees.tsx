@@ -69,6 +69,7 @@ function EmployeesPage() {
   const [tempPassword, setTempPassword] = useState(() => genPassword());
   const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
   const [editingMember, setEditingMember] = useState<EditableMember | null>(null);
+  const [editDirty, setEditDirty] = useState(false);
   const [caseloadFor, setCaseloadFor] = useState<{ id: string; name: string; role: string } | null>(null);
 
   const createManual = useServerFn(createEmployeeManually);

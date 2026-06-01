@@ -17,6 +17,7 @@ import {
   Globe,
   Info,
   Upload,
+  ChevronDown,
 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AttestationBanner } from "@/components/nectar/attestation-banner";
+
 import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
 import { ingestDocument } from "@/lib/nectar-documents.functions";
@@ -107,6 +108,50 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(bin);
 }
 
+function HowThisWorks() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+      >
+        <Info className="h-3.5 w-3.5" />
+        How this works
+        <ChevronDown
+          className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="mt-2 max-w-3xl rounded-xl border border-border/60 bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+          <p className="mb-2">
+            <strong className="text-foreground">Routing rule:</strong> if a
+            document is about one named person, it's a Company Doc; if it's a
+            state/contract authority that governs many, it's an Authoritative
+            Source.
+          </p>
+          <p className="mb-2">
+            <strong className="text-foreground">PCSPs &amp; 1056 budgets:</strong>{" "}
+            These always route to Company Docs — NECTAR extracts the billing data
+            (codes, rates, max units, plan dates) from a PCSP into the billing
+            layer for that client, while the file itself stays with the client's
+            records.
+          </p>
+          <p>
+            <strong className="text-foreground">Unverified flag:</strong> Items
+            without a traced source are flagged{" "}
+            <span className="font-medium text-amber-700 dark:text-amber-300">
+              Unverified
+            </span>{" "}
+            so authority is never implied.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AuthoritativeSourcesPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
@@ -121,44 +166,34 @@ function AuthoritativeSourcesPage() {
 
   const content = (
     <div className="space-y-6">
-      <header className="flex flex-col gap-2">
+      <header className="flex flex-col gap-3">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <ShieldCheck className="h-4 w-4" />
           Foundation · Authoritative Sources
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Your contracts &amp; State SOW power everything NECTAR shows
-        </h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          External authority documents only — SOW, contracts, DSPD/DHS requirement
-          documents, and public-record requirements. NECTAR reads from these as the
-          source of truth; every checklist item, audit requirement, and obligation
-          HIVE surfaces traces back to a clause you uploaded. Items without a traced
-          source are flagged{" "}
-          <span className="font-medium text-amber-700 dark:text-amber-300">
-            Unverified
-          </span>{" "}
-          so authority is never implied. The rule: if a document is about one
-          named person, it's a Company Doc; if it's a state/contract authority
-          that governs many, it's an Authoritative Source. PCSPs and 1056
-          budgets always route to{" "}
-          <span className="font-medium">Company Docs</span> — NECTAR extracts
-          the billing data (codes, rates, max units, plan dates) from a PCSP
-          into the billing layer for that client, while the file itself stays
-          with the client's records.
-        </p>
-        <p className="rounded-lg border border-dashed border-[color:var(--amber-400,#f4a93a)]/60 bg-[color:var(--amber-50,#fffbeb)]/60 px-3 py-2 text-xs text-[color:var(--amber-800,#92400e)]">
-          Tip — drop a PDF, scan, Word, or spreadsheet anywhere on this page and
-          NECTAR will propose a label before saving it into the source-of-truth set.
-        </p>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Your contracts &amp; State SOW power everything NECTAR shows
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            State SOW, contracts, and DSPD/DHS requirements — the source of
+            truth NECTAR reads from. Every requirement traces back to a clause
+            you uploaded.
+          </p>
+        </div>
+
+        <HowThisWorks />
       </header>
 
       {orgId && (
-        <AttestationBanner
-          organizationId={orgId}
-          scope="generic"
-          mode="nudge"
-        />
+        <div className="flex items-center gap-2 rounded-lg border border-amber-300/40 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-200">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1">
+            Review recommended before relying on or submitting. HIVE/NECTAR
+            organizes what you upload but does not independently verify accuracy
+            or guarantee compliance.
+          </span>
+        </div>
       )}
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
@@ -960,13 +995,6 @@ function RequirementsPanel({
         </div>
       )}
 
-      <AttestationBanner
-        organizationId={orgId}
-        scope="generic"
-        mode="nudge"
-        compact
-        statement="Items below are organized by NECTAR from documents you uploaded. Confirm, remove, and re-open actions are logged to the immutable attestation log — together they form your defensible 'we reviewed our requirements' record."
-      />
 
       {isLoading && (
         <p className="text-sm text-muted-foreground">

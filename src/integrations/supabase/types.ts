@@ -140,6 +140,7 @@ export type Database = {
       }
       audit_files: {
         Row: {
+          audit_packet_id: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -153,6 +154,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          audit_packet_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -166,6 +168,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          audit_packet_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -176,6 +179,133 @@ export type Database = {
           reviewed_by?: string | null
           sent_to_audit_at?: string | null
           status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_files_audit_packet_id_fkey"
+            columns: ["audit_packet_id"]
+            isOneToOne: false
+            referencedRelation: "audit_packets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_packet_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          evidence_count: number
+          evidence_refs: Json
+          id: string
+          notes: string | null
+          organization_id: string
+          packet_id: string
+          position: number
+          required: boolean
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_hint: string | null
+          status: string
+          sub_folder: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          evidence_count?: number
+          evidence_refs?: Json
+          id?: string
+          notes?: string | null
+          organization_id: string
+          packet_id: string
+          position?: number
+          required?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_hint?: string | null
+          status?: string
+          sub_folder: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          evidence_count?: number
+          evidence_refs?: Json
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          packet_id?: string
+          position?: number
+          required?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_hint?: string | null
+          status?: string
+          sub_folder?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_packet_items_packet_id_fkey"
+            columns: ["packet_id"]
+            isOneToOne: false
+            referencedRelation: "audit_packets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_packets: {
+        Row: {
+          audit_letter_path: string | null
+          audit_letter_text: string | null
+          created_at: string
+          created_by: string | null
+          expectations_summary: string | null
+          fiscal_year: string
+          id: string
+          name: string
+          organization_id: string
+          provider_name: string
+          status: string
+          timeline_end: string | null
+          timeline_start: string | null
+          updated_at: string
+        }
+        Insert: {
+          audit_letter_path?: string | null
+          audit_letter_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          expectations_summary?: string | null
+          fiscal_year: string
+          id?: string
+          name: string
+          organization_id: string
+          provider_name: string
+          status?: string
+          timeline_end?: string | null
+          timeline_start?: string | null
+          updated_at?: string
+        }
+        Update: {
+          audit_letter_path?: string | null
+          audit_letter_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          expectations_summary?: string | null
+          fiscal_year?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          provider_name?: string
+          status?: string
+          timeline_end?: string | null
+          timeline_start?: string | null
           updated_at?: string
         }
         Relationships: []

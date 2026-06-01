@@ -4277,6 +4277,68 @@ export type Database = {
           },
         ]
       }
+      shift_completeness_flags: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          dismissal_reason: string | null
+          fix_route: string | null
+          flag_type: string
+          id: string
+          message: string
+          organization_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          shift_id: string
+          staff_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          dismissal_reason?: string | null
+          fix_route?: string | null
+          flag_type: string
+          id?: string
+          message: string
+          organization_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          shift_id: string
+          staff_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          dismissal_reason?: string | null
+          fix_route?: string | null
+          flag_type?: string
+          id?: string
+          message?: string
+          organization_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          shift_id?: string
+          staff_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_completeness_flags_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "evv_timesheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_assignments: {
         Row: {
           client_id: string

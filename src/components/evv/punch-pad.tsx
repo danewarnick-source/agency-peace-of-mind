@@ -1163,6 +1163,44 @@ export function PunchPad({
           </div>
         )}
 
+        {/* ── NECTAR Shift Pre-Flight (pre-clock-in only) ── */}
+        {!isRunning && clientForPunch && serviceCode && (
+          <NectarInfusionLock
+            featureName="Shift pre-flight"
+            benefit="NECTAR tells you up front what this shift will need at clock-out — so end-of-shift isn't a surprise."
+            className="mb-4"
+          >
+            <div className="rounded-lg border border-[color:var(--amber-300)] bg-[color:var(--amber-50)]/70 px-3 py-2.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
+                <Hexagon className="h-3.5 w-3.5" /> NECTAR · Pre-flight
+              </p>
+              <p className="mt-1 text-[12px] leading-snug text-[color:var(--navy-900)]">
+                <span className="font-semibold">
+                  {serviceCode} shift with {clientForPunch.name.split(" ")[0]}
+                </span>{" "}
+                — at clock-out you'll need:
+              </p>
+              <ul className="mt-1 space-y-0.5 text-[12px] leading-snug text-[color:var(--navy-900)]/90">
+                <li>• A progress note (50-word minimum, objective)</li>
+                <li>• At least one PCSP goal checked
+                  {clientForPunch.pcspGoals?.length
+                    ? ` (${clientForPunch.pcspGoals.length} on file)`
+                    : " (none on file — ask your supervisor)"}
+                </li>
+                {isEvvLockedCode(serviceCode) && (
+                  <li>• In-radius clock-out, or a written variance</li>
+                )}
+                <li>• Any spending or reimbursement entries logged before submitting</li>
+              </ul>
+              <p className="mt-1.5 text-[11px] text-[color:var(--navy-900)]/70">
+                Tip: you can draft the note from shorthand or voice at clock-out.
+              </p>
+            </div>
+          </NectarInfusionLock>
+        )}
+
+
+
         {/* ── GPS status strip (clock-in only, no map) ── */}
         {!isRunning && (
           <div className={`mb-4 rounded-lg border p-3 text-xs leading-relaxed ${gpsStripClass}`}>

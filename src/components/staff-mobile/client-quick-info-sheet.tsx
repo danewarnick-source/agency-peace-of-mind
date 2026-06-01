@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState, cloneElement, isValidElement, Children } from "react";
+import { type ReactNode, type ReactElement, type MouseEvent, useEffect, useState, cloneElement, isValidElement, Children } from "react";
 import { MobileBottomSheet } from "./mobile-bottom-sheet";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import type { CaseloadClient } from "@/hooks/use-caseload";
@@ -61,9 +61,9 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
 
   const [open, setOpen] = useState(false);
   const triggerEl = isValidElement(trigger)
-    ? cloneElement(trigger as React.ReactElement<{ onClick?: (e: React.MouseEvent) => void }>, {
-        onClick: (e: React.MouseEvent) => {
-          (trigger as React.ReactElement<{ onClick?: (e: React.MouseEvent) => void }>).props.onClick?.(e);
+    ? cloneElement(trigger as ReactElement<{ onClick?: (e: MouseEvent) => void }>, {
+        onClick: (e: MouseEvent) => {
+          (trigger as ReactElement<{ onClick?: (e: MouseEvent) => void }>).props.onClick?.(e);
           if (!e.defaultPrevented) setOpen(true);
         },
       })

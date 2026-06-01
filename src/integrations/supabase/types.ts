@@ -2726,6 +2726,232 @@ export type Database = {
           },
         ]
       }
+      nectar_document_entities: {
+        Row: {
+          created_at: string
+          document_id: string
+          entity_id: string | null
+          entity_kind: string
+          entity_label: string | null
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          entity_id?: string | null
+          entity_kind: string
+          entity_label?: string | null
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          entity_id?: string | null
+          entity_kind?: string
+          entity_label?: string | null
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_document_entities_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nectar_documents: {
+        Row: {
+          category: string | null
+          client_id: string | null
+          created_at: string
+          document_type: string
+          effective_end: string | null
+          effective_start: string | null
+          external_ids: Json
+          file_name: string
+          file_size_bytes: number | null
+          fiscal_year: string | null
+          id: string
+          is_current: boolean
+          medicaid_id: string | null
+          metadata: Json
+          mime_type: string | null
+          organization_id: string
+          owner_kind: string
+          parent_document_id: string | null
+          parse_error: string | null
+          parse_status: string
+          parsed_at: string | null
+          raw_text: string | null
+          source: string | null
+          staff_id: string | null
+          storage_bucket: string
+          storage_path: string
+          tags: string[]
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+          uploaded_by_name: string | null
+          version: number
+        }
+        Insert: {
+          category?: string | null
+          client_id?: string | null
+          created_at?: string
+          document_type: string
+          effective_end?: string | null
+          effective_start?: string | null
+          external_ids?: Json
+          file_name: string
+          file_size_bytes?: number | null
+          fiscal_year?: string | null
+          id?: string
+          is_current?: boolean
+          medicaid_id?: string | null
+          metadata?: Json
+          mime_type?: string | null
+          organization_id: string
+          owner_kind: string
+          parent_document_id?: string | null
+          parse_error?: string | null
+          parse_status?: string
+          parsed_at?: string | null
+          raw_text?: string | null
+          source?: string | null
+          staff_id?: string | null
+          storage_bucket?: string
+          storage_path: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+          uploaded_by_name?: string | null
+          version?: number
+        }
+        Update: {
+          category?: string | null
+          client_id?: string | null
+          created_at?: string
+          document_type?: string
+          effective_end?: string | null
+          effective_start?: string | null
+          external_ids?: Json
+          file_name?: string
+          file_size_bytes?: number | null
+          fiscal_year?: string | null
+          id?: string
+          is_current?: boolean
+          medicaid_id?: string | null
+          metadata?: Json
+          mime_type?: string | null
+          organization_id?: string
+          owner_kind?: string
+          parent_document_id?: string | null
+          parse_error?: string | null
+          parse_status?: string
+          parsed_at?: string | null
+          raw_text?: string | null
+          source?: string | null
+          staff_id?: string | null
+          storage_bucket?: string
+          storage_path?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+          uploaded_by_name?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_documents_parent_document_id_fkey"
+            columns: ["parent_document_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nectar_extracted_fields: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          document_id: string
+          field_group: string | null
+          field_key: string
+          id: string
+          organization_id: string
+          override_value: Json | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_locator: string | null
+          status: string
+          updated_at: string
+          value_date: string | null
+          value_json: Json | null
+          value_number: number | null
+          value_text: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          document_id: string
+          field_group?: string | null
+          field_key: string
+          id?: string
+          organization_id: string
+          override_value?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_locator?: string | null
+          status?: string
+          updated_at?: string
+          value_date?: string | null
+          value_json?: Json | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          document_id?: string
+          field_group?: string | null
+          field_key?: string
+          id?: string
+          organization_id?: string
+          override_value?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_locator?: string | null
+          status?: string
+          updated_at?: string
+          value_date?: string | null
+          value_json?: Json | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_extracted_fields_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nectar_report_runs: {
         Row: {
           csv_url: string | null

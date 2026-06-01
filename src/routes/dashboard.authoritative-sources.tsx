@@ -312,9 +312,15 @@ function SourcesPanel({
 function SourceRow({
   source,
   orgId,
+  stats,
+  onJumpToRequirements,
 }: {
   source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null };
   orgId: string;
+  stats:
+    | { total: number; confirmed: number; needs: number; removed: number; lastDraftedAt: string | null }
+    | null;
+  onJumpToRequirements: (docId: string) => void;
 }) {
   const qc = useQueryClient();
   const genFn = useServerFn(generateRequirementsFromSource);
@@ -338,6 +344,8 @@ function SourceRow({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const hasDraft = !!stats && stats.total > 0;
 
   return (
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -372,24 +380,82 @@ function SourceRow({
           <span>{new Date(source.created_at).toLocaleDateString()}</span>
         </div>
       </div>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => generate.mutate()}
-        disabled={generate.isPending || source.parse_status !== "parsed"}
-        title={
-          source.parse_status === "parsed"
-            ? "Use NECTAR to draft checklist items from clauses found in this document"
-            : "Parsing must finish before requirements can be drafted"
-        }
-      >
-        {generate.isPending ? (
-          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Sparkles className="mr-1 h-3.5 w-3.5" />
-        )}
-        Draft requirements
-      </Button>
+
+      {hasDraft ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onJumpToRequirements(source.id)}
+            title={
+              stats!.lastDraftedAt
+                ? `Last drafted ${new Date(stats!.lastDraftedAt).toLocaleString()} — click to review in the Requirements tab`
+                : "Click to review in the Requirements tab"
+            }
+            className="flex flex-wrap items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-900 transition hover:bg-amber-500/20 dark:text-amber-200"
+          >
+            <Sparkles className="h-3 w-3" />
+            <span>Drafted</span>
+            <span className="opacity-70">·</span>
+            <span>{stats!.total} total</span>
+            <span className="text-emerald-700 dark:text-emerald-300">
+              · {stats!.confirmed} confirmed
+            </span>
+            <span
+              className={
+                stats!.needs > 0
+                  ? "text-amber-800 dark:text-amber-200"
+                  : "opacity-60"
+              }
+            >
+              · {stats!.needs} needs attention
+            </span>
+            {stats!.removed > 0 && (
+              <span className="text-red-700 dark:text-red-300">
+                · {stats!.removed} removed
+              </span>
+            )}
+            {stats!.lastDraftedAt && (
+              <span className="opacity-60">
+                · {new Date(stats!.lastDraftedAt).toLocaleDateString()}
+              </span>
+            )}
+          </button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => generate.mutate()}
+            disabled={generate.isPending || source.parse_status !== "parsed"}
+            title="Re-draft from this document (e.g. after a re-parse). Existing items are kept; new ones are added."
+            className="h-7 px-2 text-[11px]"
+          >
+            {generate.isPending ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1 h-3 w-3" />
+            )}
+            Re-draft
+          </Button>
+        </div>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => generate.mutate()}
+          disabled={generate.isPending || source.parse_status !== "parsed"}
+          title={
+            source.parse_status === "parsed"
+              ? "Use NECTAR to draft checklist items from clauses found in this document"
+              : "Parsing must finish before requirements can be drafted"
+          }
+        >
+          {generate.isPending ? (
+            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Sparkles className="mr-1 h-3.5 w-3.5" />
+          )}
+          Draft requirements
+        </Button>
+      )}
     </li>
   );
 }

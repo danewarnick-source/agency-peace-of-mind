@@ -41,8 +41,10 @@ export function NectarPayPeriodCard() {
   const hourlyPayDisplay = live.isLive ? baseHourlyPay + live.liveEarnings : baseHourlyPay;
   const payTotal = live.isLive ? live.payTotal : animatedPay;
 
-  const logs = data?.outstanding_daily_logs ?? 0;
-  const attn = data?.incomplete_attendance_days ?? 0;
+  const hasHourly = data?.has_hourly_assignment ?? true;
+  const hasDaily = data?.has_daily_assignment ?? false;
+  const logs = hasDaily ? (data?.outstanding_daily_logs ?? 0) : 0;
+  const attn = hasDaily ? (data?.incomplete_attendance_days ?? 0) : 0;
   const todo = logs + attn;
 
   return (

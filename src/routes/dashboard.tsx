@@ -44,6 +44,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
+  { to: "/dashboard/billing", label: "Billing", icon: Receipt, perm: "view_billing" },
   { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

@@ -4,7 +4,8 @@ import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { User, Search, Clock, Home } from "lucide-react";
+import { User, Search, Clock, Home, Info } from "lucide-react";
+import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
@@ -80,9 +81,23 @@ function ClientCard({
           {initials || <User className="h-5 w-5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="break-words text-base font-semibold leading-snug text-foreground">
-            {fullName}
-          </h3>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="break-words text-base font-semibold leading-snug text-foreground">
+              {fullName}
+            </h3>
+            <ClientQuickInfoSheet
+              client={c}
+              trigger={
+                <button
+                  type="button"
+                  aria-label={`Quick info for ${fullName}`}
+                  className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:border-[color:var(--amber-600,#f59324)]/60 hover:text-[color:var(--amber-700,#d97a1c)] active:scale-[0.97]"
+                >
+                  <Info className="h-3.5 w-3.5" /> Info
+                </button>
+              }
+            />
+          </div>
           <p className="mt-1 break-words text-sm leading-snug text-muted-foreground">
             {address}
           </p>
@@ -192,6 +207,22 @@ export function StaffClientGrid() {
   const { data: activeShift } = useActiveShift();
   const [q, setQ] = useState("");
 
+  // One-time welcome toast on mount (single greeting; no duplicate header).
+  useEffect(() => {
+    const KEY = "staff-welcome-toast";
+    if (typeof window === "undefined") return;
+    if (window.sessionStorage.getItem(KEY)) return;
+    window.sessionStorage.setItem(KEY, "1");
+    // Defer to next tick so Sonner Toaster is mounted.
+    const t = window.setTimeout(() => {
+      // Imported lazily to avoid a top-level import churn.
+      import("sonner").then(({ toast }) =>
+        toast.success("Welcome back!", { duration: 2500 }),
+      );
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const source = caseload ?? [];
 
   const clients = useMemo(() => {
@@ -204,14 +235,11 @@ export function StaffClientGrid() {
 
   return (
     <section aria-label="My Caseload" className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome back</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {source.length
-            ? `${source.length} ${source.length === 1 ? "person" : "people"} on your caseload`
-            : "Your caseload"}
+      {source.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {source.length} {source.length === 1 ? "person" : "people"} on your caseload
         </p>
-      </div>
+      )}
 
       {/* Sticky search */}
       <div className="sticky top-14 z-10 -mx-3 border-b border-border bg-background/95 px-3 py-2 backdrop-blur md:top-0">

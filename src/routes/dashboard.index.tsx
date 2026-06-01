@@ -154,18 +154,14 @@ function Overview() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {showAdmin ? "Company Overview" : "Welcome back"}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {showAdmin
-              ? "Real-time compliance status across your organization."
-              : "Pick up where you left off with your assigned training."}
-          </p>
-        </div>
-        {showAdmin && (
+      {showAdmin && (
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Company Overview</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Real-time compliance status across your organization.
+            </p>
+          </div>
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="shrink-0">
@@ -200,8 +196,8 @@ function Overview() {
               </form>
             </DialogContent>
           </Dialog>
-        )}
-      </div>
+        </div>
+      )}
 
       {showAdmin && org && (
         <div className="rounded-lg border border-accent/20 bg-accent/5 p-4 text-center space-y-2">

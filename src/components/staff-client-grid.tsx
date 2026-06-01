@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
+import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { User, Search, Clock, Home, Info } from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
+import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period-card";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;

@@ -823,6 +823,29 @@ export function PunchPad({
       .eq("id", active.id);
     if (error) throw error;
 
+    // Persist any unresolved / dismissed-with-reason completeness flags for the admin Task Center.
+    if (org?.organization_id && completenessFlags.length > 0) {
+      const rows = completenessFlags
+        .filter((f) => f.severity === "soft") // hard issues couldn't have gotten here
+        .map((f) => ({
+          organization_id: org.organization_id,
+          shift_id: active.id,
+          client_id: active.client_id,
+          staff_id: user.id,
+          flag_type: f.type,
+          severity: f.severity,
+          message: f.message,
+          fix_route: f.fix?.route ?? null,
+          status: dismissals[f.key] ? "dismissed_with_reason" : "pending",
+          dismissal_reason: dismissals[f.key] ?? null,
+        }));
+      if (rows.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await supabase.from("shift_completeness_flags").insert(rows as any);
+      }
+    }
+
+
     const duration = fmtElapsed(
       new Date(clockOut).getTime() - new Date(active.clock_in_timestamp).getTime(),
     );

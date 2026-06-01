@@ -81,6 +81,7 @@ type Client = {
   last_name: string;
   physical_address: string | null;
   job_code: string[] | null;
+  team_id: string | null;
 };
 type ViewMode = "staff" | "client";
 type ShiftFilter = "all" | "published" | "unpublished" | "accepted" | "pending" | "declined";

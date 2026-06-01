@@ -144,16 +144,40 @@ function HelpPage() {
             Your friendly guide to using HIVE — ask where things live or how a workflow works.
           </p>
         </div>
-        {messages.length > 0 && (
+        <div className="flex flex-col items-end gap-2">
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={clearChat}
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> New chat
+            </button>
+          )}
           <button
             type="button"
-            onClick={clearChat}
-            className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+            onClick={() => escalateM.mutate()}
+            disabled={escalateM.isPending || !!ticketId}
+            className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-1 text-xs font-medium text-[#9a3412] hover:bg-[#ffedd5] disabled:opacity-60"
           >
-            <RotateCcw className="h-3.5 w-3.5" /> New chat
+            {escalateM.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LifeBuoy className="h-3.5 w-3.5" />}
+            {ticketId ? "Connected with HIVE" : "Ask the HIVE team"}
           </button>
-        )}
+        </div>
       </header>
+
+      {ticketId && ticketQ.data && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-xs text-[#1e40af]">
+          <span className="inline-flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            HIVE support ticket — status: <span className="font-semibold capitalize">{ticketQ.data.status.replace(/_/g, " ")}</span>
+          </span>
+          <span className="text-[10px] uppercase tracking-wide text-[#1e40af]/70">
+            Updated {new Date(ticketQ.data.updated_at).toLocaleString()}
+          </span>
+        </div>
+      )}
+
 
       <div
         ref={scrollRef}

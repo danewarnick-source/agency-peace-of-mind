@@ -1560,7 +1560,6 @@ function RequirementRow({
     : inferClassification({
         title: req.title,
         description: req.description,
-        category: req.category,
         source_citation: req.source_citation,
       });
   const classification: "internal" | "external" =

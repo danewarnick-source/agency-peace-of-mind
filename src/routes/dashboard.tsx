@@ -347,7 +347,10 @@ function DashboardLayout() {
                   {pageTitle}
                 </h1>
                 <p className="truncate text-xs text-muted-foreground">
-                  {org?.organization_name ?? "Workspace"} · {ROLE_LABEL[role]}
+                  {isHiveExecView
+                    ? "HIVE Platform · HIVE Executive"
+                    : `${org?.organization_name ?? "Workspace"} · ${ROLE_LABEL[role]}`}
+
                 </p>
               </div>
             </div>

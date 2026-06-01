@@ -1094,164 +1094,170 @@ export function PunchPad({
         {/* Clock-Out Compliance Modal */}
         <Dialog open={showCompliance} onOpenChange={(o) => { if (!busy) setShowCompliance(o); }}>
           <DialogContent
-            className="max-h-[90vh] max-w-2xl overflow-y-auto"
+            className="flex max-h-[100dvh] w-[calc(100%-1rem)] max-w-2xl flex-col gap-0 p-0 sm:max-h-[90vh] sm:w-full"
             onPointerDownOutside={(e) => e.preventDefault()}
             onEscapeKeyDown={(e) => e.preventDefault()}
           >
-            <DialogHeader>
-              <DialogTitle>📋 Shift Verification &amp; Medicaid Compliance Form</DialogTitle>
-              <DialogDescription>
+            <DialogHeader className="shrink-0 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
+              <DialogTitle className="pr-8 text-base sm:text-lg">📋 Shift Verification &amp; Medicaid Compliance Form</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm">
                 Complete the goals tracker and progress note below to submit your timesheet.
               </DialogDescription>
+              {/* Live elapsed — pinned at top */}
+              <div className="mt-2 flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-2">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Live Duration</span>
+                <span className="font-mono text-base font-bold tabular-nums sm:text-lg">{elapsed}</span>
+              </div>
             </DialogHeader>
 
-            {/* Live elapsed */}
-            <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-2">
-              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Live Duration</span>
-              <span className="font-mono text-lg font-bold tabular-nums">{elapsed}</span>
-            </div>
-
-            {/* PCSP goals */}
-            <div className="grid gap-2">
-              <h3 className="text-sm font-semibold">🎯 Person-Centered Support Plan (PCSP) Objectives Tracker</h3>
-              <div className="grid gap-1.5 rounded-md border border-border p-3">
-                {activeClientGoals.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    No active PCSP goals on file for this individual.
-                  </p>
-                )}
-                {activeClientGoals.map((goal, idx) => {
-                  const id = `goal-${idx}`;
-                  return (
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              <div className="grid gap-4">
+                {/* PCSP goals */}
+                <div className="grid gap-2">
+                  <h3 className="text-sm font-semibold">🎯 Person-Centered Support Plan (PCSP) Objectives Tracker</h3>
+                  <div className="grid gap-1.5 rounded-md border border-border p-3">
+                    {activeClientGoals.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No active PCSP goals on file for this individual.
+                      </p>
+                    )}
+                    {activeClientGoals.map((goal, idx) => {
+                      const id = `goal-${idx}`;
+                      return (
+                        <label
+                          key={id}
+                          htmlFor={id}
+                          className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
+                        >
+                          <input
+                            id={id}
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                            checked={!!checkedGoals[goal]}
+                            onChange={(e) => setCheckedGoals((p) => ({ ...p, [goal]: e.target.checked }))}
+                          />
+                          <span className="break-words">{goal}</span>
+                        </label>
+                      );
+                    })}
+                    <div className="my-1 border-t border-dashed border-border" />
                     <label
-                      key={id}
-                      htmlFor={id}
+                      htmlFor="goal-baseline"
                       className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
                     >
                       <input
-                        id={id}
+                        id="goal-baseline"
                         type="checkbox"
-                        className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
-                        checked={!!checkedGoals[goal]}
-                        onChange={(e) => setCheckedGoals((p) => ({ ...p, [goal]: e.target.checked }))}
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                        checked={baselineChecked}
+                        onChange={(e) => setBaselineChecked(e.target.checked)}
                       />
-                      <span>{goal}</span>
+                      <span className="break-words italic text-muted-foreground">
+                        General baseline monitoring &amp; safety oversight
+                      </span>
                     </label>
-                  );
-                })}
-                <div className="my-1 border-t border-dashed border-border" />
-                <label
-                  htmlFor="goal-baseline"
-                  className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
-                >
-                  <input
-                    id="goal-baseline"
-                    type="checkbox"
-                    className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
-                    checked={baselineChecked}
-                    onChange={(e) => setBaselineChecked(e.target.checked)}
+                  </div>
+                  {!hasGoalSelected && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Select at least one goal worked on this shift.
+                    </p>
+                  )}
+                </div>
+
+                {/* Narrative */}
+                <div className="grid gap-2">
+                  <Label htmlFor="evv-narrative">
+                    📝 Mandatory Progress Note &amp; Narrative Log
+                  </Label>
+                  <Textarea
+                    id="evv-narrative"
+                    rows={7}
+                    value={narrative}
+                    onChange={(e) => {
+                      setNarrative(e.target.value);
+                      if (showNarrativeError) setShowNarrativeError(false);
+                      if (aiCoach) setAiCoach(null);
+                    }}
+                    placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
+                    maxLength={5000}
+                    className="min-h-[160px] w-full resize-y"
                   />
-                  <span className="italic text-muted-foreground">
-                    General baseline monitoring &amp; safety oversight
-                  </span>
-                </label>
-              </div>
-              {!hasGoalSelected && (
-                <p className="text-[11px] text-muted-foreground">
-                  Select at least one goal worked on this shift.
-                </p>
-              )}
-            </div>
-
-            {/* Narrative */}
-            <div className="grid gap-2">
-              <Label htmlFor="evv-narrative">
-                📝 Mandatory Progress Note &amp; Narrative Log
-              </Label>
-              <Textarea
-                id="evv-narrative"
-                rows={7}
-                value={narrative}
-                onChange={(e) => {
-                  setNarrative(e.target.value);
-                  if (showNarrativeError) setShowNarrativeError(false);
-                  if (aiCoach) setAiCoach(null);
-                }}
-                placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
-                maxLength={5000}
-              />
-              <div className={`text-xs font-medium ${narrativeOk ? "text-emerald-600" : "text-muted-foreground"}`}>
-                Word Count: {wordCount} / 50 words minimum
-              </div>
-              {showNarrativeError && !narrativeOk && (
-                <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
-                  ⚠️ Compliance Failure: Your daily progress narrative must be at least 50 words
-                  to satisfy state Medicaid auditing and DSPD billing validation criteria.
+                  <div className={`text-xs font-medium ${narrativeOk ? "text-emerald-600" : "text-muted-foreground"}`}>
+                    Word Count: {wordCount} / 50 words minimum
+                  </div>
+                  {showNarrativeError && !narrativeOk && (
+                    <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
+                      ⚠️ Compliance Failure: Your daily progress narrative must be at least 50 words
+                      to satisfy state Medicaid auditing and DSPD billing validation criteria.
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* NECTAR Documentation Coach */}
-            {(aiBusy || aiCoach) && (
-              <div className={`rounded-lg border-2 px-4 py-3 ${
-                aiCoach?.status === "Verified"
-                  ? "border-emerald-500/40 bg-emerald-500/10"
-                  : "border-amber-500/40 bg-amber-500/10"
-              }`}>
-                <div className="mb-1 flex items-center gap-2 text-sm font-bold">
-                  💡 NECTAR Documentation Coach
-                  {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                </div>
-                {aiCoach && (
-                  <p className={`text-xs leading-relaxed ${
-                    aiCoach.status === "Verified"
-                      ? "text-emerald-800 dark:text-emerald-200"
-                      : "text-amber-900 dark:text-amber-100"
+                {/* NECTAR Documentation Coach */}
+                {(aiBusy || aiCoach) && (
+                  <div className={`rounded-lg border-2 px-4 py-3 ${
+                    aiCoach?.status === "Verified"
+                      ? "border-emerald-500/40 bg-emerald-500/10"
+                      : "border-amber-500/40 bg-amber-500/10"
                   }`}>
-                    {aiCoach.status === "Verified" ? "🟢 NECTAR CLEARED — " : "⚠️ "}
-                    {aiCoach.feedback}
-                  </p>
-                )}
-                {aiCoach?.status === "Flagged" && (
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Edit your narrative above based on the tip, then re-submit. Iteration {aiIterations}.
-                  </p>
+                    <div className="mb-1 flex items-center gap-2 text-sm font-bold">
+                      💡 NECTAR Documentation Coach
+                      {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                    </div>
+                    {aiCoach && (
+                      <p className={`text-xs leading-relaxed ${
+                        aiCoach.status === "Verified"
+                          ? "text-emerald-800 dark:text-emerald-200"
+                          : "text-amber-900 dark:text-amber-100"
+                      }`}>
+                        {aiCoach.status === "Verified" ? "🟢 NECTAR CLEARED — " : "⚠️ "}
+                        {aiCoach.feedback}
+                      </p>
+                    )}
+                    {aiCoach?.status === "Flagged" && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Edit your narrative above based on the tip, then re-submit. Iteration {aiIterations}.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </div>
 
-            <DialogFooter className="mt-2 flex flex-col gap-2 sm:flex-col">
-              <div
-                className="w-full"
-                onMouseEnter={() => { if (!narrativeOk) setShowNarrativeError(true); }}
-                onClick={() => { if (!narrativeOk) setShowNarrativeError(true); }}
-              >
-                <Button
-                  type="button"
-                  onClick={() => submitCompliance()}
-                  disabled={!canSubmitCompliance || aiBusy}
-                  className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+            <div className="shrink-0 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
+              <div className="flex flex-col gap-2">
+                <div
+                  className="w-full"
+                  onMouseEnter={() => { if (!narrativeOk) setShowNarrativeError(true); }}
+                  onClick={() => { if (!narrativeOk) setShowNarrativeError(true); }}
                 >
-                  {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {aiBusy
-                    ? "🧠 NECTAR Coach reviewing your note…"
-                    : aiCoach?.status === "Flagged"
-                    ? "🔁 Re-Check with NECTAR Coach"
-                    : "💾 Submit Final Timesheet to EVV & Timesheet Control"}
-                </Button>
+                  <Button
+                    type="button"
+                    onClick={() => submitCompliance()}
+                    disabled={!canSubmitCompliance || aiBusy}
+                    className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                  >
+                    {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {aiBusy
+                      ? "🧠 NECTAR Coach reviewing your note…"
+                      : aiCoach?.status === "Flagged"
+                      ? "🔁 Re-Check with NECTAR Coach"
+                      : "💾 Submit Final Timesheet"}
+                  </Button>
+                </div>
+                {allowException && aiCoach?.status === "Flagged" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => submitCompliance({ exception: true })}
+                    disabled={busy || aiBusy}
+                    className="w-full border-rose-500/50 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300"
+                  >
+                    🚩 Submit with Exception Flag
+                  </Button>
+                )}
               </div>
-              {allowException && aiCoach?.status === "Flagged" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => submitCompliance({ exception: true })}
-                  disabled={busy || aiBusy}
-                  className="w-full border-rose-500/50 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300"
-                >
-                  🚩 Submit with Exception Flag
-                </Button>
-              )}
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
 

@@ -328,7 +328,9 @@ function UploadCard({
   orgId: string;
   onUploaded: () => void;
 }) {
+  const [mode, setMode] = useState<"file" | "url">("file");
   const [file, setFile] = useState<File | null>(null);
+  const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<string>("state_sow");
   const [fiscalYear, setFiscalYear] = useState("");
@@ -338,6 +340,17 @@ function UploadCard({
 
   const ingest = useServerFn(ingestDocument);
   const mark = useServerFn(markAsAuthoritativeSource);
+  const ingestUrl = useServerFn(ingestWebSource);
+
+  const resetForm = () => {
+    setFile(null);
+    setUrl("");
+    setTitle("");
+    setFiscalYear("");
+    setEffectiveStart("");
+    setEffectiveEnd("");
+    if (fileInput.current) fileInput.current.value = "";
+  };
 
   const upload = useMutation({
     mutationFn: async () => {
@@ -374,16 +387,47 @@ function UploadCard({
     },
     onSuccess: () => {
       toast.success("Source uploaded. NECTAR is parsing in the background.");
-      setFile(null);
-      setTitle("");
-      setFiscalYear("");
-      setEffectiveStart("");
-      setEffectiveEnd("");
-      if (fileInput.current) fileInput.current.value = "";
+      resetForm();
       onUploaded();
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const captureUrl = useMutation({
+    mutationFn: async () => {
+      if (!url.trim()) throw new Error("Paste a URL to capture");
+      if (!title.trim()) throw new Error("Title is required");
+      return ingestUrl({
+        data: {
+          organizationId: orgId,
+          url: url.trim(),
+          title: title.trim(),
+          authoritativeKind: kind as
+            | "state_sow"
+            | "provider_contract"
+            | "dspd_requirement"
+            | "dhs_requirement"
+            | "public_record"
+            | "other",
+          fiscalYear: fiscalYear || null,
+          effectiveStart: effectiveStart || null,
+          effectiveEnd: effectiveEnd || null,
+        },
+      });
+    },
+    onSuccess: (r) => {
+      toast.success(
+        `Captured ${new URL(r.sourceUrl).host} (${Math.round(r.textLength / 100) / 10}k chars of text). Click "Draft requirements" to extract obligations.`,
+        { duration: 7000 },
+      );
+      resetForm();
+      onUploaded();
+    },
+    onError: (e: Error) => toast.error(e.message, { duration: 9000 }),
+  });
+
+  const isUrlMode = mode === "url";
+  const submitting = upload.isPending || captureUrl.isPending;
 
   return (
     <div className="rounded-2xl border border-border/60 bg-background/60 p-4 backdrop-blur">
@@ -395,6 +439,32 @@ function UploadCard({
         parses these to derive the required-document checklist your audit and
         billing flows read from.
       </p>
+
+      <div className="mb-3 inline-flex rounded-lg border border-border/60 bg-background/40 p-0.5 text-xs">
+        <button
+          type="button"
+          onClick={() => setMode("file")}
+          className={`rounded-md px-3 py-1.5 transition ${
+            mode === "file"
+              ? "bg-amber-500 text-amber-950"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Upload className="mr-1 inline h-3.5 w-3.5" /> File
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("url")}
+          className={`rounded-md px-3 py-1.5 transition ${
+            mode === "url"
+              ? "bg-amber-500 text-amber-950"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Globe className="mr-1 inline h-3.5 w-3.5" /> Add from URL
+        </button>
+      </div>
+
       <div className="space-y-3">
         <div className="space-y-1.5">
           <Label className="text-xs">Document kind</Label>
@@ -416,7 +486,11 @@ function UploadCard({
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Utah DSPD SOW — FY26"
+            placeholder={
+              isUrlMode
+                ? "e.g. Utah DHS Provider Requirements page"
+                : "e.g. Utah DSPD SOW — FY26"
+            }
           />
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -445,30 +519,76 @@ function UploadCard({
             onChange={(e) => setEffectiveEnd(e.target.value)}
           />
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">File (PDF or text)</Label>
-          <Input
-            ref={fileInput}
-            type="file"
-            accept=".pdf,.txt,.md,.html,.htm,application/pdf,text/*"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-        </div>
-        <Button
-          className="w-full bg-amber-500 text-amber-950 hover:bg-amber-400"
-          onClick={() => upload.mutate()}
-          disabled={upload.isPending || !file}
-        >
-          {upload.isPending ? (
-            <>
-              <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Uploading…
-            </>
-          ) : (
-            <>
-              <Upload className="mr-1 h-4 w-4" /> Upload &amp; parse
-            </>
-          )}
-        </Button>
+
+        {isUrlMode ? (
+          <>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Page URL</Label>
+              <Input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://dspd.utah.gov/providers/requirements"
+              />
+            </div>
+            <div className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <p>
+                NECTAR reads text that's rendered directly on the page itself
+                (state policy pages, requirements lists, etc.) and saves a
+                snapshot with today's date — the requirement will trace to
+                "per [URL], captured [date]". Files <em>linked from</em> the
+                page (PDFs, downloadable docs, attachments) are{" "}
+                <strong>not</strong> followed. If a rule lives in a linked
+                PDF, download that file and upload it as a document instead.
+                Pages behind a login or rendered entirely by JavaScript may
+                also not be readable.
+              </p>
+            </div>
+            <Button
+              className="w-full bg-amber-500 text-amber-950 hover:bg-amber-400"
+              onClick={() => captureUrl.mutate()}
+              disabled={submitting || !url.trim() || !title.trim()}
+            >
+              {captureUrl.isPending ? (
+                <>
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Reading page…
+                </>
+              ) : (
+                <>
+                  <Globe className="mr-1 h-4 w-4" /> Capture &amp; parse page
+                </>
+              )}
+            </Button>
+          </>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              <Label className="text-xs">File (PDF or text)</Label>
+              <Input
+                ref={fileInput}
+                type="file"
+                accept=".pdf,.txt,.md,.html,.htm,application/pdf,text/*"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            <Button
+              className="w-full bg-amber-500 text-amber-950 hover:bg-amber-400"
+              onClick={() => upload.mutate()}
+              disabled={submitting || !file}
+            >
+              {upload.isPending ? (
+                <>
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Uploading…
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-1 h-4 w-4" /> Upload &amp; parse
+                </>
+              )}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

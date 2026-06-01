@@ -794,17 +794,89 @@ function SchedulerInner({ orgId, role }: { orgId: string; role: string | null })
 
   return (
     <div className="space-y-5">
+      <NectarGuidanceStrip
+        title="Scheduling guidance"
+        message={
+          canEdit ? (
+            <>
+              You can edit shifts in <span className="font-medium text-foreground">{scopeLabel}</span>.
+              Use NECTAR Auto-assign to draft shifts from staff assignments — every proposal is validated before anything is written.
+            </>
+          ) : (
+            <>
+              View-only access to <span className="font-medium text-foreground">{scopeLabel}</span>.
+              {assignedLabel ? <> {assignedLabel} is the assigned scheduler.</> : null}
+            </>
+          )
+        }
+        highlight={stats.total - stats.published > 0 ? `${stats.total - stats.published} draft shifts` : undefined}
+        actionLabel={canEdit && scope.type !== "all" ? "NECTAR Auto-assign" : undefined}
+        onAction={canEdit && scope.type !== "all" ? () => setAutoOpen(true) : undefined}
+      />
+
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Scheduling</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Manage caregiver shifts, publish schedules, and track status.
           </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={scope.type === "all" ? "all" : scope.type === "team" ? `team:${scope.id}` : `home:${scope.address}`}
+              onValueChange={(v) => {
+                if (v === "all") setScope({ type: "all" });
+                else if (v.startsWith("team:")) setScope({ type: "team", id: v.slice(5) });
+                else if (v.startsWith("home:")) setScope({ type: "home", address: v.slice(5) });
+              }}
+            >
+              <SelectTrigger className="h-8 w-[280px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All teams & homes (Admin view)</SelectItem>
+                {teamList.length > 0 && (
+                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Teams</div>
+                )}
+                {teamList.map((t) => (
+                  <SelectItem key={t.id} value={`team:${t.id}`}>
+                    {t.team_name}
+                    {t.manager_name ? ` — ${t.manager_name}` : ""}
+                  </SelectItem>
+                ))}
+                {homeAddresses.length > 0 && (
+                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Host homes</div>
+                )}
+                {homeAddresses.map((a) => (
+                  <SelectItem key={a} value={`home:${a}`}>{a}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {assignedLabel && (
+              <Badge variant="secondary" className="gap-1 text-[10px]">
+                <ShieldCheck className="h-3 w-3" /> {assignedLabel}
+              </Badge>
+            )}
+            {!canEdit && (
+              <Badge className="gap-1 border-amber-500/40 bg-amber-500/10 text-amber-700 text-[10px] dark:text-amber-300">
+                <Eye className="h-3 w-3" /> View only
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canEdit && scope.type !== "all" && (
+            <Button
+              onClick={() => setAutoOpen(true)}
+              variant="outline"
+              className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <Sparkles className="h-4 w-4" />
+              NECTAR Auto-assign
+            </Button>
+          )}
           <Button
             onClick={publishAll}
-            disabled={publishBusy || stats.published === stats.total}
+            disabled={!canEdit || publishBusy || stats.published === stats.total}
             className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
           >
             {publishBusy ? (
@@ -824,12 +896,14 @@ function SchedulerInner({ orgId, role }: { orgId: string; role: string | null })
               setEditShift(null);
               setFormOpen(true);
             }}
+            disabled={!canEdit}
             className="gap-2"
           >
             <Plus className="h-4 w-4" /> Add Shift
           </Button>
         </div>
       </div>
+
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {[

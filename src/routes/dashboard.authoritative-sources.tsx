@@ -1110,9 +1110,11 @@ const REMOVE_ATTESTATION_TEXT =
 function RequirementRow({
   req,
   orgId,
+  sourceMeta,
 }: {
   req: ReqRow;
   orgId: string;
+  sourceMeta?: SourceMeta | null;
 }) {
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
@@ -1145,6 +1147,7 @@ function RequirementRow({
 
   const [removeOpen, setRemoveOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   return (
     <li className={`py-3 ${isRemoved ? "opacity-55" : ""}`}>

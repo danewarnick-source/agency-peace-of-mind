@@ -128,9 +128,13 @@ const MAP_SYSTEM_PROMPT = `You are NECTAR, mapping a confirmed COMPLIANCE REQUIR
 
 Given:
 - the requirement text + citation
-- the provider's live entities (active DSPD service codes, staff roles/credentials present, client count)
+- the provider's CONTRACTED entities — every DSPD service code the provider is authorized to deliver (whether currently in use or dormant), staff roles/credentials present, client count
+
+Coverage follows the contract, not current activity. A dormant code (authorized but not currently in use) MUST still get its requirements mapped — when that code is later activated the rules must already be live.
 
 Decide the SCOPE(S) the requirement applies to. A requirement may have multiple scopes.
+
+
 
 Scope kinds:
 - "provider"   — agency-wide (e.g. Internal Quality Management Plan, Emergency Management Plan)

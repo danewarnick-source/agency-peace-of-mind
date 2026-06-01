@@ -971,6 +971,59 @@ export type Database = {
         }
         Relationships: []
       }
+      client_spending_log: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          organization_id: string
+          purpose: string
+          receipt_path: string | null
+          shift_id: string
+          spent_at: string
+          staff_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          client_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          purpose: string
+          receipt_path?: string | null
+          shift_id: string
+          spent_at?: string
+          staff_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          purpose?: string
+          receipt_path?: string | null
+          shift_id?: string
+          spent_at?: string
+          staff_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_spending_log_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "evv_timesheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           account_status: string

@@ -156,6 +156,30 @@ function DocumentPull({ orgId }: { orgId?: string }) {
         );
       }
 
+      // Client spending log (hourly shifts)
+      if (wantsAll || type === "client_spending") {
+        let q = supabase
+          .from("client_spending_log")
+          .select("id, amount, purpose, spent_at, client_id, staff_id, shift_id")
+          .eq("organization_id", orgId!)
+          .order("spent_at", { ascending: false })
+          .limit(50);
+        if (fromTs) q = q.gte("spent_at", fromTs);
+        if (toTs) q = q.lte("spent_at", toTs);
+        const { data: cs } = await q;
+        (cs ?? []).forEach((r: any) =>
+          rows.push({
+            id: `client_spending:${r.id}`,
+            type: "Client Spending",
+            title: `$${Number(r.amount).toFixed(2)} — ${r.purpose}`,
+            subtitle: `Shift ${String(r.shift_id).slice(0, 8)}`,
+            date: r.spent_at,
+            client_id: r.client_id,
+            staff_id: r.staff_id,
+          }),
+        );
+      }
+
       let filtered = rows;
       if (query.trim()) {
         const qLow = query.toLowerCase();
@@ -199,6 +223,7 @@ function DocumentPull({ orgId }: { orgId?: string }) {
                 <SelectItem value="billing">Billing (520)</SelectItem>
                 <SelectItem value="client">Client docs</SelectItem>
                 <SelectItem value="incident">Incidents</SelectItem>
+                <SelectItem value="client_spending">Client Spending</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -418,7 +443,7 @@ function AuditFileDialog({
       const periodEnd = format(next, "yyyy-MM-dd");
 
       // Find typical audit artifacts for the month
-      const [ts, bs, ir] = await Promise.all([
+      const [ts, bs, ir, cs] = await Promise.all([
         supabase
           .from("evv_timesheets")
           .select("id, clock_in_timestamp")
@@ -439,6 +464,13 @@ function AuditFileDialog({
           .gte("submitted_at", periodStart)
           .lt("submitted_at", periodEnd)
           .limit(50),
+        supabase
+          .from("client_spending_log")
+          .select("id, amount, spent_at")
+          .eq("organization_id", orgId)
+          .gte("spent_at", periodStart)
+          .lt("spent_at", periodEnd)
+          .limit(500),
       ]);
 
       const rows: Array<Omit<AuditDoc, "id" | "created_at">> = [];
@@ -472,6 +504,17 @@ function AuditFileDialog({
           external_ref: `incident_reports:${r.id}`,
         }),
       );
+      if ((cs.data ?? []).length > 0) {
+        const total = (cs.data ?? []).reduce((s: number, r: any) => s + Number(r.amount), 0);
+        rows.push({
+          audit_file_id: fileId,
+          source: "auto",
+          category: "billing",
+          title: `Client Spending Log — ${cs.data!.length} entries · $${total.toFixed(2)} for ${format(new Date(periodStart), "MMMM yyyy")}`,
+          storage_path: null,
+          external_ref: `client_spending_log:month:${periodStart}`,
+        });
+      }
 
       // Insert only those that aren't already present (by external_ref)
       const existingRefs = new Set((docs ?? []).map((d) => d.external_ref));

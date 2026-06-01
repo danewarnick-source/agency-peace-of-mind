@@ -4,7 +4,8 @@ import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { User, Search, Clock, Home } from "lucide-react";
+import { User, Search, Clock, Home, Info } from "lucide-react";
+import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;

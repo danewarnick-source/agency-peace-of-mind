@@ -42,6 +42,8 @@ type Role = "admin" | "manager" | "employee";
 type Position = "Direct Care" | "Host Staff" | "Office Staff" | "Admin";
 const POSITIONS: Position[] = ["Direct Care", "Host Staff", "Office Staff", "Admin"];
 
+type WorkerType = "w2" | "1099";
+
 type EditableMember = {
   membershipId: string;
   userId: string;
@@ -51,6 +53,9 @@ type EditableMember = {
   role: Role;
   active: boolean;
   position: Position | "";
+  workerType: WorkerType;
+  hourlyRate: string;
+  dailyRate: string;
 };
 
 function EmployeesPage() {

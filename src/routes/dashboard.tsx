@@ -190,7 +190,7 @@ function DashboardLayout() {
 
       {/* Desktop layout (md+) — unchanged. Also used on mobile for Admin View. */}
       <div
-        className={`grid flex-1 md:grid-cols-[260px_1fr] ${isStaffView ? "hidden md:grid" : ""}`}
+        className={`grid flex-1 md:grid-cols-[260px_1fr] ${isStaffView && !isMobilePreview ? "hidden md:grid" : ""}`}
       >
         <aside className="hidden flex-col bg-sidebar text-sidebar-foreground md:flex">
           <SidebarBody />

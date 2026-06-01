@@ -319,7 +319,7 @@ export function CompanyOverview() {
         { icon: Banknote, label: "Billing submission warnings to action", count: data.attention.pendingBillingWarnings, to: "/dashboard/billing", urgent: true },
         { icon: Receipt, label: "Reimbursement requests pending approval", count: data.attention.pendingReimbursements, to: "/dashboard/billing" },
         { icon: CalendarClock, label: "Published shifts not yet accepted", count: data.attention.unacceptedShifts, to: "/dashboard/scheduling" },
-        { icon: Share2, label: "Auditor shares expiring this week", count: data.attention.auditorSharesExpiring, to: "/dashboard/audit-packets" },
+        { icon: Share2, label: "Auditor shares expiring this week", count: data.attention.auditorSharesExpiring, to: "/dashboard/audit" },
         { icon: ClipboardX, label: "Daily logs returned for revision", count: data.attention.missingDailyLogs, to: "/dashboard/daily-logs" },
         { icon: FileSignature, label: "Notes awaiting signature (last 7 days)", count: data.attention.unsignedNotes, to: "/dashboard/records-desk" },
         { icon: Users, label: "Clients off budget pace", count: data.attention.clientsOffPace, to: "/dashboard/billing" },

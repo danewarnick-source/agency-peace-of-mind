@@ -326,7 +326,7 @@ export const autoClassifyRequirements = createServerFn({ method: "POST" })
       };
       const { error: upErr } = await supabase
         .from("nectar_requirements")
-        .update({ metadata: nextMd })
+        .update({ metadata: nextMd as Json })
         .eq("id", r.id);
       if (!upErr) {
         classified += 1;

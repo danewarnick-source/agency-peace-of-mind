@@ -12,6 +12,8 @@ import type { PaySchedule } from "@/lib/pay-periods";
  *   custom categories without code changes.
  */
 
+export type CapBehavior = "warn" | "acknowledge" | "auto_clock_out";
+
 export type TimePaySettings = {
   organization_id: string | null;
   allow_non_client_clockins: boolean;
@@ -20,6 +22,10 @@ export type TimePaySettings = {
   w2_period_anchor: string;
   contractor_schedule: PaySchedule;
   contractor_period_anchor: string;
+  /** What happens when a client's weekly cap is reached. */
+  cap_behavior: CapBehavior;
+  /** Percent of cap that triggers the early warning modal (default 90). */
+  cap_warn_pct: number;
 };
 
 export type TimePayCategory = {
@@ -41,6 +47,8 @@ const DEFAULTS: TimePaySettings = {
   w2_period_anchor: "1_and_16",
   contractor_schedule: "biweekly",
   contractor_period_anchor: "friday",
+  cap_behavior: "acknowledge",
+  cap_warn_pct: 90,
 };
 
 export const BUILTIN_CATEGORIES: TimePayCategory[] = [

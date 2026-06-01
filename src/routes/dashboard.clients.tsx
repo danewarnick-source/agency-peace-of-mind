@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselect";
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
+import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
@@ -843,6 +844,12 @@ function ProfileTab({
       clientId={client.id}
       clientName={`${client.first_name} ${client.last_name}`.trim()}
       medicaidId={client.medicaid_id ?? null}
+    />
+
+    {/* Client-specific documents — flows into Company Docs */}
+    <ClientDocumentsCard
+      clientId={client.id}
+      clientName={`${client.first_name} ${client.last_name}`.trim()}
     />
     </div>
   );

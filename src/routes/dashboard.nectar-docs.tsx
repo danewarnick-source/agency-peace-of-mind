@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useCaseload } from "@/hooks/use-caseload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,21 +107,29 @@ function NectarDocsPage() {
   const [search, setSearch] = useState("");
   const [docType, setDocType] = useState("all");
   const [ownerKind, setOwnerKind] = useState("all");
+  const [clientFilter, setClientFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
 
   const queryFn = useServerFn(queryDocuments);
   const qc = useQueryClient();
+  const { data: caseload } = useCaseload();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["nectar-docs", orgId, search, docType, ownerKind],
+    queryKey: ["nectar-docs", orgId, search, docType, ownerKind, clientFilter],
     queryFn: () =>
       queryFn({
         data: {
           organizationId: orgId!,
           search: search || undefined,
           documentType: docType === "all" ? undefined : docType,
-          ownerKind: ownerKind === "all" ? undefined : (ownerKind as never),
+          ownerKind:
+            clientFilter !== "all"
+              ? "client"
+              : ownerKind === "all"
+                ? undefined
+                : (ownerKind as never),
+          clientId: clientFilter === "all" ? undefined : clientFilter,
           currentOnly: true,
           limit: 200,
         },
@@ -144,7 +153,7 @@ function NectarDocsPage() {
         </div>
         <h1 className="text-2xl font-semibold">Company Docs</h1>
         <p className="text-sm text-muted-foreground">
-          Internal client and staff records — PCSPs, 1056 budgets, intake/referrals, assessments, certifications, training records, and other client/staff-specific files. State and contract authority documents live in <span className="font-medium">Authoritative Sources</span>.
+          Aggregated view of every client and staff document in the workspace. Files uploaded on a <span className="font-medium text-foreground">client</span> or <span className="font-medium text-foreground">staff profile</span> appear here automatically — no duplicate upload. State and contract authority documents live in <span className="font-medium">Authoritative Sources</span>.
         </p>
       </header>
 
@@ -188,6 +197,20 @@ function NectarDocsPage() {
             <SelectTrigger className="w-full md:w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               {OWNER_KINDS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Client</Label>
+          <Select value={clientFilter} onValueChange={setClientFilter}>
+            <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="All clients" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All clients</SelectItem>
+              {(caseload ?? []).map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.first_name} {c.last_name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

@@ -7,10 +7,12 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getCompanyOverview } from "@/lib/company-overview.functions";
 import { getAgencyHealthSnapshot } from "@/lib/agency-health.functions";
+import type { AgencyHealthSnapshot } from "@/lib/agency-health.functions";
 import {
   ShieldCheck, MapPin, FileCheck2, BadgeCheck, Activity,
   AlertTriangle, ArrowRight, PartyPopper, Wallet, ClipboardX,
   FileSignature, Stethoscope, Send, Users, Trophy, CalendarHeart,
+  BookOpen, Network, Receipt, CalendarClock, Share2, Banknote,
 } from "lucide-react";
 import { NectarHeader } from "@/components/nectar/nectar-brand";
 
@@ -110,25 +112,30 @@ function Kpi({
   );
 }
 
-function Kpis({ orgId }: { orgId: string }) {
+type HealthMetrics = { audit: number; evv: number; docs: number; creds: number; overall: number };
+
+function useHealthMetrics(orgId: string): { metrics: HealthMetrics | null; isLoading: boolean } {
   const fetchFn = useServerFn(getAgencyHealthSnapshot);
   const { data, isLoading } = useQuery({
     queryKey: ["agency-health", orgId],
     queryFn: () => fetchFn({ data: { organizationId: orgId } }),
   });
-
-  const metrics = useMemo(() => {
+  const metrics = useMemo<HealthMetrics | null>(() => {
     if (!data) return null;
-    const audit = Math.round(
-      (data.client.daily.score + data.client.medication.score + data.client.attendance.score) / 3,
-    );
-    const evv = data.employee.geofence.score;
-    const docs = Math.round((data.client.daily.score + data.employee.emarAccuracy.score) / 2);
-    const creds = data.employee.credentials.score;
-    const overall = Math.round((data.client.overall + data.employee.overall) / 2);
-    return { audit, evv, docs, creds, overall };
+    const d = data as AgencyHealthSnapshot;
+    const audit = Math.round((d.client.daily.score + d.client.medication.score + d.client.attendance.score) / 3);
+    return {
+      audit,
+      evv: d.employee.geofence.score,
+      docs: Math.round((d.client.daily.score + d.employee.emarAccuracy.score) / 2),
+      creds: d.employee.credentials.score,
+      overall: Math.round((d.client.overall + d.employee.overall) / 2),
+    };
   }, [data]);
+  return { metrics, isLoading };
+}
 
+function Kpis({ metrics, isLoading }: { metrics: HealthMetrics | null; isLoading: boolean }) {
   return (
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -290,6 +297,8 @@ export function CompanyOverview() {
     queryFn: () => fetchOverview({ data: { organizationId: orgId! } }),
   });
 
+  const { metrics, isLoading: healthLoading } = useHealthMetrics(orgId ?? "");
+
   const prefs = useMemo(() => getOverviewPrefs(), []);
   const canSeeBilling = can("view_billing") || can("manage_billing");
 
@@ -300,21 +309,48 @@ export function CompanyOverview() {
     user?.email?.split("@")[0] ??
     "there";
 
-  const attentionItems: AttentionItem[] = data
+  // Base attention items sourced from the platform-wide Task Center aggregator.
+  const baseItems: AttentionItem[] = data
     ? [
         { icon: BadgeCheck, label: "Staff credentials expiring within 30 days", count: data.attention.expiringCredentials, to: "/dashboard/certifications", urgent: true },
+        { icon: Stethoscope, label: "Incident reports pending admin review", count: data.attention.pendingIncidents, to: "/dashboard/records-desk", urgent: true },
+        { icon: BookOpen, label: "Authoritative requirements needing your review", count: data.attention.requirementsNeedingReview, to: "/dashboard/authoritative-sources", urgent: true },
+        { icon: Network, label: "Requirement mappings flagged for review", count: data.attention.engineMappingGaps, to: "/dashboard/authoritative-sources" },
+        { icon: Banknote, label: "Billing submission warnings to action", count: data.attention.pendingBillingWarnings, to: "/dashboard/billing", urgent: true },
+        { icon: Receipt, label: "Reimbursement requests pending approval", count: data.attention.pendingReimbursements, to: "/dashboard/billing" },
+        { icon: CalendarClock, label: "Published shifts not yet accepted", count: data.attention.unacceptedShifts, to: "/dashboard/scheduling" },
+        { icon: Share2, label: "Auditor shares expiring this week", count: data.attention.auditorSharesExpiring, to: "/dashboard/audit" },
         { icon: ClipboardX, label: "Daily logs returned for revision", count: data.attention.missingDailyLogs, to: "/dashboard/daily-logs" },
         { icon: FileSignature, label: "Notes awaiting signature (last 7 days)", count: data.attention.unsignedNotes, to: "/dashboard/records-desk" },
-        { icon: Stethoscope, label: "Incident reports pending admin review", count: data.attention.pendingIncidents, to: "/dashboard/records-desk", urgent: true },
         { icon: Users, label: "Clients off budget pace", count: data.attention.clientsOffPace, to: "/dashboard/billing" },
         { icon: ShieldCheck, label: "Timesheets awaiting payroll approval", count: data.attention.pendingPayroll, to: "/dashboard/timeclock" },
         { icon: Send, label: "Claims ready to submit", count: data.attention.claimsReady, to: "/dashboard/billing" },
       ]
     : [];
 
+  // KPI reconciliation: any KPI in an Action state (<75) MUST produce a task,
+  // so the panel and the KPI grid can never disagree (the credentials "0% / Action"
+  // contradiction the Overview was missing before).
+  const kpiItems: AttentionItem[] = [];
+  if (metrics) {
+    const push = (cond: boolean, item: AttentionItem) => { if (cond) kpiItems.push(item); };
+    push(metrics.creds < 75 && (data?.attention.expiringCredentials ?? 0) === 0,
+      { icon: BadgeCheck, label: `Credentials KPI in action (${metrics.creds}%) — review staff credentials`, count: 1, to: "/dashboard/certifications", urgent: true });
+    push(metrics.audit < 75,
+      { icon: ShieldCheck, label: `Audit readiness in action (${metrics.audit}%) — open Records Desk`, count: 1, to: "/dashboard/records-desk", urgent: true });
+    push(metrics.evv < 75,
+      { icon: MapPin, label: `EVV match in action (${metrics.evv}%) — investigate clock-ins`, count: 1, to: "/dashboard/timeclock", urgent: true });
+    push(metrics.docs < 75,
+      { icon: FileCheck2, label: `Documentation in action (${metrics.docs}%) — review notes & eMAR`, count: 1, to: "/dashboard/daily-logs" });
+    push(metrics.overall < 75,
+      { icon: Activity, label: `Overall compliance in action (${metrics.overall}%)`, count: 1, to: "/dashboard/records-desk" });
+  }
+
+  const attentionItems = [...kpiItems, ...baseItems];
+
   const sections: Record<CardKey, React.ReactNode> = {
     greeting: <Greeting name={firstName} />,
-    kpis: <Kpis orgId={orgId} />,
+    kpis: <Kpis metrics={metrics} isLoading={healthLoading} />,
     attention: isLoading || !data ? (
       <div className="h-48 animate-pulse rounded-xl border border-border bg-muted/40" />
     ) : (

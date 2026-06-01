@@ -1,0 +1,533 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+// =============================================================
+// Foundation D — NECTAR Requirements Engine.
+// Maps confirmed requirements to provider entities (codes/roles/clients/
+// provider-level) so downstream surfaces (audit checklist, billing
+// readiness, staff app, tasks) consult ONE place for "what applies?".
+// NECTAR proposes mappings; admin confirms or corrects. Nothing silent.
+// =============================================================
+
+const SCOPE_KINDS = ["provider", "code", "role", "client", "unknown"] as const;
+type ScopeKind = (typeof SCOPE_KINDS)[number];
+
+interface OrgEntityFacts {
+  codes: string[]; // active DSPD service codes in use
+  roles: string[]; // staff role/credential keys present (DSP, SLM, HHP, BCBA, RN, LPN, etc.)
+  clientCount: number;
+  jurisdictions: string[];
+}
+
+// ---------- Inventory of org's live entities (used to ground AI proposals) ----------
+
+async function gatherOrgFacts(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  organizationId: string,
+): Promise<OrgEntityFacts> {
+  const [codesRes, staffRes, clientsRes] = await Promise.all([
+    supabase
+      .from("client_billing_codes")
+      .select("service_code")
+      .eq("organization_id", organizationId),
+    supabase
+      .from("organization_members")
+      .select("role, job_title")
+      .eq("organization_id", organizationId)
+      .eq("active", true),
+    supabase
+      .from("clients")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId),
+  ]);
+
+  const codes = Array.from(
+    new Set(
+      ((codesRes.data ?? []) as Array<{ service_code: string | null }>)
+        .map((r) => (r.service_code ?? "").trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  );
+
+  const roleSet = new Set<string>();
+  for (const m of (staffRes.data ?? []) as Array<{
+    role: string | null;
+    job_title: string | null;
+  }>) {
+    if (m.role) roleSet.add(m.role.toUpperCase());
+    const jt = (m.job_title ?? "").toUpperCase();
+    if (!jt) continue;
+    // Heuristic credential keys NECTAR cares about.
+    for (const key of ["DSP", "SLM", "HHP", "BCBA", "BC", "RN", "LPN", "QIDP"]) {
+      if (jt.includes(key)) roleSet.add(key);
+    }
+  }
+
+  return {
+    codes,
+    roles: Array.from(roleSet),
+    clientCount: clientsRes.count ?? 0,
+    jurisdictions: ["UT-DSPD"], // first instance; extensibility lives on the requirement row
+  };
+}
+
+// ---------- AI proposer ----------
+
+const MAP_SYSTEM_PROMPT = `You are NECTAR, mapping a confirmed COMPLIANCE REQUIREMENT to the parts of a provider's operation it actually governs.
+
+Given:
+- the requirement text + citation
+- the provider's live entities (active DSPD service codes, staff roles/credentials present, client count)
+
+Decide the SCOPE(S) the requirement applies to. A requirement may have multiple scopes.
+
+Scope kinds:
+- "provider"   — agency-wide (e.g. Internal Quality Management Plan, Emergency Management Plan)
+- "code"       — triggered only when a specific service code is in use (scope_value = code, e.g. "HHS", "PPS", "SE", "RN")
+- "role"       — triggered only when a specific staff role/credential is present (scope_value = role key, e.g. "BCBA", "RN", "LPN", "DSP")
+- "client"     — per-client obligation/cadence (scope_value = "*" meaning every client). Use cadence to encode "annual", "quarterly", "per shift", etc.
+- "unknown"    — you cannot confidently determine; flag for admin review
+
+Return STRICT JSON only:
+{
+  "mappings": [
+    {
+      "scope_kind": "provider" | "code" | "role" | "client" | "unknown",
+      "scope_value": "string or null (null for provider/unknown; the code/role key for code/role; '*' for client)",
+      "cadence": "annual" | "quarterly" | "monthly" | "weekly" | "per_shift" | "once" | null,
+      "rationale": "one short sentence explaining why, referencing the requirement text",
+      "source_excerpt": "<=200 char quote or paraphrase from the requirement"
+    }
+  ]
+}
+
+Rules:
+- ONLY use scope_value codes/roles that appear in the provider's live entity list — do not invent new codes. If the requirement references a code/role the provider doesn't use, return "unknown" with a rationale.
+- Prefer the narrowest correct scope. A requirement that only applies under HHS is "code"+"HHS", not "provider".
+- If the requirement is genuinely agency-wide, return ONE provider mapping.
+- Output at most 6 mappings.`;
+
+const MapItem = z.object({
+  scope_kind: z.enum(SCOPE_KINDS),
+  scope_value: z.string().max(80).nullable().optional(),
+  cadence: z
+    .enum(["annual", "quarterly", "monthly", "weekly", "per_shift", "once"])
+    .nullable()
+    .optional(),
+  rationale: z.string().max(400).optional().nullable(),
+  source_excerpt: z.string().max(400).optional().nullable(),
+});
+const MapResp = z.object({ mappings: z.array(MapItem).max(6).default([]) });
+
+async function aiPropose(
+  reqTitle: string,
+  reqDescription: string | null,
+  citation: string | null,
+  facts: OrgEntityFacts,
+) {
+  const apiKey = process.env.LOVABLE_API_KEY;
+  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+  const userBody = `REQUIREMENT TITLE: ${reqTitle}
+DESCRIPTION: ${reqDescription ?? "—"}
+CITATION: ${citation ?? "—"}
+
+PROVIDER ENTITIES:
+- Active service codes: ${facts.codes.length ? facts.codes.join(", ") : "(none configured)"}
+- Staff roles/credentials present: ${facts.roles.length ? facts.roles.join(", ") : "(none configured)"}
+- Client count: ${facts.clientCount}
+- Jurisdictions: ${facts.jurisdictions.join(", ")}`;
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: MAP_SYSTEM_PROMPT },
+        { role: "user", content: userBody },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+  if (res.status === 402) throw new Error("AI credits exhausted.");
+  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
+  const json = await res.json();
+  const raw: unknown = (() => {
+    try {
+      return JSON.parse(json.choices?.[0]?.message?.content ?? "{}");
+    } catch {
+      return {};
+    }
+  })();
+  const parsed = MapResp.safeParse(raw);
+  return parsed.success ? parsed.data.mappings : [];
+}
+
+// ---------- Server functions ----------
+
+export const proposeRequirementMappings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ requirementId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: req, error: rErr } = await supabase
+      .from("nectar_requirements")
+      .select(
+        "id, organization_id, title, description, source_citation, jurisdiction",
+      )
+      .eq("id", data.requirementId)
+      .single();
+    if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
+
+    const facts = await gatherOrgFacts(supabase, req.organization_id as string);
+    const proposals = await aiPropose(
+      req.title as string,
+      (req.description as string | null) ?? null,
+      (req.source_citation as string | null) ?? null,
+      facts,
+    );
+
+    // Normalize + filter: drop code/role scopes whose value isn't in the live set.
+    const normalized = proposals
+      .map((p) => {
+        const kind = p.scope_kind as ScopeKind;
+        let value = (p.scope_value ?? "").trim().toUpperCase() || null;
+        if (kind === "provider" || kind === "unknown") value = null;
+        if (kind === "client") value = "*";
+        if (kind === "code" && (!value || !facts.codes.includes(value))) {
+          return {
+            scope_kind: "unknown" as ScopeKind,
+            scope_value: null,
+            cadence: p.cadence ?? null,
+            rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't active for this provider — flagged for review.`,
+            source_excerpt: p.source_excerpt ?? null,
+          };
+        }
+        if (kind === "role" && (!value || !facts.roles.includes(value))) {
+          return {
+            scope_kind: "unknown" as ScopeKind,
+            scope_value: null,
+            cadence: p.cadence ?? null,
+            rationale: `Requirement references role "${p.scope_value ?? "?"}" which isn't on staff — flagged for review.`,
+            source_excerpt: p.source_excerpt ?? null,
+          };
+        }
+        return {
+          scope_kind: kind,
+          scope_value: value,
+          cadence: p.cadence ?? null,
+          rationale: p.rationale ?? null,
+          source_excerpt: p.source_excerpt ?? null,
+        };
+      })
+      // de-dupe by (kind, value)
+      .filter(
+        (m, i, arr) =>
+          arr.findIndex(
+            (x) => x.scope_kind === m.scope_kind && x.scope_value === m.scope_value,
+          ) === i,
+      );
+
+    let inserted = 0;
+    for (const m of normalized) {
+      const { error } = await supabase
+        .from("nectar_requirement_mappings")
+        .insert({
+          organization_id: req.organization_id,
+          requirement_id: req.id,
+          scope_kind: m.scope_kind,
+          scope_value: m.scope_value,
+          cadence: m.cadence,
+          jurisdiction: (req.jurisdiction as string | null) ?? "UT-DSPD",
+          proposed_by: "nectar",
+          confirmed: false,
+          rationale: m.rationale,
+          source_excerpt: m.source_excerpt,
+        });
+      if (!error) inserted += 1;
+    }
+
+    return { inserted, total: normalized.length, facts };
+  });
+
+export const listRequirementMappings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        requirementId: z.string().uuid().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    let q = supabase
+      .from("nectar_requirement_mappings")
+      .select(
+        "id, requirement_id, scope_kind, scope_value, cadence, jurisdiction, proposed_by, confirmed, confirmed_at, rationale, source_excerpt, created_at",
+      )
+      .eq("organization_id", data.organizationId)
+      .order("scope_kind", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (data.requirementId) q = q.eq("requirement_id", data.requirementId);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return { mappings: rows ?? [] };
+  });
+
+export const setRequirementMapping = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        id: z.string().uuid().optional(),
+        organizationId: z.string().uuid().optional(),
+        requirementId: z.string().uuid().optional(),
+        scopeKind: z.enum(SCOPE_KINDS).optional(),
+        scopeValue: z.string().max(80).nullable().optional(),
+        cadence: z
+          .enum(["annual", "quarterly", "monthly", "weekly", "per_shift", "once"])
+          .nullable()
+          .optional(),
+        jurisdiction: z.string().max(40).nullable().optional(),
+        confirmed: z.boolean().optional(),
+        rationale: z.string().max(1000).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const nowIso = new Date().toISOString();
+
+    if (data.id) {
+      const patch: {
+        scope_kind?: ScopeKind;
+        scope_value?: string | null;
+        cadence?: string | null;
+        jurisdiction?: string | null;
+        rationale?: string | null;
+        confirmed?: boolean;
+        confirmed_by?: string | null;
+        confirmed_at?: string | null;
+      } = {};
+      if (data.scopeKind) patch.scope_kind = data.scopeKind;
+      if (data.scopeValue !== undefined) patch.scope_value = data.scopeValue;
+      if (data.cadence !== undefined) patch.cadence = data.cadence;
+      if (data.jurisdiction !== undefined) patch.jurisdiction = data.jurisdiction;
+      if (data.rationale !== undefined) patch.rationale = data.rationale;
+      if (data.confirmed !== undefined) {
+        patch.confirmed = data.confirmed;
+        patch.confirmed_by = data.confirmed ? userId : null;
+        patch.confirmed_at = data.confirmed ? nowIso : null;
+      }
+
+      const { error } = await supabase
+        .from("nectar_requirement_mappings")
+        .update(patch)
+        .eq("id", data.id);
+      if (error) throw new Error(error.message);
+      return { id: data.id };
+    }
+
+    if (!data.organizationId || !data.requirementId || !data.scopeKind) {
+      throw new Error("organizationId, requirementId, scopeKind required to create");
+    }
+    const { data: row, error } = await supabase
+      .from("nectar_requirement_mappings")
+      .insert({
+        organization_id: data.organizationId,
+        requirement_id: data.requirementId,
+        scope_kind: data.scopeKind,
+        scope_value: data.scopeValue ?? null,
+        cadence: data.cadence ?? null,
+        jurisdiction: data.jurisdiction ?? "UT-DSPD",
+        proposed_by: "admin",
+        confirmed: data.confirmed ?? true,
+        confirmed_by: (data.confirmed ?? true) ? userId : null,
+        confirmed_at: (data.confirmed ?? true) ? nowIso : null,
+        rationale: data.rationale ?? null,
+      })
+      .select("id")
+      .single();
+    if (error || !row) throw new Error(error?.message ?? "Insert failed");
+    return { id: row.id as string };
+  });
+
+export const deleteRequirementMapping = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase
+      .from("nectar_requirement_mappings")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------- Resolver: which CONFIRMED requirements apply in this context? ----------
+// Downstream consumers (audit checklist, billing readiness, staff app, tasks)
+// call this instead of embedding their own rule tables.
+
+export const getApplicableRequirements = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        codes: z.array(z.string().max(40)).optional(),
+        roles: z.array(z.string().max(40)).optional(),
+        clientScoped: z.boolean().optional(),
+        providerWide: z.boolean().optional(),
+        jurisdiction: z.string().max(40).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    let q = supabase
+      .from("nectar_requirement_mappings")
+      .select(
+        "id, requirement_id, scope_kind, scope_value, cadence, jurisdiction, confirmed",
+      )
+      .eq("organization_id", data.organizationId)
+      .eq("confirmed", true);
+    if (data.jurisdiction) q = q.eq("jurisdiction", data.jurisdiction);
+    const { data: maps, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const codes = (data.codes ?? []).map((c) => c.toUpperCase());
+    const roles = (data.roles ?? []).map((r) => r.toUpperCase());
+    const wantClient = !!data.clientScoped;
+    const wantProvider = !!data.providerWide;
+
+    const matched = (maps ?? []).filter((m) => {
+      const k = m.scope_kind as ScopeKind;
+      if (k === "provider") return wantProvider;
+      if (k === "client") return wantClient;
+      if (k === "code")
+        return codes.includes(((m.scope_value as string) ?? "").toUpperCase());
+      if (k === "role")
+        return roles.includes(((m.scope_value as string) ?? "").toUpperCase());
+      return false;
+    });
+
+    const reqIds = Array.from(new Set(matched.map((m) => m.requirement_id as string)));
+    if (!reqIds.length) return { requirements: [], mappings: matched };
+
+    const { data: reqs } = await supabase
+      .from("nectar_requirements")
+      .select(
+        "id, title, description, category, source_citation, source_document_id, review_status, applies_to, jurisdiction",
+      )
+      .in("id", reqIds)
+      .eq("review_status", "confirmed");
+
+    return { requirements: reqs ?? [], mappings: matched };
+  });
+
+// Convenience: derive billing-readiness rules for a single service code.
+export const getBillingReadinessForCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        code: z.string().min(1).max(40),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const code = data.code.toUpperCase();
+    const { data: maps } = await supabase
+      .from("nectar_requirement_mappings")
+      .select("requirement_id")
+      .eq("organization_id", data.organizationId)
+      .eq("confirmed", true)
+      .eq("scope_kind", "code")
+      .eq("scope_value", code);
+    const ids = Array.from(new Set((maps ?? []).map((m) => m.requirement_id as string)));
+    if (!ids.length) return { code, rules: [] };
+    const { data: reqs } = await supabase
+      .from("nectar_requirements")
+      .select("id, title, description, category, source_citation")
+      .in("id", ids)
+      .eq("review_status", "confirmed");
+    return { code, rules: reqs ?? [] };
+  });
+
+// Surfaces requirements that need admin attention from the engine's POV:
+// (a) confirmed requirement with NO confirmed mapping yet, or
+// (b) any unknown-scope mapping still unconfirmed.
+export const listEngineGapsAsTasks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ organizationId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const [reqsRes, mapsRes] = await Promise.all([
+      supabase
+        .from("nectar_requirements")
+        .select("id, title, source_citation")
+        .eq("organization_id", data.organizationId)
+        .eq("review_status", "confirmed"),
+      supabase
+        .from("nectar_requirement_mappings")
+        .select("requirement_id, scope_kind, confirmed")
+        .eq("organization_id", data.organizationId),
+    ]);
+    const reqs = (reqsRes.data ?? []) as Array<{
+      id: string;
+      title: string;
+      source_citation: string | null;
+    }>;
+    const maps = (mapsRes.data ?? []) as Array<{
+      requirement_id: string;
+      scope_kind: string;
+      confirmed: boolean;
+    }>;
+    const confirmedByReq = new Map<string, number>();
+    const unknownByReq = new Map<string, number>();
+    for (const m of maps) {
+      if (m.confirmed)
+        confirmedByReq.set(m.requirement_id, (confirmedByReq.get(m.requirement_id) ?? 0) + 1);
+      if (m.scope_kind === "unknown" && !m.confirmed)
+        unknownByReq.set(m.requirement_id, (unknownByReq.get(m.requirement_id) ?? 0) + 1);
+    }
+    const tasks = reqs
+      .map((r) => {
+        const confirmed = confirmedByReq.get(r.id) ?? 0;
+        const unknown = unknownByReq.get(r.id) ?? 0;
+        if (confirmed === 0)
+          return {
+            requirement_id: r.id,
+            title: r.title,
+            citation: r.source_citation,
+            reason: "no_mapping" as const,
+            label: "Scope not mapped — NECTAR needs you to confirm who this applies to.",
+          };
+        if (unknown > 0)
+          return {
+            requirement_id: r.id,
+            title: r.title,
+            citation: r.source_citation,
+            reason: "unknown_scope" as const,
+            label: "Scope flagged for review — resolve unknown mapping.",
+          };
+        return null;
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x);
+    return { tasks };
+  });

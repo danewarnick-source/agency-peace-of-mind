@@ -61,6 +61,14 @@ import {
   listAttestations,
   ingestWebSource,
 } from "@/lib/authoritative-sources.functions";
+import {
+  proposeRequirementMappings,
+  listRequirementMappings,
+  setRequirementMapping,
+  deleteRequirementMapping,
+} from "@/lib/nectar-engine.functions";
+import { Sparkle, X as XIcon } from "lucide-react";
+
 
 
 export const Route = createFileRoute("/dashboard/authoritative-sources")({
@@ -1138,9 +1146,9 @@ function RequirementRow({
   const [acknowledged, setAcknowledged] = useState(false);
 
   return (
-    <li
-      className={`flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between ${isRemoved ? "opacity-55" : ""}`}
-    >
+    <li className={`py-3 ${isRemoved ? "opacity-55" : ""}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span
@@ -1325,9 +1333,14 @@ function RequirementRow({
           </>
         )}
       </div>
+      </div>
+      {!isRemoved && (
+        <ApplicabilityPanel orgId={orgId} requirementId={req.id} />
+      )}
     </li>
   );
 }
+
 
 
 
@@ -1475,6 +1488,300 @@ function AttestationsPanel({ orgId }: { orgId: string }) {
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+// ---------- NECTAR Requirements Engine — applicability mapping ----------
+// Per-requirement scope panel: NECTAR proposes which parts of the operation
+// this requirement governs (provider-wide, by code, by role, by client);
+// admin confirms or corrects. Drives audit checklists, billing readiness,
+// staff app capture, and tasks downstream.
+
+interface MappingRow {
+  id: string;
+  requirement_id: string;
+  scope_kind: "provider" | "code" | "role" | "client" | "unknown";
+  scope_value: string | null;
+  cadence: string | null;
+  jurisdiction: string | null;
+  proposed_by: "nectar" | "admin";
+  confirmed: boolean;
+  confirmed_at: string | null;
+  rationale: string | null;
+  source_excerpt: string | null;
+}
+
+const SCOPE_LABEL: Record<MappingRow["scope_kind"], string> = {
+  provider: "Provider-wide",
+  code: "Service code",
+  role: "Staff role",
+  client: "Per client",
+  unknown: "Needs review",
+};
+
+function ApplicabilityPanel({
+  orgId,
+  requirementId,
+}: {
+  orgId: string;
+  requirementId: string;
+}) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listRequirementMappings);
+  const proposeFn = useServerFn(proposeRequirementMappings);
+  const setFn = useServerFn(setRequirementMapping);
+  const delFn = useServerFn(deleteRequirementMapping);
+  const [open, setOpen] = useState(false);
+  const [addKind, setAddKind] = useState<MappingRow["scope_kind"]>("code");
+  const [addValue, setAddValue] = useState("");
+
+  const q = useQuery({
+    enabled: open,
+    queryKey: ["req-mappings", orgId, requirementId],
+    queryFn: () =>
+      listFn({ data: { organizationId: orgId, requirementId } }),
+  });
+
+  const propose = useMutation({
+    mutationFn: () => proposeFn({ data: { requirementId } }),
+    onSuccess: (r) => {
+      toast.success(
+        r.inserted > 0
+          ? `NECTAR proposed ${r.inserted} scope${r.inserted === 1 ? "" : "s"}.`
+          : "NECTAR couldn't confidently propose a scope — add one manually.",
+      );
+      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const confirm = useMutation({
+    mutationFn: (id: string) =>
+      setFn({ data: { id, confirmed: true } }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => delFn({ data: { id } }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const add = useMutation({
+    mutationFn: () => {
+      const k = addKind;
+      const v = (k === "provider" || k === "unknown")
+        ? null
+        : k === "client"
+          ? "*"
+          : addValue.trim().toUpperCase();
+      if ((k === "code" || k === "role") && !v)
+        throw new Error("Enter a code or role key");
+      return setFn({
+        data: {
+          organizationId: orgId,
+          requirementId,
+          scopeKind: k,
+          scopeValue: v,
+          confirmed: true,
+          rationale: "Manually added by admin.",
+        },
+      });
+    },
+    onSuccess: () => {
+      setAddValue("");
+      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] });
+      toast.success("Scope added.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rows = (q.data?.mappings ?? []) as unknown as MappingRow[];
+  const hasAny = rows.length > 0;
+  const confirmedCount = rows.filter((r) => r.confirmed).length;
+  const pendingCount = rows.filter((r) => !r.confirmed).length;
+  const unknownCount = rows.filter((r) => r.scope_kind === "unknown").length;
+
+  return (
+    <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-50/40 dark:bg-amber-500/5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full min-h-[36px] items-center justify-between gap-2 px-3 py-2 text-left text-[11px]"
+      >
+        <span className="flex items-center gap-1.5 font-semibold uppercase tracking-wide text-[#d97a1c]">
+          <Sparkle className="h-3 w-3" /> NECTAR Applicability
+        </span>
+        <span className="flex items-center gap-2 text-muted-foreground">
+          {hasAny ? (
+            <>
+              <span>{confirmedCount} confirmed</span>
+              {pendingCount > 0 && (
+                <Badge className="bg-amber-500/20 text-[10px] text-amber-900 dark:text-amber-200">
+                  {pendingCount} to review
+                </Badge>
+              )}
+              {unknownCount > 0 && (
+                <Badge variant="outline" className="text-[10px] text-red-700 dark:text-red-300">
+                  {unknownCount} unknown
+                </Badge>
+              )}
+            </>
+          ) : (
+            <span className="italic">No scope mapped yet</span>
+          )}
+          <span aria-hidden>{open ? "▾" : "▸"}</span>
+        </span>
+      </button>
+
+      {open && (
+        <div className="space-y-3 border-t border-amber-500/20 px-3 py-3 text-xs">
+          <p className="text-[11px] text-muted-foreground">
+            NECTAR proposes who/what this requirement governs based on your live
+            service codes, staff roles, and clients. Confirm or correct each
+            scope — the audit checklist, billing readiness, and staff app pull
+            from confirmed scopes.
+          </p>
+
+          {q.isLoading && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Loading…
+            </div>
+          )}
+
+          {!q.isLoading && rows.length === 0 && (
+            <div className="rounded-md border border-dashed border-amber-500/30 p-3 text-muted-foreground">
+              No scopes proposed yet. Ask NECTAR to propose, or add one manually.
+            </div>
+          )}
+
+          {rows.length > 0 && (
+            <ul className="space-y-1.5">
+              {rows.map((m) => (
+                <li
+                  key={m.id}
+                  className={`flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 ${
+                    m.scope_kind === "unknown"
+                      ? "border-red-500/40 bg-red-500/5"
+                      : m.confirmed
+                        ? "border-emerald-500/30 bg-emerald-500/5"
+                        : "border-amber-500/30 bg-amber-500/5"
+                  }`}
+                >
+                  <Badge variant="outline" className="text-[10px]">
+                    {SCOPE_LABEL[m.scope_kind]}
+                  </Badge>
+                  {m.scope_value && m.scope_value !== "*" && (
+                    <span className="font-mono text-[11px] font-semibold">
+                      {m.scope_value}
+                    </span>
+                  )}
+                  {m.cadence && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {m.cadence}
+                    </Badge>
+                  )}
+                  {m.proposed_by === "nectar" && !m.confirmed && (
+                    <Badge className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]">
+                      proposed
+                    </Badge>
+                  )}
+                  {m.confirmed && (
+                    <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
+                      confirmed
+                    </Badge>
+                  )}
+                  {m.rationale && (
+                    <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                      {m.rationale}
+                    </span>
+                  )}
+                  <div className="ml-auto flex gap-1">
+                    {!m.confirmed && m.scope_kind !== "unknown" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-[11px]"
+                        disabled={confirm.isPending}
+                        onClick={() => confirm.mutate(m.id)}
+                      >
+                        Confirm
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-1.5 text-red-700 hover:bg-red-500/10 dark:text-red-300"
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate(m.id)}
+                      aria-label="Remove scope"
+                    >
+                      <XIcon className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex flex-wrap items-end gap-2 border-t border-amber-500/20 pt-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-[11px]"
+              disabled={propose.isPending}
+              onClick={() => propose.mutate()}
+            >
+              {propose.isPending ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <Sparkles className="mr-1 h-3 w-3" />
+              )}
+              Ask NECTAR to propose
+            </Button>
+
+            <div className="flex items-end gap-1.5">
+              <div>
+                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Add scope
+                </Label>
+                <Select
+                  value={addKind}
+                  onValueChange={(v) => setAddKind(v as MappingRow["scope_kind"])}
+                >
+                  <SelectTrigger className="h-8 w-[140px] text-[11px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="provider">Provider-wide</SelectItem>
+                    <SelectItem value="code">Service code</SelectItem>
+                    <SelectItem value="role">Staff role</SelectItem>
+                    <SelectItem value="client">Per client</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {(addKind === "code" || addKind === "role") && (
+                <Input
+                  value={addValue}
+                  onChange={(e) => setAddValue(e.target.value)}
+                  placeholder={addKind === "code" ? "HHS" : "RN"}
+                  className="h-8 w-24 text-[11px]"
+                />
+              )}
+              <Button
+                size="sm"
+                className="h-8 text-[11px]"
+                disabled={add.isPending}
+                onClick={() => add.mutate()}
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

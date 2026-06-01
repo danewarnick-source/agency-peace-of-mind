@@ -421,12 +421,16 @@ export const setRequirementReviewStatus = createServerFn({ method: "POST" })
       .eq("id", userId)
       .maybeSingle();
 
-    const statement =
+    const defaultStatement =
       data.status === "confirmed"
         ? `Confirmed requirement "${req.title}" as accurate and applicable to my agency${sourceTitle ? ` (from "${sourceTitle}")` : ""}.`
         : data.status === "removed"
           ? `Removed requirement "${req.title}" from the active set${sourceTitle ? ` (drafted from "${sourceTitle}")` : ""}. NECTAR will stop pulling from it; the record is retained for the review trail.`
           : `Re-opened requirement "${req.title}" for review${sourceTitle ? ` (drafted from "${sourceTitle}")` : ""}.`;
+
+    const statement = data.attestStatement?.trim()
+      ? data.attestStatement.trim()
+      : defaultStatement;
 
     await supabase.from("nectar_attestations").insert({
       organization_id: req.organization_id,
@@ -444,6 +448,7 @@ export const setRequirementReviewStatus = createServerFn({ method: "POST" })
         source_citation: req.source_citation,
         previous_status: req.review_status,
         new_status: data.status,
+        user_acknowledged: !!data.attestStatement,
       },
     });
 

@@ -193,7 +193,7 @@ export const listAuthoritativeSources = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabase
       .from("nectar_documents")
       .select(
-        "id, title, document_type, authoritative_kind, fiscal_year, effective_start, effective_end, file_name, uploaded_by_name, created_at, parse_status, is_current, version",
+        "id, title, document_type, authoritative_kind, fiscal_year, effective_start, effective_end, file_name, uploaded_by_name, created_at, parse_status, is_current, version, metadata",
       )
       .eq("organization_id", data.organizationId)
       .eq("is_authoritative_source", true)

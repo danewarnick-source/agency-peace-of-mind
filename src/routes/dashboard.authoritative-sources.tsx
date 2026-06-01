@@ -1197,7 +1197,17 @@ function RequirementRow({
           </p>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 px-2 text-[11px] text-muted-foreground"
+          onClick={() => setDetailOpen(true)}
+          aria-label="Open requirement detail"
+          title="Open requirement detail"
+        >
+          <Info className="mr-1 h-3.5 w-3.5" /> Details
+        </Button>
         {isRemoved ? (
           <Button
             size="sm"

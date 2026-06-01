@@ -82,6 +82,9 @@ function classifyFile(name: string): StagedFile["kind"] {
 }
 
 function CompanyMigrationPage() {
+  const [targetOrgId, setTargetOrgId] = useState<string>("");
+  const [engagementStatus, setEngagementStatus] = useState<EngagementStatus>("quoted");
+  const [quoteAmount, setQuoteAmount] = useState<string>("2000");
   const [files, setFiles] = useState<StagedFile[]>([]);
   const [phase, setPhase] = useState<"idle" | "analyzing" | "preview" | "importing" | "done">("idle");
   const [progress, setProgress] = useState(0);
@@ -94,6 +97,14 @@ function CompanyMigrationPage() {
     documents: true,
     history: true,
   });
+
+  const listCompaniesFn = useServerFn(listCompanies);
+  const companiesQ = useQuery<CompanyRow[]>({
+    queryKey: ["hive-exec-companies-migration"],
+    queryFn: () => listCompaniesFn(),
+    staleTime: 60_000,
+  });
+  const targetCompany = companiesQ.data?.find((c) => c.organization_id === targetOrgId) ?? null;
 
   const onPickFiles = (list: FileList | null) => {
     if (!list) return;

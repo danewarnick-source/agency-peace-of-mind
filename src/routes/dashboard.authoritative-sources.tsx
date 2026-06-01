@@ -51,8 +51,8 @@ import {
   markAsAuthoritativeSource,
   listRequirements,
   generateRequirementsFromSource,
-  verifyRequirement,
   upsertRequirement,
+
   setRequirementReviewStatus,
   listAttestations,
   ingestWebSource,

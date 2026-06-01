@@ -76,7 +76,7 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
 
           {isAdminCapable && (
             <div className="mt-5">
-              <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/55">
+              <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/80">
                 Portal View
               </label>
               <Select value={view} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile")}>

@@ -138,6 +138,76 @@ export const getCompanyOverview = createServerFn({ method: "POST" })
       return n;
     }, 0);
 
+    // --- Platform-wide Task Center sources ---
+    const in7 = new Date(now.getTime() + 7 * 86_400_000).toISOString();
+
+    const requirementsNeedingReview = await safe(async () => {
+      const { count } = await sb
+        .from("nectar_requirements")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("review_status", "needs_attention");
+      return count ?? 0;
+    }, 0);
+
+    const engineMappingGaps = await safe(async () => {
+      const [{ data: reqs }, { data: maps }] = await Promise.all([
+        sb.from("nectar_requirements").select("id").eq("organization_id", orgId).eq("review_status", "confirmed"),
+        sb.from("nectar_requirement_mappings").select("requirement_id, scope_kind, confirmed").eq("organization_id", orgId),
+      ]);
+      const confirmed = new Set<string>();
+      const unknown = new Set<string>();
+      for (const m of (maps ?? []) as Array<{ requirement_id: string; scope_kind: string; confirmed: boolean }>) {
+        if (m.confirmed) confirmed.add(m.requirement_id);
+        if (m.scope_kind === "unknown" && !m.confirmed) unknown.add(m.requirement_id);
+      }
+      let gaps = 0;
+      for (const r of (reqs ?? []) as Array<{ id: string }>) {
+        if (!confirmed.has(r.id) || unknown.has(r.id)) gaps += 1;
+      }
+      return gaps;
+    }, 0);
+
+    const pendingBillingWarnings = await safe(async () => {
+      const { count } = await sb
+        .from("billing_submission_warnings")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("status", "pending");
+      return count ?? 0;
+    }, 0);
+
+    const pendingReimbursements = await safe(async () => {
+      const { count } = await sb
+        .from("activity_reimbursement_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("status", "pending");
+      return count ?? 0;
+    }, 0);
+
+    const unacceptedShifts = await safe(async () => {
+      const { count } = await sb
+        .from("scheduled_shifts")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("published", true)
+        .eq("status", "pending")
+        .gte("starts_at", now.toISOString());
+      return count ?? 0;
+    }, 0);
+
+    const auditorSharesExpiring = await safe(async () => {
+      const { count } = await sb
+        .from("auditor_shares")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .is("revoked_at", null)
+        .lte("ends_at", in7)
+        .gte("ends_at", now.toISOString());
+      return count ?? 0;
+    }, 0);
+
     const attention: Attention = {
       expiringCredentials,
       missingDailyLogs,
@@ -146,6 +216,12 @@ export const getCompanyOverview = createServerFn({ method: "POST" })
       claimsReady,
       pendingPayroll,
       clientsOffPace,
+      requirementsNeedingReview,
+      engineMappingGaps,
+      pendingBillingWarnings,
+      pendingReimbursements,
+      unacceptedShifts,
+      auditorSharesExpiring,
     };
 
     // --- Celebrations ---

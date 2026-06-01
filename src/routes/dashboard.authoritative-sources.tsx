@@ -2250,7 +2250,7 @@ function RequirementDetailDialog({
                     onOpenChange(false);
                   }}
                 >
-                  Unconfirm
+                  Unconfirm requirement
                 </Button>
               ) : (
                 <Button

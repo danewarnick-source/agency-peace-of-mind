@@ -155,13 +155,7 @@ function Overview() {
   return (
     <div className="space-y-8">
       {showAdmin && (
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">Company Overview</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Real-time compliance status across your organization.
-            </p>
-          </div>
+        <div className="flex items-start justify-end">
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="shrink-0">
@@ -199,22 +193,7 @@ function Overview() {
         </div>
       )}
 
-      {showAdmin && org && (
-        <div className="rounded-lg border border-accent/20 bg-accent/5 p-4 text-center space-y-2">
-          <p className="text-base font-semibold">Admin tools have moved</p>
-          <p className="text-sm text-muted-foreground">
-            The Agency Command Center is your new daily triage desk — urgent items,
-            pending reviews, approved records, and analytics all in one place.
-          </p>
-          <a
-            href="/dashboard/command-center"
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 h-10 text-sm font-semibold text-accent-foreground hover:bg-accent/90 transition mt-2"
-          >
-            Open Agency Command Center <ArrowRight className="h-4 w-4" />
-          </a>
-        </div>
-
-      )}
+      {showAdmin && <CompanyOverview />}
 
       {!showAdmin && (
         <div className="space-y-6">

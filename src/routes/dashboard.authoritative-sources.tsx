@@ -1336,6 +1336,7 @@ function RequirementRow({
 }) {
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
+  const confirmAllFn = useServerFn(confirmRequirementWithScopes);
   const set = useMutation({
     mutationFn: (vars: { status: ReviewStatus; attestStatement?: string }) =>
       setStatusFn({
@@ -1357,15 +1358,41 @@ function RequirementRow({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const confirmAll = useMutation({
+    mutationFn: () => confirmAllFn({ data: { requirementId: req.id } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, req.id] });
+      qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
+      qc.invalidateQueries({ queryKey: ["attestations", orgId] });
+      toast.success(
+        r.scopesConfirmed > 0
+          ? `Confirmed requirement + ${r.scopesConfirmed} applicability scope${
+              r.scopesConfirmed === 1 ? "" : "s"
+            }.`
+          : "Confirmed requirement.",
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const status = statusOf(req);
   const isRemoved = status === "removed";
   const isConfirmed = status === "confirmed";
   const isFromAuthSource = req.origin === "document" && !!req.source_document_id;
 
+  // NECTAR pre-fill awareness: if there are pending non-unknown proposals,
+  // the admin can approve requirement + scope together in one click.
+  const pendingProposals = applicStats
+    ? Math.max(0, applicStats.pending - applicStats.unknown)
+    : 0;
+  const hasPrefilledProposals = pendingProposals > 0 && !isConfirmed && !isRemoved;
+  const hasUnknownProposals = (applicStats?.unknown ?? 0) > 0;
+
   const [removeOpen, setRemoveOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+
 
   return (
     <li className={`py-3 ${isRemoved ? "opacity-55" : ""}`}>

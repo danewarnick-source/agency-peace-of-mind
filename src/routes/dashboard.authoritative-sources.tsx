@@ -288,11 +288,13 @@ function SourcesPanel({
   onJumpToRequirements: (docId: string) => void;
 }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
   const listFn = useServerFn(listAuthoritativeSources);
   const { data, isLoading } = useQuery({
     queryKey: ["auth-sources", orgId],
     queryFn: () => listFn({ data: { organizationId: orgId } }),
   });
+
 
   // Per-source draft stats so the pill on each row can show
   // total / confirmed / needs / removed and last-drafted time.

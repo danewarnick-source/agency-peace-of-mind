@@ -1155,11 +1155,14 @@ function RequirementRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`text-sm font-medium ${isRemoved ? "line-through decoration-muted-foreground/60" : ""}`}
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            className={`rounded-sm text-left text-sm font-medium underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-amber-500/40 ${isRemoved ? "line-through decoration-muted-foreground/60" : ""}`}
+            title="Open full requirement detail"
           >
             {req.title}
-          </span>
+          </button>
           {req.category && (
             <Badge variant="outline" className="text-[10px]">
               {req.category}

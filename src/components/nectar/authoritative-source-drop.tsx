@@ -66,14 +66,36 @@ interface Draft {
   issuingAuthority: string;
   notes: string;
   routeWarning: string | null;
+  /** Hard block: this file type is always a client/staff record, never authoritative. */
+  routeBlock: { label: string; reason: string } | null;
 }
 
-// Heuristic guardrail: detect files that look like client/staff records.
+// Hard block: documents that are always client/staff records.
+// Rule: if a document is about one named person, it's a Company Doc.
+// PCSPs and 1056 budgets are the canonical straddlers — force them to Company Docs.
+function detectRouteBlock(fileName: string): { label: string; reason: string } | null {
+  const n = fileName.toLowerCase();
+  if (/\bpcsp\b/.test(n)) {
+    return {
+      label: "PCSP",
+      reason:
+        "PCSPs are always client records. Upload to Company Docs — NECTAR will extract the authoritative billing data (service codes, rates, max units, plan start/end, financial eligibility) into the billing layer for that client, while the PCSP file itself lives with the client's records.",
+    };
+  }
+  if (/1056|budget/.test(n)) {
+    return {
+      label: "1056 budget",
+      reason:
+        "1056 budgets are client-specific. Upload to Company Docs against the client — NECTAR pulls the billing-relevant figures into the billing layer automatically.",
+    };
+  }
+  return null;
+}
+
+// Soft guardrail: looks like a client/staff record but not hard-blocked.
 function detectRouteWarning(fileName: string): string | null {
   const n = fileName.toLowerCase();
   const clientyHits = [
-    { re: /\bpcsp\b/, label: "PCSP" },
-    { re: /1056|budget/, label: "1056 budget" },
     { re: /referral/, label: "referral" },
     { re: /\bintake\b/, label: "intake" },
     { re: /assessment/, label: "assessment" },

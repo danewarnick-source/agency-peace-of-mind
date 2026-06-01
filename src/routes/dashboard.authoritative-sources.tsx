@@ -1149,8 +1149,16 @@ function DocumentRequirementGroup({
             {counts.total} total
           </Badge>
           <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
-            {counts.confirmed} confirmed
+            {counts.fullyConfirmed} fully confirmed
           </Badge>
+          {counts.scopePending > 0 && (
+            <Badge
+              className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]"
+              title="Requirement confirmed, but NECTAR applicability scope still needs review"
+            >
+              {counts.scopePending} scope pending
+            </Badge>
+          )}
           <Badge
             className={
               counts.needs > 0
@@ -1180,7 +1188,13 @@ function DocumentRequirementGroup({
             </li>
           )}
           {group.items.map((r) => (
-            <RequirementRow key={r.id} req={r} orgId={orgId} sourceMeta={group.source} />
+            <RequirementRow
+              key={r.id}
+              req={r}
+              orgId={orgId}
+              sourceMeta={group.source}
+              applicStats={applicByReq.get(r.id)}
+            />
           ))}
         </ul>
       )}

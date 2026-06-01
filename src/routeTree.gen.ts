@@ -73,6 +73,8 @@ import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashb
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
 import { Route as DashboardHiveExecPlansRouteImport } from './routes/dashboard.hive-exec.plans'
+import { Route as DashboardHiveExecPermissionsRouteImport } from './routes/dashboard.hive-exec.permissions'
+import { Route as DashboardHiveExecNewCompanyRouteImport } from './routes/dashboard.hive-exec.new-company'
 import { Route as DashboardHiveExecHealthRouteImport } from './routes/dashboard.hive-exec.health'
 import { Route as DashboardHiveExecCompanyMigrationRouteImport } from './routes/dashboard.hive-exec.company-migration'
 import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
@@ -418,6 +420,18 @@ const DashboardHiveExecPlansRoute = DashboardHiveExecPlansRouteImport.update({
   path: '/plans',
   getParentRoute: () => DashboardHiveExecRoute,
 } as any)
+const DashboardHiveExecPermissionsRoute =
+  DashboardHiveExecPermissionsRouteImport.update({
+    id: '/permissions',
+    path: '/permissions',
+    getParentRoute: () => DashboardHiveExecRoute,
+  } as any)
+const DashboardHiveExecNewCompanyRoute =
+  DashboardHiveExecNewCompanyRouteImport.update({
+    id: '/new-company',
+    path: '/new-company',
+    getParentRoute: () => DashboardHiveExecRoute,
+  } as any)
 const DashboardHiveExecHealthRoute = DashboardHiveExecHealthRouteImport.update({
   id: '/health',
   path: '/health',
@@ -560,6 +574,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
+  '/dashboard/hive-exec/new-company': typeof DashboardHiveExecNewCompanyRoute
+  '/dashboard/hive-exec/permissions': typeof DashboardHiveExecPermissionsRoute
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -637,6 +653,8 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
+  '/dashboard/hive-exec/new-company': typeof DashboardHiveExecNewCompanyRoute
+  '/dashboard/hive-exec/permissions': typeof DashboardHiveExecPermissionsRoute
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -718,6 +736,8 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
+  '/dashboard/hive-exec/new-company': typeof DashboardHiveExecNewCompanyRoute
+  '/dashboard/hive-exec/permissions': typeof DashboardHiveExecPermissionsRoute
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
@@ -800,6 +820,8 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
+    | '/dashboard/hive-exec/new-company'
+    | '/dashboard/hive-exec/permissions'
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
@@ -877,6 +899,8 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
+    | '/dashboard/hive-exec/new-company'
+    | '/dashboard/hive-exec/permissions'
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
@@ -957,6 +981,8 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
+    | '/dashboard/hive-exec/new-company'
+    | '/dashboard/hive-exec/permissions'
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
@@ -1445,6 +1471,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHiveExecPlansRouteImport
       parentRoute: typeof DashboardHiveExecRoute
     }
+    '/dashboard/hive-exec/permissions': {
+      id: '/dashboard/hive-exec/permissions'
+      path: '/permissions'
+      fullPath: '/dashboard/hive-exec/permissions'
+      preLoaderRoute: typeof DashboardHiveExecPermissionsRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
+    '/dashboard/hive-exec/new-company': {
+      id: '/dashboard/hive-exec/new-company'
+      path: '/new-company'
+      fullPath: '/dashboard/hive-exec/new-company'
+      preLoaderRoute: typeof DashboardHiveExecNewCompanyRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
     '/dashboard/hive-exec/health': {
       id: '/dashboard/hive-exec/health'
       path: '/health'
@@ -1569,6 +1609,8 @@ interface DashboardHiveExecRouteChildren {
   DashboardHiveExecOrgIdRoute: typeof DashboardHiveExecOrgIdRoute
   DashboardHiveExecCompanyMigrationRoute: typeof DashboardHiveExecCompanyMigrationRoute
   DashboardHiveExecHealthRoute: typeof DashboardHiveExecHealthRoute
+  DashboardHiveExecNewCompanyRoute: typeof DashboardHiveExecNewCompanyRoute
+  DashboardHiveExecPermissionsRoute: typeof DashboardHiveExecPermissionsRoute
   DashboardHiveExecPlansRoute: typeof DashboardHiveExecPlansRoute
   DashboardHiveExecTicketsRoute: typeof DashboardHiveExecTicketsRoute
   DashboardHiveExecIndexRoute: typeof DashboardHiveExecIndexRoute
@@ -1579,6 +1621,8 @@ const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
   DashboardHiveExecCompanyMigrationRoute:
     DashboardHiveExecCompanyMigrationRoute,
   DashboardHiveExecHealthRoute: DashboardHiveExecHealthRoute,
+  DashboardHiveExecNewCompanyRoute: DashboardHiveExecNewCompanyRoute,
+  DashboardHiveExecPermissionsRoute: DashboardHiveExecPermissionsRoute,
   DashboardHiveExecPlansRoute: DashboardHiveExecPlansRoute,
   DashboardHiveExecTicketsRoute: DashboardHiveExecTicketsRoute,
   DashboardHiveExecIndexRoute: DashboardHiveExecIndexRoute,

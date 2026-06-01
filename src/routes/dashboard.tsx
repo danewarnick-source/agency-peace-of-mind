@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -104,6 +104,8 @@ function DashboardLayout() {
   const showExecSection = isExecutive && (rawView === "hive_exec" || rawView === "admin");
   const execNav: NavItem[] = [
     { to: "/dashboard/hive-exec", label: "Companies", icon: Building2, exact: true },
+    { to: "/dashboard/hive-exec/new-company", label: "Add Company", icon: Plus },
+    { to: "/dashboard/hive-exec/permissions", label: "Permissions & Roles", icon: UserCog },
     { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
     { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },
     { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },

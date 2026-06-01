@@ -157,7 +157,8 @@ Return STRICT JSON only:
 }
 
 Rules:
-- ONLY use scope_value codes/roles that appear in the provider's live entity list — do not invent new codes. If the requirement references a code/role the provider doesn't use, return "unknown" with a rationale.
+- ONLY use scope_value codes/roles that appear in the provider's CONTRACTED entity list (active OR dormant) — do not invent new codes. If the requirement references a code/role the provider isn't contracted for at all, return "unknown" with a rationale.
+- Dormant (authorized-but-unused) codes are valid scope_values — map to them anyway so coverage is in place when they activate.
 - Prefer the narrowest correct scope. A requirement that only applies under HHS is "code"+"HHS", not "provider".
 - If the requirement is genuinely agency-wide, return ONE provider mapping.
 - Output at most 6 mappings.`;

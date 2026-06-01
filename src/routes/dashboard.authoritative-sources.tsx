@@ -61,6 +61,14 @@ import {
   listAttestations,
   ingestWebSource,
 } from "@/lib/authoritative-sources.functions";
+import {
+  proposeRequirementMappings,
+  listRequirementMappings,
+  setRequirementMapping,
+  deleteRequirementMapping,
+} from "@/lib/nectar-engine.functions";
+import { Sparkle, X as XIcon } from "lucide-react";
+
 
 
 export const Route = createFileRoute("/dashboard/authoritative-sources")({

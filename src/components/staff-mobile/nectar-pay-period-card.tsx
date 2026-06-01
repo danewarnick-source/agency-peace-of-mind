@@ -195,6 +195,6 @@ export function NectarPayPeriodCard() {
           </ul>
         </div>
       )}
-    </section>
+    </NectarSurface>
   );
 }

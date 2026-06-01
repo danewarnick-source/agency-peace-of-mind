@@ -107,21 +107,29 @@ function NectarDocsPage() {
   const [search, setSearch] = useState("");
   const [docType, setDocType] = useState("all");
   const [ownerKind, setOwnerKind] = useState("all");
+  const [clientFilter, setClientFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
 
   const queryFn = useServerFn(queryDocuments);
   const qc = useQueryClient();
+  const { data: caseload } = useCaseload();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["nectar-docs", orgId, search, docType, ownerKind],
+    queryKey: ["nectar-docs", orgId, search, docType, ownerKind, clientFilter],
     queryFn: () =>
       queryFn({
         data: {
           organizationId: orgId!,
           search: search || undefined,
           documentType: docType === "all" ? undefined : docType,
-          ownerKind: ownerKind === "all" ? undefined : (ownerKind as never),
+          ownerKind:
+            clientFilter !== "all"
+              ? "client"
+              : ownerKind === "all"
+                ? undefined
+                : (ownerKind as never),
+          clientId: clientFilter === "all" ? undefined : clientFilter,
           currentOnly: true,
           limit: 200,
         },

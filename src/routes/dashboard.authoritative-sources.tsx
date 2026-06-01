@@ -1175,9 +1175,18 @@ function RequirementsPanel({
       {removedAuthoritative > 0 && (
         <div ref={removedRef} aria-hidden className="-mt-2 pt-2" />
       )}
+
+      <ReviewQueueDialog
+        open={queueOpen}
+        onOpenChange={setQueueOpen}
+        orgId={orgId}
+        items={queueItems}
+        applicByReq={applicByReq}
+      />
     </div>
   );
 }
+
 
 function DocumentRequirementGroup({
   group,

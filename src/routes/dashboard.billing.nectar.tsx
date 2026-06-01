@@ -55,11 +55,11 @@ function NectarPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <section className="rounded-xl border border-[#f4a93a]/30 bg-card p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#d97a1c]" />
-            <h2 className="font-display text-lg font-semibold">NECTAR utilization alerts</h2>
+            <NectarBadge size="sm" />
+            <h2 className="font-display text-lg font-semibold">Utilization alerts</h2>
             {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
           </div>
           <button

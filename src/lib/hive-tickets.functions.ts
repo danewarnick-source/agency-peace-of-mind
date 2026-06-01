@@ -246,7 +246,7 @@ export const updatePlatformTicket = createServerFn({ method: "POST" })
 
     const { error } = await supabase
       .from("hive_platform_tickets")
-      .update(patch)
+      .update(patch as never)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };

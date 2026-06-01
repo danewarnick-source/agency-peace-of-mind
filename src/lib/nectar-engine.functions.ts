@@ -262,7 +262,7 @@ export const proposeRequirementMappings = createServerFn({ method: "POST" })
             scope_kind: "unknown" as ScopeKind,
             scope_value: null,
             cadence: p.cadence ?? null,
-            rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't active for this provider — flagged for review.`,
+            rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't in the provider's contracted code set — flagged for review.`,
             source_excerpt: p.source_excerpt ?? null,
           };
         }
@@ -675,7 +675,7 @@ export const prefillRequirementMappings = createServerFn({ method: "POST" })
                   scope_kind: "unknown" as ScopeKind,
                   scope_value: null,
                   cadence: p.cadence ?? null,
-                  rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't active for this provider — flagged for review.`,
+                  rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't in the provider's contracted code set — flagged for review.`,
                   source_excerpt: p.source_excerpt ?? null,
                 };
               }

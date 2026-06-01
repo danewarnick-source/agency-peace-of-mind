@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation } from "@tanstack/react-query";
-import { Sparkles, AlertTriangle, TrendingDown, TrendingUp, Download, History, Loader2, Settings } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Sparkles, AlertTriangle, TrendingDown, TrendingUp, Download, History, Loader2, Settings, Save, Pin, PinOff, Trash2, Calendar, X, Play } from "lucide-react";
 import { useNectarAlerts, DEFAULT_NECTAR_ALERT_SETTINGS, type NectarAlert, type NectarAlertSettings } from "@/hooks/use-nectar-alerts";
 import { askNectarReport, type NectarReportResult } from "@/lib/nectar-reports.functions";
+import { listSavedReports, saveReport, deleteSavedReport, togglePinReport, upsertReportSchedule, unscheduleReport, type SavedReport } from "@/lib/saved-reports.functions";
+
 
 export const Route = createFileRoute("/dashboard/billing/nectar")({
   head: () => ({ meta: [{ title: "NECTAR — Billing" }] }),

@@ -27,7 +27,7 @@ export function ClientCapBars({
   const { data: billing } = useClientBillingCodes(clientId);
   const { data: usage } = useClientUtilization();
   const { settings } = useTimePaySettings();
-  const warnPct = settings.cap_warn_pct ?? 90;
+  const warnPct = (settings as unknown as { cap_warn_pct?: number }).cap_warn_pct ?? 90;
 
   if (!codes.length) return null;
   const rows = codes

@@ -9,6 +9,8 @@ import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { useClientUtilization, getUsage } from "@/hooks/use-client-utilization";
 import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
 import { useMobileShellContainer } from "@/components/staff-mobile/mobile-shell-context";
+
+type CapBehavior = "warn" | "acknowledge" | "auto_clock_out";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { unitsToHours, fmtHours } from "@/lib/billing-units";
 
@@ -25,7 +27,9 @@ export function CapThresholdModal() {
   const { data: billing } = useClientBillingCodes(clientId);
   const { data: usage } = useClientUtilization();
   const { settings } = useTimePaySettings();
-  const container = useMobileShellContainer();
+  const { container } = useMobileShellContainer();
+  const capBehavior = ((settings as unknown as { cap_behavior?: CapBehavior }).cap_behavior ?? "acknowledge") as CapBehavior;
+  const warnPct = (settings as unknown as { cap_warn_pct?: number }).cap_warn_pct ?? 90;
   const navigate = useNavigate();
 
   const ackedRef = useRef<Set<string>>(new Set());
@@ -56,7 +60,7 @@ export function CapThresholdModal() {
     );
     const totalHours = baseHours + liveHours;
     const pct = capHours > 0 ? (totalHours / capHours) * 100 : 0;
-    return { capHours, totalHours, pct, behavior: settings.cap_behavior, warnPct: settings.cap_warn_pct };
+    return { capHours, totalHours, pct, behavior: capBehavior, warnPct };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, billing, usage, settings, tick, code, clientId]);
 

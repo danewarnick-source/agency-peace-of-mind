@@ -1527,6 +1527,36 @@ export function PunchPad({
                 <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
               </div>
             )}
+            <NectarInfusionLock
+              featureName="NECTAR variance rescue"
+              benefit="Type a few words and NECTAR drafts an auditor-ready clock-out justification. You always review and confirm."
+            >
+              <div className="rounded-md border border-[color:var(--amber-300)] bg-[color:var(--amber-50)]/60 p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
+                  <Hexagon className="h-3.5 w-3.5" /> NECTAR · Variance rescue
+                </p>
+                <Textarea
+                  rows={2}
+                  value={outVarShorthand}
+                  onChange={(e) => setOutVarShorthand(e.target.value)}
+                  placeholder='Shorthand — e.g. "finished outing at park" or "dropped at day program"'
+                  maxLength={400}
+                  className="mt-2 text-sm"
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleDraftVariance("clock_out")}
+                    disabled={outVarDraftBusy || outVarShorthand.trim().length < 2}
+                    className="bg-[color:var(--amber-500)] text-[color:var(--navy-900)] hover:bg-[color:var(--amber-600)]"
+                  >
+                    {outVarDraftBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1 h-3.5 w-3.5" />}
+                    Draft justification
+                  </Button>
+                </div>
+              </div>
+            </NectarInfusionLock>
             <div className="grid gap-2">
               <Label htmlFor="out-variance-reason">Variance justification</Label>
               <Textarea
@@ -1538,6 +1568,7 @@ export function PunchPad({
                 maxLength={500}
               />
             </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => { setOutVariance(null); setOutVarianceReason(""); }}>
                 Cancel

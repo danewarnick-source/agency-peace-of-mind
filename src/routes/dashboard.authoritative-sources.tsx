@@ -1212,10 +1212,12 @@ function RequirementRow({
   req,
   orgId,
   sourceMeta,
+  applicStats,
 }: {
   req: ReqRow;
   orgId: string;
   sourceMeta?: SourceMeta | null;
+  applicStats?: ApplicStats;
 }) {
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);

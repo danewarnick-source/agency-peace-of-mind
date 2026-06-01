@@ -524,7 +524,9 @@ export function PunchPad({
 
   const hasGoalSelected    = baselineChecked || Object.values(checkedGoals).some(Boolean);
   const narrativeOk        = wordCount >= 50;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && !busy;
+  const nectarConfirmOk    = !nectarUsed || draftConfirmed;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && !busy;
+
 
   function openCompliance() {
     if (!active) return;

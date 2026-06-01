@@ -210,35 +210,44 @@ function DashboardLayout() {
         })}
 
         {effectiveView === "admin" && (
-
-          <div className="mt-4 border-t border-sidebar-border pt-4">
-            <div className="mb-1 flex items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]">
-              <Hexagon className="h-3 w-3 fill-[#fed7aa]/20" />
-              <span>NECTAR</span>
+          <div className="mt-5 border-t border-sidebar-border pt-5">
+            {/* Premium NECTAR section header */}
+            <div className="mb-2.5 flex items-start gap-2.5 px-3">
+              <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f4a93a]/15 ring-1 ring-[#f4a93a]/20">
+                <Hexagon className="h-4 w-4 text-[#f4a93a]" strokeWidth={2} />
+              </span>
+              <div className="min-w-0">
+                <span className="text-sm font-bold tracking-wide text-[#f4a93a]">NECTAR</span>
+                <p className="text-[11px] leading-relaxed text-sidebar-foreground/50">
+                  The brain. Tabs below feed it the data the rest of HIVE reads from.
+                </p>
+              </div>
             </div>
-            <p className="mb-2 px-3 text-[10px] text-sidebar-foreground/50">
-              The brain. Tabs below feed it the data the rest of HIVE reads from.
-            </p>
-            {NECTAR_NAV.map((item) => {
-              const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
-              const Icon = item.icon;
-              const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onClick={onNavigate}
-                  data-tour={`nav.${slug}`}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                    active
-                      ? "bg-[#d97a1c] text-white shadow-sm"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" /> {item.label}
-                </Link>
-              );
-            })}
+
+            {/* NECTAR nav cluster — unified amber family */}
+            <div className="mx-1 space-y-0.5 rounded-xl border border-[#f4a93a]/10 bg-[#f4a93a]/[0.04] p-1.5">
+              {NECTAR_NAV.map((item) => {
+                const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+                const Icon = item.icon;
+                const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={onNavigate}
+                    data-tour={`nav.${slug}`}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                      active
+                        ? "bg-[#d97a1c] text-white shadow-sm"
+                        : "text-sidebar-foreground/80 hover:bg-[#f4a93a]/10 hover:text-[#f4a93a]"
+                    }`}
+                  >
+                    <Icon className={`h-4 w-4 ${active ? "text-white" : "text-[#f4a93a]/80"}`} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         )}
       </nav>

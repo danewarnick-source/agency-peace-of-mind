@@ -305,7 +305,3 @@ function DecisionDialog({
     </Dialog>
   );
 }
-
-// Silence unused-import warnings during code-splitter pre-parse for memoization helpers
-const _unused = useMemo;
-void _unused;

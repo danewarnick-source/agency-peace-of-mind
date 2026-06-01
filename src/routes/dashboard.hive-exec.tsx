@@ -13,6 +13,8 @@ export const Route = createFileRoute("/dashboard/hive-exec")({
 
 const TABS = [
   { to: "/dashboard/hive-exec", label: "Companies", icon: Building2, exact: true },
+  { to: "/dashboard/hive-exec/new-company", label: "Add Company", icon: Plus },
+  { to: "/dashboard/hive-exec/permissions", label: "Permissions & Roles", icon: UserCog },
   { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
   { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },
   { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },

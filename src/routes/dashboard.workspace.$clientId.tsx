@@ -20,7 +20,9 @@ import {
   Pill,
   User,
   AlertTriangle,
+  Info,
 } from "lucide-react";
+import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 
 import { toast } from "sonner";
 import { AboutTab } from "@/components/workspace/about-tab";

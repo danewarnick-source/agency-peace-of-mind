@@ -2726,6 +2726,45 @@ export type Database = {
           },
         ]
       }
+      nectar_attestations: {
+        Row: {
+          attested_at: string
+          context: Json
+          id: string
+          organization_id: string
+          scope: string
+          scope_ref_id: string | null
+          scope_ref_type: string | null
+          statement: string
+          user_display_name: string | null
+          user_id: string
+        }
+        Insert: {
+          attested_at?: string
+          context?: Json
+          id?: string
+          organization_id: string
+          scope: string
+          scope_ref_id?: string | null
+          scope_ref_type?: string | null
+          statement: string
+          user_display_name?: string | null
+          user_id: string
+        }
+        Update: {
+          attested_at?: string
+          context?: Json
+          id?: string
+          organization_id?: string
+          scope?: string
+          scope_ref_id?: string | null
+          scope_ref_type?: string | null
+          statement?: string
+          user_display_name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       nectar_document_entities: {
         Row: {
           created_at: string
@@ -2766,6 +2805,7 @@ export type Database = {
       }
       nectar_documents: {
         Row: {
+          authoritative_kind: string | null
           category: string | null
           client_id: string | null
           created_at: string
@@ -2777,6 +2817,7 @@ export type Database = {
           file_size_bytes: number | null
           fiscal_year: string | null
           id: string
+          is_authoritative_source: boolean
           is_current: boolean
           medicaid_id: string | null
           metadata: Json
@@ -2800,6 +2841,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          authoritative_kind?: string | null
           category?: string | null
           client_id?: string | null
           created_at?: string
@@ -2811,6 +2853,7 @@ export type Database = {
           file_size_bytes?: number | null
           fiscal_year?: string | null
           id?: string
+          is_authoritative_source?: boolean
           is_current?: boolean
           medicaid_id?: string | null
           metadata?: Json
@@ -2834,6 +2877,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          authoritative_kind?: string | null
           category?: string | null
           client_id?: string | null
           created_at?: string
@@ -2845,6 +2889,7 @@ export type Database = {
           file_size_bytes?: number | null
           fiscal_year?: string | null
           id?: string
+          is_authoritative_source?: boolean
           is_current?: boolean
           medicaid_id?: string | null
           metadata?: Json
@@ -3042,6 +3087,71 @@ export type Database = {
             columns: ["saved_report_id"]
             isOneToOne: false
             referencedRelation: "nectar_saved_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nectar_requirements: {
+        Row: {
+          applies_to: string | null
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          metadata: Json
+          organization_id: string
+          origin: string
+          requirement_key: string
+          source_citation: string | null
+          source_document_id: string | null
+          title: string
+          updated_at: string
+          verified: boolean
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          applies_to?: string | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json
+          organization_id: string
+          origin?: string
+          requirement_key: string
+          source_citation?: string | null
+          source_document_id?: string | null
+          title: string
+          updated_at?: string
+          verified?: boolean
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          applies_to?: string | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          origin?: string
+          requirement_key?: string
+          source_citation?: string | null
+          source_document_id?: string | null
+          title?: string
+          updated_at?: string
+          verified?: boolean
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_requirements_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_documents"
             referencedColumns: ["id"]
           },
         ]

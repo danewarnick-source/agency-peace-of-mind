@@ -40,6 +40,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { parseAndProduceAuditPacket } from "@/lib/audit-packet.functions";
+import { AttestationBanner } from "@/components/nectar/attestation-banner";
 
 export const Route = createFileRoute("/dashboard/audit")({
   head: () => ({ meta: [{ title: "Audit — HIVE" }] }),
@@ -133,7 +134,7 @@ function AuditPage() {
           <div>
             <h1 className="text-2xl font-semibold">Audit</h1>
             <p className="text-sm text-muted-foreground">
-              Audit folders organized by timeline. Upload a state audit letter and HIVE auto-produces the checklist.
+              Audit folders organized by timeline. Upload a state audit letter and HIVE auto-produces the checklist, grounded in your uploaded SOW and contracts.
             </p>
           </div>
         </div>
@@ -141,6 +142,16 @@ function AuditPage() {
           <Plus className="h-4 w-4" /> New audit folder
         </Button>
       </div>
+
+      {orgId && (
+        <AttestationBanner
+          organizationId={orgId}
+          scope="audit_packet"
+          mode="nudge"
+          compact
+          statement="Audit checklists are derived from the SOW, contracts, and requirement documents you uploaded under Authoritative Sources. Items without a traced source are flagged Unverified — review every item for accuracy before submitting to the State."
+        />
+      )}
 
       {isLoading && (
         <div className="text-sm text-muted-foreground flex items-center gap-2">

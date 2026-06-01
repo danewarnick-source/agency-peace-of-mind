@@ -275,6 +275,12 @@ export function AuthoritativeSourceDrop({
 
   const handleSaveAndNext = async () => {
     if (!current) return;
+    if (current.routeBlock) {
+      toast.error(
+        `${current.routeBlock.label} files route to Company Docs, not Authoritative Sources.`,
+      );
+      return;
+    }
     if (!current.title.trim()) {
       toast.error("Title is required");
       return;

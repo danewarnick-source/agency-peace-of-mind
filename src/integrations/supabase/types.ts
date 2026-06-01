@@ -378,6 +378,152 @@ export type Database = {
         }
         Relationships: []
       }
+      auditor_share_access_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          organization_id: string
+          payload: Json
+          share_id: string
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          organization_id: string
+          payload?: Json
+          share_id: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          organization_id?: string
+          payload?: Json
+          share_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auditor_share_access_log_share_id_fkey"
+            columns: ["share_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_shares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      auditor_share_items: {
+        Row: {
+          audit_file_id: string | null
+          created_at: string
+          id: string
+          packet_item_id: string | null
+          share_id: string
+        }
+        Insert: {
+          audit_file_id?: string | null
+          created_at?: string
+          id?: string
+          packet_item_id?: string | null
+          share_id: string
+        }
+        Update: {
+          audit_file_id?: string | null
+          created_at?: string
+          id?: string
+          packet_item_id?: string | null
+          share_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auditor_share_items_audit_file_id_fkey"
+            columns: ["audit_file_id"]
+            isOneToOne: false
+            referencedRelation: "audit_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auditor_share_items_packet_item_id_fkey"
+            columns: ["packet_item_id"]
+            isOneToOne: false
+            referencedRelation: "audit_packet_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auditor_share_items_share_id_fkey"
+            columns: ["share_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_shares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      auditor_shares: {
+        Row: {
+          created_at: string
+          created_by: string
+          ends_at: string
+          id: string
+          message: string | null
+          organization_id: string
+          packet_id: string
+          recipient_email: string
+          revoked_at: string | null
+          revoked_by: string | null
+          share_all_items: boolean
+          starts_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          ends_at: string
+          id?: string
+          message?: string | null
+          organization_id: string
+          packet_id: string
+          recipient_email: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          share_all_items?: boolean
+          starts_at: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          ends_at?: string
+          id?: string
+          message?: string | null
+          organization_id?: string
+          packet_id?: string
+          recipient_email?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          share_all_items?: boolean
+          starts_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auditor_shares_packet_id_fkey"
+            columns: ["packet_id"]
+            isOneToOne: false
+            referencedRelation: "audit_packets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_submission_audit_log: {
         Row: {
           action: string

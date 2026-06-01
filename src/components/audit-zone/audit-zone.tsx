@@ -223,6 +223,7 @@ function DocumentPull({ orgId }: { orgId?: string }) {
                 <SelectItem value="billing">Billing (520)</SelectItem>
                 <SelectItem value="client">Client docs</SelectItem>
                 <SelectItem value="incident">Incidents</SelectItem>
+                <SelectItem value="client_spending">Client Spending</SelectItem>
               </SelectContent>
             </Select>
           </div>

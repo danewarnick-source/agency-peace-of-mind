@@ -277,7 +277,8 @@ function DashboardLayout() {
     </>
   );
 
-  const allNav = showExecSection ? [...nav, ...execNav] : nav;
+  const nectarNavForView = effectiveView === "admin" ? NECTAR_NAV : [];
+  const allNav = showExecSection ? [...nav, ...nectarNavForView, ...execNav] : [...nav, ...nectarNavForView];
   const pageTitle =
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
   const isStaffView = effectiveView === "staff";

@@ -1,9 +1,28 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
+import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { User, Search, Clock, Home } from "lucide-react";
+
+function fmtElapsed(ms: number) {
+  if (ms < 0) ms = 0;
+  const s = Math.floor(ms / 1000);
+  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
+function useTick(enabled: boolean) {
+  const [, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!enabled) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [enabled]);
+}
 
 // Service codes billed per day (daily workspace). Everything else is treated
 // as hourly (EVV time punch). HHS and RHS are the canonical daily codes;

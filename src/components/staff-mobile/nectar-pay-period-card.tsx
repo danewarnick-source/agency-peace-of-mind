@@ -1,25 +1,21 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  Sparkles,
-  ChevronDown,
-  ChevronRight,
-  FileText,
-  CalendarX,
+  Sparkles, ChevronDown, ChevronRight, FileText, CalendarX,
 } from "lucide-react";
 import {
-  useNectarPayPeriod,
-  useLivePayPeriod,
+  useNectarPayPeriod, useLivePayPeriod,
 } from "@/hooks/use-nectar-pay-period";
+import { useCountUp } from "@/hooks/use-count-up";
+import { HexWatermark } from "@/components/brand/hex-watermark";
 
 const fmtHours = (n: number) => `${n.toFixed(1)} hrs`;
 const fmtUSD = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 /**
- * NECTAR pay-period summary as a slim navy pill that expands on tap. Keeps
- * the client list as the primary content. Ticks live while a shift is
- * active (earnings accrue at hourly_rate / 3600 per second).
+ * Slim NECTAR pay-period pill — expands on tap. Hours/pay count up on load
+ * and tick live while a shift is active. Hex watermark reinforces brand.
  */
 export function NectarPayPeriodCard() {
   const { data } = useNectarPayPeriod();
@@ -27,8 +23,12 @@ export function NectarPayPeriodCard() {
   const [open, setOpen] = useState(false);
 
   const label = data?.label ?? "Current period";
-  const hours = live.hoursTotal;
-  const pay = live.payTotal;
+  // Count up to the static base on load; once a shift is live, mirror the
+  // live total directly so the second-by-second tick is smooth.
+  const animatedHours = useCountUp(data?.hours_total ?? 0);
+  const animatedPay = useCountUp(data?.est_gross_pay ?? 0);
+  const hours = live.isLive ? live.hoursTotal : animatedHours;
+  const pay = live.isLive ? live.payTotal : animatedPay;
   const logs = data?.outstanding_daily_logs ?? 0;
   const days = data?.incomplete_attendance_days ?? 0;
   const todo = logs + days;
@@ -36,15 +36,16 @@ export function NectarPayPeriodCard() {
   return (
     <section
       aria-label="NECTAR pay-period summary"
-      className="overflow-hidden rounded-2xl border border-[#1f2752] bg-[#141a3d] text-white"
+      className="relative overflow-hidden rounded-2xl border border-[#1f2752] bg-[#141a3d] text-white shadow-[0_12px_30px_-20px_rgba(13,17,43,0.6)]"
     >
-      {/* Collapsed pill (always visible, acts as the trigger) */}
+      <HexWatermark size={120} className="-right-6 -top-6" opacity={0.07} />
+
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-controls="nectar-pay-period-details"
-        className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-white/[0.04]"
+        className="relative flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-white/[0.04]"
       >
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[image:var(--gradient-amber)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#412402]">
           <Sparkles className="h-3 w-3" /> NECTAR
@@ -80,7 +81,7 @@ export function NectarPayPeriodCard() {
       {open && (
         <div
           id="nectar-pay-period-details"
-          className="border-t border-white/10 px-4 pb-4 pt-3"
+          className="relative border-t border-white/10 px-4 pb-4 pt-3"
         >
           <p className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
             Pay period · {label}

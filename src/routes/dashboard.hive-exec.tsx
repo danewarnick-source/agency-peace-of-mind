@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Shield, Building2, LifeBuoy, ShieldAlert, CreditCard, Activity, ArrowRightLeft, Plus, UserCog } from "lucide-react";
+import { Shield, Building2, LifeBuoy, ShieldAlert, CreditCard, Activity, ArrowRightLeft, Plus, UserCog, Hexagon } from "lucide-react";
 import { RequireHiveExecutive } from "@/components/hive-executive-guard";
 
 export const Route = createFileRoute("/dashboard/hive-exec")({

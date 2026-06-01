@@ -11,6 +11,7 @@ import {
   ShieldCheck, MapPin, FileCheck2, BadgeCheck, Activity,
   AlertTriangle, ArrowRight, PartyPopper, Wallet, ClipboardX,
   FileSignature, Stethoscope, Send, Users, Trophy, CalendarHeart,
+  BookOpen, Network, Receipt, CalendarClock, Share2, Banknote,
 } from "lucide-react";
 import { NectarHeader } from "@/components/nectar/nectar-brand";
 

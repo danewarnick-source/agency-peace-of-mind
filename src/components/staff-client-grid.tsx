@@ -207,6 +207,22 @@ export function StaffClientGrid() {
   const { data: activeShift } = useActiveShift();
   const [q, setQ] = useState("");
 
+  // One-time welcome toast on mount (single greeting; no duplicate header).
+  useEffect(() => {
+    const KEY = "staff-welcome-toast";
+    if (typeof window === "undefined") return;
+    if (window.sessionStorage.getItem(KEY)) return;
+    window.sessionStorage.setItem(KEY, "1");
+    // Defer to next tick so Sonner Toaster is mounted.
+    const t = window.setTimeout(() => {
+      // Imported lazily to avoid a top-level import churn.
+      import("sonner").then(({ toast }) =>
+        toast.success("Welcome back!", { duration: 2500 }),
+      );
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const source = caseload ?? [];
 
   const clients = useMemo(() => {
@@ -219,14 +235,11 @@ export function StaffClientGrid() {
 
   return (
     <section aria-label="My Caseload" className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome back</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {source.length
-            ? `${source.length} ${source.length === 1 ? "person" : "people"} on your caseload`
-            : "Your caseload"}
+      {source.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {source.length} {source.length === 1 ? "person" : "people"} on your caseload
         </p>
-      </div>
+      )}
 
       {/* Sticky search */}
       <div className="sticky top-14 z-10 -mx-3 border-b border-border bg-background/95 px-3 py-2 backdrop-blur md:top-0">

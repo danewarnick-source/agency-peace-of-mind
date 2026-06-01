@@ -428,9 +428,9 @@ function AuditFileDialog({
           .limit(200),
         supabase
           .from("billing_submissions")
-          .select("id, period_month")
+          .select("id, period_start")
           .eq("organization_id", orgId)
-          .eq("period_month", periodStart)
+          .eq("period_start", periodStart)
           .limit(10),
         supabase
           .from("incident_reports")

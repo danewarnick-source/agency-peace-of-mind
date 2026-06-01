@@ -1092,6 +1092,12 @@ function DocumentRequirementGroup({
   );
 }
 
+// Attestation copy for the weighted-remove flow. Marked for counsel review
+// alongside the other attestation copy in this product.
+// LEGAL_REVIEW: requirement-remove-attestation
+const REMOVE_ATTESTATION_TEXT =
+  "Removing this requirement means NECTAR will no longer track it for audit readiness. This requirement came from an authoritative source you uploaded. By removing it, you confirm this is intentional and accept responsibility for the change to your compliance tracking.";
+
 function RequirementRow({
   req,
   orgId,
@@ -1102,18 +1108,23 @@ function RequirementRow({
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
   const set = useMutation({
-    mutationFn: (status: ReviewStatus) =>
-      setStatusFn({ data: { id: req.id, status } }),
-    onSuccess: (_d, status) => {
+    mutationFn: (vars: { status: ReviewStatus; attestStatement?: string }) =>
+      setStatusFn({
+        data: { id: req.id, status: vars.status, attestStatement: vars.attestStatement },
+      }),
+    onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["requirements", orgId] });
       qc.invalidateQueries({ queryKey: ["attestations", orgId] });
-      if (status === "confirmed") toast.success("Confirmed.");
-      else if (status === "removed")
+      if (vars.status === "confirmed") toast.success("Confirmed.");
+      else if (vars.status === "removed")
         toast.message("Removed from active use", {
           description:
-            "NECTAR will stop pulling from this requirement. Record kept for the trail.",
+            "Logged to the attestation trail. NECTAR will stop pulling from this requirement.",
         });
-      else toast.message("Re-opened for review.");
+      else toast.message("Re-opened for review.", {
+        description:
+          "Logged to the attestation trail. NECTAR will resume tracking this requirement once you confirm it.",
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1121,6 +1132,10 @@ function RequirementRow({
   const status = statusOf(req);
   const isRemoved = status === "removed";
   const isConfirmed = status === "confirmed";
+  const isFromAuthSource = req.origin === "document" && !!req.source_document_id;
+
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
 
   return (
     <li
@@ -1150,8 +1165,11 @@ function RequirementRow({
             </Badge>
           )}
           {isRemoved && (
-            <Badge variant="outline" className="text-[10px] text-muted-foreground">
-              Removed — not in active use
+            <Badge
+              variant="outline"
+              className="text-[10px] text-red-700 dark:text-red-300"
+            >
+              Removed — not tracked for audit
             </Badge>
           )}
         </div>
@@ -1169,7 +1187,7 @@ function RequirementRow({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => set.mutate("needs_attention")}
+            onClick={() => set.mutate({ status: "needs_attention" })}
             disabled={set.isPending}
           >
             Re-open for review
@@ -1180,7 +1198,7 @@ function RequirementRow({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => set.mutate("needs_attention")}
+                onClick={() => set.mutate({ status: "needs_attention" })}
                 disabled={set.isPending}
               >
                 Unconfirm
@@ -1189,26 +1207,129 @@ function RequirementRow({
               <Button
                 size="sm"
                 className="bg-amber-500 text-amber-950 hover:bg-amber-400"
-                onClick={() => set.mutate("confirmed")}
+                onClick={() => set.mutate({ status: "confirmed" })}
                 disabled={set.isPending}
               >
                 Confirm
               </Button>
             )}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => set.mutate("removed")}
-              disabled={set.isPending}
+
+            <Dialog
+              open={removeOpen}
+              onOpenChange={(o) => {
+                setRemoveOpen(o);
+                if (!o) setAcknowledged(false);
+              }}
             >
-              Remove
-            </Button>
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-700 hover:bg-red-500/10 hover:text-red-800 dark:text-red-300"
+                  disabled={set.isPending}
+                >
+                  Remove…
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    Remove this requirement from NECTAR?
+                  </DialogTitle>
+                  <DialogDescription className="text-xs">
+                    {isFromAuthSource
+                      ? "This requirement was drafted from an authoritative source you uploaded."
+                      : "This requirement is currently in NECTAR's active set."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-900 dark:text-red-200">
+                    <p className="font-semibold">"{req.title}"</p>
+                    {req.source_citation && (
+                      <p className="mt-0.5 opacity-80">
+                        {req.source_citation}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+                    <p className="mb-1 flex items-center gap-1 font-semibold">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      This changes what NECTAR treats as audit-ready
+                    </p>
+                    <p>
+                      Once removed, NECTAR will no longer track or surface this
+                      requirement. Your company may no longer be fully
+                      state-audit-ready as a result — whether the removal is
+                      accidental or intentional. The record stays on the trail
+                      and is re-openable.
+                    </p>
+                  </div>
+
+                  <label
+                    className="flex items-start gap-2 rounded-xl border border-border/60 bg-background/60 p-3 text-xs"
+                  >
+                    <Checkbox
+                      checked={acknowledged}
+                      onCheckedChange={(v) => setAcknowledged(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-foreground/90">
+                      {REMOVE_ATTESTATION_TEXT}
+                    </span>
+                  </label>
+                  <p className="text-[10px] text-muted-foreground">
+                    Your user, the timestamp, the requirement, the source
+                    document, and this exact statement will be written to the
+                    immutable Attestation log.
+                  </p>
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRemoveOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!acknowledged || set.isPending}
+                    className="bg-red-600 text-white hover:bg-red-500"
+                    onClick={() => {
+                      set.mutate(
+                        {
+                          status: "removed",
+                          attestStatement: REMOVE_ATTESTATION_TEXT,
+                        },
+                        {
+                          onSuccess: () => {
+                            setRemoveOpen(false);
+                            setAcknowledged(false);
+                          },
+                        },
+                      );
+                    }}
+                  >
+                    {set.isPending ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    Confirm removal
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </>
         )}
       </div>
     </li>
   );
 }
+
+
 
 
 function ManualRequirementDialog({ orgId }: { orgId: string }) {

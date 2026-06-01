@@ -41,8 +41,10 @@ export function NectarPayPeriodCard() {
   const hourlyPayDisplay = live.isLive ? baseHourlyPay + live.liveEarnings : baseHourlyPay;
   const payTotal = live.isLive ? live.payTotal : animatedPay;
 
-  const logs = data?.outstanding_daily_logs ?? 0;
-  const attn = data?.incomplete_attendance_days ?? 0;
+  const hasHourly = data?.has_hourly_assignment ?? true;
+  const hasDaily = data?.has_daily_assignment ?? false;
+  const logs = hasDaily ? (data?.outstanding_daily_logs ?? 0) : 0;
+  const attn = hasDaily ? (data?.incomplete_attendance_days ?? 0) : 0;
   const todo = logs + attn;
 
   return (
@@ -101,41 +103,45 @@ export function NectarPayPeriodCard() {
 
           {/* Pay breakdown */}
           <div className="mt-3 overflow-hidden rounded-xl bg-white/[0.06]">
-            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-              <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
-                <Clock className="h-4 w-4 text-[#f4a93a]" />
-                Hourly services
-              </span>
-              <span className="font-mono text-sm tabular-nums text-white/90">
-                {fmtHours(hourlyHoursDisplay)} × {fmtUSD(hourlyRate)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
-              <span className="text-[11px] uppercase tracking-wider text-white/70">
-                = subtotal
-              </span>
-              <span className="font-mono text-sm font-semibold tabular-nums text-white">
-                {fmtUSD(hourlyPayDisplay)}
-              </span>
-            </div>
+            {hasHourly && (
+              <>
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+                    <Clock className="h-4 w-4 text-[#f4a93a]" />
+                    Hourly services
+                  </span>
+                  <span className="font-mono text-sm tabular-nums text-white/90">
+                    {fmtHours(hourlyHoursDisplay)} × {fmtUSD(hourlyRate)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
+                  <span className="text-[11px] uppercase tracking-wider text-white/70">= subtotal</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-white">
+                    {fmtUSD(hourlyPayDisplay)}
+                  </span>
+                </div>
+              </>
+            )}
 
-            <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
-              <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
-                <CalendarDays className="h-4 w-4 text-[#f4a93a]" />
-                Daily services
-              </span>
-              <span className="font-mono text-sm tabular-nums text-white/90">
-                {fmtDays(dailyDays)} × {fmtUSD(dailyRate)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
-              <span className="text-[11px] uppercase tracking-wider text-white/70">
-                = subtotal
-              </span>
-              <span className="font-mono text-sm font-semibold tabular-nums text-white">
-                {fmtUSD(dailyPay)}
-              </span>
-            </div>
+            {hasDaily && (
+              <>
+                <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+                    <CalendarDays className="h-4 w-4 text-[#f4a93a]" />
+                    Daily services
+                  </span>
+                  <span className="font-mono text-sm tabular-nums text-white/90">
+                    {fmtDays(dailyDays)} × {fmtUSD(dailyRate)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
+                  <span className="text-[11px] uppercase tracking-wider text-white/70">= subtotal</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-white">
+                    {fmtUSD(dailyPay)}
+                  </span>
+                </div>
+              </>
+            )}
 
             <div className="flex items-center justify-between gap-3 border-t border-white/15 bg-white/[0.04] px-3 py-3">
               <div className="flex flex-col">

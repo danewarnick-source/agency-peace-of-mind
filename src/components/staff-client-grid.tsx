@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
+import { useMyAssignments, allowedCodesFor, type AssignmentMap } from "@/hooks/use-my-assignments";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { User, Search, Clock, Home, Info } from "lucide-react";
@@ -38,22 +39,28 @@ function ClientCard({
   c,
   activeShift,
   periodHours,
+  assignments,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
   periodHours: number;
+  assignments: AssignmentMap | undefined;
 }) {
-  const codes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
+  const allCodes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
+  // Limit displayed pills to the codes this staff is assigned for this client.
+  const codes = allowedCodesFor(assignments, c.id, allCodes);
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
 
   // If this client is the active one, lock the pill selection to that service.
   const initial = isOnTheClock
     ? activeShift!.service_type_code
-    : codes[0] ?? "SEI";
+    : codes[0] ?? allCodes[0] ?? "SEI";
   const [selected, setSelected] = useState<string>(initial);
   useEffect(() => {
     if (isOnTheClock) setSelected(activeShift!.service_type_code);
-  }, [isOnTheClock, activeShift]);
+    else if (codes.length && !codes.includes(selected)) setSelected(codes[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnTheClock, activeShift, codes.join("|")]);
 
   useTick(isOnTheClock);
 
@@ -213,6 +220,7 @@ export function StaffClientGrid() {
   const { data: caseload, isLoading } = useCaseload();
   const { data: activeShift } = useActiveShift();
   const { data: nectar } = useNectarPayPeriod();
+  const { data: assignments } = useMyAssignments();
   const [q, setQ] = useState("");
 
   // One-time welcome toast on mount (single greeting; no duplicate header).
@@ -282,6 +290,7 @@ export function StaffClientGrid() {
                 c={c}
                 activeShift={activeShift ?? null}
                 periodHours={nectar?.per_client_hours[c.id] ?? 0}
+                assignments={assignments}
               />
             </li>
           ))}

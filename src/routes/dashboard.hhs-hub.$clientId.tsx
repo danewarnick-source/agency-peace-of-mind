@@ -7,6 +7,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useMyAssignments, allowedCodesFor } from "@/hooks/use-my-assignments";
+import { isDailyServiceCode } from "@/lib/service-billing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -78,6 +80,24 @@ function HhsClientHub() {
       return data ?? [];
     },
   });
+
+  const { data: assignments } = useMyAssignments();
+  const allowedCodes = useMemo(() => {
+    if (!client) return [];
+    const all = Array.isArray(client.authorized_dspd_codes) ? client.authorized_dspd_codes : [];
+    return allowedCodesFor(assignments, client.id, all);
+  }, [client, assignments]);
+  const allowedDaily = useMemo(
+    () => allowedCodes.filter(isDailyServiceCode),
+    [allowedCodes],
+  );
+
+  useEffect(() => {
+    if (!isLoading && client && assignments && !allowedDaily.length) {
+      toast.error("You are not assigned to any daily services for this individual.");
+      navigate({ to: "/dashboard" });
+    }
+  }, [isLoading, client, assignments, allowedDaily.length, navigate]);
 
   if (isLoading) return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   if (!client || !orgId) return <p className="p-6 text-sm text-muted-foreground">Client unavailable.</p>;

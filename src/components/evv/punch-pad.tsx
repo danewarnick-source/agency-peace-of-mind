@@ -1352,6 +1352,79 @@ export function PunchPad({
           </span>
         </p>
 
+        {/* ── NECTAR Procedural Q&A (embedded, plain-language) ── */}
+        <NectarInfusionLock
+          featureName="Ask NECTAR (procedural)"
+          benefit="Plain-language answers to 'am I allowed to…?' questions, grounded in this client's plan and your company policy."
+          className="mt-4"
+        >
+          <div className="rounded-lg border border-[color:var(--border-light)] bg-background/60 p-3">
+            <button
+              type="button"
+              onClick={() => setAskOpen((o) => !o)}
+              className="flex w-full items-center justify-between gap-2 text-left"
+              aria-expanded={askOpen}
+            >
+              <span className="flex items-center gap-2 text-xs font-semibold text-[color:var(--navy-900)]">
+                <Hexagon className="h-3.5 w-3.5 text-[color:var(--amber-600)]" />
+                Ask NECTAR — "am I allowed to…?"
+              </span>
+              <span className="text-[11px] text-muted-foreground">{askOpen ? "Hide" : "Open"}</span>
+            </button>
+
+            {askOpen && (
+              <div className="mt-3 space-y-2">
+                <Textarea
+                  rows={2}
+                  value={askQuestion}
+                  onChange={(e) => setAskQuestion(e.target.value)}
+                  placeholder='e.g. "Can I take Blake out of county?" or "What if he refuses a med?"'
+                  maxLength={500}
+                  className="text-sm"
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    Grounded in {lockedClient?.name?.split(" ")[0] ?? "this client"}&apos;s plan when available. You still take the action.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={handleAskNectar}
+                    disabled={askBusy || askQuestion.trim().length < 4}
+                    className="bg-[color:var(--amber-500)] text-[color:var(--navy-900)] hover:bg-[color:var(--amber-600)]"
+                  >
+                    {askBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1 h-3.5 w-3.5" />}
+                    Ask
+                  </Button>
+                </div>
+
+                {askResult && (
+                  <div
+                    className={`rounded-md border p-3 text-[13px] leading-snug ${
+                      askResult.escalate
+                        ? "border-rose-300 bg-rose-50 text-rose-900"
+                        : "border-[color:var(--amber-300)] bg-[color:var(--amber-50)] text-[color:var(--navy-900)]"
+                    }`}
+                  >
+                    <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide">
+                      {askResult.escalate ? (
+                        <><AlertTriangle className="h-3.5 w-3.5" /> Escalate now</>
+                      ) : (
+                        <><Hexagon className="h-3.5 w-3.5" /> NECTAR · Confidence: {askResult.confidence}</>
+                      )}
+                    </p>
+                    <p className="mt-1">{askResult.answer}</p>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Guidance only — confirm against your supervisor or company policy before acting.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </NectarInfusionLock>
+
+
+
         {/* ════════════════════════════════════════════════════════════════════
             DIALOGS
         ════════════════════════════════════════════════════════════════════ */}

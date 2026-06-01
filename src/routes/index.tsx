@@ -27,6 +27,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing/footer";
+import { FounderStory } from "@/components/landing/founder-story";
+import { CompetitiveContrast } from "@/components/landing/competitive-contrast";
 import { HexBackdrop as HexBg } from "@/components/brand/hex-backdrop";
 
 export const Route = createFileRoute("/")({
@@ -341,6 +343,9 @@ function HiveLandingPage() {
         </div>
       </section>
 
+      {/* ───────── Competitive contrast ───────── */}
+      <CompetitiveContrast />
+
       {/* ───────── NECTAR spotlight ───────── */}
       <section id="nectar" className="relative overflow-hidden bg-hive-navy-800 text-primary-foreground">
         <Honeycomb />
@@ -477,6 +482,9 @@ function HiveLandingPage() {
           </p>
         </div>
       </section>
+
+      {/* ───────── Founder story ───────── */}
+      <FounderStory />
 
       {/* ───────── Switching ───────── */}
       <section className="py-20 sm:py-24">

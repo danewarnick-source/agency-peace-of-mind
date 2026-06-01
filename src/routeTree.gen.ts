@@ -40,6 +40,7 @@ import { Route as DashboardProgramsAdminRouteImport } from './routes/dashboard.p
 import { Route as DashboardProgramsRouteImport } from './routes/dashboard.programs'
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
 import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
+import { Route as DashboardNectarDocsRouteImport } from './routes/dashboard.nectar-docs'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
 import { Route as DashboardHiveExecRouteImport } from './routes/dashboard.hive-exec'
@@ -237,6 +238,11 @@ const DashboardPermissionsRoute = DashboardPermissionsRouteImport.update({
 const DashboardPbaLedgerRoute = DashboardPbaLedgerRouteImport.update({
   id: '/pba-ledger',
   path: '/pba-ledger',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardNectarDocsRoute = DashboardNectarDocsRouteImport.update({
+  id: '/nectar-docs',
+  path: '/nectar-docs',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardInvitationsRoute = DashboardInvitationsRouteImport.update({
@@ -502,6 +508,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
+  '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
@@ -575,6 +582,7 @@ export interface FileRoutesByTo {
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
+  '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
@@ -652,6 +660,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
+  '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
@@ -730,6 +739,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
     | '/dashboard/invitations'
+    | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
     | '/dashboard/programs'
@@ -803,6 +813,7 @@ export interface FileRouteTypes {
     | '/dashboard/help'
     | '/dashboard/host-home-control'
     | '/dashboard/invitations'
+    | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
     | '/dashboard/programs'
@@ -879,6 +890,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
     | '/dashboard/invitations'
+    | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
     | '/dashboard/programs'
@@ -1161,6 +1173,13 @@ declare module '@tanstack/react-router' {
       path: '/pba-ledger'
       fullPath: '/dashboard/pba-ledger'
       preLoaderRoute: typeof DashboardPbaLedgerRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/nectar-docs': {
+      id: '/dashboard/nectar-docs'
+      path: '/nectar-docs'
+      fullPath: '/dashboard/nectar-docs'
+      preLoaderRoute: typeof DashboardNectarDocsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/invitations': {
@@ -1573,6 +1592,7 @@ interface DashboardRouteChildren {
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
+  DashboardNectarDocsRoute: typeof DashboardNectarDocsRoute
   DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
   DashboardProgramsRoute: typeof DashboardProgramsRouteWithChildren
@@ -1617,6 +1637,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
+  DashboardNectarDocsRoute: DashboardNectarDocsRoute,
   DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,
   DashboardPermissionsRoute: DashboardPermissionsRoute,
   DashboardProgramsRoute: DashboardProgramsRouteWithChildren,

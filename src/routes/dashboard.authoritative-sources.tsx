@@ -995,13 +995,6 @@ function RequirementsPanel({
         </div>
       )}
 
-      <AttestationBanner
-        organizationId={orgId}
-        scope="generic"
-        mode="nudge"
-        compact
-        statement="Items below are organized by NECTAR from documents you uploaded. Confirm, remove, and re-open actions are logged to the immutable attestation log — together they form your defensible 'we reviewed our requirements' record."
-      />
 
       {isLoading && (
         <p className="text-sm text-muted-foreground">

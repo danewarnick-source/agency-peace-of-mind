@@ -69,7 +69,7 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
         >
           <SheetHeader className="text-left">
             <SheetTitle className="text-white">{displayName}</SheetTitle>
-            <SheetDescription className="text-white/60">
+            <SheetDescription className="text-white/80">
               {(org?.organization_name ?? "Workspace") + " · " + ROLE_LABEL[role]}
             </SheetDescription>
           </SheetHeader>

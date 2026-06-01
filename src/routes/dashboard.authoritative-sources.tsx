@@ -596,6 +596,52 @@ function UploadCard({
 }
 
 // ---------- Requirements panel ----------
+// Requirements are grouped under the source document NECTAR drafted them
+// from. Each group is collapsible, with a per-document review-progress pill
+// (total / confirmed / needs attention / removed). Every Confirm, Remove,
+// and Re-open hits the immutable attestation log.
+
+type ReviewStatus = "needs_attention" | "confirmed" | "removed";
+
+interface ReqRow {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  origin: string;
+  source_document_id: string | null;
+  source_citation: string | null;
+  verified: boolean;
+  verified_at: string | null;
+  review_status: ReviewStatus | string | null;
+}
+
+interface SourceMeta {
+  id: string;
+  title: string;
+  authoritative_kind: string | null;
+  fiscal_year: string | null;
+  file_name: string | null;
+  created_at: string | null;
+}
+
+interface ReqGroup {
+  key: string;
+  /** Source-doc id or a synthetic bucket id ("__suggestions" / "__manual"). */
+  source: SourceMeta | null;
+  /** Group title shown in the header. */
+  title: string;
+  /** Subtitle / context line. */
+  subtitle: string;
+  items: ReqRow[];
+}
+
+function statusOf(r: ReqRow): ReviewStatus {
+  const s = (r.review_status as ReviewStatus | null) ?? null;
+  if (s === "confirmed" || s === "removed" || s === "needs_attention") return s;
+  // Legacy rows (pre-migration): infer from verified flag.
+  return r.verified ? "confirmed" : "needs_attention";
+}
 
 function RequirementsPanel({ orgId }: { orgId: string }) {
   const listReqFn = useServerFn(listRequirements);
@@ -604,26 +650,87 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
     queryFn: () => listReqFn({ data: { organizationId: orgId } }),
   });
 
-  const grouped = useMemo(() => {
-    const buckets: { document: any[]; suggestion: any[]; manual: any[] } = {
-      document: [],
-      suggestion: [],
-      manual: [],
-    };
-    for (const r of data?.requirements ?? []) {
-      const k = (r.origin as "document" | "suggestion" | "manual") ?? "manual";
-      buckets[k].push(r);
+  const groups = useMemo<ReqGroup[]>(() => {
+    const rows = (data?.requirements ?? []) as unknown as ReqRow[];
+    const byDoc = new Map<string, ReqRow[]>();
+    const suggestions: ReqRow[] = [];
+    const manual: ReqRow[] = [];
+    for (const r of rows) {
+      if (r.origin === "document" && r.source_document_id) {
+        const arr = byDoc.get(r.source_document_id) ?? [];
+        arr.push(r);
+        byDoc.set(r.source_document_id, arr);
+      } else if (r.origin === "suggestion") {
+        suggestions.push(r);
+      } else {
+        manual.push(r);
+      }
     }
-    return buckets;
+    const sourcesById = (data?.sourcesById ?? {}) as Record<string, SourceMeta>;
+    const docGroups: ReqGroup[] = Array.from(byDoc.entries()).map(([id, items]) => {
+      const src = sourcesById[id] ?? null;
+      return {
+        key: id,
+        source: src,
+        title: src?.title ?? "Source document",
+        subtitle:
+          (src?.authoritative_kind ? KIND_LABEL[src.authoritative_kind] ?? src.authoritative_kind : "Authoritative source") +
+          (src?.fiscal_year ? ` · ${src.fiscal_year}` : ""),
+        items,
+      };
+    });
+    // Sort doc groups by needs-attention desc (so review work surfaces first).
+    docGroups.sort((a, b) => {
+      const na = a.items.filter((i) => statusOf(i) === "needs_attention").length;
+      const nb = b.items.filter((i) => statusOf(i) === "needs_attention").length;
+      if (nb !== na) return nb - na;
+      return a.title.localeCompare(b.title);
+    });
+    const tail: ReqGroup[] = [];
+    if (suggestions.length)
+      tail.push({
+        key: "__suggestions",
+        source: null,
+        title: "NECTAR suggestions (no source)",
+        subtitle:
+          "Commonly required but not traced to a document you uploaded. Confirm or remove each one.",
+        items: suggestions,
+      });
+    if (manual.length)
+      tail.push({
+        key: "__manual",
+        source: null,
+        title: "Manual entries",
+        subtitle: "Items you added by hand.",
+        items: manual,
+      });
+    return [...docGroups, ...tail];
   }, [data]);
+
+  const outstandingDocs = groups.filter(
+    (g) => g.source && g.items.some((i) => statusOf(i) === "needs_attention"),
+  ).length;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">
-          NECTAR-organized requirements
-        </h2>
-        <ManualRequirementDialog orgId={orgId} />
+        <div>
+          <h2 className="text-sm font-semibold">
+            NECTAR-organized requirements
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Grouped by the document each was drafted from. Confirm what
+            applies, remove what doesn't — both are kept on the record.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {outstandingDocs > 0 && (
+            <Badge className="bg-amber-500/15 text-[10px] text-amber-800 dark:text-amber-200">
+              {outstandingDocs} document{outstandingDocs === 1 ? "" : "s"} need review
+            </Badge>
+          )}
+          <ManualRequirementDialog orgId={orgId} />
+        </div>
       </div>
 
       <AttestationBanner
@@ -631,7 +738,7 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
         scope="generic"
         mode="nudge"
         compact
-        statement="Items below are organized by NECTAR from documents you uploaded. Items without a traced source are surfaced as suggestions and need your confirmation before they're treated as requirements."
+        statement="Items below are organized by NECTAR from documents you uploaded. Confirm, remove, and re-open actions are logged to the immutable attestation log — together they form your defensible 'we reviewed our requirements' record."
       />
 
       {isLoading && (
@@ -640,60 +747,103 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
         </p>
       )}
 
-      <RequirementGroup
-        title="Traced to an uploaded source"
-        subtitle="Document-backed — citation visible per row"
-        items={grouped.document}
-        orgId={orgId}
-      />
-      <RequirementGroup
-        title="NECTAR suggestions (unverified)"
-        subtitle="Commonly required but not traced to a document you uploaded. Confirm or remove."
-        items={grouped.suggestion}
-        orgId={orgId}
-      />
-      <RequirementGroup
-        title="Manual entries"
-        subtitle="Items you added by hand"
-        items={grouped.manual}
-        orgId={orgId}
-      />
+      {!isLoading && groups.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-border/60 bg-background/60 p-8 text-center text-sm text-muted-foreground">
+          No requirements yet. Upload a SOW or contract above, then run
+          "Draft requirements" on it — or add one by hand.
+        </div>
+      )}
+
+      {groups.map((g) => (
+        <DocumentRequirementGroup key={g.key} group={g} orgId={orgId} />
+      ))}
     </div>
   );
 }
 
-function RequirementGroup({
-  title,
-  subtitle,
-  items,
+function DocumentRequirementGroup({
+  group,
   orgId,
 }: {
-  title: string;
-  subtitle: string;
-  items: Array<{
-    id: string;
-    title: string;
-    description: string | null;
-    category: string | null;
-    origin: string;
-    source_citation: string | null;
-    verified: boolean;
-    verified_at: string | null;
-  }>;
+  group: ReqGroup;
   orgId: string;
 }) {
-  if (!items?.length) return null;
+  const counts = useMemo(() => {
+    let confirmed = 0;
+    let needs = 0;
+    let removed = 0;
+    for (const i of group.items) {
+      const s = statusOf(i);
+      if (s === "confirmed") confirmed += 1;
+      else if (s === "removed") removed += 1;
+      else needs += 1;
+    }
+    return { total: group.items.length, confirmed, needs, removed };
+  }, [group.items]);
+
+  // Default: expand if there's anything still needing attention.
+  const [open, setOpen] = useState(counts.needs > 0);
+
   return (
-    <section className="rounded-2xl border border-border/60 bg-background/60 p-4 backdrop-blur">
-      <header className="mb-3">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
-      </header>
-      <ul className="divide-y divide-border/40">
-        {items.map((r) => (
-          <RequirementRow key={r.id} req={r} orgId={orgId} />
-        ))}
-      </ul>
+    <section className="overflow-hidden rounded-2xl border border-border/60 bg-background/60 backdrop-blur">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {group.source ? (
+              <FileText className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+            ) : (
+              <Sparkles className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+            )}
+            <h3 className="truncate text-sm font-semibold">{group.title}</h3>
+          </div>
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            {group.subtitle}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="outline" className="text-[10px]">
+            {counts.total} total
+          </Badge>
+          <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
+            {counts.confirmed} confirmed
+          </Badge>
+          <Badge
+            className={
+              counts.needs > 0
+                ? "bg-amber-500/20 text-[10px] text-amber-900 dark:text-amber-200"
+                : "bg-muted text-[10px] text-muted-foreground"
+            }
+          >
+            {counts.needs} needs attention
+          </Badge>
+          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+            {counts.removed} removed
+          </Badge>
+          <span
+            className={`ml-1 inline-block text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden
+          >
+            ▾
+          </span>
+        </div>
+      </button>
+
+      {open && (
+        <ul className="divide-y divide-border/40 border-t border-border/40 px-4 pb-2">
+          {group.items.length === 0 && (
+            <li className="py-4 text-xs text-muted-foreground">
+              No requirements drafted yet.
+            </li>
+          )}
+          {group.items.map((r) => (
+            <RequirementRow key={r.id} req={r} orgId={orgId} />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -702,89 +852,120 @@ function RequirementRow({
   req,
   orgId,
 }: {
-  req: {
-    id: string;
-    title: string;
-    description: string | null;
-    category: string | null;
-    origin: string;
-    source_citation: string | null;
-    verified: boolean;
-    verified_at: string | null;
-  };
+  req: ReqRow;
   orgId: string;
 }) {
   const qc = useQueryClient();
-  const verifyFn = useServerFn(verifyRequirement);
-  const delFn = useServerFn(deleteRequirement);
-  const verify = useMutation({
-    mutationFn: (val: boolean) =>
-      verifyFn({
-        data: {
-          id: req.id,
-          verified: val,
-          attestStatement: val
-            ? `Confirmed requirement "${req.title}" as accurate and applicable to my agency.`
-            : undefined,
-        },
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["requirements", orgId] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const del = useMutation({
-    mutationFn: () => delFn({ data: { id: req.id } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["requirements", orgId] }),
+  const setStatusFn = useServerFn(setRequirementReviewStatus);
+  const set = useMutation({
+    mutationFn: (status: ReviewStatus) =>
+      setStatusFn({ data: { id: req.id, status } }),
+    onSuccess: (_d, status) => {
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      qc.invalidateQueries({ queryKey: ["attestations", orgId] });
+      if (status === "confirmed") toast.success("Confirmed.");
+      else if (status === "removed")
+        toast.message("Removed from active use", {
+          description:
+            "NECTAR will stop pulling from this requirement. Record kept for the trail.",
+        });
+      else toast.message("Re-opened for review.");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const status = statusOf(req);
+  const isRemoved = status === "removed";
+  const isConfirmed = status === "confirmed";
+
   return (
-    <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
+    <li
+      className={`flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between ${isRemoved ? "opacity-55" : ""}`}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">{req.title}</span>
+          <span
+            className={`text-sm font-medium ${isRemoved ? "line-through decoration-muted-foreground/60" : ""}`}
+          >
+            {req.title}
+          </span>
           {req.category && (
             <Badge variant="outline" className="text-[10px]">
               {req.category}
             </Badge>
           )}
           <SourceCitationChip citation={req.source_citation} />
-          {req.verified && (
+          {isConfirmed && (
             <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
-              <CheckCircle2 className="mr-1 h-3 w-3" /> Confirmed by company
+              <CheckCircle2 className="mr-1 h-3 w-3" /> Confirmed
+            </Badge>
+          )}
+          {status === "needs_attention" && (
+            <Badge className="bg-amber-500/15 text-[10px] text-amber-800 dark:text-amber-200">
+              Needs attention
+            </Badge>
+          )}
+          {isRemoved && (
+            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+              Removed — not in active use
             </Badge>
           )}
         </div>
         {req.description && (
           <p className="mt-1 text-xs text-muted-foreground">{req.description}</p>
         )}
-        {req.verified && req.verified_at && (
+        {isConfirmed && req.verified_at && (
           <p className="mt-1 text-[10px] text-muted-foreground">
             Confirmed {new Date(req.verified_at).toLocaleString()}
           </p>
         )}
       </div>
-      <div className="flex gap-2">
-        {req.verified ? (
-          <Button size="sm" variant="ghost" onClick={() => verify.mutate(false)}>
-            Unconfirm
-          </Button>
-        ) : (
+      <div className="flex flex-wrap gap-2">
+        {isRemoved ? (
           <Button
             size="sm"
-            className="bg-amber-500 text-amber-950 hover:bg-amber-400"
-            onClick={() => verify.mutate(true)}
-            disabled={verify.isPending}
+            variant="outline"
+            onClick={() => set.mutate("needs_attention")}
+            disabled={set.isPending}
           >
-            Confirm
+            Re-open for review
           </Button>
+        ) : (
+          <>
+            {isConfirmed ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => set.mutate("needs_attention")}
+                disabled={set.isPending}
+              >
+                Unconfirm
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="bg-amber-500 text-amber-950 hover:bg-amber-400"
+                onClick={() => set.mutate("confirmed")}
+                disabled={set.isPending}
+              >
+                Confirm
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => set.mutate("removed")}
+              disabled={set.isPending}
+            >
+              Remove
+            </Button>
+          </>
         )}
-        <Button size="sm" variant="ghost" onClick={() => del.mutate()}>
-          Remove
-        </Button>
       </div>
     </li>
   );
 }
+
 
 function ManualRequirementDialog({ orgId }: { orgId: string }) {
   const qc = useQueryClient();

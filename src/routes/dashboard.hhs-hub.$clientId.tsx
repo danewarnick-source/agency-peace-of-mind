@@ -81,6 +81,24 @@ function HhsClientHub() {
     },
   });
 
+  const { data: assignments } = useMyAssignments();
+  const allowedCodes = useMemo(() => {
+    if (!client) return [];
+    const all = Array.isArray(client.authorized_dspd_codes) ? client.authorized_dspd_codes : [];
+    return allowedCodesFor(assignments, client.id, all);
+  }, [client, assignments]);
+  const allowedDaily = useMemo(
+    () => allowedCodes.filter(isDailyServiceCode),
+    [allowedCodes],
+  );
+
+  useEffect(() => {
+    if (!isLoading && client && assignments && !allowedDaily.length) {
+      toast.error("You are not assigned to any daily services for this individual.");
+      navigate({ to: "/dashboard" });
+    }
+  }, [isLoading, client, assignments, allowedDaily.length, navigate]);
+
   if (isLoading) return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   if (!client || !orgId) return <p className="p-6 text-sm text-muted-foreground">Client unavailable.</p>;
 

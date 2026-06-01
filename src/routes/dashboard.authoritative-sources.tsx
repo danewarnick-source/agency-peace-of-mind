@@ -395,9 +395,10 @@ function SourceRow({
   source,
   orgId,
   stats,
+  allSources,
   onJumpToRequirements,
 }: {
-  source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null };
+  source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null; metadata?: Record<string, unknown> | null };
   orgId: string;
   stats:
     | {
@@ -410,8 +411,50 @@ function SourceRow({
         lastDraftedAt: string | null;
       }
     | null;
+  allSources: Array<{ id: string; title: string; metadata?: Record<string, unknown> | null }>;
   onJumpToRequirements: (docId: string) => void;
 }) {
+  const meta = (source.metadata ?? {}) as {
+    ignored?: boolean;
+    ignored_as?: "ignore" | "duplicate";
+    ignored_at?: string;
+    ignored_by_name?: string;
+    ignored_reason?: string;
+    duplicate_of_id?: string;
+    duplicate_of_title?: string;
+  };
+  const isIgnored = !!meta.ignored;
+  const kind = source.authoritative_kind ?? "other";
+  const isNonObligation = NON_OBLIGATION_KINDS.has(kind);
+  const [ignoreOpen, setIgnoreOpen] = useState(false);
+  const [ignoreMode, setIgnoreMode] = useState<"ignore" | "duplicate">("ignore");
+
+  const ignoreFn = useServerFn(setSourceIgnoreState);
+  const ignoreMutation = useMutation({
+    mutationFn: (vars: { action: "ignore" | "duplicate" | "reactivate"; reason?: string; duplicateOfId?: string; existingRequirementsChoice?: "keep_active" | "leave_as_is" | "none" }) =>
+      ignoreFn({
+        data: {
+          documentId: source.id,
+          action: vars.action,
+          reason: vars.reason ?? null,
+          duplicateOfId: vars.duplicateOfId ?? null,
+          existingRequirementsChoice: vars.existingRequirementsChoice ?? "none",
+        },
+      }),
+    onSuccess: (_r, vars) => {
+      toast.success(
+        vars.action === "reactivate"
+          ? "Source reactivated — NECTAR will draft from it again."
+          : vars.action === "duplicate"
+            ? "Marked as duplicate and set aside."
+            : "Source set aside.",
+      );
+      qc.invalidateQueries({ queryKey: ["auth-sources", orgId] });
+      qc.invalidateQueries({ queryKey: ["attestations", orgId] });
+      setIgnoreOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const qc = useQueryClient();
   const genFn = useServerFn(generateRequirementsFromSource);
   const [progress, setProgress] = useState(0);

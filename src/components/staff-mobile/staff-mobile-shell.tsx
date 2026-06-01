@@ -1,14 +1,15 @@
-import type { ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 import { StaffTopBar } from "./staff-top-bar";
 import { StaffBottomTabs } from "./staff-bottom-tabs";
 import { ActiveShiftBar } from "./active-shift-bar";
+import { MobileShellProvider, useMobileShellContainer } from "./mobile-shell-context";
 
 /**
- * Mobile-only chrome for the staff portal. Renders the sticky top app bar,
- * page content, the persistent clocked-in status bar (when active), and the
- * fixed bottom tab bar. All are hidden at md+ via internal `md:hidden`
- * classes so the existing desktop sidebar layout remains in charge on
- * larger viewports.
+ * Mobile-only chrome for the staff portal. The shell is a fixed-viewport
+ * `position: relative; overflow: hidden` container that acts as the
+ * positioning context for every overlay (bottom sheets, confirm dialogs,
+ * paperwork pop-ups). All overlays mount into this subtree via portal so
+ * they stay bounded by the screen.
  */
 export function StaffMobileShell({
   title,
@@ -18,20 +19,30 @@ export function StaffMobileShell({
   children: ReactNode;
 }) {
   return (
-    <>
-      <StaffTopBar title={title} />
-      <div
-        className="md:hidden min-h-[calc(100dvh-3.5rem)] bg-[#f7f8fb]"
-        style={{
-          // Reserve room for bottom tabs (~56px) + active shift bar (~52px)
-          // + safe-area inset so the active shift bar never overlaps content.
-          paddingBottom: "calc(env(safe-area-inset-bottom) + 128px)",
-        }}
-      >
+    <MobileShellProvider>
+      <ShellInner title={title}>{children}</ShellInner>
+    </MobileShellProvider>
+  );
+}
+
+function ShellInner({ title, children }: { title: string; children: ReactNode }) {
+  const { setContainer } = useMobileShellContainer();
+  // Stable callback ref — only updates on mount/unmount.
+  const ref = useCallback(
+    (el: HTMLDivElement | null) => setContainer(el),
+    [setContainer],
+  );
+  return (
+    <div
+      ref={ref}
+      className="md:hidden fixed inset-0 z-30 flex flex-col overflow-hidden bg-[#f7f8fb]"
+    >
+      <StaffTopBar title={title} framed />
+      <main className="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
         {children}
-      </div>
-      <ActiveShiftBar />
-      <StaffBottomTabs />
-    </>
+      </main>
+      <ActiveShiftBar framed />
+      <StaffBottomTabs framed />
+    </div>
   );
 }

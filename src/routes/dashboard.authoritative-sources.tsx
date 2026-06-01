@@ -1775,7 +1775,7 @@ function ApplicabilityPanel({
     },
     onSuccess: () => {
       setAddValue("");
-      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] });
+      invalidateMappings();
       toast.success("Scope added.");
     },
     onError: (e: Error) => toast.error(e.message),

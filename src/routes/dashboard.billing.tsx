@@ -1,70 +1,62 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useCurrentOrg } from "@/hooks/use-org";
-import { Button } from "@/components/ui/button";
-import { Check, CreditCard } from "lucide-react";
-
-import { RequirePermission } from "@/components/rbac-guard";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { RequireRole } from "@/components/rbac-guard";
+import { Receipt, Users, FileSpreadsheet, Upload, CreditCard } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/billing")({
+  head: () => ({ meta: [{ title: "Billing — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="view_billing">
-      <BillingPage />
-    </RequirePermission>
+    <RequireRole roles={["admin", "manager", "super_admin"]}>
+      <BillingLayout />
+    </RequireRole>
   ),
 });
 
-function BillingPage() {
-  const { data: org } = useCurrentOrg();
-  const { data: count } = useQuery({
-    enabled: !!org,
-    queryKey: ["seat-count", org?.organization_id],
-    queryFn: async () => {
-      const { count } = await supabase
-        .from("organization_members")
-        .select("*", { count: "exact", head: true })
-        .eq("organization_id", org!.organization_id)
-        .eq("active", true);
-      return count ?? 0;
-    },
-  });
+const TABS = [
+  { to: "/dashboard/billing", label: "Overview", icon: Users, exact: true },
+  { to: "/dashboard/billing/form520", label: "520 Form", icon: FileSpreadsheet },
+  { to: "/dashboard/billing/imports", label: "Imports / Authorizations", icon: Upload },
+  { to: "/dashboard/billing/subscription", label: "HIVE Subscription", icon: CreditCard },
+] as const;
 
-  const seats = count ?? 0;
-  const monthly = seats * 25;
+function BillingLayout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <p className="text-sm font-medium text-accent">Current plan</p>
-        <div className="mt-2 flex flex-wrap items-baseline gap-3">
-          <h2 className="text-2xl font-semibold tracking-tight">Per-employee</h2>
-          <span className="text-muted-foreground">· $25 / active employee / month</span>
+    <div className="space-y-4">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Receipt className="h-4 w-4" />
+            <span>Admin · Client Billing</span>
+          </div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Billing</h1>
+          <p className="text-sm text-muted-foreground">
+            Authorizations, 520 generation, live unit ledger, and per-client budget. Admin-only — never visible to staff.
+          </p>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {seats} active employee{seats === 1 ? "" : "s"} ·
-          <span className="ml-1 font-semibold text-foreground">${monthly}/mo</span> estimated
-        </p>
-        <div className="mt-6 flex flex-wrap gap-2">
-          <Button variant="outline" disabled><CreditCard className="mr-2 h-4 w-4" /> Update payment method</Button>
-          <Button className="bg-[image:var(--gradient-brand)] text-primary-foreground" disabled>Open billing portal</Button>
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">Stripe billing will activate when you connect your payment account.</p>
-      </div>
+      </header>
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <h3 className="text-base font-semibold">What's included</h3>
-        <ul className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-          {["Unlimited course assignments", "Verifiable certificates", "Manager dashboards", "Email invitations", "CSV exports", "Priority support"].map((f) => (
-            <li key={f} className="flex items-center gap-2"><Check className="h-4 w-4 text-accent" /> {f}</li>
-          ))}
-        </ul>
-      </div>
+      <nav className="flex flex-wrap gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
+        {TABS.map((t) => {
+          const active = t.exact ? pathname === t.to : pathname.startsWith(t.to);
+          const Icon = t.icon;
+          return (
+            <Link
+              key={t.to}
+              to={t.to}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? "bg-[image:var(--gradient-brand)] text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" /> {t.label}
+            </Link>
+          );
+        })}
+      </nav>
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <h3 className="text-base font-semibold">Recent invoices</h3>
-        <p className="mt-1 text-sm text-muted-foreground">No invoices yet — you're in the free trial period.</p>
-      </div>
+      <Outlet />
     </div>
   );
 }

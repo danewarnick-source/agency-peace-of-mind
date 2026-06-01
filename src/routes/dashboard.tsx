@@ -65,6 +65,7 @@ function DashboardLayout() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [taskCenterOpen, setTaskCenterOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/login" });

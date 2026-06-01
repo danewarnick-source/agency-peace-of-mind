@@ -2737,6 +2737,7 @@ export type Database = {
           id: string
           is_group_home_assignment: boolean
           organization_id: string
+          service_codes: string[] | null
           staff_id: string
         }
         Insert: {
@@ -2746,6 +2747,7 @@ export type Database = {
           id?: string
           is_group_home_assignment?: boolean
           organization_id: string
+          service_codes?: string[] | null
           staff_id: string
         }
         Update: {
@@ -2755,6 +2757,7 @@ export type Database = {
           id?: string
           is_group_home_assignment?: boolean
           organization_id?: string
+          service_codes?: string[] | null
           staff_id?: string
         }
         Relationships: []

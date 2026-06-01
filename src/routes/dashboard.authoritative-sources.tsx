@@ -1092,7 +1092,7 @@ function DocumentRequirementGroup({
             </li>
           )}
           {group.items.map((r) => (
-            <RequirementRow key={r.id} req={r} orgId={orgId} />
+            <RequirementRow key={r.id} req={r} orgId={orgId} sourceMeta={group.source} />
           ))}
         </ul>
       )}

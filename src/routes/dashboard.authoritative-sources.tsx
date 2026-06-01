@@ -104,8 +104,13 @@ const AUTH_KINDS = [
   { value: "dspd_requirement", label: "DSPD requirement doc" },
   { value: "dhs_requirement", label: "DHS requirement doc" },
   { value: "public_record", label: "Other public-record requirement" },
+  { value: "tool_template", label: "Tool / Template (review, audit, scoring form)" },
   { value: "other", label: "Other" },
 ];
+
+// Kinds NECTAR will NOT draft requirements from — tools/templates describe
+// HOW someone reviews compliance, not WHAT the provider must do.
+const NON_OBLIGATION_KINDS = new Set<string>(["tool_template"]);
 
 const KIND_LABEL: Record<string, string> = Object.fromEntries(
   AUTH_KINDS.map((k) => [k.value, k.label]),

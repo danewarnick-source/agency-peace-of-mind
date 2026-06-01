@@ -84,7 +84,8 @@ function DashboardLayout() {
   const rawView = isAdminCapable ? view : "staff";
   const isMobilePreview = rawView === "staff_mobile";
   const effectiveView: "staff" | "admin" = rawView === "admin" ? "admin" : "staff";
-  const nav: NavItem[] = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
+  const baseNav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
+  const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");
   const showExecSection = isExecutive && effectiveView === "admin";
   const execNav: NavItem[] = [
     { to: "/dashboard/hive-exec", label: "Companies", icon: Building2, exact: true },

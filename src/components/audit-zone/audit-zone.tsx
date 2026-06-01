@@ -504,6 +504,17 @@ function AuditFileDialog({
           external_ref: `incident_reports:${r.id}`,
         }),
       );
+      if ((cs.data ?? []).length > 0) {
+        const total = (cs.data ?? []).reduce((s: number, r: any) => s + Number(r.amount), 0);
+        rows.push({
+          audit_file_id: fileId,
+          source: "auto",
+          category: "billing",
+          title: `Client Spending Log — ${cs.data!.length} entries · $${total.toFixed(2)} for ${format(new Date(periodStart), "MMMM yyyy")}`,
+          storage_path: null,
+          external_ref: `client_spending_log:month:${periodStart}`,
+        });
+      }
 
       // Insert only those that aren't already present (by external_ref)
       const existingRefs = new Set((docs ?? []).map((d) => d.external_ref));

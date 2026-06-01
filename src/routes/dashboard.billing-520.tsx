@@ -11,9 +11,15 @@ import { Copy, Download } from "lucide-react";
 import { hoursToUnits, unitsToHours, fmtHours } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 
+import { RequireRole } from "@/components/rbac-guard";
+
 export const Route = createFileRoute("/dashboard/billing-520")({
   head: () => ({ meta: [{ title: "520 Billing — HIVE" }] }),
-  component: Billing520Page,
+  component: () => (
+    <RequireRole roles={["admin", "manager", "super_admin"]}>
+      <Billing520Page />
+    </RequireRole>
+  ),
 });
 
 type Row = {

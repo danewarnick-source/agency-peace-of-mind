@@ -464,8 +464,16 @@ function SourceRow({
             <span className="opacity-70">·</span>
             <span>{stats!.total} total</span>
             <span className="text-emerald-700 dark:text-emerald-300">
-              · {stats!.confirmed} confirmed
+              · {stats!.fullyConfirmed} fully confirmed
             </span>
+            {stats!.scopePending > 0 && (
+              <span
+                className="text-[#d97a1c]"
+                title="Requirement confirmed but applicability scope not yet confirmed"
+              >
+                · {stats!.scopePending} scope pending
+              </span>
+            )}
             <span
               className={
                 stats!.needs > 0

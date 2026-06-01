@@ -278,27 +278,41 @@ function SourcesPanel({
     queryKey: ["requirements", orgId],
     queryFn: () => listReqFn({ data: { organizationId: orgId } }),
   });
+  const applicByReq = useApplicabilityByReq(orgId);
 
   const statsByDoc = useMemo(() => {
     const map = new Map<
       string,
-      { total: number; confirmed: number; needs: number; removed: number; lastDraftedAt: string | null }
+      {
+        total: number;
+        confirmed: number;
+        fullyConfirmed: number;
+        scopePending: number;
+        needs: number;
+        removed: number;
+        lastDraftedAt: string | null;
+      }
     >();
-    type Row = { source_document_id: string | null; review_status: string | null; verified: boolean | null; created_at: string | null };
+    type Row = { id: string; source_document_id: string | null; review_status: string | null; verified: boolean | null; created_at: string | null };
     const rows = ((reqData?.requirements ?? []) as unknown) as Row[];
     for (const r of rows) {
       if (!r.source_document_id) continue;
       const cur = map.get(r.source_document_id) ?? {
         total: 0,
         confirmed: 0,
+        fullyConfirmed: 0,
+        scopePending: 0,
         needs: 0,
         removed: 0,
         lastDraftedAt: null as string | null,
       };
       cur.total += 1;
       const s = r.review_status ?? (r.verified ? "confirmed" : "needs_attention");
-      if (s === "confirmed") cur.confirmed += 1;
-      else if (s === "removed") cur.removed += 1;
+      if (s === "confirmed") {
+        cur.confirmed += 1;
+        if (isScopeReady(applicByReq.get(r.id))) cur.fullyConfirmed += 1;
+        else cur.scopePending += 1;
+      } else if (s === "removed") cur.removed += 1;
       else cur.needs += 1;
       if (r.created_at && (!cur.lastDraftedAt || r.created_at > cur.lastDraftedAt)) {
         cur.lastDraftedAt = r.created_at;
@@ -306,7 +320,7 @@ function SourcesPanel({
       map.set(r.source_document_id, cur);
     }
     return map;
-  }, [reqData]);
+  }, [reqData, applicByReq]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
@@ -362,7 +376,15 @@ function SourceRow({
   source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null };
   orgId: string;
   stats:
-    | { total: number; confirmed: number; needs: number; removed: number; lastDraftedAt: string | null }
+    | {
+        total: number;
+        confirmed: number;
+        fullyConfirmed: number;
+        scopePending: number;
+        needs: number;
+        removed: number;
+        lastDraftedAt: string | null;
+      }
     | null;
   onJumpToRequirements: (docId: string) => void;
 }) {
@@ -442,8 +464,16 @@ function SourceRow({
             <span className="opacity-70">·</span>
             <span>{stats!.total} total</span>
             <span className="text-emerald-700 dark:text-emerald-300">
-              · {stats!.confirmed} confirmed
+              · {stats!.fullyConfirmed} fully confirmed
             </span>
+            {stats!.scopePending > 0 && (
+              <span
+                className="text-[#d97a1c]"
+                title="Requirement confirmed but applicability scope not yet confirmed"
+              >
+                · {stats!.scopePending} scope pending
+              </span>
+            )}
             <span
               className={
                 stats!.needs > 0
@@ -825,6 +855,51 @@ function statusOf(r: ReqRow): ReviewStatus {
   return r.verified ? "confirmed" : "needs_attention";
 }
 
+// ----- Applicability (NECTAR scope) helpers -----
+// A requirement is only "fully reviewed" when both the requirement itself is
+// confirmed AND its applicability scope is confirmed. Prompt 30 makes that
+// two-step state visible at the row, group, and source-pill level so an admin
+// scanning the list immediately sees what still needs review.
+export interface ApplicStats {
+  total: number;
+  confirmed: number;
+  pending: number;
+  unknown: number;
+}
+
+export function isScopeReady(s: ApplicStats | undefined | null): boolean {
+  if (!s) return false;
+  return s.confirmed > 0 && s.unknown === 0 && s.pending === 0;
+}
+
+function useApplicabilityByReq(orgId: string) {
+  const listMapFn = useServerFn(listRequirementMappings);
+  const q = useQuery({
+    queryKey: ["req-mappings-all", orgId],
+    queryFn: () => listMapFn({ data: { organizationId: orgId } }),
+  });
+  const byReq = useMemo(() => {
+    const map = new Map<string, ApplicStats>();
+    type Row = { requirement_id: string; scope_kind: string; confirmed: boolean };
+    const rows = ((q.data?.mappings ?? []) as unknown) as Row[];
+    for (const m of rows) {
+      const cur = map.get(m.requirement_id) ?? {
+        total: 0,
+        confirmed: 0,
+        pending: 0,
+        unknown: 0,
+      };
+      cur.total += 1;
+      if (m.confirmed) cur.confirmed += 1;
+      else cur.pending += 1;
+      if (m.scope_kind === "unknown" && !m.confirmed) cur.unknown += 1;
+      map.set(m.requirement_id, cur);
+    }
+    return map;
+  }, [q.data]);
+  return byReq;
+}
+
 function RequirementsPanel({
   orgId,
   focusDocumentId,
@@ -839,6 +914,7 @@ function RequirementsPanel({
     queryKey: ["requirements", orgId],
     queryFn: () => listReqFn({ data: { organizationId: orgId } }),
   });
+  const applicByReq = useApplicabilityByReq(orgId);
 
   const groups = useMemo<ReqGroup[]>(() => {
     const rows = (data?.requirements ?? []) as unknown as ReqRow[];
@@ -1014,6 +1090,7 @@ function RequirementsPanel({
           key={g.key}
           group={g}
           orgId={orgId}
+          applicByReq={applicByReq}
           highlight={highlightKey === g.key}
           forceOpen={focusDocumentId === g.key}
         />
@@ -1029,26 +1106,38 @@ function RequirementsPanel({
 function DocumentRequirementGroup({
   group,
   orgId,
+  applicByReq,
   highlight = false,
   forceOpen = false,
 }: {
   group: ReqGroup;
   orgId: string;
+  applicByReq: Map<string, ApplicStats>;
   highlight?: boolean;
   forceOpen?: boolean;
 }) {
   const counts = useMemo(() => {
-    let confirmed = 0;
+    let fullyConfirmed = 0;
+    let scopePending = 0;
     let needs = 0;
     let removed = 0;
     for (const i of group.items) {
       const s = statusOf(i);
-      if (s === "confirmed") confirmed += 1;
-      else if (s === "removed") removed += 1;
+      if (s === "confirmed") {
+        if (isScopeReady(applicByReq.get(i.id))) fullyConfirmed += 1;
+        else scopePending += 1;
+      } else if (s === "removed") removed += 1;
       else needs += 1;
     }
-    return { total: group.items.length, confirmed, needs, removed };
-  }, [group.items]);
+    return {
+      total: group.items.length,
+      confirmed: fullyConfirmed + scopePending,
+      fullyConfirmed,
+      scopePending,
+      needs,
+      removed,
+    };
+  }, [group.items, applicByReq]);
 
   // Default: expand if there's anything still needing attention.
   const [open, setOpen] = useState(counts.needs > 0);
@@ -1090,8 +1179,16 @@ function DocumentRequirementGroup({
             {counts.total} total
           </Badge>
           <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
-            {counts.confirmed} confirmed
+            {counts.fullyConfirmed} fully confirmed
           </Badge>
+          {counts.scopePending > 0 && (
+            <Badge
+              className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]"
+              title="Requirement confirmed, but NECTAR applicability scope still needs review"
+            >
+              {counts.scopePending} scope pending
+            </Badge>
+          )}
           <Badge
             className={
               counts.needs > 0
@@ -1121,7 +1218,13 @@ function DocumentRequirementGroup({
             </li>
           )}
           {group.items.map((r) => (
-            <RequirementRow key={r.id} req={r} orgId={orgId} sourceMeta={group.source} />
+            <RequirementRow
+              key={r.id}
+              req={r}
+              orgId={orgId}
+              sourceMeta={group.source}
+              applicStats={applicByReq.get(r.id)}
+            />
           ))}
         </ul>
       )}
@@ -1139,10 +1242,12 @@ function RequirementRow({
   req,
   orgId,
   sourceMeta,
+  applicStats,
 }: {
   req: ReqRow;
   orgId: string;
   sourceMeta?: SourceMeta | null;
+  applicStats?: ApplicStats;
 }) {
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
@@ -1197,11 +1302,36 @@ function RequirementRow({
             </Badge>
           )}
           <SourceCitationChip citation={req.source_citation} />
-          {isConfirmed && (
-            <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
-              <CheckCircle2 className="mr-1 h-3 w-3" /> Confirmed
-            </Badge>
-          )}
+          {isConfirmed && (() => {
+            const ready = isScopeReady(applicStats);
+            const hasAny = !!applicStats && applicStats.total > 0;
+            const pending = applicStats?.pending ?? 0;
+            const unknown = applicStats?.unknown ?? 0;
+            if (ready) {
+              return (
+                <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> Fully confirmed
+                </Badge>
+              );
+            }
+            return (
+              <>
+                <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> Requirement confirmed
+                </Badge>
+                <Badge
+                  className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]"
+                  title="Applicability scope still needs to be confirmed below"
+                >
+                  <Sparkle className="mr-1 h-3 w-3" />
+                  Applicability needs review
+                  {hasAny
+                    ? ` (${pending + unknown} to confirm)`
+                    : " (not mapped yet)"}
+                </Badge>
+              </>
+            );
+          })()}
           {status === "needs_attention" && (
             <Badge className="bg-amber-500/15 text-[10px] text-amber-800 dark:text-amber-200">
               Needs attention
@@ -1253,8 +1383,9 @@ function RequirementRow({
                 variant="ghost"
                 onClick={() => set.mutate({ status: "needs_attention" })}
                 disabled={set.isPending}
+                title="Unconfirm this requirement (does not affect applicability scope below)"
               >
-                Unconfirm
+                Unconfirm requirement
               </Button>
             ) : (
               <Button
@@ -1262,8 +1393,9 @@ function RequirementRow({
                 className="bg-amber-500 text-amber-950 hover:bg-amber-400"
                 onClick={() => set.mutate({ status: "confirmed" })}
                 disabled={set.isPending}
+                title="Step 1 of 2 — confirm this is a real requirement. You'll then confirm applicability scope below."
               >
-                Confirm
+                Confirm requirement
               </Button>
             )}
 
@@ -1614,21 +1746,40 @@ function ApplicabilityPanel({
           : "NECTAR couldn't confidently propose a scope — add one manually.",
       );
       qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] });
+      qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const invalidateMappings = () => {
+    qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] });
+    qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
+  };
+
   const confirm = useMutation({
     mutationFn: (id: string) =>
       setFn({ data: { id, confirmed: true } }),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] }),
+    onSuccess: () => invalidateMappings(),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const confirmAll = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => setFn({ data: { id, confirmed: true } })));
+      return ids.length;
+    },
+    onSuccess: (n) => {
+      invalidateMappings();
+      toast.success(
+        n === 1
+          ? "Applicability confirmed for 1 scope."
+          : `Applicability confirmed for ${n} scopes.`,
+      );
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const remove = useMutation({
     mutationFn: (id: string) => delFn({ data: { id } }),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] }),
+    onSuccess: () => invalidateMappings(),
     onError: (e: Error) => toast.error(e.message),
   });
   const add = useMutation({
@@ -1654,7 +1805,7 @@ function ApplicabilityPanel({
     },
     onSuccess: () => {
       setAddValue("");
-      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] });
+      invalidateMappings();
       toast.success("Scope added.");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1701,11 +1852,46 @@ function ApplicabilityPanel({
       {open && (
         <div className="space-y-3 border-t border-amber-500/20 px-3 py-3 text-xs">
           <p className="text-[11px] text-muted-foreground">
-            NECTAR proposes who/what this requirement governs based on your live
-            service codes, staff roles, and clients. Confirm or correct each
-            scope — the audit checklist, billing readiness, and staff app pull
-            from confirmed scopes.
+            <span className="font-semibold text-[#d97a1c]">Step 2 of 2.</span>{" "}
+            Confirming applicability tells NECTAR <em>who or what</em> this
+            requirement governs — it's what drives the audit checklist, billing
+            readiness, and staff capture. A requirement isn't fully reviewed
+            until at least one scope is confirmed.
           </p>
+
+          {/* Primary bulk action — promoted out of the per-row right edge so
+              "confirm scope" is obviously the next step after confirming the
+              requirement above. */}
+          {(() => {
+            const pendingIds = rows
+              .filter((r) => !r.confirmed && r.scope_kind !== "unknown")
+              .map((r) => r.id);
+            if (pendingIds.length === 0) return null;
+            return (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#d97a1c]/40 bg-[#d97a1c]/10 px-3 py-2">
+                <span className="text-[11px] text-[#7a4310] dark:text-amber-200">
+                  NECTAR proposed{" "}
+                  <span className="font-semibold">
+                    {pendingIds.length} scope{pendingIds.length === 1 ? "" : "s"}
+                  </span>{" "}
+                  for this requirement. Confirm to apply.
+                </span>
+                <Button
+                  size="sm"
+                  className="h-8 bg-[#d97a1c] text-white hover:bg-[#b86413]"
+                  disabled={confirmAll.isPending}
+                  onClick={() => confirmAll.mutate(pendingIds)}
+                >
+                  {confirmAll.isPending ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                  )}
+                  Confirm applicability ({pendingIds.length})
+                </Button>
+              </div>
+            );
+          })()}
 
           {q.isLoading && (
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -1769,7 +1955,7 @@ function ApplicabilityPanel({
                         disabled={confirm.isPending}
                         onClick={() => confirm.mutate(m.id)}
                       >
-                        Confirm
+                        Confirm scope
                       </Button>
                     )}
                     <Button
@@ -2094,7 +2280,7 @@ function RequirementDetailDialog({
                     onOpenChange(false);
                   }}
                 >
-                  Unconfirm
+                  Unconfirm requirement
                 </Button>
               ) : (
                 <Button
@@ -2106,7 +2292,7 @@ function RequirementDetailDialog({
                     onOpenChange(false);
                   }}
                 >
-                  Confirm
+                  Confirm requirement
                 </Button>
               )}
               <Button

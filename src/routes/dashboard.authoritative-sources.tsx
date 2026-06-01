@@ -1716,6 +1716,7 @@ function ApplicabilityPanel({
           : "NECTAR couldn't confidently propose a scope — add one manually.",
       );
       qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] });
+      qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

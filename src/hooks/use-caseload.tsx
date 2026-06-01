@@ -47,7 +47,7 @@ export function useCaseload() {
         const { data, error } = await supabase
           .from("clients")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, physical_address, geofence_radius_feet, special_directions, profile_photo_url, feature_config" as any)
+          .select("id, first_name, last_name, home_latitude, home_longitude, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, physical_address, geofence_radius_feet, special_directions, profile_photo_url, feature_config, emergency_contact_name, emergency_contact_phone, date_of_birth" as any)
           .eq("organization_id", org!.organization_id)
           .order("last_name");
         if (error) throw error;

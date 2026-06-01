@@ -160,6 +160,34 @@ function ReportBuilder() {
 
   useEffect(() => { setHistory(loadHistory()); }, []);
 
+  // Listen for "run this saved report" events from SavedReportsSection.
+  useEffect(() => {
+    const onRun = (e: Event) => {
+      const detail = (e as CustomEvent<{ prompt: string }>).detail;
+      if (detail?.prompt) {
+        setPrompt(detail.prompt);
+        m.mutate(detail.prompt);
+      }
+    };
+    window.addEventListener("hive:nectar:run", onRun as EventListener);
+    return () => window.removeEventListener("hive:nectar:run", onRun as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const qc = useQueryClient();
+  const saveSrv = useServerFn(saveReport);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const saveM = useMutation({
+    mutationFn: async (name: string) => saveSrv({ data: { name, prompt: prompt.trim(), pinned: true } }),
+    onSuccess: () => {
+      setSaveOpen(false);
+      setSaveName("");
+      qc.invalidateQueries({ queryKey: ["saved-reports"] });
+    },
+  });
+
+
   const m = useMutation({
     mutationFn: async (p: string) => ask({ data: { prompt: p } }),
     onSuccess: (r, p) => {

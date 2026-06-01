@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Landmark, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
+import { CelebrationSettings } from "@/components/celebrations/celebration-settings";
 
 export const Route = createFileRoute("/dashboard/settings")({ component: SettingsPage });
 
@@ -75,6 +76,8 @@ function SettingsPage() {
       {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
         <CompanyOverviewSettings />
       )}
+
+      <CelebrationSettings isAdmin={org?.role === "admin" || org?.role === "super_admin"} />
 
 
       {(org?.role === "admin" || org?.role === "super_admin") && (

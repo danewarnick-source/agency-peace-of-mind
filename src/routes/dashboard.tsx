@@ -116,12 +116,12 @@ function DashboardLayout() {
       </div>
 
 
-      {isAdminCapable && (
+      {(isAdminCapable || isExecutive) && (
         <div className="border-b border-sidebar-border px-4 py-4">
           <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
             Portal View
           </label>
-          <Select value={rawView} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile")}>
+          <Select value={rawView} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile" | "hive_exec")}>
             <SelectTrigger className="w-full border-sidebar-border bg-sidebar-accent/40 text-sidebar-foreground">
               <SelectValue />
             </SelectTrigger>
@@ -131,20 +131,32 @@ function DashboardLayout() {
                   <GraduationCap className="h-3.5 w-3.5" /> Staff View
                 </span>
               </SelectItem>
-              <SelectItem value="admin">
-                <span className="inline-flex items-center gap-2">
-                  <Building2 className="h-3.5 w-3.5" /> Admin View
-                </span>
-              </SelectItem>
-              <SelectItem value="staff_mobile">
-                <span className="inline-flex items-center gap-2">
-                  <GraduationCap className="h-3.5 w-3.5" /> Staff Mobile (Preview)
-                </span>
-              </SelectItem>
+              {isAdminCapable && (
+                <SelectItem value="admin">
+                  <span className="inline-flex items-center gap-2">
+                    <Building2 className="h-3.5 w-3.5" /> Admin View
+                  </span>
+                </SelectItem>
+              )}
+              {isAdminCapable && (
+                <SelectItem value="staff_mobile">
+                  <span className="inline-flex items-center gap-2">
+                    <GraduationCap className="h-3.5 w-3.5" /> Staff Mobile (Preview)
+                  </span>
+                </SelectItem>
+              )}
+              {isExecutive && (
+                <SelectItem value="hive_exec">
+                  <span className="inline-flex items-center gap-2">
+                    <Lock className="h-3.5 w-3.5" /> HIVE Executive
+                  </span>
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
       )}
+
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {nav.map((item) => {

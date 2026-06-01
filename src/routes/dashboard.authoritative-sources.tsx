@@ -840,6 +840,7 @@ interface ReqRow {
   verified: boolean;
   verified_at: string | null;
   review_status: ReviewStatus | string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface SourceMeta {

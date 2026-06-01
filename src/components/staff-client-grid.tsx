@@ -220,6 +220,7 @@ export function StaffClientGrid() {
   const { data: caseload, isLoading } = useCaseload();
   const { data: activeShift } = useActiveShift();
   const { data: nectar } = useNectarPayPeriod();
+  const { data: assignments } = useMyAssignments();
   const [q, setQ] = useState("");
 
   // One-time welcome toast on mount (single greeting; no duplicate header).

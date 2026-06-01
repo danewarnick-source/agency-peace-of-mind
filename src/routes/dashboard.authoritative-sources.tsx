@@ -373,6 +373,7 @@ function SourcesPanel({
                 source={s}
                 orgId={orgId}
                 stats={statsByDoc.get(s.id as string) ?? null}
+                allSources={data!.sources as Array<{ id: string; title: string; metadata?: Record<string, unknown> | null }>}
                 onJumpToRequirements={onJumpToRequirements}
               />
             ))}

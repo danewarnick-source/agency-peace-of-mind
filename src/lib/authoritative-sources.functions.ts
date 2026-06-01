@@ -237,7 +237,7 @@ export const listRequirements = createServerFn({ method: "POST" })
     let q = supabase
       .from("nectar_requirements")
       .select(
-        "id, source_document_id, origin, requirement_key, title, description, category, source_citation, applies_to, verified, verified_by, verified_at, created_at, metadata",
+        "id, source_document_id, origin, requirement_key, title, description, category, source_citation, applies_to, verified, verified_by, verified_at, review_status, created_at, metadata",
       )
       .eq("organization_id", data.organizationId)
       .order("origin", { ascending: true })
@@ -248,7 +248,7 @@ export const listRequirements = createServerFn({ method: "POST" })
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
 
-    // Lightweight source-doc lookup for citation rendering
+    // Lightweight source-doc lookup for citation rendering / grouping.
     const sourceIds = Array.from(
       new Set(
         (rows ?? [])
@@ -256,22 +256,36 @@ export const listRequirements = createServerFn({ method: "POST" })
           .filter((x): x is string => !!x),
       ),
     );
-    const sourcesById: Record<string, { id: string; title: string; authoritative_kind: string | null }> = {};
+    const sourcesById: Record<
+      string,
+      {
+        id: string;
+        title: string;
+        authoritative_kind: string | null;
+        fiscal_year: string | null;
+        file_name: string | null;
+        created_at: string | null;
+      }
+    > = {};
     if (sourceIds.length) {
       const { data: srcs } = await supabase
         .from("nectar_documents")
-        .select("id, title, authoritative_kind")
+        .select("id, title, authoritative_kind, fiscal_year, file_name, created_at")
         .in("id", sourceIds);
       for (const s of srcs ?? [])
         sourcesById[s.id as string] = {
           id: s.id as string,
           title: s.title as string,
           authoritative_kind: (s.authoritative_kind as string | null) ?? null,
+          fiscal_year: (s.fiscal_year as string | null) ?? null,
+          file_name: (s.file_name as string | null) ?? null,
+          created_at: (s.created_at as string | null) ?? null,
         };
     }
 
     return { requirements: rows ?? [], sourcesById };
   });
+
 
 export const upsertRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -312,9 +326,15 @@ export const upsertRequirement = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
+    // Manual entries are confirmed-on-create (the admin typed them in);
+    // document/suggestion inserts default to needs_attention via the column default.
+    const insertPayload =
+      data.origin === "manual"
+        ? { ...payload, review_status: "confirmed", verified: true, verified_by: context.userId, verified_at: new Date().toISOString() }
+        : payload;
     const { data: row, error } = await supabase
       .from("nectar_requirements")
-      .insert(payload)
+      .insert(insertPayload)
       .select("id")
       .single();
     if (error || !row) throw new Error(error?.message ?? "Insert failed");
@@ -333,6 +353,102 @@ export const deleteRequirement = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ---------- Persistent review state ----------
+// Confirm / Remove / Re-open. We never hard-delete a NECTAR-drafted
+// requirement — "removed" rows stay so the admin has a complete record
+// of what was intentionally excluded. Every transition logs an attestation.
+
+export const setRequirementReviewStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(["confirmed", "removed", "needs_attention"]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: req, error: gErr } = await supabase
+      .from("nectar_requirements")
+      .select(
+        "id, organization_id, title, source_document_id, source_citation, review_status",
+      )
+      .eq("id", data.id)
+      .single();
+    if (gErr || !req) throw new Error(gErr?.message ?? "Requirement not found");
+
+    const nowIso = new Date().toISOString();
+    const patch =
+      data.status === "confirmed"
+        ? {
+            review_status: "confirmed" as const,
+            verified: true,
+            verified_by: userId,
+            verified_at: nowIso,
+          }
+        : {
+            review_status: data.status,
+            verified: false,
+            verified_by: null,
+            verified_at: null,
+          };
+
+    const { error } = await supabase
+      .from("nectar_requirements")
+      .update(patch)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+
+    // Source-doc context for the attestation log
+    let sourceTitle: string | null = null;
+    if (req.source_document_id) {
+      const { data: src } = await supabase
+        .from("nectar_documents")
+        .select("title")
+        .eq("id", req.source_document_id as string)
+        .maybeSingle();
+      sourceTitle = (src?.title as string | null) ?? null;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const statement =
+      data.status === "confirmed"
+        ? `Confirmed requirement "${req.title}" as accurate and applicable to my agency${sourceTitle ? ` (from "${sourceTitle}")` : ""}.`
+        : data.status === "removed"
+          ? `Removed requirement "${req.title}" from the active set${sourceTitle ? ` (drafted from "${sourceTitle}")` : ""}. NECTAR will stop pulling from it; the record is retained for the review trail.`
+          : `Re-opened requirement "${req.title}" for review${sourceTitle ? ` (drafted from "${sourceTitle}")` : ""}.`;
+
+    await supabase.from("nectar_attestations").insert({
+      organization_id: req.organization_id,
+      user_id: userId,
+      user_display_name:
+        (profile?.full_name as string) ?? (profile?.email as string) ?? null,
+      scope: "requirement_verify",
+      scope_ref_id: req.id,
+      scope_ref_type: "nectar_requirement",
+      statement,
+      context: {
+        requirement_title: req.title,
+        source_document_id: req.source_document_id,
+        source_document_title: sourceTitle,
+        source_citation: req.source_citation,
+        previous_status: req.review_status,
+        new_status: data.status,
+      },
+    });
+
+    return { ok: true };
+  });
+
 
 export const verifyRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

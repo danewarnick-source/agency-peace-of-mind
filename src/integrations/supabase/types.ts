@@ -3346,6 +3346,7 @@ export type Database = {
           organization_id: string
           origin: string
           requirement_key: string
+          review_status: string
           source_citation: string | null
           source_document_id: string | null
           title: string
@@ -3364,6 +3365,7 @@ export type Database = {
           organization_id: string
           origin?: string
           requirement_key: string
+          review_status?: string
           source_citation?: string | null
           source_document_id?: string | null
           title: string
@@ -3382,6 +3384,7 @@ export type Database = {
           organization_id?: string
           origin?: string
           requirement_key?: string
+          review_status?: string
           source_citation?: string | null
           source_document_id?: string | null
           title?: string

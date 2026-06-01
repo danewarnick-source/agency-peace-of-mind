@@ -977,6 +977,24 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     }
 
     if (inserted === 0) {
+      // Document parsed cleanly but yielded zero requirements. Worth a HIVE
+      // ticket for the platform team to investigate — either the extractor
+      // missed obligation language, or the document genuinely has none.
+      await reportPlatformEvent({
+        eventKind: "no_requirements_found",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Extractor returned 0 requirements from "${(doc.title as string) ?? doc.file_name}"`,
+        detail: `Document ${doc.id} parsed cleanly (${rawText.length} chars, ${letterCount} letters) but produced no drafted requirements after both prose-clause extraction and SOW-field fallback. Either the obligation language is phrased outside the extractor's patterns, or the document doesn't contain requirements. Kind: ${(doc.authoritative_kind as string) ?? "(none)"}.`,
+        category: "parsing_failure",
+        severity: "low",
+        dedupeKey: `no_requirements:${doc.id}`,
+        eventRef: {
+          documentId: doc.id,
+          authoritativeKind: doc.authoritative_kind,
+          rawTextLength: rawText.length,
+        },
+      });
       return {
         inserted: 0,
         reason: "no_requirements" as const,
@@ -984,6 +1002,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           "NECTAR read the document but didn't find clear requirement language (\"shall…\", \"must…\", required documents, etc.). If this source does contain obligations, add them by hand from the Requirements tab.",
       };
     }
+
 
     return { inserted, reason: "ok" as const };
   });

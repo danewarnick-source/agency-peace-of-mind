@@ -16,8 +16,8 @@ import { UserPlus, AlertTriangle, Clock, FileText, ArrowRight } from "lucide-rea
 import { toast } from "sonner";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
-import { AgencyHealthSnapshot } from "@/components/agency-health-snapshot";
 import { TodayShiftBanner } from "@/components/today-shift-banner";
+import { CompanyOverview } from "@/components/company-overview";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 

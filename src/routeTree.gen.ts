@@ -41,6 +41,7 @@ import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.per
 import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
+import { Route as DashboardHiveExecRouteImport } from './routes/dashboard.hive-exec'
 import { Route as DashboardHelpRouteImport } from './routes/dashboard.help'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
@@ -56,6 +57,7 @@ import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
+import { Route as DashboardHiveExecIndexRouteImport } from './routes/dashboard.hive-exec.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
 import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.billing.index'
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
@@ -63,6 +65,8 @@ import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.trai
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
+import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
+import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
@@ -235,6 +239,11 @@ const DashboardHostHomeControlRoute =
     path: '/host-home-control',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardHiveExecRoute = DashboardHiveExecRouteImport.update({
+  id: '/hive-exec',
+  path: '/hive-exec',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardHelpRoute = DashboardHelpRouteImport.update({
   id: '/help',
   path: '/help',
@@ -312,6 +321,11 @@ const DashboardTrainingIndexRoute = DashboardTrainingIndexRouteImport.update({
   path: '/training/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardHiveExecIndexRoute = DashboardHiveExecIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardHiveExecRoute,
+} as any)
 const DashboardCoursesIndexRoute = DashboardCoursesIndexRouteImport.update({
   id: '/courses/',
   path: '/courses/',
@@ -351,6 +365,17 @@ const DashboardProgramsProgramIdRoute =
     path: '/$programId',
     getParentRoute: () => DashboardProgramsRoute,
   } as any)
+const DashboardHiveExecTicketsRoute =
+  DashboardHiveExecTicketsRouteImport.update({
+    id: '/tickets',
+    path: '/tickets',
+    getParentRoute: () => DashboardHiveExecRoute,
+  } as any)
+const DashboardHiveExecOrgIdRoute = DashboardHiveExecOrgIdRouteImport.update({
+  id: '/$orgId',
+  path: '/$orgId',
+  getParentRoute: () => DashboardHiveExecRoute,
+} as any)
 const DashboardHhsHubClientIdRoute = DashboardHhsHubClientIdRouteImport.update({
   id: '/hhs-hub/$clientId',
   path: '/hhs-hub/$clientId',
@@ -435,6 +460,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/help': typeof DashboardHelpRoute
+  '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -462,6 +488,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
+  '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -469,6 +497,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
+  '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
@@ -526,6 +555,8 @@ export interface FileRoutesByTo {
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
+  '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -533,6 +564,7 @@ export interface FileRoutesByTo {
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/billing': typeof DashboardBillingIndexRoute
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
+  '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
@@ -566,6 +598,7 @@ export interface FileRoutesById {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/help': typeof DashboardHelpRoute
+  '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -593,6 +626,8 @@ export interface FileRoutesById {
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
+  '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -600,6 +635,7 @@ export interface FileRoutesById {
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
+  '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
@@ -634,6 +670,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/help'
+    | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
     | '/dashboard/invitations'
     | '/dashboard/pba-ledger'
@@ -661,6 +698,8 @@ export interface FileRouteTypes {
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
+    | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/tracks/$trackSlug'
@@ -668,6 +707,7 @@ export interface FileRouteTypes {
     | '/dashboard/workspace/$clientId'
     | '/dashboard/billing/'
     | '/dashboard/courses/'
+    | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
   fileRoutesByTo: FileRoutesByTo
@@ -725,6 +765,8 @@ export interface FileRouteTypes {
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
+    | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/tracks/$trackSlug'
@@ -732,6 +774,7 @@ export interface FileRouteTypes {
     | '/dashboard/workspace/$clientId'
     | '/dashboard/billing'
     | '/dashboard/courses'
+    | '/dashboard/hive-exec'
     | '/dashboard/training'
     | '/dashboard/courses/$courseId/edit'
   id:
@@ -764,6 +807,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/help'
+    | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
     | '/dashboard/invitations'
     | '/dashboard/pba-ledger'
@@ -791,6 +835,8 @@ export interface FileRouteTypes {
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
+    | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/tracks/$trackSlug'
@@ -798,6 +844,7 @@ export interface FileRouteTypes {
     | '/dashboard/workspace/$clientId'
     | '/dashboard/billing/'
     | '/dashboard/courses/'
+    | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
   fileRoutesById: FileRoutesById
@@ -1048,6 +1095,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHostHomeControlRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/hive-exec': {
+      id: '/dashboard/hive-exec'
+      path: '/hive-exec'
+      fullPath: '/dashboard/hive-exec'
+      preLoaderRoute: typeof DashboardHiveExecRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/help': {
       id: '/dashboard/help'
       path: '/help'
@@ -1153,6 +1207,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardTrainingIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/hive-exec/': {
+      id: '/dashboard/hive-exec/'
+      path: '/'
+      fullPath: '/dashboard/hive-exec/'
+      preLoaderRoute: typeof DashboardHiveExecIndexRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
     '/dashboard/courses/': {
       id: '/dashboard/courses/'
       path: '/courses'
@@ -1201,6 +1262,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/programs/$programId'
       preLoaderRoute: typeof DashboardProgramsProgramIdRouteImport
       parentRoute: typeof DashboardProgramsRoute
+    }
+    '/dashboard/hive-exec/tickets': {
+      id: '/dashboard/hive-exec/tickets'
+      path: '/tickets'
+      fullPath: '/dashboard/hive-exec/tickets'
+      preLoaderRoute: typeof DashboardHiveExecTicketsRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
+    '/dashboard/hive-exec/$orgId': {
+      id: '/dashboard/hive-exec/$orgId'
+      path: '/$orgId'
+      fullPath: '/dashboard/hive-exec/$orgId'
+      preLoaderRoute: typeof DashboardHiveExecOrgIdRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
     }
     '/dashboard/hhs-hub/$clientId': {
       id: '/dashboard/hhs-hub/$clientId'
@@ -1294,6 +1369,21 @@ const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
 const DashboardBillingRouteWithChildren =
   DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
 
+interface DashboardHiveExecRouteChildren {
+  DashboardHiveExecOrgIdRoute: typeof DashboardHiveExecOrgIdRoute
+  DashboardHiveExecTicketsRoute: typeof DashboardHiveExecTicketsRoute
+  DashboardHiveExecIndexRoute: typeof DashboardHiveExecIndexRoute
+}
+
+const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
+  DashboardHiveExecOrgIdRoute: DashboardHiveExecOrgIdRoute,
+  DashboardHiveExecTicketsRoute: DashboardHiveExecTicketsRoute,
+  DashboardHiveExecIndexRoute: DashboardHiveExecIndexRoute,
+}
+
+const DashboardHiveExecRouteWithChildren =
+  DashboardHiveExecRoute._addFileChildren(DashboardHiveExecRouteChildren)
+
 interface DashboardProgramsRouteChildren {
   DashboardProgramsProgramIdRoute: typeof DashboardProgramsProgramIdRoute
 }
@@ -1356,6 +1446,7 @@ interface DashboardRouteChildren {
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardHelpRoute: typeof DashboardHelpRoute
+  DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
@@ -1397,6 +1488,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardHelpRoute: DashboardHelpRoute,
+  DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,

@@ -105,6 +105,9 @@ function ClientCard({
           <p className="mt-1 break-words text-sm leading-snug text-muted-foreground">
             {address}
           </p>
+          <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[color:var(--navy-900,#0d112b)]/5 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-[color:var(--navy-900,#0d112b)]">
+            {periodHours.toFixed(1)} hrs this period
+          </p>
           {isOnTheClock && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#117a52]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0d5c3d]">
               <span className="relative inline-flex h-2 w-2">

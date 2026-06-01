@@ -136,6 +136,80 @@ ${data.narrative}
     return { status, feedback };
   });
 
+// ─── Draft Assist — expand shorthand/voice into a compliant draft note ───────
+
+interface DraftInput {
+  shorthand: string;
+  goals: string[];
+  clientFirstName: string;
+}
+
+function validateDraft(input: unknown): DraftInput {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const shorthand = typeof i.shorthand === "string" ? i.shorthand.trim() : "";
+  const goals = Array.isArray(i.goals)
+    ? (i.goals as unknown[]).map((g) => String(g)).slice(0, 25)
+    : [];
+  const clientFirstName =
+    typeof i.clientFirstName === "string"
+      ? i.clientFirstName.slice(0, 80)
+      : "the client";
+  if (shorthand.length < 3 || shorthand.length > 4000) {
+    throw new Error("Shorthand must be 3–4000 characters.");
+  }
+  return { shorthand, goals, clientFirstName };
+}
+
+export interface DraftResult {
+  draft: string;
+  wordCount: number;
+}
+
+export const draftShiftNote = createServerFn({ method: "POST" })
+  .inputValidator(validateDraft)
+  .handler(async ({ data }): Promise<DraftResult> => {
+    const system = `You are NECTAR, a Medicaid DSPD progress-note drafting assistant for direct-support caregivers.
+
+GOAL:
+Expand the caregiver's shorthand or voice transcript into a professional, audit-ready progress-note narrative for the end-of-shift Shift Verification & Medicaid Compliance Form.
+
+REQUIREMENTS:
+- Write 60–120 words (must be at least 55 words to clear the 50-word minimum comfortably).
+- Past tense, third person, objective and behavior-focused. No subjective fluff ("had a great day"). Describe what the client did, chose, said, and how staff supported them.
+- Explicitly reference each checked PCSP goal by what the caregiver did to support it (functional, real-world actions). Do NOT invent facts that are not implied by the shorthand — if a goal isn't covered by the shorthand, note baseline support for it generically (e.g. "Provided prompting and oversight aligned with [goal]") instead of fabricating events.
+- Use the client's first name naturally.
+- Keep medical/incident claims only if clearly stated in the shorthand. Never invent injuries, medications, or incidents.
+- No markdown, no headings, no bullet lists — return one or two clean paragraphs.
+
+OUTPUT FORMAT — return STRICT JSON only, no markdown, no code fences:
+{"draft":"<the narrative paragraph(s)>"}`;
+
+    const user = `CLIENT FIRST NAME: ${data.clientFirstName}
+CHECKED PCSP GOALS (${data.goals.length}):
+${data.goals.length ? data.goals.map((g, i) => `${i + 1}. ${g}`).join("\n") : "(none — write a general baseline-support narrative)"}
+
+CAREGIVER SHORTHAND / VOICE TRANSCRIPT:
+"""
+${data.shorthand}
+"""`;
+
+    const raw = await callAI(system, user);
+    let parsed: { draft?: string } = {};
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) { try { parsed = JSON.parse(m[0]); } catch { /* ignore */ } }
+    }
+
+    const draft = typeof parsed.draft === "string" ? parsed.draft.trim() : "";
+    if (!draft) throw new Error("NECTAR could not generate a draft — please try again or write the note manually.");
+
+    const wordCount = draft.split(/\s+/).filter(Boolean).length;
+    return { draft, wordCount };
+  });
+
+
 // ─── Content Scanner — runs AFTER quality coach passes ───────────────────────
 // Detects incident/medical/eMAR triggers that require follow-up forms.
 // Returns structured JSON so the client can decide which modal to show.

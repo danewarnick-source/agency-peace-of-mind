@@ -781,7 +781,15 @@ function statusOf(r: ReqRow): ReviewStatus {
   return r.verified ? "confirmed" : "needs_attention";
 }
 
-function RequirementsPanel({ orgId }: { orgId: string }) {
+function RequirementsPanel({
+  orgId,
+  focusDocumentId,
+  onFocusHandled,
+}: {
+  orgId: string;
+  focusDocumentId?: string | null;
+  onFocusHandled?: () => void;
+}) {
   const listReqFn = useServerFn(listRequirements);
   const { data, isLoading } = useQuery({
     queryKey: ["requirements", orgId],
@@ -849,8 +857,43 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
     (g) => g.source && g.items.some((i) => statusOf(i) === "needs_attention"),
   ).length;
 
+  // Count authoritative-source items that have been removed — this drives the
+  // red high-stakes banner. Suggestion/manual removals don't count toward
+  // "audit-readiness changed" because they were never traced to a state doc.
+  const removedAuthoritative = useMemo(
+    () =>
+      groups
+        .filter((g) => !!g.source)
+        .reduce(
+          (n, g) => n + g.items.filter((i) => statusOf(i) === "removed").length,
+          0,
+        ),
+    [groups],
+  );
+
+  // Auto-scroll + expand the focused group when the user jumps in from the
+  // Sources-tab pill. We scroll on the next frame so the section is in the DOM.
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const removedRef = useRef<HTMLDivElement | null>(null);
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusDocumentId) return;
+    const id = window.setTimeout(() => {
+      const node = containerRef.current?.querySelector<HTMLElement>(
+        `[data-req-group-id="${focusDocumentId}"]`,
+      );
+      if (node) {
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+        setHighlightKey(focusDocumentId);
+        window.setTimeout(() => setHighlightKey(null), 2200);
+      }
+      onFocusHandled?.();
+    }, 80);
+    return () => window.clearTimeout(id);
+  }, [focusDocumentId, onFocusHandled]);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={containerRef}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold">
@@ -870,6 +913,43 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
           <ManualRequirementDialog orgId={orgId} />
         </div>
       </div>
+
+      {removedAuthoritative > 0 && (
+        <div
+          className="flex flex-col gap-2 rounded-2xl border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-900 dark:text-red-200 sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">
+                {removedAuthoritative} authoritative-source requirement
+                {removedAuthoritative === 1 ? " has" : "s have"} been removed.
+              </p>
+              <p className="text-xs opacity-90">
+                NECTAR is no longer tracking{" "}
+                {removedAuthoritative === 1 ? "this item" : "these items"} for
+                audit readiness. Your company may no longer be fully
+                state-audit-ready as a result. Review and re-open if any
+                removal was accidental.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0 border-red-500/60 bg-background/40 text-red-900 hover:bg-red-500/15 dark:text-red-100"
+            onClick={() =>
+              removedRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              })
+            }
+          >
+            Review removed items
+          </Button>
+        </div>
+      )}
 
       <AttestationBanner
         organizationId={orgId}
@@ -893,8 +973,18 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
       )}
 
       {groups.map((g) => (
-        <DocumentRequirementGroup key={g.key} group={g} orgId={orgId} />
+        <DocumentRequirementGroup
+          key={g.key}
+          group={g}
+          orgId={orgId}
+          highlight={highlightKey === g.key}
+          forceOpen={focusDocumentId === g.key}
+        />
       ))}
+
+      {removedAuthoritative > 0 && (
+        <div ref={removedRef} aria-hidden className="-mt-2 pt-2" />
+      )}
     </div>
   );
 }

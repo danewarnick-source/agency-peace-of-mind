@@ -367,10 +367,10 @@ function SourcesPanel({
           </div>
         ) : (
           <ul className="divide-y divide-border/40">
-            {data!.sources.map((s) => (
+            {(data!.sources as Array<Record<string, unknown>>).map((s) => (
               <SourceRow
                 key={s.id as string}
-                source={s}
+                source={s as never}
                 orgId={orgId}
                 stats={statsByDoc.get(s.id as string) ?? null}
                 allSources={data!.sources as Array<{ id: string; title: string; metadata?: Record<string, unknown> | null }>}

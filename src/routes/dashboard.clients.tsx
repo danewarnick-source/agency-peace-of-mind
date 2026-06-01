@@ -837,6 +837,14 @@ function ProfileTab({
         />
       </div>
     </div>
+
+    {/* Billing Codes Detail — per-code ledger lives beneath the multi-select */}
+    <BillingCodesDetail
+      clientId={client.id}
+      clientName={`${client.first_name} ${client.last_name}`.trim()}
+      medicaidId={client.medicaid_id ?? null}
+    />
+    </div>
   );
 }
 

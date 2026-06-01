@@ -212,6 +212,7 @@ function DashboardLayout() {
         })}
 
         {effectiveView === "admin" && (
+
           <div className="mt-4 border-t border-sidebar-border pt-4">
             <div className="mb-1 flex items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]">
               <Hexagon className="h-3 w-3 fill-[#fed7aa]/20" />

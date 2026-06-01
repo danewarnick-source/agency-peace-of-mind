@@ -156,6 +156,36 @@ function DashboardLayout() {
             </Link>
           );
         })}
+
+        {showExecSection && (
+          <div className="mt-4 border-t border-sidebar-border pt-4">
+            <div className="mb-1 flex items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]">
+              <Lock className="h-3 w-3" />
+              <span>HIVE Executive</span>
+            </div>
+            <p className="mb-2 px-3 text-[10px] text-sidebar-foreground/50">
+              Visible to HIVE executives only
+            </p>
+            {execNav.map((item) => {
+              const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={onNavigate}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                    active
+                      ? "bg-[#0f1b3d] text-white shadow-sm ring-1 ring-[#d97a1c]/40"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" /> {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       <div className="border-t border-sidebar-border p-4">

@@ -1353,8 +1353,9 @@ function RequirementRow({
                 variant="ghost"
                 onClick={() => set.mutate({ status: "needs_attention" })}
                 disabled={set.isPending}
+                title="Unconfirm this requirement (does not affect applicability scope below)"
               >
-                Unconfirm
+                Unconfirm requirement
               </Button>
             ) : (
               <Button
@@ -1362,8 +1363,9 @@ function RequirementRow({
                 className="bg-amber-500 text-amber-950 hover:bg-amber-400"
                 onClick={() => set.mutate({ status: "confirmed" })}
                 disabled={set.isPending}
+                title="Step 1 of 2 — confirm this is a real requirement. You'll then confirm applicability scope below."
               >
-                Confirm
+                Confirm requirement
               </Button>
             )}
 

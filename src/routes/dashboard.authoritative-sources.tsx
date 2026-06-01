@@ -916,12 +916,35 @@ function RequirementsPanel({
   focusDocumentId?: string | null;
   onFocusHandled?: () => void;
 }) {
+  const qc = useQueryClient();
   const listReqFn = useServerFn(listRequirements);
   const { data, isLoading } = useQuery({
     queryKey: ["requirements", orgId],
     queryFn: () => listReqFn({ data: { organizationId: orgId } }),
   });
   const applicByReq = useApplicabilityByReq(orgId);
+
+  // Prompt 31 — bulk pre-fill NECTAR proposals for any requirement with no
+  // mappings yet, and a "Review queue" walk-through mode.
+  const prefillFn = useServerFn(prefillRequirementMappings);
+  const prefill = useMutation({
+    mutationFn: () => prefillFn({ data: { organizationId: orgId, max: 60 } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
+      if (r.processed === 0 && r.candidates === 0) {
+        toast.message("Every requirement already has NECTAR's proposed scope.");
+      } else {
+        toast.success(
+          `NECTAR pre-filled proposals for ${r.processed} requirement${
+            r.processed === 1 ? "" : "s"
+          } (${r.inserted} scope${r.inserted === 1 ? "" : "s"} to review).`,
+        );
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const [queueOpen, setQueueOpen] = useState(false);
+
 
   const groups = useMemo<ReqGroup[]>(() => {
     const rows = (data?.requirements ?? []) as unknown as ReqRow[];

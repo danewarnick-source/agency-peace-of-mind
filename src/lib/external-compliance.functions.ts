@@ -220,7 +220,7 @@ export const setRequirementClassification = createServerFn({ method: "POST" })
     if (data.renewalCadence !== undefined) nextMd["renewal_cadence"] = data.renewalCadence;
     const { error } = await supabase
       .from("nectar_requirements")
-      .update({ metadata: nextMd })
+      .update({ metadata: nextMd as Json })
       .eq("id", data.requirementId);
     if (error) throw new Error(error.message);
     return { ok: true };

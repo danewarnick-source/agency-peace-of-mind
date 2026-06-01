@@ -800,6 +800,14 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     const rawText = ((doc.raw_text as string | null) ?? "").trim();
     const letterCount = (rawText.match(/[a-zA-Z]/g) ?? []).length;
 
+    // Resolve triggering org name once for any platform-event reports below.
+    const { data: orgRow } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", doc.organization_id)
+      .maybeSingle();
+    const orgName = (orgRow?.name as string | null) ?? null;
+
     // Guardrail: if no text was extracted (likely a scanned/image PDF) tell
     // the user clearly and offer the manual path — never fabricate.
     if (rawText.length < 400 || letterCount < 100) {
@@ -809,8 +817,40 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       const reason = looksLikePdf
         ? "Couldn't read enough text from this PDF — it may be a scanned image. Try uploading a text-based PDF (export from Word/Pages, or run OCR first). You can still add requirements by hand from the Requirements tab."
         : "No readable text was extracted from this file. You can still add requirements by hand from the Requirements tab.";
+      // Auto-file a HIVE Executive NECTAR ticket: this is the clearest
+      // detectable platform-level problem (parsing pipeline can't see text).
+      await reportPlatformEvent({
+        eventKind: "parsing_no_text",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: looksLikePdf
+          ? `Scanned/image PDF won't parse — "${(doc.title as string) ?? doc.file_name}"`
+          : `No readable text extracted — "${(doc.title as string) ?? doc.file_name}"`,
+        detail: `Document ${doc.id} (${doc.file_name}, ${doc.mime_type ?? "unknown mime"}) yielded ${rawText.length} chars / ${letterCount} letters. NECTAR could not draft any requirements because the parsing pipeline did not return usable text. Likely cause: scanned/image PDF without OCR.`,
+        category: "parsing_failure",
+        severity: looksLikePdf ? "medium" : "low",
+        dedupeKey: `parsing_no_text:${doc.id}`,
+        eventRef: {
+          documentId: doc.id,
+          fileName: doc.file_name,
+          mimeType: doc.mime_type,
+          rawTextLength: rawText.length,
+          letterCount,
+        },
+        nectarProposal: looksLikePdf
+          ? {
+              type: "operational",
+              summary:
+                "Add an image-PDF OCR fallback ahead of the requirements extractor (Tesseract + table-line detection); re-ingest scanned addenda automatically.",
+              changeKind: "Ingestion pipeline: OCR fallback stage",
+              blastRadius: "Document ingestion only — no schema changes",
+              risk: "low",
+            }
+          : undefined,
+      });
       return { inserted: 0, reason: "no_text" as const, message: reason };
     }
+
 
     // Existing requirements (so we can de-dupe across re-runs)
     const { data: existing } = await supabase

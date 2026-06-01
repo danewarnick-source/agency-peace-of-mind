@@ -1,14 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 
-export type PortalView = "staff" | "admin" | "staff_mobile";
+export type PortalView = "staff" | "admin" | "staff_mobile" | "hive_exec";
 const KEY = "portal-view";
 const EVT = "portal-view-change";
 
 function read(): PortalView {
   if (typeof window === "undefined") return "staff";
   const v = window.localStorage.getItem(KEY);
-  if (v === "admin") return "admin";
-  if (v === "staff_mobile") return "staff_mobile";
+  if (v === "admin" || v === "staff_mobile" || v === "hive_exec") return v;
   return "staff";
 }
 

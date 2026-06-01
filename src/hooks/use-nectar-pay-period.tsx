@@ -37,6 +37,10 @@ export type NectarPayPeriod = {
   outstanding_daily_logs: number;
   incomplete_attendance_days: number;
   schedule: PaySchedule;
+  /** True if any client assignment includes an hourly code. */
+  has_hourly_assignment: boolean;
+  /** True if any client assignment includes a daily code. */
+  has_daily_assignment: boolean;
 };
 
 const FALLBACK_HOURLY = 18;

@@ -212,6 +212,7 @@ function ClientCard({
 export function StaffClientGrid() {
   const { data: caseload, isLoading } = useCaseload();
   const { data: activeShift } = useActiveShift();
+  const { data: nectar } = useNectarPayPeriod();
   const [q, setQ] = useState("");
 
   // One-time welcome toast on mount (single greeting; no duplicate header).
@@ -242,6 +243,8 @@ export function StaffClientGrid() {
 
   return (
     <section aria-label="My Caseload" className="space-y-4">
+      <NectarPayPeriodCard />
+
       {source.length > 0 && (
         <p className="text-sm text-muted-foreground">
           {source.length} {source.length === 1 ? "person" : "people"} on your caseload
@@ -275,7 +278,11 @@ export function StaffClientGrid() {
         <ul className="flex flex-col gap-3">
           {clients.map((c) => (
             <li key={c.id}>
-              <ClientCard c={c} activeShift={activeShift ?? null} />
+              <ClientCard
+                c={c}
+                activeShift={activeShift ?? null}
+                periodHours={nectar?.per_client_hours[c.id] ?? 0}
+              />
             </li>
           ))}
         </ul>

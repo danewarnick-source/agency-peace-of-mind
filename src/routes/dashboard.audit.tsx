@@ -41,6 +41,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { parseAndProduceAuditPacket } from "@/lib/audit-packet.functions";
 import { AttestationBanner } from "@/components/nectar/attestation-banner";
+import { AuditorShareManager } from "@/components/audit/auditor-share-manager";
 
 export const Route = createFileRoute("/dashboard/audit")({
   head: () => ({ meta: [{ title: "Audit — HIVE" }] }),
@@ -569,6 +570,21 @@ function PacketDetail({
           ))}
         </CardContent>
       </Card>
+
+      {packet && (
+        <Card className="bg-card/60 backdrop-blur border-[color:var(--border-light)]">
+          <CardHeader>
+            <CardTitle className="text-sm">Auditor Access Portal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AuditorShareManager
+              packetId={packetId}
+              packetName={packet.name}
+              organizationId={orgId}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

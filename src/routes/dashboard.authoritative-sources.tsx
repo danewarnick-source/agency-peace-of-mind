@@ -197,10 +197,12 @@ function SourcesPanel({ orgId }: { orgId: string }) {
         )}
       </div>
 
-      <UploadCard
-        orgId={orgId}
-        onUploaded={() => qc.invalidateQueries({ queryKey: ["auth-sources", orgId] })}
-      />
+      <div data-tour="authsources.upload">
+        <UploadCard
+          orgId={orgId}
+          onUploaded={() => qc.invalidateQueries({ queryKey: ["auth-sources", orgId] })}
+        />
+      </div>
     </div>
   );
 }

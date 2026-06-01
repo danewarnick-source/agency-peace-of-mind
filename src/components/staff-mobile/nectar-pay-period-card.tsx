@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  Sparkles, ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays,
+  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays,
 } from "lucide-react";
 import {
   useNectarPayPeriod, useLivePayPeriod,
 } from "@/hooks/use-nectar-pay-period";
 import { useCountUp } from "@/hooks/use-count-up";
 import { HexWatermark } from "@/components/brand/hex-watermark";
+import { NectarBadge, NectarSurface } from "@/components/nectar/nectar-brand";
 
 const fmtHours = (n: number) => `${n.toFixed(1)} hrs`;
 const fmtDays = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;

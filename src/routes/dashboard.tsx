@@ -279,11 +279,14 @@ function DashboardLayout() {
         <div className="mb-3 text-xs text-sidebar-foreground/60">
           <div className="font-medium text-sidebar-foreground">{user?.user_metadata?.full_name ?? user?.email}</div>
           <div className="flex items-center justify-between">
-            <span className="truncate">{org?.organization_name ?? "Your workspace"}</span>
+            <span className="truncate">
+              {isHiveExecView ? "HIVE Platform" : (org?.organization_name ?? "Your workspace")}
+            </span>
             <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">
-              {ROLE_LABEL[role]}
+              {isHiveExecView ? "HIVE Exec" : ROLE_LABEL[role]}
             </span>
           </div>
+
         </div>
 
         <Button

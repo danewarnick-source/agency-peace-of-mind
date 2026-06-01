@@ -440,7 +440,7 @@ export const reviewExtractedField = createServerFn({ method: "POST" })
     }
     const { error } = await supabase
       .from("nectar_extracted_fields")
-      .update(update)
+      .update(update as never)
       .eq("id", data.fieldId);
     if (error) throw new Error(error.message);
     return { ok: true };

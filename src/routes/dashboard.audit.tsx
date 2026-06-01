@@ -40,6 +40,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { parseAndProduceAuditPacket } from "@/lib/audit-packet.functions";
+import { AttestationBanner } from "@/components/nectar/attestation-banner";
 
 export const Route = createFileRoute("/dashboard/audit")({
   head: () => ({ meta: [{ title: "Audit — HIVE" }] }),

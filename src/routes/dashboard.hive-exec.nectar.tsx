@@ -128,7 +128,7 @@ function HiveNectarPage() {
   const companiesQ = useQuery({ queryKey: ["hive-exec-companies-lite"], queryFn: () => listFn() });
 
   const seeded = useMemo(
-    () => seedObservations((companiesQ.data ?? []).map((c) => ({ id: c.id, name: c.name }))),
+    () => seedObservations((companiesQ.data ?? []).map((c) => ({ id: c.organization_id, name: c.name }))),
     [companiesQ.data],
   );
 

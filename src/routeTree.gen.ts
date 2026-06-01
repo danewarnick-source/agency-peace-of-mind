@@ -63,6 +63,7 @@ import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.bi
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
 import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
+import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashboard.settings.team-access'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
@@ -356,6 +357,12 @@ const DashboardTracksTrackSlugRoute =
     path: '/$trackSlug',
     getParentRoute: () => DashboardTracksRoute,
   } as any)
+const DashboardSettingsTeamAccessRoute =
+  DashboardSettingsTeamAccessRouteImport.update({
+    id: '/team-access',
+    path: '/team-access',
+    getParentRoute: () => DashboardSettingsRoute,
+  } as any)
 const DashboardSettingsBankMappingRoute =
   DashboardSettingsBankMappingRouteImport.update({
     id: '/bank-mapping',
@@ -513,6 +520,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
+  '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
@@ -583,6 +591,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
+  '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
@@ -657,6 +666,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
+  '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
@@ -732,6 +742,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
+    | '/dashboard/settings/team-access'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
@@ -802,6 +813,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
+    | '/dashboard/settings/team-access'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
@@ -875,6 +887,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
+    | '/dashboard/settings/team-access'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
@@ -1287,6 +1300,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardTracksTrackSlugRouteImport
       parentRoute: typeof DashboardTracksRoute
     }
+    '/dashboard/settings/team-access': {
+      id: '/dashboard/settings/team-access'
+      path: '/team-access'
+      fullPath: '/dashboard/settings/team-access'
+      preLoaderRoute: typeof DashboardSettingsTeamAccessRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
     '/dashboard/settings/bank-mapping': {
       id: '/dashboard/settings/bank-mapping'
       path: '/bank-mapping'
@@ -1460,10 +1480,12 @@ const DashboardProgramsRouteWithChildren =
 
 interface DashboardSettingsRouteChildren {
   DashboardSettingsBankMappingRoute: typeof DashboardSettingsBankMappingRoute
+  DashboardSettingsTeamAccessRoute: typeof DashboardSettingsTeamAccessRoute
 }
 
 const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
   DashboardSettingsBankMappingRoute: DashboardSettingsBankMappingRoute,
+  DashboardSettingsTeamAccessRoute: DashboardSettingsTeamAccessRoute,
 }
 
 const DashboardSettingsRouteWithChildren =

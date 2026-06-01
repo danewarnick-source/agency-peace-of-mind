@@ -2451,6 +2451,7 @@ export type Database = {
           active: boolean
           created_at: string
           id: string
+          is_company_executive: boolean
           job_title: string | null
           manager_id: string | null
           organization_id: string
@@ -2461,6 +2462,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          is_company_executive?: boolean
           job_title?: string | null
           manager_id?: string | null
           organization_id: string
@@ -2471,6 +2473,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          is_company_executive?: boolean
           job_title?: string | null
           manager_id?: string | null
           organization_id?: string
@@ -3787,6 +3790,10 @@ export type Database = {
           similarity: number
         }[]
       }
+      is_company_executive: {
+        Args: { _org: string; _user: string }
+        Returns: boolean
+      }
       is_hive_executive: { Args: { _user: string }; Returns: boolean }
       is_org_admin_or_manager: {
         Args: { _org: string; _user: string }
@@ -3830,6 +3837,14 @@ export type Database = {
         Returns: undefined
       }
       restore_my_admin_role: { Args: never; Returns: undefined }
+      set_company_executive: {
+        Args: { _grant: boolean; _membership_id: string }
+        Returns: undefined
+      }
+      set_hive_executive: {
+        Args: { _grant: boolean; _user_id: string }
+        Returns: undefined
+      }
       user_org_ids: { Args: { _user: string }; Returns: string[] }
       verify_certification: {
         Args: { _code: string }

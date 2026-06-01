@@ -245,9 +245,19 @@ function SourceRow({
   const generate = useMutation({
     mutationFn: () => genFn({ data: { documentId: source.id } }),
     onSuccess: (r) => {
-      toast.success(
-        `NECTAR drafted ${r.inserted} requirement${r.inserted === 1 ? "" : "s"} from this source. Review them in the Requirements tab.`,
-      );
+      const inserted = (r as { inserted: number }).inserted ?? 0;
+      const message = (r as { message?: string }).message;
+      if (inserted > 0) {
+        toast.success(
+          `NECTAR drafted ${inserted} requirement${inserted === 1 ? "" : "s"} from this source. Review them in the Requirements tab.`,
+        );
+      } else {
+        toast.warning(
+          message ??
+            "NECTAR couldn't draft any requirements from this source. You can add them by hand from the Requirements tab.",
+          { duration: 9000 },
+        );
+      }
       qc.invalidateQueries({ queryKey: ["requirements", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),

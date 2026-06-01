@@ -884,6 +884,7 @@ function RequirementsPanel({
     queryKey: ["requirements", orgId],
     queryFn: () => listReqFn({ data: { organizationId: orgId } }),
   });
+  const applicByReq = useApplicabilityByReq(orgId);
 
   const groups = useMemo<ReqGroup[]>(() => {
     const rows = (data?.requirements ?? []) as unknown as ReqRow[];

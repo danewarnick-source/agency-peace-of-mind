@@ -66,6 +66,8 @@ import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
+import { Route as DashboardHiveExecPlansRouteImport } from './routes/dashboard.hive-exec.plans'
+import { Route as DashboardHiveExecHealthRouteImport } from './routes/dashboard.hive-exec.health'
 import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
@@ -372,6 +374,16 @@ const DashboardHiveExecTicketsRoute =
     path: '/tickets',
     getParentRoute: () => DashboardHiveExecRoute,
   } as any)
+const DashboardHiveExecPlansRoute = DashboardHiveExecPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => DashboardHiveExecRoute,
+} as any)
+const DashboardHiveExecHealthRoute = DashboardHiveExecHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => DashboardHiveExecRoute,
+} as any)
 const DashboardHiveExecOrgIdRoute = DashboardHiveExecOrgIdRouteImport.update({
   id: '/$orgId',
   path: '/$orgId',
@@ -496,6 +508,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
+  '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
@@ -564,6 +578,8 @@ export interface FileRoutesByTo {
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
+  '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
@@ -636,6 +652,8 @@ export interface FileRoutesById {
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
+  '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
@@ -709,6 +727,8 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/health'
+    | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
@@ -777,6 +797,8 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/health'
+    | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
@@ -848,6 +870,8 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/health'
+    | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
@@ -1284,6 +1308,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHiveExecTicketsRouteImport
       parentRoute: typeof DashboardHiveExecRoute
     }
+    '/dashboard/hive-exec/plans': {
+      id: '/dashboard/hive-exec/plans'
+      path: '/plans'
+      fullPath: '/dashboard/hive-exec/plans'
+      preLoaderRoute: typeof DashboardHiveExecPlansRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
+    '/dashboard/hive-exec/health': {
+      id: '/dashboard/hive-exec/health'
+      path: '/health'
+      fullPath: '/dashboard/hive-exec/health'
+      preLoaderRoute: typeof DashboardHiveExecHealthRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
     '/dashboard/hive-exec/$orgId': {
       id: '/dashboard/hive-exec/$orgId'
       path: '/$orgId'
@@ -1392,12 +1430,16 @@ const DashboardBillingRouteWithChildren =
 
 interface DashboardHiveExecRouteChildren {
   DashboardHiveExecOrgIdRoute: typeof DashboardHiveExecOrgIdRoute
+  DashboardHiveExecHealthRoute: typeof DashboardHiveExecHealthRoute
+  DashboardHiveExecPlansRoute: typeof DashboardHiveExecPlansRoute
   DashboardHiveExecTicketsRoute: typeof DashboardHiveExecTicketsRoute
   DashboardHiveExecIndexRoute: typeof DashboardHiveExecIndexRoute
 }
 
 const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
   DashboardHiveExecOrgIdRoute: DashboardHiveExecOrgIdRoute,
+  DashboardHiveExecHealthRoute: DashboardHiveExecHealthRoute,
+  DashboardHiveExecPlansRoute: DashboardHiveExecPlansRoute,
   DashboardHiveExecTicketsRoute: DashboardHiveExecTicketsRoute,
   DashboardHiveExecIndexRoute: DashboardHiveExecIndexRoute,
 }

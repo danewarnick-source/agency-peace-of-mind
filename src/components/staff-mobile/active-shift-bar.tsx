@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useGeneralShift } from "@/hooks/use-general-shift";
+import { useLivePayPeriod } from "@/hooks/use-nectar-pay-period";
+
+const fmtUSD = (n: number) =>
+  n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;

@@ -1,5 +1,5 @@
 import { Clock, CalendarDays } from "lucide-react";
-import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import { useClientCaps } from "@/hooks/use-client-caps";
 import { useClientUtilization, getUsage } from "@/hooks/use-client-utilization";
 import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
 import { isDailyServiceCode } from "@/lib/service-billing";

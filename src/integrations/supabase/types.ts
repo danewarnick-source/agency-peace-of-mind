@@ -85,6 +85,65 @@ export type Database = {
           },
         ]
       }
+      celebration_acknowledgements: {
+        Row: {
+          acknowledged_at: string
+          event_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          event_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          event_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "celebration_acknowledgements_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "celebration_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      celebration_events: {
+        Row: {
+          created_at: string
+          event_key: string
+          id: string
+          organization_id: string
+          payload: Json
+          scope_user_id: string | null
+          tier: number
+        }
+        Insert: {
+          created_at?: string
+          event_key: string
+          id?: string
+          organization_id: string
+          payload?: Json
+          scope_user_id?: string | null
+          tier: number
+        }
+        Update: {
+          created_at?: string
+          event_key?: string
+          id?: string
+          organization_id?: string
+          payload?: Json
+          scope_user_id?: string | null
+          tier?: number
+        }
+        Relationships: []
+      }
       certification_types: {
         Row: {
           code: string
@@ -2337,6 +2396,33 @@ export type Database = {
         }
         Relationships: []
       }
+      org_celebration_settings: {
+        Row: {
+          enabled: boolean
+          organization_id: string
+          tier1_enabled: boolean
+          tier2_enabled: boolean
+          tier3_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          organization_id: string
+          tier1_enabled?: boolean
+          tier2_enabled?: boolean
+          tier3_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          organization_id?: string
+          tier1_enabled?: boolean
+          tier2_enabled?: boolean
+          tier3_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       org_subscriptions: {
         Row: {
           canceled_at: string | null
@@ -3645,6 +3731,24 @@ export type Database = {
           slug?: string
           track_type?: Database["public"]["Enums"]["track_type"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_celebration_mute: {
+        Row: {
+          muted: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          muted?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          muted?: boolean
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

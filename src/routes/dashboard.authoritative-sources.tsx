@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { AttestationBanner } from "@/components/nectar/attestation-banner";
 import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
+import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
 import { ingestDocument } from "@/lib/nectar-documents.functions";
 import {
   listAuthoritativeSources,

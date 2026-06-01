@@ -302,5 +302,6 @@ function DashboardLayout() {
         </div>
       </div>
     </div>
+    </CelebrationProvider>
   );
 }

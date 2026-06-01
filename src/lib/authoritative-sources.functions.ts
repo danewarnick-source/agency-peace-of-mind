@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 
 // =============================================================
 // Foundation B — Authoritative sources, derived requirements,
@@ -14,8 +15,15 @@ const AUTH_KINDS = [
   "dspd_requirement",
   "dhs_requirement",
   "public_record",
+  "tool_template",
   "other",
 ] as const;
+
+// Document kinds where NECTAR should NOT try to extract obligations.
+// Tools/templates (review tools, audit checklists, scoring forms) describe
+// HOW someone reviews compliance, not WHAT the provider must do — drafting
+// from them produces the misleading "no requirement language" message.
+const NON_OBLIGATION_KINDS = new Set<string>(["tool_template"]);
 
 // ---------- Web-page authoritative sources ----------
 // NECTAR reads content that is directly rendered on the page itself.
@@ -186,7 +194,7 @@ export const listAuthoritativeSources = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabase
       .from("nectar_documents")
       .select(
-        "id, title, document_type, authoritative_kind, fiscal_year, effective_start, effective_end, file_name, uploaded_by_name, created_at, parse_status, is_current, version",
+        "id, title, document_type, authoritative_kind, fiscal_year, effective_start, effective_end, file_name, uploaded_by_name, created_at, parse_status, is_current, version, metadata",
       )
       .eq("organization_id", data.organizationId)
       .eq("is_authoritative_source", true)
@@ -217,6 +225,155 @@ export const markAsAuthoritativeSource = createServerFn({ method: "POST" })
       .eq("id", data.documentId);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+// ---------- Ignore / archive / mark-as-duplicate ----------
+// We never hard-delete an authoritative source. Setting one aside flips a
+// flag in metadata, dims it in the list, and excludes it from active use
+// (NECTAR stops drafting; it no longer counts toward the active source set).
+// Reactivating restores it. Every transition is logged to the attestation
+// trail so audit-readiness changes are deliberate, not silent.
+
+export const setSourceIgnoreState = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        documentId: z.string().uuid(),
+        action: z.enum(["ignore", "duplicate", "reactivate"]),
+        reason: z.string().max(2000).optional().nullable(),
+        duplicateOfId: z.string().uuid().optional().nullable(),
+        existingRequirementsChoice: z
+          .enum(["keep_active", "leave_as_is", "none"])
+          .default("none"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: doc, error: dErr } = await supabase
+      .from("nectar_documents")
+      .select("id, organization_id, title, authoritative_kind, metadata")
+      .eq("id", data.documentId)
+      .single();
+    if (dErr || !doc) throw new Error(dErr?.message ?? "Source not found");
+
+    let duplicateOfTitle: string | null = null;
+    if (data.action === "duplicate") {
+      if (!data.duplicateOfId) {
+        throw new Error(
+          "Pick which source this duplicates so the trail records it.",
+        );
+      }
+      if (data.duplicateOfId === data.documentId) {
+        throw new Error("A source can't be a duplicate of itself.");
+      }
+      const { data: dup } = await supabase
+        .from("nectar_documents")
+        .select("id, title, organization_id")
+        .eq("id", data.duplicateOfId)
+        .maybeSingle();
+      if (!dup || (dup.organization_id as string) !== (doc.organization_id as string)) {
+        throw new Error("Duplicate-of source must belong to the same workspace.");
+      }
+      duplicateOfTitle = (dup.title as string | null) ?? null;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+    const actorName =
+      (profile?.full_name as string) ?? (profile?.email as string) ?? null;
+    const nowIso = new Date().toISOString();
+    const prevMeta = (doc.metadata ?? {}) as Record<string, unknown>;
+
+    const nextMeta: Record<string, unknown> = { ...prevMeta };
+    if (data.action === "reactivate") {
+      delete nextMeta.ignored;
+      delete nextMeta.ignored_at;
+      delete nextMeta.ignored_by;
+      delete nextMeta.ignored_by_name;
+      delete nextMeta.ignored_reason;
+      delete nextMeta.ignored_as;
+      delete nextMeta.duplicate_of_id;
+      delete nextMeta.duplicate_of_title;
+      nextMeta.reactivated_at = nowIso;
+      nextMeta.reactivated_by = userId;
+      nextMeta.reactivated_by_name = actorName;
+    } else {
+      nextMeta.ignored = true;
+      nextMeta.ignored_as = data.action;
+      nextMeta.ignored_at = nowIso;
+      nextMeta.ignored_by = userId;
+      nextMeta.ignored_by_name = actorName;
+      nextMeta.ignored_reason = data.reason ?? null;
+      if (data.action === "duplicate") {
+        nextMeta.duplicate_of_id = data.duplicateOfId;
+        nextMeta.duplicate_of_title = duplicateOfTitle;
+      }
+    }
+
+    const { error: uErr } = await supabase
+      .from("nectar_documents")
+      .update({ metadata: nextMeta as Json })
+      .eq("id", data.documentId);
+    if (uErr) throw new Error(uErr.message);
+
+    // Capture audit-readiness impact at decision time.
+    const { data: reqs } = await supabase
+      .from("nectar_requirements")
+      .select("id, review_status")
+      .eq("source_document_id", data.documentId);
+    const total = reqs?.length ?? 0;
+    const confirmed = (reqs ?? []).filter(
+      (r) => (r.review_status as string | null) === "confirmed",
+    ).length;
+
+    const baseStatement =
+      data.action === "reactivate"
+        ? `Reactivated authoritative source "${doc.title}". NECTAR will resume drafting from it; existing requirements remain as-is.`
+        : data.action === "duplicate"
+          ? `Set aside authoritative source "${doc.title}" as a duplicate of "${duplicateOfTitle ?? "another source"}". NECTAR will stop drafting from it.`
+          : `Set aside authoritative source "${doc.title}". NECTAR will stop drafting from it; the record is retained.`;
+
+    const reqClause =
+      data.action !== "reactivate" && total > 0
+        ? ` ${total} requirement${total === 1 ? "" : "s"} were previously drafted (${confirmed} confirmed); admin chose to ${
+            data.existingRequirementsChoice === "keep_active"
+              ? "KEEP those requirements active in the engine"
+              : data.existingRequirementsChoice === "leave_as_is"
+                ? "LEAVE them as-is (manual cleanup if needed)"
+                : "proceed without changing them"
+          }.`
+        : "";
+
+    const reasonClause = data.reason?.trim() ? ` Reason: ${data.reason.trim()}` : "";
+
+    await supabase.from("nectar_attestations").insert({
+      organization_id: doc.organization_id,
+      user_id: userId,
+      user_display_name: actorName,
+      scope: "document_upload",
+      scope_ref_id: doc.id,
+      scope_ref_type: "nectar_document",
+      statement: `${baseStatement}${reqClause}${reasonClause}`,
+      context: {
+        action: data.action,
+        document_title: doc.title,
+        authoritative_kind: doc.authoritative_kind,
+        duplicate_of_id: data.duplicateOfId ?? null,
+        duplicate_of_title: duplicateOfTitle,
+        reason: data.reason ?? null,
+        requirements_total: total,
+        requirements_confirmed: confirmed,
+        existing_requirements_choice: data.existingRequirementsChoice,
+      },
+    });
+
+    return { ok: true, requirementsTotal: total, requirementsConfirmed: confirmed };
   });
 
 // ---------- Derived requirements (NECTAR-organized checklist) ----------
@@ -597,13 +754,28 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
       .select(
-        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, parse_status, file_name, mime_type, source, external_ids",
+        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, parse_status, file_name, mime_type, source, external_ids, metadata",
       )
       .eq("id", data.documentId)
       .single();
     if (dErr || !doc) throw new Error(dErr?.message ?? "Document not found");
     if (!doc.is_authoritative_source)
       throw new Error("Document is not marked as an authoritative source.");
+
+    const meta = (doc.metadata ?? {}) as { ignored?: boolean };
+    if (meta.ignored) {
+      throw new Error(
+        "This source is set aside (ignored). Reactivate it before drafting requirements.",
+      );
+    }
+    if (NON_OBLIGATION_KINDS.has((doc.authoritative_kind as string) ?? "")) {
+      return {
+        inserted: 0,
+        reason: "non_obligation_kind" as const,
+        message:
+          "This document is labeled as a tool or template. NECTAR doesn't extract obligations from review/audit tools — change the kind if it actually contains state or contract requirements.",
+      };
+    }
 
     const rawText = ((doc.raw_text as string | null) ?? "").trim();
     const letterCount = (rawText.match(/[a-zA-Z]/g) ?? []).length;

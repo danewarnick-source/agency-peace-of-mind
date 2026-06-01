@@ -73,21 +73,13 @@ function Greeting({ name }: { name: string }) {
   const hour = new Date().getHours();
   const salute = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   return (
-    <section className="rounded-xl border border-accent/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-6 shadow-card">
-      <div className="flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-          <Sparkles className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {salute}, {name}.
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Here's your sweet nectar for today — a quick read on company health, what needs you, and what's worth celebrating.
-          </p>
-        </div>
-      </div>
-    </section>
+    <NectarHeader
+      surface="navy"
+      markSize="lg"
+      eyebrow="Company Overview"
+      title={`${salute}, ${name}.`}
+      description="Here's your sweet nectar for today — a quick read on company health, what needs you, and what's worth celebrating."
+    />
   );
 }
 

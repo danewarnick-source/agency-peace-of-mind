@@ -226,6 +226,155 @@ export const markAsAuthoritativeSource = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ---------- Ignore / archive / mark-as-duplicate ----------
+// We never hard-delete an authoritative source. Setting one aside flips a
+// flag in metadata, dims it in the list, and excludes it from active use
+// (NECTAR stops drafting; it no longer counts toward the active source set).
+// Reactivating restores it. Every transition is logged to the attestation
+// trail so audit-readiness changes are deliberate, not silent.
+
+export const setSourceIgnoreState = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        documentId: z.string().uuid(),
+        action: z.enum(["ignore", "duplicate", "reactivate"]),
+        reason: z.string().max(2000).optional().nullable(),
+        duplicateOfId: z.string().uuid().optional().nullable(),
+        existingRequirementsChoice: z
+          .enum(["keep_active", "leave_as_is", "none"])
+          .default("none"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: doc, error: dErr } = await supabase
+      .from("nectar_documents")
+      .select("id, organization_id, title, authoritative_kind, metadata")
+      .eq("id", data.documentId)
+      .single();
+    if (dErr || !doc) throw new Error(dErr?.message ?? "Source not found");
+
+    let duplicateOfTitle: string | null = null;
+    if (data.action === "duplicate") {
+      if (!data.duplicateOfId) {
+        throw new Error(
+          "Pick which source this duplicates so the trail records it.",
+        );
+      }
+      if (data.duplicateOfId === data.documentId) {
+        throw new Error("A source can't be a duplicate of itself.");
+      }
+      const { data: dup } = await supabase
+        .from("nectar_documents")
+        .select("id, title, organization_id")
+        .eq("id", data.duplicateOfId)
+        .maybeSingle();
+      if (!dup || (dup.organization_id as string) !== (doc.organization_id as string)) {
+        throw new Error("Duplicate-of source must belong to the same workspace.");
+      }
+      duplicateOfTitle = (dup.title as string | null) ?? null;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+    const actorName =
+      (profile?.full_name as string) ?? (profile?.email as string) ?? null;
+    const nowIso = new Date().toISOString();
+    const prevMeta = (doc.metadata ?? {}) as Record<string, unknown>;
+
+    const nextMeta: Record<string, unknown> = { ...prevMeta };
+    if (data.action === "reactivate") {
+      delete nextMeta.ignored;
+      delete nextMeta.ignored_at;
+      delete nextMeta.ignored_by;
+      delete nextMeta.ignored_by_name;
+      delete nextMeta.ignored_reason;
+      delete nextMeta.ignored_as;
+      delete nextMeta.duplicate_of_id;
+      delete nextMeta.duplicate_of_title;
+      nextMeta.reactivated_at = nowIso;
+      nextMeta.reactivated_by = userId;
+      nextMeta.reactivated_by_name = actorName;
+    } else {
+      nextMeta.ignored = true;
+      nextMeta.ignored_as = data.action;
+      nextMeta.ignored_at = nowIso;
+      nextMeta.ignored_by = userId;
+      nextMeta.ignored_by_name = actorName;
+      nextMeta.ignored_reason = data.reason ?? null;
+      if (data.action === "duplicate") {
+        nextMeta.duplicate_of_id = data.duplicateOfId;
+        nextMeta.duplicate_of_title = duplicateOfTitle;
+      }
+    }
+
+    const { error: uErr } = await supabase
+      .from("nectar_documents")
+      .update({ metadata: nextMeta })
+      .eq("id", data.documentId);
+    if (uErr) throw new Error(uErr.message);
+
+    // Capture audit-readiness impact at decision time.
+    const { data: reqs } = await supabase
+      .from("nectar_requirements")
+      .select("id, review_status")
+      .eq("source_document_id", data.documentId);
+    const total = reqs?.length ?? 0;
+    const confirmed = (reqs ?? []).filter(
+      (r) => (r.review_status as string | null) === "confirmed",
+    ).length;
+
+    const baseStatement =
+      data.action === "reactivate"
+        ? `Reactivated authoritative source "${doc.title}". NECTAR will resume drafting from it; existing requirements remain as-is.`
+        : data.action === "duplicate"
+          ? `Set aside authoritative source "${doc.title}" as a duplicate of "${duplicateOfTitle ?? "another source"}". NECTAR will stop drafting from it.`
+          : `Set aside authoritative source "${doc.title}". NECTAR will stop drafting from it; the record is retained.`;
+
+    const reqClause =
+      data.action !== "reactivate" && total > 0
+        ? ` ${total} requirement${total === 1 ? "" : "s"} were previously drafted (${confirmed} confirmed); admin chose to ${
+            data.existingRequirementsChoice === "keep_active"
+              ? "KEEP those requirements active in the engine"
+              : data.existingRequirementsChoice === "leave_as_is"
+                ? "LEAVE them as-is (manual cleanup if needed)"
+                : "proceed without changing them"
+          }.`
+        : "";
+
+    const reasonClause = data.reason?.trim() ? ` Reason: ${data.reason.trim()}` : "";
+
+    await supabase.from("nectar_attestations").insert({
+      organization_id: doc.organization_id,
+      user_id: userId,
+      user_display_name: actorName,
+      scope: "document_upload",
+      scope_ref_id: doc.id,
+      scope_ref_type: "nectar_document",
+      statement: `${baseStatement}${reqClause}${reasonClause}`,
+      context: {
+        action: data.action,
+        document_title: doc.title,
+        authoritative_kind: doc.authoritative_kind,
+        duplicate_of_id: data.duplicateOfId ?? null,
+        duplicate_of_title: duplicateOfTitle,
+        reason: data.reason ?? null,
+        requirements_total: total,
+        requirements_confirmed: confirmed,
+        existing_requirements_choice: data.existingRequirementsChoice,
+      },
+    });
+
+    return { ok: true, requirementsTotal: total, requirementsConfirmed: confirmed };
+  });
+
 // ---------- Derived requirements (NECTAR-organized checklist) ----------
 
 export const listRequirements = createServerFn({ method: "POST" })

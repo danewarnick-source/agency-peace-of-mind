@@ -28,6 +28,8 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now());
 
+  const live = useLivePayPeriod();
+
   const isClient = !!active;
   const isGeneral = !active && !!general;
   const showing = isClient || isGeneral;

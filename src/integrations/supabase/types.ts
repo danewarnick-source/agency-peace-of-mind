@@ -2313,6 +2313,7 @@ export type Database = {
           first_name: string | null
           full_name: string | null
           hire_date: string | null
+          hourly_rate: number | null
           id: string
           is_active: boolean
           last_name: string | null
@@ -2335,6 +2336,7 @@ export type Database = {
           first_name?: string | null
           full_name?: string | null
           hire_date?: string | null
+          hourly_rate?: number | null
           id: string
           is_active?: boolean
           last_name?: string | null
@@ -2357,6 +2359,7 @@ export type Database = {
           first_name?: string | null
           full_name?: string | null
           hire_date?: string | null
+          hourly_rate?: number | null
           id?: string
           is_active?: boolean
           last_name?: string | null

@@ -101,7 +101,6 @@ function ClientCard({ c }: { c: CaseloadClient }) {
           <Link
             to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
             params={{ clientId: c.id }}
-            search={{ service: selected }}
           >
             {daily ? <Home /> : <Clock />}
             {daily ? "Open Client Hub" : "Open Time Clock"}

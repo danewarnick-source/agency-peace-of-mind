@@ -60,6 +60,7 @@ import {
   setRequirementReviewStatus,
   listAttestations,
   ingestWebSource,
+  explainRequirement,
 } from "@/lib/authoritative-sources.functions";
 import {
   proposeRequirementMappings,
@@ -1092,7 +1093,7 @@ function DocumentRequirementGroup({
             </li>
           )}
           {group.items.map((r) => (
-            <RequirementRow key={r.id} req={r} orgId={orgId} />
+            <RequirementRow key={r.id} req={r} orgId={orgId} sourceMeta={group.source} />
           ))}
         </ul>
       )}
@@ -1109,9 +1110,11 @@ const REMOVE_ATTESTATION_TEXT =
 function RequirementRow({
   req,
   orgId,
+  sourceMeta,
 }: {
   req: ReqRow;
   orgId: string;
+  sourceMeta?: SourceMeta | null;
 }) {
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
@@ -1144,6 +1147,7 @@ function RequirementRow({
 
   const [removeOpen, setRemoveOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   return (
     <li className={`py-3 ${isRemoved ? "opacity-55" : ""}`}>
@@ -1151,11 +1155,14 @@ function RequirementRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`text-sm font-medium ${isRemoved ? "line-through decoration-muted-foreground/60" : ""}`}
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            className={`rounded-sm text-left text-sm font-medium underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-amber-500/40 ${isRemoved ? "line-through decoration-muted-foreground/60" : ""}`}
+            title="Open full requirement detail"
           >
             {req.title}
-          </span>
+          </button>
           {req.category && (
             <Badge variant="outline" className="text-[10px]">
               {req.category}
@@ -1190,7 +1197,17 @@ function RequirementRow({
           </p>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 px-2 text-[11px] text-muted-foreground"
+          onClick={() => setDetailOpen(true)}
+          aria-label="Open requirement detail"
+          title="Open requirement detail"
+        >
+          <Info className="mr-1 h-3.5 w-3.5" /> Details
+        </Button>
         {isRemoved ? (
           <Button
             size="sm"
@@ -1337,6 +1354,22 @@ function RequirementRow({
       {!isRemoved && (
         <ApplicabilityPanel orgId={orgId} requirementId={req.id} />
       )}
+      <RequirementDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        req={req}
+        orgId={orgId}
+        sourceMeta={sourceMeta ?? null}
+        status={status}
+        onConfirm={() => set.mutate({ status: "confirmed" })}
+        onUnconfirm={() => set.mutate({ status: "needs_attention" })}
+        onReopen={() => set.mutate({ status: "needs_attention" })}
+        onRequestRemove={() => {
+          setDetailOpen(false);
+          setRemoveOpen(true);
+        }}
+        isMutating={set.isPending}
+      />
     </li>
   );
 }
@@ -1784,5 +1817,283 @@ function ApplicabilityPanel({
         </div>
       )}
     </div>
+  );
+}
+
+// ---------- Requirement detail pop-up (Prompt 27) ----------
+// Frosted modal that surfaces full requirement text, source citation, mapping,
+// and a NECTAR plain-language restatement. The original source wording stays
+// primary; the NECTAR explanation is clearly secondary and clearly labeled as
+// comprehension-aid only — never authoritative.
+function RequirementDetailDialog({
+  open,
+  onOpenChange,
+  req,
+  orgId,
+  sourceMeta,
+  status,
+  onConfirm,
+  onUnconfirm,
+  onReopen,
+  onRequestRemove,
+  isMutating,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  req: ReqRow;
+  orgId: string;
+  sourceMeta: SourceMeta | null;
+  status: ReviewStatus;
+  onConfirm: () => void;
+  onUnconfirm: () => void;
+  onReopen: () => void;
+  onRequestRemove: () => void;
+  isMutating: boolean;
+}) {
+  const isRemoved = status === "removed";
+  const isConfirmed = status === "confirmed";
+
+  const explainFn = useServerFn(explainRequirement);
+  const explain = useMutation({
+    mutationFn: () => explainFn({ data: { requirementId: req.id } }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const explanation = explain.data?.explanation;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto border-border/60 bg-background/95 backdrop-blur-xl">
+        <DialogHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            {isConfirmed && (
+              <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="mr-1 h-3 w-3" /> Confirmed
+              </Badge>
+            )}
+            {status === "needs_attention" && (
+              <Badge className="bg-amber-500/15 text-[10px] text-amber-800 dark:text-amber-200">
+                Needs attention
+              </Badge>
+            )}
+            {isRemoved && (
+              <Badge
+                variant="outline"
+                className="text-[10px] text-red-700 dark:text-red-300"
+              >
+                Removed — not tracked for audit
+              </Badge>
+            )}
+            {req.category && (
+              <Badge variant="outline" className="text-[10px]">
+                {req.category}
+              </Badge>
+            )}
+          </div>
+          <DialogTitle className="mt-1 text-base leading-snug">
+            {req.title}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Review the requirement in full before confirming. Confirm and remove
+            actions log to the Attestation trail.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 text-sm">
+          {/* Source attribution — primary, authoritative */}
+          <section className="rounded-xl border border-border/60 bg-muted/30 p-3">
+            <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <BookOpen className="h-3 w-3" /> Source
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">
+                {sourceMeta?.title ?? sourceMeta?.file_name ?? "Manual / suggestion"}
+              </span>
+              {sourceMeta?.fiscal_year && (
+                <Badge variant="outline" className="text-[10px]">
+                  FY {sourceMeta.fiscal_year}
+                </Badge>
+              )}
+              {sourceMeta?.authoritative_kind && (
+                <Badge variant="outline" className="text-[10px]">
+                  {sourceMeta.authoritative_kind.replace(/_/g, " ")}
+                </Badge>
+              )}
+            </div>
+            <div className="mt-2">
+              <SourceCitationChip citation={req.source_citation} />
+            </div>
+          </section>
+
+          {/* Original requirement text — authoritative wording */}
+          <section className="rounded-xl border border-border/60 bg-background/60 p-3">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Requirement text (original wording)
+            </p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {req.description?.trim() || (
+                <span className="italic text-muted-foreground">
+                  No extended description was extracted — the title above is the
+                  full text NECTAR captured from the source.
+                </span>
+              )}
+            </p>
+            {isConfirmed && req.verified_at && (
+              <p className="mt-2 text-[10px] text-muted-foreground">
+                Confirmed {new Date(req.verified_at).toLocaleString()}
+              </p>
+            )}
+          </section>
+
+          {/* Applicability mapping (Foundation D) */}
+          {!isRemoved && (
+            <section>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Applicability (NECTAR Requirements Engine)
+              </p>
+              <ApplicabilityPanel orgId={orgId} requirementId={req.id} />
+            </section>
+          )}
+
+          {/* NECTAR plain-language explanation — clearly secondary */}
+          <section className="rounded-xl border border-amber-500/30 bg-amber-50/40 p-3 dark:bg-amber-500/5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#d97a1c]">
+                <Sparkle className="h-3 w-3" /> NECTAR — Explain this (plain language)
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-[11px]"
+                disabled={explain.isPending}
+                onClick={() => explain.mutate()}
+              >
+                {explain.isPending ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1 h-3 w-3" />
+                )}
+                {explanation ? "Re-explain" : "Explain in plain language"}
+              </Button>
+            </div>
+            <p className="mt-1.5 text-[11px] italic text-amber-900/80 dark:text-amber-200/80">
+              Plain-language restatement based on the source above — an aid to
+              understanding, not legal or compliance advice. The original wording
+              (shown above) governs. Review the source and consult counsel as
+              needed before acting.
+            </p>
+
+            {!explanation && !explain.isPending && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                NECTAR can restate this requirement in plainer words. The
+                original source text stays the authority — this is a reading aid
+                only.
+              </p>
+            )}
+
+            {explain.isPending && (
+              <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> NECTAR is reading the
+                source…
+              </div>
+            )}
+
+            {explanation && (
+              <div className="mt-2 space-y-2">
+                <div className="rounded-md border border-amber-500/30 bg-background/60 p-2.5">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                    {explanation.plain_language}
+                  </p>
+                </div>
+                {explanation.key_terms.length > 0 && (
+                  <div className="rounded-md border border-amber-500/20 bg-background/40 p-2.5">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Key terms
+                    </p>
+                    <ul className="space-y-1">
+                      {explanation.key_terms.map((t, i) => (
+                        <li key={i} className="text-[11px]">
+                          <span className="font-semibold">{t.term}</span>
+                          <span className="text-muted-foreground"> — {t.plain}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                  <Badge variant="outline" className="text-[10px]">
+                    Confidence: {explanation.confidence}
+                  </Badge>
+                  {explanation.caveat && <span>{explanation.caveat}</span>}
+                </div>
+                <p className="text-[10px] text-amber-900/80 dark:text-amber-200/80">
+                  ↑ Review recommended. Always compare against the original
+                  requirement text above.
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
+            Close
+          </Button>
+          {isRemoved ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isMutating}
+              onClick={() => {
+                onReopen();
+                onOpenChange(false);
+              }}
+            >
+              Re-open for review
+            </Button>
+          ) : (
+            <>
+              {isConfirmed ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={isMutating}
+                  onClick={() => {
+                    onUnconfirm();
+                    onOpenChange(false);
+                  }}
+                >
+                  Unconfirm
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="bg-amber-500 text-amber-950 hover:bg-amber-400"
+                  disabled={isMutating}
+                  onClick={() => {
+                    onConfirm();
+                    onOpenChange(false);
+                  }}
+                >
+                  Confirm
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-700 hover:bg-red-500/10 hover:text-red-800 dark:text-red-300"
+                disabled={isMutating}
+                onClick={onRequestRemove}
+              >
+                Remove…
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,4 +1,4 @@
-import { Hexagon, ShieldCheck, ClipboardCheck, FileSearch, Crosshair } from "lucide-react";
+import { Hexagon, Crosshair } from "lucide-react";
 
 export function FounderStory() {
   return (

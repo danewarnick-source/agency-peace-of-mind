@@ -16,7 +16,7 @@ import { usePortalView } from "@/hooks/use-portal-view";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { toast } from "sonner";
 
-export function StaffTopBar({ title }: { title: string }) {
+export function StaffTopBar({ title, framed = false }: { title: string; framed?: boolean }) {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { can } = usePermissions();
@@ -37,10 +37,14 @@ export function StaffTopBar({ title }: { title: string }) {
   const displayName =
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
+  const headerCls = framed
+    ? "relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#0d112b] px-3 text-white"
+    : "sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 bg-[#0d112b] px-3 text-white md:hidden";
+
   return (
     <header
-      className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 bg-[#0d112b] px-3 text-white md:hidden"
-      style={{ paddingTop: "env(safe-area-inset-top)" }}
+      className={headerCls}
+      style={framed ? undefined : { paddingTop: "env(safe-area-inset-top)" }}
     >
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06]">
@@ -75,13 +79,14 @@ export function StaffTopBar({ title }: { title: string }) {
               <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/55">
                 Portal View
               </label>
-              <Select value={view} onValueChange={(v) => setView(v as "staff" | "admin")}>
+              <Select value={view} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile")}>
                 <SelectTrigger className="h-12 w-full border-white/15 bg-white/[0.06] text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="staff">Staff View</SelectItem>
                   <SelectItem value="admin">Admin View</SelectItem>
+                  <SelectItem value="staff_mobile">Staff Mobile (Preview)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

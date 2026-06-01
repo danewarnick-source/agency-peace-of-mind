@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
 import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
+import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — HIVE" }] }),
@@ -73,7 +74,9 @@ function DashboardLayout() {
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
-  const effectiveView = isAdminCapable ? view : "staff";
+  const rawView = isAdminCapable ? view : "staff";
+  const isMobilePreview = rawView === "staff_mobile";
+  const effectiveView: "staff" | "admin" = rawView === "admin" ? "admin" : "staff";
   const nav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -97,7 +100,7 @@ function DashboardLayout() {
           <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
             Portal View
           </label>
-          <Select value={effectiveView} onValueChange={(v) => setView(v as "staff" | "admin")}>
+          <Select value={rawView} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile")}>
             <SelectTrigger className="w-full border-sidebar-border bg-sidebar-accent/40 text-sidebar-foreground">
               <SelectValue />
             </SelectTrigger>
@@ -110,6 +113,11 @@ function DashboardLayout() {
               <SelectItem value="admin">
                 <span className="inline-flex items-center gap-2">
                   <Building2 className="h-3.5 w-3.5" /> Admin View
+                </span>
+              </SelectItem>
+              <SelectItem value="staff_mobile">
+                <span className="inline-flex items-center gap-2">
+                  <GraduationCap className="h-3.5 w-3.5" /> Staff Mobile (Preview)
                 </span>
               </SelectItem>
             </SelectContent>
@@ -170,7 +178,7 @@ function DashboardLayout() {
       <ImpersonationBanner />
 
       {/* Mobile shell — staff view only (below md) */}
-      {isStaffView && (
+      {isStaffView && !isMobilePreview && (
         <div className="md:hidden">
           <StaffMobileShell title={pageTitle}>
             <main className="bg-secondary/40 px-3 py-4">
@@ -182,7 +190,7 @@ function DashboardLayout() {
 
       {/* Desktop layout (md+) — unchanged. Also used on mobile for Admin View. */}
       <div
-        className={`grid flex-1 md:grid-cols-[260px_1fr] ${isStaffView ? "hidden md:grid" : ""}`}
+        className={`grid flex-1 md:grid-cols-[260px_1fr] ${isStaffView && !isMobilePreview ? "hidden md:grid" : ""}`}
       >
         <aside className="hidden flex-col bg-sidebar text-sidebar-foreground md:flex">
           <SidebarBody />
@@ -220,9 +228,14 @@ function DashboardLayout() {
             </Button>
           </header>
 
-          <main className="flex-1 bg-secondary/40 px-4 py-6 md:px-8">
-
-            <Outlet />
+          <main className={isMobilePreview ? "flex-1 bg-secondary/40" : "flex-1 bg-secondary/40 px-4 py-6 md:px-8"}>
+            {isMobilePreview ? (
+              <StaffMobilePreviewFrame title={pageTitle}>
+                <Outlet />
+              </StaffMobilePreviewFrame>
+            ) : (
+              <Outlet />
+            )}
           </main>
         </div>
       </div>

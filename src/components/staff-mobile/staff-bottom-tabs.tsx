@@ -8,14 +8,18 @@ const TABS = [
   { to: "/dashboard/courses", label: "Trainings", icon: GraduationCap, exact: false },
 ] as const;
 
-export function StaffBottomTabs() {
+export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const positioning = framed
+    ? "absolute inset-x-0 bottom-0 z-40"
+    : "fixed inset-x-0 bottom-0 z-40 md:hidden";
 
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0d112b] text-white md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className={`${positioning} border-t border-white/10 bg-[#0d112b] text-white`}
+      style={framed ? undefined : { paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul className="grid grid-cols-4">
         {TABS.map((t) => {

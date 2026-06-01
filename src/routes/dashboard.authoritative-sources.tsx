@@ -375,8 +375,10 @@ function SourcesPanel({
                 stats={statsByDoc.get(s.id as string) ?? null}
                 allSources={data!.sources as Array<{ id: string; title: string; metadata?: Record<string, unknown> | null }>}
                 onJumpToRequirements={onJumpToRequirements}
+                currentRole={org?.role ?? null}
               />
             ))}
+
           </ul>
         )}
       </div>

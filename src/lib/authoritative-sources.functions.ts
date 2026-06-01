@@ -17,6 +17,163 @@ const AUTH_KINDS = [
   "other",
 ] as const;
 
+// ---------- Web-page authoritative sources ----------
+// NECTAR reads content that is directly rendered on the page itself.
+// Files linked FROM the page (PDFs, attachments) are NOT followed —
+// the user must download those and upload them separately.
+
+function stripHtmlToText(html: string): { title: string | null; text: string } {
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].trim().slice(0, 200) : null;
+  let cleaned = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<\/(p|div|section|article|li|h[1-6]|tr|br)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ");
+  cleaned = cleaned
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&[a-z]+;/gi, " ");
+  cleaned = cleaned.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return { title, text: cleaned };
+}
+
+export const ingestWebSource = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        url: z.string().url().max(2000),
+        title: z.string().min(1).max(200),
+        authoritativeKind: z.enum(AUTH_KINDS),
+        fiscalYear: z.string().max(20).optional().nullable(),
+        effectiveStart: z.string().max(40).optional().nullable(),
+        effectiveEnd: z.string().max(40).optional().nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const parsedUrl = new URL(data.url);
+    if (!/^https?:$/.test(parsedUrl.protocol)) {
+      throw new Error("Only http:// and https:// URLs are supported.");
+    }
+
+    let html = "";
+    try {
+      const res = await fetch(parsedUrl.toString(), {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (compatible; HIVE-NECTAR/1.0; +https://hivecompliance.app)",
+          Accept: "text/html,application/xhtml+xml",
+        },
+        redirect: "follow",
+      });
+      if (!res.ok) throw new Error(`Page returned HTTP ${res.status}`);
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("html") && !contentType.includes("text")) {
+        throw new Error(
+          `URL is not a readable web page (content-type: ${contentType}). If it's a PDF or document download, upload the file directly instead.`,
+        );
+      }
+      html = await res.text();
+    } catch (err) {
+      throw new Error(
+        `Couldn't fetch ${parsedUrl.host}: ${(err as Error).message}`,
+      );
+    }
+
+    const { title: pageTitle, text } = stripHtmlToText(html);
+    const letterCount = (text.match(/[a-zA-Z]/g) ?? []).length;
+    if (text.length < 200 || letterCount < 80) {
+      throw new Error(
+        "NECTAR couldn't read meaningful text from that page. It may be JavaScript-rendered or behind a login. Try a direct, public, text-based URL — or upload the document file.",
+      );
+    }
+
+    const capturedAt = new Date().toISOString();
+    const snapshotBody = `Source URL: ${parsedUrl.toString()}\nCaptured: ${capturedAt}\nPage title: ${pageTitle ?? "—"}\n\n----- BEGIN CAPTURED TEXT -----\n\n${text}`;
+    const snapshotBytes = new TextEncoder().encode(snapshotBody);
+    const safeHost = parsedUrl.host.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const objectPath = `${data.organizationId}/web-${safeHost}-${Date.now()}.txt`;
+
+    const upload = await supabase.storage
+      .from("nectar-documents")
+      .upload(objectPath, snapshotBytes, {
+        contentType: "text/plain; charset=utf-8",
+        upsert: false,
+      });
+    if (upload.error)
+      throw new Error(`Snapshot upload failed: ${upload.error.message}`);
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const docType =
+      data.authoritativeKind === "state_sow"
+        ? "sow"
+        : data.authoritativeKind === "provider_contract"
+          ? "contract"
+          : "other";
+
+    const { data: doc, error: insertErr } = await supabase
+      .from("nectar_documents")
+      .insert({
+        organization_id: data.organizationId,
+        owner_kind: "company",
+        document_type: docType,
+        title: data.title.trim(),
+        version: 1,
+        is_current: true,
+        effective_start: data.effectiveStart ?? null,
+        effective_end: data.effectiveEnd ?? null,
+        fiscal_year: data.fiscalYear ?? null,
+        external_ids: {
+          source_url: parsedUrl.toString(),
+          source_host: parsedUrl.host,
+          captured_at: capturedAt,
+        },
+        tags: ["authoritative-source", data.authoritativeKind, "web-source"],
+        storage_path: objectPath,
+        file_name: `${safeHost} (captured ${capturedAt.slice(0, 10)}).txt`,
+        mime_type: "text/plain",
+        file_size_bytes: snapshotBytes.byteLength,
+        source: "web",
+        parse_status: "parsed",
+        parsed_at: capturedAt,
+        raw_text: text.slice(0, 50000),
+        is_authoritative_source: true,
+        authoritative_kind: data.authoritativeKind,
+        uploaded_by: userId,
+        uploaded_by_name:
+          (profile?.full_name as string) ?? (profile?.email as string) ?? null,
+        metadata: { page_title: pageTitle, captured_at: capturedAt },
+      })
+      .select("id, title")
+      .single();
+    if (insertErr || !doc)
+      throw new Error(insertErr?.message ?? "Insert failed");
+
+    return {
+      documentId: doc.id as string,
+      capturedAt,
+      sourceUrl: parsedUrl.toString(),
+      textLength: text.length,
+    };
+  });
+
 // ---------- Authoritative sources ----------
 
 export const listAuthoritativeSources = createServerFn({ method: "POST" })
@@ -318,7 +475,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
       .select(
-        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, parse_status, file_name, mime_type",
+        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, parse_status, file_name, mime_type, source, external_ids",
       )
       .eq("id", data.documentId)
       .single();
@@ -380,6 +537,20 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       (f) => (f.field_group as string | null) === "sow_clause",
     );
 
+    // Web sources cite "per <url>, captured <date>" so the trace points back
+    // to the URL + snapshot date rather than a generic file name.
+    const ext = (doc.external_ids ?? {}) as {
+      source_url?: string;
+      captured_at?: string;
+    };
+    const isWeb = (doc.source as string | null) === "web" && !!ext.source_url;
+    const webSuffix = isWeb
+      ? ` (per ${ext.source_url}${
+          ext.captured_at ? `, captured ${ext.captured_at.slice(0, 10)}` : ""
+        })`
+      : "";
+    const baseLabel = (doc.title as string) ?? "Source";
+
     let inserted = 0;
 
     for (const item of aiItems) {
@@ -390,8 +561,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         .slice(0, 120);
       if (existingKeys.has(key)) continue;
       const citation = item.citation
-        ? `${(doc.title as string) ?? "Source"} — ${item.citation}`
-        : (doc.title as string) ?? null;
+        ? `${baseLabel} — ${item.citation}${webSuffix}`
+        : `${baseLabel}${webSuffix}`;
       const { error } = await supabase.from("nectar_requirements").insert({
         organization_id: doc.organization_id,
         source_document_id: doc.id,
@@ -428,8 +599,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         category:
           (f.field_key as string) === "required_document" ? "audit_doc" : "obligation",
         source_citation: citation
-          ? `${(doc.title as string) ?? "Source"} — ${citation}`
-          : (doc.title as string) ?? null,
+          ? `${baseLabel} — ${citation}${webSuffix}`
+          : `${baseLabel}${webSuffix}`,
         applies_to: "company",
       });
       if (!error) {

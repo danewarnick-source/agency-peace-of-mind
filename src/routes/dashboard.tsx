@@ -291,11 +291,23 @@ function DashboardLayout() {
               </div>
             </div>
 
-            {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
-            <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTaskCenterOpen(true)}
+                data-tour="nav.help"
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-2.5 py-1 text-xs font-medium text-[#9a3412] hover:bg-[#ffedd5]"
+                title="Open NECTAR Task Center"
+              >
+                <ListChecks className="h-3.5 w-3.5" /> <span className="hidden md:inline">Guide me</span>
+              </button>
+              {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
+              <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </header>
+          <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
 
           <main className={isMobilePreview ? "flex-1 bg-secondary/40" : "flex-1 bg-secondary/40 px-4 py-6 md:px-8"}>
             {isMobilePreview ? (

@@ -5,6 +5,7 @@ import { useAuth } from "./use-auth";
 import { useActiveShift } from "./use-active-shift";
 import { useTimePaySettings } from "./use-time-pay-settings";
 import { useWorkerProfile } from "./use-worker-profile";
+import { useMyAssignments } from "./use-my-assignments";
 import { computePeriodBounds, type PaySchedule } from "@/lib/pay-periods";
 import { isDailyServiceCode } from "@/lib/service-billing";
 

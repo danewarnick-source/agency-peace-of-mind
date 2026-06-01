@@ -2262,7 +2262,7 @@ function RequirementDetailDialog({
                     onOpenChange(false);
                   }}
                 >
-                  Confirm
+                  Confirm requirement
                 </Button>
               )}
               <Button

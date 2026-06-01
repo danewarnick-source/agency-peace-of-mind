@@ -1525,6 +1525,7 @@ function RequirementRow({
   const status = statusOf(req);
   const isRemoved = status === "removed";
   const isConfirmed = status === "confirmed";
+  const isFullyConfirmed = isConfirmed && isScopeReady(applicStats);
   const isFromAuthSource = req.origin === "document" && !!req.source_document_id;
 
   // NECTAR pre-fill awareness: if there are pending non-unknown proposals,
@@ -1541,7 +1542,9 @@ function RequirementRow({
 
 
   return (
-    <li className={`py-3 ${isRemoved ? "opacity-55" : ""}`}>
+    <li
+      className={`${isRemoved ? "opacity-55" : ""} ${isFullyConfirmed ? "border-l-[3px] border-l-emerald-400/50 bg-emerald-500/[0.06] py-2" : "py-3"}`}
+    >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 
       <div className="min-w-0 flex-1">

@@ -311,7 +311,7 @@ function MonthlyAuditFolders({ orgId }: { orgId?: string }) {
       const { data: user } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from("audit_files")
-        .insert({ organization_id: orgId, period_month: period, created_by: user.user?.id })
+        .insert({ organization_id: orgId!, period_month: period, created_by: user.user?.id })
         .select("*")
         .single();
       if (error) throw error;

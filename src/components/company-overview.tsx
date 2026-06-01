@@ -7,6 +7,7 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getCompanyOverview } from "@/lib/company-overview.functions";
 import { getAgencyHealthSnapshot } from "@/lib/agency-health.functions";
+import type { AgencyHealthSnapshot } from "@/lib/agency-health.functions";
 import {
   ShieldCheck, MapPin, FileCheck2, BadgeCheck, Activity,
   AlertTriangle, ArrowRight, PartyPopper, Wallet, ClipboardX,

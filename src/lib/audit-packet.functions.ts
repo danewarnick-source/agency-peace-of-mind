@@ -187,12 +187,6 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
           .eq("organization_id", orgId);
         return count ?? 0;
       },
-        const { count } = await supabase
-          .from("pba_accounts")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId);
-        return count ?? 0;
-      },
     };
 
     const { data: created } = await supabase

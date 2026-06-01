@@ -85,6 +85,101 @@ export type Database = {
           },
         ]
       }
+      audit_file_documents: {
+        Row: {
+          added_by: string | null
+          audit_file_id: string
+          category: string | null
+          created_at: string
+          external_ref: string | null
+          id: string
+          mime_type: string | null
+          organization_id: string
+          size_bytes: number | null
+          source: string
+          storage_path: string | null
+          title: string
+        }
+        Insert: {
+          added_by?: string | null
+          audit_file_id: string
+          category?: string | null
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          mime_type?: string | null
+          organization_id: string
+          size_bytes?: number | null
+          source: string
+          storage_path?: string | null
+          title: string
+        }
+        Update: {
+          added_by?: string | null
+          audit_file_id?: string
+          category?: string | null
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          mime_type?: string | null
+          organization_id?: string
+          size_bytes?: number | null
+          source?: string
+          storage_path?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_file_documents_audit_file_id_fkey"
+            columns: ["audit_file_id"]
+            isOneToOne: false
+            referencedRelation: "audit_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_files: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          period_month: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sent_to_audit_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          period_month: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sent_to_audit_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          period_month?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sent_to_audit_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       billing_submission_audit_log: {
         Row: {
           action: string

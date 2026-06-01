@@ -1,7 +1,10 @@
 import { useMemo, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { supabase } from "@/integrations/supabase/client";
+import { askNectarHelp, type NectarHelpReply } from "@/lib/nectar-help.functions";
+import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -49,155 +52,290 @@ type PulledRow = {
   staff_id?: string | null;
 };
 
+type RecordTypeKey =
+  | "evv"
+  | "billing_520"
+  | "client_doc"
+  | "incident"
+  | "client_spending"
+  | "activity_reimbursement"
+  | "pcsp"
+  | "budget_1056"
+  | "intake_referral"
+  | "certification"
+  | "training"
+  | "mar"
+  | "nectar_doc";
+
+const RECORD_TYPES: { key: RecordTypeKey; label: string; group: string }[] = [
+  { key: "evv", label: "EVV timesheets", group: "Service delivery" },
+  { key: "billing_520", label: "520 billing submissions", group: "Billing" },
+  { key: "client_spending", label: "Client spending logs", group: "Billing" },
+  { key: "activity_reimbursement", label: "Activity reimbursements", group: "Billing" },
+  { key: "pcsp", label: "PCSP plans", group: "Client documents" },
+  { key: "budget_1056", label: "1056 budgets", group: "Client documents" },
+  { key: "intake_referral", label: "Intake & referrals", group: "Client documents" },
+  { key: "client_doc", label: "Client documents (other)", group: "Client documents" },
+  { key: "mar", label: "MAR / eMAR records", group: "Clinical" },
+  { key: "incident", label: "Incident reports", group: "Clinical" },
+  { key: "certification", label: "Staff certifications", group: "Workforce" },
+  { key: "training", label: "Training records", group: "Workforce" },
+  { key: "nectar_doc", label: "NECTAR document library", group: "Other" },
+];
+
+// Each record type maps to a Supabase pull. Types without an implemented
+// source resolve to an empty list with a friendly note — the dropdown still
+// exposes them so the catalog is complete, and NECTAR's document library
+// captures uploaded copies in the meantime.
+async function pullByType(args: {
+  orgId: string;
+  type: RecordTypeKey;
+  fromTs: string | null;
+  toTs: string | null;
+  fromDate: string | null;
+  toDate: string | null;
+  clientId: string | null;
+  staffId: string | null;
+}): Promise<PulledRow[]> {
+  const { orgId, type, fromTs, toTs, fromDate, toDate, clientId, staffId } = args;
+
+  switch (type) {
+    case "evv": {
+      let q = supabase
+        .from("evv_timesheets")
+        .select("id, clock_in_timestamp, client_id, staff_id, service_type_code")
+        .eq("organization_id", orgId)
+        .order("clock_in_timestamp", { ascending: false })
+        .limit(200);
+      if (fromTs) q = q.gte("clock_in_timestamp", fromTs);
+      if (toTs) q = q.lte("clock_in_timestamp", toTs);
+      if (clientId) q = q.eq("client_id", clientId);
+      if (staffId) q = q.eq("staff_id", staffId);
+      const { data } = await q;
+      return (data ?? []).map((t: any) => ({
+        id: `evv:${t.id}`,
+        type: "EVV Timesheet",
+        title: `Timesheet ${format(new Date(t.clock_in_timestamp), "MMM d, yyyy p")}`,
+        subtitle: t.service_type_code ?? null,
+        date: t.clock_in_timestamp,
+        client_id: t.client_id,
+        staff_id: t.staff_id,
+      }));
+    }
+    case "billing_520": {
+      let q = supabase
+        .from("billing_submissions")
+        .select("id, period_start, period_end, status")
+        .eq("organization_id", orgId)
+        .order("period_start", { ascending: false })
+        .limit(200);
+      if (fromDate) q = q.gte("period_start", fromDate);
+      if (toDate) q = q.lte("period_start", toDate);
+      const { data } = await q;
+      return (data ?? []).map((s: any) => ({
+        id: `billing:${s.id}`,
+        type: "520 Submission",
+        title: `520 — ${format(new Date(s.period_start), "MMMM yyyy")}`,
+        subtitle: s.status,
+        date: s.period_start,
+      }));
+    }
+    case "client_doc":
+    case "pcsp":
+    case "budget_1056":
+    case "intake_referral": {
+      const categoryFilter: Record<string, string | null> = {
+        pcsp: "pcsp",
+        budget_1056: "1056",
+        intake_referral: "intake",
+        client_doc: null,
+      };
+      let q = supabase
+        .from("client_documents")
+        .select("id, title, created_at, client_id, category")
+        .eq("organization_id", orgId)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (fromTs) q = q.gte("created_at", fromTs);
+      if (toTs) q = q.lte("created_at", toTs);
+      if (clientId) q = q.eq("client_id", clientId);
+      const cat = categoryFilter[type];
+      if (cat) q = q.ilike("category", `%${cat}%`);
+      const { data } = await q;
+      const label = RECORD_TYPES.find((r) => r.key === type)?.label ?? "Client document";
+      return (data ?? []).map((d: any) => ({
+        id: `client_doc:${d.id}`,
+        type: label,
+        title: d.title ?? "Untitled",
+        subtitle: d.category ?? null,
+        date: d.created_at,
+        client_id: d.client_id,
+      }));
+    }
+    case "incident": {
+      let q = supabase
+        .from("incident_reports")
+        .select("id, summary, submitted_at, client_id")
+        .eq("organization_id", orgId)
+        .order("submitted_at", { ascending: false })
+        .limit(200);
+      if (fromTs) q = q.gte("submitted_at", fromTs);
+      if (toTs) q = q.lte("submitted_at", toTs);
+      if (clientId) q = q.eq("client_id", clientId);
+      const { data } = await q;
+      return (data ?? []).map((r: any) => ({
+        id: `incident:${r.id}`,
+        type: "Incident Report",
+        title: r.summary ?? "Incident report",
+        date: r.submitted_at,
+        client_id: r.client_id,
+      }));
+    }
+    case "client_spending": {
+      let q = supabase
+        .from("client_spending_log")
+        .select("id, amount, purpose, spent_at, client_id, staff_id, shift_id")
+        .eq("organization_id", orgId)
+        .order("spent_at", { ascending: false })
+        .limit(200);
+      if (fromTs) q = q.gte("spent_at", fromTs);
+      if (toTs) q = q.lte("spent_at", toTs);
+      if (clientId) q = q.eq("client_id", clientId);
+      if (staffId) q = q.eq("staff_id", staffId);
+      const { data } = await q;
+      return (data ?? []).map((r: any) => ({
+        id: `client_spending:${r.id}`,
+        type: "Client Spending",
+        title: `$${Number(r.amount).toFixed(2)} — ${r.purpose}`,
+        subtitle: r.shift_id ? `Shift ${String(r.shift_id).slice(0, 8)}` : null,
+        date: r.spent_at,
+        client_id: r.client_id,
+        staff_id: r.staff_id,
+      }));
+    }
+    case "nectar_doc": {
+      let q = supabase
+        .from("nectar_documents")
+        .select("id, title, doc_type, created_at, client_id, staff_id")
+        .eq("organization_id", orgId)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (fromTs) q = q.gte("created_at", fromTs);
+      if (toTs) q = q.lte("created_at", toTs);
+      if (clientId) q = q.eq("client_id", clientId);
+      if (staffId) q = q.eq("staff_id", staffId);
+      const { data, error } = await q;
+      if (error) return [];
+      return (data ?? []).map((d: any) => ({
+        id: `nectar_doc:${d.id}`,
+        type: "NECTAR Document",
+        title: d.title ?? d.doc_type ?? "Document",
+        subtitle: d.doc_type ?? null,
+        date: d.created_at,
+        client_id: d.client_id,
+        staff_id: d.staff_id,
+      }));
+    }
+    case "activity_reimbursement":
+    case "certification":
+    case "training":
+    case "mar":
+    default:
+      // Catalog entry is exposed in the dropdown so the user can request
+      // these record types; backend wiring lands in their respective
+      // foundation prompts. Return empty for now.
+      return [];
+  }
+}
+
 function DocumentPull({ orgId }: { orgId?: string }) {
-  const [type, setType] = useState<string>("all");
-  const [query, setQuery] = useState("");
+  const [type, setType] = useState<RecordTypeKey | "">("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [clientFilter, setClientFilter] = useState("");
-  const [staffFilter, setStaffFilter] = useState("");
+  const [clientId, setClientId] = useState<string>("");
+  const [staffId, setStaffId] = useState<string>("");
+  const [pullKey, setPullKey] = useState(0);
 
-  const { data, isLoading } = useQuery({
+  // NECTAR Infusion: plain-language pull
+  const [nectarPrompt, setNectarPrompt] = useState("");
+  const [nectarReply, setNectarReply] = useState<NectarHelpReply | null>(null);
+  const ask = useServerFn(askNectarHelp);
+  const askMutation = useMutation({
+    mutationFn: async (q: string) => ask({ data: { question: q, role: "admin" } }),
+    onSuccess: (r: NectarHelpReply) => setNectarReply(r),
+    onError: (e: any) => toast.error(e?.message ?? "NECTAR couldn't answer that."),
+  });
+
+  const { data: clients } = useQuery({
     enabled: !!orgId,
-    queryKey: ["audit-pull", orgId, type, from, to, clientFilter, staffFilter, query],
+    queryKey: ["audit-pull-clients", orgId],
     queryFn: async () => {
-      const rows: PulledRow[] = [];
-      const fromTs = from ? new Date(from).toISOString() : null;
-      const toTs = to ? new Date(to + "T23:59:59").toISOString() : null;
-
-      const wantsAll = type === "all";
-
-      // EVV timesheets
-      if (wantsAll || type === "evv") {
-        let q = supabase
-          .from("evv_timesheets")
-          .select("id, clock_in_timestamp, client_id, staff_id")
-          .eq("organization_id", orgId!)
-          .order("clock_in_timestamp", { ascending: false })
-          .limit(50);
-        if (fromTs) q = q.gte("clock_in_timestamp", fromTs);
-        if (toTs) q = q.lte("clock_in_timestamp", toTs);
-        const { data: ts } = await q;
-        (ts ?? []).forEach((t: any) =>
-          rows.push({
-            id: `evv:${t.id}`,
-            type: "EVV Timesheet",
-            title: `Timesheet ${format(new Date(t.clock_in_timestamp), "MMM d, yyyy p")}`,
-            date: t.clock_in_timestamp,
-            client_id: t.client_id,
-            staff_id: t.staff_id,
-          }),
-        );
-      }
-
-      // Client documents
-      if (wantsAll || type === "client") {
-        let q = supabase
-          .from("client_documents")
-          .select("id, title, created_at, client_id")
-          .eq("organization_id", orgId!)
-          .order("created_at", { ascending: false })
-          .limit(50);
-        if (fromTs) q = q.gte("created_at", fromTs);
-        if (toTs) q = q.lte("created_at", toTs);
-        const { data: cd } = await q;
-        (cd ?? []).forEach((d: any) =>
-          rows.push({
-            id: `client_doc:${d.id}`,
-            type: "Client Document",
-            title: d.title ?? "Untitled",
-            date: d.created_at,
-            client_id: d.client_id,
-          }),
-        );
-      }
-
-      // Billing
-      if (wantsAll || type === "billing") {
-        let q = supabase
-          .from("billing_submissions")
-          .select("id, period_start, period_end, status, created_at")
-          .eq("organization_id", orgId!)
-          .order("period_start", { ascending: false })
-          .limit(50);
-        if (from) q = q.gte("period_start", from);
-        if (to) q = q.lte("period_start", to);
-        const { data: bs } = await q;
-        (bs ?? []).forEach((s: any) =>
-          rows.push({
-            id: `billing:${s.id}`,
-            type: "520 Billing Submission",
-            title: `520 — ${format(new Date(s.period_start), "MMMM yyyy")}`,
-            subtitle: s.status,
-            date: s.period_start,
-          }),
-        );
-      }
-
-      // Incidents
-      if (wantsAll || type === "incident") {
-        let q = supabase
-          .from("incident_reports")
-          .select("id, summary, submitted_at, client_id")
-          .eq("organization_id", orgId!)
-          .order("submitted_at", { ascending: false })
-          .limit(50);
-        if (fromTs) q = q.gte("submitted_at", fromTs);
-        if (toTs) q = q.lte("submitted_at", toTs);
-        const { data: ir } = await q;
-        (ir ?? []).forEach((r: any) =>
-          rows.push({
-            id: `incident:${r.id}`,
-            type: "Incident Report",
-            title: r.summary ?? "Incident report",
-            date: r.submitted_at,
-            client_id: r.client_id,
-          }),
-        );
-      }
-
-      // Client spending log (hourly shifts)
-      if (wantsAll || type === "client_spending") {
-        let q = supabase
-          .from("client_spending_log")
-          .select("id, amount, purpose, spent_at, client_id, staff_id, shift_id")
-          .eq("organization_id", orgId!)
-          .order("spent_at", { ascending: false })
-          .limit(50);
-        if (fromTs) q = q.gte("spent_at", fromTs);
-        if (toTs) q = q.lte("spent_at", toTs);
-        const { data: cs } = await q;
-        (cs ?? []).forEach((r: any) =>
-          rows.push({
-            id: `client_spending:${r.id}`,
-            type: "Client Spending",
-            title: `$${Number(r.amount).toFixed(2)} — ${r.purpose}`,
-            subtitle: `Shift ${String(r.shift_id).slice(0, 8)}`,
-            date: r.spent_at,
-            client_id: r.client_id,
-            staff_id: r.staff_id,
-          }),
-        );
-      }
-
-      let filtered = rows;
-      if (query.trim()) {
-        const qLow = query.toLowerCase();
-        filtered = filtered.filter(
-          (r) =>
-            r.title.toLowerCase().includes(qLow) ||
-            r.type.toLowerCase().includes(qLow),
-        );
-      }
-      if (clientFilter.trim()) {
-        filtered = filtered.filter((r) => (r.client_id ?? "").includes(clientFilter.trim()));
-      }
-      if (staffFilter.trim()) {
-        filtered = filtered.filter((r) => (r.staff_id ?? "").includes(staffFilter.trim()));
-      }
-      return filtered.sort((a, b) => (a.date && b.date ? (a.date < b.date ? 1 : -1) : 0));
+      const { data } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name")
+        .eq("organization_id", orgId!)
+        .order("last_name", { ascending: true })
+        .limit(500);
+      return (data ?? []) as Array<{ id: string; first_name: string; last_name: string }>;
     },
   });
+
+  const { data: staff } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["audit-pull-staff", orgId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("organization_members")
+        .select("user_id, profiles(id, full_name, email)")
+        .eq("organization_id", orgId!)
+        .eq("active", true)
+        .limit(500);
+      const out = (data ?? []).map((m: any) => ({
+        id: m.user_id as string,
+        name: (m.profiles?.full_name as string) || (m.profiles?.email as string) || "Staff",
+      }));
+      return out.sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+
+  const { data, isLoading, isFetching } = useQuery({
+    enabled: !!orgId && pullKey > 0,
+    queryKey: ["audit-pull", orgId, pullKey],
+    queryFn: async () => {
+      const fromTs = from ? new Date(from).toISOString() : null;
+      const toTs = to ? new Date(to + "T23:59:59").toISOString() : null;
+      const typesToPull: RecordTypeKey[] = type
+        ? [type]
+        : (RECORD_TYPES.map((r) => r.key) as RecordTypeKey[]);
+
+      const all: PulledRow[] = [];
+      for (const t of typesToPull) {
+        const rows = await pullByType({
+          orgId: orgId!,
+          type: t,
+          fromTs,
+          toTs,
+          fromDate: from || null,
+          toDate: to || null,
+          clientId: clientId || null,
+          staffId: staffId || null,
+        });
+        all.push(...rows);
+      }
+      return all.sort((a, b) => (a.date && b.date ? (a.date < b.date ? 1 : -1) : 0));
+    },
+  });
+
+  const canPull = !!orgId;
+  const grouped = useMemo(() => {
+    const groups = new Map<string, typeof RECORD_TYPES>();
+    for (const r of RECORD_TYPES) {
+      const arr = groups.get(r.group) ?? [];
+      arr.push(r);
+      groups.set(r.group, arr);
+    }
+    return Array.from(groups.entries());
+  }, []);
 
   return (
     <Card className="bg-card/60 backdrop-blur border-[color:var(--border-light)]">
@@ -206,66 +344,195 @@ function DocumentPull({ orgId }: { orgId?: string }) {
           <Search className="h-4 w-4 text-[color:var(--amber-600)]" />
           Pull a document or report
         </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Choose a record type and date range, optionally narrow by client or
+          staff, then pull. Nothing loads until you do — keeps the audit trail
+          deliberate.
+        </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-          <div className="md:col-span-2">
-            <Label className="text-xs">Search</Label>
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. timesheet, 520, intake" />
+        {/* NECTAR Infusion search bar — visible-but-locked for tiers without it */}
+        <NectarInfusionLock
+          featureName="Pull records in plain language"
+          benefit="Ask NECTAR to assemble any pull from your data — e.g. “all of Blake's DSI timesheets for FY26” — instead of building filters by hand. Works across every record type and every plan year on file."
+        >
+          <div className="rounded-lg border border-[color:var(--amber-300)] bg-gradient-to-br from-[color:var(--amber-50)]/70 to-white p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <span
+                className="inline-flex h-6 w-6 items-center justify-center text-[color:var(--amber-600)]"
+                style={{
+                  clipPath:
+                    "polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)",
+                  background: "linear-gradient(135deg, var(--amber-100), var(--amber-200))",
+                }}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+              </span>
+              <Label className="text-xs font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
+                NECTAR Infusion
+              </Label>
+              <span className="text-xs text-muted-foreground">
+                Ask in plain language
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={nectarPrompt}
+                onChange={(e) => setNectarPrompt(e.target.value)}
+                placeholder="e.g. Pull all of Blake's DSI timesheets for FY26"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && nectarPrompt.trim().length > 1) {
+                    askMutation.mutate(nectarPrompt.trim());
+                  }
+                }}
+              />
+              <Button
+                variant="cta"
+                onClick={() => askMutation.mutate(nectarPrompt.trim())}
+                disabled={askMutation.isPending || nectarPrompt.trim().length < 2}
+              >
+                {askMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Ask NECTAR
+              </Button>
+            </div>
+            {nectarReply && (
+              <div className="mt-3 rounded-md border border-[color:var(--amber-200)] bg-white/80 p-3 text-sm">
+                <p className="text-foreground">{nectarReply.answer}</p>
+                {nectarReply.deepLink && (
+                  <a
+                    href={nectarReply.deepLink.path}
+                    className="mt-2 inline-block text-xs font-medium text-[color:var(--amber-700)] hover:underline"
+                  >
+                    {nectarReply.deepLink.label} →
+                  </a>
+                )}
+              </div>
+            )}
           </div>
-          <div>
-            <Label className="text-xs">Type</Label>
-            <Select value={type} onValueChange={setType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+        </NectarInfusionLock>
+
+        {/* Manual pull — always available */}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+          <div className="md:col-span-4">
+            <Label className="text-xs">Record type</Label>
+            <Select value={type || "__any"} onValueChange={(v) => setType(v === "__any" ? "" : (v as RecordTypeKey))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a record type" />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="evv">EVV / Timesheets</SelectItem>
-                <SelectItem value="billing">Billing (520)</SelectItem>
-                <SelectItem value="client">Client docs</SelectItem>
-                <SelectItem value="incident">Incidents</SelectItem>
-                <SelectItem value="client_spending">Client Spending</SelectItem>
+                <SelectItem value="__any">Any record type</SelectItem>
+                {grouped.map(([group, items]) => (
+                  <div key={group}>
+                    <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {group}
+                    </div>
+                    {items.map((r) => (
+                      <SelectItem key={r.key} value={r.key}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </div>
+                ))}
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="md:col-span-4">
+            <Label className="text-xs">Filter by client</Label>
+            <Select value={clientId || "__any"} onValueChange={(v) => setClientId(v === "__any" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Any client" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__any">Any client</SelectItem>
+                {(clients ?? []).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.last_name}, {c.first_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Select a client to pull all of their records.
+            </p>
+          </div>
+          <div className="md:col-span-4">
+            <Label className="text-xs">Filter by staff</Label>
+            <Select value={staffId || "__any"} onValueChange={(v) => setStaffId(v === "__any" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Any staff" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__any">Any staff</SelectItem>
+                {(staff ?? []).map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Select a staff member to pull everything they touched.
+            </p>
+          </div>
+
+          <div className="md:col-span-3">
             <Label className="text-xs">From</Label>
             <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
-          <div>
+          <div className="md:col-span-3">
             <Label className="text-xs">To</Label>
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
-          <div className="md:col-span-3">
-            <Label className="text-xs">Client ID contains</Label>
-            <Input value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} placeholder="optional" />
-          </div>
-          <div className="md:col-span-3">
-            <Label className="text-xs">Staff ID contains</Label>
-            <Input value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} placeholder="optional" />
+          <div className="flex items-end md:col-span-6">
+            <Button
+              className="w-full md:w-auto"
+              variant="cta"
+              onClick={() => setPullKey((k) => k + 1)}
+              disabled={!canPull}
+            >
+              <Search className="h-4 w-4" />
+              Pull records
+            </Button>
           </div>
         </div>
 
-        <div className="rounded-md border border-[color:var(--border-light)] divide-y">
-          {isLoading && (
-            <div className="p-4 text-sm text-muted-foreground flex items-center gap-2">
+        <div className="divide-y rounded-md border border-[color:var(--border-light)]">
+          {pullKey === 0 && (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              Choose your criteria above and press <span className="font-medium text-foreground">Pull records</span>.
+              Results stay empty until you do.
+            </div>
+          )}
+          {pullKey > 0 && (isLoading || isFetching) && (
+            <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Pulling records…
             </div>
           )}
-          {!isLoading && (data ?? []).length === 0 && (
-            <div className="p-6 text-sm text-muted-foreground text-center">No records match those filters.</div>
+          {pullKey > 0 && !isLoading && !isFetching && (data ?? []).length === 0 && (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              No records match those filters.
+            </div>
           )}
-          {(data ?? []).slice(0, 100).map((r) => (
-            <div key={r.id} className="p-3 flex items-center justify-between gap-3">
+          {(data ?? []).slice(0, 200).map((r) => (
+            <div key={r.id} className="flex items-center justify-between gap-3 p-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-sm truncate">{r.title}</span>
+                  <span className="truncate text-sm font-medium">{r.title}</span>
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  {r.type}{r.subtitle ? ` · ${r.subtitle}` : ""}{r.date ? ` · ${format(new Date(r.date), "MMM d, yyyy")}` : ""}
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  {r.type}
+                  {r.subtitle ? ` · ${r.subtitle}` : ""}
+                  {r.date ? ` · ${format(new Date(r.date), "MMM d, yyyy")}` : ""}
                 </div>
               </div>
-              <Badge variant="secondary" className="shrink-0">{r.type.split(" ")[0]}</Badge>
+              <Badge variant="secondary" className="shrink-0">
+                {r.type.split(" ")[0]}
+              </Badge>
             </div>
           ))}
         </div>

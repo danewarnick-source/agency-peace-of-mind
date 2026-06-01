@@ -590,7 +590,7 @@ function SchedulerInner({ orgId, role }: { orgId: string; role: string | null })
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await (supabase as any)
         .from("clients")
-        .select("id, first_name, last_name, physical_address, job_code")
+        .select("id, first_name, last_name, physical_address, job_code, team_id")
         .eq("organization_id", orgId)
         .eq("account_status", "active");
       if (error) throw error;
@@ -598,9 +598,115 @@ function SchedulerInner({ orgId, role }: { orgId: string; role: string | null })
     },
   });
 
+  const { data: teamList = [] } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["sched-teams", orgId],
+    queryFn: async (): Promise<TeamRow[]> => {
+      const { data, error } = await (supabase as any)
+        .from("teams")
+        .select("id, team_name, manager_id")
+        .eq("organization_id", orgId)
+        .order("team_name");
+      if (error) throw error;
+      const teams = (data ?? []) as TeamRow[];
+      const mgrIds = Array.from(new Set(teams.map((t) => t.manager_id).filter(Boolean) as string[]));
+      if (mgrIds.length) {
+        const { data: profs } = await (supabase as any)
+          .from("profiles").select("id, full_name, email").in("id", mgrIds);
+        const map = new Map<string, { full_name: string | null; email: string | null }>(
+          ((profs ?? []) as any[]).map((p) => [p.id, p]),
+        );
+        teams.forEach((t) => {
+          const p = t.manager_id ? map.get(t.manager_id) : null;
+          t.manager_name = p?.full_name ?? p?.email ?? null;
+        });
+      }
+      return teams;
+    },
+  });
+
+  const { data: homeHosts = [] } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["sched-home-hosts", orgId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("staff_assignments")
+        .select("staff_id, client_id, is_group_home_assignment")
+        .eq("organization_id", orgId)
+        .eq("is_group_home_assignment", true);
+      if (error) throw error;
+      return (data ?? []) as Array<{ staff_id: string; client_id: string }>;
+    },
+  });
+
+  // Group-home addresses derived from clients with shared physical_address.
+  const homeAddresses = useMemo(() => {
+    const counts = new Map<string, number>();
+    clientList.forEach((c) => {
+      const a = (c.physical_address ?? "").trim();
+      if (!a) return;
+      counts.set(a, (counts.get(a) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .filter(([, n]) => n >= 2)
+      .map(([address]) => address)
+      .sort();
+  }, [clientList]);
+
+  // Clients in current scope.
+  const scopedClients = useMemo(() => {
+    if (scope.type === "all") return clientList;
+    if (scope.type === "team") return clientList.filter((c) => c.team_id === scope.id);
+    return clientList.filter((c) => (c.physical_address ?? "").trim() === scope.address);
+  }, [clientList, scope]);
+
+  // Who is the assigned scheduler for the current scope, and can the current user edit?
+  const { assignedLabel, canEdit } = useMemo(() => {
+    if (scope.type === "all") {
+      return { assignedLabel: isAdmin ? "Company Admin oversight" : null, canEdit: isAdmin };
+    }
+    if (scope.type === "team") {
+      const t = teamList.find((x) => x.id === scope.id);
+      const mgrName = t?.manager_name ?? "Unassigned";
+      const mine = !!t?.manager_id && t.manager_id === user?.id;
+      return {
+        assignedLabel: `Manager: ${mgrName}`,
+        canEdit: isAdmin || mine,
+      };
+    }
+    // home scope: any staff with is_group_home_assignment at this address is a host
+    const clientIdsAtHome = new Set(
+      clientList
+        .filter((c) => (c.physical_address ?? "").trim() === scope.address)
+        .map((c) => c.id),
+    );
+    const hostStaffIds = Array.from(
+      new Set(
+        homeHosts
+          .filter((h) => clientIdsAtHome.has(h.client_id))
+          .map((h) => h.staff_id),
+      ),
+    );
+    const isHost = !!user?.id && hostStaffIds.includes(user.id);
+    return {
+      assignedLabel: `Hosts: ${hostStaffIds.length} assigned`,
+      canEdit: isAdmin || isHost,
+    };
+  }, [scope, teamList, clientList, homeHosts, user?.id, isAdmin]);
+
+  const scopeLabel =
+    scope.type === "all"
+      ? "All teams & homes"
+      : scope.type === "team"
+      ? `Team: ${teamList.find((t) => t.id === scope.id)?.team_name ?? "—"}`
+      : `Host Home: ${scope.address}`;
+
+  const scopedClientIds = useMemo(() => new Set(scopedClients.map((c) => c.id)), [scopedClients]);
+
   const filtered = useMemo(
     () =>
       shifts.filter((s) => {
+        if (scope.type !== "all" && !scopedClientIds.has(s.client_id)) return false;
         if (selStaff !== "all" && s.staff_id !== selStaff) return false;
         if (selClient !== "all" && s.client_id !== selClient) return false;
         if (filter === "published" && !s.published) return false;
@@ -610,7 +716,7 @@ function SchedulerInner({ orgId, role }: { orgId: string; role: string | null })
         if (filter === "declined" && s.status !== "declined") return false;
         return true;
       }),
-    [shifts, filter, selStaff, selClient]
+    [shifts, filter, selStaff, selClient, scope, scopedClientIds]
   );
 
   const byDate = useMemo(() => {

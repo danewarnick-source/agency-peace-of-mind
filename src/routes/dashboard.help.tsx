@@ -235,14 +235,14 @@ function HelpPage() {
           className="min-h-[44px] flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#d97a1c]/40"
           disabled={m.isPending}
         />
-        <button
+        <NectarButton
           type="submit"
-          disabled={m.isPending || input.trim().length < 2}
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-md bg-[#0f1b3d] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
+          disabled={input.trim().length < 2}
+          loading={m.isPending}
+          icon={<Send className="h-4 w-4" />}
         >
-          {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Send
-        </button>
+        </NectarButton>
       </form>
     </div>
   );

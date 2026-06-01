@@ -2,6 +2,7 @@ import { useCallback, type ReactNode } from "react";
 import { StaffTopBar } from "./staff-top-bar";
 import { StaffBottomTabs } from "./staff-bottom-tabs";
 import { ActiveShiftBar } from "./active-shift-bar";
+import { CapThresholdModal } from "./cap-threshold-modal";
 import { MobileShellProvider, useMobileShellContainer } from "./mobile-shell-context";
 
 /**
@@ -43,6 +44,7 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
       </main>
       <ActiveShiftBar framed />
       <StaffBottomTabs framed />
+      <CapThresholdModal />
     </div>
   );
 }

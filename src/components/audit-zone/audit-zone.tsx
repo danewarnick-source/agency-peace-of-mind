@@ -156,6 +156,30 @@ function DocumentPull({ orgId }: { orgId?: string }) {
         );
       }
 
+      // Client spending log (hourly shifts)
+      if (wantsAll || type === "client_spending") {
+        let q = supabase
+          .from("client_spending_log")
+          .select("id, amount, purpose, spent_at, client_id, staff_id, shift_id")
+          .eq("organization_id", orgId!)
+          .order("spent_at", { ascending: false })
+          .limit(50);
+        if (fromTs) q = q.gte("spent_at", fromTs);
+        if (toTs) q = q.lte("spent_at", toTs);
+        const { data: cs } = await q;
+        (cs ?? []).forEach((r: any) =>
+          rows.push({
+            id: `client_spending:${r.id}`,
+            type: "Client Spending",
+            title: `$${Number(r.amount).toFixed(2)} — ${r.purpose}`,
+            subtitle: `Shift ${String(r.shift_id).slice(0, 8)}`,
+            date: r.spent_at,
+            client_id: r.client_id,
+            staff_id: r.staff_id,
+          }),
+        );
+      }
+
       let filtered = rows;
       if (query.trim()) {
         const qLow = query.toLowerCase();

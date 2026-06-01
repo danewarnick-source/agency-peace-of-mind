@@ -490,14 +490,26 @@ function EmployeesPage() {
       </Dialog>
 
       {/* Edit employee */}
-      <Dialog open={!!editingMember} onOpenChange={(o) => !o && setEditingMember(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit employee</DialogTitle>
-            <DialogDescription>Update profile, role, and employment status. Changes save immediately.</DialogDescription>
+      <Dialog
+        open={!!editingMember}
+        onOpenChange={(o) => {
+          if (o) return;
+          if (editDirty && !window.confirm("Discard unsaved changes?")) return;
+          setEditingMember(null);
+          setEditDirty(false);
+        }}
+      >
+        <DialogContent className="flex max-h-[100dvh] w-[calc(100%-1rem)] max-w-lg flex-col gap-0 p-0 sm:max-h-[90vh] sm:w-full">
+          <DialogHeader className="shrink-0 border-b border-border px-4 py-3 sm:px-6 sm:py-4">
+            <DialogTitle className="pr-8">Edit employee</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Update profile, role, and employment status. Changes save when you tap Save.
+            </DialogDescription>
           </DialogHeader>
           {editingMember && (
             <form
+              id="edit-employee-form"
+              onChange={() => { if (!editDirty) setEditDirty(true); }}
               onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
@@ -514,8 +526,9 @@ function EmployeesPage() {
                   hourlyRate: String(fd.get("hourly_rate") || "").trim(),
                   dailyRate: String(fd.get("daily_rate") || "").trim(),
                 });
+                setEditDirty(false);
               }}
-              className="grid gap-4"
+              className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-6"
             >
               <div className="grid gap-2"><Label htmlFor="full_name">Full name</Label><Input id="full_name" name="full_name" defaultValue={editingMember.fullName} required /></div>
               <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={editingMember.email} /></div>
@@ -529,7 +542,7 @@ function EmployeesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-role">System role</Label>
                   <Select name="role" defaultValue={editingMember.role}>
@@ -571,7 +584,7 @@ function EmployeesPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="hourly_rate">Hourly rate ($)</Label>
                       <Input
@@ -613,15 +626,33 @@ function EmployeesPage() {
                 id={editingMember.userId}
                 fullName={editingMember.fullName}
                 organizationId={org?.organization_id}
-                onDone={() => setEditingMember(null)}
+                onDone={() => { setEditingMember(null); setEditDirty(false); }}
               />
-              <DialogFooter>
-                <Button type="submit" disabled={editMemberMutation.isPending}>
-                  {editMemberMutation.isPending ? "Saving…" : "Save changes"}
-                </Button>
-              </DialogFooter>
             </form>
           )}
+          <div className="shrink-0 border-t border-border bg-background px-4 py-3 sm:px-6 sm:py-4">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  if (editDirty && !window.confirm("Discard unsaved changes?")) return;
+                  setEditingMember(null);
+                  setEditDirty(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                form="edit-employee-form"
+                disabled={editMemberMutation.isPending}
+                className="bg-amber-500 text-amber-950 hover:bg-amber-400"
+              >
+                {editMemberMutation.isPending ? "Saving…" : "Save changes"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

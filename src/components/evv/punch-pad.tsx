@@ -692,6 +692,11 @@ export function PunchPad({
       setShowNarrativeError(true);
       return;
     }
+    if (nectarUsed && !draftConfirmed) {
+      toast.error("Please review the NECTAR-drafted note and check the confirmation box before submitting.");
+      return;
+    }
+
 
     const isException     = !!opts?.exception;
     let aiVerdict: CoachResult | null = aiCoach;

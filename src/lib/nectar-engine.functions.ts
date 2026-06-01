@@ -308,7 +308,16 @@ export const setRequirementMapping = createServerFn({ method: "POST" })
     const nowIso = new Date().toISOString();
 
     if (data.id) {
-      const patch: Record<string, unknown> = {};
+      const patch: {
+        scope_kind?: ScopeKind;
+        scope_value?: string | null;
+        cadence?: string | null;
+        jurisdiction?: string | null;
+        rationale?: string | null;
+        confirmed?: boolean;
+        confirmed_by?: string | null;
+        confirmed_at?: string | null;
+      } = {};
       if (data.scopeKind) patch.scope_kind = data.scopeKind;
       if (data.scopeValue !== undefined) patch.scope_value = data.scopeValue;
       if (data.cadence !== undefined) patch.cadence = data.cadence;
@@ -319,6 +328,7 @@ export const setRequirementMapping = createServerFn({ method: "POST" })
         patch.confirmed_by = data.confirmed ? userId : null;
         patch.confirmed_at = data.confirmed ? nowIso : null;
       }
+
       const { error } = await supabase
         .from("nectar_requirement_mappings")
         .update(patch)

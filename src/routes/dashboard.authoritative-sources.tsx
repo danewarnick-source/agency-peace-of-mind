@@ -376,7 +376,15 @@ function SourceRow({
   source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null };
   orgId: string;
   stats:
-    | { total: number; confirmed: number; needs: number; removed: number; lastDraftedAt: string | null }
+    | {
+        total: number;
+        confirmed: number;
+        fullyConfirmed: number;
+        scopePending: number;
+        needs: number;
+        removed: number;
+        lastDraftedAt: string | null;
+      }
     | null;
   onJumpToRequirements: (docId: string) => void;
 }) {

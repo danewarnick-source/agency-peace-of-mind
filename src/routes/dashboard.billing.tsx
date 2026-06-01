@@ -11,12 +11,12 @@ export const Route = createFileRoute("/dashboard/billing")({
   ),
 });
 
-const TABS = [
+const TABS: Array<{ to: string; label: string; icon: typeof Users; exact?: boolean }> = [
   { to: "/dashboard/billing", label: "Overview", icon: Users, exact: true },
   { to: "/dashboard/billing/form520", label: "520 Form", icon: FileSpreadsheet },
   { to: "/dashboard/billing/imports", label: "Imports / Authorizations", icon: Upload },
   { to: "/dashboard/billing/subscription", label: "HIVE Subscription", icon: CreditCard },
-] as const;
+];
 
 function BillingLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

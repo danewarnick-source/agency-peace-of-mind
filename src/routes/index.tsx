@@ -343,6 +343,9 @@ function HiveLandingPage() {
         </div>
       </section>
 
+      {/* ───────── Competitive contrast ───────── */}
+      <CompetitiveContrast />
+
       {/* ───────── NECTAR spotlight ───────── */}
       <section id="nectar" className="relative overflow-hidden bg-hive-navy-800 text-primary-foreground">
         <Honeycomb />

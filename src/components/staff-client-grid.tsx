@@ -37,9 +37,11 @@ const billingLabel = (code: string) => (isDaily(code) ? "Daily" : "Hourly");
 function ClientCard({
   c,
   activeShift,
+  periodHours,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
+  periodHours: number;
 }) {
   const codes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;

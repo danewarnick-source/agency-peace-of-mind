@@ -65,6 +65,7 @@ import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboa
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
+import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard.billing.$clientId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as ApiPublicSeedStaffRouteImport } from './routes/api/public/seed-staff'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
@@ -358,6 +359,12 @@ const DashboardCoursesCourseIdRoute =
     path: '/courses/$courseId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardBillingClientIdRoute =
+  DashboardBillingClientIdRouteImport.update({
+    id: '/$clientId',
+    path: '/$clientId',
+    getParentRoute: () => DashboardBillingRoute,
+  } as any)
 const DashboardAdminEmarAuditRoute = DashboardAdminEmarAuditRouteImport.update({
   id: '/admin/emar-audit',
   path: '/admin/emar-audit',
@@ -423,6 +430,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
+  '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
@@ -482,6 +490,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
+  '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
@@ -544,6 +553,7 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
+  '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
@@ -607,6 +617,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
+    | '/dashboard/billing/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
@@ -666,6 +677,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
+    | '/dashboard/billing/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
@@ -727,6 +739,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
+    | '/dashboard/billing/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
@@ -1155,6 +1168,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/billing/$clientId': {
+      id: '/dashboard/billing/$clientId'
+      path: '/$clientId'
+      fullPath: '/dashboard/billing/$clientId'
+      preLoaderRoute: typeof DashboardBillingClientIdRouteImport
+      parentRoute: typeof DashboardBillingRoute
+    }
     '/dashboard/admin/emar-audit': {
       id: '/dashboard/admin/emar-audit'
       path: '/admin/emar-audit'
@@ -1180,10 +1200,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardBillingRouteChildren {
+  DashboardBillingClientIdRoute: typeof DashboardBillingClientIdRoute
   DashboardBillingIndexRoute: typeof DashboardBillingIndexRoute
 }
 
 const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
+  DashboardBillingClientIdRoute: DashboardBillingClientIdRoute,
   DashboardBillingIndexRoute: DashboardBillingIndexRoute,
 }
 

@@ -200,6 +200,20 @@ function NectarDocsPage() {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Client</Label>
+          <Select value={clientFilter} onValueChange={setClientFilter}>
+            <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="All clients" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All clients</SelectItem>
+              {(caseload ?? []).map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.first_name} {c.last_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <UploadButton
           orgId={orgId}
           open={uploadOpen}

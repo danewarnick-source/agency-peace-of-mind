@@ -6,13 +6,15 @@ const OrgInput = z.object({ organizationId: z.string().uuid() });
 
 export type CelebrationTier = 1 | 2 | 3;
 
+export type CelebrationPayload = Record<string, string | number | boolean | null>;
+
 export type ActiveCelebration = {
   id: string;
   organizationId: string;
   eventKey: string;
   tier: CelebrationTier;
   scopeUserId: string | null;
-  payload: Record<string, unknown>;
+  payload: CelebrationPayload;
   createdAt: string;
 };
 

@@ -115,19 +115,17 @@ function DashboardLayout() {
     effectiveView === "hive_exec" ? execNav :
     effectiveView === "admin"     ? ADMIN_NAV : STAFF_NAV;
   const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");
-  // Only expose the exec quick-section inside Admin View (so a HIVE exec who's
-  // also a company admin can jump to the platform tools). In HIVE View it's
-  // already the primary nav.
-  const showExecSection = isExecutive && rawView === "admin";
 
-  // Whenever the user switches into HIVE View while sitting on a company-scoped
-  // route, take them to the HIVE landing so the main content can't echo a
-  // company's overview.
+  // Keep view and content strictly aligned: leaving HIVE View must also leave
+  // /dashboard/hive-exec, and entering HIVE View jumps to the platform landing.
   useEffect(() => {
     if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) {
       navigate({ to: "/dashboard/hive-exec" });
+    } else if (!isHiveExecView && pathname.startsWith("/dashboard/hive-exec")) {
+      navigate({ to: "/dashboard" });
     }
   }, [isHiveExecView, pathname, navigate]);
+
 
 
   const signOut = async () => {

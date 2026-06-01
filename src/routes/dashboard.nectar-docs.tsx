@@ -46,11 +46,11 @@ import {
 export const Route = createFileRoute("/dashboard/nectar-docs")({
   head: () => ({
     meta: [
-      { title: "NECTAR Document Store — HIVE" },
+      { title: "Company Docs — HIVE" },
       {
         name: "description",
         content:
-          "Central, parsed repository of every document HIVE uses — billing, audit, scheduling, and compliance all read from here.",
+          "Client and staff document uploads — PCSPs, 1056 budgets, intake/referrals, assessments, certifications, training records. NECTAR parses every file on upload.",
       },
     ],
   }),

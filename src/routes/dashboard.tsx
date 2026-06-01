@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -57,6 +57,7 @@ const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
   { to: "/dashboard/authoritative-sources", label: "Authoritative Sources", icon: ShieldCheck },
   { to: "/dashboard/nectar-docs", label: "Company Docs", icon: Database },
+  { to: "/dashboard/external-compliance", label: "External Compliance", icon: ExternalLink },
 ];
 
 function DashboardLayout() {

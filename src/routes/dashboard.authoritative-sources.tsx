@@ -78,6 +78,9 @@ import {
 } from "@/lib/nectar-engine.functions";
 import { Sparkle, X as XIcon, Hexagon } from "lucide-react";
 import { AuthorizedCodesPanel } from "@/components/nectar/authorized-codes-panel";
+import { ExternalLink as ExternalLinkIcon, Building } from "lucide-react";
+import { attestExternalCompletion, inferClassification } from "@/lib/external-compliance.functions";
+import { Textarea } from "@/components/ui/textarea";
 
 
 
@@ -840,6 +843,7 @@ interface ReqRow {
   verified: boolean;
   verified_at: string | null;
   review_status: ReviewStatus | string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface SourceMeta {
@@ -1546,6 +1550,25 @@ function RequirementRow({
   const [removeOpen, setRemoveOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [attestOpen, setAttestOpen] = useState(false);
+
+  // Internal vs external classification (stored in metadata, falls back to heuristic)
+  const md = (req.metadata ?? {}) as Record<string, unknown>;
+  const storedClass = md["classification"] as "internal" | "external" | undefined;
+  const inferred = storedClass
+    ? null
+    : inferClassification({
+        title: req.title,
+        description: req.description,
+        source_citation: req.source_citation,
+      });
+  const classification: "internal" | "external" =
+    storedClass ?? (inferred?.classification ?? "internal");
+  const externalSystem =
+    (md["external_system"] as string | null | undefined) ?? inferred?.externalSystem ?? null;
+  const renewalDueAt = (md["renewal_due_at"] as string | null | undefined) ?? null;
+
+
 
 
   return (
@@ -1631,7 +1654,34 @@ function RequirementRow({
               Removed — not tracked for audit
             </Badge>
           )}
-
+          {classification === "external" ? (
+            <Badge
+              variant="outline"
+              className="text-[10px] border-sky-500/40 text-sky-700 dark:text-sky-300"
+              title={`External action${externalSystem ? ` — happens in ${externalSystem}` : ""}. HIVE tracks your attestation; the action itself happens outside HIVE.`}
+            >
+              <ExternalLinkIcon className="mr-1 h-3 w-3" />
+              External{externalSystem ? ` · ${externalSystem}` : ""}
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="text-[10px] border-slate-500/30 text-muted-foreground"
+              title="HIVE produces and holds evidence for this requirement internally."
+            >
+              <Building className="mr-1 h-3 w-3" />
+              Internal
+            </Badge>
+          )}
+          {renewalDueAt && (
+            <Badge
+              variant="outline"
+              className="text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-300"
+              title={`Next renewal: ${new Date(renewalDueAt).toLocaleDateString()}`}
+            >
+              Renewal {new Date(renewalDueAt).toLocaleDateString()}
+            </Badge>
+          )}
 
         </div>
         {req.description && (
@@ -1654,6 +1704,18 @@ function RequirementRow({
         >
           <Info className="mr-1 h-3.5 w-3.5" /> Details
         </Button>
+        {classification === "external" && !isRemoved && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 border-sky-500/40 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300"
+            onClick={() => setAttestOpen(true)}
+            title="Log your attestation that this external action was completed"
+          >
+            <ExternalLinkIcon className="mr-1 h-3.5 w-3.5" />
+            Attest external completion
+          </Button>
+        )}
         {isRemoved ? (
           <Button
             size="sm"
@@ -1848,9 +1910,114 @@ function RequirementRow({
         }}
         isMutating={set.isPending}
       />
+      <AttestExternalDialog
+        open={attestOpen}
+        onOpenChange={setAttestOpen}
+        requirementId={req.id}
+        requirementTitle={req.title}
+        externalSystem={externalSystem}
+        orgId={orgId}
+      />
     </li>
   );
 }
+
+function AttestExternalDialog({
+  open,
+  onOpenChange,
+  requirementId,
+  requirementTitle,
+  externalSystem,
+  orgId,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  requirementId: string;
+  requirementTitle: string;
+  externalSystem: string | null;
+  orgId: string;
+}) {
+  const qc = useQueryClient();
+  const attestFn = useServerFn(attestExternalCompletion);
+  const [completedOn, setCompletedOn] = useState("");
+  const [reference, setReference] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
+  const [nextRenewalAt, setNextRenewalAt] = useState("");
+  const [notes, setNotes] = useState("");
+  const mut = useMutation({
+    mutationFn: () =>
+      attestFn({
+        data: {
+          requirementId,
+          completedOn: completedOn || undefined,
+          reference: reference || undefined,
+          proofUrl: proofUrl || undefined,
+          nextRenewalAt: nextRenewalAt || undefined,
+          notes: notes || undefined,
+        },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      qc.invalidateQueries({ queryKey: ["attestations", orgId] });
+      toast.success("Attestation logged.", {
+        description: "HIVE recorded that this external action was completed.",
+      });
+      onOpenChange(false);
+      setCompletedOn(""); setReference(""); setProofUrl(""); setNextRenewalAt(""); setNotes("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ExternalLinkIcon className="h-4 w-4 text-sky-600" />
+            Attest external completion
+          </DialogTitle>
+          <DialogDescription>
+            {externalSystem
+              ? `Log that "${requirementTitle}" was completed in ${externalSystem}.`
+              : `Log that "${requirementTitle}" was completed in the external system.`}{" "}
+            HIVE records this attestation — it does not verify the external system.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="att-completed" className="text-xs">Completed on</Label>
+              <Input id="att-completed" type="date" value={completedOn} onChange={(e) => setCompletedOn(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="att-renewal" className="text-xs">Next renewal (optional)</Label>
+              <Input id="att-renewal" type="date" value={nextRenewalAt} onChange={(e) => setNextRenewalAt(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="att-ref" className="text-xs">Reference / confirmation number</Label>
+            <Input id="att-ref" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. UPI-2025-00123" />
+          </div>
+          <div>
+            <Label htmlFor="att-proof" className="text-xs">Proof URL (optional)</Label>
+            <Input id="att-proof" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="https://…" />
+          </div>
+          <div>
+            <Label htmlFor="att-notes" className="text-xs">Notes</Label>
+            <Textarea id="att-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending}>
+            {mut.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+            Log attestation
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 
 

@@ -48,6 +48,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
   { to: "/dashboard/billing", label: "Billing", icon: Receipt, perm: "view_billing" },
   { to: "/dashboard/audit", label: "Audit", icon: FolderArchive },
+  { to: "/dashboard/authoritative-sources", label: "Authoritative Sources", icon: ShieldCheck },
   { to: "/dashboard/nectar-docs", label: "NECTAR Docs", icon: Database },
   { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },

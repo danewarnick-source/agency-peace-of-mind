@@ -600,8 +600,12 @@ function SourceRow({
             size="sm"
             variant="ghost"
             onClick={() => generate.mutate()}
-            disabled={generate.isPending || source.parse_status !== "parsed"}
-            title="Re-draft from this document (e.g. after a re-parse). Existing items are kept; new ones are added."
+            disabled={generate.isPending || source.parse_status !== "parsed" || !canDraft}
+            title={
+              !canDraft
+                ? "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to re-draft."
+                : "Re-draft from this document (e.g. after a re-parse). Existing items are kept; new ones are added."
+            }
             className="h-7 px-2 text-[11px]"
           >
             {generate.isPending ? (
@@ -611,6 +615,7 @@ function SourceRow({
             )}
             {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Re-draft"}
           </Button>
+
         </div>
       ) : (
         <div className="flex flex-col items-stretch gap-1 sm:items-end">

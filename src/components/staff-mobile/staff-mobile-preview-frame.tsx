@@ -3,6 +3,7 @@ import { Smartphone } from "lucide-react";
 import { StaffTopBar } from "./staff-top-bar";
 import { StaffBottomTabs } from "./staff-bottom-tabs";
 import { ActiveShiftBar } from "./active-shift-bar";
+import { CapThresholdModal } from "./cap-threshold-modal";
 import {
   MobileShellProvider,
   useMobileShellContainer,
@@ -111,6 +112,7 @@ function FrameScreen({
         </main>
         <ActiveShiftBar framed />
         <StaffBottomTabs framed />
+        <CapThresholdModal />
       </div>
     </div>
   );

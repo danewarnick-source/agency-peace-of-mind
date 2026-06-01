@@ -238,6 +238,68 @@ export type Database = {
         }
         Relationships: []
       }
+      client_billing_codes: {
+        Row: {
+          annual_unit_authorization: number
+          client_id: string
+          created_at: string
+          id: string
+          monthly_max_units: number | null
+          organization_id: string
+          provider_approver_email: string | null
+          rate_per_unit: number
+          sce: string | null
+          service_code: string
+          service_end_date: string | null
+          service_start_date: string | null
+          unit_type: string
+          updated_at: string
+          weekly_cap_units: number | null
+        }
+        Insert: {
+          annual_unit_authorization?: number
+          client_id: string
+          created_at?: string
+          id?: string
+          monthly_max_units?: number | null
+          organization_id: string
+          provider_approver_email?: string | null
+          rate_per_unit?: number
+          sce?: string | null
+          service_code: string
+          service_end_date?: string | null
+          service_start_date?: string | null
+          unit_type?: string
+          updated_at?: string
+          weekly_cap_units?: number | null
+        }
+        Update: {
+          annual_unit_authorization?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          monthly_max_units?: number | null
+          organization_id?: string
+          provider_approver_email?: string | null
+          rate_per_unit?: number
+          sce?: string | null
+          service_code?: string
+          service_end_date?: string | null
+          service_start_date?: string | null
+          unit_type?: string
+          updated_at?: string
+          weekly_cap_units?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_billing_codes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_documents: {
         Row: {
           client_id: string
@@ -3039,6 +3101,8 @@ export type Database = {
       time_pay_settings: {
         Row: {
           allow_non_client_clockins: boolean
+          cap_behavior: string
+          cap_warn_pct: number
           contractor_period_anchor: string
           contractor_schedule: string
           created_at: string
@@ -3051,6 +3115,8 @@ export type Database = {
         }
         Insert: {
           allow_non_client_clockins?: boolean
+          cap_behavior?: string
+          cap_warn_pct?: number
           contractor_period_anchor?: string
           contractor_schedule?: string
           created_at?: string
@@ -3063,6 +3129,8 @@ export type Database = {
         }
         Update: {
           allow_non_client_clockins?: boolean
+          cap_behavior?: string
+          cap_warn_pct?: number
           contractor_period_anchor?: string
           contractor_schedule?: string
           created_at?: string

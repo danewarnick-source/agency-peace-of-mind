@@ -152,15 +152,24 @@ function HelpPage() {
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          {messages.length > 0 && (
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={clearChat}
-              className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+              onClick={() => { setPendingGoal(undefined); setTaskCenterOpen(true); }}
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-md bg-[#d97a1c] px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-[#b8651a]"
             >
-              <RotateCcw className="h-3.5 w-3.5" /> New chat
+              <ListChecks className="h-3.5 w-3.5" /> Guide me
             </button>
-          )}
+            {messages.length > 0 && (
+              <button
+                type="button"
+                onClick={clearChat}
+                className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> New chat
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => escalateM.mutate()}

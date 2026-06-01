@@ -2974,6 +2974,7 @@ export type Database = {
           id: string
           is_authoritative_source: boolean
           is_current: boolean
+          jurisdiction: string | null
           medicaid_id: string | null
           metadata: Json
           mime_type: string | null
@@ -3010,6 +3011,7 @@ export type Database = {
           id?: string
           is_authoritative_source?: boolean
           is_current?: boolean
+          jurisdiction?: string | null
           medicaid_id?: string | null
           metadata?: Json
           mime_type?: string | null
@@ -3046,6 +3048,7 @@ export type Database = {
           id?: string
           is_authoritative_source?: boolean
           is_current?: boolean
+          jurisdiction?: string | null
           medicaid_id?: string | null
           metadata?: Json
           mime_type?: string | null
@@ -3335,6 +3338,71 @@ export type Database = {
           },
         ]
       }
+      nectar_requirement_mappings: {
+        Row: {
+          cadence: string | null
+          confirmed: boolean
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          jurisdiction: string | null
+          metadata: Json
+          organization_id: string
+          proposed_by: string
+          rationale: string | null
+          requirement_id: string
+          scope_kind: string
+          scope_value: string | null
+          source_excerpt: string | null
+          updated_at: string
+        }
+        Insert: {
+          cadence?: string | null
+          confirmed?: boolean
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          jurisdiction?: string | null
+          metadata?: Json
+          organization_id: string
+          proposed_by?: string
+          rationale?: string | null
+          requirement_id: string
+          scope_kind: string
+          scope_value?: string | null
+          source_excerpt?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cadence?: string | null
+          confirmed?: boolean
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          jurisdiction?: string | null
+          metadata?: Json
+          organization_id?: string
+          proposed_by?: string
+          rationale?: string | null
+          requirement_id?: string
+          scope_kind?: string
+          scope_value?: string | null
+          source_excerpt?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_requirement_mappings_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nectar_requirements: {
         Row: {
           applies_to: string | null
@@ -3342,6 +3410,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          jurisdiction: string | null
           metadata: Json
           organization_id: string
           origin: string
@@ -3361,6 +3430,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          jurisdiction?: string | null
           metadata?: Json
           organization_id: string
           origin?: string
@@ -3380,6 +3450,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          jurisdiction?: string | null
           metadata?: Json
           organization_id?: string
           origin?: string

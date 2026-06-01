@@ -791,6 +791,76 @@ export function PunchPad({
     setShowNarrativeError(false);
   }
 
+  async function handleDraftVariance(phase: "clock_in" | "clock_out") {
+    const shorthand = phase === "clock_in" ? varShorthand.trim() : outVarShorthand.trim();
+    if (shorthand.length < 2) {
+      toast.error("Add a few words first — NECTAR will expand it.");
+      return;
+    }
+    const v = phase === "clock_in" ? variance : outVariance;
+    const clientFirst =
+      lockedClient?.name?.split(" ")?.[0] ??
+      caseload.find((c) => c.id === (active?.client_id ?? selectedClientId))?.first_name ??
+      "the client";
+    const setBusyFn = phase === "clock_in" ? setVarDraftBusy : setOutVarDraftBusy;
+    setBusyFn(true);
+    try {
+      const res = await draftVarianceJustification({
+        data: {
+          shorthand,
+          distanceFeet: v?.distanceFeet ?? null,
+          limitFeet:    v?.limitFeet ?? null,
+          serviceCode:  serviceCode || null,
+          clientFirstName: clientFirst,
+          phase,
+          frameBlocked: phase === "clock_in" ? !!variance?.frameBlocked : false,
+        },
+      });
+      if (phase === "clock_in") {
+        setVarianceReason(res.draft);
+      } else {
+        setOutVarianceReason(res.draft);
+      }
+      toast.success("Draft ready — review and edit before submitting.");
+    } catch (e) {
+      toast.error((e as Error).message || "NECTAR couldn't draft a justification.");
+    } finally {
+      setBusyFn(false);
+    }
+  }
+
+  async function handleAskNectar() {
+    const q = askQuestion.trim();
+    if (q.length < 4) {
+      toast.error("Type your question first.");
+      return;
+    }
+    const clientFirst =
+      lockedClient?.name?.split(" ")?.[0] ??
+      caseload.find((c) => c.id === (active?.client_id ?? selectedClientId))?.first_name ??
+      "the client";
+    const goals = lockedClient?.pcspGoals ?? [];
+    setAskBusy(true);
+    setAskResult(null);
+    try {
+      const res = await answerProceduralQuestion({
+        data: {
+          question: q,
+          clientFirstName: clientFirst,
+          serviceCode: serviceCode || null,
+          pcspGoals: goals,
+          notes: null,
+        },
+      });
+      setAskResult(res);
+    } catch (e) {
+      toast.error((e as Error).message || "NECTAR couldn't answer right now.");
+    } finally {
+      setAskBusy(false);
+    }
+  }
+
+
   async function finalizeClockOut(args: {
     pos: { lat: number; lng: number; acc: number };
     outsideReason?: string;

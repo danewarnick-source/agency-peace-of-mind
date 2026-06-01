@@ -104,10 +104,15 @@ function NectarPage() {
         )}
       </section>
 
+      <SavedReportsSection onRunPrompt={(p) => {
+        // scroll to builder; ReportBuilder consumes via prop
+        window.dispatchEvent(new CustomEvent("hive:nectar:run", { detail: { prompt: p } }));
+      }} />
       <ReportBuilder />
     </div>
   );
 }
+
 
 function AlertCard({ alert: a }: { alert: NectarAlert }) {
   const palette = {

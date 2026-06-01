@@ -1016,8 +1016,20 @@ function DocumentRequirementGroup({
   // Default: expand if there's anything still needing attention.
   const [open, setOpen] = useState(counts.needs > 0);
 
+  // If the user jumped here from the Sources-tab pill, force-expand once.
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
+
   return (
-    <section className="overflow-hidden rounded-2xl border border-border/60 bg-background/60 backdrop-blur">
+    <section
+      data-req-group-id={group.source?.id ?? group.key}
+      className={`overflow-hidden rounded-2xl border bg-background/60 backdrop-blur transition-shadow ${
+        highlight
+          ? "border-amber-500/70 shadow-[0_0_0_3px_rgba(245,158,11,0.25)]"
+          : "border-border/60"
+      }`}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

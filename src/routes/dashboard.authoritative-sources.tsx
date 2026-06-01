@@ -39,11 +39,13 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AttestationBanner } from "@/components/nectar/attestation-banner";
 import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";

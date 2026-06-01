@@ -1042,6 +1042,23 @@ function RequirementsPanel({
     return () => window.clearTimeout(id);
   }, [focusDocumentId, onFocusHandled]);
 
+  // Flat queue + pre-fill counts.
+  const allRows = useMemo(
+    () => groups.flatMap((g) => g.items),
+    [groups],
+  );
+  const queueItems = useMemo(
+    () => allRows.filter((r) => statusOf(r) === "needs_attention"),
+    [allRows],
+  );
+  const unmappedCount = useMemo(
+    () =>
+      allRows.filter(
+        (r) => statusOf(r) !== "removed" && !applicByReq.has(r.id),
+      ).length,
+    [allRows, applicByReq],
+  );
+
   return (
     <div className="space-y-4" ref={containerRef}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1050,19 +1067,48 @@ function RequirementsPanel({
             NECTAR-organized requirements
           </h2>
           <p className="text-xs text-muted-foreground">
-            Grouped by the document each was drafted from. Confirm what
-            applies, remove what doesn't — both are kept on the record.
+            NECTAR pre-fills its proposed applicability. You review and
+            approve — pre-filled scope is never auto-confirmed.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {outstandingDocs > 0 && (
             <Badge className="bg-amber-500/15 text-[10px] text-amber-800 dark:text-amber-200">
               {outstandingDocs} document{outstandingDocs === 1 ? "" : "s"} need review
             </Badge>
           )}
+          {unmappedCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 border-[#d97a1c]/40 text-[11px] text-[#7a4310] hover:bg-[#d97a1c]/10 dark:text-amber-200"
+              disabled={prefill.isPending}
+              onClick={() => prefill.mutate()}
+              title="Have NECTAR pre-fill its proposed applicability for every requirement without a scope yet. You still review and confirm each one."
+            >
+              {prefill.isPending ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <Wand2 className="mr-1 h-3 w-3" />
+              )}
+              Pre-fill {unmappedCount} with NECTAR
+            </Button>
+          )}
+          {queueItems.length > 0 && (
+            <Button
+              size="sm"
+              className="h-8 bg-amber-500 text-[11px] text-amber-950 hover:bg-amber-400"
+              onClick={() => setQueueOpen(true)}
+              title="Walk through every requirement that still needs review, one at a time, with NECTAR's proposal shown."
+            >
+              <ListChecks className="mr-1 h-3 w-3" />
+              Review queue ({queueItems.length})
+            </Button>
+          )}
           <ManualRequirementDialog orgId={orgId} />
         </div>
       </div>
+
 
       {removedAuthoritative > 0 && (
         <div

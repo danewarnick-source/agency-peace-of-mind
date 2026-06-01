@@ -1,7 +1,10 @@
 import { useMemo, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { supabase } from "@/integrations/supabase/client";
+import { askNectarHelp, type NectarHelpReply } from "@/lib/nectar-help.functions";
+import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";

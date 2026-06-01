@@ -112,25 +112,30 @@ function Kpi({
   );
 }
 
-function Kpis({ orgId }: { orgId: string }) {
+type HealthMetrics = { audit: number; evv: number; docs: number; creds: number; overall: number };
+
+function useHealthMetrics(orgId: string): { metrics: HealthMetrics | null; isLoading: boolean } {
   const fetchFn = useServerFn(getAgencyHealthSnapshot);
   const { data, isLoading } = useQuery({
     queryKey: ["agency-health", orgId],
     queryFn: () => fetchFn({ data: { organizationId: orgId } }),
   });
-
-  const metrics = useMemo(() => {
+  const metrics = useMemo<HealthMetrics | null>(() => {
     if (!data) return null;
-    const audit = Math.round(
-      (data.client.daily.score + data.client.medication.score + data.client.attendance.score) / 3,
-    );
-    const evv = data.employee.geofence.score;
-    const docs = Math.round((data.client.daily.score + data.employee.emarAccuracy.score) / 2);
-    const creds = data.employee.credentials.score;
-    const overall = Math.round((data.client.overall + data.employee.overall) / 2);
-    return { audit, evv, docs, creds, overall };
+    const d = data as AgencyHealthSnapshot;
+    const audit = Math.round((d.client.daily.score + d.client.medication.score + d.client.attendance.score) / 3);
+    return {
+      audit,
+      evv: d.employee.geofence.score,
+      docs: Math.round((d.client.daily.score + d.employee.emarAccuracy.score) / 2),
+      creds: d.employee.credentials.score,
+      overall: Math.round((d.client.overall + d.employee.overall) / 2),
+    };
   }, [data]);
+  return { metrics, isLoading };
+}
 
+function Kpis({ metrics, isLoading }: { metrics: HealthMetrics | null; isLoading: boolean }) {
   return (
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">

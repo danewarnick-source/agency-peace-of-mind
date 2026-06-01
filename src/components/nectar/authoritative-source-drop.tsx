@@ -556,7 +556,7 @@ export function AuthoritativeSourceDrop({
             <Button
               type="button"
               onClick={handleSaveAndNext}
-              disabled={saveOne.isPending || !current?.title.trim()}
+              disabled={saveOne.isPending || !current?.title.trim() || !!current?.routeBlock}
               className="gap-1 bg-[color:var(--amber-500,#f4a93a)] text-amber-950 hover:bg-[color:var(--amber-400,#f6b94d)]"
             >
               {saveOne.isPending ? (

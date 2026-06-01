@@ -1550,6 +1550,26 @@ function RequirementRow({
   const [removeOpen, setRemoveOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [attestOpen, setAttestOpen] = useState(false);
+
+  // Internal vs external classification (stored in metadata, falls back to heuristic)
+  const md = (req.metadata ?? {}) as Record<string, unknown>;
+  const storedClass = md["classification"] as "internal" | "external" | undefined;
+  const inferred = storedClass
+    ? null
+    : inferClassification({
+        title: req.title,
+        description: req.description,
+        category: req.category,
+        source_citation: req.source_citation,
+      });
+  const classification: "internal" | "external" =
+    storedClass ?? (inferred?.classification ?? "internal");
+  const externalSystem =
+    (md["external_system"] as string | null | undefined) ?? inferred?.externalSystem ?? null;
+  const renewalDueAt = (md["renewal_due_at"] as string | null | undefined) ?? null;
+
+
 
 
   return (

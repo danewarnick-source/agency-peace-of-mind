@@ -536,7 +536,93 @@ export function PunchPad({
     setAiIterations(0);
     setAiFlagCount(0);
     setAllowException(false);
+    setShorthand("");
+    setNectarDraft(null);
+    setDraftBusy(false);
+    setDraftConfirmed(false);
+    setNectarUsed(false);
+    stopRecording();
     setShowCompliance(true);
+  }
+
+  function stopRecording() {
+    try { recognitionRef.current?.stop?.(); } catch { /* ignore */ }
+    recognitionRef.current = null;
+    setIsRecording(false);
+  }
+
+  function startRecording() {
+    if (typeof window === "undefined") return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) {
+      toast.error("Voice input isn't supported on this browser.");
+      return;
+    }
+    try {
+      const rec = new SR();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = "en-US";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rec.onresult = (e: any) => {
+        let finalText = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
+        }
+        if (finalText) {
+          setShorthand((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
+        }
+      };
+      rec.onerror = () => stopRecording();
+      rec.onend = () => setIsRecording(false);
+      recognitionRef.current = rec;
+      rec.start();
+      setIsRecording(true);
+    } catch {
+      toast.error("Couldn't start voice input — please type instead.");
+    }
+  }
+
+  async function runDraftWithNectar() {
+    if (!active) return;
+    const text = shorthand.trim();
+    if (text.length < 3) {
+      toast.error("Add a few words of shorthand first (e.g. 'park, soda $2, talked to 2 ppl').");
+      return;
+    }
+    stopRecording();
+    setDraftBusy(true);
+    try {
+      const selectedGoalsForAi = Object.entries(checkedGoals)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
+      if (baselineChecked) selectedGoalsForAi.push("General baseline monitoring & safety oversight");
+
+      const clientFirst =
+        lockedClient?.name?.split(" ")?.[0] ??
+        caseload.find((c) => c.id === active.client_id)?.first_name ??
+        "the client";
+
+      const res = await draftShiftNote({
+        data: { shorthand: text, goals: selectedGoalsForAi, clientFirstName: clientFirst },
+      });
+      setNectarDraft(res.draft);
+      setDraftConfirmed(false);
+      setNectarUsed(true);
+    } catch (e) {
+      toast.error((e as Error).message || "NECTAR couldn't draft the note — please try again.");
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  function acceptNectarDraft() {
+    if (!nectarDraft) return;
+    setNarrative(nectarDraft);
+    setAiCoach(null);
+    setShowNarrativeError(false);
   }
 
   async function finalizeClockOut(args: {
@@ -564,12 +650,18 @@ export function PunchPad({
       raw_clock_out:        clockOut,
       rounded_clock_out:    roundToQuarterHourISO(clockOut),
     };
+    if (nectarUsed) {
+      update.nectar_drafted = true;
+      update.nectar_drafted_confirmed_at = clockOut;
+      update.nectar_drafted_confirmed_by = user.id;
+    }
     if (args.outsideReason) update.outside_geofence_reason = args.outsideReason;
     if (args.aiStatus) {
       update.ai_compliance_status    = args.aiStatus;
       update.ai_compliance_feedback  = args.aiFeedback ?? null;
       update.ai_coaching_iterations  = args.aiIterationCount ?? 0;
     }
+
 
     const { error } = await supabase
       .from("evv_timesheets")

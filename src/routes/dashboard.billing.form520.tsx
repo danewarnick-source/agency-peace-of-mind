@@ -626,7 +626,9 @@ function Billing520Page() {
             </Badge>
           )}
           <Button variant="outline" onClick={copyTSV}><Copy className="mr-2 h-4 w-4" />Copy</Button>
-          <Button onClick={exportXlsx}><Download className="mr-2 h-4 w-4" />Export Excel</Button>
+          <Button variant="outline" onClick={exportCsv}><Download className="mr-2 h-4 w-4" />CSV</Button>
+          <Button variant="outline" onClick={exportPdf}><Download className="mr-2 h-4 w-4" />PDF</Button>
+          <Button onClick={exportXlsx}><Download className="mr-2 h-4 w-4" />Excel</Button>
         </div>
       </header>
 

@@ -3451,6 +3451,17 @@ export type Database = {
         }
       }
       generate_pba_audit_sample: { Args: { _org: string }; Returns: number }
+      get_client_caps: {
+        Args: { _client_id: string }
+        Returns: {
+          client_id: string
+          id: string
+          monthly_max_units: number
+          service_code: string
+          unit_type: string
+          weekly_cap_units: number
+        }[]
+      }
       has_org_role: {
         Args: {
           _org: string

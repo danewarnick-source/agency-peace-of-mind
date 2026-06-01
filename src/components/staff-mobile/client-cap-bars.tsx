@@ -1,5 +1,5 @@
 import { Clock, CalendarDays } from "lucide-react";
-import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import { useClientCaps } from "@/hooks/use-client-caps";
 import { useClientUtilization, getUsage } from "@/hooks/use-client-utilization";
 import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
 import { isDailyServiceCode } from "@/lib/service-billing";
@@ -24,7 +24,7 @@ export function ClientCapBars({
   clientId: string;
   codes: string[];
 }) {
-  const { data: billing } = useClientBillingCodes(clientId);
+  const { data: billing } = useClientCaps(clientId);
   const { data: usage } = useClientUtilization();
   const { settings } = useTimePaySettings();
   const warnPct = (settings as unknown as { cap_warn_pct?: number }).cap_warn_pct ?? 90;

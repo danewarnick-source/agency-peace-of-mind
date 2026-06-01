@@ -1,112 +1,101 @@
-# Plan — HIVE Executive view + NECTAR escalation & saved reports
+# Company Overview dashboard + NECTAR celebration system
 
-Two independent blocks. Both ship in this turn.
+This rebuilds the Company Overview into the spec'd 3-row layout, adds role variations (Company Executive billing card, HIVE Executive cross-company rollup), and ships an event-driven celebration system with server-side de-duplication.
 
----
-
-## Block 1 — HIVE Executive (platform-owner) view
-
-A new top-level surface for HIVE staff to oversee customer companies as **accounts**, never as clinical tenants. Hard-walled from PHI.
-
-### Permission model
-
-- New permission `view_platform_executive` (separate from `manage_all_orgs`).
-- Granted only to specific accounts via a new `hive_executives` table (user_id + granted_by + active). Membership in this table — not just `super_admin` role — is the gate.
-- Server-side helper `is_hive_executive(uuid)` (SECURITY DEFINER) used in RLS + server fns.
-- Every read goes through a `createServerFn` that:
-  1. Calls `requireSupabaseAuth`
-  2. Verifies `is_hive_executive(userId)` server-side
-  3. Logs the access to `hive_executive_audit_log` (actor, action, target_org, payload_summary, at)
-  4. Returns ONLY aggregate/account columns — never joins clients/daily_logs/PHI tables.
-
-### Database (one migration)
-
-```text
-hive_executives(id, user_id UNIQUE, active, granted_by, granted_at, notes)
-hive_executive_audit_log(id, actor_user_id, action, target_org_id, summary, created_at)
-org_subscriptions(id, organization_id UNIQUE, plan tier_enum,
-                  status sub_status_enum, mrr_cents, renewal_date,
-                  trial_ends_at, started_at, canceled_at, notes)
-org_support_tickets(id, organization_id, opened_by, subject, body,
-                    status ticket_status_enum, severity, assignee_user_id,
-                    created_at, updated_at, resolved_at, conversation jsonb)
-```
-
-GRANTs + RLS: only `is_hive_executive(auth.uid())` can SELECT these admin tables; org admins may INSERT into `org_support_tickets` for their own org.
-
-### Server functions (src/lib/hive-exec.functions.ts)
-
-- `listCompanies()` → per-org row: name, plan, status, mrr, renewal, staff_count, client_count, open_tickets, health_score. Counts via `count: 'exact', head: true` — never returns row data.
-- `getCompanyDetail(orgId)` → subscription history, ticket list, aggregate usage (hours logged last 30d, active staff last 7d). NO client identifiers.
-- `getExecKpis()` → active companies, MRR sum, trials, past_due count.
-- `updateSubscription(orgId, patch)` for HIVE-exec edits.
-
-Every handler: audit-log the call.
-
-### Routes
-
-- `src/routes/dashboard.hive-exec.tsx` — layout with RequireHiveExecutive guard + persistent banner "Account & billing only — no client records or PHI".
-- `…/dashboard.hive-exec.index.tsx` — KPI strip + companies table (search, sort, status filter).
-- `…/dashboard.hive-exec.$orgId.tsx` — company detail (subscription, billing history, usage aggregates, tickets).
-- `…/dashboard.hive-exec.tickets.tsx` — all support tickets queue.
-- New `RequireHiveExecutive` guard component (calls a `checkHiveExecutive` server fn).
-
-### Nav
-
-Add "HIVE Executive" entry in `dashboard.tsx` sidebar, visible only when `useIsHiveExecutive()` returns true. Navy/amber styled with Sparkles/Shield icon.
+Everything reuses the existing HIVE/NECTAR design system (navy `#141a3d`, amber `#f4a93a`, hexagon motif, Plus Jakarta Sans, `NectarSurface`/`NectarHeader`/`NectarBadge`/`NectarButton`).
 
 ---
 
-## Block 2 — NECTAR escalation + saved/scheduled reports
+## 1. Database (one migration)
 
-### 2a. Help-chat escalation
+- `celebration_events` — durable log of fired achievements per scope. Columns: `id`, `organization_id`, `event_key` (e.g. `onboarding.first_completed`, `training.completed`, `compliance.threshold_100`, `streak.30`, `cert.renewed_early`, `onboarding.completed_quickly`), `scope_user_id` (nullable — for per-staff events), `tier` (1|2|3), `payload` jsonb, `created_at`. Unique index on `(organization_id, event_key, coalesce(scope_user_id, '00000000-…'))` so each achievement fires once.
+- `celebration_acknowledgements` — per-user dismissals for Tier 2 banners and Tier 3 modals. Columns: `id`, `event_id` (fk), `user_id`, `acknowledged_at`. Unique `(event_id, user_id)`.
+- `org_celebration_settings` — `organization_id` pk, `enabled boolean default true`, `tier1_enabled`, `tier2_enabled`, `tier3_enabled`.
+- `user_celebration_mute` — `user_id` pk, `muted boolean`.
+- GRANTs + RLS scoped to org members; only admins/managers can flip org settings; HIVE-exec gets cross-org read.
 
-- Reuse `org_support_tickets` from Block 1. (Source = `'nectar_help'`.)
-- New server fn `escalateHelpToHive(question, context, conversation)` in `nectar-help.functions.ts`. Inserts a ticket; returns ticket id + status.
-- Update `dashboard.help.tsx`:
-  - Detect "talk to a human" intent or add explicit "Ask the HIVE team" button at the bottom of every NECTAR reply.
-  - Render in-chat ticket card with live status (submitted → in_progress → resolved), polled via `useQuery` refetchInterval.
-  - Friendly copy: "I'll connect you with the HIVE team — they'll follow up here."
+## 2. Server functions (`createServerFn`, all auth-middleware-gated)
 
-### 2b. Saved + scheduled reports
+`src/lib/company-overview.functions.ts` (extend):
+- `getCompanyOverviewV2({ organizationId })` returning the new shape:
+  - `kpis`: `{ activeStaff, activeStaffDeltaMoM, trainingCompletionPct, complianceCurrentPct, pendingInvites }`
+  - `onboardingPipeline`: counts for Invited / In progress / Complete + a short list
+  - `expiringSoon`: certs in next 30/60d, soonest first
+  - `recentActivity`: last 5 events (completions, hires, role changes)
+  - `leaderboard`: top 5 by completion/streak
+  - `billing` (only if role can view billing): `{ seatsUsed, seatsPurchased, nextInvoiceAt }` — derived from existing org metadata; null if unknown
+  - `isFirstRun`: true when most counts are 0 (drives empty-state nudges)
+- `getHiveExecRollup()` — counts + account metadata across orgs for HIVE Execs only. No PHI.
 
-New tables:
+`src/lib/celebrations.functions.ts` (new):
+- `listActiveCelebrations({ organizationId })` — returns unacknowledged Tier 2/3 events for this user + recent Tier 1 toasts not yet shown (last 60s window for this user).
+- `fireCelebration({ organizationId, eventKey, scopeUserId?, tier, payload })` — idempotent insert (ON CONFLICT DO NOTHING); returns whether it actually fired.
+- `acknowledgeCelebration({ eventId })` — records per-user dismissal.
+- `evaluateCelebrationTriggers({ organizationId })` — server-side scan that checks domain conditions (first onboarding done, all-training-completed-per-staff, compliance threshold reached, 7/30 day streaks, cert renewed before expiry, fast onboarding) and calls `fireCelebration` for any newly-met conditions. Invoked from a cheap polling endpoint on the dashboard.
+- `getCelebrationSettings({ organizationId })` + `setCelebrationSettings(...)` (admin) + `setUserMute({ muted })`.
 
-```text
-nectar_saved_reports(id, organization_id, owner_user_id, name, prompt,
-                     plan jsonb, pinned bool, created_at, updated_at)
-nectar_report_schedules(id, saved_report_id, cadence weekly|monthly,
-                        day_of_week int, day_of_month int, hour int,
-                        deliver_email bool, recipients text[],
-                        deliver_save bool, last_run_at, next_run_at, active)
-nectar_report_runs(id, saved_report_id, ran_at, row_count, csv_url, error)
-```
+## 3. UI components
 
-RLS scoped to `organization_id` + `is_org_admin_or_manager`.
+`src/components/company-overview/` (split the monolith for maintainability):
+- `kpi-stat-card.tsx` — frosted-glass compact card with delta chip; progress ring variant turns amber below target.
+- `onboarding-pipeline-card.tsx` — Invited → In progress → Complete stage list.
+- `expiring-soon-card.tsx` — 30/60d certs list with empty state.
+- `recent-activity-card.tsx` — 5-row feed, "View all" link.
+- `team-leaderboard-card.tsx` — dismissible (state stored in `localStorage`).
+- `quick-actions-card.tsx` — Invite staff / Assign module / Create group; primary amber-gradient `NectarButton`, others ghost.
+- `billing-plan-card.tsx` — Company Executive only; seats + next invoice (account metadata, no PHI).
+- `hive-exec-rollup.tsx` — cross-company counts (HIVE Executive only).
+- `first-run-nudge.tsx` — replaces bleak 0% stats on brand-new companies and points at Quick Actions.
 
-Hook `useSavedReports()` + UI additions in `dashboard.billing.nectar.tsx`:
-- "Save report" button next to results (name + pin toggle).
-- "Saved reports" panel listing pinned/all reports — one-tap re-run, edit, schedule, delete.
-- "Schedule" dialog: cadence, recipients, email-and-or-save options.
+`src/components/company-overview.tsx` is rewritten to compose those into 3 rows and to branch on role (`company_executive`, `hive_executive`, default admin). Dashboard prefs and `OVERVIEW_CARDS` are migrated to the new card keys (kept exported so the Settings card still works; old keys are gracefully ignored).
 
-Server fns in `nectar-reports.functions.ts`:
-- `saveNectarReport`, `listSavedReports`, `runSavedReport(id)`, `deleteSavedReport`, `upsertSchedule`, `removeSchedule`.
-- `runDueSchedules()` — invoked by a `/api/public/hooks/nectar-schedules` cron endpoint (pg_cron hourly). Re-runs each due saved report via the existing `askNectarReport` plan executor, stores row count + CSV, emails recipients when configured. Respects original owner's permissions.
+## 4. Celebration system
 
-Cron wiring: `pg_cron` job hitting the public hook hourly with apikey.
+`src/components/celebrations/celebration-provider.tsx` — top-level provider mounted in `src/routes/dashboard.tsx`:
+- Polls `listActiveCelebrations` every 60s and on window focus.
+- Tier 1 → amber `sonner` toast with hexagon + check, 4s auto-dismiss. Marks acknowledged immediately.
+- Tier 2 → renders `CelebrationBanner` (inline at the top of Company Overview) until dismissed.
+- Tier 3 → renders `CelebrationModal` (centered) with restrained confetti/hex-burst.
+- Honors `prefers-reduced-motion`: confetti/burst → static hex badge, no animation.
+- Honors org `enabled` + per-tier toggles + per-user mute.
+- Calls `evaluateCelebrationTriggers` on first load + after key mutations to advance fired-state.
 
----
+`src/components/celebrations/hex-burst.tsx` — lightweight SVG/canvas hex-burst (CSS keyframes only, ~600ms), reduced-motion fallback included.
 
-## Technical notes (non-user-facing)
+## 5. Settings integration
 
-- PHI wall is enforced by: (a) executive routes use only `hive-exec.functions.ts` — no imports from clients/daily-logs/billing-code modules; (b) `is_hive_executive` gate is checked server-side on every call; (c) audit log writes happen inside each handler before returning.
-- Counts use Supabase `count: 'exact', head: true` so no row payloads are sent to executives.
-- Saved-report executor reuses existing `askNectarReport` plan; we do NOT widen permissions for the cron — the run is attributed to the saving admin and re-validated against current org membership.
-- All money is stored in cents; rendered as USD client-side. Round hours 1 decimal, units whole.
-- No edits to generated files (`types.ts`, `client.ts`, `routeTree.gen.ts` apart from autogen).
+`src/routes/dashboard.settings.tsx`: add a "Celebrations" panel (admin only) with org toggle + per-tier checkboxes. Add a per-user "Mute celebrations" switch (visible to everyone including Staff).
 
-### Files to create/edit (high level)
+## 6. Role gating
 
-Create: 1 migration; `src/lib/hive-exec.functions.ts`; `src/hooks/use-hive-executive.tsx`; `src/hooks/use-saved-reports.tsx`; `src/components/hive-executive-guard.tsx`; routes `dashboard.hive-exec.tsx`, `…index.tsx`, `…$orgId.tsx`, `…tickets.tsx`; `src/routes/api/public/hooks/nectar-schedules.ts`; extend `nectar-reports.functions.ts` and `nectar-help.functions.ts`; update `dashboard.help.tsx`, `dashboard.billing.nectar.tsx`, `dashboard.tsx` (sidebar).
+All gating enforced server-side (server fns check role via `requireSupabaseAuth` + RLS):
+- Company Staff → never see the overview (existing portal switch already lands them on staff portal).
+- Company Admin → full overview minus billing/plan card.
+- Company Executive → adds the Billing/Plan card.
+- HIVE Executive → cross-company rollup variant.
 
-Ready to implement on approval.
+## Files
+
+**New**
+- `supabase/migrations/<ts>_celebrations.sql`
+- `src/lib/celebrations.functions.ts`
+- `src/components/company-overview/` (8 files above)
+- `src/components/celebrations/celebration-provider.tsx`
+- `src/components/celebrations/celebration-banner.tsx`
+- `src/components/celebrations/celebration-modal.tsx`
+- `src/components/celebrations/hex-burst.tsx`
+- `src/hooks/use-reduced-motion.tsx`
+
+**Edited**
+- `src/lib/company-overview.functions.ts` (add v2 + hive rollup)
+- `src/components/company-overview.tsx` (rewrite composition)
+- `src/components/company-overview-settings.tsx` (new card keys)
+- `src/routes/dashboard.tsx` (mount CelebrationProvider)
+- `src/routes/dashboard.settings.tsx` (Celebrations panel)
+- `src/integrations/supabase/types.ts` (auto-regenerated by migration)
+
+## Non-goals
+
+- I'm not refactoring the existing `getCompanyOverview` callers; v2 is additive.
+- No new icon library / animation library. Confetti is hand-rolled SVG to keep it brand-correct and lightweight.
+- HIVE Executive rollup shows account metadata only — no client PHI ever crosses an org boundary.

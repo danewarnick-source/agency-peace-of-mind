@@ -276,40 +276,55 @@ function HelpPage() {
 function EmptyState({
   starters, recent, onPick,
 }: { starters: string[]; recent: string[]; onPick: (q: string) => void }) {
+  const [showAll, setShowAll] = useState(false);
+  const DEFAULT_COUNT = 3;
+  const visible = showAll ? starters : starters.slice(0, DEFAULT_COUNT);
+  const hasMore = starters.length > DEFAULT_COUNT;
   return (
-    <div className="flex flex-col items-center gap-4 py-8 text-center">
-      <NectarMark size="lg" />
-      <div>
-        <h2 className="font-display text-lg font-semibold text-[#0f1b3d]">Hi! I'm NECTAR.</h2>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">
-          Ask me where things live in HIVE or how a workflow works — I'll point you straight to it.
-        </p>
+    <div className="flex flex-col items-center gap-3 py-3 text-center sm:gap-4 sm:py-8">
+      <div className="hidden flex-col items-center gap-3 sm:flex">
+        <NectarMark size="lg" />
+        <div>
+          <h2 className="font-display text-lg font-semibold text-[#0f1b3d]">Hi! I'm NECTAR.</h2>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">
+            Ask me where things live in HIVE or how a workflow works — I'll point you straight to it.
+          </p>
+        </div>
       </div>
       <div className="w-full max-w-xl">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Try one of these</p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {starters.map((s) => (
+        <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:mb-2 sm:text-xs">Try one of these</p>
+        <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
+          {visible.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => onPick(s)}
-              className="min-h-[44px] rounded-full border border-[#fed7aa] bg-white px-3 py-1.5 text-xs text-[#0f1b3d] shadow-sm hover:bg-[#fff7ed]"
+              className="min-h-[36px] rounded-full border border-[#fed7aa] bg-white px-2.5 py-1 text-xs text-[#0f1b3d] shadow-sm hover:bg-[#fff7ed] sm:min-h-[44px] sm:px-3 sm:py-1.5"
             >
               {s}
             </button>
           ))}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="min-h-[36px] rounded-full border border-border bg-white px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted sm:min-h-[44px] sm:px-3 sm:py-1.5"
+            >
+              {showAll ? "Fewer" : "More suggestions"}
+            </button>
+          )}
         </div>
       </div>
       {recent.length > 0 && (
         <div className="w-full max-w-xl">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Recent</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {recent.map((r) => (
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:mb-2 sm:text-xs">Recent</p>
+          <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
+            {recent.slice(0, showAll ? recent.length : 3).map((r) => (
               <button
                 key={r}
                 type="button"
                 onClick={() => onPick(r)}
-                className="min-h-[44px] rounded-full border border-border bg-white px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+                className="min-h-[36px] rounded-full border border-border bg-white px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted sm:min-h-[44px] sm:px-3 sm:py-1.5"
               >
                 {r.length > 60 ? r.slice(0, 57) + "…" : r}
               </button>
@@ -320,6 +335,7 @@ function EmptyState({
     </div>
   );
 }
+
 
 function UserBubble({ text }: { text: string }) {
   return (

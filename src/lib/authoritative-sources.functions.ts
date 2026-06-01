@@ -237,7 +237,7 @@ export const listRequirements = createServerFn({ method: "POST" })
     let q = supabase
       .from("nectar_requirements")
       .select(
-        "id, source_document_id, origin, requirement_key, title, description, category, source_citation, applies_to, verified, verified_by, verified_at, created_at, metadata",
+        "id, source_document_id, origin, requirement_key, title, description, category, source_citation, applies_to, verified, verified_by, verified_at, review_status, created_at, metadata",
       )
       .eq("organization_id", data.organizationId)
       .order("origin", { ascending: true })
@@ -248,7 +248,7 @@ export const listRequirements = createServerFn({ method: "POST" })
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
 
-    // Lightweight source-doc lookup for citation rendering
+    // Lightweight source-doc lookup for citation rendering / grouping.
     const sourceIds = Array.from(
       new Set(
         (rows ?? [])
@@ -256,22 +256,36 @@ export const listRequirements = createServerFn({ method: "POST" })
           .filter((x): x is string => !!x),
       ),
     );
-    const sourcesById: Record<string, { id: string; title: string; authoritative_kind: string | null }> = {};
+    const sourcesById: Record<
+      string,
+      {
+        id: string;
+        title: string;
+        authoritative_kind: string | null;
+        fiscal_year: string | null;
+        file_name: string | null;
+        created_at: string | null;
+      }
+    > = {};
     if (sourceIds.length) {
       const { data: srcs } = await supabase
         .from("nectar_documents")
-        .select("id, title, authoritative_kind")
+        .select("id, title, authoritative_kind, fiscal_year, file_name, created_at")
         .in("id", sourceIds);
       for (const s of srcs ?? [])
         sourcesById[s.id as string] = {
           id: s.id as string,
           title: s.title as string,
           authoritative_kind: (s.authoritative_kind as string | null) ?? null,
+          fiscal_year: (s.fiscal_year as string | null) ?? null,
+          file_name: (s.file_name as string | null) ?? null,
+          created_at: (s.created_at as string | null) ?? null,
         };
     }
 
     return { requirements: rows ?? [], sourcesById };
   });
+
 
 export const upsertRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

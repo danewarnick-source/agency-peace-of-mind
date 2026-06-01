@@ -992,9 +992,13 @@ function RequirementsPanel({
 function DocumentRequirementGroup({
   group,
   orgId,
+  highlight = false,
+  forceOpen = false,
 }: {
   group: ReqGroup;
   orgId: string;
+  highlight?: boolean;
+  forceOpen?: boolean;
 }) {
   const counts = useMemo(() => {
     let confirmed = 0;

@@ -144,21 +144,21 @@ function HelpPage() {
 
   return (
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-3xl flex-col">
-      <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <header className="mb-2 flex flex-wrap items-end justify-between gap-2 sm:mb-3 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <NectarMark size="md" />
           <div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
               <NectarBadge size="xs" />
               <span>Need help? NECTAR can help.</span>
             </div>
-            <h1 className="font-display text-2xl font-bold tracking-tight text-[#0f1b3d]">Ask NECTAR</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="font-display text-xl font-bold tracking-tight text-[#0f1b3d] sm:text-2xl">Ask NECTAR</h1>
+            <p className="hidden text-sm text-muted-foreground sm:block">
               Your friendly guide to using HIVE — ask where things live or how a workflow works.
             </p>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-1.5 sm:gap-2">
           <div className="flex gap-2">
             <button
               type="button"
@@ -188,6 +188,7 @@ function HelpPage() {
           </button>
         </div>
       </header>
+
 
       {ticketId && ticketQ.data && (
         <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-xs text-[#1e40af]">
@@ -275,40 +276,55 @@ function HelpPage() {
 function EmptyState({
   starters, recent, onPick,
 }: { starters: string[]; recent: string[]; onPick: (q: string) => void }) {
+  const [showAll, setShowAll] = useState(false);
+  const DEFAULT_COUNT = 3;
+  const visible = showAll ? starters : starters.slice(0, DEFAULT_COUNT);
+  const hasMore = starters.length > DEFAULT_COUNT;
   return (
-    <div className="flex flex-col items-center gap-4 py-8 text-center">
-      <NectarMark size="lg" />
-      <div>
-        <h2 className="font-display text-lg font-semibold text-[#0f1b3d]">Hi! I'm NECTAR.</h2>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">
-          Ask me where things live in HIVE or how a workflow works — I'll point you straight to it.
-        </p>
+    <div className="flex flex-col items-center gap-3 py-3 text-center sm:gap-4 sm:py-8">
+      <div className="hidden flex-col items-center gap-3 sm:flex">
+        <NectarMark size="lg" />
+        <div>
+          <h2 className="font-display text-lg font-semibold text-[#0f1b3d]">Hi! I'm NECTAR.</h2>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">
+            Ask me where things live in HIVE or how a workflow works — I'll point you straight to it.
+          </p>
+        </div>
       </div>
       <div className="w-full max-w-xl">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Try one of these</p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {starters.map((s) => (
+        <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:mb-2 sm:text-xs">Try one of these</p>
+        <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
+          {visible.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => onPick(s)}
-              className="min-h-[44px] rounded-full border border-[#fed7aa] bg-white px-3 py-1.5 text-xs text-[#0f1b3d] shadow-sm hover:bg-[#fff7ed]"
+              className="min-h-[36px] rounded-full border border-[#fed7aa] bg-white px-2.5 py-1 text-xs text-[#0f1b3d] shadow-sm hover:bg-[#fff7ed] sm:min-h-[44px] sm:px-3 sm:py-1.5"
             >
               {s}
             </button>
           ))}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="min-h-[36px] rounded-full border border-border bg-white px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted sm:min-h-[44px] sm:px-3 sm:py-1.5"
+            >
+              {showAll ? "Fewer" : "More suggestions"}
+            </button>
+          )}
         </div>
       </div>
       {recent.length > 0 && (
         <div className="w-full max-w-xl">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Recent</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {recent.map((r) => (
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:mb-2 sm:text-xs">Recent</p>
+          <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
+            {recent.slice(0, showAll ? recent.length : 3).map((r) => (
               <button
                 key={r}
                 type="button"
                 onClick={() => onPick(r)}
-                className="min-h-[44px] rounded-full border border-border bg-white px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+                className="min-h-[36px] rounded-full border border-border bg-white px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted sm:min-h-[44px] sm:px-3 sm:py-1.5"
               >
                 {r.length > 60 ? r.slice(0, 57) + "…" : r}
               </button>
@@ -319,6 +335,7 @@ function EmptyState({
     </div>
   );
 }
+
 
 function UserBubble({ text }: { text: string }) {
   return (

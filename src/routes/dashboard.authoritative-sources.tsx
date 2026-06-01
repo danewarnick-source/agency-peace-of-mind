@@ -60,6 +60,7 @@ import {
   setRequirementReviewStatus,
   listAttestations,
   ingestWebSource,
+  explainRequirement,
 } from "@/lib/authoritative-sources.functions";
 import {
   proposeRequirementMappings,

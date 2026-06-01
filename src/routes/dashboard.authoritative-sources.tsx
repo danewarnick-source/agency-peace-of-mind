@@ -76,7 +76,8 @@ import {
   prefillRequirementMappings,
   confirmRequirementWithScopes,
 } from "@/lib/nectar-engine.functions";
-import { Sparkle, X as XIcon } from "lucide-react";
+import { Sparkle, X as XIcon, Hexagon } from "lucide-react";
+import { AuthorizedCodesPanel } from "@/components/nectar/authorized-codes-panel";
 
 
 
@@ -211,6 +212,9 @@ function AuthoritativeSourcesPage() {
           <TabsTrigger value="requirements" className="gap-1">
             <FileCheck className="h-3.5 w-3.5" /> Requirements
           </TabsTrigger>
+          <TabsTrigger value="codes" className="gap-1">
+            <Hexagon className="h-3.5 w-3.5" /> Authorized codes
+          </TabsTrigger>
           <TabsTrigger value="attestations" className="gap-1">
             <ScrollText className="h-3.5 w-3.5" /> Attestation log
           </TabsTrigger>
@@ -233,6 +237,9 @@ function AuthoritativeSourcesPage() {
           ) : (
             <LoadingCard />
           )}
+        </TabsContent>
+        <TabsContent value="codes">
+          {orgId ? <AuthorizedCodesPanel orgId={orgId} /> : <LoadingCard />}
         </TabsContent>
         <TabsContent value="attestations">
           {orgId ? <AttestationsPanel orgId={orgId} /> : <LoadingCard />}

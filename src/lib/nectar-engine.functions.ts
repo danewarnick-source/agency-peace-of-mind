@@ -14,42 +14,90 @@ const SCOPE_KINDS = ["provider", "code", "role", "client", "unknown"] as const;
 type ScopeKind = (typeof SCOPE_KINDS)[number];
 
 interface OrgEntityFacts {
-  codes: string[]; // active DSPD service codes in use
-  roles: string[]; // staff role/credential keys present (DSP, SLM, HHP, BCBA, RN, LPN, etc.)
+  // Every code the provider is contracted/authorized to provide (active + dormant).
+  // NECTAR scopes coverage against this superset so a dormant code keeps its
+  // requirements live and doesn't lose audit protection when activated later.
+  codes: string[];
+  activeCodes: string[]; // currently attached to a client
+  dormantCodes: string[]; // authorized but not currently in use
+  roles: string[];
   clientCount: number;
   jurisdictions: string[];
 }
 
-// ---------- Inventory of org's live entities (used to ground AI proposals) ----------
+// ---------- Inventory of org's contracted entities (used to ground AI proposals) ----------
 
 async function gatherOrgFacts(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   organizationId: string,
 ): Promise<OrgEntityFacts> {
-  const [codesRes, staffRes, clientsRes] = await Promise.all([
-    supabase
-      .from("client_billing_codes")
-      .select("service_code")
-      .eq("organization_id", organizationId),
-    supabase
-      .from("organization_members")
-      .select("role, job_title")
-      .eq("organization_id", organizationId)
-      .eq("active", true),
-    supabase
-      .from("clients")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId),
-  ]);
+  const [billingCodesRes, clientAuthRes, authorizedRes, staffRes, clientsRes] =
+    await Promise.all([
+      supabase
+        .from("client_billing_codes")
+        .select("service_code")
+        .eq("organization_id", organizationId),
+      supabase
+        .from("clients")
+        .select("authorized_dspd_codes, job_code")
+        .eq("organization_id", organizationId),
+      supabase
+        .from("provider_authorized_codes")
+        .select("code, status")
+        .eq("organization_id", organizationId),
+      supabase
+        .from("organization_members")
+        .select("role, job_title")
+        .eq("organization_id", organizationId)
+        .eq("active", true),
+      supabase
+        .from("clients")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId),
+    ]);
 
-  const codes = Array.from(
-    new Set(
-      ((codesRes.data ?? []) as Array<{ service_code: string | null }>)
-        .map((r) => (r.service_code ?? "").trim().toUpperCase())
-        .filter(Boolean),
-    ),
+  const norm = (v: unknown) => (typeof v === "string" ? v.trim().toUpperCase() : "");
+
+  // "Active" = some client is currently set up to use it.
+  const activeSet = new Set<string>();
+  for (const r of (billingCodesRes.data ?? []) as Array<{ service_code: string | null }>) {
+    const c = norm(r.service_code);
+    if (c) activeSet.add(c);
+  }
+  for (const r of (clientAuthRes.data ?? []) as Array<{
+    authorized_dspd_codes: string[] | null;
+    job_code: string[] | null;
+  }>) {
+    for (const c of r.authorized_dspd_codes ?? []) {
+      const v = norm(c);
+      if (v) activeSet.add(v);
+    }
+    for (const c of r.job_code ?? []) {
+      const v = norm(c);
+      if (v) activeSet.add(v);
+    }
+  }
+
+  // Provider-level authorized set (contract/SOW/addendum/manual entries).
+  const authorizedSet = new Set<string>();
+  const authorizedStatus = new Map<string, string>();
+  for (const r of (authorizedRes.data ?? []) as Array<{
+    code: string | null;
+    status: string | null;
+  }>) {
+    const c = norm(r.code);
+    if (!c) continue;
+    authorizedSet.add(c);
+    authorizedStatus.set(c, r.status ?? "dormant");
+  }
+
+  // Union — coverage follows the contract, not current activity.
+  const codes = Array.from(new Set<string>([...activeSet, ...authorizedSet]));
+  const activeCodes = codes.filter(
+    (c) => activeSet.has(c) || authorizedStatus.get(c) === "active",
   );
+  const dormantCodes = codes.filter((c) => !activeCodes.includes(c));
 
   const roleSet = new Set<string>();
   for (const m of (staffRes.data ?? []) as Array<{
@@ -59,7 +107,6 @@ async function gatherOrgFacts(
     if (m.role) roleSet.add(m.role.toUpperCase());
     const jt = (m.job_title ?? "").toUpperCase();
     if (!jt) continue;
-    // Heuristic credential keys NECTAR cares about.
     for (const key of ["DSP", "SLM", "HHP", "BCBA", "BC", "RN", "LPN", "QIDP"]) {
       if (jt.includes(key)) roleSet.add(key);
     }
@@ -67,9 +114,11 @@ async function gatherOrgFacts(
 
   return {
     codes,
+    activeCodes,
+    dormantCodes,
     roles: Array.from(roleSet),
     clientCount: clientsRes.count ?? 0,
-    jurisdictions: ["UT-DSPD"], // first instance; extensibility lives on the requirement row
+    jurisdictions: ["UT-DSPD"],
   };
 }
 
@@ -79,9 +128,13 @@ const MAP_SYSTEM_PROMPT = `You are NECTAR, mapping a confirmed COMPLIANCE REQUIR
 
 Given:
 - the requirement text + citation
-- the provider's live entities (active DSPD service codes, staff roles/credentials present, client count)
+- the provider's CONTRACTED entities — every DSPD service code the provider is authorized to deliver (whether currently in use or dormant), staff roles/credentials present, client count
+
+Coverage follows the contract, not current activity. A dormant code (authorized but not currently in use) MUST still get its requirements mapped — when that code is later activated the rules must already be live.
 
 Decide the SCOPE(S) the requirement applies to. A requirement may have multiple scopes.
+
+
 
 Scope kinds:
 - "provider"   — agency-wide (e.g. Internal Quality Management Plan, Emergency Management Plan)
@@ -104,7 +157,8 @@ Return STRICT JSON only:
 }
 
 Rules:
-- ONLY use scope_value codes/roles that appear in the provider's live entity list — do not invent new codes. If the requirement references a code/role the provider doesn't use, return "unknown" with a rationale.
+- ONLY use scope_value codes/roles that appear in the provider's CONTRACTED entity list (active OR dormant) — do not invent new codes. If the requirement references a code/role the provider isn't contracted for at all, return "unknown" with a rationale.
+- Dormant (authorized-but-unused) codes are valid scope_values — map to them anyway so coverage is in place when they activate.
 - Prefer the narrowest correct scope. A requirement that only applies under HHS is "code"+"HHS", not "provider".
 - If the requirement is genuinely agency-wide, return ONE provider mapping.
 - Output at most 6 mappings.`;
@@ -134,7 +188,9 @@ DESCRIPTION: ${reqDescription ?? "—"}
 CITATION: ${citation ?? "—"}
 
 PROVIDER ENTITIES:
-- Active service codes: ${facts.codes.length ? facts.codes.join(", ") : "(none configured)"}
+- Contracted service codes (active OR dormant — coverage applies to both): ${facts.codes.length ? facts.codes.join(", ") : "(none configured)"}
+  · Active (in use today): ${facts.activeCodes.length ? facts.activeCodes.join(", ") : "(none)"}
+  · Dormant (authorized, not currently used — still must be covered): ${facts.dormantCodes.length ? facts.dormantCodes.join(", ") : "(none)"}
 - Staff roles/credentials present: ${facts.roles.length ? facts.roles.join(", ") : "(none configured)"}
 - Client count: ${facts.clientCount}
 - Jurisdictions: ${facts.jurisdictions.join(", ")}`;
@@ -206,7 +262,7 @@ export const proposeRequirementMappings = createServerFn({ method: "POST" })
             scope_kind: "unknown" as ScopeKind,
             scope_value: null,
             cadence: p.cadence ?? null,
-            rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't active for this provider — flagged for review.`,
+            rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't in the provider's contracted code set — flagged for review.`,
             source_excerpt: p.source_excerpt ?? null,
           };
         }
@@ -619,7 +675,7 @@ export const prefillRequirementMappings = createServerFn({ method: "POST" })
                   scope_kind: "unknown" as ScopeKind,
                   scope_value: null,
                   cadence: p.cadence ?? null,
-                  rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't active for this provider — flagged for review.`,
+                  rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't in the provider's contracted code set — flagged for review.`,
                   source_excerpt: p.source_excerpt ?? null,
                 };
               }
@@ -820,4 +876,176 @@ export const confirmRequirementWithScopes = createServerFn({ method: "POST" })
     });
 
     return { ok: true, scopesConfirmed };
+  });
+
+// ============================================================
+// Prompt 34 — Provider Authorized Codes
+// Coverage follows the contract, not current activity. The
+// authorized-codes set is the source of truth for which codes
+// NECTAR keeps requirements live for. Active vs dormant is a
+// usage signal only — both stay covered.
+// ============================================================
+
+const AuthorizedCodeSource = z.enum([
+  "contract",
+  "sow",
+  "addendum",
+  "manual",
+  "inferred",
+]);
+
+export const listAuthorizedCodes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ organizationId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const facts = await gatherOrgFacts(supabase, data.organizationId);
+
+    const { data: authRows, error } = await supabase
+      .from("provider_authorized_codes")
+      .select(
+        "id, code, label, status, source, source_document_id, notes, created_at, updated_at",
+      )
+      .eq("organization_id", data.organizationId)
+      .order("code", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const authoredCodes = new Set(
+      ((authRows ?? []) as Array<{ code: string }>).map((r) =>
+        r.code.toUpperCase(),
+      ),
+    );
+
+    // Count confirmed mappings per code so the UI can show coverage.
+    const { data: maps } = await supabase
+      .from("nectar_requirement_mappings")
+      .select("scope_value, confirmed")
+      .eq("organization_id", data.organizationId)
+      .eq("scope_kind", "code");
+    const confirmedByCode = new Map<string, number>();
+    const proposedByCode = new Map<string, number>();
+    for (const m of (maps ?? []) as Array<{
+      scope_value: string | null;
+      confirmed: boolean;
+    }>) {
+      const c = (m.scope_value ?? "").toUpperCase();
+      if (!c) continue;
+      if (m.confirmed) confirmedByCode.set(c, (confirmedByCode.get(c) ?? 0) + 1);
+      else proposedByCode.set(c, (proposedByCode.get(c) ?? 0) + 1);
+    }
+
+    // Synthesise rows for codes that show up in active use but aren't yet in
+    // the authorized table (so the admin can promote them to "authorized").
+    const inferred = facts.codes
+      .filter((c) => !authoredCodes.has(c))
+      .map((c) => ({
+        id: null as string | null,
+        code: c,
+        label: null as string | null,
+        status: facts.activeCodes.includes(c) ? "active" : "dormant",
+        source: "inferred" as const,
+        source_document_id: null as string | null,
+        notes: "Detected from client/staff data — promote to lock it into your authorized set.",
+        created_at: null,
+        updated_at: null,
+      }));
+
+    const explicit = ((authRows ?? []) as Array<{
+      id: string;
+      code: string;
+      label: string | null;
+      status: string;
+      source: string;
+      source_document_id: string | null;
+      notes: string | null;
+      created_at: string;
+      updated_at: string;
+    }>).map((r) => ({
+      ...r,
+      code: r.code.toUpperCase(),
+      // Promote authorized rows to "active" status reflection if a client is using it.
+      status: facts.activeCodes.includes(r.code.toUpperCase()) ? "active" : r.status,
+    }));
+
+    const rows = [...explicit, ...inferred]
+      .map((r) => ({
+        ...r,
+        confirmedRequirements: confirmedByCode.get(r.code) ?? 0,
+        proposedRequirements: proposedByCode.get(r.code) ?? 0,
+        inUse: facts.activeCodes.includes(r.code),
+      }))
+      .sort((a, b) => {
+        // active first, then dormant, then by code
+        const ar = a.inUse ? 0 : 1;
+        const br = b.inUse ? 0 : 1;
+        if (ar !== br) return ar - br;
+        return a.code.localeCompare(b.code);
+      });
+
+    return {
+      codes: rows,
+      summary: {
+        total: rows.length,
+        active: rows.filter((r) => r.inUse).length,
+        dormant: rows.filter((r) => !r.inUse).length,
+        authorizedExplicit: explicit.length,
+        inferredOnly: inferred.length,
+      },
+    };
+  });
+
+export const upsertAuthorizedCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        code: z.string().min(1).max(40),
+        label: z.string().max(200).nullable().optional(),
+        status: z.enum(["active", "dormant"]).optional(),
+        source: AuthorizedCodeSource.optional(),
+        sourceDocumentId: z.string().uuid().nullable().optional(),
+        notes: z.string().max(1000).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const code = data.code.trim().toUpperCase();
+    if (!code) throw new Error("Code required");
+
+    const { data: row, error } = await supabase
+      .from("provider_authorized_codes")
+      .upsert(
+        {
+          organization_id: data.organizationId,
+          code,
+          label: data.label ?? null,
+          status: data.status ?? "dormant",
+          source: data.source ?? "manual",
+          source_document_id: data.sourceDocumentId ?? null,
+          notes: data.notes ?? null,
+          added_by: userId,
+        },
+        { onConflict: "organization_id,code" },
+      )
+      .select("id")
+      .single();
+    if (error || !row) throw new Error(error?.message ?? "Upsert failed");
+    return { id: row.id as string, code };
+  });
+
+export const removeAuthorizedCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase
+      .from("provider_authorized_codes")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });

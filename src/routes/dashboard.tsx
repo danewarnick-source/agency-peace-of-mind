@@ -211,8 +211,9 @@ function DashboardLayout() {
     </>
   );
 
+  const allNav = showExecSection ? [...nav, ...execNav] : nav;
   const pageTitle =
-    nav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
+    allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
   const isStaffView = effectiveView === "staff";
 
   return (

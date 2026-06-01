@@ -196,7 +196,7 @@ function ClientWorkspace() {
                 name: `${client.first_name} ${client.last_name}`.trim(),
                 memberId: padMemberId(client.medicaid_id),
                 facility: client.physical_address,
-                authorizedCodes: client.job_code ?? undefined,
+                authorizedCodes: allowedHourly.length ? allowedHourly : (client.job_code ?? undefined),
                 homeLat: client.home_latitude,
                 homeLng: client.home_longitude,
                 geofenceRadiusFeet: client.geofence_radius_feet ?? 1000,

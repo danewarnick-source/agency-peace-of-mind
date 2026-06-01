@@ -41,6 +41,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
+  { to: "/dashboard/staff-mobile-preview", label: "Staff Mobile Preview", icon: Smartphone },
 ];
 
 function DashboardLayout() {

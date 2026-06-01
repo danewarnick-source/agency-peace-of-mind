@@ -205,8 +205,8 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
             <KvRow k="Address" v={client.physical_address ?? "—"} />
           </Section>
         </div>
-      </SheetContent>
-    </Sheet>
+      </MobileBottomSheet>
+    </>
   );
 }
 

@@ -4156,6 +4156,63 @@ export type Database = {
           },
         ]
       }
+      provider_authorized_codes: {
+        Row: {
+          added_by: string | null
+          code: string
+          created_at: string
+          id: string
+          label: string | null
+          notes: string | null
+          organization_id: string
+          source: string
+          source_document_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          added_by?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          notes?: string | null
+          organization_id: string
+          source?: string
+          source_document_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          added_by?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          notes?: string | null
+          organization_id?: string
+          source?: string
+          source_document_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_authorized_codes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_authorized_codes_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_tenants: {
         Row: {
           agency_name: string

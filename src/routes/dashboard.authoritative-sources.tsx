@@ -1720,17 +1720,35 @@ function ApplicabilityPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const invalidateMappings = () => {
+    qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] });
+    qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
+  };
+
   const confirm = useMutation({
     mutationFn: (id: string) =>
       setFn({ data: { id, confirmed: true } }),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] }),
+    onSuccess: () => invalidateMappings(),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const confirmAll = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => setFn({ data: { id, confirmed: true } })));
+      return ids.length;
+    },
+    onSuccess: (n) => {
+      invalidateMappings();
+      toast.success(
+        n === 1
+          ? "Applicability confirmed for 1 scope."
+          : `Applicability confirmed for ${n} scopes.`,
+      );
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const remove = useMutation({
     mutationFn: (id: string) => delFn({ data: { id } }),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, requirementId] }),
+    onSuccess: () => invalidateMappings(),
     onError: (e: Error) => toast.error(e.message),
   });
   const add = useMutation({

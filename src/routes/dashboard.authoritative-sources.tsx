@@ -288,11 +288,13 @@ function SourcesPanel({
   onJumpToRequirements: (docId: string) => void;
 }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
   const listFn = useServerFn(listAuthoritativeSources);
   const { data, isLoading } = useQuery({
     queryKey: ["auth-sources", orgId],
     queryFn: () => listFn({ data: { organizationId: orgId } }),
   });
+
 
   // Per-source draft stats so the pill on each row can show
   // total / confirmed / needs / removed and last-drafted time.
@@ -375,8 +377,10 @@ function SourcesPanel({
                 stats={statsByDoc.get(s.id as string) ?? null}
                 allSources={data!.sources as Array<{ id: string; title: string; metadata?: Record<string, unknown> | null }>}
                 onJumpToRequirements={onJumpToRequirements}
+                currentRole={org?.role ?? null}
               />
             ))}
+
           </ul>
         )}
       </div>
@@ -397,6 +401,7 @@ function SourceRow({
   stats,
   allSources,
   onJumpToRequirements,
+  currentRole,
 }: {
   source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null; metadata?: Record<string, unknown> | null };
   orgId: string;
@@ -413,7 +418,10 @@ function SourceRow({
     | null;
   allSources: Array<{ id: string; title: string; metadata?: Record<string, unknown> | null }>;
   onJumpToRequirements: (docId: string) => void;
+  currentRole?: string | null;
 }) {
+  const canDraft = currentRole === "admin" || currentRole === "manager" || currentRole === "super_admin";
+
   const meta = (source.metadata ?? {}) as {
     ignored?: boolean;
     ignored_as?: "ignore" | "duplicate";
@@ -592,8 +600,12 @@ function SourceRow({
             size="sm"
             variant="ghost"
             onClick={() => generate.mutate()}
-            disabled={generate.isPending || source.parse_status !== "parsed"}
-            title="Re-draft from this document (e.g. after a re-parse). Existing items are kept; new ones are added."
+            disabled={generate.isPending || source.parse_status !== "parsed" || !canDraft}
+            title={
+              !canDraft
+                ? "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to re-draft."
+                : "Re-draft from this document (e.g. after a re-parse). Existing items are kept; new ones are added."
+            }
             className="h-7 px-2 text-[11px]"
           >
             {generate.isPending ? (
@@ -603,6 +615,7 @@ function SourceRow({
             )}
             {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Re-draft"}
           </Button>
+
         </div>
       ) : (
         <div className="flex flex-col items-stretch gap-1 sm:items-end">
@@ -610,11 +623,13 @@ function SourceRow({
             size="sm"
             variant="outline"
             onClick={() => generate.mutate()}
-            disabled={generate.isPending || source.parse_status !== "parsed"}
+            disabled={generate.isPending || source.parse_status !== "parsed" || !canDraft}
             title={
-              source.parse_status === "parsed"
-                ? "Use NECTAR to draft checklist items from clauses found in this document"
-                : "Parsing must finish before requirements can be drafted"
+              !canDraft
+                ? "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to draft from authoritative sources."
+                : source.parse_status === "parsed"
+                  ? "Use NECTAR to draft checklist items from clauses found in this document"
+                  : "Parsing must finish before requirements can be drafted"
             }
             className={
               generate.isPending
@@ -629,6 +644,7 @@ function SourceRow({
             )}
             {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Draft requirements"}
           </Button>
+
           {generate.isPending && (
             <div
               className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--amber-100,#fef3c7)] sm:w-44"

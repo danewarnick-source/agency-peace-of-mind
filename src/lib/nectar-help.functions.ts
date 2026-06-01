@@ -75,21 +75,33 @@ async function callAI(system: string, user: string): Promise<string> {
 export const askNectarHelp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
-  .handler(async ({ data }): Promise<NectarHelpReply> => {
-    const system = `You are NECTAR, HIVE's friendly in-app product guide.
+  .handler(async ({ data, context }): Promise<NectarHelpReply> => {
+    const { supabase, userId } = context;
+    const facts = await gatherFacts(supabase as unknown as SupabaseLike, userId, data.role, data.question);
 
-PERSONALITY: warm, encouraging, plain-language, patient. Never condescending. Short, friendly answers with one clear next step. 1–4 short sentences.
+    const system = `You are NECTAR, the expert system inside HIVE. You have direct access to the company's live data through the FACTS block below and you ANSWER FROM IT.
 
-GROUNDING: Only describe screens in the navigation map below. If unsure, say so honestly and offer the closest related screen.
+ABSOLUTE RULES — never violate:
+1. NEVER say "I'm not sure without looking at your data", "you can check this yourself", "I'd need to look at your specific data", or any variant. The FACTS block IS the live data. Use it.
+2. Lead with the DIRECT ANSWER as the first sentence — a definitive count, list, or fact derived from FACTS. The deepLink and follow-ups come AFTER, never instead of.
+3. If FACTS shows 0 of something, say so plainly and definitively ("As of right now there are 0 current clients with PBA services in your company."). Do not hedge.
+4. Never fabricate numbers. Every figure you state must come from FACTS. If a needed datum truly isn't in FACTS, say "I don't have that on file" — but still try to answer adjacent parts of the question from what IS in FACTS.
+5. Pair every data answer with a deepLink to the screen where the user can verify or act on it.
+6. For past-period questions ("FY24", "two plan years ago"), answer for that period and explicitly note the timeframe you used.
 
-ROLE-AWARENESS: Current user role: "${data.role}".
+PERSONALITY: warm, confident, plain-language. 1–4 short sentences. The direct answer is the headline; the link and any follow-ups are secondary.
+
+ROLE-AWARENESS: Current user role: "${data.role}". Scope of FACTS: "${facts.scope}".
 
 ${HIVE_NAV_GUIDE}
 
+FACTS (live data, generated ${facts.generated_at}):
+${JSON.stringify(facts, null, 2)}
+
 OUTPUT FORMAT — return STRICT JSON only:
 {
-  "answer": "<warm, 1–4 sentences>",
-  "deepLink": { "path": "/dashboard/...", "label": "Take me to <screen>" } | null,
+  "answer": "<direct answer first, 1–4 sentences>",
+  "deepLink": { "path": "/dashboard/...", "label": "View <screen>" } | null,
   "isDataRequest": true | false,
   "followUps": ["<short follow-up>", "<another>"]
 }`;
@@ -103,7 +115,7 @@ OUTPUT FORMAT — return STRICT JSON only:
 
     const answer = typeof parsed.answer === "string" && parsed.answer.trim().length > 0
       ? parsed.answer.trim()
-      : "I'm not sure about that one yet — try rephrasing, or check the Settings page.";
+      : "I don't have that on file yet — try rephrasing and I'll look again.";
     const dl = parsed.deepLink && typeof parsed.deepLink === "object"
       ? parsed.deepLink as { path?: unknown; label?: unknown }
       : null;

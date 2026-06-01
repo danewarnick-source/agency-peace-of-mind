@@ -1,14 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   BookOpen,
   CheckCircle2,
   FileCheck,
   FileText,
   Loader2,
+  RefreshCw,
   ScrollText,
   ShieldCheck,
   Sparkles,
@@ -37,11 +39,13 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AttestationBanner } from "@/components/nectar/attestation-banner";
 import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
@@ -98,6 +102,13 @@ function AuthoritativeSourcesPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
   const qc = useQueryClient();
+  const [tab, setTab] = useState<string>("sources");
+  const [focusDocumentId, setFocusDocumentId] = useState<string | null>(null);
+
+  const jumpToRequirements = (docId: string) => {
+    setFocusDocumentId(docId);
+    setTab("requirements");
+  };
 
   const content = (
     <div className="space-y-6">
@@ -141,7 +152,7 @@ function AuthoritativeSourcesPage() {
         />
       )}
 
-      <Tabs defaultValue="sources" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 rounded-2xl border border-border/60 bg-background/60 p-1 backdrop-blur">
           <TabsTrigger value="sources" className="gap-1">
             <BookOpen className="h-3.5 w-3.5" /> Sources
@@ -155,10 +166,22 @@ function AuthoritativeSourcesPage() {
         </TabsList>
 
         <TabsContent value="sources">
-          {orgId ? <SourcesPanel orgId={orgId} /> : <LoadingCard />}
+          {orgId ? (
+            <SourcesPanel orgId={orgId} onJumpToRequirements={jumpToRequirements} />
+          ) : (
+            <LoadingCard />
+          )}
         </TabsContent>
         <TabsContent value="requirements">
-          {orgId ? <RequirementsPanel orgId={orgId} /> : <LoadingCard />}
+          {orgId ? (
+            <RequirementsPanel
+              orgId={orgId}
+              focusDocumentId={focusDocumentId}
+              onFocusHandled={() => setFocusDocumentId(null)}
+            />
+          ) : (
+            <LoadingCard />
+          )}
         </TabsContent>
         <TabsContent value="attestations">
           {orgId ? <AttestationsPanel orgId={orgId} /> : <LoadingCard />}
@@ -190,13 +213,56 @@ function LoadingCard() {
 
 // ---------- Sources panel ----------
 
-function SourcesPanel({ orgId }: { orgId: string }) {
+function SourcesPanel({
+  orgId,
+  onJumpToRequirements,
+}: {
+  orgId: string;
+  onJumpToRequirements: (docId: string) => void;
+}) {
   const qc = useQueryClient();
   const listFn = useServerFn(listAuthoritativeSources);
   const { data, isLoading } = useQuery({
     queryKey: ["auth-sources", orgId],
     queryFn: () => listFn({ data: { organizationId: orgId } }),
   });
+
+  // Per-source draft stats so the pill on each row can show
+  // total / confirmed / needs / removed and last-drafted time.
+  const listReqFn = useServerFn(listRequirements);
+  const { data: reqData } = useQuery({
+    queryKey: ["requirements", orgId],
+    queryFn: () => listReqFn({ data: { organizationId: orgId } }),
+  });
+
+  const statsByDoc = useMemo(() => {
+    const map = new Map<
+      string,
+      { total: number; confirmed: number; needs: number; removed: number; lastDraftedAt: string | null }
+    >();
+    type Row = { source_document_id: string | null; review_status: string | null; verified: boolean | null; created_at: string | null };
+    const rows = ((reqData?.requirements ?? []) as unknown) as Row[];
+    for (const r of rows) {
+      if (!r.source_document_id) continue;
+      const cur = map.get(r.source_document_id) ?? {
+        total: 0,
+        confirmed: 0,
+        needs: 0,
+        removed: 0,
+        lastDraftedAt: null as string | null,
+      };
+      cur.total += 1;
+      const s = r.review_status ?? (r.verified ? "confirmed" : "needs_attention");
+      if (s === "confirmed") cur.confirmed += 1;
+      else if (s === "removed") cur.removed += 1;
+      else cur.needs += 1;
+      if (r.created_at && (!cur.lastDraftedAt || r.created_at > cur.lastDraftedAt)) {
+        cur.lastDraftedAt = r.created_at;
+      }
+      map.set(r.source_document_id, cur);
+    }
+    return map;
+  }, [reqData]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
@@ -221,7 +287,13 @@ function SourcesPanel({ orgId }: { orgId: string }) {
         ) : (
           <ul className="divide-y divide-border/40">
             {data!.sources.map((s) => (
-              <SourceRow key={s.id as string} source={s} orgId={orgId} />
+              <SourceRow
+                key={s.id as string}
+                source={s}
+                orgId={orgId}
+                stats={statsByDoc.get(s.id as string) ?? null}
+                onJumpToRequirements={onJumpToRequirements}
+              />
             ))}
           </ul>
         )}
@@ -240,9 +312,15 @@ function SourcesPanel({ orgId }: { orgId: string }) {
 function SourceRow({
   source,
   orgId,
+  stats,
+  onJumpToRequirements,
 }: {
   source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null };
   orgId: string;
+  stats:
+    | { total: number; confirmed: number; needs: number; removed: number; lastDraftedAt: string | null }
+    | null;
+  onJumpToRequirements: (docId: string) => void;
 }) {
   const qc = useQueryClient();
   const genFn = useServerFn(generateRequirementsFromSource);
@@ -266,6 +344,8 @@ function SourceRow({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const hasDraft = !!stats && stats.total > 0;
 
   return (
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -300,24 +380,82 @@ function SourceRow({
           <span>{new Date(source.created_at).toLocaleDateString()}</span>
         </div>
       </div>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => generate.mutate()}
-        disabled={generate.isPending || source.parse_status !== "parsed"}
-        title={
-          source.parse_status === "parsed"
-            ? "Use NECTAR to draft checklist items from clauses found in this document"
-            : "Parsing must finish before requirements can be drafted"
-        }
-      >
-        {generate.isPending ? (
-          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Sparkles className="mr-1 h-3.5 w-3.5" />
-        )}
-        Draft requirements
-      </Button>
+
+      {hasDraft ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onJumpToRequirements(source.id)}
+            title={
+              stats!.lastDraftedAt
+                ? `Last drafted ${new Date(stats!.lastDraftedAt).toLocaleString()} — click to review in the Requirements tab`
+                : "Click to review in the Requirements tab"
+            }
+            className="flex flex-wrap items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-900 transition hover:bg-amber-500/20 dark:text-amber-200"
+          >
+            <Sparkles className="h-3 w-3" />
+            <span>Drafted</span>
+            <span className="opacity-70">·</span>
+            <span>{stats!.total} total</span>
+            <span className="text-emerald-700 dark:text-emerald-300">
+              · {stats!.confirmed} confirmed
+            </span>
+            <span
+              className={
+                stats!.needs > 0
+                  ? "text-amber-800 dark:text-amber-200"
+                  : "opacity-60"
+              }
+            >
+              · {stats!.needs} needs attention
+            </span>
+            {stats!.removed > 0 && (
+              <span className="text-red-700 dark:text-red-300">
+                · {stats!.removed} removed
+              </span>
+            )}
+            {stats!.lastDraftedAt && (
+              <span className="opacity-60">
+                · {new Date(stats!.lastDraftedAt).toLocaleDateString()}
+              </span>
+            )}
+          </button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => generate.mutate()}
+            disabled={generate.isPending || source.parse_status !== "parsed"}
+            title="Re-draft from this document (e.g. after a re-parse). Existing items are kept; new ones are added."
+            className="h-7 px-2 text-[11px]"
+          >
+            {generate.isPending ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1 h-3 w-3" />
+            )}
+            Re-draft
+          </Button>
+        </div>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => generate.mutate()}
+          disabled={generate.isPending || source.parse_status !== "parsed"}
+          title={
+            source.parse_status === "parsed"
+              ? "Use NECTAR to draft checklist items from clauses found in this document"
+              : "Parsing must finish before requirements can be drafted"
+          }
+        >
+          {generate.isPending ? (
+            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Sparkles className="mr-1 h-3.5 w-3.5" />
+          )}
+          Draft requirements
+        </Button>
+      )}
     </li>
   );
 }
@@ -643,7 +781,15 @@ function statusOf(r: ReqRow): ReviewStatus {
   return r.verified ? "confirmed" : "needs_attention";
 }
 
-function RequirementsPanel({ orgId }: { orgId: string }) {
+function RequirementsPanel({
+  orgId,
+  focusDocumentId,
+  onFocusHandled,
+}: {
+  orgId: string;
+  focusDocumentId?: string | null;
+  onFocusHandled?: () => void;
+}) {
   const listReqFn = useServerFn(listRequirements);
   const { data, isLoading } = useQuery({
     queryKey: ["requirements", orgId],
@@ -711,8 +857,43 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
     (g) => g.source && g.items.some((i) => statusOf(i) === "needs_attention"),
   ).length;
 
+  // Count authoritative-source items that have been removed — this drives the
+  // red high-stakes banner. Suggestion/manual removals don't count toward
+  // "audit-readiness changed" because they were never traced to a state doc.
+  const removedAuthoritative = useMemo(
+    () =>
+      groups
+        .filter((g) => !!g.source)
+        .reduce(
+          (n, g) => n + g.items.filter((i) => statusOf(i) === "removed").length,
+          0,
+        ),
+    [groups],
+  );
+
+  // Auto-scroll + expand the focused group when the user jumps in from the
+  // Sources-tab pill. We scroll on the next frame so the section is in the DOM.
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const removedRef = useRef<HTMLDivElement | null>(null);
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusDocumentId) return;
+    const id = window.setTimeout(() => {
+      const node = containerRef.current?.querySelector<HTMLElement>(
+        `[data-req-group-id="${focusDocumentId}"]`,
+      );
+      if (node) {
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+        setHighlightKey(focusDocumentId);
+        window.setTimeout(() => setHighlightKey(null), 2200);
+      }
+      onFocusHandled?.();
+    }, 80);
+    return () => window.clearTimeout(id);
+  }, [focusDocumentId, onFocusHandled]);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={containerRef}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold">
@@ -732,6 +913,43 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
           <ManualRequirementDialog orgId={orgId} />
         </div>
       </div>
+
+      {removedAuthoritative > 0 && (
+        <div
+          className="flex flex-col gap-2 rounded-2xl border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-900 dark:text-red-200 sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">
+                {removedAuthoritative} authoritative-source requirement
+                {removedAuthoritative === 1 ? " has" : "s have"} been removed.
+              </p>
+              <p className="text-xs opacity-90">
+                NECTAR is no longer tracking{" "}
+                {removedAuthoritative === 1 ? "this item" : "these items"} for
+                audit readiness. Your company may no longer be fully
+                state-audit-ready as a result. Review and re-open if any
+                removal was accidental.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0 border-red-500/60 bg-background/40 text-red-900 hover:bg-red-500/15 dark:text-red-100"
+            onClick={() =>
+              removedRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              })
+            }
+          >
+            Review removed items
+          </Button>
+        </div>
+      )}
 
       <AttestationBanner
         organizationId={orgId}
@@ -755,8 +973,18 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
       )}
 
       {groups.map((g) => (
-        <DocumentRequirementGroup key={g.key} group={g} orgId={orgId} />
+        <DocumentRequirementGroup
+          key={g.key}
+          group={g}
+          orgId={orgId}
+          highlight={highlightKey === g.key}
+          forceOpen={focusDocumentId === g.key}
+        />
       ))}
+
+      {removedAuthoritative > 0 && (
+        <div ref={removedRef} aria-hidden className="-mt-2 pt-2" />
+      )}
     </div>
   );
 }
@@ -764,9 +992,13 @@ function RequirementsPanel({ orgId }: { orgId: string }) {
 function DocumentRequirementGroup({
   group,
   orgId,
+  highlight = false,
+  forceOpen = false,
 }: {
   group: ReqGroup;
   orgId: string;
+  highlight?: boolean;
+  forceOpen?: boolean;
 }) {
   const counts = useMemo(() => {
     let confirmed = 0;
@@ -784,8 +1016,20 @@ function DocumentRequirementGroup({
   // Default: expand if there's anything still needing attention.
   const [open, setOpen] = useState(counts.needs > 0);
 
+  // If the user jumped here from the Sources-tab pill, force-expand once.
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
+
   return (
-    <section className="overflow-hidden rounded-2xl border border-border/60 bg-background/60 backdrop-blur">
+    <section
+      data-req-group-id={group.source?.id ?? group.key}
+      className={`overflow-hidden rounded-2xl border bg-background/60 backdrop-blur transition-shadow ${
+        highlight
+          ? "border-amber-500/70 shadow-[0_0_0_3px_rgba(245,158,11,0.25)]"
+          : "border-border/60"
+      }`}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -848,6 +1092,12 @@ function DocumentRequirementGroup({
   );
 }
 
+// Attestation copy for the weighted-remove flow. Marked for counsel review
+// alongside the other attestation copy in this product.
+// LEGAL_REVIEW: requirement-remove-attestation
+const REMOVE_ATTESTATION_TEXT =
+  "Removing this requirement means NECTAR will no longer track it for audit readiness. This requirement came from an authoritative source you uploaded. By removing it, you confirm this is intentional and accept responsibility for the change to your compliance tracking.";
+
 function RequirementRow({
   req,
   orgId,
@@ -858,18 +1108,23 @@ function RequirementRow({
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
   const set = useMutation({
-    mutationFn: (status: ReviewStatus) =>
-      setStatusFn({ data: { id: req.id, status } }),
-    onSuccess: (_d, status) => {
+    mutationFn: (vars: { status: ReviewStatus; attestStatement?: string }) =>
+      setStatusFn({
+        data: { id: req.id, status: vars.status, attestStatement: vars.attestStatement },
+      }),
+    onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["requirements", orgId] });
       qc.invalidateQueries({ queryKey: ["attestations", orgId] });
-      if (status === "confirmed") toast.success("Confirmed.");
-      else if (status === "removed")
+      if (vars.status === "confirmed") toast.success("Confirmed.");
+      else if (vars.status === "removed")
         toast.message("Removed from active use", {
           description:
-            "NECTAR will stop pulling from this requirement. Record kept for the trail.",
+            "Logged to the attestation trail. NECTAR will stop pulling from this requirement.",
         });
-      else toast.message("Re-opened for review.");
+      else toast.message("Re-opened for review.", {
+        description:
+          "Logged to the attestation trail. NECTAR will resume tracking this requirement once you confirm it.",
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -877,6 +1132,10 @@ function RequirementRow({
   const status = statusOf(req);
   const isRemoved = status === "removed";
   const isConfirmed = status === "confirmed";
+  const isFromAuthSource = req.origin === "document" && !!req.source_document_id;
+
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
 
   return (
     <li
@@ -906,8 +1165,11 @@ function RequirementRow({
             </Badge>
           )}
           {isRemoved && (
-            <Badge variant="outline" className="text-[10px] text-muted-foreground">
-              Removed — not in active use
+            <Badge
+              variant="outline"
+              className="text-[10px] text-red-700 dark:text-red-300"
+            >
+              Removed — not tracked for audit
             </Badge>
           )}
         </div>
@@ -925,7 +1187,7 @@ function RequirementRow({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => set.mutate("needs_attention")}
+            onClick={() => set.mutate({ status: "needs_attention" })}
             disabled={set.isPending}
           >
             Re-open for review
@@ -936,7 +1198,7 @@ function RequirementRow({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => set.mutate("needs_attention")}
+                onClick={() => set.mutate({ status: "needs_attention" })}
                 disabled={set.isPending}
               >
                 Unconfirm
@@ -945,26 +1207,129 @@ function RequirementRow({
               <Button
                 size="sm"
                 className="bg-amber-500 text-amber-950 hover:bg-amber-400"
-                onClick={() => set.mutate("confirmed")}
+                onClick={() => set.mutate({ status: "confirmed" })}
                 disabled={set.isPending}
               >
                 Confirm
               </Button>
             )}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => set.mutate("removed")}
-              disabled={set.isPending}
+
+            <Dialog
+              open={removeOpen}
+              onOpenChange={(o) => {
+                setRemoveOpen(o);
+                if (!o) setAcknowledged(false);
+              }}
             >
-              Remove
-            </Button>
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-700 hover:bg-red-500/10 hover:text-red-800 dark:text-red-300"
+                  disabled={set.isPending}
+                >
+                  Remove…
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    Remove this requirement from NECTAR?
+                  </DialogTitle>
+                  <DialogDescription className="text-xs">
+                    {isFromAuthSource
+                      ? "This requirement was drafted from an authoritative source you uploaded."
+                      : "This requirement is currently in NECTAR's active set."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-900 dark:text-red-200">
+                    <p className="font-semibold">"{req.title}"</p>
+                    {req.source_citation && (
+                      <p className="mt-0.5 opacity-80">
+                        {req.source_citation}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+                    <p className="mb-1 flex items-center gap-1 font-semibold">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      This changes what NECTAR treats as audit-ready
+                    </p>
+                    <p>
+                      Once removed, NECTAR will no longer track or surface this
+                      requirement. Your company may no longer be fully
+                      state-audit-ready as a result — whether the removal is
+                      accidental or intentional. The record stays on the trail
+                      and is re-openable.
+                    </p>
+                  </div>
+
+                  <label
+                    className="flex items-start gap-2 rounded-xl border border-border/60 bg-background/60 p-3 text-xs"
+                  >
+                    <Checkbox
+                      checked={acknowledged}
+                      onCheckedChange={(v) => setAcknowledged(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-foreground/90">
+                      {REMOVE_ATTESTATION_TEXT}
+                    </span>
+                  </label>
+                  <p className="text-[10px] text-muted-foreground">
+                    Your user, the timestamp, the requirement, the source
+                    document, and this exact statement will be written to the
+                    immutable Attestation log.
+                  </p>
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRemoveOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!acknowledged || set.isPending}
+                    className="bg-red-600 text-white hover:bg-red-500"
+                    onClick={() => {
+                      set.mutate(
+                        {
+                          status: "removed",
+                          attestStatement: REMOVE_ATTESTATION_TEXT,
+                        },
+                        {
+                          onSuccess: () => {
+                            setRemoveOpen(false);
+                            setAcknowledged(false);
+                          },
+                        },
+                      );
+                    }}
+                  >
+                    {set.isPending ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    Confirm removal
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </>
         )}
       </div>
     </li>
   );
 }
+
+
 
 
 function ManualRequirementDialog({ orgId }: { orgId: string }) {

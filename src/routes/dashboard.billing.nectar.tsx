@@ -104,8 +104,7 @@ function NectarPage() {
         )}
       </section>
 
-      <SavedReportsSection onRunPrompt={(p) => {
-        // scroll to builder; ReportBuilder consumes via prop
+      <SavedReportsSection onRunPrompt={(p: string) => {
         window.dispatchEvent(new CustomEvent("hive:nectar:run", { detail: { prompt: p } }));
       }} />
       <ReportBuilder />

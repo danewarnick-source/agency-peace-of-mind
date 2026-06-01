@@ -82,12 +82,13 @@ export async function reportPlatformEvent(input: {
       await supabaseAdmin
         .from("hive_platform_tickets")
         .update({
-          audit: [...prevAudit, entry],
+          audit: [...prevAudit, entry] as unknown as Json,
           affected_orgs: distinctOrgBumped
             ? (existing.affected_orgs as number) + 1
-            : existing.affected_orgs,
+            : (existing.affected_orgs as number),
         })
         .eq("id", existing.id);
+
       return;
     }
 

@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
@@ -32,6 +32,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard/timeclock", label: "General Time Clock", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
+  { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
 ];
 
 const ADMIN_NAV: NavItem[] = [
@@ -41,6 +42,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
+  { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

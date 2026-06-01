@@ -1,19 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePortalView } from "@/hooks/use-portal-view";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
-} from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, AlertTriangle, Clock, FileText, ArrowRight } from "lucide-react";
-import { toast } from "sonner";
+import { AlertTriangle, Clock, FileText, ArrowRight } from "lucide-react";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
 import { TodayShiftBanner } from "@/components/today-shift-banner";

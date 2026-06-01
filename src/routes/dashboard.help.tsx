@@ -134,16 +134,19 @@ function HelpPage() {
 
   return (
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-3xl flex-col">
-      <header className="mb-3 flex items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Hexagon className="h-4 w-4 text-[#d97a1c]" />
-            <span>Need help? NECTAR can help.</span>
+      <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <NectarMark size="md" />
+          <div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <NectarBadge size="xs" />
+              <span>Need help? NECTAR can help.</span>
+            </div>
+            <h1 className="font-display text-2xl font-bold tracking-tight text-[#0f1b3d]">Ask NECTAR</h1>
+            <p className="text-sm text-muted-foreground">
+              Your friendly guide to using HIVE — ask where things live or how a workflow works.
+            </p>
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-[#0f1b3d]">Ask NECTAR</h1>
-          <p className="text-sm text-muted-foreground">
-            Your friendly guide to using HIVE — ask where things live or how a workflow works.
-          </p>
         </div>
         <div className="flex flex-col items-end gap-2">
           {messages.length > 0 && (

@@ -2473,3 +2473,379 @@ function RequirementDetailDialog({
     </Dialog>
   );
 }
+
+// ---------- Prompt 31: Review Queue ----------
+// Walks the admin through every needs-attention requirement one at a time
+// with NECTAR's pre-filled proposal visible. Keyboard-friendly: A approve,
+// S skip, R remove, ←/→ navigate.
+
+function ReviewQueueDialog({
+  open,
+  onOpenChange,
+  orgId,
+  items,
+  applicByReq,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  orgId: string;
+  items: ReqRow[];
+  applicByReq: Map<string, ApplicStats>;
+}) {
+  const qc = useQueryClient();
+  const [index, setIndex] = useState(0);
+  const [highConfidenceOnly, setHighConfidenceOnly] = useState(false);
+
+  const filtered = useMemo(() => {
+    if (!highConfidenceOnly) return items;
+    return items.filter((i) => {
+      const s = applicByReq.get(i.id);
+      return !!s && s.unknown === 0 && s.pending > 0;
+    });
+  }, [items, applicByReq, highConfidenceOnly]);
+
+  useEffect(() => {
+    if (filtered.length === 0) setIndex(0);
+    else if (index >= filtered.length) setIndex(filtered.length - 1);
+  }, [filtered.length, index]);
+
+  useEffect(() => {
+    if (open) setIndex(0);
+  }, [open]);
+
+  const current = filtered[index];
+
+  const listMapFn = useServerFn(listRequirementMappings);
+  const mapsQ = useQuery({
+    enabled: open && !!current,
+    queryKey: ["req-mappings", orgId, current?.id],
+    queryFn: () =>
+      listMapFn({
+        data: { organizationId: orgId, requirementId: current!.id },
+      }),
+  });
+
+  const confirmAllFn = useServerFn(confirmRequirementWithScopes);
+  const setStatusFn = useServerFn(setRequirementReviewStatus);
+  const proposeFn = useServerFn(proposeRequirementMappings);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+    qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
+    qc.invalidateQueries({ queryKey: ["attestations", orgId] });
+    if (current)
+      qc.invalidateQueries({ queryKey: ["req-mappings", orgId, current.id] });
+  };
+
+  const advance = () => {
+    setIndex((i) => Math.min(i + 1, Math.max(0, filtered.length - 1)));
+  };
+
+  const approve = useMutation({
+    mutationFn: () => confirmAllFn({ data: { requirementId: current!.id } }),
+    onSuccess: (r) => {
+      invalidate();
+      toast.success(
+        r.scopesConfirmed > 0
+          ? `Approved — confirmed requirement + ${r.scopesConfirmed} scope${r.scopesConfirmed === 1 ? "" : "s"}.`
+          : "Approved.",
+      );
+      advance();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const confirmJustReq = useMutation({
+    mutationFn: () =>
+      setStatusFn({ data: { id: current!.id, status: "confirmed" } }),
+    onSuccess: () => {
+      invalidate();
+      toast.success("Requirement confirmed; review scope later.");
+      advance();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: () =>
+      setStatusFn({
+        data: {
+          id: current!.id,
+          status: "removed",
+          attestStatement: REMOVE_ATTESTATION_TEXT,
+        },
+      }),
+    onSuccess: () => {
+      invalidate();
+      toast.message("Removed from active use.");
+      advance();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const propose = useMutation({
+    mutationFn: () => proposeFn({ data: { requirementId: current!.id } }),
+    onSuccess: () => invalidate(),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA")) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setIndex((i) => Math.min(i + 1, Math.max(0, filtered.length - 1)));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setIndex((i) => Math.max(0, i - 1));
+      } else if ((e.key === "a" || e.key === "A") && current && !approve.isPending) {
+        e.preventDefault();
+        approve.mutate();
+      } else if ((e.key === "s" || e.key === "S") && current) {
+        e.preventDefault();
+        advance();
+      } else if ((e.key === "r" || e.key === "R") && current && !remove.isPending) {
+        e.preventDefault();
+        remove.mutate();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, filtered.length, current?.id, approve.isPending, remove.isPending]);
+
+  const rows = (mapsQ.data?.mappings ?? []) as unknown as MappingRow[];
+  const pendingScopes = rows.filter((m) => !m.confirmed && m.scope_kind !== "unknown");
+  const unknownScopes = rows.filter((m) => m.scope_kind === "unknown");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <ListChecks className="h-4 w-4 text-amber-600" />
+            Review queue
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Walk through every requirement that still needs review. NECTAR's
+            pre-filled proposal is shown; you approve, edit, or remove.
+            Shortcuts: <kbd className="rounded bg-muted px-1">A</kbd> approve ·{" "}
+            <kbd className="rounded bg-muted px-1">S</kbd> skip ·{" "}
+            <kbd className="rounded bg-muted px-1">R</kbd> remove ·{" "}
+            <kbd className="rounded bg-muted px-1">←</kbd>/
+            <kbd className="rounded bg-muted px-1">→</kbd> navigate.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <span>
+            {filtered.length === 0
+              ? "Nothing left to review."
+              : `Item ${index + 1} of ${filtered.length}`}
+          </span>
+          <label className="flex cursor-pointer items-center gap-1.5">
+            <Checkbox
+              checked={highConfidenceOnly}
+              onCheckedChange={(v) => setHighConfidenceOnly(v === true)}
+              className="h-3.5 w-3.5"
+            />
+            High-confidence only (skip unknown scopes)
+          </label>
+        </div>
+
+        {!current ? (
+          <div className="rounded-2xl border border-dashed border-border/60 bg-background/60 p-8 text-center text-sm text-muted-foreground">
+            <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-emerald-600" />
+            All caught up — every requirement matching this filter has been
+            reviewed.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold">{current.title}</h3>
+                {current.category && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {current.category}
+                  </Badge>
+                )}
+                <SourceCitationChip citation={current.source_citation} />
+              </div>
+              {current.description && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {current.description}
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-amber-500/30 bg-amber-50/40 p-3 dark:bg-amber-500/5">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#d97a1c]">
+                  <Sparkle className="h-3 w-3" /> NECTAR's proposed applicability
+                </span>
+                {rows.length === 0 && !mapsQ.isLoading && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px]"
+                    disabled={propose.isPending}
+                    onClick={() => propose.mutate()}
+                  >
+                    {propose.isPending ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1 h-3 w-3" />
+                    )}
+                    Ask NECTAR to propose
+                  </Button>
+                )}
+              </div>
+              {mapsQ.isLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Loading proposal…
+                </div>
+              ) : rows.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No proposal yet. Ask NECTAR to propose, or open Details to
+                  add scope manually.
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {rows.map((m) => (
+                    <li
+                      key={m.id}
+                      className={`flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 text-xs ${
+                        m.scope_kind === "unknown"
+                          ? "border-red-500/40 bg-red-500/5"
+                          : m.confirmed
+                            ? "border-emerald-500/30 bg-emerald-500/5"
+                            : "border-amber-500/30 bg-amber-500/5"
+                      }`}
+                    >
+                      <Badge variant="outline" className="text-[10px]">
+                        {SCOPE_LABEL[m.scope_kind]}
+                      </Badge>
+                      {m.scope_value && m.scope_value !== "*" && (
+                        <span className="font-mono text-[11px] font-semibold">
+                          {m.scope_value}
+                        </span>
+                      )}
+                      {m.cadence && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {m.cadence}
+                        </Badge>
+                      )}
+                      {!m.confirmed && m.scope_kind !== "unknown" && (
+                        <Badge className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]">
+                          proposed
+                        </Badge>
+                      )}
+                      {m.scope_kind === "unknown" && (
+                        <Badge variant="outline" className="text-[10px] text-red-700 dark:text-red-300">
+                          needs your judgement
+                        </Badge>
+                      )}
+                      {m.rationale && (
+                        <span className="min-w-0 flex-1 text-[11px] text-muted-foreground">
+                          {m.rationale}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {unknownScopes.length > 0 && (
+                <p className="mt-2 flex items-start gap-1 text-[11px] text-red-700 dark:text-red-300">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                  NECTAR flagged {unknownScopes.length} scope
+                  {unknownScopes.length === 1 ? "" : "s"} as unknown — those
+                  won't be auto-confirmed.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setIndex((i) => Math.max(0, i - 1))}
+              disabled={!current || index === 0}
+              aria-label="Previous"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                setIndex((i) => Math.min(i + 1, Math.max(0, filtered.length - 1)))
+              }
+              disabled={!current || index >= filtered.length - 1}
+              aria-label="Next"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={advance}
+              disabled={!current}
+              title="Skip (S) — leave for later"
+            >
+              Skip
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-700 hover:bg-red-500/10 dark:text-red-300"
+              onClick={() => remove.mutate()}
+              disabled={!current || remove.isPending}
+              title="Remove from active set (R)"
+            >
+              {remove.isPending ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1 h-3.5 w-3.5" />
+              )}
+              Remove
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => confirmJustReq.mutate()}
+              disabled={!current || confirmJustReq.isPending}
+              title="Confirm just the requirement; review scope manually"
+            >
+              {confirmJustReq.isPending ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : null}
+              Just the requirement
+            </Button>
+            <Button
+              size="sm"
+              className="bg-amber-500 text-amber-950 hover:bg-amber-400"
+              onClick={() => approve.mutate()}
+              disabled={!current || approve.isPending}
+              title="Approve NECTAR's proposal (A)"
+            >
+              {approve.isPending ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+              )}
+              Approve{pendingScopes.length > 0 ? ` (+${pendingScopes.length})` : ""}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

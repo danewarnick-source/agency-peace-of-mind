@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useGeneralShift } from "@/hooks/use-general-shift";
+import { useLivePayPeriod } from "@/hooks/use-nectar-pay-period";
+
+const fmtUSD = (n: number) =>
+  n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
@@ -23,6 +27,8 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
   const { shift: general } = useGeneralShift();
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now());
+
+  const live = useLivePayPeriod();
 
   const isClient = !!active;
   const isGeneral = !active && !!general;
@@ -92,12 +98,19 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
         </span>
 
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-[13px] font-semibold">{title}</p>
+          <p className="truncate text-[13px] font-semibold text-white">{title}</p>
           <p className="truncate text-[11px] text-white/80">{subtitle}</p>
         </div>
 
-        <span className="shrink-0 font-mono text-base font-semibold tabular-nums">
-          {elapsed}
+        <span className="flex shrink-0 flex-col items-end leading-tight">
+          <span className="font-mono text-base font-semibold tabular-nums text-white">
+            {elapsed}
+          </span>
+          {isClient && (
+            <span className="font-mono text-[11px] font-semibold tabular-nums text-[#f4a93a]">
+              {fmtUSD(live.liveEarnings)}
+            </span>
+          )}
         </span>
 
         <span

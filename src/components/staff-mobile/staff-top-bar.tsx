@@ -69,14 +69,14 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
         >
           <SheetHeader className="text-left">
             <SheetTitle className="text-white">{displayName}</SheetTitle>
-            <SheetDescription className="text-white/60">
+            <SheetDescription className="text-white/80">
               {(org?.organization_name ?? "Workspace") + " · " + ROLE_LABEL[role]}
             </SheetDescription>
           </SheetHeader>
 
           {isAdminCapable && (
             <div className="mt-5">
-              <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/55">
+              <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/80">
                 Portal View
               </label>
               <Select value={view} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile")}>

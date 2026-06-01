@@ -21,7 +21,7 @@ export function StaffMobileShell({
     <>
       <StaffTopBar title={title} />
       <div
-        className="md:hidden"
+        className="md:hidden min-h-[calc(100dvh-3.5rem)] bg-[#f7f8fb]"
         style={{
           // Reserve room for bottom tabs (~56px) + active shift bar (~52px)
           // + safe-area inset so the active shift bar never overlaps content.

@@ -537,6 +537,20 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       (f) => (f.field_group as string | null) === "sow_clause",
     );
 
+    // Web sources cite "per <url>, captured <date>" so the trace points back
+    // to the URL + snapshot date rather than a generic file name.
+    const ext = (doc.external_ids ?? {}) as {
+      source_url?: string;
+      captured_at?: string;
+    };
+    const isWeb = (doc.source as string | null) === "web" && !!ext.source_url;
+    const webSuffix = isWeb
+      ? ` (per ${ext.source_url}${
+          ext.captured_at ? `, captured ${ext.captured_at.slice(0, 10)}` : ""
+        })`
+      : "";
+    const baseLabel = (doc.title as string) ?? "Source";
+
     let inserted = 0;
 
     for (const item of aiItems) {
@@ -547,8 +561,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         .slice(0, 120);
       if (existingKeys.has(key)) continue;
       const citation = item.citation
-        ? `${(doc.title as string) ?? "Source"} — ${item.citation}`
-        : (doc.title as string) ?? null;
+        ? `${baseLabel} — ${item.citation}${webSuffix}`
+        : `${baseLabel}${webSuffix}`;
       const { error } = await supabase.from("nectar_requirements").insert({
         organization_id: doc.organization_id,
         source_document_id: doc.id,
@@ -585,8 +599,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         category:
           (f.field_key as string) === "required_document" ? "audit_doc" : "obligation",
         source_citation: citation
-          ? `${(doc.title as string) ?? "Source"} — ${citation}`
-          : (doc.title as string) ?? null,
+          ? `${baseLabel} — ${citation}${webSuffix}`
+          : `${baseLabel}${webSuffix}`,
         applies_to: "company",
       });
       if (!error) {

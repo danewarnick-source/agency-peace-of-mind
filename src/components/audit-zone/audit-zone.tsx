@@ -447,7 +447,7 @@ function AuditFileDialog({
           audit_file_id: fileId,
           source: "auto",
           category: "billing",
-          title: `520 Submission — ${format(new Date(b.period_month), "MMMM yyyy")}`,
+          title: `520 Submission — ${format(new Date(b.period_start), "MMMM yyyy")}`,
           storage_path: null,
           external_ref: `billing_submissions:${b.id}`,
         }),

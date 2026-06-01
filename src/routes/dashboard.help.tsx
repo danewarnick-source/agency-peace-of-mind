@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Hexagon, Send, Loader2, ArrowRight, BarChart3, Sparkles, RotateCcw, LifeBuoy, CheckCircle2 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { askNectarHelp, escalateHelpToHive, getHelpTicketStatus, type NectarHelpReply } from "@/lib/nectar-help.functions";
+import { NectarBadge, NectarMark, NectarButton } from "@/components/nectar/nectar-brand";
 
 export const Route = createFileRoute("/dashboard/help")({
   head: () => ({ meta: [{ title: "Need help? — NECTAR" }] }),
@@ -133,16 +134,19 @@ function HelpPage() {
 
   return (
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-3xl flex-col">
-      <header className="mb-3 flex items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Hexagon className="h-4 w-4 text-[#d97a1c]" />
-            <span>Need help? NECTAR can help.</span>
+      <header className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <NectarMark size="md" />
+          <div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <NectarBadge size="xs" />
+              <span>Need help? NECTAR can help.</span>
+            </div>
+            <h1 className="font-display text-2xl font-bold tracking-tight text-[#0f1b3d]">Ask NECTAR</h1>
+            <p className="text-sm text-muted-foreground">
+              Your friendly guide to using HIVE — ask where things live or how a workflow works.
+            </p>
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-[#0f1b3d]">Ask NECTAR</h1>
-          <p className="text-sm text-muted-foreground">
-            Your friendly guide to using HIVE — ask where things live or how a workflow works.
-          </p>
         </div>
         <div className="flex flex-col items-end gap-2">
           {messages.length > 0 && (
@@ -231,14 +235,14 @@ function HelpPage() {
           className="min-h-[44px] flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#d97a1c]/40"
           disabled={m.isPending}
         />
-        <button
+        <NectarButton
           type="submit"
-          disabled={m.isPending || input.trim().length < 2}
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-md bg-[#0f1b3d] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
+          disabled={input.trim().length < 2}
+          loading={m.isPending}
+          icon={<Send className="h-4 w-4" />}
         >
-          {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Send
-        </button>
+        </NectarButton>
       </form>
     </div>
   );
@@ -249,9 +253,7 @@ function EmptyState({
 }: { starters: string[]; recent: string[]; onPick: (q: string) => void }) {
   return (
     <div className="flex flex-col items-center gap-4 py-8 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0f1b3d] text-white shadow-md">
-        <Hexagon className="h-8 w-8 text-[#d97a1c]" fill="currentColor" />
-      </div>
+      <NectarMark size="lg" />
       <div>
         <h2 className="font-display text-lg font-semibold text-[#0f1b3d]">Hi! I'm NECTAR.</h2>
         <p className="mt-1 max-w-md text-sm text-muted-foreground">

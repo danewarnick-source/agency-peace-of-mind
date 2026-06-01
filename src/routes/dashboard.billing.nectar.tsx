@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, AlertTriangle, TrendingDown, TrendingUp, Download, History, Loader2, Settings, Save, Pin, PinOff, Trash2, Calendar, X, Play } from "lucide-react";
+import { AlertTriangle, TrendingDown, TrendingUp, Download, History, Loader2, Settings, Save, Pin, PinOff, Trash2, Calendar, X, Play } from "lucide-react";
 import { useNectarAlerts, DEFAULT_NECTAR_ALERT_SETTINGS, type NectarAlert, type NectarAlertSettings } from "@/hooks/use-nectar-alerts";
 import { askNectarReport, type NectarReportResult } from "@/lib/nectar-reports.functions";
 import { listSavedReports, saveReport, deleteSavedReport, togglePinReport, upsertReportSchedule, unscheduleReport, type SavedReport } from "@/lib/saved-reports.functions";
+import { NectarBadge, NectarMark, NectarButton } from "@/components/nectar/nectar-brand";
 
 
 export const Route = createFileRoute("/dashboard/billing/nectar")({
@@ -54,11 +55,11 @@ function NectarPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <section className="rounded-xl border border-[#f4a93a]/30 bg-card p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#d97a1c]" />
-            <h2 className="font-display text-lg font-semibold">NECTAR utilization alerts</h2>
+            <NectarBadge size="sm" />
+            <h2 className="font-display text-lg font-semibold">Utilization alerts</h2>
             {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
           </div>
           <button
@@ -233,11 +234,16 @@ function ReportBuilder() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-[#d97a1c]" />
-        <h2 className="font-display text-lg font-semibold">Ask NECTAR</h2>
-        <span className="text-xs text-muted-foreground">Natural-language reports from HIVE data</span>
+    <section className="rounded-xl border border-[#f4a93a]/30 bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-3">
+        <NectarMark size="sm" />
+        <div className="flex flex-1 items-center gap-2">
+          <h2 className="font-display text-lg font-semibold">Ask NECTAR</h2>
+          <NectarBadge size="xs" label="REPORTS" />
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            Natural-language reports from HIVE data
+          </span>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -248,15 +254,14 @@ function ReportBuilder() {
           placeholder='e.g. "Total DSI hours per client last quarter" or "All shifts John worked this month with Tonya"'
           className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
         />
-        <button
+        <NectarButton
           type="button"
           onClick={() => submit()}
-          disabled={m.isPending || prompt.trim().length < 3}
-          className="inline-flex items-center gap-2 rounded-md bg-[image:var(--gradient-brand)] px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm disabled:opacity-50"
+          disabled={prompt.trim().length < 3}
+          loading={m.isPending}
         >
-          {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           Run
-        </button>
+        </NectarButton>
         <button
           type="button"
           onClick={() => { setSaveName(prompt.slice(0, 60)); setSaveOpen(true); }}

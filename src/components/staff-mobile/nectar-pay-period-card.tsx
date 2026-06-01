@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  Sparkles, ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays,
+  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays,
 } from "lucide-react";
 import {
   useNectarPayPeriod, useLivePayPeriod,
 } from "@/hooks/use-nectar-pay-period";
 import { useCountUp } from "@/hooks/use-count-up";
 import { HexWatermark } from "@/components/brand/hex-watermark";
+import { NectarBadge, NectarSurface } from "@/components/nectar/nectar-brand";
 
 const fmtHours = (n: number) => `${n.toFixed(1)} hrs`;
 const fmtDays = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
@@ -48,10 +49,7 @@ export function NectarPayPeriodCard() {
   const todo = logs + attn;
 
   return (
-    <section
-      aria-label="NECTAR pay-period summary"
-      className="relative overflow-hidden rounded-2xl border border-[#1f2752] bg-[#141a3d] text-white shadow-[0_12px_30px_-20px_rgba(13,17,43,0.6)]"
-    >
+    <NectarSurface aria-label="NECTAR pay-period summary">
       <HexWatermark size={120} className="-right-6 -top-6" opacity={0.07} />
 
       <button
@@ -61,9 +59,7 @@ export function NectarPayPeriodCard() {
         aria-controls="nectar-pay-period-details"
         className="relative flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-white/[0.04]"
       >
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[image:var(--gradient-amber)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#412402]">
-          <Sparkles className="h-3 w-3" /> NECTAR
-        </span>
+        <NectarBadge size="sm" live={live.isLive} />
 
         <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold tabular-nums text-white">
           {fmtHours(hourlyHoursDisplay)} · {fmtUSD(payTotal)}
@@ -199,6 +195,6 @@ export function NectarPayPeriodCard() {
           </ul>
         </div>
       )}
-    </section>
+    </NectarSurface>
   );
 }

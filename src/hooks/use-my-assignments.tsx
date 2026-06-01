@@ -59,6 +59,6 @@ export function allowedCodesFor(
   if (!map) return clientCodes;
   if (!map.has(clientId)) return [];
   const allow = map.get(clientId);
-  if (allow === null) return clientCodes;
+  if (!allow) return clientCodes;
   return clientCodes.filter((c) => allow.has(c));
 }

@@ -1138,9 +1138,9 @@ function RequirementRow({
   const [acknowledged, setAcknowledged] = useState(false);
 
   return (
-    <li
-      className={`flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between ${isRemoved ? "opacity-55" : ""}`}
-    >
+    <li className={`py-3 ${isRemoved ? "opacity-55" : ""}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span

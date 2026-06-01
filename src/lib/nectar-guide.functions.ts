@@ -196,7 +196,9 @@ export const updateGuideTask = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const patch: { updated_at: string; status?: GuideTask["status"]; current_step?: number } = {
+      updated_at: new Date().toISOString(),
+    };
     if (data.status) patch.status = data.status;
     if (typeof data.currentStep === "number") patch.current_step = Math.max(0, data.currentStep);
     const { error } = await supabase

@@ -188,7 +188,7 @@ function ClientWorkspace() {
             <AboutTab client={client} />
           </TabsContent>
 
-          <TabsContent value="clock-in" className="mt-5">
+          <TabsContent value="clock-in" className="mt-5 space-y-5">
             <PunchPad
               entryType="Client_Profile_Pass"
               lockedClient={{
@@ -205,6 +205,7 @@ function ClientWorkspace() {
               presetServiceCode={presetCode}
               lockServiceCode={!!presetCode}
             />
+            <ActiveShiftReimbursementSlot clientId={client.id} />
           </TabsContent>
 
           <TabsContent value="emar" className="mt-5">

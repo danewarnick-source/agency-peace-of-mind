@@ -1060,6 +1060,7 @@ function RequirementsPanel({
           key={g.key}
           group={g}
           orgId={orgId}
+          applicByReq={applicByReq}
           highlight={highlightKey === g.key}
           forceOpen={focusDocumentId === g.key}
         />

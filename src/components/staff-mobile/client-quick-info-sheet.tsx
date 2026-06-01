@@ -166,8 +166,8 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
           >
             <ContactRow
               label="Emergency contact"
-              name={client.emergency_contact_name}
-              phone={client.emergency_contact_phone}
+              name={client.emergency_contact_name ?? null}
+              phone={client.emergency_contact_phone ?? null}
             />
             <ContactRow
               label="On-call supervisor"

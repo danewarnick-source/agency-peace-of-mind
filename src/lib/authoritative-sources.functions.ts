@@ -231,6 +231,79 @@ export const verifyRequirement = createServerFn({ method: "POST" })
 // ---------- Generate suggested requirements from an authoritative source ----------
 // NECTAR proposes — admin verifies. Source-citation always carried.
 
+// SOW/contract requirements live as prose clauses, not tabular fields.
+// We ask the AI to read narrative text and pull obligations + required
+// documents directly. Source-citation always carried; nothing fabricated.
+const REQ_SYSTEM_PROMPT = `You are NECTAR, reading a Utah DSPD provider's State Scope of Work, provider contract, or DSPD/DHS requirement document.
+
+Your job is to extract REQUIREMENTS the provider must meet — written as prose clauses, numbered sections, "the Provider shall…", "must maintain…", "required documents include…", etc. This is narrative text, NOT a structured table.
+
+Return STRICT JSON only, shape:
+{
+  "requirements": [
+    {
+      "title": "short imperative phrase, <=140 chars",
+      "description": "exact or close paraphrase of the obligation, <=600 chars",
+      "category": "audit_doc" | "obligation" | "rule" | "billing",
+      "citation": "best locator you can identify, e.g. '§4.2', 'Section 3.1', 'page 7', 'Attachment A'",
+      "applies_to": "company" | "staff" | "client"
+    }
+  ]
+}
+
+Rules:
+- Only include items actually stated in the document text. Do NOT invent.
+- "category":
+    audit_doc  = a document the provider must produce, retain, or submit (PCSPs on file, incident reports, training records, etc.)
+    obligation = a thing the provider must do (notify within X hours, conduct annual review, maintain insurance, etc.)
+    rule       = a constraint / prohibition (no overlapping services, staff-to-client ratio caps, etc.)
+    billing    = a billing/reimbursement requirement (EVV, claim timeliness, prior auth)
+- Prefer fewer high-quality items over many vague ones.
+- If the text contains no requirement language at all, return {"requirements": []}.`;
+
+const ReqItem = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional().nullable(),
+  category: z.enum(["audit_doc", "obligation", "rule", "billing"]).optional().nullable(),
+  citation: z.string().max(200).optional().nullable(),
+  applies_to: z.enum(["company", "staff", "client"]).optional().nullable(),
+});
+const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(200).default([]) });
+
+async function extractRequirementsFromText(text: string) {
+  const apiKey = process.env.LOVABLE_API_KEY;
+  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: REQ_SYSTEM_PROMPT },
+        { role: "user", content: `DOCUMENT TEXT:\n\n${text.slice(0, 60000)}` },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
+  if (res.status === 402)
+    throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
+  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
+  const json = await res.json();
+  const content: string = json.choices?.[0]?.message?.content ?? "{}";
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    raw = {};
+  }
+  const parsed = ReqExtraction.safeParse(raw);
+  return parsed.success ? parsed.data.requirements : [];
+}
+
 export const generateRequirementsFromSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -244,33 +317,107 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
-      .select("id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source")
+      .select(
+        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, parse_status, file_name, mime_type",
+      )
       .eq("id", data.documentId)
       .single();
     if (dErr || !doc) throw new Error(dErr?.message ?? "Document not found");
     if (!doc.is_authoritative_source)
       throw new Error("Document is not marked as an authoritative source.");
 
-    // Pull SOW-style extracted fields (group "sow_clause") as the natural seed
+    const rawText = ((doc.raw_text as string | null) ?? "").trim();
+    const letterCount = (rawText.match(/[a-zA-Z]/g) ?? []).length;
+
+    // Guardrail: if no text was extracted (likely a scanned/image PDF) tell
+    // the user clearly and offer the manual path — never fabricate.
+    if (rawText.length < 400 || letterCount < 100) {
+      const looksLikePdf =
+        (doc.mime_type as string | null)?.toLowerCase().includes("pdf") ||
+        ((doc.file_name as string | null) ?? "").toLowerCase().endsWith(".pdf");
+      const reason = looksLikePdf
+        ? "Couldn't read enough text from this PDF — it may be a scanned image. Try uploading a text-based PDF (export from Word/Pages, or run OCR first). You can still add requirements by hand from the Requirements tab."
+        : "No readable text was extracted from this file. You can still add requirements by hand from the Requirements tab.";
+      return { inserted: 0, reason: "no_text" as const, message: reason };
+    }
+
+    // Existing requirements (so we can de-dupe across re-runs)
+    const { data: existing } = await supabase
+      .from("nectar_requirements")
+      .select("requirement_key")
+      .eq("organization_id", doc.organization_id)
+      .eq("source_document_id", doc.id);
+    const existingKeys = new Set(
+      (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
+    );
+
+    // 1. Prose-clause extraction (the real path for SOW / contracts)
+    let aiItems: Array<{
+      title: string;
+      description?: string | null;
+      category?: "audit_doc" | "obligation" | "rule" | "billing" | null;
+      citation?: string | null;
+      applies_to?: "company" | "staff" | "client" | null;
+    }> = [];
+    try {
+      aiItems = await extractRequirementsFromText(rawText);
+    } catch (err) {
+      // Surface AI errors as a soft failure (e.g. rate-limit/credits) so the
+      // user can retry rather than seeing a silent 0.
+      return {
+        inserted: 0,
+        reason: "ai_error" as const,
+        message: (err as Error).message,
+      };
+    }
+
+    // 2. Legacy fallback — any sow_clause fields the generic extractor caught
     const { data: fields } = await supabase
       .from("nectar_extracted_fields")
       .select("field_key, field_group, value_text, source_locator")
       .eq("document_id", data.documentId);
-
     const sowFields = (fields ?? []).filter(
       (f) => (f.field_group as string | null) === "sow_clause",
     );
 
     let inserted = 0;
+
+    for (const item of aiItems) {
+      const titleClean = item.title.trim().slice(0, 200);
+      if (!titleClean) continue;
+      const key = `${(doc.authoritative_kind as string) ?? "src"}:ai:${titleClean}:${item.citation ?? ""}`
+        .toLowerCase()
+        .slice(0, 120);
+      if (existingKeys.has(key)) continue;
+      const citation = item.citation
+        ? `${(doc.title as string) ?? "Source"} — ${item.citation}`
+        : (doc.title as string) ?? null;
+      const { error } = await supabase.from("nectar_requirements").insert({
+        organization_id: doc.organization_id,
+        source_document_id: doc.id,
+        origin: "document",
+        requirement_key: key,
+        title: titleClean,
+        description: item.description ?? null,
+        category: item.category ?? "obligation",
+        source_citation: citation,
+        applies_to: item.applies_to ?? "company",
+      });
+      if (!error) {
+        existingKeys.add(key);
+        inserted += 1;
+      }
+    }
+
     for (const f of sowFields) {
       const title =
         (f.value_text as string | null)?.slice(0, 180) ??
         `Requirement: ${f.field_key}`;
       const citation = (f.source_locator as string | null) ?? null;
-      const key = `${(doc.authoritative_kind as string) ?? "src"}:${f.field_key as string}:${(f.source_locator as string | null) ?? ""}`.slice(
-        0,
-        120,
-      );
+      const key = `${(doc.authoritative_kind as string) ?? "src"}:${f.field_key as string}:${(f.source_locator as string | null) ?? ""}`
+        .toLowerCase()
+        .slice(0, 120);
+      if (existingKeys.has(key)) continue;
       const { error } = await supabase.from("nectar_requirements").insert({
         organization_id: doc.organization_id,
         source_document_id: doc.id,
@@ -285,10 +432,22 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           : (doc.title as string) ?? null,
         applies_to: "company",
       });
-      if (!error) inserted += 1;
+      if (!error) {
+        existingKeys.add(key);
+        inserted += 1;
+      }
     }
 
-    return { inserted, totalFields: sowFields.length };
+    if (inserted === 0) {
+      return {
+        inserted: 0,
+        reason: "no_requirements" as const,
+        message:
+          "NECTAR read the document but didn't find clear requirement language (\"shall…\", \"must…\", required documents, etc.). If this source does contain obligations, add them by hand from the Requirements tab.",
+      };
+    }
+
+    return { inserted, reason: "ok" as const };
   });
 
 // ---------- Attestation log ----------

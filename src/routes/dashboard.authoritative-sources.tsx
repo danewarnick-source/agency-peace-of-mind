@@ -1704,6 +1704,18 @@ function RequirementRow({
         >
           <Info className="mr-1 h-3.5 w-3.5" /> Details
         </Button>
+        {classification === "external" && !isRemoved && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 border-sky-500/40 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300"
+            onClick={() => setAttestOpen(true)}
+            title="Log your attestation that this external action was completed"
+          >
+            <ExternalLinkIcon className="mr-1 h-3.5 w-3.5" />
+            Attest external completion
+          </Button>
+        )}
         {isRemoved ? (
           <Button
             size="sm"

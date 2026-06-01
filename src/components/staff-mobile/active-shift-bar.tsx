@@ -45,9 +45,12 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
 
   const open = () => {
     if (isClient) {
+      // Route to the Clock In/Out tab so the staff completes the punch +
+      // paperwork there. The bar itself never finalizes the shift.
       navigate({
         to: "/dashboard/workspace/$clientId",
         params: { clientId: active!.client_id },
+        search: { tab: "clock-in" },
       });
     } else {
       navigate({ to: "/dashboard/timeclock" });
@@ -107,10 +110,11 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
               onClockOut(e as unknown as React.MouseEvent);
             }
           }}
-          className="ml-1 inline-flex min-h-[36px] shrink-0 cursor-pointer items-center rounded-md bg-white/15 px-3 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-          aria-label="Clock out of current shift"
+          className="ml-1 inline-flex min-h-[36px] shrink-0 cursor-pointer items-center gap-1 rounded-md bg-white/15 px-3 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          aria-label="Go to clock-out flow (paperwork required to finalize)"
+          title="Opens the Clock In/Out tab — paperwork required to finalize"
         >
-          Clock out
+          Clock out <span aria-hidden>→</span>
         </span>
       </button>
     </div>

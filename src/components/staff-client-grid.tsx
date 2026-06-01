@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
+import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { User, Search, Clock, Home, Info } from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
+import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period-card";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
@@ -35,9 +37,11 @@ const billingLabel = (code: string) => (isDaily(code) ? "Daily" : "Hourly");
 function ClientCard({
   c,
   activeShift,
+  periodHours,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
+  periodHours: number;
 }) {
   const codes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
@@ -100,6 +104,9 @@ function ClientCard({
           </div>
           <p className="mt-1 break-words text-sm leading-snug text-muted-foreground">
             {address}
+          </p>
+          <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[color:var(--navy-900,#0d112b)]/5 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-[color:var(--navy-900,#0d112b)]">
+            {periodHours.toFixed(1)} hrs this period
           </p>
           {isOnTheClock && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#117a52]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0d5c3d]">
@@ -205,6 +212,7 @@ function ClientCard({
 export function StaffClientGrid() {
   const { data: caseload, isLoading } = useCaseload();
   const { data: activeShift } = useActiveShift();
+  const { data: nectar } = useNectarPayPeriod();
   const [q, setQ] = useState("");
 
   // One-time welcome toast on mount (single greeting; no duplicate header).
@@ -235,6 +243,8 @@ export function StaffClientGrid() {
 
   return (
     <section aria-label="My Caseload" className="space-y-4">
+      <NectarPayPeriodCard />
+
       {source.length > 0 && (
         <p className="text-sm text-muted-foreground">
           {source.length} {source.length === 1 ? "person" : "people"} on your caseload
@@ -268,7 +278,11 @@ export function StaffClientGrid() {
         <ul className="flex flex-col gap-3">
           {clients.map((c) => (
             <li key={c.id}>
-              <ClientCard c={c} activeShift={activeShift ?? null} />
+              <ClientCard
+                c={c}
+                activeShift={activeShift ?? null}
+                periodHours={nectar?.per_client_hours[c.id] ?? 0}
+              />
             </li>
           ))}
         </ul>

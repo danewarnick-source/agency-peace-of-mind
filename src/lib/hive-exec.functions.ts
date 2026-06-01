@@ -465,7 +465,8 @@ export const updateTicket = createServerFn({ method: "POST" })
 
     const { error } = await supabase
       .from("org_support_tickets")
-      .update(updates)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .update(updates as any)
       .eq("id", data.ticketId);
     if (error) throw error;
 

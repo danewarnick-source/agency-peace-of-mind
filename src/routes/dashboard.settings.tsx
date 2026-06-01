@@ -72,6 +72,10 @@ function SettingsPage() {
           </div>
         </form>
       )}
+      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+        <CompanyOverviewSettings />
+      )}
+
 
       {org?.role === "admin" && (
         <Link to="/dashboard/settings/bank-mapping" className="group lg:col-span-2">

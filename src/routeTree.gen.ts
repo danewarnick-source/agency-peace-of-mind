@@ -56,6 +56,7 @@ import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.ass
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
+import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.billing.index'
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
 import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
@@ -64,6 +65,9 @@ import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboa
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
+import { Route as DashboardBillingImportsRouteImport } from './routes/dashboard.billing.imports'
+import { Route as DashboardBillingForm520RouteImport } from './routes/dashboard.billing.form520'
+import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard.billing.$clientId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as ApiPublicSeedStaffRouteImport } from './routes/api/public/seed-staff'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
@@ -306,6 +310,11 @@ const DashboardCoursesIndexRoute = DashboardCoursesIndexRouteImport.update({
   path: '/courses/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardBillingIndexRoute = DashboardBillingIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardBillingRoute,
+} as any)
 const DashboardWorkspaceClientIdRoute =
   DashboardWorkspaceClientIdRouteImport.update({
     id: '/workspace/$clientId',
@@ -352,6 +361,22 @@ const DashboardCoursesCourseIdRoute =
     path: '/courses/$courseId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardBillingImportsRoute = DashboardBillingImportsRouteImport.update({
+  id: '/imports',
+  path: '/imports',
+  getParentRoute: () => DashboardBillingRoute,
+} as any)
+const DashboardBillingForm520Route = DashboardBillingForm520RouteImport.update({
+  id: '/form520',
+  path: '/form520',
+  getParentRoute: () => DashboardBillingRoute,
+} as any)
+const DashboardBillingClientIdRoute =
+  DashboardBillingClientIdRouteImport.update({
+    id: '/$clientId',
+    path: '/$clientId',
+    getParentRoute: () => DashboardBillingRoute,
+  } as any)
 const DashboardAdminEmarAuditRoute = DashboardAdminEmarAuditRouteImport.update({
   id: '/admin/emar-audit',
   path: '/admin/emar-audit',
@@ -386,7 +411,7 @@ export interface FileRoutesByFullPath {
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
-  '/dashboard/billing': typeof DashboardBillingRoute
+  '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
@@ -417,6 +442,9 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
+  '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
+  '/dashboard/billing/form520': typeof DashboardBillingForm520Route
+  '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
@@ -425,6 +453,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
+  '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -445,7 +474,6 @@ export interface FileRoutesByTo {
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
-  '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
@@ -476,6 +504,9 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
+  '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
+  '/dashboard/billing/form520': typeof DashboardBillingForm520Route
+  '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
@@ -484,6 +515,7 @@ export interface FileRoutesByTo {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
+  '/dashboard/billing': typeof DashboardBillingIndexRoute
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -506,7 +538,7 @@ export interface FileRoutesById {
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
-  '/dashboard/billing': typeof DashboardBillingRoute
+  '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
@@ -537,6 +569,9 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
+  '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
+  '/dashboard/billing/form520': typeof DashboardBillingForm520Route
+  '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
@@ -545,6 +580,7 @@ export interface FileRoutesById {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
+  '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -599,6 +635,9 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
+    | '/dashboard/billing/$clientId'
+    | '/dashboard/billing/form520'
+    | '/dashboard/billing/imports'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
@@ -607,6 +646,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
+    | '/dashboard/billing/'
     | '/dashboard/courses/'
     | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
@@ -627,7 +667,6 @@ export interface FileRouteTypes {
     | '/unauthorized'
     | '/certificate/$code'
     | '/dashboard/assignments'
-    | '/dashboard/billing'
     | '/dashboard/billing-520'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
@@ -658,6 +697,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
+    | '/dashboard/billing/$clientId'
+    | '/dashboard/billing/form520'
+    | '/dashboard/billing/imports'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
@@ -666,6 +708,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
+    | '/dashboard/billing'
     | '/dashboard/courses'
     | '/dashboard/training'
     | '/dashboard/courses/$courseId/edit'
@@ -718,6 +761,9 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
+    | '/dashboard/billing/$clientId'
+    | '/dashboard/billing/form520'
+    | '/dashboard/billing/imports'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
@@ -726,6 +772,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
+    | '/dashboard/billing/'
     | '/dashboard/courses/'
     | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
@@ -1082,6 +1129,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/billing/': {
+      id: '/dashboard/billing/'
+      path: '/'
+      fullPath: '/dashboard/billing/'
+      preLoaderRoute: typeof DashboardBillingIndexRouteImport
+      parentRoute: typeof DashboardBillingRoute
+    }
     '/dashboard/workspace/$clientId': {
       id: '/dashboard/workspace/$clientId'
       path: '/workspace/$clientId'
@@ -1138,6 +1192,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/billing/imports': {
+      id: '/dashboard/billing/imports'
+      path: '/imports'
+      fullPath: '/dashboard/billing/imports'
+      preLoaderRoute: typeof DashboardBillingImportsRouteImport
+      parentRoute: typeof DashboardBillingRoute
+    }
+    '/dashboard/billing/form520': {
+      id: '/dashboard/billing/form520'
+      path: '/form520'
+      fullPath: '/dashboard/billing/form520'
+      preLoaderRoute: typeof DashboardBillingForm520RouteImport
+      parentRoute: typeof DashboardBillingRoute
+    }
+    '/dashboard/billing/$clientId': {
+      id: '/dashboard/billing/$clientId'
+      path: '/$clientId'
+      fullPath: '/dashboard/billing/$clientId'
+      preLoaderRoute: typeof DashboardBillingClientIdRouteImport
+      parentRoute: typeof DashboardBillingRoute
+    }
     '/dashboard/admin/emar-audit': {
       id: '/dashboard/admin/emar-audit'
       path: '/admin/emar-audit'
@@ -1161,6 +1236,23 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface DashboardBillingRouteChildren {
+  DashboardBillingClientIdRoute: typeof DashboardBillingClientIdRoute
+  DashboardBillingForm520Route: typeof DashboardBillingForm520Route
+  DashboardBillingImportsRoute: typeof DashboardBillingImportsRoute
+  DashboardBillingIndexRoute: typeof DashboardBillingIndexRoute
+}
+
+const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
+  DashboardBillingClientIdRoute: DashboardBillingClientIdRoute,
+  DashboardBillingForm520Route: DashboardBillingForm520Route,
+  DashboardBillingImportsRoute: DashboardBillingImportsRoute,
+  DashboardBillingIndexRoute: DashboardBillingIndexRoute,
+}
+
+const DashboardBillingRouteWithChildren =
+  DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
 
 interface DashboardProgramsRouteChildren {
   DashboardProgramsProgramIdRoute: typeof DashboardProgramsProgramIdRoute
@@ -1212,7 +1304,7 @@ const DashboardCoursesCourseIdRouteWithChildren =
 
 interface DashboardRouteChildren {
   DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
-  DashboardBillingRoute: typeof DashboardBillingRoute
+  DashboardBillingRoute: typeof DashboardBillingRouteWithChildren
   DashboardBilling520Route: typeof DashboardBilling520Route
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientBillingCodesRoute: typeof DashboardClientBillingCodesRoute
@@ -1252,7 +1344,7 @@ interface DashboardRouteChildren {
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAssignmentsRoute: DashboardAssignmentsRoute,
-  DashboardBillingRoute: DashboardBillingRoute,
+  DashboardBillingRoute: DashboardBillingRouteWithChildren,
   DashboardBilling520Route: DashboardBilling520Route,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientBillingCodesRoute: DashboardClientBillingCodesRoute,

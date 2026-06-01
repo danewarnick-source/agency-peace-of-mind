@@ -383,7 +383,34 @@ export function AuthoritativeSourceDrop({
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             {current && (
               <>
-                {current.routeWarning && (
+                {current.routeBlock ? (
+                  <div className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50/80 p-3 text-xs text-rose-900">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div className="space-y-1.5">
+                      <div className="font-semibold">
+                        {current.routeBlock.label} files always route to Company Docs.
+                      </div>
+                      <p className="leading-relaxed">{current.routeBlock.reason}</p>
+                      <p className="leading-relaxed text-rose-800/80">
+                        Authoritative Sources is state/contract documents that
+                        apply across clients (SOW, contracts, DSPD/DHS
+                        requirements). Anything tied to a specific client or
+                        staff member belongs in Company Docs.
+                      </p>
+                      <div className="pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 border-rose-300 text-xs text-rose-900 hover:bg-rose-100"
+                          onClick={removeCurrent}
+                        >
+                          Remove — I'll upload to Company Docs
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : current.routeWarning ? (
                   <div className="flex items-start gap-2 rounded-xl border border-amber-400/60 bg-amber-50/80 p-3 text-xs text-amber-900">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="space-y-1">
@@ -409,7 +436,7 @@ export function AuthoritativeSourceDrop({
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   <FileText className="h-4 w-4 shrink-0" />

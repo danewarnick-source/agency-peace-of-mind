@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,12 +15,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Play, Square, MapPin, Lock, Loader2, AlertTriangle, CheckCircle2, Clock, Wifi,
+  Hexagon, Mic, MicOff, Sparkles, Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from "@/lib/evv-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
+import { draftShiftNote } from "@/lib/ai-coach.functions";
+import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
+import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

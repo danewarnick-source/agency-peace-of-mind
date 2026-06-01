@@ -1910,9 +1910,114 @@ function RequirementRow({
         }}
         isMutating={set.isPending}
       />
+      <AttestExternalDialog
+        open={attestOpen}
+        onOpenChange={setAttestOpen}
+        requirementId={req.id}
+        requirementTitle={req.title}
+        externalSystem={externalSystem}
+        orgId={orgId}
+      />
     </li>
   );
 }
+
+function AttestExternalDialog({
+  open,
+  onOpenChange,
+  requirementId,
+  requirementTitle,
+  externalSystem,
+  orgId,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  requirementId: string;
+  requirementTitle: string;
+  externalSystem: string | null;
+  orgId: string;
+}) {
+  const qc = useQueryClient();
+  const attestFn = useServerFn(attestExternalCompletion);
+  const [completedOn, setCompletedOn] = useState("");
+  const [reference, setReference] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
+  const [nextRenewalAt, setNextRenewalAt] = useState("");
+  const [notes, setNotes] = useState("");
+  const mut = useMutation({
+    mutationFn: () =>
+      attestFn({
+        data: {
+          requirementId,
+          completedOn: completedOn || undefined,
+          reference: reference || undefined,
+          proofUrl: proofUrl || undefined,
+          nextRenewalAt: nextRenewalAt || undefined,
+          notes: notes || undefined,
+        },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      qc.invalidateQueries({ queryKey: ["attestations", orgId] });
+      toast.success("Attestation logged.", {
+        description: "HIVE recorded that this external action was completed.",
+      });
+      onOpenChange(false);
+      setCompletedOn(""); setReference(""); setProofUrl(""); setNextRenewalAt(""); setNotes("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ExternalLinkIcon className="h-4 w-4 text-sky-600" />
+            Attest external completion
+          </DialogTitle>
+          <DialogDescription>
+            {externalSystem
+              ? `Log that "${requirementTitle}" was completed in ${externalSystem}.`
+              : `Log that "${requirementTitle}" was completed in the external system.`}{" "}
+            HIVE records this attestation — it does not verify the external system.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="att-completed" className="text-xs">Completed on</Label>
+              <Input id="att-completed" type="date" value={completedOn} onChange={(e) => setCompletedOn(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="att-renewal" className="text-xs">Next renewal (optional)</Label>
+              <Input id="att-renewal" type="date" value={nextRenewalAt} onChange={(e) => setNextRenewalAt(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="att-ref" className="text-xs">Reference / confirmation number</Label>
+            <Input id="att-ref" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. UPI-2025-00123" />
+          </div>
+          <div>
+            <Label htmlFor="att-proof" className="text-xs">Proof URL (optional)</Label>
+            <Input id="att-proof" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="https://…" />
+          </div>
+          <div>
+            <Label htmlFor="att-notes" className="text-xs">Notes</Label>
+            <Textarea id="att-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending}>
+            {mut.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+            Log attestation
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 
 

@@ -89,7 +89,7 @@ function Billing520Page() {
   const rows = useMemo<Row[]>(() => {
     if (!codes || !clientsQ.data) return [];
     const clientMap = new Map(
-      (clientsQ.data as Array<{ id: string; first_name: string; last_name: string; medicaid_id: string | null }>)
+      (clientsQ.data as unknown as Array<{ id: string; first_name: string; last_name: string; medicaid_id: string | null }>)
         .map((c) => [c.id, c]),
     );
 

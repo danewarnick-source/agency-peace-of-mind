@@ -509,6 +509,9 @@ function EmployeesPage() {
                   role: String(fd.get("role") || "employee") as Role,
                   active: String(fd.get("active") || "true") === "true",
                   position: (String(fd.get("position") || "") as Position | ""),
+                  workerType: (String(fd.get("worker_type") || "w2") as WorkerType),
+                  hourlyRate: String(fd.get("hourly_rate") || "").trim(),
+                  dailyRate: String(fd.get("daily_rate") || "").trim(),
                 });
               }}
               className="grid gap-4"
@@ -546,6 +549,57 @@ function EmployeesPage() {
                       <SelectItem value="false">Deactivated</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-muted/30 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Pay & classification
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Used by NECTAR to estimate gross pay each pay period (pre-tax).
+                </p>
+                <div className="mt-3 grid gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-worker-type">Worker type</Label>
+                    <Select name="worker_type" defaultValue={editingMember.workerType}>
+                      <SelectTrigger id="edit-worker-type"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="w2">W-2 employee</SelectItem>
+                        <SelectItem value="1099">1099 contractor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="hourly_rate">Hourly rate ($)</Label>
+                      <Input
+                        id="hourly_rate"
+                        name="hourly_rate"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        defaultValue={editingMember.hourlyRate}
+                        placeholder="e.g. 18.50"
+                      />
+                      <p className="text-[10px] text-muted-foreground">Applies to hourly service codes (EVV punches).</p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="daily_rate">Daily rate ($)</Label>
+                      <Input
+                        id="daily_rate"
+                        name="daily_rate"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        defaultValue={editingMember.dailyRate}
+                        placeholder="e.g. 120.00"
+                      />
+                      <p className="text-[10px] text-muted-foreground">Applies to daily codes (HHS, RHS, DSG, RL6, RP3–RP5).</p>
+                    </div>
+                  </div>
                 </div>
               </div>
               <CustomAttributesSection

@@ -8,10 +8,11 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { getCompanyOverview } from "@/lib/company-overview.functions";
 import { getAgencyHealthSnapshot } from "@/lib/agency-health.functions";
 import {
-  Sparkles, ShieldCheck, MapPin, FileCheck2, BadgeCheck, Activity,
+  ShieldCheck, MapPin, FileCheck2, BadgeCheck, Activity,
   AlertTriangle, ArrowRight, PartyPopper, Wallet, ClipboardX,
   FileSignature, Stethoscope, Send, Users, Trophy, CalendarHeart,
 } from "lucide-react";
+import { NectarHeader } from "@/components/nectar/nectar-brand";
 
 const CARD_KEYS = ["greeting", "kpis", "attention", "celebrations", "billing"] as const;
 type CardKey = (typeof CARD_KEYS)[number];

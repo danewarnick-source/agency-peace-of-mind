@@ -1822,11 +1822,46 @@ function ApplicabilityPanel({
       {open && (
         <div className="space-y-3 border-t border-amber-500/20 px-3 py-3 text-xs">
           <p className="text-[11px] text-muted-foreground">
-            NECTAR proposes who/what this requirement governs based on your live
-            service codes, staff roles, and clients. Confirm or correct each
-            scope — the audit checklist, billing readiness, and staff app pull
-            from confirmed scopes.
+            <span className="font-semibold text-[#d97a1c]">Step 2 of 2.</span>{" "}
+            Confirming applicability tells NECTAR <em>who or what</em> this
+            requirement governs — it's what drives the audit checklist, billing
+            readiness, and staff capture. A requirement isn't fully reviewed
+            until at least one scope is confirmed.
           </p>
+
+          {/* Primary bulk action — promoted out of the per-row right edge so
+              "confirm scope" is obviously the next step after confirming the
+              requirement above. */}
+          {(() => {
+            const pendingIds = rows
+              .filter((r) => !r.confirmed && r.scope_kind !== "unknown")
+              .map((r) => r.id);
+            if (pendingIds.length === 0) return null;
+            return (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#d97a1c]/40 bg-[#d97a1c]/10 px-3 py-2">
+                <span className="text-[11px] text-[#7a4310] dark:text-amber-200">
+                  NECTAR proposed{" "}
+                  <span className="font-semibold">
+                    {pendingIds.length} scope{pendingIds.length === 1 ? "" : "s"}
+                  </span>{" "}
+                  for this requirement. Confirm to apply.
+                </span>
+                <Button
+                  size="sm"
+                  className="h-8 bg-[#d97a1c] text-white hover:bg-[#b86413]"
+                  disabled={confirmAll.isPending}
+                  onClick={() => confirmAll.mutate(pendingIds)}
+                >
+                  {confirmAll.isPending ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                  )}
+                  Confirm applicability ({pendingIds.length})
+                </Button>
+              </div>
+            );
+          })()}
 
           {q.isLoading && (
             <div className="flex items-center gap-2 text-muted-foreground">

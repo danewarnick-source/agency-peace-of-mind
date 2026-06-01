@@ -108,6 +108,29 @@ function HelpPage() {
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
+  const escalateM = useMutation({
+    mutationFn: async () => {
+      const lastUser = [...messages].reverse().find((mm) => mm.role === "user");
+      const context = messages.slice(-6).map((mm) => `${mm.role === "user" ? "Me" : "NECTAR"}: ${mm.text}`).join("\n");
+      const question = lastUser?.text ?? "I'd like to talk to a human at HIVE.";
+      return escalate({ data: { question, context } });
+    },
+    onSuccess: (r) => {
+      setTicketId(r.ticketId);
+      setMessages((prev) => [...prev, {
+        id: `n-esc-${Date.now()}`, role: "nectar",
+        text: "I've connected you with the HIVE team — someone will follow up shortly. You can keep chatting with me in the meantime.",
+      }]);
+    },
+    onError: (e) => {
+      setMessages((prev) => [...prev, {
+        id: `e-esc-${Date.now()}`, role: "nectar",
+        text: e instanceof Error ? e.message : "Couldn't reach the HIVE team — please try again.",
+      }]);
+    },
+  });
+
+
   return (
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-3xl flex-col">
       <header className="mb-3 flex items-end justify-between gap-3">

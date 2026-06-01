@@ -75,12 +75,16 @@ function DashboardLayout() {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
   }
 
+  const { isExecutive } = useIsHiveExecutive();
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
   const rawView = isAdminCapable ? view : "staff";
   const isMobilePreview = rawView === "staff_mobile";
   const effectiveView: "staff" | "admin" = rawView === "admin" ? "admin" : "staff";
-  const nav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
+  const baseNav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
+  const nav: NavItem[] = isExecutive && effectiveView === "admin"
+    ? [...baseNav, { to: "/dashboard/hive-exec", label: "HIVE Executive", icon: Shield }]
+    : baseNav;
   const signOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out");

@@ -1,15 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation } from "@tanstack/react-query";
-import { Hexagon, Send, Loader2, ArrowRight, BarChart3, Sparkles, RotateCcw } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Hexagon, Send, Loader2, ArrowRight, BarChart3, Sparkles, RotateCcw, LifeBuoy, CheckCircle2 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
-import { askNectarHelp, type NectarHelpReply } from "@/lib/nectar-help.functions";
+import { askNectarHelp, escalateHelpToHive, getHelpTicketStatus, type NectarHelpReply } from "@/lib/nectar-help.functions";
 
 export const Route = createFileRoute("/dashboard/help")({
   head: () => ({ meta: [{ title: "Need help? — NECTAR" }] }),
   component: HelpPage,
 });
+
 
 interface ChatMsg {
   id: string;
@@ -53,15 +54,26 @@ function HelpPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
+  const [ticketId, setTicketId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const ask = useServerFn(askNectarHelp);
+  const escalate = useServerFn(escalateHelpToHive);
+  const getStatus = useServerFn(getHelpTicketStatus);
 
   useEffect(() => { setRecent(loadRecent()); }, []);
   useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  const ticketQ = useQuery({
+    queryKey: ["help-ticket", ticketId],
+    enabled: !!ticketId,
+    queryFn: () => getStatus({ data: { ticketId: ticketId! } }),
+    refetchInterval: 15_000,
+  });
+
 
   const m = useMutation({
     mutationFn: async (q: string) => ask({ data: { question: q, role } }),
@@ -96,6 +108,29 @@ function HelpPage() {
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
+  const escalateM = useMutation({
+    mutationFn: async () => {
+      const lastUser = [...messages].reverse().find((mm) => mm.role === "user");
+      const context = messages.slice(-6).map((mm) => `${mm.role === "user" ? "Me" : "NECTAR"}: ${mm.text}`).join("\n");
+      const question = lastUser?.text ?? "I'd like to talk to a human at HIVE.";
+      return escalate({ data: { question, context } });
+    },
+    onSuccess: (r) => {
+      setTicketId(r.ticketId);
+      setMessages((prev) => [...prev, {
+        id: `n-esc-${Date.now()}`, role: "nectar",
+        text: "I've connected you with the HIVE team — someone will follow up shortly. You can keep chatting with me in the meantime.",
+      }]);
+    },
+    onError: (e) => {
+      setMessages((prev) => [...prev, {
+        id: `e-esc-${Date.now()}`, role: "nectar",
+        text: e instanceof Error ? e.message : "Couldn't reach the HIVE team — please try again.",
+      }]);
+    },
+  });
+
+
   return (
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-3xl flex-col">
       <header className="mb-3 flex items-end justify-between gap-3">
@@ -109,16 +144,40 @@ function HelpPage() {
             Your friendly guide to using HIVE — ask where things live or how a workflow works.
           </p>
         </div>
-        {messages.length > 0 && (
+        <div className="flex flex-col items-end gap-2">
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={clearChat}
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> New chat
+            </button>
+          )}
           <button
             type="button"
-            onClick={clearChat}
-            className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+            onClick={() => escalateM.mutate()}
+            disabled={escalateM.isPending || !!ticketId}
+            className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-1 text-xs font-medium text-[#9a3412] hover:bg-[#ffedd5] disabled:opacity-60"
           >
-            <RotateCcw className="h-3.5 w-3.5" /> New chat
+            {escalateM.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LifeBuoy className="h-3.5 w-3.5" />}
+            {ticketId ? "Connected with HIVE" : "Ask the HIVE team"}
           </button>
-        )}
+        </div>
       </header>
+
+      {ticketId && ticketQ.data && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-xs text-[#1e40af]">
+          <span className="inline-flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            HIVE support ticket — status: <span className="font-semibold capitalize">{ticketQ.data.status.replace(/_/g, " ")}</span>
+          </span>
+          <span className="text-[10px] uppercase tracking-wide text-[#1e40af]/70">
+            Updated {new Date(ticketQ.data.updated_at).toLocaleString()}
+          </span>
+        </div>
+      )}
+
 
       <div
         ref={scrollRef}

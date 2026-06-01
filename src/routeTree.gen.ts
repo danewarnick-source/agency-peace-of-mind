@@ -77,6 +77,7 @@ import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as ApiPublicSeedStaffRouteImport } from './routes/api/public/seed-staff'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
+import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
@@ -430,6 +431,12 @@ const DashboardCoursesCourseIdEditRoute =
     path: '/edit',
     getParentRoute: () => DashboardCoursesCourseIdRoute,
   } as any)
+const ApiPublicHooksNectarSchedulesRoute =
+  ApiPublicHooksNectarSchedulesRouteImport.update({
+    id: '/api/public/hooks/nectar-schedules',
+    path: '/api/public/hooks/nectar-schedules',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -499,6 +506,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
+  '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
 export interface FileRoutesByTo {
@@ -566,6 +574,7 @@ export interface FileRoutesByTo {
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
+  '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
 export interface FileRoutesById {
@@ -637,6 +646,7 @@ export interface FileRoutesById {
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
+  '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
 }
 export interface FileRouteTypes {
@@ -709,6 +719,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/'
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
+    | '/api/public/hooks/nectar-schedules'
     | '/dashboard/courses/$courseId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -776,6 +787,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses'
     | '/dashboard/hive-exec'
     | '/dashboard/training'
+    | '/api/public/hooks/nectar-schedules'
     | '/dashboard/courses/$courseId/edit'
   id:
     | '__root__'
@@ -846,6 +858,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/'
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
+    | '/api/public/hooks/nectar-schedules'
     | '/dashboard/courses/$courseId/edit'
   fileRoutesById: FileRoutesById
 }
@@ -867,6 +880,7 @@ export interface RootRouteChildren {
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
   ApiPublicSeedStaffRoute: typeof ApiPublicSeedStaffRoute
+  ApiPublicHooksNectarSchedulesRoute: typeof ApiPublicHooksNectarSchedulesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1347,6 +1361,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdEditRouteImport
       parentRoute: typeof DashboardCoursesCourseIdRoute
     }
+    '/api/public/hooks/nectar-schedules': {
+      id: '/api/public/hooks/nectar-schedules'
+      path: '/api/public/hooks/nectar-schedules'
+      fullPath: '/api/public/hooks/nectar-schedules'
+      preLoaderRoute: typeof ApiPublicHooksNectarSchedulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1538,6 +1559,7 @@ const rootRouteChildren: RootRouteChildren = {
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
   ApiPublicSeedStaffRoute: ApiPublicSeedStaffRoute,
+  ApiPublicHooksNectarSchedulesRoute: ApiPublicHooksNectarSchedulesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

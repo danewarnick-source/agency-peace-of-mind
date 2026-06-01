@@ -108,6 +108,50 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(bin);
 }
 
+function HowThisWorks() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+      >
+        <Info className="h-3.5 w-3.5" />
+        How this works
+        <ChevronDown
+          className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="mt-2 max-w-3xl rounded-xl border border-border/60 bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+          <p className="mb-2">
+            <strong className="text-foreground">Routing rule:</strong> if a
+            document is about one named person, it's a Company Doc; if it's a
+            state/contract authority that governs many, it's an Authoritative
+            Source.
+          </p>
+          <p className="mb-2">
+            <strong className="text-foreground">PCSPs &amp; 1056 budgets:</strong>{" "}
+            These always route to Company Docs — NECTAR extracts the billing data
+            (codes, rates, max units, plan dates) from a PCSP into the billing
+            layer for that client, while the file itself stays with the client's
+            records.
+          </p>
+          <p>
+            <strong className="text-foreground">Unverified flag:</strong> Items
+            without a traced source are flagged{" "}
+            <span className="font-medium text-amber-700 dark:text-amber-300">
+              Unverified
+            </span>{" "}
+            so authority is never implied.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AuthoritativeSourcesPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;

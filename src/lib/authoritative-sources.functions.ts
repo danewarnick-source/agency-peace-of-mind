@@ -381,27 +381,27 @@ export const setRequirementReviewStatus = createServerFn({ method: "POST" })
     if (gErr || !req) throw new Error(gErr?.message ?? "Requirement not found");
 
     const nowIso = new Date().toISOString();
-    const patch: Record<string, unknown> = { review_status: data.status };
-    if (data.status === "confirmed") {
-      patch.verified = true;
-      patch.verified_by = userId;
-      patch.verified_at = nowIso;
-    } else if (data.status === "removed") {
-      patch.verified = false;
-      patch.verified_by = null;
-      patch.verified_at = null;
-    } else {
-      // needs_attention → back to unreviewed
-      patch.verified = false;
-      patch.verified_by = null;
-      patch.verified_at = null;
-    }
+    const patch =
+      data.status === "confirmed"
+        ? {
+            review_status: "confirmed" as const,
+            verified: true,
+            verified_by: userId,
+            verified_at: nowIso,
+          }
+        : {
+            review_status: data.status,
+            verified: false,
+            verified_by: null,
+            verified_at: null,
+          };
 
     const { error } = await supabase
       .from("nectar_requirements")
       .update(patch)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+
 
     // Source-doc context for the attestation log
     let sourceTitle: string | null = null;

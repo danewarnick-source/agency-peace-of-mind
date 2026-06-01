@@ -59,24 +59,35 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
     ? fmtElapsed(now - new Date(active.clock_in_timestamp).getTime())
     : "";
 
+  const [open, setOpen] = useState(false);
+  const triggerEl = isValidElement(trigger)
+    ? cloneElement(trigger as React.ReactElement<{ onClick?: (e: React.MouseEvent) => void }>, {
+        onClick: (e: React.MouseEvent) => {
+          (trigger as React.ReactElement<{ onClick?: (e: React.MouseEvent) => void }>).props.onClick?.(e);
+          if (!e.defaultPrevented) setOpen(true);
+        },
+      })
+    : Children.only(trigger);
+
   return (
-    <Sheet>
-      <SheetTrigger asChild>{trigger}</SheetTrigger>
-      <SheetContent
-        side="bottom"
-        className="max-h-[88vh] overflow-y-auto rounded-t-2xl border-t-4 border-[color:var(--amber-500,#f4a93a)] bg-background p-0"
+    <>
+      {triggerEl}
+      <MobileBottomSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        ariaLabel={`${fullName} quick info`}
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-2">
           <span className="h-1.5 w-12 rounded-full bg-muted-foreground/30" aria-hidden />
         </div>
 
-        <SheetHeader className="space-y-1 px-5 pt-3 text-left">
+        <header className="space-y-1 px-5 pt-3 text-left">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <SheetTitle className="break-words text-lg leading-tight">
+              <h2 className="break-words text-lg font-semibold leading-tight">
                 {fullName}
-              </SheetTitle>
+              </h2>
               <p className="break-words text-xs text-muted-foreground">
                 Quick info · safety first
               </p>
@@ -91,7 +102,7 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
               </span>
             )}
           </div>
-        </SheetHeader>
+        </header>
 
         <div className="space-y-3 px-5 pb-8 pt-4">
           {/* (a) Safety & trigger flags + allergies / medical alerts */}

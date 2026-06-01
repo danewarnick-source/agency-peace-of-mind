@@ -263,6 +263,11 @@ function HelpPage() {
           Send
         </NectarButton>
       </form>
+      <NectarTaskCenter
+        open={taskCenterOpen}
+        onOpenChange={(o) => { setTaskCenterOpen(o); if (!o) setPendingGoal(undefined); }}
+        initialGoal={pendingGoal}
+      />
     </div>
   );
 }

@@ -98,12 +98,12 @@ function DashboardLayout() {
     ? (view as "staff" | "admin" | "staff_mobile" | "hive_exec")
     : "staff";
   const isMobilePreview = rawView === "staff_mobile";
-  const effectiveView: "staff" | "admin" = rawView === "admin" || rawView === "hive_exec" ? "admin" : "staff";
-  const baseNav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
-  const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");
-  const showExecSection = isExecutive && (rawView === "hive_exec" || rawView === "admin");
+  const isHiveExecView  = rawView === "hive_exec";
+  // HIVE Executive is its own context — never mixed with a company's admin/staff nav.
+  const effectiveView: "staff" | "admin" | "hive_exec" =
+    isHiveExecView ? "hive_exec" : (rawView === "admin" ? "admin" : "staff");
   const execNav: NavItem[] = [
-    { to: "/dashboard/hive-exec", label: "Companies", icon: Building2, exact: true },
+    { to: "/dashboard/hive-exec", label: "HIVE Overview", icon: LayoutDashboard, exact: true },
     { to: "/dashboard/hive-exec/new-company", label: "Add Company", icon: Plus },
     { to: "/dashboard/hive-exec/permissions", label: "Permissions & Roles", icon: UserCog },
     { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
@@ -111,6 +111,24 @@ function DashboardLayout() {
     { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },
     { to: "/dashboard/hive-exec/company-migration", label: "Company Migration", icon: ArrowRightLeft },
   ];
+  const baseNav: NavItem[] =
+    effectiveView === "hive_exec" ? execNav :
+    effectiveView === "admin"     ? ADMIN_NAV : STAFF_NAV;
+  const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");
+  // Only expose the exec quick-section inside Admin View (so a HIVE exec who's
+  // also a company admin can jump to the platform tools). In HIVE View it's
+  // already the primary nav.
+  const showExecSection = isExecutive && rawView === "admin";
+
+  // Whenever the user switches into HIVE View while sitting on a company-scoped
+  // route, take them to the HIVE landing so the main content can't echo a
+  // company's overview.
+  useEffect(() => {
+    if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) {
+      navigate({ to: "/dashboard/hive-exec" });
+    }
+  }, [isHiveExecView, pathname, navigate]);
+
 
   const signOut = async () => {
     await supabase.auth.signOut();

@@ -9,7 +9,7 @@ import {
   Hexagon,
   Loader2,
   Sparkles,
-  Upload,
+  Upload as _Upload,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";

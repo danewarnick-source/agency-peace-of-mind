@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
 import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
+import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — HIVE" }] }),

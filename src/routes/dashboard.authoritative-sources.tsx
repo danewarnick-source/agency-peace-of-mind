@@ -1224,13 +1224,50 @@ function DocumentRequirementGroup({
     };
   }, [group.items, applicByReq]);
 
-  // Default: expand if there's anything still needing attention.
   const [open, setOpen] = useState(counts.needs > 0);
 
-  // If the user jumped here from the Sources-tab pill, force-expand once.
   useEffect(() => {
     if (forceOpen) setOpen(true);
   }, [forceOpen]);
+
+  // Sort: needs_attention first (with proposals first), then scope_pending,
+  // then fully_confirmed, then removed
+  const sortedItems = useMemo(() => {
+    const score = (r: ReqRow) => {
+      const s = statusOf(r);
+      if (s === "removed") return 4;
+      if (s === "needs_attention") {
+        const stats = applicByReq.get(r.id);
+        const hasProposals = stats && stats.pending > 0 && stats.unknown === 0;
+        return hasProposals ? -1 : 0;
+      }
+      if (s === "confirmed") {
+        return isScopeReady(applicByReq.get(r.id)) ? 3 : 1;
+      }
+      return 2;
+    };
+    return [...group.items].sort(
+      (a, b) => score(a) - score(b) || a.title.localeCompare(b.title),
+    );
+  }, [group.items, applicByReq]);
+
+  const [rowFilter, setRowFilter] = useState<
+    "all" | "needs_attention" | "fully_confirmed"
+  >("all");
+  const [confirmedCollapsed, setConfirmedCollapsed] = useState(true);
+
+  const activeItems = sortedItems.filter((r) => {
+    const s = statusOf(r);
+    return (
+      s === "needs_attention" ||
+      (s === "confirmed" && !isScopeReady(applicByReq.get(r.id)))
+    );
+  });
+  const doneItems = sortedItems.filter((r) => {
+    const s = statusOf(r);
+    return s === "confirmed" && isScopeReady(applicByReq.get(r.id));
+  });
+  const removedItems = sortedItems.filter((r) => statusOf(r) === "removed");
 
   return (
     <section
@@ -1296,22 +1333,131 @@ function DocumentRequirementGroup({
       </button>
 
       {open && (
-        <ul className="divide-y divide-border/40 border-t border-border/40 px-4 pb-2">
-          {group.items.length === 0 && (
-            <li className="py-4 text-xs text-muted-foreground">
-              No requirements drafted yet.
-            </li>
-          )}
-          {group.items.map((r) => (
-            <RequirementRow
-              key={r.id}
-              req={r}
-              orgId={orgId}
-              sourceMeta={group.source}
-              applicStats={applicByReq.get(r.id)}
-            />
-          ))}
-        </ul>
+        <div className="border-t border-border/40">
+          {/* Row filter */}
+          <div className="flex flex-wrap items-center gap-1.5 px-4 pb-1 pt-2.5">
+            <span className="text-[10px] text-muted-foreground">Show:</span>
+            {(
+              [
+                { key: "all" as const, label: "All" },
+                {
+                  key: "needs_attention" as const,
+                  label: `Needs attention (${activeItems.length})`,
+                },
+                {
+                  key: "fully_confirmed" as const,
+                  label: `Fully confirmed (${doneItems.length})`,
+                },
+              ] as const
+            ).map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => {
+                  setRowFilter(f.key);
+                  if (f.key === "all") setConfirmedCollapsed(true);
+                  if (f.key === "fully_confirmed") setConfirmedCollapsed(false);
+                }}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
+                  rowFilter === f.key
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <ul className="divide-y divide-border/40 px-4 pb-2">
+            {group.items.length === 0 && (
+              <li className="py-4 text-xs text-muted-foreground">
+                No requirements drafted yet.
+              </li>
+            )}
+
+            {rowFilter === "needs_attention" && activeItems.length === 0 && (
+              <li className="py-4 text-xs text-muted-foreground">
+                No requirements need attention in this group.
+              </li>
+            )}
+            {rowFilter === "fully_confirmed" && doneItems.length === 0 && (
+              <li className="py-4 text-xs text-muted-foreground">
+                No fully confirmed requirements in this group.
+              </li>
+            )}
+
+            {/* Active items */}
+            {(rowFilter === "all" || rowFilter === "needs_attention") &&
+              activeItems.map((r) => (
+                <RequirementRow
+                  key={r.id}
+                  req={r}
+                  orgId={orgId}
+                  sourceMeta={group.source}
+                  applicStats={applicByReq.get(r.id)}
+                />
+              ))}
+
+            {/* Fully confirmed collapsible section (default "all" view) */}
+            {rowFilter === "all" && doneItems.length > 0 && (
+              <>
+                <li className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmedCollapsed((v) => !v)}
+                    className="flex w-full items-center gap-1.5 py-1.5 text-left text-[11px] font-medium text-emerald-700 transition hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                  >
+                    <span
+                      className={`inline-block transition-transform ${confirmedCollapsed ? "" : "rotate-90"}`}
+                    >
+                      ▸
+                    </span>
+                    <CheckCircle2 className="h-3 w-3" />
+                    {doneItems.length} fully confirmed
+                    <span className="ml-1 font-normal text-muted-foreground">
+                      — click to {confirmedCollapsed ? "expand" : "collapse"}
+                    </span>
+                  </button>
+                </li>
+                {!confirmedCollapsed &&
+                  doneItems.map((r) => (
+                    <RequirementRow
+                      key={r.id}
+                      req={r}
+                      orgId={orgId}
+                      sourceMeta={group.source}
+                      applicStats={applicByReq.get(r.id)}
+                    />
+                  ))}
+              </>
+            )}
+
+            {/* Fully confirmed items when filter is explicitly set */}
+            {rowFilter === "fully_confirmed" &&
+              doneItems.map((r) => (
+                <RequirementRow
+                  key={r.id}
+                  req={r}
+                  orgId={orgId}
+                  sourceMeta={group.source}
+                  applicStats={applicByReq.get(r.id)}
+                />
+              ))}
+
+            {/* Removed items at bottom for "all" view */}
+            {rowFilter === "all" &&
+              removedItems.map((r) => (
+                <RequirementRow
+                  key={r.id}
+                  req={r}
+                  orgId={orgId}
+                  sourceMeta={group.source}
+                  applicStats={applicByReq.get(r.id)}
+                />
+              ))}
+          </ul>
+        </div>
       )}
     </section>
   );
@@ -1379,6 +1525,7 @@ function RequirementRow({
   const status = statusOf(req);
   const isRemoved = status === "removed";
   const isConfirmed = status === "confirmed";
+  const isFullyConfirmed = isConfirmed && isScopeReady(applicStats);
   const isFromAuthSource = req.origin === "document" && !!req.source_document_id;
 
   // NECTAR pre-fill awareness: if there are pending non-unknown proposals,
@@ -1395,7 +1542,9 @@ function RequirementRow({
 
 
   return (
-    <li className={`py-3 ${isRemoved ? "opacity-55" : ""}`}>
+    <li
+      className={`${isRemoved ? "opacity-55" : ""} ${isFullyConfirmed ? "border-l-[3px] border-l-emerald-400/50 bg-emerald-500/[0.06] py-2" : "py-3"}`}
+    >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 
       <div className="min-w-0 flex-1">

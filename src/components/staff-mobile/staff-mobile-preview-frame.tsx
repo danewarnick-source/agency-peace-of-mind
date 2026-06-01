@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Smartphone } from "lucide-react";
 import { StaffTopBar } from "./staff-top-bar";
 import { StaffBottomTabs } from "./staff-bottom-tabs";
+import { ActiveShiftBar } from "./active-shift-bar";
 
 const DEVICES = [
   { id: "se", label: "iPhone SE", w: 375, h: 667 },
@@ -66,6 +67,7 @@ export function StaffMobilePreviewFrame({
               <main className="flex-1 overflow-y-auto overscroll-contain bg-secondary/40 px-3 py-4 pb-20">
                 {children}
               </main>
+              <ActiveShiftBar framed />
               <StaffBottomTabs framed />
             </div>
           </div>

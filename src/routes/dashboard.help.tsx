@@ -102,6 +102,13 @@ function HelpPage() {
   function send(text?: string) {
     const q = (text ?? input).trim();
     if (q.length < 2) return;
+    // Heuristic: if the user asks for a walkthrough, open the Task Center pre-filled.
+    if (/\b(walk me through|guide me|help me with|show me how|tour)\b/i.test(q)) {
+      setPendingGoal(q);
+      setTaskCenterOpen(true);
+      setInput("");
+      return;
+    }
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", text: q }]);
     setInput("");
     m.mutate(q);

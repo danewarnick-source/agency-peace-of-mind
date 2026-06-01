@@ -239,6 +239,7 @@ function DashboardLayout() {
   const isStaffView = effectiveView === "staff";
 
   return (
+    <CelebrationProvider>
     <div className="flex min-h-screen flex-col">
       <ImpersonationBanner />
 

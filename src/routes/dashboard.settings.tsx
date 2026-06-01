@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Landmark, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
+import { CelebrationSettings } from "@/components/celebrations/celebration-settings";
 
 export const Route = createFileRoute("/dashboard/settings")({ component: SettingsPage });
 

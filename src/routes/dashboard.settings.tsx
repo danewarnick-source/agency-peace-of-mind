@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Landmark, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 
 export const Route = createFileRoute("/dashboard/settings")({ component: SettingsPage });
 

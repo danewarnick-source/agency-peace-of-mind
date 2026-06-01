@@ -560,9 +560,143 @@ export function PunchPad({
     setDraftBusy(false);
     setDraftConfirmed(false);
     setNectarUsed(false);
+    setCompletenessRan(false);
+    setCompletenessFlags([]);
+    setDismissals({});
+    setDismissingKey(null);
+    setDismissReasonDraft("");
     stopRecording();
     setShowCompliance(true);
   }
+
+  // Re-running the check is required after staff edit the note/goals
+  useEffect(() => {
+    if (completenessRan) {
+      setCompletenessRan(false);
+      setCompletenessFlags([]);
+      setDismissals({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [narrative, checkedGoals, baselineChecked]);
+
+  async function runCompletenessCheck(): Promise<CFlag[]> {
+    if (!active) return [];
+    setCompletenessBusy(true);
+    const flags: CFlag[] = [];
+    try {
+      // Hard checks first (mirror existing field validation in the panel)
+      if (!hasGoalSelected) {
+        flags.push({
+          key: "no-goal",
+          type: "missing_goal",
+          severity: "hard",
+          message: "Select at least one PCSP goal or baseline monitoring above.",
+          fix: { label: "Pick a goal" },
+        });
+      }
+      if (!narrativeOk) {
+        flags.push({
+          key: "short-note",
+          type: "narrative_too_short",
+          severity: "hard",
+          message: `Progress note is ${wordCount} words — Medicaid requires at least 50.`,
+          fix: { label: "Expand note" },
+        });
+      }
+      if (nectarUsed && !draftConfirmed) {
+        flags.push({
+          key: "nectar-unconfirmed",
+          type: "ai_unconfirmed",
+          severity: "hard",
+          message: "Confirm the NECTAR-drafted note accurately reflects the shift.",
+          fix: { label: "Review & confirm" },
+        });
+      }
+
+      // Soft cross-checks (Infusion layer)
+      const dollarMatches = narrative.match(/\$\s?\d+(?:\.\d{1,2})?/g) ?? [];
+
+      const spendQ = await supabase
+        .from("client_spending_log")
+        .select("id, amount", { count: "exact", head: false })
+        .eq("shift_id", active.id);
+      const loggedSpend = spendQ.data ?? [];
+
+      if (dollarMatches.length > 0 && loggedSpend.length === 0) {
+        flags.push({
+          key: "mentioned-spend",
+          type: "spend_mentioned_not_logged",
+          severity: "soft",
+          message: `You mentioned ${dollarMatches.slice(0, 3).join(", ")} in the note — add to the client spending log?`,
+          fix: {
+            label: "Open spending log",
+            route: `/dashboard/workspace/${active.client_id}`,
+          },
+        });
+      }
+
+      const reimbQ = await supabase
+        .from("activity_reimbursement_requests")
+        .select("id, status, receipt_paths, event_summary")
+        .eq("shift_id", active.id)
+        .eq("status", "approved");
+      const approvedReimbs = reimbQ.data ?? [];
+      const missingReceipt = approvedReimbs.find(
+        (r) => !Array.isArray(r.receipt_paths) || r.receipt_paths.length === 0,
+      );
+      if (missingReceipt) {
+        flags.push({
+          key: `reimb-no-receipt-${missingReceipt.id}`,
+          type: "reimbursement_receipt_missing",
+          severity: "soft",
+          message: "An approved activity reimbursement has no receipt uploaded yet.",
+          fix: { label: "Upload receipt", route: "/dashboard/reimbursements" },
+        });
+      }
+      const missingSummary = approvedReimbs.find((r) => !r.event_summary);
+      if (missingSummary) {
+        flags.push({
+          key: `reimb-no-summary-${missingSummary.id}`,
+          type: "reimbursement_summary_missing",
+          severity: "soft",
+          message: "Approved activity has no event summary — add one for billing.",
+          fix: { label: "Add summary", route: "/dashboard/reimbursements" },
+        });
+      }
+
+      setCompletenessFlags(flags);
+      setCompletenessRan(true);
+      return flags;
+    } catch (e) {
+      toast.error((e as Error).message || "Couldn't run completeness check.");
+      return flags;
+    } finally {
+      setCompletenessBusy(false);
+    }
+  }
+
+  function jumpToFix(flag: CFlag) {
+    if (flag.fix?.route) {
+      setShowCompliance(false);
+      navigate({ to: flag.fix.route });
+    } else {
+      // In-form hard issues — just close any dismiss draft and scroll focus
+      setDismissingKey(null);
+      toast.info(flag.fix?.label ?? "Address this above, then re-check.");
+    }
+  }
+
+  function confirmDismiss(key: string) {
+    const reason = dismissReasonDraft.trim();
+    if (reason.length < 5) {
+      toast.error("Add a short reason (5+ chars) so the admin knows why.");
+      return;
+    }
+    setDismissals((d) => ({ ...d, [key]: reason }));
+    setDismissingKey(null);
+    setDismissReasonDraft("");
+  }
+
 
   function stopRecording() {
     try { recognitionRef.current?.stop?.(); } catch { /* ignore */ }

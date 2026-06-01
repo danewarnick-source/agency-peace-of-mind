@@ -31,24 +31,47 @@ const DAILY_CODES = new Set(["HHS", "RHS", "DSG", "RL6", "RP3", "RP4", "RP5"]);
 const isDaily = (code: string) => DAILY_CODES.has(code);
 const billingLabel = (code: string) => (isDaily(code) ? "Daily" : "Hourly");
 
-function ClientCard({ c }: { c: CaseloadClient }) {
+function ClientCard({
+  c,
+  activeShift,
+}: {
+  c: CaseloadClient;
+  activeShift: ActiveShift | null;
+}) {
   const codes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
-  // Default to first available (treated as primary/most-frequent).
-  const initial = codes[0] ?? "SEI";
+  const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
+
+  // If this client is the active one, lock the pill selection to that service.
+  const initial = isOnTheClock
+    ? activeShift!.service_type_code
+    : codes[0] ?? "SEI";
   const [selected, setSelected] = useState<string>(initial);
+  useEffect(() => {
+    if (isOnTheClock) setSelected(activeShift!.service_type_code);
+  }, [isOnTheClock, activeShift]);
+
+  useTick(isOnTheClock);
 
   const fullName = `${c.first_name} ${c.last_name}`.trim();
   const address = c.physical_address?.trim() || "No primary house on file";
   const daily = isDaily(selected);
 
-  // Avatar initials
-  const initials = `${c.first_name?.[0] ?? ""}${c.last_name?.[0] ?? ""}`.toUpperCase() || "—";
+  const initials =
+    `${c.first_name?.[0] ?? ""}${c.last_name?.[0] ?? ""}`.toUpperCase() || "—";
 
   const pills = codes.length ? codes : [initial];
 
+  const elapsed = isOnTheClock
+    ? fmtElapsed(Date.now() - new Date(activeShift!.clock_in_timestamp).getTime())
+    : "";
+
   return (
-    <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      {/* Header: avatar + name + address (no truncation) */}
+    <article
+      className={[
+        "rounded-xl border bg-card p-4 shadow-sm",
+        isOnTheClock ? "border-[#15a06a] ring-1 ring-[#15a06a]/40" : "border-border",
+      ].join(" ")}
+    >
       <header className="flex items-start gap-3">
         <span
           aria-hidden
@@ -63,10 +86,19 @@ function ClientCard({ c }: { c: CaseloadClient }) {
           <p className="mt-1 break-words text-sm leading-snug text-muted-foreground">
             {address}
           </p>
+          {isOnTheClock && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#117a52]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0d5c3d]">
+              <span className="relative inline-flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#15a06a] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#15a06a]" />
+              </span>
+              On the clock · {activeShift!.service_type_code} ·{" "}
+              <span className="font-mono tabular-nums">{elapsed}</span>
+            </p>
+          )}
         </div>
       </header>
 
-      {/* Service selector */}
       <div className="mt-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Select a service
@@ -78,18 +110,22 @@ function ClientCard({ c }: { c: CaseloadClient }) {
         >
           {pills.map((code) => {
             const active = selected === code;
+            const locked = isOnTheClock && code !== activeShift!.service_type_code;
             return (
               <button
                 key={code}
                 type="button"
                 role="radio"
                 aria-checked={active}
+                disabled={locked}
                 onClick={() => setSelected(code)}
                 className={[
                   "min-h-[44px] rounded-lg border px-3 py-1.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   active
                     ? "border-[color:var(--amber-600,#f59324)] bg-[image:var(--gradient-amber)] text-[color:var(--navy-900,#0d112b)] shadow-sm"
-                    : "border-border bg-background text-foreground hover:border-[color:var(--amber-600,#f59324)]/60",
+                    : locked
+                      ? "border-border bg-muted/40 text-muted-foreground opacity-60"
+                      : "border-border bg-background text-foreground hover:border-[color:var(--amber-600,#f59324)]/60",
                 ].join(" ")}
               >
                 <span className="block font-mono text-sm font-semibold leading-tight">
@@ -98,7 +134,9 @@ function ClientCard({ c }: { c: CaseloadClient }) {
                 <span
                   className={[
                     "block text-[10px] font-medium uppercase tracking-wide leading-tight",
-                    active ? "text-[color:var(--navy-900,#0d112b)]/70" : "text-muted-foreground",
+                    active
+                      ? "text-[color:var(--navy-900,#0d112b)]/70"
+                      : "text-muted-foreground",
                   ].join(" ")}
                 >
                   {billingLabel(code)}
@@ -109,20 +147,34 @@ function ClientCard({ c }: { c: CaseloadClient }) {
         </div>
       </div>
 
-      {/* Primary action */}
       <div className="mt-4">
         <Button
           asChild
           size="lg"
-          className="h-12 w-full text-base"
-          aria-label={`${daily ? "Open Client Hub" : "Open Time Clock"} for ${fullName} (${selected})`}
+          className={[
+            "h-12 w-full text-base",
+            isOnTheClock
+              ? "bg-[#117a52] text-white shadow-sm hover:bg-[#0f6b48] hover:brightness-100"
+              : "",
+          ].join(" ")}
+          aria-label={`${
+            isOnTheClock
+              ? "Continue Time Clock"
+              : daily
+                ? "Open Client Hub"
+                : "Open Time Clock"
+          } for ${fullName} (${selected})`}
         >
           <Link
             to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
             params={{ clientId: c.id }}
           >
-            {daily ? <Home /> : <Clock />}
-            {daily ? "Open Client Hub" : "Open Time Clock"}
+            {daily && !isOnTheClock ? <Home /> : <Clock />}
+            {isOnTheClock
+              ? "Continue Time Clock"
+              : daily
+                ? "Open Client Hub"
+                : "Open Time Clock"}
           </Link>
         </Button>
         <p className="mt-2 text-center text-xs text-muted-foreground">

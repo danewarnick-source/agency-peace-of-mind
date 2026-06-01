@@ -1449,14 +1449,25 @@ function RequirementRow({
               Needs attention
             </Badge>
           )}
-          {isRemoved && (
+          {status === "needs_attention" && hasPrefilledProposals && (
+            <Badge
+              className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]"
+              title="NECTAR has pre-filled its proposed applicability for this requirement — review and approve."
+            >
+              <Sparkle className="mr-1 h-3 w-3" />
+              NECTAR proposal ready ({pendingProposals})
+            </Badge>
+          )}
+          {status === "needs_attention" && hasUnknownProposals && (
             <Badge
               variant="outline"
               className="text-[10px] text-red-700 dark:text-red-300"
+              title="NECTAR couldn't confidently determine scope — needs your judgement."
             >
-              Removed — not tracked for audit
+              Low confidence
             </Badge>
           )}
+
         </div>
         {req.description && (
           <p className="mt-1 text-xs text-muted-foreground">{req.description}</p>

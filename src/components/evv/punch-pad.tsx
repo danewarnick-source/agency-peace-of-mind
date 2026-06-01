@@ -257,6 +257,22 @@ export function PunchPad({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
 
+  // ── NECTAR Completeness Check (Infusion add-on) ────────────────────────────
+  type CFlag = {
+    key: string;
+    type: string;
+    severity: "soft" | "hard";
+    message: string;
+    fix?: { label: string; route?: string };
+  };
+  const [completenessRan, setCompletenessRan]   = useState(false);
+  const [completenessBusy, setCompletenessBusy] = useState(false);
+  const [completenessFlags, setCompletenessFlags] = useState<CFlag[]>([]);
+  const [dismissals, setDismissals] = useState<Record<string, string>>({});
+  const [dismissingKey, setDismissingKey] = useState<string | null>(null);
+  const [dismissReasonDraft, setDismissReasonDraft] = useState("");
+  const navigate = useNavigate();
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

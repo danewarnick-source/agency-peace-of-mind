@@ -317,7 +317,7 @@ export const setSourceIgnoreState = createServerFn({ method: "POST" })
 
     const { error: uErr } = await supabase
       .from("nectar_documents")
-      .update({ metadata: nextMeta })
+      .update({ metadata: nextMeta as unknown as Record<string, never> })
       .eq("id", data.documentId);
     if (uErr) throw new Error(uErr.message);
 

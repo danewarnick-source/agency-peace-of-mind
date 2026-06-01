@@ -825,6 +825,51 @@ function statusOf(r: ReqRow): ReviewStatus {
   return r.verified ? "confirmed" : "needs_attention";
 }
 
+// ----- Applicability (NECTAR scope) helpers -----
+// A requirement is only "fully reviewed" when both the requirement itself is
+// confirmed AND its applicability scope is confirmed. Prompt 30 makes that
+// two-step state visible at the row, group, and source-pill level so an admin
+// scanning the list immediately sees what still needs review.
+export interface ApplicStats {
+  total: number;
+  confirmed: number;
+  pending: number;
+  unknown: number;
+}
+
+export function isScopeReady(s: ApplicStats | undefined | null): boolean {
+  if (!s) return false;
+  return s.confirmed > 0 && s.unknown === 0 && s.pending === 0;
+}
+
+function useApplicabilityByReq(orgId: string) {
+  const listMapFn = useServerFn(listRequirementMappings);
+  const q = useQuery({
+    queryKey: ["req-mappings-all", orgId],
+    queryFn: () => listMapFn({ data: { organizationId: orgId } }),
+  });
+  const byReq = useMemo(() => {
+    const map = new Map<string, ApplicStats>();
+    type Row = { requirement_id: string; scope_kind: string; confirmed: boolean };
+    const rows = ((q.data?.mappings ?? []) as unknown) as Row[];
+    for (const m of rows) {
+      const cur = map.get(m.requirement_id) ?? {
+        total: 0,
+        confirmed: 0,
+        pending: 0,
+        unknown: 0,
+      };
+      cur.total += 1;
+      if (m.confirmed) cur.confirmed += 1;
+      else cur.pending += 1;
+      if (m.scope_kind === "unknown" && !m.confirmed) cur.unknown += 1;
+      map.set(m.requirement_id, cur);
+    }
+    return map;
+  }, [q.data]);
+  return byReq;
+}
+
 function RequirementsPanel({
   orgId,
   focusDocumentId,

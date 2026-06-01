@@ -877,3 +877,175 @@ export const confirmRequirementWithScopes = createServerFn({ method: "POST" })
 
     return { ok: true, scopesConfirmed };
   });
+
+// ============================================================
+// Prompt 34 — Provider Authorized Codes
+// Coverage follows the contract, not current activity. The
+// authorized-codes set is the source of truth for which codes
+// NECTAR keeps requirements live for. Active vs dormant is a
+// usage signal only — both stay covered.
+// ============================================================
+
+const AuthorizedCodeSource = z.enum([
+  "contract",
+  "sow",
+  "addendum",
+  "manual",
+  "inferred",
+]);
+
+export const listAuthorizedCodes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ organizationId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const facts = await gatherOrgFacts(supabase, data.organizationId);
+
+    const { data: authRows, error } = await supabase
+      .from("provider_authorized_codes")
+      .select(
+        "id, code, label, status, source, source_document_id, notes, created_at, updated_at",
+      )
+      .eq("organization_id", data.organizationId)
+      .order("code", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const authoredCodes = new Set(
+      ((authRows ?? []) as Array<{ code: string }>).map((r) =>
+        r.code.toUpperCase(),
+      ),
+    );
+
+    // Count confirmed mappings per code so the UI can show coverage.
+    const { data: maps } = await supabase
+      .from("nectar_requirement_mappings")
+      .select("scope_value, confirmed")
+      .eq("organization_id", data.organizationId)
+      .eq("scope_kind", "code");
+    const confirmedByCode = new Map<string, number>();
+    const proposedByCode = new Map<string, number>();
+    for (const m of (maps ?? []) as Array<{
+      scope_value: string | null;
+      confirmed: boolean;
+    }>) {
+      const c = (m.scope_value ?? "").toUpperCase();
+      if (!c) continue;
+      if (m.confirmed) confirmedByCode.set(c, (confirmedByCode.get(c) ?? 0) + 1);
+      else proposedByCode.set(c, (proposedByCode.get(c) ?? 0) + 1);
+    }
+
+    // Synthesise rows for codes that show up in active use but aren't yet in
+    // the authorized table (so the admin can promote them to "authorized").
+    const inferred = facts.codes
+      .filter((c) => !authoredCodes.has(c))
+      .map((c) => ({
+        id: null as string | null,
+        code: c,
+        label: null as string | null,
+        status: facts.activeCodes.includes(c) ? "active" : "dormant",
+        source: "inferred" as const,
+        source_document_id: null as string | null,
+        notes: "Detected from client/staff data — promote to lock it into your authorized set.",
+        created_at: null,
+        updated_at: null,
+      }));
+
+    const explicit = ((authRows ?? []) as Array<{
+      id: string;
+      code: string;
+      label: string | null;
+      status: string;
+      source: string;
+      source_document_id: string | null;
+      notes: string | null;
+      created_at: string;
+      updated_at: string;
+    }>).map((r) => ({
+      ...r,
+      code: r.code.toUpperCase(),
+      // Promote authorized rows to "active" status reflection if a client is using it.
+      status: facts.activeCodes.includes(r.code.toUpperCase()) ? "active" : r.status,
+    }));
+
+    const rows = [...explicit, ...inferred]
+      .map((r) => ({
+        ...r,
+        confirmedRequirements: confirmedByCode.get(r.code) ?? 0,
+        proposedRequirements: proposedByCode.get(r.code) ?? 0,
+        inUse: facts.activeCodes.includes(r.code),
+      }))
+      .sort((a, b) => {
+        // active first, then dormant, then by code
+        const ar = a.inUse ? 0 : 1;
+        const br = b.inUse ? 0 : 1;
+        if (ar !== br) return ar - br;
+        return a.code.localeCompare(b.code);
+      });
+
+    return {
+      codes: rows,
+      summary: {
+        total: rows.length,
+        active: rows.filter((r) => r.inUse).length,
+        dormant: rows.filter((r) => !r.inUse).length,
+        authorizedExplicit: explicit.length,
+        inferredOnly: inferred.length,
+      },
+    };
+  });
+
+export const upsertAuthorizedCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        code: z.string().min(1).max(40),
+        label: z.string().max(200).nullable().optional(),
+        status: z.enum(["active", "dormant"]).optional(),
+        source: AuthorizedCodeSource.optional(),
+        sourceDocumentId: z.string().uuid().nullable().optional(),
+        notes: z.string().max(1000).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const code = data.code.trim().toUpperCase();
+    if (!code) throw new Error("Code required");
+
+    const { data: row, error } = await supabase
+      .from("provider_authorized_codes")
+      .upsert(
+        {
+          organization_id: data.organizationId,
+          code,
+          label: data.label ?? null,
+          status: data.status ?? "dormant",
+          source: data.source ?? "manual",
+          source_document_id: data.sourceDocumentId ?? null,
+          notes: data.notes ?? null,
+          added_by: userId,
+        },
+        { onConflict: "organization_id,code" },
+      )
+      .select("id")
+      .single();
+    if (error || !row) throw new Error(error?.message ?? "Upsert failed");
+    return { id: row.id as string, code };
+  });
+
+export const removeAuthorizedCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase
+      .from("provider_authorized_codes")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

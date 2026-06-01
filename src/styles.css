@@ -331,3 +331,16 @@
   .animate-bounce-slow { animation: bounce-slow 3s ease-in-out infinite; }
   .animate-fade-in { animation: fade-in 0.2s ease-out; }
 }
+
+/* ===== Mobile / PWA polish ===== */
+@media (max-width: 767px) {
+  html, body { -webkit-tap-highlight-color: transparent; }
+  /* Prevent iOS zoom-on-focus: any focusable form input needs >=16px font-size. */
+  input, select, textarea { font-size: 16px; }
+  /* Momentum scrolling + contain overscroll for app-like feel. */
+  body, main { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+}
+
+/* Safe-area helpers usable anywhere */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }

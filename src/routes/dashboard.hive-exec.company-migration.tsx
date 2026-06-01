@@ -123,10 +123,15 @@ function CompanyMigrationPage() {
   const totalBytes = useMemo(() => files.reduce((s, f) => s + f.size, 0), [files]);
 
   const analyze = async () => {
+    if (!targetOrgId) {
+      toast.error("Pick the target company first.");
+      return;
+    }
     if (files.length === 0) {
       toast.error("Add at least one export file first.");
       return;
     }
+    setEngagementStatus((s) => (s === "quoted" ? "in_progress" : s));
     setPhase("analyzing");
     setProgress(10);
     // Heuristic-only proposal: NECTAR would normally read the files. We surface

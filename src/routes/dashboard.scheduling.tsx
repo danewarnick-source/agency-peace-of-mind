@@ -480,10 +480,22 @@ function SchedulingPage() {
         Access denied.
       </div>
     );
-  return <SchedulerInner orgId={org.organization_id} />;
+  return <SchedulerInner orgId={org.organization_id} role={org.role} />;
 }
 
-function SchedulerInner({ orgId }: { orgId: string }) {
+type Scope =
+  | { type: "all" }
+  | { type: "team"; id: string }
+  | { type: "home"; address: string };
+
+type TeamRow = {
+  id: string;
+  team_name: string;
+  manager_id: string | null;
+  manager_name?: string | null;
+};
+
+function SchedulerInner({ orgId, role }: { orgId: string; role: string | null }) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [cursor, setCursor] = useState(() => new Date());
@@ -494,6 +506,10 @@ function SchedulerInner({ orgId }: { orgId: string }) {
   const [publishBusy, setPublishBusy] = useState(false);
   const [selStaff, setSelStaff] = useState("all");
   const [selClient, setSelClient] = useState("all");
+  const [scope, setScope] = useState<Scope>({ type: "all" });
+  const [autoOpen, setAutoOpen] = useState(false);
+
+  const isAdmin = role === "admin" || role === "super_admin";
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();

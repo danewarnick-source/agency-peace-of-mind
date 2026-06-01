@@ -228,9 +228,14 @@ function DashboardLayout() {
             </Button>
           </header>
 
-          <main className="flex-1 bg-secondary/40 px-4 py-6 md:px-8">
-
-            <Outlet />
+          <main className={isMobilePreview ? "flex-1 bg-secondary/40" : "flex-1 bg-secondary/40 px-4 py-6 md:px-8"}>
+            {isMobilePreview ? (
+              <StaffMobilePreviewFrame title={pageTitle}>
+                <Outlet />
+              </StaffMobilePreviewFrame>
+            ) : (
+              <Outlet />
+            )}
           </main>
         </div>
       </div>

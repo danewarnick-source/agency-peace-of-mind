@@ -2502,6 +2502,80 @@ export type Database = {
         }
         Relationships: []
       }
+      hive_platform_tickets: {
+        Row: {
+          affected_orgs: number
+          audit: Json
+          category: Database["public"]["Enums"]["hive_ticket_category"]
+          created_at: string
+          created_by: string | null
+          dedupe_key: string | null
+          detail: string
+          detected_at: string
+          event_kind: string | null
+          event_ref: Json
+          id: string
+          resolution: Json
+          severity: Database["public"]["Enums"]["hive_ticket_severity"]
+          source: Database["public"]["Enums"]["hive_ticket_source"]
+          status: Database["public"]["Enums"]["hive_ticket_status"]
+          title: string
+          triggering_org_id: string | null
+          triggering_org_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          affected_orgs?: number
+          audit?: Json
+          category?: Database["public"]["Enums"]["hive_ticket_category"]
+          created_at?: string
+          created_by?: string | null
+          dedupe_key?: string | null
+          detail?: string
+          detected_at?: string
+          event_kind?: string | null
+          event_ref?: Json
+          id?: string
+          resolution?: Json
+          severity?: Database["public"]["Enums"]["hive_ticket_severity"]
+          source?: Database["public"]["Enums"]["hive_ticket_source"]
+          status?: Database["public"]["Enums"]["hive_ticket_status"]
+          title: string
+          triggering_org_id?: string | null
+          triggering_org_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          affected_orgs?: number
+          audit?: Json
+          category?: Database["public"]["Enums"]["hive_ticket_category"]
+          created_at?: string
+          created_by?: string | null
+          dedupe_key?: string | null
+          detail?: string
+          detected_at?: string
+          event_kind?: string | null
+          event_ref?: Json
+          id?: string
+          resolution?: Json
+          severity?: Database["public"]["Enums"]["hive_ticket_severity"]
+          source?: Database["public"]["Enums"]["hive_ticket_source"]
+          status?: Database["public"]["Enums"]["hive_ticket_status"]
+          title?: string
+          triggering_org_id?: string | null
+          triggering_org_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_platform_tickets_triggering_org_id_fkey"
+            columns: ["triggering_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incident_reports: {
         Row: {
           additional_client_ids: string[] | null
@@ -5254,6 +5328,16 @@ export type Database = {
       app_role: "admin" | "manager" | "employee" | "super_admin"
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
+      hive_ticket_category:
+        | "structural_gap"
+        | "parsing_failure"
+        | "expansion_need"
+        | "mapping_gap"
+        | "permission_inconsistency"
+        | "other"
+      hive_ticket_severity: "low" | "medium" | "high" | "critical"
+      hive_ticket_source: "auto" | "manual"
+      hive_ticket_status: "new" | "in_progress" | "resolved"
       invitation_status: "pending" | "accepted" | "revoked"
       report_cadence: "weekly" | "monthly"
       sub_plan: "starter" | "pro" | "enterprise" | "custom"
@@ -5402,6 +5486,17 @@ export const Constants = {
       app_role: ["admin", "manager", "employee", "super_admin"],
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
+      hive_ticket_category: [
+        "structural_gap",
+        "parsing_failure",
+        "expansion_need",
+        "mapping_gap",
+        "permission_inconsistency",
+        "other",
+      ],
+      hive_ticket_severity: ["low", "medium", "high", "critical"],
+      hive_ticket_source: ["auto", "manual"],
+      hive_ticket_status: ["new", "in_progress", "resolved"],
       invitation_status: ["pending", "accepted", "revoked"],
       report_cadence: ["weekly", "monthly"],
       sub_plan: ["starter", "pro", "enterprise", "custom"],

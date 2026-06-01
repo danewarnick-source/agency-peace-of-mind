@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
+import { reportPlatformEvent } from "./hive-tickets.functions";
+
 
 // =============================================================
 // Foundation B — Authoritative sources, derived requirements,
@@ -798,6 +800,14 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     const rawText = ((doc.raw_text as string | null) ?? "").trim();
     const letterCount = (rawText.match(/[a-zA-Z]/g) ?? []).length;
 
+    // Resolve triggering org name once for any platform-event reports below.
+    const { data: orgRow } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", doc.organization_id)
+      .maybeSingle();
+    const orgName = (orgRow?.name as string | null) ?? null;
+
     // Guardrail: if no text was extracted (likely a scanned/image PDF) tell
     // the user clearly and offer the manual path — never fabricate.
     if (rawText.length < 400 || letterCount < 100) {
@@ -807,8 +817,40 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       const reason = looksLikePdf
         ? "Couldn't read enough text from this PDF — it may be a scanned image. Try uploading a text-based PDF (export from Word/Pages, or run OCR first). You can still add requirements by hand from the Requirements tab."
         : "No readable text was extracted from this file. You can still add requirements by hand from the Requirements tab.";
+      // Auto-file a HIVE Executive NECTAR ticket: this is the clearest
+      // detectable platform-level problem (parsing pipeline can't see text).
+      await reportPlatformEvent({
+        eventKind: "parsing_no_text",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: looksLikePdf
+          ? `Scanned/image PDF won't parse — "${(doc.title as string) ?? doc.file_name}"`
+          : `No readable text extracted — "${(doc.title as string) ?? doc.file_name}"`,
+        detail: `Document ${doc.id} (${doc.file_name}, ${doc.mime_type ?? "unknown mime"}) yielded ${rawText.length} chars / ${letterCount} letters. NECTAR could not draft any requirements because the parsing pipeline did not return usable text. Likely cause: scanned/image PDF without OCR.`,
+        category: "parsing_failure",
+        severity: looksLikePdf ? "medium" : "low",
+        dedupeKey: `parsing_no_text:${doc.id}`,
+        eventRef: {
+          documentId: doc.id,
+          fileName: doc.file_name,
+          mimeType: doc.mime_type,
+          rawTextLength: rawText.length,
+          letterCount,
+        },
+        nectarProposal: looksLikePdf
+          ? {
+              type: "operational",
+              summary:
+                "Add an image-PDF OCR fallback ahead of the requirements extractor (Tesseract + table-line detection); re-ingest scanned addenda automatically.",
+              changeKind: "Ingestion pipeline: OCR fallback stage",
+              blastRadius: "Document ingestion only — no schema changes",
+              risk: "low",
+            }
+          : undefined,
+      });
       return { inserted: 0, reason: "no_text" as const, message: reason };
     }
+
 
     // Existing requirements (so we can de-dupe across re-runs)
     const { data: existing } = await supabase
@@ -833,12 +875,25 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     } catch (err) {
       // Surface AI errors as a soft failure (e.g. rate-limit/credits) so the
       // user can retry rather than seeing a silent 0.
+      const msg = (err as Error).message;
+      await reportPlatformEvent({
+        eventKind: "ai_error",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Requirements extractor failed on "${(doc.title as string) ?? doc.file_name}"`,
+        detail: `AI extraction call threw while drafting from document ${doc.id}. Message: ${msg.slice(0, 600)}`,
+        category: "parsing_failure",
+        severity: "medium",
+        dedupeKey: `ai_error:${doc.id}`,
+        eventRef: { documentId: doc.id, error: msg.slice(0, 400) },
+      });
       return {
         inserted: 0,
         reason: "ai_error" as const,
-        message: (err as Error).message,
+        message: msg,
       };
     }
+
 
     // 2. Legacy fallback — any sow_clause fields the generic extractor caught
     const { data: fields } = await supabase
@@ -922,6 +977,24 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     }
 
     if (inserted === 0) {
+      // Document parsed cleanly but yielded zero requirements. Worth a HIVE
+      // ticket for the platform team to investigate — either the extractor
+      // missed obligation language, or the document genuinely has none.
+      await reportPlatformEvent({
+        eventKind: "no_requirements_found",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Extractor returned 0 requirements from "${(doc.title as string) ?? doc.file_name}"`,
+        detail: `Document ${doc.id} parsed cleanly (${rawText.length} chars, ${letterCount} letters) but produced no drafted requirements after both prose-clause extraction and SOW-field fallback. Either the obligation language is phrased outside the extractor's patterns, or the document doesn't contain requirements. Kind: ${(doc.authoritative_kind as string) ?? "(none)"}.`,
+        category: "parsing_failure",
+        severity: "low",
+        dedupeKey: `no_requirements:${doc.id}`,
+        eventRef: {
+          documentId: doc.id,
+          authoritativeKind: doc.authoritative_kind,
+          rawTextLength: rawText.length,
+        },
+      });
       return {
         inserted: 0,
         reason: "no_requirements" as const,
@@ -929,6 +1002,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           "NECTAR read the document but didn't find clear requirement language (\"shall…\", \"must…\", required documents, etc.). If this source does contain obligations, add them by hand from the Requirements tab.",
       };
     }
+
 
     return { inserted, reason: "ok" as const };
   });

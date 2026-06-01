@@ -604,13 +604,28 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
       .select(
-        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, parse_status, file_name, mime_type, source, external_ids",
+        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, parse_status, file_name, mime_type, source, external_ids, metadata",
       )
       .eq("id", data.documentId)
       .single();
     if (dErr || !doc) throw new Error(dErr?.message ?? "Document not found");
     if (!doc.is_authoritative_source)
       throw new Error("Document is not marked as an authoritative source.");
+
+    const meta = (doc.metadata ?? {}) as { ignored?: boolean };
+    if (meta.ignored) {
+      throw new Error(
+        "This source is set aside (ignored). Reactivate it before drafting requirements.",
+      );
+    }
+    if (NON_OBLIGATION_KINDS.has((doc.authoritative_kind as string) ?? "")) {
+      return {
+        inserted: 0,
+        reason: "non_obligation_kind" as const,
+        message:
+          "This document is labeled as a tool or template. NECTAR doesn't extract obligations from review/audit tools — change the kind if it actually contains state or contract requirements.",
+      };
+    }
 
     const rawText = ((doc.raw_text as string | null) ?? "").trim();
     const letterCount = (rawText.match(/[a-zA-Z]/g) ?? []).length;

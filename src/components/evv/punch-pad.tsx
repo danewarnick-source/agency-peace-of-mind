@@ -871,6 +871,29 @@ export function PunchPad({
       return;
     }
 
+    // NECTAR Completeness Check (Infusion only). Without infusion, basic field
+    // validation above is sufficient — the cross-checks are the locked layer.
+    if (nectarInfusionEnabled) {
+      let flags = completenessFlags;
+      if (!completenessRan) {
+        flags = await runCompletenessCheck();
+      }
+      const hardOpen = flags.some((f) => f.severity === "hard");
+      const softOpen = flags.some(
+        (f) => f.severity === "soft" && !dismissals[f.key],
+      );
+      if (hardOpen) {
+        toast.error("Fix the required items flagged by NECTAR before submitting.");
+        return;
+      }
+      if (softOpen) {
+        toast.error("Resolve or dismiss-with-reason each NECTAR completeness flag.");
+        return;
+      }
+    }
+
+
+
 
     const isException     = !!opts?.exception;
     let aiVerdict: CoachResult | null = aiCoach;

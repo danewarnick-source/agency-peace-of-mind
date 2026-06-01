@@ -1247,6 +1247,16 @@ function SchedulerInner({ orgId, role }: { orgId: string; role: string | null })
           qc.invalidateQueries({ queryKey: ["shifts", orgId, year, month] })
         }
       />
+
+      <NectarAutoAssignDialog
+        open={autoOpen}
+        onClose={() => setAutoOpen(false)}
+        orgId={orgId}
+        userId={user?.id ?? ""}
+        clientsInScope={scopedClients}
+        scopeLabel={scopeLabel}
+      />
     </div>
   );
 }
+

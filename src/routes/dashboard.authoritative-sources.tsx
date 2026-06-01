@@ -407,9 +407,14 @@ function SourceRow({
 }) {
   const qc = useQueryClient();
   const genFn = useServerFn(generateRequirementsFromSource);
+  const [progress, setProgress] = useState(0);
   const generate = useMutation({
     mutationFn: () => genFn({ data: { documentId: source.id } }),
+    onMutate: () => {
+      setProgress(4);
+    },
     onSuccess: (r) => {
+      setProgress(100);
       const inserted = (r as { inserted: number }).inserted ?? 0;
       const message = (r as { message?: string }).message;
       if (inserted > 0) {
@@ -419,14 +424,36 @@ function SourceRow({
       } else {
         toast.warning(
           message ??
-            "NECTAR couldn't draft any requirements from this source. You can add them by hand from the Requirements tab.",
+            "NECTAR read the document but didn't find clear requirement language. You can add them by hand from the Requirements tab.",
           { duration: 9000 },
         );
       }
       qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      // Let the bar reach 100% briefly before resetting
+      window.setTimeout(() => setProgress(0), 600);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      setProgress(0);
+      toast.error(e.message);
+    },
   });
+
+  // Simulated progress while NECTAR works server-side. Creeps toward 92%
+  // and snaps to 100% on completion — gives the admin honest "still working"
+  // feedback on long documents without claiming false precision.
+  useEffect(() => {
+    if (!generate.isPending) return;
+    const id = window.setInterval(() => {
+      setProgress((p) => {
+        if (p >= 92) return p;
+        // Slower as we approach the ceiling
+        const step = p < 30 ? 6 : p < 60 ? 3 : p < 80 ? 1.5 : 0.6;
+        return Math.min(92, p + step);
+      });
+    }, 450);
+    return () => window.clearInterval(id);
+  }, [generate.isPending]);
+
 
   const hasDraft = !!stats && stats.total > 0;
 
@@ -520,32 +547,54 @@ function SourceRow({
             className="h-7 px-2 text-[11px]"
           >
             {generate.isPending ? (
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              <Loader2 className="mr-1 h-3 w-3 animate-spin text-[color:var(--amber-600,#d97706)]" />
             ) : (
               <RefreshCw className="mr-1 h-3 w-3" />
             )}
-            Re-draft
+            {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Re-draft"}
           </Button>
         </div>
       ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => generate.mutate()}
-          disabled={generate.isPending || source.parse_status !== "parsed"}
-          title={
-            source.parse_status === "parsed"
-              ? "Use NECTAR to draft checklist items from clauses found in this document"
-              : "Parsing must finish before requirements can be drafted"
-          }
-        >
-          {generate.isPending ? (
-            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Sparkles className="mr-1 h-3.5 w-3.5" />
+        <div className="flex flex-col items-stretch gap-1 sm:items-end">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => generate.mutate()}
+            disabled={generate.isPending || source.parse_status !== "parsed"}
+            title={
+              source.parse_status === "parsed"
+                ? "Use NECTAR to draft checklist items from clauses found in this document"
+                : "Parsing must finish before requirements can be drafted"
+            }
+            className={
+              generate.isPending
+                ? "border-[color:var(--amber-500,#f4a93a)]/60 bg-[color:var(--amber-50,#fffbeb)] text-[color:var(--amber-900,#78350f)] hover:bg-[color:var(--amber-100,#fef3c7)]"
+                : undefined
+            }
+          >
+            {generate.isPending ? (
+              <Sparkles className="mr-1 h-3.5 w-3.5 animate-pulse text-[color:var(--amber-600,#d97706)]" />
+            ) : (
+              <Sparkles className="mr-1 h-3.5 w-3.5" />
+            )}
+            {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Draft requirements"}
+          </Button>
+          {generate.isPending && (
+            <div
+              className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--amber-100,#fef3c7)] sm:w-44"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progress)}
+              aria-label="NECTAR drafting progress"
+            >
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[color:var(--amber-400,#f6b94d)] to-[color:var(--amber-600,#d97706)] transition-[width] duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           )}
-          Draft requirements
-        </Button>
+        </div>
       )}
     </li>
   );

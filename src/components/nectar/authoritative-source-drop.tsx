@@ -9,7 +9,7 @@ import {
   Hexagon,
   Loader2,
   Sparkles,
-  Upload,
+  
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -311,28 +311,18 @@ export function AuthoritativeSourceDrop({
     <div className="relative">
       {children}
 
-      {/* Floating upload button — always available alternative to drag-drop */}
-      <div className="pointer-events-none fixed bottom-6 right-6 z-30 flex flex-col items-end gap-2 sm:bottom-8 sm:right-8">
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={ACCEPT}
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files?.length) acceptFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
-        <Button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="pointer-events-auto gap-2 rounded-full bg-[color:var(--amber-500,#f4a93a)] px-4 py-5 text-amber-950 shadow-lg hover:bg-[color:var(--amber-400,#f6b94d)]"
-        >
-          <Upload className="h-4 w-4" />
-          Upload sources
-        </Button>
-      </div>
+      {/* Hidden file input retained for potential programmatic use */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length) acceptFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
 
       {/* Drag overlay */}
       {dragging && (

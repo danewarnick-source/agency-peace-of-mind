@@ -244,6 +244,27 @@ export function PunchPad({
   const [aiFlagCount, setAiFlagCount]     = useState(0);
   const [allowException, setAllowException] = useState(false);
 
+  // ── NECTAR Progress-Note Assist (Infusion add-on) ──────────────────────────
+  const { enabled: nectarInfusionEnabled } = useNectarInfusion();
+  const [shorthand, setShorthand]             = useState("");
+  const [nectarDraft, setNectarDraft]         = useState<string | null>(null);
+  const [draftBusy, setDraftBusy]             = useState(false);
+  const [draftConfirmed, setDraftConfirmed]   = useState(false);
+  const [nectarUsed, setNectarUsed]           = useState(false);
+  const [isRecording, setIsRecording]         = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    setSpeechSupported(!!SR);
+  }, []);
+
+
   // ── Facilities list ─────────────────────────────────────────────────────────
   const facilities = useMemo(() => {
     const set = new Set<string>();

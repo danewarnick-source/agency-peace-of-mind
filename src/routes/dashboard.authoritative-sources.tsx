@@ -1925,7 +1925,7 @@ function ApplicabilityPanel({
                         disabled={confirm.isPending}
                         onClick={() => confirm.mutate(m.id)}
                       >
-                        Confirm
+                        Confirm scope
                       </Button>
                     )}
                     <Button

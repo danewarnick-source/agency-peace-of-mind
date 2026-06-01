@@ -1,11 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useAuth } from "@/hooks/use-auth";
 import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -15,7 +22,9 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { toast } from "sonner";
-import { ArrowLeft, Copy, Download } from "lucide-react";
+import {
+  ArrowLeft, Copy, Download, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Lock, FileSearch,
+} from "lucide-react";
 import { hoursToUnits, fmtHours } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { RequireRole } from "@/components/rbac-guard";
@@ -43,25 +52,53 @@ type Row = {
   remaining_units: number;
   sce: string;
   monthly_max_units: number | "";
+  // Internal — not part of the 520 column set
+  _key: string;
+  _client_id: string;
 };
+
+type DraftWarning = {
+  row_key: string;
+  warning_type: string;
+  severity: "info" | "warning" | "blocker";
+  message: string;
+  related_ids: Record<string, unknown>;
+};
+
+const ATTESTATION_TEXT =
+  "I have reviewed this billing submission and confirm the hours and units reflect services actually provided. " +
+  "I understand HIVE/NECTAR presents data as entered by staff and does not verify its accuracy. " +
+  "I accept full responsibility for the accuracy of this submission to the State, and acknowledge HIVE is not liable " +
+  "for errors, omissions, or negligence by staff or provider in data submitted to or reviewed by me.";
 
 function startOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 function endOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999); }
 
 function Billing520Page() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { data: codes } = useAllClientBillingCodes();
 
   const periodStart = startOfMonth();
   const periodEnd = endOfMonth();
+  const periodStartStr = periodStart.toISOString().slice(0, 10);
+  const periodEndStr = periodEnd.toISOString().slice(0, 10);
 
+  const actorName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.name as string | undefined) ||
+    user?.email ||
+    "Unknown user";
+
+  // ─── Data feeds for the 520 grid ──────────────────────────────────────────
   const tsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["520-evv", org?.organization_id, periodStart.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("evv_timesheets")
-        .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+        .select("id, client_id, staff_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
         .eq("organization_id", org!.organization_id)
         .gte("clock_in_timestamp", periodStart.toISOString())
         .lte("clock_in_timestamp", periodEnd.toISOString());
@@ -78,8 +115,8 @@ function Billing520Page() {
         .from("hhs_daily_records")
         .select("client_id, record_date")
         .eq("organization_id", org!.organization_id)
-        .gte("record_date", periodStart.toISOString().slice(0, 10))
-        .lte("record_date", periodEnd.toISOString().slice(0, 10));
+        .gte("record_date", periodStartStr)
+        .lte("record_date", periodEndStr);
       if (error) throw error;
       return data ?? [];
     },
@@ -94,6 +131,21 @@ function Billing520Page() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .select("id, first_name, last_name, medicaid_id" as any)
         .eq("organization_id", org!.organization_id);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const shiftsQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["520-shifts", org?.organization_id, periodStart.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("scheduled_shifts")
+        .select("id, client_id, staff_id, starts_at, ends_at")
+        .eq("organization_id", org!.organization_id)
+        .gte("starts_at", periodStart.toISOString())
+        .lte("starts_at", periodEnd.toISOString());
       if (error) throw error;
       return data ?? [];
     },
@@ -125,8 +177,6 @@ function Billing520Page() {
 
     const out: Row[] = [];
     let line = 1;
-    const startStr = periodStart.toISOString().slice(0, 10);
-    const endStr = periodEnd.toISOString().slice(0, 10);
     for (const b of codes) {
       const client = clientMap.get(b.client_id);
       if (!client) continue;
@@ -146,17 +196,319 @@ function Billing520Page() {
         service_code: b.service_code,
         rate: Number(b.rate_per_unit ?? 0),
         unit_type: b.unit_type || "Q",
-        service_start_date: b.service_start_date || startStr,
-        service_end_date: b.service_end_date || endStr,
+        service_start_date: b.service_start_date || periodStartStr,
+        service_end_date: b.service_end_date || periodEndStr,
         units,
         remaining_units: remaining,
         sce: b.sce ?? "",
         monthly_max_units: b.monthly_max_units ?? "",
+        _key: `${b.client_id}|${b.service_code}`,
+        _client_id: b.client_id,
       });
     }
     return out;
-  }, [codes, clientsQ.data, tsQ.data, dailyQ.data, periodStart, periodEnd]);
+  }, [codes, clientsQ.data, tsQ.data, dailyQ.data, periodStartStr, periodEndStr]);
 
+  // ─── Warning generation (HIVE-surfaced audit checks) ──────────────────────
+  const draftWarnings = useMemo<DraftWarning[]>(() => {
+    const out: DraftWarning[] = [];
+
+    for (const r of rows) {
+      if (r.units > 0 && r.rate <= 0) {
+        out.push({
+          row_key: r._key,
+          warning_type: "missing_rate",
+          severity: "warning",
+          message: `${r.consumer_name} · ${r.service_code}: ${r.units} units billed at $0 rate. Confirm the client's PCSP/1056 rate is on file.`,
+          related_ids: { client_id: r._client_id, service_code: r.service_code },
+        });
+      }
+      if (typeof r.monthly_max_units === "number" && r.monthly_max_units > 0 && r.units > r.monthly_max_units) {
+        out.push({
+          row_key: r._key,
+          warning_type: "exceeds_monthly_cap",
+          severity: "warning",
+          message: `${r.consumer_name} · ${r.service_code}: ${r.units} units exceeds monthly cap of ${r.monthly_max_units}.`,
+          related_ids: { client_id: r._client_id, service_code: r.service_code },
+        });
+      }
+      if (r.units > 0 && r.remaining_units === 0) {
+        out.push({
+          row_key: r._key,
+          warning_type: "annual_auth_exhausted",
+          severity: "warning",
+          message: `${r.consumer_name} · ${r.service_code}: annual authorization is exhausted after this submission.`,
+          related_ids: { client_id: r._client_id, service_code: r.service_code },
+        });
+      }
+      if (r.units > 0 && !r.provider_approver_email) {
+        out.push({
+          row_key: r._key,
+          warning_type: "missing_approver",
+          severity: "warning",
+          message: `${r.consumer_name} · ${r.service_code}: no provider approver email on file for the 520 header.`,
+          related_ids: { client_id: r._client_id, service_code: r.service_code },
+        });
+      }
+    }
+
+    // EVV vs schedule — flag punches with clock_in deviating >15 min from
+    // any scheduled shift for the same staff+client on the same calendar day.
+    const shifts = (shiftsQ.data ?? []) as Array<{ id: string; client_id: string; staff_id: string; starts_at: string; ends_at: string }>;
+    const ts = (tsQ.data ?? []) as Array<{ id: string; client_id: string; staff_id: string; clock_in_timestamp: string }>;
+
+    const shiftsByKey = new Map<string, Array<{ id: string; start: number; end: number }>>();
+    for (const s of shifts) {
+      const k = `${s.staff_id}|${s.client_id}`;
+      const arr = shiftsByKey.get(k) ?? [];
+      arr.push({ id: s.id, start: new Date(s.starts_at).getTime(), end: new Date(s.ends_at).getTime() });
+      shiftsByKey.set(k, arr);
+    }
+
+    const FIFTEEN_MIN = 15 * 60 * 1000;
+    let mismatch = 0;
+    for (const t of ts) {
+      if (!t.staff_id) continue;
+      const k = `${t.staff_id}|${t.client_id}`;
+      const list = shiftsByKey.get(k);
+      const ci = new Date(t.clock_in_timestamp).getTime();
+      if (!list || list.length === 0) continue; // no schedule → don't flag (handled elsewhere)
+      // Find closest scheduled start within the same day window
+      const sameDay = list.filter((s) => Math.abs(s.start - ci) < 12 * 60 * 60 * 1000);
+      if (sameDay.length === 0) continue;
+      const closest = sameDay.reduce((best, s) => (Math.abs(s.start - ci) < Math.abs(best.start - ci) ? s : best));
+      if (Math.abs(closest.start - ci) > FIFTEEN_MIN) {
+        mismatch++;
+        if (mismatch <= 10) {
+          out.push({
+            row_key: `evv|${t.id}`,
+            warning_type: "evv_vs_schedule_drift",
+            severity: "warning",
+            message: `EVV clock-in on ${new Date(t.clock_in_timestamp).toLocaleString()} is more than 15 min off the scheduled shift starting ${new Date(closest.start).toLocaleString()}.`,
+            related_ids: { timesheet_id: t.id, shift_id: closest.id },
+          });
+        }
+      }
+    }
+    if (mismatch > 10) {
+      out.push({
+        row_key: `evv|summary`,
+        warning_type: "evv_vs_schedule_drift_summary",
+        severity: "warning",
+        message: `${mismatch - 10} additional EVV clock-ins drift more than 15 min from their scheduled shift. Review the EVV ledger.`,
+        related_ids: { extra_count: mismatch - 10 },
+      });
+    }
+
+    return out;
+  }, [rows, shiftsQ.data, tsQ.data]);
+
+  // ─── Submission + warning persistence ─────────────────────────────────────
+  const submissionQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["520-submission", org?.organization_id, periodStartStr],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("billing_submissions")
+        .select("*")
+        .eq("organization_id", org!.organization_id)
+        .eq("period_start", periodStartStr)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const submission = submissionQ.data as
+    | {
+        id: string;
+        status: "draft" | "submitted" | "locked";
+        submitted_at: string | null;
+        submitted_by: string | null;
+        attestation_signature_name: string | null;
+      }
+    | null
+    | undefined;
+
+  const warningsQ = useQuery({
+    enabled: !!submission?.id,
+    queryKey: ["520-warnings", submission?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("billing_submission_warnings")
+        .select("*")
+        .eq("submission_id", submission!.id)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const auditQ = useQuery({
+    enabled: !!submission?.id,
+    queryKey: ["520-audit", submission?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("billing_submission_audit_log")
+        .select("*")
+        .eq("submission_id", submission!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const warnings = (warningsQ.data ?? []) as Array<{
+    id: string;
+    warning_type: string;
+    severity: "info" | "warning" | "blocker";
+    message: string;
+    status: "pending" | "dismissed" | "attested";
+    actor_name: string | null;
+    action_at: string | null;
+    row_key: string | null;
+    related_ids: Record<string, unknown>;
+  }>;
+  const pendingCount = warnings.filter((w) => w.status === "pending").length;
+  const allActed = warnings.length > 0 && pendingCount === 0;
+
+  const [signatureName, setSignatureName] = useState("");
+  const [agreed, setAgreed] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function openSubmission() {
+    if (!org?.organization_id || !user) return;
+    setBusy(true);
+    try {
+      const { data: sub, error: subErr } = await (supabase as any)
+        .from("billing_submissions")
+        .insert({
+          organization_id: org.organization_id,
+          period_start: periodStartStr,
+          period_end: periodEndStr,
+          status: "draft",
+          created_by: user.id,
+        })
+        .select("*")
+        .single();
+      if (subErr) throw subErr;
+
+      if (draftWarnings.length > 0) {
+        const { error: wErr } = await (supabase as any)
+          .from("billing_submission_warnings")
+          .insert(
+            draftWarnings.map((w) => ({
+              submission_id: sub.id,
+              organization_id: org.organization_id,
+              row_key: w.row_key,
+              warning_type: w.warning_type,
+              severity: w.severity,
+              message: w.message,
+              related_ids: w.related_ids,
+            })),
+          );
+        if (wErr) throw wErr;
+      }
+
+      await (supabase as any).from("billing_submission_audit_log").insert({
+        submission_id: sub.id,
+        organization_id: org.organization_id,
+        actor_user_id: user.id,
+        actor_name: actorName,
+        action: "submission_opened",
+        payload: { warning_count: draftWarnings.length, row_count: rows.length },
+      });
+
+      toast.success("Submission opened for review.");
+      qc.invalidateQueries({ queryKey: ["520-submission"] });
+      qc.invalidateQueries({ queryKey: ["520-warnings"] });
+      qc.invalidateQueries({ queryKey: ["520-audit"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not open submission.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function actWarning(w: (typeof warnings)[number], action: "dismissed" | "attested") {
+    if (!submission || !user || !org) return;
+    try {
+      const { error } = await (supabase as any)
+        .from("billing_submission_warnings")
+        .update({
+          status: action,
+          actor_name: actorName,
+          action_at: new Date().toISOString(),
+        })
+        .eq("id", w.id);
+      if (error) throw error;
+
+      await (supabase as any).from("billing_submission_audit_log").insert({
+        submission_id: submission.id,
+        organization_id: org.organization_id,
+        actor_user_id: user.id,
+        actor_name: actorName,
+        action: action === "dismissed" ? "warning_dismissed" : "warning_attested",
+        item_type: "warning",
+        item_id: w.id,
+        payload: { warning_type: w.warning_type, message: w.message, row_key: w.row_key },
+      });
+
+      toast.success(action === "dismissed" ? "Warning dismissed." : "Warning attested.");
+      qc.invalidateQueries({ queryKey: ["520-warnings"] });
+      qc.invalidateQueries({ queryKey: ["520-audit"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Action failed.");
+    }
+  }
+
+  async function submitToState() {
+    if (!submission || !user || !org) return;
+    if (!agreed) return toast.error("You must check the attestation box.");
+    if (!signatureName.trim()) return toast.error("Type your full name to sign.");
+    if (pendingCount > 0) return toast.error("Every warning must be dismissed or attested first.");
+    setBusy(true);
+    try {
+      const submittedAt = new Date().toISOString();
+      const { error } = await (supabase as any)
+        .from("billing_submissions")
+        .update({
+          status: "submitted",
+          attestation_text: ATTESTATION_TEXT,
+          attestation_signature_name: signatureName.trim(),
+          submitted_by: user.id,
+          submitted_at: submittedAt,
+        })
+        .eq("id", submission.id);
+      if (error) throw error;
+
+      await (supabase as any).from("billing_submission_audit_log").insert({
+        submission_id: submission.id,
+        organization_id: org.organization_id,
+        actor_user_id: user.id,
+        actor_name: actorName,
+        action: "submission_attested_and_submitted",
+        payload: {
+          attestation_text: ATTESTATION_TEXT,
+          signature_name: signatureName.trim(),
+          submitted_at: submittedAt,
+          warnings_total: warnings.length,
+          warnings_attested: warnings.filter((w) => w.status === "attested").length,
+          warnings_dismissed: warnings.filter((w) => w.status === "dismissed").length,
+        },
+      });
+
+      toast.success("520 submission attested and locked.");
+      qc.invalidateQueries({ queryKey: ["520-submission"] });
+      qc.invalidateQueries({ queryKey: ["520-audit"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Submission failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ─── Export ───────────────────────────────────────────────────────────────
   const HEADERS = [
     "line_number","provider_approver_email","consumer_name","consumer_pid","service_code",
     "rate","unit_type","service_start_date","service_end_date","units","remaining_units","sce","monthly_max_units",
@@ -169,11 +521,14 @@ function Billing520Page() {
   };
 
   const exportXlsx = () => {
-    const ws = XLSX.utils.json_to_sheet(rows, { header: HEADERS as unknown as string[] });
+    const exportRows = rows.map(({ _key: _k, _client_id: _c, ...r }) => r);
+    const ws = XLSX.utils.json_to_sheet(exportRows, { header: HEADERS as unknown as string[] });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "520");
     XLSX.writeFile(wb, `520-${periodStart.toISOString().slice(0, 7)}.xlsx`);
   };
+
+  const locked = submission?.status === "submitted" || submission?.status === "locked";
 
   return (
     <div className="space-y-4">
@@ -202,12 +557,19 @@ function Billing520Page() {
 
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">520 Billing — {periodStart.toLocaleString("en-US", { month: "long", year: "numeric" })}</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
+            520 Billing — {periodStart.toLocaleString("en-US", { month: "long", year: "numeric" })}
+          </h1>
           <p className="text-sm text-muted-foreground">
             Auto-populated from EVV time punches + daily logs. Hourly hours → units at {fmtHours(1)} hr = 4 units.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {locked && (
+            <Badge className="gap-1 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300">
+              <Lock className="h-3 w-3" /> Submitted & locked
+            </Badge>
+          )}
           <Button variant="outline" onClick={copyTSV}><Copy className="mr-2 h-4 w-4" />Copy</Button>
           <Button onClick={exportXlsx}><Download className="mr-2 h-4 w-4" />Export Excel</Button>
         </div>
@@ -243,8 +605,204 @@ function Billing520Page() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Units shown are whole numbers (1 unit = 15 min for hourly codes; 1 unit = 1 day for daily codes). Hours rounded to 2 decimals where shown.
+        Units shown are whole numbers (1 unit = 15 min for hourly codes; 1 unit = 1 day for daily codes).
       </p>
+
+      {/* ── Review & Submit ────────────────────────────────────────────── */}
+      <Card className="border-amber-500/20 bg-card/60 backdrop-blur">
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="h-4 w-4 text-amber-600" />
+                Review & Attest — Provider Confirmation Required
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Every billing submission must be reviewed and confirmed by the provider before it's sent to the State.
+              </p>
+            </div>
+            {submission && (
+              <Badge variant="outline" className="font-mono text-[10px]">
+                Status: {submission.status}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {!submission ? (
+            <div className="rounded-xl border border-dashed border-border bg-background/40 p-6 text-center">
+              <p className="text-sm font-medium">
+                {draftWarnings.length === 0
+                  ? "No audit warnings detected for this period."
+                  : `HIVE found ${draftWarnings.length} audit warning${draftWarnings.length === 1 ? "" : "s"} for this period.`}
+              </p>
+              <p className="mt-1 text-[12px] text-muted-foreground">
+                Open the submission to lock these warnings in and begin the attestation workflow.
+              </p>
+              <Button onClick={openSubmission} disabled={busy || rows.length === 0} className="mt-3 gap-1.5">
+                <FileSearch className="h-4 w-4" /> Open submission for review
+              </Button>
+            </div>
+          ) : (
+            <>
+              {/* Warnings */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Audit warnings ({warnings.length}) · {pendingCount} pending
+                  </h3>
+                </div>
+                {warnings.length === 0 ? (
+                  <Alert className="border-emerald-500/30 bg-emerald-500/5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <AlertTitle>Clean</AlertTitle>
+                    <AlertDescription>HIVE did not surface any audit warnings for this submission.</AlertDescription>
+                  </Alert>
+                ) : (
+                  warnings.map((w) => (
+                    <Alert
+                      key={w.id}
+                      className={
+                        w.severity === "blocker"
+                          ? "border-destructive/40 bg-destructive/5"
+                          : "border-amber-500/40 bg-amber-500/5"
+                      }
+                    >
+                      <AlertTriangle className={w.severity === "blocker" ? "h-4 w-4 text-destructive" : "h-4 w-4 text-amber-600"} />
+                      <AlertTitle className="font-mono text-xs uppercase">{w.warning_type.replaceAll("_", " ")}</AlertTitle>
+                      <AlertDescription className="space-y-2">
+                        <p>{w.message}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {w.status === "pending" ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 gap-1 text-xs"
+                                disabled={locked}
+                                onClick={() => actWarning(w, "dismissed")}
+                              >
+                                <XCircle className="h-3.5 w-3.5" /> It's okay — dismiss
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-7 gap-1 text-xs"
+                                disabled={locked}
+                                onClick={() => actWarning(w, "attested")}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" /> I attest
+                              </Button>
+                            </>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className={
+                                w.status === "attested"
+                                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                  : "border-muted-foreground/30 bg-muted/40"
+                              }
+                            >
+                              {w.status === "attested" ? "Attested" : "Dismissed"} by {w.actor_name} ·{" "}
+                              {w.action_at ? new Date(w.action_at).toLocaleString() : "—"}
+                            </Badge>
+                          )}
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  ))
+                )}
+              </div>
+
+              {/* Attestation */}
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                  Provider Attestation
+                </h3>
+                <p className="text-[11px] italic text-muted-foreground">
+                  ⚠️ Placeholder legal copy — must be reviewed by counsel before launch.
+                </p>
+                <p className="text-sm leading-relaxed">{ATTESTATION_TEXT}</p>
+
+                {locked ? (
+                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">
+                    <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                      <Lock className="mr-1 inline h-3.5 w-3.5" />
+                      Submitted by {submission.attestation_signature_name}{" "}
+                      on {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : "—"}.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-2">
+                      <Checkbox
+                        id="attest-checkbox"
+                        checked={agreed}
+                        onCheckedChange={(v) => setAgreed(v === true)}
+                        disabled={!allActed}
+                      />
+                      <Label htmlFor="attest-checkbox" className="text-sm leading-snug">
+                        I have read and agree to the attestation above.
+                      </Label>
+                    </div>
+                    <div className="grid gap-1.5 max-w-md">
+                      <Label htmlFor="attest-name" className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Type your full name to sign
+                      </Label>
+                      <Input
+                        id="attest-name"
+                        value={signatureName}
+                        onChange={(e) => setSignatureName(e.target.value)}
+                        placeholder="Jane Provider"
+                        disabled={!allActed}
+                      />
+                    </div>
+                    <Button
+                      onClick={submitToState}
+                      disabled={busy || !allActed || !agreed || !signatureName.trim()}
+                      className="gap-1.5"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      {busy ? "Submitting…" : "Attest & submit to State"}
+                    </Button>
+                    {!allActed && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Resolve all pending warnings to enable submission.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Audit log */}
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Immutable audit trail ({(auditQ.data ?? []).length})
+                </h3>
+                <div className="max-h-72 overflow-auto rounded-md border border-border bg-background/40">
+                  {((auditQ.data ?? []) as Array<{
+                    id: string; action: string; actor_name: string | null; created_at: string;
+                    payload: Record<string, unknown>; item_type: string | null;
+                  }>).map((a) => (
+                    <div key={a.id} className="flex items-start justify-between gap-3 border-b border-border px-3 py-2 last:border-b-0">
+                      <div className="min-w-0">
+                        <p className="font-mono text-[11px] uppercase text-foreground">{a.action.replaceAll("_", " ")}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {a.actor_name ?? "Unknown"} · {new Date(a.created_at).toLocaleString()}
+                          {a.item_type && <> · {a.item_type}</>}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {(auditQ.data ?? []).length === 0 && (
+                    <p className="p-3 text-center text-xs text-muted-foreground">No audit entries yet.</p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

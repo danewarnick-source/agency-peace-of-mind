@@ -85,6 +85,157 @@ export type Database = {
           },
         ]
       }
+      billing_submission_audit_log: {
+        Row: {
+          action: string
+          actor_name: string | null
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          item_id: string | null
+          item_type: string | null
+          organization_id: string
+          payload: Json
+          submission_id: string
+        }
+        Insert: {
+          action: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          item_type?: string | null
+          organization_id: string
+          payload?: Json
+          submission_id: string
+        }
+        Update: {
+          action?: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          item_type?: string | null
+          organization_id?: string
+          payload?: Json
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_submission_audit_log_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "billing_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_submission_warnings: {
+        Row: {
+          acted_by: string | null
+          action_at: string | null
+          action_note: string | null
+          actor_name: string | null
+          created_at: string
+          id: string
+          message: string
+          organization_id: string
+          related_ids: Json
+          row_key: string | null
+          severity: string
+          status: string
+          submission_id: string
+          warning_type: string
+        }
+        Insert: {
+          acted_by?: string | null
+          action_at?: string | null
+          action_note?: string | null
+          actor_name?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          organization_id: string
+          related_ids?: Json
+          row_key?: string | null
+          severity?: string
+          status?: string
+          submission_id: string
+          warning_type: string
+        }
+        Update: {
+          acted_by?: string | null
+          action_at?: string | null
+          action_note?: string | null
+          actor_name?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          organization_id?: string
+          related_ids?: Json
+          row_key?: string | null
+          severity?: string
+          status?: string
+          submission_id?: string
+          warning_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_submission_warnings_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "billing_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_submissions: {
+        Row: {
+          attestation_signature_name: string | null
+          attestation_text: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          attestation_signature_name?: string | null
+          attestation_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attestation_signature_name?: string | null
+          attestation_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       celebration_acknowledgements: {
         Row: {
           acknowledged_at: string

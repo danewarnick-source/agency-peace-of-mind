@@ -57,6 +57,8 @@ function HelpPage() {
   const [input, setInput] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
   const [ticketId, setTicketId] = useState<string | null>(null);
+  const [taskCenterOpen, setTaskCenterOpen] = useState(false);
+  const [pendingGoal, setPendingGoal] = useState<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const ask = useServerFn(askNectarHelp);

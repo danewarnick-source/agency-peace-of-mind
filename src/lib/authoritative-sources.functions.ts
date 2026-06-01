@@ -366,6 +366,7 @@ export const setRequirementReviewStatus = createServerFn({ method: "POST" })
       .object({
         id: z.string().uuid(),
         status: z.enum(["confirmed", "removed", "needs_attention"]),
+        attestStatement: z.string().max(2000).optional(),
       })
       .parse(input),
   )

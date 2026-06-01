@@ -68,6 +68,8 @@ import {
   listRequirementMappings,
   setRequirementMapping,
   deleteRequirementMapping,
+  prefillRequirementMappings,
+  confirmRequirementWithScopes,
 } from "@/lib/nectar-engine.functions";
 import { Sparkle, X as XIcon } from "lucide-react";
 

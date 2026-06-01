@@ -34,6 +34,7 @@ import {
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselect";
+import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
@@ -616,6 +617,7 @@ function ProfileTab({
   }
 
   return (
+    <div className="space-y-5">
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-5">
 
@@ -834,6 +836,14 @@ function ProfileTab({
           organizationId={undefined}
         />
       </div>
+    </div>
+
+    {/* Billing Codes Detail — per-code ledger lives beneath the multi-select */}
+    <BillingCodesDetail
+      clientId={client.id}
+      clientName={`${client.first_name} ${client.last_name}`.trim()}
+      medicaidId={client.medicaid_id ?? null}
+    />
     </div>
   );
 }

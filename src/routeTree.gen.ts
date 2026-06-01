@@ -48,7 +48,9 @@ import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily
 import { Route as DashboardComplianceDeskRouteImport } from './routes/dashboard.compliance-desk'
 import { Route as DashboardCommandCenterRouteImport } from './routes/dashboard.command-center'
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
+import { Route as DashboardClientBillingCodesRouteImport } from './routes/dashboard.client-billing-codes'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
+import { Route as DashboardBilling520RouteImport } from './routes/dashboard.billing-520'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
@@ -263,9 +265,20 @@ const DashboardClientsRoute = DashboardClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardClientBillingCodesRoute =
+  DashboardClientBillingCodesRouteImport.update({
+    id: '/client-billing-codes',
+    path: '/client-billing-codes',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardCertificationsRoute = DashboardCertificationsRouteImport.update({
   id: '/certifications',
   path: '/certifications',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardBilling520Route = DashboardBilling520RouteImport.update({
+  id: '/billing-520',
+  path: '/billing-520',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardBillingRoute = DashboardBillingRouteImport.update({
@@ -374,7 +387,9 @@ export interface FileRoutesByFullPath {
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/billing': typeof DashboardBillingRoute
+  '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
+  '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
@@ -431,7 +446,9 @@ export interface FileRoutesByTo {
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/billing': typeof DashboardBillingRoute
+  '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
+  '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
@@ -490,7 +507,9 @@ export interface FileRoutesById {
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/billing': typeof DashboardBillingRoute
+  '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
+  '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/clients': typeof DashboardClientsRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
@@ -550,7 +569,9 @@ export interface FileRouteTypes {
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/billing'
+    | '/dashboard/billing-520'
     | '/dashboard/certifications'
+    | '/dashboard/client-billing-codes'
     | '/dashboard/clients'
     | '/dashboard/command-center'
     | '/dashboard/compliance-desk'
@@ -607,7 +628,9 @@ export interface FileRouteTypes {
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/billing'
+    | '/dashboard/billing-520'
     | '/dashboard/certifications'
+    | '/dashboard/client-billing-codes'
     | '/dashboard/clients'
     | '/dashboard/command-center'
     | '/dashboard/compliance-desk'
@@ -665,7 +688,9 @@ export interface FileRouteTypes {
     | '/certificate/$code'
     | '/dashboard/assignments'
     | '/dashboard/billing'
+    | '/dashboard/billing-520'
     | '/dashboard/certifications'
+    | '/dashboard/client-billing-codes'
     | '/dashboard/clients'
     | '/dashboard/command-center'
     | '/dashboard/compliance-desk'
@@ -1001,11 +1026,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardClientsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/client-billing-codes': {
+      id: '/dashboard/client-billing-codes'
+      path: '/client-billing-codes'
+      fullPath: '/dashboard/client-billing-codes'
+      preLoaderRoute: typeof DashboardClientBillingCodesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/certifications': {
       id: '/dashboard/certifications'
       path: '/certifications'
       fullPath: '/dashboard/certifications'
       preLoaderRoute: typeof DashboardCertificationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/billing-520': {
+      id: '/dashboard/billing-520'
+      path: '/billing-520'
+      fullPath: '/dashboard/billing-520'
+      preLoaderRoute: typeof DashboardBilling520RouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/billing': {
@@ -1174,7 +1213,9 @@ const DashboardCoursesCourseIdRouteWithChildren =
 interface DashboardRouteChildren {
   DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
   DashboardBillingRoute: typeof DashboardBillingRoute
+  DashboardBilling520Route: typeof DashboardBilling520Route
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
+  DashboardClientBillingCodesRoute: typeof DashboardClientBillingCodesRoute
   DashboardClientsRoute: typeof DashboardClientsRoute
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
@@ -1212,7 +1253,9 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAssignmentsRoute: DashboardAssignmentsRoute,
   DashboardBillingRoute: DashboardBillingRoute,
+  DashboardBilling520Route: DashboardBilling520Route,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
+  DashboardClientBillingCodesRoute: DashboardClientBillingCodesRoute,
   DashboardClientsRoute: DashboardClientsRoute,
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,

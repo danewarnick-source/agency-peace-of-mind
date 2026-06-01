@@ -31,6 +31,14 @@ import { AboutTab } from "@/components/workspace/about-tab";
 import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
 import { FormsHubTab } from "@/components/workspace/forms-hub-tab";
 import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
+import { ReimbursementShiftPanel } from "@/components/staff-mobile/reimbursement-shift-panel";
+import { useActiveShift } from "@/hooks/use-active-shift";
+
+function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
+  const { data: active } = useActiveShift();
+  if (!active || active.client_id !== clientId) return null;
+  return <ReimbursementShiftPanel shiftId={active.id} clientId={clientId} />;
+}
 
 const workspaceSearch = z.object({ tab: z.string().optional(), code: z.string().optional() });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({

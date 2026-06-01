@@ -278,27 +278,41 @@ function SourcesPanel({
     queryKey: ["requirements", orgId],
     queryFn: () => listReqFn({ data: { organizationId: orgId } }),
   });
+  const applicByReq = useApplicabilityByReq(orgId);
 
   const statsByDoc = useMemo(() => {
     const map = new Map<
       string,
-      { total: number; confirmed: number; needs: number; removed: number; lastDraftedAt: string | null }
+      {
+        total: number;
+        confirmed: number;
+        fullyConfirmed: number;
+        scopePending: number;
+        needs: number;
+        removed: number;
+        lastDraftedAt: string | null;
+      }
     >();
-    type Row = { source_document_id: string | null; review_status: string | null; verified: boolean | null; created_at: string | null };
+    type Row = { id: string; source_document_id: string | null; review_status: string | null; verified: boolean | null; created_at: string | null };
     const rows = ((reqData?.requirements ?? []) as unknown) as Row[];
     for (const r of rows) {
       if (!r.source_document_id) continue;
       const cur = map.get(r.source_document_id) ?? {
         total: 0,
         confirmed: 0,
+        fullyConfirmed: 0,
+        scopePending: 0,
         needs: 0,
         removed: 0,
         lastDraftedAt: null as string | null,
       };
       cur.total += 1;
       const s = r.review_status ?? (r.verified ? "confirmed" : "needs_attention");
-      if (s === "confirmed") cur.confirmed += 1;
-      else if (s === "removed") cur.removed += 1;
+      if (s === "confirmed") {
+        cur.confirmed += 1;
+        if (isScopeReady(applicByReq.get(r.id))) cur.fullyConfirmed += 1;
+        else cur.scopePending += 1;
+      } else if (s === "removed") cur.removed += 1;
       else cur.needs += 1;
       if (r.created_at && (!cur.lastDraftedAt || r.created_at > cur.lastDraftedAt)) {
         cur.lastDraftedAt = r.created_at;
@@ -306,7 +320,7 @@ function SourcesPanel({
       map.set(r.source_document_id, cur);
     }
     return map;
-  }, [reqData]);
+  }, [reqData, applicByReq]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">

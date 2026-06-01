@@ -528,6 +528,61 @@ function Billing520Page() {
     XLSX.writeFile(wb, `520-${periodStart.toISOString().slice(0, 7)}.xlsx`);
   };
 
+  const exportCsv = () => {
+    const esc = (v: unknown) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [
+      HEADERS.join(","),
+      ...rows.map((r) =>
+        HEADERS.map((h) => esc((r as unknown as Record<string, unknown>)[h])).join(","),
+      ),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `520-${periodStart.toISOString().slice(0, 7)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("520 CSV downloaded");
+  };
+
+  const exportPdf = () => {
+    const monthLabel = periodStart.toLocaleString("en-US", { month: "long", year: "numeric" });
+    const win = window.open("", "_blank", "noopener,noreferrer");
+    if (!win) return toast.error("Pop-up blocked — allow pop-ups to export PDF.");
+    const rowsHtml = rows
+      .map(
+        (r) =>
+          `<tr>${HEADERS.map(
+            (h) =>
+              `<td>${String((r as unknown as Record<string, unknown>)[h] ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")}</td>`,
+          ).join("")}</tr>`,
+      )
+      .join("");
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>520 ${monthLabel}</title>
+<style>
+  body{font-family:ui-sans-serif,system-ui,sans-serif;color:#0f1b3d;padding:24px;}
+  h1{font-size:18px;margin:0 0 4px;} p{margin:0 0 16px;color:#555;font-size:12px;}
+  table{width:100%;border-collapse:collapse;font-size:11px;}
+  th,td{border:1px solid #d4d4d8;padding:6px 8px;text-align:left;}
+  th{background:#f5f3ee;text-transform:uppercase;font-size:10px;letter-spacing:.04em;}
+  @media print{body{padding:0;}}
+</style></head><body>
+<h1>520 Submission — ${monthLabel}</h1>
+<p>${rows.length} line item${rows.length === 1 ? "" : "s"} · Generated ${new Date().toLocaleString()}</p>
+<table><thead><tr>${HEADERS.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+<tbody>${rowsHtml}</tbody></table>
+<script>window.onload=()=>{window.print();}</script>
+</body></html>`);
+    win.document.close();
+  };
+
+
   const locked = submission?.status === "submitted" || submission?.status === "locked";
 
   return (
@@ -571,7 +626,9 @@ function Billing520Page() {
             </Badge>
           )}
           <Button variant="outline" onClick={copyTSV}><Copy className="mr-2 h-4 w-4" />Copy</Button>
-          <Button onClick={exportXlsx}><Download className="mr-2 h-4 w-4" />Export Excel</Button>
+          <Button variant="outline" onClick={exportCsv}><Download className="mr-2 h-4 w-4" />CSV</Button>
+          <Button variant="outline" onClick={exportPdf}><Download className="mr-2 h-4 w-4" />PDF</Button>
+          <Button onClick={exportXlsx}><Download className="mr-2 h-4 w-4" />Excel</Button>
         </div>
       </header>
 

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { RequireRole } from "@/components/rbac-guard";
 import { Receipt, Users, FileSpreadsheet, Upload, CreditCard, Sparkles } from "lucide-react";
+import { NectarBillingReadinessBar } from "@/components/billing/nectar-billing-readiness-bar";
 
 export const Route = createFileRoute("/dashboard/billing")({
   head: () => ({ meta: [{ title: "Billing — HIVE" }] }),
@@ -36,8 +37,10 @@ function BillingLayout() {
           </p>
         </div>
       </header>
+      <NectarBillingReadinessBar />
 
       <nav className="flex flex-wrap gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
+
         {TABS.map((t) => {
           const active = t.exact ? pathname === t.to : pathname.startsWith(t.to);
           const Icon = t.icon;

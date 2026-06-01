@@ -23,7 +23,7 @@ import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
-import { draftShiftNote } from "@/lib/ai-coach.functions";
+import { draftShiftNote, draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
 
@@ -272,6 +272,19 @@ export function PunchPad({
   const [dismissingKey, setDismissingKey] = useState<string | null>(null);
   const [dismissReasonDraft, setDismissReasonDraft] = useState("");
   const navigate = useNavigate();
+
+  // ── NECTAR Variance Rescue (Infusion add-on) ───────────────────────────────
+  const [varShorthand, setVarShorthand]       = useState("");
+  const [varDraftBusy, setVarDraftBusy]       = useState(false);
+  const [outVarShorthand, setOutVarShorthand] = useState("");
+  const [outVarDraftBusy, setOutVarDraftBusy] = useState(false);
+
+  // ── NECTAR Procedural Q&A (Infusion add-on) ────────────────────────────────
+  const [askOpen, setAskOpen]         = useState(false);
+  const [askQuestion, setAskQuestion] = useState("");
+  const [askBusy, setAskBusy]         = useState(false);
+  const [askResult, setAskResult]     = useState<ProceduralResult | null>(null);
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -778,6 +791,76 @@ export function PunchPad({
     setShowNarrativeError(false);
   }
 
+  async function handleDraftVariance(phase: "clock_in" | "clock_out") {
+    const shorthand = phase === "clock_in" ? varShorthand.trim() : outVarShorthand.trim();
+    if (shorthand.length < 2) {
+      toast.error("Add a few words first — NECTAR will expand it.");
+      return;
+    }
+    const v = phase === "clock_in" ? variance : outVariance;
+    const clientFirst =
+      lockedClient?.name?.split(" ")?.[0] ??
+      caseload.find((c) => c.id === (active?.client_id ?? selectedClientId))?.first_name ??
+      "the client";
+    const setBusyFn = phase === "clock_in" ? setVarDraftBusy : setOutVarDraftBusy;
+    setBusyFn(true);
+    try {
+      const res = await draftVarianceJustification({
+        data: {
+          shorthand,
+          distanceFeet: v?.distanceFeet ?? null,
+          limitFeet:    v?.limitFeet ?? null,
+          serviceCode:  serviceCode || null,
+          clientFirstName: clientFirst,
+          phase,
+          frameBlocked: phase === "clock_in" ? !!variance?.frameBlocked : false,
+        },
+      });
+      if (phase === "clock_in") {
+        setVarianceReason(res.draft);
+      } else {
+        setOutVarianceReason(res.draft);
+      }
+      toast.success("Draft ready — review and edit before submitting.");
+    } catch (e) {
+      toast.error((e as Error).message || "NECTAR couldn't draft a justification.");
+    } finally {
+      setBusyFn(false);
+    }
+  }
+
+  async function handleAskNectar() {
+    const q = askQuestion.trim();
+    if (q.length < 4) {
+      toast.error("Type your question first.");
+      return;
+    }
+    const clientFirst =
+      lockedClient?.name?.split(" ")?.[0] ??
+      caseload.find((c) => c.id === (active?.client_id ?? selectedClientId))?.first_name ??
+      "the client";
+    const goals = lockedClient?.pcspGoals ?? [];
+    setAskBusy(true);
+    setAskResult(null);
+    try {
+      const res = await answerProceduralQuestion({
+        data: {
+          question: q,
+          clientFirstName: clientFirst,
+          serviceCode: serviceCode || null,
+          pcspGoals: goals,
+          notes: null,
+        },
+      });
+      setAskResult(res);
+    } catch (e) {
+      toast.error((e as Error).message || "NECTAR couldn't answer right now.");
+    } finally {
+      setAskBusy(false);
+    }
+  }
+
+
   async function finalizeClockOut(args: {
     pos: { lat: number; lng: number; acc: number };
     outsideReason?: string;
@@ -1080,6 +1163,44 @@ export function PunchPad({
           </div>
         )}
 
+        {/* ── NECTAR Shift Pre-Flight (pre-clock-in only) ── */}
+        {!isRunning && clientForPunch && serviceCode && (
+          <NectarInfusionLock
+            featureName="Shift pre-flight"
+            benefit="NECTAR tells you up front what this shift will need at clock-out — so end-of-shift isn't a surprise."
+            className="mb-4"
+          >
+            <div className="rounded-lg border border-[color:var(--amber-300)] bg-[color:var(--amber-50)]/70 px-3 py-2.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
+                <Hexagon className="h-3.5 w-3.5" /> NECTAR · Pre-flight
+              </p>
+              <p className="mt-1 text-[12px] leading-snug text-[color:var(--navy-900)]">
+                <span className="font-semibold">
+                  {serviceCode} shift with {clientForPunch.name.split(" ")[0]}
+                </span>{" "}
+                — at clock-out you'll need:
+              </p>
+              <ul className="mt-1 space-y-0.5 text-[12px] leading-snug text-[color:var(--navy-900)]/90">
+                <li>• A progress note (50-word minimum, objective)</li>
+                <li>• At least one PCSP goal checked
+                  {clientForPunch.pcspGoals?.length
+                    ? ` (${clientForPunch.pcspGoals.length} on file)`
+                    : " (none on file — ask your supervisor)"}
+                </li>
+                {isEvvLockedCode(serviceCode) && (
+                  <li>• In-radius clock-out, or a written variance</li>
+                )}
+                <li>• Any spending or reimbursement entries logged before submitting</li>
+              </ul>
+              <p className="mt-1.5 text-[11px] text-[color:var(--navy-900)]/70">
+                Tip: you can draft the note from shorthand or voice at clock-out.
+              </p>
+            </div>
+          </NectarInfusionLock>
+        )}
+
+
+
         {/* ── GPS status strip (clock-in only, no map) ── */}
         {!isRunning && (
           <div className={`mb-4 rounded-lg border p-3 text-xs leading-relaxed ${gpsStripClass}`}>
@@ -1231,12 +1352,85 @@ export function PunchPad({
           </span>
         </p>
 
+        {/* ── NECTAR Procedural Q&A (embedded, plain-language) ── */}
+        <NectarInfusionLock
+          featureName="Ask NECTAR (procedural)"
+          benefit="Plain-language answers to 'am I allowed to…?' questions, grounded in this client's plan and your company policy."
+          className="mt-4"
+        >
+          <div className="rounded-lg border border-[color:var(--border-light)] bg-background/60 p-3">
+            <button
+              type="button"
+              onClick={() => setAskOpen((o) => !o)}
+              className="flex w-full items-center justify-between gap-2 text-left"
+              aria-expanded={askOpen}
+            >
+              <span className="flex items-center gap-2 text-xs font-semibold text-[color:var(--navy-900)]">
+                <Hexagon className="h-3.5 w-3.5 text-[color:var(--amber-600)]" />
+                Ask NECTAR — "am I allowed to…?"
+              </span>
+              <span className="text-[11px] text-muted-foreground">{askOpen ? "Hide" : "Open"}</span>
+            </button>
+
+            {askOpen && (
+              <div className="mt-3 space-y-2">
+                <Textarea
+                  rows={2}
+                  value={askQuestion}
+                  onChange={(e) => setAskQuestion(e.target.value)}
+                  placeholder='e.g. "Can I take Blake out of county?" or "What if he refuses a med?"'
+                  maxLength={500}
+                  className="text-sm"
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    Grounded in {lockedClient?.name?.split(" ")[0] ?? "this client"}&apos;s plan when available. You still take the action.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={handleAskNectar}
+                    disabled={askBusy || askQuestion.trim().length < 4}
+                    className="bg-[color:var(--amber-500)] text-[color:var(--navy-900)] hover:bg-[color:var(--amber-600)]"
+                  >
+                    {askBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1 h-3.5 w-3.5" />}
+                    Ask
+                  </Button>
+                </div>
+
+                {askResult && (
+                  <div
+                    className={`rounded-md border p-3 text-[13px] leading-snug ${
+                      askResult.escalate
+                        ? "border-rose-300 bg-rose-50 text-rose-900"
+                        : "border-[color:var(--amber-300)] bg-[color:var(--amber-50)] text-[color:var(--navy-900)]"
+                    }`}
+                  >
+                    <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide">
+                      {askResult.escalate ? (
+                        <><AlertTriangle className="h-3.5 w-3.5" /> Escalate now</>
+                      ) : (
+                        <><Hexagon className="h-3.5 w-3.5" /> NECTAR · Confidence: {askResult.confidence}</>
+                      )}
+                    </p>
+                    <p className="mt-1">{askResult.answer}</p>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Guidance only — confirm against your supervisor or company policy before acting.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </NectarInfusionLock>
+
+
+
         {/* ════════════════════════════════════════════════════════════════════
             DIALOGS
         ════════════════════════════════════════════════════════════════════ */}
 
         {/* Clock-in variance — text only, no map */}
-        <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); } }}>
+        <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); setVarShorthand(""); } }}>
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -1256,6 +1450,36 @@ export function PunchPad({
                 <span className="font-mono font-semibold">{variance.limitFeet.toLocaleString()} ft</span>
               </div>
             )}
+            <NectarInfusionLock
+              featureName="NECTAR variance rescue"
+              benefit="Type a few words and NECTAR drafts an auditor-ready justification. You always review and confirm before submitting."
+            >
+              <div className="rounded-md border border-[color:var(--amber-300)] bg-[color:var(--amber-50)]/60 p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
+                  <Hexagon className="h-3.5 w-3.5" /> NECTAR · Variance rescue
+                </p>
+                <Textarea
+                  rows={2}
+                  value={varShorthand}
+                  onChange={(e) => setVarShorthand(e.target.value)}
+                  placeholder='Shorthand — e.g. "GPS off on phone, at house" or "community outing, library"'
+                  maxLength={400}
+                  className="mt-2 text-sm"
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleDraftVariance("clock_in")}
+                    disabled={varDraftBusy || varShorthand.trim().length < 2}
+                    className="bg-[color:var(--amber-500)] text-[color:var(--navy-900)] hover:bg-[color:var(--amber-600)]"
+                  >
+                    {varDraftBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1 h-3.5 w-3.5" />}
+                    Draft justification
+                  </Button>
+                </div>
+              </div>
+            </NectarInfusionLock>
             <div className="grid gap-2">
               <Label htmlFor="variance-reason">Location variance justification</Label>
               <Textarea
@@ -1267,9 +1491,10 @@ export function PunchPad({
                 maxLength={500}
               />
               <p className="text-[11px] text-muted-foreground">
-                {varianceReason.trim().length}/10 characters minimum
+                {varianceReason.trim().length}/10 characters minimum — review NECTAR drafts before confirming.
               </p>
             </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => { setVariance(null); setVarianceReason(""); }}>
                 Cancel
@@ -1283,7 +1508,7 @@ export function PunchPad({
         </Dialog>
 
         {/* Clock-out variance — text only, no map */}
-        <Dialog open={!!outVariance} onOpenChange={(o) => { if (!o) { setOutVariance(null); setOutVarianceReason(""); } }}>
+        <Dialog open={!!outVariance} onOpenChange={(o) => { if (!o) { setOutVariance(null); setOutVarianceReason(""); setOutVarShorthand(""); } }}>
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -1302,6 +1527,36 @@ export function PunchPad({
                 <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
               </div>
             )}
+            <NectarInfusionLock
+              featureName="NECTAR variance rescue"
+              benefit="Type a few words and NECTAR drafts an auditor-ready clock-out justification. You always review and confirm."
+            >
+              <div className="rounded-md border border-[color:var(--amber-300)] bg-[color:var(--amber-50)]/60 p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
+                  <Hexagon className="h-3.5 w-3.5" /> NECTAR · Variance rescue
+                </p>
+                <Textarea
+                  rows={2}
+                  value={outVarShorthand}
+                  onChange={(e) => setOutVarShorthand(e.target.value)}
+                  placeholder='Shorthand — e.g. "finished outing at park" or "dropped at day program"'
+                  maxLength={400}
+                  className="mt-2 text-sm"
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleDraftVariance("clock_out")}
+                    disabled={outVarDraftBusy || outVarShorthand.trim().length < 2}
+                    className="bg-[color:var(--amber-500)] text-[color:var(--navy-900)] hover:bg-[color:var(--amber-600)]"
+                  >
+                    {outVarDraftBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1 h-3.5 w-3.5" />}
+                    Draft justification
+                  </Button>
+                </div>
+              </div>
+            </NectarInfusionLock>
             <div className="grid gap-2">
               <Label htmlFor="out-variance-reason">Variance justification</Label>
               <Textarea
@@ -1313,6 +1568,7 @@ export function PunchPad({
                 maxLength={500}
               />
             </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => { setOutVariance(null); setOutVarianceReason(""); }}>
                 Cancel

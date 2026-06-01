@@ -102,6 +102,13 @@ function AuthoritativeSourcesPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
   const qc = useQueryClient();
+  const [tab, setTab] = useState<string>("sources");
+  const [focusDocumentId, setFocusDocumentId] = useState<string | null>(null);
+
+  const jumpToRequirements = (docId: string) => {
+    setFocusDocumentId(docId);
+    setTab("requirements");
+  };
 
   const content = (
     <div className="space-y-6">
@@ -145,7 +152,7 @@ function AuthoritativeSourcesPage() {
         />
       )}
 
-      <Tabs defaultValue="sources" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 rounded-2xl border border-border/60 bg-background/60 p-1 backdrop-blur">
           <TabsTrigger value="sources" className="gap-1">
             <BookOpen className="h-3.5 w-3.5" /> Sources
@@ -159,10 +166,22 @@ function AuthoritativeSourcesPage() {
         </TabsList>
 
         <TabsContent value="sources">
-          {orgId ? <SourcesPanel orgId={orgId} /> : <LoadingCard />}
+          {orgId ? (
+            <SourcesPanel orgId={orgId} onJumpToRequirements={jumpToRequirements} />
+          ) : (
+            <LoadingCard />
+          )}
         </TabsContent>
         <TabsContent value="requirements">
-          {orgId ? <RequirementsPanel orgId={orgId} /> : <LoadingCard />}
+          {orgId ? (
+            <RequirementsPanel
+              orgId={orgId}
+              focusDocumentId={focusDocumentId}
+              onFocusHandled={() => setFocusDocumentId(null)}
+            />
+          ) : (
+            <LoadingCard />
+          )}
         </TabsContent>
         <TabsContent value="attestations">
           {orgId ? <AttestationsPanel orgId={orgId} /> : <LoadingCard />}

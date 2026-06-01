@@ -20,7 +20,7 @@ import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
 import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
-import { CelebrationProvider } from "@/components/celebrations/celebration-provider";
+
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — HIVE" }] }),

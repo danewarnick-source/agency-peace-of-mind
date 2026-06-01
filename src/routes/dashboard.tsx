@@ -57,6 +57,7 @@ const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
   { to: "/dashboard/authoritative-sources", label: "Authoritative Sources", icon: ShieldCheck },
   { to: "/dashboard/nectar-docs", label: "Company Docs", icon: Database },
+  { to: "/dashboard/external-compliance", label: "External Compliance", icon: ExternalLink },
 ];
 
 function DashboardLayout() {

@@ -20,6 +20,8 @@ import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
 import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
+import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
+import { ListChecks } from "lucide-react";
 
 
 export const Route = createFileRoute("/dashboard")({
@@ -63,6 +65,7 @@ function DashboardLayout() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [taskCenterOpen, setTaskCenterOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/login" });
@@ -166,11 +169,13 @@ function DashboardLayout() {
         {nav.map((item) => {
           const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
           const Icon = item.icon;
+          const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
           return (
             <Link
               key={item.to}
               to={item.to}
               onClick={onNavigate}
+              data-tour={`nav.${slug}`}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                 active
                   ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
@@ -286,11 +291,23 @@ function DashboardLayout() {
               </div>
             </div>
 
-            {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
-            <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTaskCenterOpen(true)}
+                data-tour="nav.help"
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-2.5 py-1 text-xs font-medium text-[#9a3412] hover:bg-[#ffedd5]"
+                title="Open NECTAR Task Center"
+              >
+                <ListChecks className="h-3.5 w-3.5" /> <span className="hidden md:inline">Guide me</span>
+              </button>
+              {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
+              <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </header>
+          <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
 
           <main className={isMobilePreview ? "flex-1 bg-secondary/40" : "flex-1 bg-secondary/40 px-4 py-6 md:px-8"}>
             {isMobilePreview ? (

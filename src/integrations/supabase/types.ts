@@ -3143,6 +3143,95 @@ export type Database = {
           },
         ]
       }
+      nectar_guide_tasks: {
+        Row: {
+          created_at: string
+          current_step: number
+          guide_id: string
+          id: string
+          organization_id: string
+          position: number
+          status: string
+          steps: Json
+          title: string
+          updated_at: string
+          user_id: string
+          why: string | null
+        }
+        Insert: {
+          created_at?: string
+          current_step?: number
+          guide_id: string
+          id?: string
+          organization_id: string
+          position?: number
+          status?: string
+          steps?: Json
+          title: string
+          updated_at?: string
+          user_id: string
+          why?: string | null
+        }
+        Update: {
+          created_at?: string
+          current_step?: number
+          guide_id?: string
+          id?: string
+          organization_id?: string
+          position?: number
+          status?: string
+          steps?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
+          why?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_guide_tasks_guide_id_fkey"
+            columns: ["guide_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_guides"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nectar_guides: {
+        Row: {
+          created_at: string
+          goal: string
+          id: string
+          organization_id: string
+          status: string
+          summary: string | null
+          surface: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          goal: string
+          id?: string
+          organization_id: string
+          status?: string
+          summary?: string | null
+          surface?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          goal?: string
+          id?: string
+          organization_id?: string
+          status?: string
+          summary?: string | null
+          surface?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       nectar_report_runs: {
         Row: {
           csv_url: string | null

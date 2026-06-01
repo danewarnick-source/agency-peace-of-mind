@@ -128,7 +128,7 @@ function AuditPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="audit.body">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <FolderArchive className="h-6 w-6 text-[color:var(--amber-600)]" />

@@ -2,10 +2,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Hexagon, Send, Loader2, ArrowRight, BarChart3, Sparkles, RotateCcw, LifeBuoy, CheckCircle2 } from "lucide-react";
+import { Hexagon, Send, Loader2, ArrowRight, BarChart3, Sparkles, RotateCcw, LifeBuoy, CheckCircle2, ListChecks } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { askNectarHelp, escalateHelpToHive, getHelpTicketStatus, type NectarHelpReply } from "@/lib/nectar-help.functions";
 import { NectarBadge, NectarMark, NectarButton } from "@/components/nectar/nectar-brand";
+import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 
 export const Route = createFileRoute("/dashboard/help")({
   head: () => ({ meta: [{ title: "Need help? — NECTAR" }] }),
@@ -56,6 +57,8 @@ function HelpPage() {
   const [input, setInput] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
   const [ticketId, setTicketId] = useState<string | null>(null);
+  const [taskCenterOpen, setTaskCenterOpen] = useState(false);
+  const [pendingGoal, setPendingGoal] = useState<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const ask = useServerFn(askNectarHelp);
@@ -99,6 +102,13 @@ function HelpPage() {
   function send(text?: string) {
     const q = (text ?? input).trim();
     if (q.length < 2) return;
+    // Heuristic: if the user asks for a walkthrough, open the Task Center pre-filled.
+    if (/\b(walk me through|guide me|help me with|show me how|tour)\b/i.test(q)) {
+      setPendingGoal(q);
+      setTaskCenterOpen(true);
+      setInput("");
+      return;
+    }
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", text: q }]);
     setInput("");
     m.mutate(q);
@@ -149,15 +159,24 @@ function HelpPage() {
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          {messages.length > 0 && (
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={clearChat}
-              className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+              onClick={() => { setPendingGoal(undefined); setTaskCenterOpen(true); }}
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-md bg-[#d97a1c] px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-[#b8651a]"
             >
-              <RotateCcw className="h-3.5 w-3.5" /> New chat
+              <ListChecks className="h-3.5 w-3.5" /> Guide me
             </button>
-          )}
+            {messages.length > 0 && (
+              <button
+                type="button"
+                onClick={clearChat}
+                className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> New chat
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => escalateM.mutate()}
@@ -244,6 +263,11 @@ function HelpPage() {
           Send
         </NectarButton>
       </form>
+      <NectarTaskCenter
+        open={taskCenterOpen}
+        onOpenChange={(o) => { setTaskCenterOpen(o); if (!o) setPendingGoal(undefined); }}
+        initialGoal={pendingGoal}
+      />
     </div>
   );
 }

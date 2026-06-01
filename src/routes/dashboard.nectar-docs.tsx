@@ -140,11 +140,11 @@ function NectarDocsPage() {
     <div className="space-y-4">
       <header className="space-y-1">
         <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-          <Database className="h-3.5 w-3.5" /> NECTAR · Universal Document Store
+          <Database className="h-3.5 w-3.5" /> NECTAR · Client &amp; Staff Documents
         </div>
-        <h1 className="text-2xl font-semibold">Document Repository</h1>
+        <h1 className="text-2xl font-semibold">Company Docs</h1>
         <p className="text-sm text-muted-foreground">
-          The shared backbone every feature reads from — billing rates, audit pulls, scheduling, and compliance.
+          Internal client and staff records — PCSPs, 1056 budgets, intake/referrals, assessments, certifications, training records, and other client/staff-specific files. State and contract authority documents live in <span className="font-medium">Authoritative Sources</span>.
         </p>
       </header>
 
@@ -152,7 +152,7 @@ function NectarDocsPage() {
         title="NECTAR parses on upload"
         message={
           <>
-            Drop a PCSP, 1056 budget, SOW, certification or any compliance document. NECTAR extracts
+            Drop a PCSP, 1056 budget, certification, or any client/staff document. NECTAR extracts
             structured fields (rate, units, dates, clauses) with source locators. An admin always confirms or overrides — the platform proposes, you decide.
           </>
         }

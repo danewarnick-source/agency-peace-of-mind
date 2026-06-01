@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowRightLeft,
   CheckCircle2,
@@ -13,27 +15,44 @@ import {
   Receipt,
   ClipboardCheck,
   AlertTriangle,
+  Briefcase,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NectarGuidanceStrip } from "@/components/nectar/nectar-guidance-strip";
+import { RequireHiveExecutive } from "@/components/hive-executive-guard";
+import { listCompanies, type CompanyRow } from "@/lib/hive-exec.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/company-migration")({
   head: () => ({
     meta: [
-      { title: "Company Migration — HIVE" },
+      { title: "Company Migration — HIVE Executive" },
       {
         name: "description",
         content:
-          "Transfer your entire operation into HIVE. NECTAR parses your exports and proposes the mapping — you confirm before anything commits.",
+          "HIVE-staff migration service: ingest a customer's prior-platform export and have NECTAR auto-populate clients, staff, billing codes, and documents into their account.",
       },
     ],
   }),
-  component: CompanyMigrationPage,
+  component: () => (
+    <RequireHiveExecutive>
+      <CompanyMigrationPage />
+    </RequireHiveExecutive>
+  ),
 });
+
+type EngagementStatus = "quoted" | "in_progress" | "review" | "complete";
+const ENGAGEMENT_STEPS: { value: EngagementStatus; label: string }[] = [
+  { value: "quoted", label: "Quoted" },
+  { value: "in_progress", label: "In progress" },
+  { value: "review", label: "Customer review" },
+  { value: "complete", label: "Complete" },
+];
 
 type EntityKind = "clients" | "staff" | "teams" | "billing" | "documents" | "history";
 

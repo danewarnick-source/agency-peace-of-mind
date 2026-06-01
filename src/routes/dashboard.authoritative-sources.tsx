@@ -18,6 +18,11 @@ import {
   Info,
   Upload,
   ChevronDown,
+  Wand2,
+  ListChecks,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";

@@ -166,11 +166,13 @@ function DashboardLayout() {
         {nav.map((item) => {
           const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
           const Icon = item.icon;
+          const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
           return (
             <Link
               key={item.to}
               to={item.to}
               onClick={onNavigate}
+              data-tour={`nav.${slug}`}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                 active
                   ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"

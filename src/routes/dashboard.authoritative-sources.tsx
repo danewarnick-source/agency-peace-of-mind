@@ -401,6 +401,7 @@ function SourceRow({
   stats,
   allSources,
   onJumpToRequirements,
+  currentRole,
 }: {
   source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null; metadata?: Record<string, unknown> | null };
   orgId: string;
@@ -417,7 +418,10 @@ function SourceRow({
     | null;
   allSources: Array<{ id: string; title: string; metadata?: Record<string, unknown> | null }>;
   onJumpToRequirements: (docId: string) => void;
+  currentRole?: string | null;
 }) {
+  const canDraft = currentRole === "admin" || currentRole === "manager" || currentRole === "super_admin";
+
   const meta = (source.metadata ?? {}) as {
     ignored?: boolean;
     ignored_as?: "ignore" | "duplicate";

@@ -290,6 +290,7 @@ export function StaffClientGrid() {
                 c={c}
                 activeShift={activeShift ?? null}
                 periodHours={nectar?.per_client_hours[c.id] ?? 0}
+                assignments={assignments}
               />
             </li>
           ))}

@@ -1430,7 +1430,7 @@ export function PunchPad({
         ════════════════════════════════════════════════════════════════════ */}
 
         {/* Clock-in variance — text only, no map */}
-        <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); } }}>
+        <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); setVarShorthand(""); } }}>
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">

@@ -114,9 +114,14 @@ function AuthoritativeSourcesPage() {
           <span className="font-medium text-amber-700 dark:text-amber-300">
             Unverified
           </span>{" "}
-          so authority is never implied. Client- and staff-specific files (PCSPs,
-          1056 budgets, certifications, training records) belong in{" "}
-          <span className="font-medium">Company Docs</span>.
+          so authority is never implied. The rule: if a document is about one
+          named person, it's a Company Doc; if it's a state/contract authority
+          that governs many, it's an Authoritative Source. PCSPs and 1056
+          budgets always route to{" "}
+          <span className="font-medium">Company Docs</span> — NECTAR extracts
+          the billing data (codes, rates, max units, plan dates) from a PCSP
+          into the billing layer for that client, while the file itself stays
+          with the client's records.
         </p>
         <p className="rounded-lg border border-dashed border-[color:var(--amber-400,#f4a93a)]/60 bg-[color:var(--amber-50,#fffbeb)]/60 px-3 py-2 text-xs text-[color:var(--amber-800,#92400e)]">
           Tip — drop a PDF, scan, Word, or spreadsheet anywhere on this page and

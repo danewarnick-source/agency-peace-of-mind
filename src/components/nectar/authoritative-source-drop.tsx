@@ -66,14 +66,36 @@ interface Draft {
   issuingAuthority: string;
   notes: string;
   routeWarning: string | null;
+  /** Hard block: this file type is always a client/staff record, never authoritative. */
+  routeBlock: { label: string; reason: string } | null;
 }
 
-// Heuristic guardrail: detect files that look like client/staff records.
+// Hard block: documents that are always client/staff records.
+// Rule: if a document is about one named person, it's a Company Doc.
+// PCSPs and 1056 budgets are the canonical straddlers — force them to Company Docs.
+function detectRouteBlock(fileName: string): { label: string; reason: string } | null {
+  const n = fileName.toLowerCase();
+  if (/\bpcsp\b/.test(n)) {
+    return {
+      label: "PCSP",
+      reason:
+        "PCSPs are always client records. Upload to Company Docs — NECTAR will extract the authoritative billing data (service codes, rates, max units, plan start/end, financial eligibility) into the billing layer for that client, while the PCSP file itself lives with the client's records.",
+    };
+  }
+  if (/1056|budget/.test(n)) {
+    return {
+      label: "1056 budget",
+      reason:
+        "1056 budgets are client-specific. Upload to Company Docs against the client — NECTAR pulls the billing-relevant figures into the billing layer automatically.",
+    };
+  }
+  return null;
+}
+
+// Soft guardrail: looks like a client/staff record but not hard-blocked.
 function detectRouteWarning(fileName: string): string | null {
   const n = fileName.toLowerCase();
   const clientyHits = [
-    { re: /\bpcsp\b/, label: "PCSP" },
-    { re: /1056|budget/, label: "1056 budget" },
     { re: /referral/, label: "referral" },
     { re: /\bintake\b/, label: "intake" },
     { re: /assessment/, label: "assessment" },
@@ -120,6 +142,7 @@ function makeDraft(file: File): Draft {
     issuingAuthority: "",
     notes: "",
     routeWarning: detectRouteWarning(file.name),
+    routeBlock: detectRouteBlock(file.name),
   };
 }
 
@@ -252,6 +275,12 @@ export function AuthoritativeSourceDrop({
 
   const handleSaveAndNext = async () => {
     if (!current) return;
+    if (current.routeBlock) {
+      toast.error(
+        `${current.routeBlock.label} files route to Company Docs, not Authoritative Sources.`,
+      );
+      return;
+    }
     if (!current.title.trim()) {
       toast.error("Title is required");
       return;
@@ -360,7 +389,34 @@ export function AuthoritativeSourceDrop({
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             {current && (
               <>
-                {current.routeWarning && (
+                {current.routeBlock ? (
+                  <div className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50/80 p-3 text-xs text-rose-900">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div className="space-y-1.5">
+                      <div className="font-semibold">
+                        {current.routeBlock.label} files always route to Company Docs.
+                      </div>
+                      <p className="leading-relaxed">{current.routeBlock.reason}</p>
+                      <p className="leading-relaxed text-rose-800/80">
+                        Authoritative Sources is state/contract documents that
+                        apply across clients (SOW, contracts, DSPD/DHS
+                        requirements). Anything tied to a specific client or
+                        staff member belongs in Company Docs.
+                      </p>
+                      <div className="pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 border-rose-300 text-xs text-rose-900 hover:bg-rose-100"
+                          onClick={removeCurrent}
+                        >
+                          Remove — I'll upload to Company Docs
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : current.routeWarning ? (
                   <div className="flex items-start gap-2 rounded-xl border border-amber-400/60 bg-amber-50/80 p-3 text-xs text-amber-900">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="space-y-1">
@@ -386,7 +442,7 @@ export function AuthoritativeSourceDrop({
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   <FileText className="h-4 w-4 shrink-0" />
@@ -500,7 +556,7 @@ export function AuthoritativeSourceDrop({
             <Button
               type="button"
               onClick={handleSaveAndNext}
-              disabled={saveOne.isPending || !current?.title.trim()}
+              disabled={saveOne.isPending || !current?.title.trim() || !!current?.routeBlock}
               className="gap-1 bg-[color:var(--amber-500,#f4a93a)] text-amber-950 hover:bg-[color:var(--amber-400,#f6b94d)]"
             >
               {saveOne.isPending ? (

@@ -762,6 +762,24 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     if (!doc.is_authoritative_source)
       throw new Error("Document is not marked as an authoritative source.");
 
+    // Preflight: drafting writes to nectar_requirements, which is gated by
+    // is_org_admin_or_manager. Surface a clear message instead of letting RLS
+    // throw a cryptic permission error.
+    const { data: membership } = await supabase
+      .from("organization_members")
+      .select("role, active")
+      .eq("organization_id", doc.organization_id)
+      .eq("user_id", context.userId)
+      .eq("active", true)
+      .maybeSingle();
+    const allowedRoles = new Set(["admin", "manager", "super_admin"]);
+    if (!membership || !allowedRoles.has(membership.role as string)) {
+      throw new Error(
+        "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to draft from authoritative sources.",
+      );
+    }
+
+
     const meta = (doc.metadata ?? {}) as { ignored?: boolean };
     if (meta.ignored) {
       throw new Error(

@@ -14,8 +14,15 @@ const AUTH_KINDS = [
   "dspd_requirement",
   "dhs_requirement",
   "public_record",
+  "tool_template",
   "other",
 ] as const;
+
+// Document kinds where NECTAR should NOT try to extract obligations.
+// Tools/templates (review tools, audit checklists, scoring forms) describe
+// HOW someone reviews compliance, not WHAT the provider must do — drafting
+// from them produces the misleading "no requirement language" message.
+const NON_OBLIGATION_KINDS = new Set<string>(["tool_template"]);
 
 // ---------- Web-page authoritative sources ----------
 // NECTAR reads content that is directly rendered on the page itself.

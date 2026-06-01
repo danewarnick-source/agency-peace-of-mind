@@ -374,16 +374,18 @@ export const upsertSubscription = createServerFn({ method: "POST" })
       .eq("organization_id", data.organizationId)
       .maybeSingle();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const patchAny = data.patch as any;
     if (existing) {
       const { error } = await supabase
         .from("org_subscriptions")
-        .update(data.patch)
+        .update(patchAny)
         .eq("id", existing.id);
       if (error) throw error;
     } else {
       const { error } = await supabase.from("org_subscriptions").insert({
         organization_id: data.organizationId,
-        ...data.patch,
+        ...patchAny,
       });
       if (error) throw error;
     }

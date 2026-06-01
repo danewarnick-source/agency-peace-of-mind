@@ -79,13 +79,14 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
               <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/55">
                 Portal View
               </label>
-              <Select value={view} onValueChange={(v) => setView(v as "staff" | "admin")}>
+              <Select value={view} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile")}>
                 <SelectTrigger className="h-12 w-full border-white/15 bg-white/[0.06] text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="staff">Staff View</SelectItem>
                   <SelectItem value="admin">Admin View</SelectItem>
+                  <SelectItem value="staff_mobile">Staff Mobile (Preview)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -822,3 +822,114 @@ export const listAttestations = createServerFn({ method: "POST" })
   });
 
 export const REDUCED_LIABILITY_NOTICE = `The documents, checklists, and data shown here are generated from materials you uploaded (including your contracts and State Scope of Work) and from information entered by your staff. HIVE/NECTAR organizes and surfaces this information but does not independently verify its accuracy or guarantee compliance with State requirements. You are strongly encouraged to review all forms and documents for accuracy. By proceeding, you confirm you have reviewed this information and accept responsibility for its accuracy and for your submissions to the State.`;
+
+// ---------- NECTAR plain-language explanation (aid to comprehension only) ----------
+// LEGAL_REVIEW: nectar-explain-requirement-disclaimer
+const EXPLAIN_SYSTEM_PROMPT = `You are NECTAR. Your job is to RESTATE a compliance requirement in plain, everyday English so a busy provider-admin can understand what it is saying.
+
+STRICT RULES:
+- You are NOT giving legal, compliance, or audit advice.
+- You DO NOT tell the reader whether they are compliant, whether the rule applies to them, or what they "must" do beyond what the source already says.
+- You DO NOT add obligations, deadlines, dollar figures, or specifics that are not in the source text.
+- You stay close to the source. If the source is vague, your restatement is vague.
+- If you cannot confidently restate it without inventing meaning, say so.
+
+Return STRICT JSON only:
+{
+  "plain_language": "2-5 short sentences restating the requirement in plain English. No bullet points. No headings.",
+  "key_terms": [
+    { "term": "string from the source", "plain": "short plain-English gloss" }
+  ],
+  "confidence": "high" | "medium" | "low",
+  "caveat": "one short sentence noting any ambiguity or what the reader should double-check in the source"
+}
+
+key_terms is at most 4 items. Only include terms that actually appear in the requirement text and are likely unfamiliar to a non-lawyer.`;
+
+const ExplainResp = z.object({
+  plain_language: z.string().max(2000),
+  key_terms: z
+    .array(z.object({ term: z.string().max(120), plain: z.string().max(400) }))
+    .max(6)
+    .default([]),
+  confidence: z.enum(["high", "medium", "low"]).default("medium"),
+  caveat: z.string().max(400).optional().nullable(),
+});
+
+export const explainRequirement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ requirementId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: req, error } = await supabase
+      .from("nectar_requirements")
+      .select(
+        "id, title, description, category, source_citation, source_document_id",
+      )
+      .eq("id", data.requirementId)
+      .single();
+    if (error || !req) throw new Error(error?.message ?? "Requirement not found");
+
+    let sourceTitle: string | null = null;
+    if (req.source_document_id) {
+      const { data: doc } = await supabase
+        .from("nectar_documents")
+        .select("title, file_name")
+        .eq("id", req.source_document_id)
+        .single();
+      sourceTitle =
+        (doc?.title as string | null) ?? (doc?.file_name as string | null) ?? null;
+    }
+
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+
+    const userBody = `SOURCE DOCUMENT: ${sourceTitle ?? "—"}
+CITATION: ${req.source_citation ?? "—"}
+REQUIREMENT TITLE: ${req.title}
+REQUIREMENT TEXT: ${req.description ?? "(no extended text — restate the title only)"}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: EXPLAIN_SYSTEM_PROMPT },
+          { role: "user", content: userBody },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+    if (res.status === 402) throw new Error("AI credits exhausted.");
+    if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
+    const json = await res.json();
+    let raw: unknown = {};
+    try {
+      raw = JSON.parse(json.choices?.[0]?.message?.content ?? "{}");
+    } catch {
+      raw = {};
+    }
+    const parsed = ExplainResp.safeParse(raw);
+    const explanation = parsed.success
+      ? parsed.data
+      : {
+          plain_language:
+            "NECTAR couldn't produce a confident plain-language restatement of this requirement. Please read the original source text.",
+          key_terms: [] as Array<{ term: string; plain: string }>,
+          confidence: "low" as const,
+          caveat: "Defer to the original source wording.",
+        };
+
+    return {
+      explanation,
+      disclaimer:
+        "This is a NECTAR plain-language restatement to aid your understanding. It is NOT legal, compliance, or audit advice, and does NOT replace the original source text. Always review the original requirement and consult counsel as needed before acting.",
+    };
+  });

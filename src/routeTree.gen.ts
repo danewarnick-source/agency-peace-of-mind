@@ -56,6 +56,7 @@ import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.ass
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
+import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.billing.index'
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
 import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
@@ -306,6 +307,11 @@ const DashboardCoursesIndexRoute = DashboardCoursesIndexRouteImport.update({
   path: '/courses/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardBillingIndexRoute = DashboardBillingIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardBillingRoute,
+} as any)
 const DashboardWorkspaceClientIdRoute =
   DashboardWorkspaceClientIdRouteImport.update({
     id: '/workspace/$clientId',
@@ -386,7 +392,7 @@ export interface FileRoutesByFullPath {
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
-  '/dashboard/billing': typeof DashboardBillingRoute
+  '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
@@ -425,6 +431,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
+  '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -445,7 +452,6 @@ export interface FileRoutesByTo {
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
-  '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
@@ -484,6 +490,7 @@ export interface FileRoutesByTo {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
+  '/dashboard/billing': typeof DashboardBillingIndexRoute
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -506,7 +513,7 @@ export interface FileRoutesById {
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
-  '/dashboard/billing': typeof DashboardBillingRoute
+  '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
@@ -545,6 +552,7 @@ export interface FileRoutesById {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
+  '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -607,6 +615,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
+    | '/dashboard/billing/'
     | '/dashboard/courses/'
     | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
@@ -627,7 +636,6 @@ export interface FileRouteTypes {
     | '/unauthorized'
     | '/certificate/$code'
     | '/dashboard/assignments'
-    | '/dashboard/billing'
     | '/dashboard/billing-520'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
@@ -666,6 +674,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
+    | '/dashboard/billing'
     | '/dashboard/courses'
     | '/dashboard/training'
     | '/dashboard/courses/$courseId/edit'
@@ -726,6 +735,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
+    | '/dashboard/billing/'
     | '/dashboard/courses/'
     | '/dashboard/training/'
     | '/dashboard/courses/$courseId/edit'
@@ -1082,6 +1092,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/billing/': {
+      id: '/dashboard/billing/'
+      path: '/'
+      fullPath: '/dashboard/billing/'
+      preLoaderRoute: typeof DashboardBillingIndexRouteImport
+      parentRoute: typeof DashboardBillingRoute
+    }
     '/dashboard/workspace/$clientId': {
       id: '/dashboard/workspace/$clientId'
       path: '/workspace/$clientId'
@@ -1162,6 +1179,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DashboardBillingRouteChildren {
+  DashboardBillingIndexRoute: typeof DashboardBillingIndexRoute
+}
+
+const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
+  DashboardBillingIndexRoute: DashboardBillingIndexRoute,
+}
+
+const DashboardBillingRouteWithChildren =
+  DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
+
 interface DashboardProgramsRouteChildren {
   DashboardProgramsProgramIdRoute: typeof DashboardProgramsProgramIdRoute
 }
@@ -1212,7 +1240,7 @@ const DashboardCoursesCourseIdRouteWithChildren =
 
 interface DashboardRouteChildren {
   DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
-  DashboardBillingRoute: typeof DashboardBillingRoute
+  DashboardBillingRoute: typeof DashboardBillingRouteWithChildren
   DashboardBilling520Route: typeof DashboardBilling520Route
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientBillingCodesRoute: typeof DashboardClientBillingCodesRoute
@@ -1252,7 +1280,7 @@ interface DashboardRouteChildren {
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAssignmentsRoute: DashboardAssignmentsRoute,
-  DashboardBillingRoute: DashboardBillingRoute,
+  DashboardBillingRoute: DashboardBillingRouteWithChildren,
   DashboardBilling520Route: DashboardBilling520Route,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientBillingCodesRoute: DashboardClientBillingCodesRoute,

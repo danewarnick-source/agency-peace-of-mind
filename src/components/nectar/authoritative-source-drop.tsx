@@ -142,6 +142,7 @@ function makeDraft(file: File): Draft {
     issuingAuthority: "",
     notes: "",
     routeWarning: detectRouteWarning(file.name),
+    routeBlock: detectRouteBlock(file.name),
   };
 }
 

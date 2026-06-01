@@ -53,6 +53,7 @@ function DashboardLayout() {
   const { data: org } = useCurrentOrg();
   const { can } = usePermissions();
   const { view, setView } = usePortalView();
+  const { isExecutive } = useIsHiveExecutive();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -76,7 +77,6 @@ function DashboardLayout() {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
   }
 
-  const { isExecutive } = useIsHiveExecutive();
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
   const rawView = isAdminCapable ? view : "staff";

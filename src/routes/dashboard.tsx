@@ -178,7 +178,7 @@ function DashboardLayout() {
       <ImpersonationBanner />
 
       {/* Mobile shell — staff view only (below md) */}
-      {isStaffView && (
+      {isStaffView && !isMobilePreview && (
         <div className="md:hidden">
           <StaffMobileShell title={pageTitle}>
             <main className="bg-secondary/40 px-3 py-4">

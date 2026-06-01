@@ -845,6 +845,12 @@ function ProfileTab({
       clientName={`${client.first_name} ${client.last_name}`.trim()}
       medicaidId={client.medicaid_id ?? null}
     />
+
+    {/* Client-specific documents — flows into Company Docs */}
+    <ClientDocumentsCard
+      clientId={client.id}
+      clientName={`${client.first_name} ${client.last_name}`.trim()}
+    />
     </div>
   );
 }

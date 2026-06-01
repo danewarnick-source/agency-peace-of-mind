@@ -101,7 +101,7 @@ type DocRow = {
 
 function NectarDocsPage() {
   const { data: org } = useCurrentOrg();
-  const orgId = org?.id;
+  const orgId = org?.organization_id;
 
   const [search, setSearch] = useState("");
   const [docType, setDocType] = useState("all");

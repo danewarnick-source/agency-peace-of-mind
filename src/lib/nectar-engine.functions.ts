@@ -14,42 +14,90 @@ const SCOPE_KINDS = ["provider", "code", "role", "client", "unknown"] as const;
 type ScopeKind = (typeof SCOPE_KINDS)[number];
 
 interface OrgEntityFacts {
-  codes: string[]; // active DSPD service codes in use
-  roles: string[]; // staff role/credential keys present (DSP, SLM, HHP, BCBA, RN, LPN, etc.)
+  // Every code the provider is contracted/authorized to provide (active + dormant).
+  // NECTAR scopes coverage against this superset so a dormant code keeps its
+  // requirements live and doesn't lose audit protection when activated later.
+  codes: string[];
+  activeCodes: string[]; // currently attached to a client
+  dormantCodes: string[]; // authorized but not currently in use
+  roles: string[];
   clientCount: number;
   jurisdictions: string[];
 }
 
-// ---------- Inventory of org's live entities (used to ground AI proposals) ----------
+// ---------- Inventory of org's contracted entities (used to ground AI proposals) ----------
 
 async function gatherOrgFacts(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   organizationId: string,
 ): Promise<OrgEntityFacts> {
-  const [codesRes, staffRes, clientsRes] = await Promise.all([
-    supabase
-      .from("client_billing_codes")
-      .select("service_code")
-      .eq("organization_id", organizationId),
-    supabase
-      .from("organization_members")
-      .select("role, job_title")
-      .eq("organization_id", organizationId)
-      .eq("active", true),
-    supabase
-      .from("clients")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId),
-  ]);
+  const [billingCodesRes, clientAuthRes, authorizedRes, staffRes, clientsRes] =
+    await Promise.all([
+      supabase
+        .from("client_billing_codes")
+        .select("service_code")
+        .eq("organization_id", organizationId),
+      supabase
+        .from("clients")
+        .select("authorized_dspd_codes, job_code")
+        .eq("organization_id", organizationId),
+      supabase
+        .from("provider_authorized_codes")
+        .select("code, status")
+        .eq("organization_id", organizationId),
+      supabase
+        .from("organization_members")
+        .select("role, job_title")
+        .eq("organization_id", organizationId)
+        .eq("active", true),
+      supabase
+        .from("clients")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId),
+    ]);
 
-  const codes = Array.from(
-    new Set(
-      ((codesRes.data ?? []) as Array<{ service_code: string | null }>)
-        .map((r) => (r.service_code ?? "").trim().toUpperCase())
-        .filter(Boolean),
-    ),
+  const norm = (v: unknown) => (typeof v === "string" ? v.trim().toUpperCase() : "");
+
+  // "Active" = some client is currently set up to use it.
+  const activeSet = new Set<string>();
+  for (const r of (billingCodesRes.data ?? []) as Array<{ service_code: string | null }>) {
+    const c = norm(r.service_code);
+    if (c) activeSet.add(c);
+  }
+  for (const r of (clientAuthRes.data ?? []) as Array<{
+    authorized_dspd_codes: string[] | null;
+    job_code: string[] | null;
+  }>) {
+    for (const c of r.authorized_dspd_codes ?? []) {
+      const v = norm(c);
+      if (v) activeSet.add(v);
+    }
+    for (const c of r.job_code ?? []) {
+      const v = norm(c);
+      if (v) activeSet.add(v);
+    }
+  }
+
+  // Provider-level authorized set (contract/SOW/addendum/manual entries).
+  const authorizedSet = new Set<string>();
+  const authorizedStatus = new Map<string, string>();
+  for (const r of (authorizedRes.data ?? []) as Array<{
+    code: string | null;
+    status: string | null;
+  }>) {
+    const c = norm(r.code);
+    if (!c) continue;
+    authorizedSet.add(c);
+    authorizedStatus.set(c, r.status ?? "dormant");
+  }
+
+  // Union — coverage follows the contract, not current activity.
+  const codes = Array.from(new Set<string>([...activeSet, ...authorizedSet]));
+  const activeCodes = codes.filter(
+    (c) => activeSet.has(c) || authorizedStatus.get(c) === "active",
   );
+  const dormantCodes = codes.filter((c) => !activeCodes.includes(c));
 
   const roleSet = new Set<string>();
   for (const m of (staffRes.data ?? []) as Array<{
@@ -59,7 +107,6 @@ async function gatherOrgFacts(
     if (m.role) roleSet.add(m.role.toUpperCase());
     const jt = (m.job_title ?? "").toUpperCase();
     if (!jt) continue;
-    // Heuristic credential keys NECTAR cares about.
     for (const key of ["DSP", "SLM", "HHP", "BCBA", "BC", "RN", "LPN", "QIDP"]) {
       if (jt.includes(key)) roleSet.add(key);
     }
@@ -67,9 +114,11 @@ async function gatherOrgFacts(
 
   return {
     codes,
+    activeCodes,
+    dormantCodes,
     roles: Array.from(roleSet),
     clientCount: clientsRes.count ?? 0,
-    jurisdictions: ["UT-DSPD"], // first instance; extensibility lives on the requirement row
+    jurisdictions: ["UT-DSPD"],
   };
 }
 

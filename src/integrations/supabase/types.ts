@@ -2305,6 +2305,7 @@ export type Database = {
           account_status: string
           agency_name: string | null
           created_at: string
+          daily_rate: number | null
           department: string | null
           email: string | null
           employee_id: string | null
@@ -2329,6 +2330,7 @@ export type Database = {
           account_status?: string
           agency_name?: string | null
           created_at?: string
+          daily_rate?: number | null
           department?: string | null
           email?: string | null
           employee_id?: string | null
@@ -2353,6 +2355,7 @@ export type Database = {
           account_status?: string
           agency_name?: string | null
           created_at?: string
+          daily_rate?: number | null
           department?: string | null
           email?: string | null
           employee_id?: string | null

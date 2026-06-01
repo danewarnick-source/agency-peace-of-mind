@@ -42,6 +42,8 @@ type Role = "admin" | "manager" | "employee";
 type Position = "Direct Care" | "Host Staff" | "Office Staff" | "Admin";
 const POSITIONS: Position[] = ["Direct Care", "Host Staff", "Office Staff", "Admin"];
 
+type WorkerType = "w2" | "1099";
+
 type EditableMember = {
   membershipId: string;
   userId: string;
@@ -51,6 +53,9 @@ type EditableMember = {
   role: Role;
   active: boolean;
   position: Position | "";
+  workerType: WorkerType;
+  hourlyRate: string;
+  dailyRate: string;
 };
 
 function EmployeesPage() {
@@ -89,7 +94,7 @@ function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position, account_status" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position, account_status, worker_type, hourly_rate, daily_rate" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
@@ -202,6 +207,9 @@ function EmployeesPage() {
           email: input.email || null,
           employee_id: input.employeeId || null,
           position: input.position || null,
+          worker_type: input.workerType,
+          hourly_rate: input.hourlyRate === "" ? null : Number(input.hourlyRate),
+          daily_rate: input.dailyRate === "" ? null : Number(input.dailyRate),
         } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;
@@ -313,6 +321,9 @@ function EmployeesPage() {
                       role: m.role as Role,
                       active: m.active,
                       position,
+                      workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
+                      hourlyRate: m.profile?.hourly_rate != null ? String(m.profile.hourly_rate) : "",
+                      dailyRate: m.profile?.daily_rate != null ? String(m.profile.daily_rate) : "",
                     })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
                       <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload
@@ -498,6 +509,9 @@ function EmployeesPage() {
                   role: String(fd.get("role") || "employee") as Role,
                   active: String(fd.get("active") || "true") === "true",
                   position: (String(fd.get("position") || "") as Position | ""),
+                  workerType: (String(fd.get("worker_type") || "w2") as WorkerType),
+                  hourlyRate: String(fd.get("hourly_rate") || "").trim(),
+                  dailyRate: String(fd.get("daily_rate") || "").trim(),
                 });
               }}
               className="grid gap-4"
@@ -535,6 +549,57 @@ function EmployeesPage() {
                       <SelectItem value="false">Deactivated</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-muted/30 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Pay & classification
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Used by NECTAR to estimate gross pay each pay period (pre-tax).
+                </p>
+                <div className="mt-3 grid gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-worker-type">Worker type</Label>
+                    <Select name="worker_type" defaultValue={editingMember.workerType}>
+                      <SelectTrigger id="edit-worker-type"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="w2">W-2 employee</SelectItem>
+                        <SelectItem value="1099">1099 contractor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="hourly_rate">Hourly rate ($)</Label>
+                      <Input
+                        id="hourly_rate"
+                        name="hourly_rate"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        defaultValue={editingMember.hourlyRate}
+                        placeholder="e.g. 18.50"
+                      />
+                      <p className="text-[10px] text-muted-foreground">Applies to hourly service codes (EVV punches).</p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="daily_rate">Daily rate ($)</Label>
+                      <Input
+                        id="daily_rate"
+                        name="daily_rate"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        defaultValue={editingMember.dailyRate}
+                        placeholder="e.g. 120.00"
+                      />
+                      <p className="text-[10px] text-muted-foreground">Applies to daily codes (HHS, RHS, DSG, RL6, RP3–RP5).</p>
+                    </div>
+                  </div>
                 </div>
               </div>
               <CustomAttributesSection

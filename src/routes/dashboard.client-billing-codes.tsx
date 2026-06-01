@@ -13,9 +13,15 @@ import { unitsToHours, fmtHours, fmtUnits, UNITS_PER_HOUR } from "@/lib/billing-
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { Trash2, Plus } from "lucide-react";
 
+import { RequireRole } from "@/components/rbac-guard";
+
 export const Route = createFileRoute("/dashboard/client-billing-codes")({
   head: () => ({ meta: [{ title: "Client Billing Codes — HIVE" }] }),
-  component: ClientBillingCodesPage,
+  component: () => (
+    <RequireRole roles={["admin", "manager", "super_admin"]}>
+      <ClientBillingCodesPage />
+    </RequireRole>
+  ),
 });
 
 type Client = { id: string; first_name: string; last_name: string };

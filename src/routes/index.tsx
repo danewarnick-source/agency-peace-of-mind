@@ -27,6 +27,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing/footer";
+import { FounderStory } from "@/components/landing/founder-story";
+import { CompetitiveContrast } from "@/components/landing/competitive-contrast";
 import { HexBackdrop as HexBg } from "@/components/brand/hex-backdrop";
 
 export const Route = createFileRoute("/")({

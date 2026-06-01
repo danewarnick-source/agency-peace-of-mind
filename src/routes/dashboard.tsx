@@ -81,18 +81,24 @@ function DashboardLayout() {
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
-  const rawView = isAdminCapable ? view : "staff";
+  const allowedViews: Array<"staff" | "admin" | "staff_mobile" | "hive_exec"> = ["staff"];
+  if (isAdminCapable) { allowedViews.push("admin", "staff_mobile"); }
+  if (isExecutive) { allowedViews.push("hive_exec"); }
+  const rawView = allowedViews.includes(view as "staff" | "admin" | "staff_mobile" | "hive_exec")
+    ? (view as "staff" | "admin" | "staff_mobile" | "hive_exec")
+    : "staff";
   const isMobilePreview = rawView === "staff_mobile";
-  const effectiveView: "staff" | "admin" = rawView === "admin" ? "admin" : "staff";
+  const effectiveView: "staff" | "admin" = rawView === "admin" || rawView === "hive_exec" ? "admin" : "staff";
   const baseNav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
   const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");
-  const showExecSection = isExecutive && effectiveView === "admin";
+  const showExecSection = isExecutive && (rawView === "hive_exec" || rawView === "admin");
   const execNav: NavItem[] = [
     { to: "/dashboard/hive-exec", label: "Companies", icon: Building2, exact: true },
     { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
     { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },
     { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },
   ];
+
   const signOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out");

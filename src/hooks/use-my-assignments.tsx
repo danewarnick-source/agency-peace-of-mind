@@ -29,7 +29,7 @@ export function useMyAssignments() {
         .eq("staff_id", user!.id);
       if (error) throw error;
       const map: AssignmentMap = new Map();
-      for (const r of (data ?? []) as Array<{
+      for (const r of ((data ?? []) as unknown) as Array<{
         client_id: string;
         service_codes: string[] | null;
       }>) {

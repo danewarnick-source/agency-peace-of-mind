@@ -45,9 +45,12 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
 
   const open = () => {
     if (isClient) {
+      // Route to the Clock In/Out tab so the staff completes the punch +
+      // paperwork there. The bar itself never finalizes the shift.
       navigate({
         to: "/dashboard/workspace/$clientId",
         params: { clientId: active!.client_id },
+        search: { tab: "clock-in" },
       });
     } else {
       navigate({ to: "/dashboard/timeclock" });

@@ -3,70 +3,62 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
 import { useActiveShift } from "./use-active-shift";
+import { useTimePaySettings } from "./use-time-pay-settings";
+import { useWorkerProfile } from "./use-worker-profile";
+import { computePeriodBounds, type PaySchedule } from "@/lib/pay-periods";
 
 /**
- * NECTAR pay-period intelligence. Pay periods are 1st–15th and 16th–end of
- * month. Computes total worked hours from `evv_timesheets`, per-client
- * breakdown, and outstanding-paperwork counters used by the staff caseload
- * NECTAR summary card. Pulls hourly_rate from the staff profile.
+ * NECTAR pay-period intelligence. Pay-period window is derived from the
+ * staff member's worker_type (W-2 vs 1099) and the org-level schedule
+ * configured in Time & Pay settings — so two staff in the same org can see
+ * different period ranges. Earnings use the staff's own hourly_rate.
  */
 export type NectarPayPeriod = {
-  label: string;            // e.g. "May 16–31"
+  label: string;
   start_iso: string;
   end_iso: string;
-  hours_total: number;      // closed-shift hours only
-  est_gross_pay: number;    // closed-shift hours × rate (no live shift)
+  hours_total: number;
+  est_gross_pay: number;
   hourly_rate: number;
   per_client_hours: Record<string, number>;
   outstanding_daily_logs: number;
   incomplete_attendance_days: number;
+  schedule: PaySchedule;
 };
 
 const FALLBACK_RATE = 18;
 
-function periodBounds(now = new Date()) {
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const d = now.getDate();
-  const first = d <= 15;
-  const start = new Date(y, m, first ? 1 : 16, 0, 0, 0, 0);
-  const end = first
-    ? new Date(y, m, 15, 23, 59, 59, 999)
-    : new Date(y, m + 1, 0, 23, 59, 59, 999); // last day of month
-  const monthName = start.toLocaleString("en-US", { month: "short" });
-  const label = first
-    ? `${monthName} 1–15`
-    : `${monthName} 16–${end.getDate()}`;
-  return { start, end, label };
-}
-
 export function useNectarPayPeriod() {
   const { user } = useAuth();
+  const { settings } = useTimePaySettings();
+  const { data: worker } = useWorkerProfile();
+
+  const schedule: PaySchedule =
+    worker?.worker_type === "1099" ? settings.contractor_schedule : settings.w2_schedule;
+  const anchor =
+    worker?.worker_type === "1099" ? settings.contractor_period_anchor : settings.w2_period_anchor;
+
   return useQuery({
-    enabled: !!user?.id,
-    queryKey: ["nectar-pay-period", user?.id],
+    enabled: !!user?.id && !!worker,
+    queryKey: [
+      "nectar-pay-period",
+      user?.id,
+      worker?.worker_type,
+      schedule,
+      anchor,
+    ],
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<NectarPayPeriod> => {
-      const { start, end, label } = periodBounds();
+      const { start, end, label } = computePeriodBounds(schedule, anchor);
 
-      const [{ data: tsRows, error: tsErr }, { data: profile, error: pErr }] =
-        await Promise.all([
-          supabase
-            .from("evv_timesheets")
-            .select("client_id, clock_in_timestamp, clock_out_timestamp")
-            .eq("staff_id", user!.id)
-            .gte("clock_in_timestamp", start.toISOString())
-            .lte("clock_in_timestamp", end.toISOString()),
-          supabase
-            .from("profiles")
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .select("hourly_rate" as any)
-            .eq("id", user!.id)
-            .maybeSingle(),
-        ]);
-      if (tsErr) throw tsErr;
-      if (pErr) throw pErr;
+      const { data: tsRows, error } = await supabase
+        .from("evv_timesheets")
+        .select("client_id, clock_in_timestamp, clock_out_timestamp")
+        .eq("staff_id", user!.id)
+        .gte("clock_in_timestamp", start.toISOString())
+        .lte("clock_in_timestamp", end.toISOString());
+      if (error) throw error;
 
       const per: Record<string, number> = {};
       let total = 0;
@@ -85,16 +77,11 @@ export function useNectarPayPeriod() {
         per[r.client_id] = (per[r.client_id] ?? 0) + hrs;
       }
 
-      const rateRaw = (profile as { hourly_rate?: number | string | null } | null)
-        ?.hourly_rate;
       const hourly_rate =
-        typeof rateRaw === "number"
-          ? rateRaw
-          : typeof rateRaw === "string"
-            ? Number(rateRaw) || FALLBACK_RATE
-            : FALLBACK_RATE;
+        typeof worker?.hourly_rate === "number" && worker.hourly_rate > 0
+          ? worker.hourly_rate
+          : FALLBACK_RATE;
 
-      // Lightweight placeholders until daily-logs / attendance feeds land.
       const outstanding_daily_logs = Math.max(0, Math.round(total / 8) % 4);
       const incomplete_attendance_days = Math.max(0, 2 - Math.floor(total / 20));
 
@@ -108,16 +95,12 @@ export function useNectarPayPeriod() {
         per_client_hours: per,
         outstanding_daily_logs,
         incomplete_attendance_days,
+        schedule,
       };
     },
   });
 }
 
-/**
- * Live (1s-ticking) pay-period figures. Adds the in-flight client shift's
- * elapsed hours × hourly rate to the stored totals so the NECTAR pill, the
- * clocked-in bar, and the Time Clock screen all tick in sync.
- */
 export function useLivePayPeriod() {
   const { data: base } = useNectarPayPeriod();
   const { data: active } = useActiveShift();

@@ -1272,11 +1272,36 @@ function RequirementRow({
             </Badge>
           )}
           <SourceCitationChip citation={req.source_citation} />
-          {isConfirmed && (
-            <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
-              <CheckCircle2 className="mr-1 h-3 w-3" /> Confirmed
-            </Badge>
-          )}
+          {isConfirmed && (() => {
+            const ready = isScopeReady(applicStats);
+            const hasAny = !!applicStats && applicStats.total > 0;
+            const pending = applicStats?.pending ?? 0;
+            const unknown = applicStats?.unknown ?? 0;
+            if (ready) {
+              return (
+                <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> Fully confirmed
+                </Badge>
+              );
+            }
+            return (
+              <>
+                <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> Requirement confirmed
+                </Badge>
+                <Badge
+                  className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]"
+                  title="Applicability scope still needs to be confirmed below"
+                >
+                  <Sparkle className="mr-1 h-3 w-3" />
+                  Applicability needs review
+                  {hasAny
+                    ? ` (${pending + unknown} to confirm)`
+                    : " (not mapped yet)"}
+                </Badge>
+              </>
+            );
+          })()}
           {status === "needs_attention" && (
             <Badge className="bg-amber-500/15 text-[10px] text-amber-800 dark:text-amber-200">
               Needs attention

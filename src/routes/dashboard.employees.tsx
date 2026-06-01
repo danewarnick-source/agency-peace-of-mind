@@ -207,6 +207,9 @@ function EmployeesPage() {
           email: input.email || null,
           employee_id: input.employeeId || null,
           position: input.position || null,
+          worker_type: input.workerType,
+          hourly_rate: input.hourlyRate === "" ? null : Number(input.hourlyRate),
+          daily_rate: input.dailyRate === "" ? null : Number(input.dailyRate),
         } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;

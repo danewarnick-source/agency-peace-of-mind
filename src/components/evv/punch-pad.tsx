@@ -1289,10 +1289,110 @@ export function PunchPad({
                   )}
                 </div>
 
+                {/* NECTAR Progress-Note Assist (Infusion add-on) */}
+                <NectarInfusionLock
+                  featureName="Draft with NECTAR"
+                  benefit="Turn quick shorthand (or a voice memo) into a compliant, goal-aligned progress-note draft in seconds. You always review and confirm before it's attached to the timesheet."
+                >
+                  <div className="rounded-lg border-2 border-dashed border-[color:var(--amber-400)] bg-[color:var(--amber-50)]/60 px-3 py-3 sm:px-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span
+                        className="inline-flex h-6 w-6 items-center justify-center text-[color:var(--amber-700)]"
+                        style={{ clipPath: "polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)", background: "linear-gradient(135deg, var(--amber-100), var(--amber-200))" }}
+                      >
+                        <Hexagon className="h-3 w-3" />
+                      </span>
+                      <div className="flex-1">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">NECTAR Infusion</div>
+                        <div className="text-sm font-semibold text-[color:var(--navy-900)]">Draft with NECTAR</div>
+                      </div>
+                    </div>
+                    <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
+                      Jot quick shorthand or tap the mic — NECTAR expands it into a goal-aligned draft you review and confirm.
+                    </p>
+                    {activeClientGoals.length > 0 && (
+                      <div className="mb-2 rounded-md border border-[color:var(--amber-300)] bg-white/70 px-2.5 py-1.5 text-[11px] text-[color:var(--navy-900)]">
+                        <span className="font-semibold">PCSP goals to address:</span>{" "}
+                        {activeClientGoals.slice(0, 3).join("; ")}
+                        {activeClientGoals.length > 3 && ` (+${activeClientGoals.length - 3} more)`}
+                      </div>
+                    )}
+                    <Textarea
+                      rows={3}
+                      value={shorthand}
+                      onChange={(e) => setShorthand(e.target.value)}
+                      placeholder="e.g. went to park, Blake talked to two people, bought a soda $2, calm all shift"
+                      maxLength={4000}
+                      className="min-h-[72px] w-full resize-y bg-white text-sm"
+                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={runDraftWithNectar}
+                        disabled={draftBusy || shorthand.trim().length < 3}
+                        className="min-h-[44px] bg-[color:var(--amber-600)] text-white hover:bg-[color:var(--amber-700)]"
+                      >
+                        {draftBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                        Draft with NECTAR
+                      </Button>
+                      {speechSupported && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => (isRecording ? stopRecording() : startRecording())}
+                          className={`min-h-[44px] ${isRecording ? "border-rose-500 text-rose-700" : ""}`}
+                        >
+                          {isRecording ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
+                          {isRecording ? "Stop voice" : "Speak shorthand"}
+                        </Button>
+                      )}
+                    </div>
+                    {nectarDraft && (
+                      <div className="mt-3 rounded-md border-2 border-[color:var(--amber-500)] bg-white px-3 py-2.5 shadow-sm">
+                        <div className="mb-1.5 flex items-center gap-2">
+                          <Hexagon className="h-3.5 w-3.5 text-[color:var(--amber-600)]" fill="currentColor" />
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
+                            NECTAR draft — review before confirming
+                          </span>
+                        </div>
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{nectarDraft}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={acceptNectarDraft}
+                            className="min-h-[44px]"
+                          >
+                            <Pencil className="mr-2 h-3.5 w-3.5" />
+                            Use draft &amp; edit below
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => { setNectarDraft(null); setNectarUsed(false); setDraftConfirmed(false); }}
+                            className="min-h-[44px]"
+                          >
+                            Discard draft
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </NectarInfusionLock>
+
                 {/* Narrative */}
                 <div className="grid gap-2">
                   <Label htmlFor="evv-narrative">
                     📝 Mandatory Progress Note &amp; Narrative Log
+                    {nectarUsed && (
+                      <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[color:var(--amber-400)] bg-[color:var(--amber-50)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
+                        <Hexagon className="h-2.5 w-2.5" fill="currentColor" /> AI-drafted — your review required
+                      </span>
+                    )}
                   </Label>
                   <Textarea
                     id="evv-narrative"
@@ -1302,10 +1402,11 @@ export function PunchPad({
                       setNarrative(e.target.value);
                       if (showNarrativeError) setShowNarrativeError(false);
                       if (aiCoach) setAiCoach(null);
+                      if (draftConfirmed) setDraftConfirmed(false);
                     }}
                     placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
                     maxLength={5000}
-                    className="min-h-[160px] w-full resize-y"
+                    className={`min-h-[160px] w-full resize-y ${nectarUsed && !draftConfirmed ? "border-[color:var(--amber-500)] bg-[color:var(--amber-50)]/30" : ""}`}
                   />
                   <div className={`text-xs font-medium ${narrativeOk ? "text-emerald-600" : "text-muted-foreground"}`}>
                     Word Count: {wordCount} / 50 words minimum
@@ -1316,7 +1417,24 @@ export function PunchPad({
                       to satisfy state Medicaid auditing and DSPD billing validation criteria.
                     </div>
                   )}
+                  {nectarUsed && (
+                    <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-md border-2 border-[color:var(--amber-400)] bg-[color:var(--amber-50)]/60 px-3 py-2 text-xs">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
+                        checked={draftConfirmed}
+                        onChange={(e) => setDraftConfirmed(e.target.checked)}
+                      />
+                      <span className="leading-relaxed text-[color:var(--navy-900)]">
+                        <span className="font-semibold">I've reviewed this note and confirm it accurately reflects the shift.</span>
+                        <span className="block text-[10px] text-muted-foreground">
+                          NECTAR drafted a starting point — the final narrative is staff-owned. Required before submission.
+                        </span>
+                      </span>
+                    </label>
+                  )}
                 </div>
+
 
                 {/* NECTAR Documentation Coach */}
                 {(aiBusy || aiCoach) && (

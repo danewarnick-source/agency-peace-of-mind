@@ -1661,8 +1661,131 @@ export function PunchPad({
                     )}
                   </div>
                 )}
+
+                {/* NECTAR Completeness Check */}
+                <NectarInfusionLock
+                  feature="Pre-submit completeness check"
+                  pitch="NECTAR cross-checks your shift before submit — purchases mentioned vs spending log, approved reimbursements vs receipts, EVV consistency — so issues get fixed before they become audit flags."
+                >
+                  <div className="rounded-lg border-2 border-[color:var(--amber-400)]/50 bg-white/60 px-3 py-3 shadow-sm backdrop-blur sm:px-4">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-sm font-bold text-[color:var(--navy-900)]">
+                        <ShieldCheck className="h-4 w-4 text-[color:var(--amber-600)]" />
+                        NECTAR Completeness Check
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={completenessRan ? "outline" : "default"}
+                        onClick={() => { void runCompletenessCheck(); }}
+                        disabled={completenessBusy}
+                        className={completenessRan ? "" : "bg-[color:var(--amber-600)] text-white hover:bg-[color:var(--amber-700)]"}
+                      >
+                        {completenessBusy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                        {completenessRan ? "Re-check" : "Run check"}
+                      </Button>
+                    </div>
+
+                    {!completenessRan && !completenessBusy && (
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        Run a quick check before submitting — catches missing receipts, unlogged purchases, and goal/note mismatches while you can still fix them.
+                      </p>
+                    )}
+
+                    {completenessRan && completenessFlags.length === 0 && (
+                      <div className="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-200">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>All clear — paperwork is consistent and complete.</span>
+                      </div>
+                    )}
+
+                    {completenessFlags.length > 0 && (
+                      <ul className="space-y-2">
+                        {completenessFlags.map((f) => {
+                          const dismissed = !!dismissals[f.key];
+                          const isHard = f.severity === "hard";
+                          return (
+                            <li
+                              key={f.key}
+                              className={`rounded-md border px-3 py-2 backdrop-blur ${
+                                dismissed
+                                  ? "border-muted bg-muted/40"
+                                  : isHard
+                                  ? "border-rose-500/50 bg-rose-500/10"
+                                  : "border-[color:var(--amber-500)]/50 bg-[color:var(--amber-50)]/70"
+                              }`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <span
+                                  className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                                    isHard
+                                      ? "bg-rose-600 text-white"
+                                      : "bg-[color:var(--amber-600)] text-white"
+                                  }`}
+                                >
+                                  {isHard ? "!" : "?"}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-xs font-medium leading-snug ${dismissed ? "text-muted-foreground line-through" : "text-[color:var(--navy-900)]"}`}>
+                                    {f.message}
+                                  </p>
+                                  {dismissed && (
+                                    <p className="mt-1 text-[10px] italic text-muted-foreground">
+                                      Dismissed: {dismissals[f.key]} — admin will review.
+                                    </p>
+                                  )}
+                                  {!dismissed && dismissingKey === f.key && (
+                                    <div className="mt-2 space-y-1.5">
+                                      <Textarea
+                                        rows={2}
+                                        value={dismissReasonDraft}
+                                        onChange={(e) => setDismissReasonDraft(e.target.value)}
+                                        placeholder="Why are you submitting without addressing this?"
+                                        className="min-h-[60px] text-xs"
+                                      />
+                                      <div className="flex gap-1.5">
+                                        <Button type="button" size="sm" variant="outline" onClick={() => { setDismissingKey(null); setDismissReasonDraft(""); }} className="h-8 text-[11px]">Cancel</Button>
+                                        <Button type="button" size="sm" onClick={() => confirmDismiss(f.key)} className="h-8 text-[11px]">Save reason</Button>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {!dismissed && dismissingKey !== f.key && (
+                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => jumpToFix(f)}
+                                        className="h-8 gap-1 text-[11px]"
+                                      >
+                                        {f.fix?.route ? <ExternalLink className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+                                        {f.fix?.label ?? "Fix"}
+                                      </Button>
+                                      {!isHard && (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => { setDismissingKey(f.key); setDismissReasonDraft(""); }}
+                                          className="h-8 text-[11px] text-muted-foreground"
+                                        >
+                                          Dismiss with reason
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                </NectarInfusionLock>
               </div>
             </div>
+
 
             <div className="shrink-0 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
               <div className="flex flex-col gap-2">

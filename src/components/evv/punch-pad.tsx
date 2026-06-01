@@ -273,6 +273,19 @@ export function PunchPad({
   const [dismissReasonDraft, setDismissReasonDraft] = useState("");
   const navigate = useNavigate();
 
+  // ── NECTAR Variance Rescue (Infusion add-on) ───────────────────────────────
+  const [varShorthand, setVarShorthand]       = useState("");
+  const [varDraftBusy, setVarDraftBusy]       = useState(false);
+  const [outVarShorthand, setOutVarShorthand] = useState("");
+  const [outVarDraftBusy, setOutVarDraftBusy] = useState(false);
+
+  // ── NECTAR Procedural Q&A (Infusion add-on) ────────────────────────────────
+  const [askOpen, setAskOpen]         = useState(false);
+  const [askQuestion, setAskQuestion] = useState("");
+  const [askBusy, setAskBusy]         = useState(false);
+  const [askResult, setAskResult]     = useState<ProceduralResult | null>(null);
+
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

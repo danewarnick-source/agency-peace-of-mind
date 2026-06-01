@@ -2,91 +2,118 @@ import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, Search, MapPin, Clock, Home } from "lucide-react";
+import { User, Search, Clock, Home } from "lucide-react";
 
+// Service codes billed per day (daily workspace). Everything else is treated
+// as hourly (EVV time punch). HHS and RHS are the canonical daily codes;
+// DSG and the room-and-board respite codes also bill per day.
+const DAILY_CODES = new Set(["HHS", "RHS", "DSG", "RL6", "RP3", "RP4", "RP5"]);
+const isDaily = (code: string) => DAILY_CODES.has(code);
+const billingLabel = (code: string) => (isDaily(code) ? "Daily" : "Hourly");
 
-// Service-mode pills shown under the address. Only codes that represent a
-// worker-facing "mode" (hourly EVV vs. residential HHS) are rendered as
-// interactive pills here.
-const MODE_CODES = ["SEI", "DSI", "HHS"] as const;
-type ModeCode = (typeof MODE_CODES)[number];
-
-function ClientRow({ c }: { c: CaseloadClient }) {
-  const allCodes = Array.isArray(c.job_code) ? c.job_code : [];
-  const availableModes = MODE_CODES.filter((m) => allCodes.includes(m));
-  const initialMode: ModeCode =
-    availableModes[0] ?? (allCodes.includes("HHS") ? "HHS" : "SEI");
-  const [mode, setMode] = useState<ModeCode>(initialMode);
+function ClientCard({ c }: { c: CaseloadClient }) {
+  const codes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
+  // Default to first available (treated as primary/most-frequent).
+  const initial = codes[0] ?? "SEI";
+  const [selected, setSelected] = useState<string>(initial);
 
   const fullName = `${c.first_name} ${c.last_name}`.trim();
-  const location = c.physical_address?.trim() || "No primary house on file";
-  const isHHS = mode === "HHS";
+  const address = c.physical_address?.trim() || "No primary house on file";
+  const daily = isDaily(selected);
 
-  const pills: ModeCode[] = availableModes.length ? availableModes : [initialMode];
+  // Avatar initials
+  const initials = `${c.first_name?.[0] ?? ""}${c.last_name?.[0] ?? ""}`.toUpperCase() || "—";
+
+  const pills = codes.length ? codes : [initial];
 
   return (
-    <li className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4 transition-colors hover:border-accent/50 md:flex-row md:items-center md:justify-between">
-      <div className="flex items-start gap-3 min-w-0">
+    <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      {/* Header: avatar + name + address (no truncation) */}
+      <header className="flex items-start gap-3">
         <span
-          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${
-            isHHS ? "bg-warning/15 text-warning-foreground" : "bg-accent/10 text-accent"
-          }`}
+          aria-hidden
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--navy-900,#0d112b)] text-sm font-semibold text-white"
         >
-          <User className="h-5 w-5" />
+          {initials || <User className="h-5 w-5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold leading-tight">{fullName}</p>
-          <p className="mt-0.5 flex items-start gap-1.5 text-xs text-muted-foreground">
-            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span className="line-clamp-2">{location}</span>
+          <h3 className="break-words text-base font-semibold leading-snug text-foreground">
+            {fullName}
+          </h3>
+          <p className="mt-1 break-words text-sm leading-snug text-muted-foreground">
+            {address}
           </p>
+        </div>
+      </header>
 
-          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Service mode">
-            {pills.map((code) => {
-              const active = mode === code;
-              return (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setMode(code)}
-                  aria-pressed={active}
-                  className={`min-h-[28px] rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    active
-                      ? code === "HHS"
-                        ? "border-warning bg-warning/15 text-warning-foreground"
-                        : "border-accent bg-accent/10 text-accent"
-                      : "border-border bg-background text-muted-foreground hover:border-accent/40 hover:text-foreground"
-                  }`}
-                >
-                  [{code}]
-                </button>
-              );
-            })}
-            {allCodes
-              .filter((code) => !MODE_CODES.includes(code as ModeCode))
-              .slice(0, 4)
-              .map((code) => (
-                <Badge key={code} variant="outline" className="font-mono text-[10px]">
+      {/* Service selector */}
+      <div className="mt-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Select a service
+        </p>
+        <div
+          role="radiogroup"
+          aria-label={`Service for ${fullName}`}
+          className="mt-2 flex flex-wrap gap-2"
+        >
+          {pills.map((code) => {
+            const active = selected === code;
+            return (
+              <button
+                key={code}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setSelected(code)}
+                className={[
+                  "min-h-[44px] rounded-lg border px-3 py-1.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  active
+                    ? "border-[color:var(--amber-600,#f59324)] bg-[image:var(--gradient-amber)] text-[color:var(--navy-900,#0d112b)] shadow-sm"
+                    : "border-border bg-background text-foreground hover:border-[color:var(--amber-600,#f59324)]/60",
+                ].join(" ")}
+              >
+                <span className="block font-mono text-sm font-semibold leading-tight">
                   {code}
-                </Badge>
-              ))}
-          </div>
+                </span>
+                <span
+                  className={[
+                    "block text-[10px] font-medium uppercase tracking-wide leading-tight",
+                    active ? "text-[color:var(--navy-900,#0d112b)]/70" : "text-muted-foreground",
+                  ].join(" ")}
+                >
+                  {billingLabel(code)}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <Button asChild size="default" className="shrink-0 md:ml-4">
-        <Link
-          to={isHHS ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
-          params={{ clientId: c.id }}
-          aria-label={`Open ${isHHS ? "host home client hub" : "hourly time clock"} for ${fullName}`}
+      {/* Primary action */}
+      <div className="mt-4">
+        <Button
+          asChild
+          size="lg"
+          className="h-12 w-full text-base"
+          aria-label={`${daily ? "Open Client Hub" : "Open Time Clock"} for ${fullName} (${selected})`}
         >
-          {isHHS ? <Home /> : <Clock />}
-          {isHHS ? "Open Client Hub" : "Open Time Clock"}
-        </Link>
-      </Button>
-    </li>
+          <Link
+            to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
+            params={{ clientId: c.id }}
+            search={{ service: selected }}
+          >
+            {daily ? <Home /> : <Clock />}
+            {daily ? "Open Client Hub" : "Open Time Clock"}
+          </Link>
+        </Button>
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          {daily
+            ? "Daily note · PCSP narrative · month-end paperwork"
+            : "EVV time punch · shift & month-end paperwork"}
+        </p>
+      </div>
+    </article>
   );
 }
 
@@ -105,39 +132,45 @@ export function StaffClientGrid() {
   }, [source, q]);
 
   return (
-    <section
-      aria-label="My Caseload"
-      className="rounded-lg border border-border bg-card p-4"
-    >
-      <div className="sticky top-14 z-10 -mx-4 flex flex-col gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:flex-row md:items-center md:justify-between md:border-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight">My Caseload</h2>
-          <p className="hidden text-xs text-muted-foreground md:block">
-            Tap a service pill to switch modes, then open the matching workspace.
-          </p>
-        </div>
-        <div className="relative w-full md:max-w-xs">
+    <section aria-label="My Caseload" className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome back</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {source.length
+            ? `${source.length} ${source.length === 1 ? "person" : "people"} on your caseload`
+            : "Your caseload"}
+        </p>
+      </div>
+
+      {/* Sticky search */}
+      <div className="sticky top-14 z-10 -mx-3 border-b border-border bg-background/95 px-3 py-2 backdrop-blur md:top-0">
+        <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search by name…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="h-11 pl-9 text-base md:h-10 md:text-sm"
+            className="h-12 w-full pl-10 text-base"
             inputMode="search"
+            aria-label="Search caseload by name"
           />
         </div>
       </div>
 
       {isLoading ? (
-        <p className="mt-4 text-sm text-muted-foreground">Loading caseload…</p>
+        <p className="text-sm text-muted-foreground">Loading caseload…</p>
       ) : !clients.length ? (
-        <div className="mt-4 rounded-lg border border-dashed border-border bg-surface-warm p-6 text-center text-sm text-muted-foreground">
-          {q ? "No matches in your caseload." : "No clients assigned yet — contact your administrator to be assigned to individuals on your caseload."}
+        <div className="rounded-xl border border-dashed border-border bg-surface-warm p-6 text-center text-sm text-muted-foreground">
+          {q
+            ? "No matches in your caseload."
+            : "No clients assigned yet — contact your administrator to be assigned to individuals on your caseload."}
         </div>
       ) : (
-        <ul className="mt-4 flex flex-col gap-2">
+        <ul className="flex flex-col gap-3">
           {clients.map((c) => (
-            <ClientRow key={c.id} c={c} />
+            <li key={c.id}>
+              <ClientCard c={c} />
+            </li>
           ))}
         </ul>
       )}

@@ -99,7 +99,7 @@ interface AttestationRow {
   attested_at: string;
   user_display_name: string | null;
   statement: string;
-  context: Record<string, unknown> | null;
+  context: Json | null;
 }
 
 export const listExternalRequirements = createServerFn({ method: "POST" })

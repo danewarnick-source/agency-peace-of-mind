@@ -1354,6 +1354,22 @@ function RequirementRow({
       {!isRemoved && (
         <ApplicabilityPanel orgId={orgId} requirementId={req.id} />
       )}
+      <RequirementDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        req={req}
+        orgId={orgId}
+        sourceMeta={sourceMeta ?? null}
+        status={status}
+        onConfirm={() => set.mutate({ status: "confirmed" })}
+        onUnconfirm={() => set.mutate({ status: "needs_attention" })}
+        onReopen={() => set.mutate({ status: "needs_attention" })}
+        onRequestRemove={() => {
+          setDetailOpen(false);
+          setRemoveOpen(true);
+        }}
+        isMutating={set.isPending}
+      />
     </li>
   );
 }

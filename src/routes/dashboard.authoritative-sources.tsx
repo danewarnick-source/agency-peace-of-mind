@@ -76,7 +76,8 @@ import {
   prefillRequirementMappings,
   confirmRequirementWithScopes,
 } from "@/lib/nectar-engine.functions";
-import { Sparkle, X as XIcon } from "lucide-react";
+import { Sparkle, X as XIcon, Hexagon } from "lucide-react";
+import { AuthorizedCodesPanel } from "@/components/nectar/authorized-codes-panel";
 
 
 

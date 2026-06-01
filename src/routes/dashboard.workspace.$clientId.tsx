@@ -141,36 +141,23 @@ function ClientWorkspace() {
           onValueChange={(val) => navigate({ to: ".", search: { tab: val }, replace: true })}
           className="w-full"
         >
-          {/* Touch-friendly tab bar — mirrored across mobile and desktop */}
-          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 p-1">
-            <TabsTrigger
-              value="about"
-              className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
-            >
-              <User className="h-4 w-4" />
-              <span>About</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="clock-in"
-              className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
-            >
-              <Clock className="h-4 w-4" />
-              <span>Clock In</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="emar"
-              className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
-            >
-              <Pill className="h-4 w-4" />
-              <span>MAR</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="forms"
-              className="h-11 min-w-[44px] gap-1.5 text-xs sm:text-sm"
-            >
-              <FileText className="h-4 w-4" />
-              <span>Forms & Reports</span>
-            </TabsTrigger>
+          {/* Touch-friendly tab bar — amber active w/ 2px underline, navy inactive (tappable, never dimmed) */}
+          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 border-b border-border bg-transparent p-0 text-foreground">
+            {[
+              { v: "about", label: "About", Icon: User },
+              { v: "clock-in", label: "Clock In", Icon: Clock },
+              { v: "emar", label: "MAR", Icon: Pill },
+              { v: "forms", label: "Forms", Icon: FileText },
+            ].map(({ v, label, Icon }) => (
+              <TabsTrigger
+                key={v}
+                value={v}
+                className="h-12 min-w-[44px] gap-1.5 rounded-none px-1 text-xs font-semibold text-[color:var(--navy-900,#0d112b)] hover:text-[color:var(--amber-700,#d97a1c)] data-[state=active]:text-[color:var(--amber-700,#d97a1c)] sm:text-sm"
+              >
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <TabsContent value="about" className="mt-5">

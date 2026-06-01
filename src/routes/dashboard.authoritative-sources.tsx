@@ -53,10 +53,11 @@ import {
   generateRequirementsFromSource,
   verifyRequirement,
   upsertRequirement,
-  deleteRequirement,
+  setRequirementReviewStatus,
   listAttestations,
   ingestWebSource,
 } from "@/lib/authoritative-sources.functions";
+
 
 export const Route = createFileRoute("/dashboard/authoritative-sources")({
   head: () => ({

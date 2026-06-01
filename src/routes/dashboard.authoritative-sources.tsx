@@ -78,6 +78,9 @@ import {
 } from "@/lib/nectar-engine.functions";
 import { Sparkle, X as XIcon, Hexagon } from "lucide-react";
 import { AuthorizedCodesPanel } from "@/components/nectar/authorized-codes-panel";
+import { ExternalLink as ExternalLinkIcon, Building } from "lucide-react";
+import { attestExternalCompletion, inferClassification } from "@/lib/external-compliance.functions";
+import { Textarea } from "@/components/ui/textarea";
 
 
 

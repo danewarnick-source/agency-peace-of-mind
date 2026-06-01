@@ -50,11 +50,31 @@ export function useNectarPayPeriod() {
   const { user } = useAuth();
   const { settings } = useTimePaySettings();
   const { data: worker } = useWorkerProfile();
+  const { data: assignments } = useMyAssignments();
 
   const schedule: PaySchedule =
     worker?.worker_type === "1099" ? settings.contractor_schedule : settings.w2_schedule;
   const anchor =
     worker?.worker_type === "1099" ? settings.contractor_period_anchor : settings.w2_period_anchor;
+
+  // Aggregate the staff member's assigned codes across all clients to
+  // decide whether NECTAR should show the hourly line, the daily line, or
+  // both. A staff with no daily assignment never sees daily totals/lines.
+  let has_hourly_assignment = false;
+  let has_daily_assignment = false;
+  if (assignments) {
+    for (const codes of assignments.values()) {
+      if (codes === null) {
+        has_hourly_assignment = true;
+        has_daily_assignment = true;
+        break;
+      }
+      for (const c of codes) {
+        if (isDailyServiceCode(c)) has_daily_assignment = true;
+        else has_hourly_assignment = true;
+      }
+    }
+  }
 
   return useQuery({
     enabled: !!user?.id && !!worker,
@@ -66,55 +86,79 @@ export function useNectarPayPeriod() {
       worker?.daily_rate,
       schedule,
       anchor,
+      has_hourly_assignment,
+      has_daily_assignment,
     ],
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<NectarPayPeriod> => {
       const { start, end, label } = computePeriodBounds(schedule, anchor);
 
-      // Hourly side: completed evv punches on hourly service codes.
-      const { data: tsRows, error } = await supabase
-        .from("evv_timesheets")
-        .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
-        .eq("staff_id", user!.id)
-        .gte("clock_in_timestamp", start.toISOString())
-        .lte("clock_in_timestamp", end.toISOString());
-      if (error) throw error;
-
       const per: Record<string, number> = {};
       let hourly_hours = 0;
-      for (const r of (tsRows ?? []) as Array<{
-        client_id: string;
-        service_type_code: string | null;
-        clock_in_timestamp: string;
-        clock_out_timestamp: string | null;
-      }>) {
-        if (!r.clock_out_timestamp) continue;
-        if (isDailyServiceCode(r.service_type_code)) continue;
-        const hrs =
-          (new Date(r.clock_out_timestamp).getTime() -
-            new Date(r.clock_in_timestamp).getTime()) /
-          3_600_000;
-        if (hrs <= 0 || !isFinite(hrs)) continue;
-        hourly_hours += hrs;
-        per[r.client_id] = (per[r.client_id] ?? 0) + hrs;
+      if (has_hourly_assignment) {
+        const { data: tsRows, error } = await supabase
+          .from("evv_timesheets")
+          .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+          .eq("staff_id", user!.id)
+          .gte("clock_in_timestamp", start.toISOString())
+          .lte("clock_in_timestamp", end.toISOString());
+        if (error) throw error;
+        for (const r of (tsRows ?? []) as Array<{
+          client_id: string;
+          service_type_code: string | null;
+          clock_in_timestamp: string;
+          clock_out_timestamp: string | null;
+        }>) {
+          if (!r.clock_out_timestamp) continue;
+          if (isDailyServiceCode(r.service_type_code)) continue;
+          // Honor per-client assignment scope: only count punches on codes
+          // the staff is actually assigned for this client.
+          if (assignments) {
+            const allow = assignments.get(r.client_id);
+            if (allow === undefined) continue;
+            if (allow && r.service_type_code && !allow.has(r.service_type_code)) continue;
+          }
+          const hrs =
+            (new Date(r.clock_out_timestamp).getTime() -
+              new Date(r.clock_in_timestamp).getTime()) /
+            3_600_000;
+          if (hrs <= 0 || !isFinite(hrs)) continue;
+          hourly_hours += hrs;
+          per[r.client_id] = (per[r.client_id] ?? 0) + hrs;
+        }
       }
 
-      // Daily side: distinct completed daily-log days for this staff in window.
-      const startDate = start.toISOString().slice(0, 10);
-      const endDate = end.toISOString().slice(0, 10);
-      const { data: dlRows, error: dlErr } = await supabase
-        .from("hhs_daily_records")
-        .select("record_date")
-        .eq("provider_id", user!.id)
-        .gte("record_date", startDate)
-        .lte("record_date", endDate);
-      if (dlErr) throw dlErr;
-      const dayKeys = new Set<string>();
-      for (const r of (dlRows ?? []) as Array<{ record_date: string }>) {
-        if (r.record_date) dayKeys.add(r.record_date);
+      let daily_days = 0;
+      if (has_daily_assignment) {
+        const startDate = start.toISOString().slice(0, 10);
+        const endDate = end.toISOString().slice(0, 10);
+        const { data: dlRows, error: dlErr } = await supabase
+          .from("hhs_daily_records")
+          .select("record_date, client_id")
+          .eq("provider_id", user!.id)
+          .gte("record_date", startDate)
+          .lte("record_date", endDate);
+        if (dlErr) throw dlErr;
+        const dayKeys = new Set<string>();
+        for (const r of (dlRows ?? []) as Array<{ record_date: string; client_id: string }>) {
+          if (!r.record_date) continue;
+          if (assignments) {
+            const allow = assignments.get(r.client_id);
+            if (allow === undefined) continue;
+            // Daily-billed clients: any daily code in allow-list is enough.
+            if (allow) {
+              let ok = false;
+              for (const c of allow) {
+                if (isDailyServiceCode(c)) { ok = true; break; }
+              }
+              if (!ok) continue;
+            }
+          }
+          dayKeys.add(`${r.client_id}|${r.record_date}`);
+        }
+        daily_days = dayKeys.size;
       }
-      const daily_days = dayKeys.size;
 
       const hourly_rate =
         typeof worker?.hourly_rate === "number" && worker.hourly_rate > 0
@@ -125,11 +169,15 @@ export function useNectarPayPeriod() {
           ? worker.daily_rate
           : FALLBACK_DAILY;
 
-      const hourly_earnings = hourly_hours * hourly_rate;
-      const daily_earnings = daily_days * daily_rate;
+      const hourly_earnings = has_hourly_assignment ? hourly_hours * hourly_rate : 0;
+      const daily_earnings = has_daily_assignment ? daily_days * daily_rate : 0;
 
-      const outstanding_daily_logs = Math.max(0, Math.round(hourly_hours / 8) % 4);
-      const incomplete_attendance_days = Math.max(0, 2 - Math.floor(hourly_hours / 20));
+      const outstanding_daily_logs = has_daily_assignment
+        ? Math.max(0, Math.round(hourly_hours / 8) % 4)
+        : 0;
+      const incomplete_attendance_days = has_daily_assignment
+        ? Math.max(0, 2 - Math.floor(hourly_hours / 20))
+        : 0;
 
       return {
         label,
@@ -146,6 +194,8 @@ export function useNectarPayPeriod() {
         outstanding_daily_logs,
         incomplete_attendance_days,
         schedule,
+        has_hourly_assignment,
+        has_daily_assignment,
       };
     },
   });

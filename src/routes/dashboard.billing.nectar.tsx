@@ -234,11 +234,16 @@ function ReportBuilder() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-[#d97a1c]" />
-        <h2 className="font-display text-lg font-semibold">Ask NECTAR</h2>
-        <span className="text-xs text-muted-foreground">Natural-language reports from HIVE data</span>
+    <section className="rounded-xl border border-[#f4a93a]/30 bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-3">
+        <NectarMark size="sm" />
+        <div className="flex flex-1 items-center gap-2">
+          <h2 className="font-display text-lg font-semibold">Ask NECTAR</h2>
+          <NectarBadge size="xs" label="REPORTS" />
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            Natural-language reports from HIVE data
+          </span>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -249,15 +254,14 @@ function ReportBuilder() {
           placeholder='e.g. "Total DSI hours per client last quarter" or "All shifts John worked this month with Tonya"'
           className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
         />
-        <button
+        <NectarButton
           type="button"
           onClick={() => submit()}
-          disabled={m.isPending || prompt.trim().length < 3}
-          className="inline-flex items-center gap-2 rounded-md bg-[image:var(--gradient-brand)] px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm disabled:opacity-50"
+          disabled={prompt.trim().length < 3}
+          loading={m.isPending}
         >
-          {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           Run
-        </button>
+        </NectarButton>
         <button
           type="button"
           onClick={() => { setSaveName(prompt.slice(0, 60)); setSaveOpen(true); }}

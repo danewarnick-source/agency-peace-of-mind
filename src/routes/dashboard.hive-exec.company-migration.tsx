@@ -209,7 +209,12 @@ function CompanyMigrationPage() {
       setProgress(i);
     }
     setPhase("done");
-    toast.success("Migration committed. Items needing attention sent to NECTAR Task Center.");
+    setEngagementStatus("review");
+    toast.success(
+      targetCompany
+        ? `Migration committed to ${targetCompany.name}. Flagged items sent to their NECTAR Task Center.`
+        : "Migration committed. Flagged items sent to the NECTAR Task Center.",
+    );
   };
 
   return (

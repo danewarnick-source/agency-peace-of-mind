@@ -54,15 +54,26 @@ function HelpPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
+  const [ticketId, setTicketId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const ask = useServerFn(askNectarHelp);
+  const escalate = useServerFn(escalateHelpToHive);
+  const getStatus = useServerFn(getHelpTicketStatus);
 
   useEffect(() => { setRecent(loadRecent()); }, []);
   useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  const ticketQ = useQuery({
+    queryKey: ["help-ticket", ticketId],
+    enabled: !!ticketId,
+    queryFn: () => getStatus({ data: { ticketId: ticketId! } }),
+    refetchInterval: 15_000,
+  });
+
 
   const m = useMutation({
     mutationFn: async (q: string) => ask({ data: { question: q, role } }),

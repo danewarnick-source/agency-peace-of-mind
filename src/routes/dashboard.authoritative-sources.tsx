@@ -1519,6 +1519,35 @@ function RequirementRow({
               >
                 Unconfirm requirement
               </Button>
+            ) : hasPrefilledProposals ? (
+              <>
+                <Button
+                  size="sm"
+                  className="bg-amber-500 text-amber-950 hover:bg-amber-400"
+                  onClick={() => confirmAll.mutate()}
+                  disabled={confirmAll.isPending || set.isPending}
+                  title={`Approve NECTAR's proposal: confirm this requirement and its ${pendingProposals} proposed scope${
+                    pendingProposals === 1 ? "" : "s"
+                  } in one step.`}
+                >
+                  {confirmAll.isPending ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                  )}
+                  Looks right — confirm ({pendingProposals})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-2 text-[11px] text-muted-foreground"
+                  onClick={() => set.mutate({ status: "confirmed" })}
+                  disabled={set.isPending || confirmAll.isPending}
+                  title="Confirm just the requirement; review the scope manually below."
+                >
+                  Just the requirement
+                </Button>
+              </>
             ) : (
               <Button
                 size="sm"
@@ -1528,6 +1557,7 @@ function RequirementRow({
                 title="Step 1 of 2 — confirm this is a real requirement. You'll then confirm applicability scope below."
               >
                 Confirm requirement
+
               </Button>
             )}
 

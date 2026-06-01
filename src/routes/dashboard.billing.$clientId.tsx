@@ -1,4 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -93,12 +101,31 @@ function ClientBillingDetail() {
 
   return (
     <div className="space-y-5">
-      <Link
-        to="/dashboard/billing"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> All clients
-      </Link>
+      <div className="flex flex-col gap-2">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/dashboard/billing">Billing</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>
+                {clientQ.data ? `${clientQ.data.last_name}, ${clientQ.data.first_name}` : "Client"}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <div>
+          <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground">
+            <Link to="/dashboard/billing">
+              <ArrowLeft className="mr-1 h-4 w-4" /> Back to Billing
+            </Link>
+          </Button>
+        </div>
+      </div>
+
 
       <header className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h2 className="font-display text-xl font-bold">

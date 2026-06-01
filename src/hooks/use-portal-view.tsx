@@ -1,13 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 
-export type PortalView = "staff" | "admin";
+export type PortalView = "staff" | "admin" | "staff_mobile";
 const KEY = "portal-view";
 const EVT = "portal-view-change";
 
 function read(): PortalView {
   if (typeof window === "undefined") return "staff";
   const v = window.localStorage.getItem(KEY);
-  return v === "admin" ? "admin" : "staff";
+  if (v === "admin") return "admin";
+  if (v === "staff_mobile") return "staff_mobile";
+  return "staff";
 }
 
 export function usePortalView() {

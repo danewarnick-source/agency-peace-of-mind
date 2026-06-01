@@ -116,20 +116,20 @@ function DocumentPull({ orgId }: { orgId?: string }) {
       if (wantsAll || type === "billing") {
         let q = supabase
           .from("billing_submissions")
-          .select("id, period_month, status, created_at")
+          .select("id, period_start, period_end, status, created_at")
           .eq("organization_id", orgId!)
-          .order("period_month", { ascending: false })
+          .order("period_start", { ascending: false })
           .limit(50);
-        if (from) q = q.gte("period_month", from);
-        if (to) q = q.lte("period_month", to);
+        if (from) q = q.gte("period_start", from);
+        if (to) q = q.lte("period_start", to);
         const { data: bs } = await q;
         (bs ?? []).forEach((s: any) =>
           rows.push({
             id: `billing:${s.id}`,
             type: "520 Billing Submission",
-            title: `520 — ${format(new Date(s.period_month), "MMMM yyyy")}`,
+            title: `520 — ${format(new Date(s.period_start), "MMMM yyyy")}`,
             subtitle: s.status,
-            date: s.period_month,
+            date: s.period_start,
           }),
         );
       }

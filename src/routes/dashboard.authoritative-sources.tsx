@@ -12,6 +12,8 @@ import {
   ScrollText,
   ShieldCheck,
   Sparkles,
+  Globe,
+  Info,
   Upload,
 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";

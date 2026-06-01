@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  Sparkles, ChevronDown, ChevronRight, FileText, CalendarX,
+  Sparkles, ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays,
 } from "lucide-react";
 import {
   useNectarPayPeriod, useLivePayPeriod,
@@ -10,12 +10,14 @@ import { useCountUp } from "@/hooks/use-count-up";
 import { HexWatermark } from "@/components/brand/hex-watermark";
 
 const fmtHours = (n: number) => `${n.toFixed(1)} hrs`;
+const fmtDays = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 const fmtUSD = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 /**
- * Slim NECTAR pay-period pill — expands on tap. Hours/pay count up on load
- * and tick live while a shift is active. Hex watermark reinforces brand.
+ * Slim NECTAR pay-period pill — expands to show the hourly + daily pay
+ * breakdown. Hourly earnings tick live during an active hourly shift;
+ * daily earnings only update when a daily log is filed.
  */
 export function NectarPayPeriodCard() {
   const { data } = useNectarPayPeriod();
@@ -23,15 +25,25 @@ export function NectarPayPeriodCard() {
   const [open, setOpen] = useState(false);
 
   const label = data?.label ?? "Current period";
-  // Count up to the static base on load; once a shift is live, mirror the
-  // live total directly so the second-by-second tick is smooth.
-  const animatedHours = useCountUp(data?.hours_total ?? 0);
-  const animatedPay = useCountUp(data?.est_gross_pay ?? 0);
-  const hours = live.isLive ? live.hoursTotal : animatedHours;
-  const pay = live.isLive ? live.payTotal : animatedPay;
+
+  const baseHourlyHours = data?.hourly_hours ?? 0;
+  const baseHourlyPay = data?.hourly_earnings ?? 0;
+  const dailyDays = data?.daily_days ?? 0;
+  const dailyPay = data?.daily_earnings ?? 0;
+  const hourlyRate = data?.hourly_rate ?? 0;
+  const dailyRate = data?.daily_rate ?? 0;
+
+  // Count up the static totals on load; mirror live values second-by-second
+  // once an hourly shift is running.
+  const animatedHours = useCountUp(baseHourlyHours);
+  const animatedPay = useCountUp((data?.est_gross_pay ?? 0));
+  const hourlyHoursDisplay = live.isLive ? live.hoursTotal : animatedHours;
+  const hourlyPayDisplay = live.isLive ? baseHourlyPay + live.liveEarnings : baseHourlyPay;
+  const payTotal = live.isLive ? live.payTotal : animatedPay;
+
   const logs = data?.outstanding_daily_logs ?? 0;
-  const days = data?.incomplete_attendance_days ?? 0;
-  const todo = logs + days;
+  const attn = data?.incomplete_attendance_days ?? 0;
+  const todo = logs + attn;
 
   return (
     <section
@@ -52,7 +64,7 @@ export function NectarPayPeriodCard() {
         </span>
 
         <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold tabular-nums text-white">
-          {fmtHours(hours)} · {fmtUSD(pay)}
+          {fmtHours(hourlyHoursDisplay)} · {fmtUSD(payTotal)}
           {live.isLive && (
             <span className="ml-2 inline-flex items-center gap-1 align-middle text-[10px] font-semibold uppercase tracking-wider text-[#9cf2c8]">
               <span className="relative inline-flex h-1.5 w-1.5">
@@ -87,25 +99,56 @@ export function NectarPayPeriodCard() {
             Pay period · {label}
           </p>
 
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-white/[0.06] px-3 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
-                Hours this period
-              </p>
-              <p className="mt-1 font-mono text-2xl font-bold tabular-nums">
-                {fmtHours(hours)}
-              </p>
+          {/* Pay breakdown */}
+          <div className="mt-3 overflow-hidden rounded-xl bg-white/[0.06]">
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+                <Clock className="h-4 w-4 text-[#f4a93a]" />
+                Hourly services
+              </span>
+              <span className="font-mono text-sm tabular-nums text-white/90">
+                {fmtHours(hourlyHoursDisplay)} × {fmtUSD(hourlyRate)}
+              </span>
             </div>
-            <div className="rounded-xl bg-white/[0.06] px-3 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
-                Est. gross pay
-              </p>
-              <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[#f4a93a]">
-                {fmtUSD(pay)}
-              </p>
-              <p className="text-[10px] font-semibold text-[#f4a93a]">
-                before taxes
-              </p>
+            <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
+              <span className="text-[11px] uppercase tracking-wider text-white/70">
+                = subtotal
+              </span>
+              <span className="font-mono text-sm font-semibold tabular-nums text-white">
+                {fmtUSD(hourlyPayDisplay)}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+                <CalendarDays className="h-4 w-4 text-[#f4a93a]" />
+                Daily services
+              </span>
+              <span className="font-mono text-sm tabular-nums text-white/90">
+                {fmtDays(dailyDays)} × {fmtUSD(dailyRate)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
+              <span className="text-[11px] uppercase tracking-wider text-white/70">
+                = subtotal
+              </span>
+              <span className="font-mono text-sm font-semibold tabular-nums text-white">
+                {fmtUSD(dailyPay)}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-white/15 bg-white/[0.04] px-3 py-3">
+              <div className="flex flex-col">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
+                  Est. gross pay
+                </span>
+                <span className="text-[10px] font-medium text-[#f4a93a]">
+                  Estimate · before taxes
+                </span>
+              </div>
+              <span className="font-mono text-xl font-bold tabular-nums text-[#f4a93a]">
+                {fmtUSD(payTotal)}
+              </span>
             </div>
           </div>
 
@@ -141,7 +184,7 @@ export function NectarPayPeriodCard() {
                 </span>
                 <span className="inline-flex items-center gap-2">
                   <span className="rounded-full bg-[image:var(--gradient-amber)] px-2 py-0.5 font-mono text-xs font-bold tabular-nums text-[#412402]">
-                    {days}
+                    {attn}
                   </span>
                   <ChevronRight className="h-4 w-4 text-white/80" />
                 </span>

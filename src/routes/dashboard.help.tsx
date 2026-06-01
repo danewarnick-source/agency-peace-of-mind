@@ -253,9 +253,7 @@ function EmptyState({
 }: { starters: string[]; recent: string[]; onPick: (q: string) => void }) {
   return (
     <div className="flex flex-col items-center gap-4 py-8 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0f1b3d] text-white shadow-md">
-        <Hexagon className="h-8 w-8 text-[#d97a1c]" fill="currentColor" />
-      </div>
+      <NectarMark size="lg" />
       <div>
         <h2 className="font-display text-lg font-semibold text-[#0f1b3d]">Hi! I'm NECTAR.</h2>
         <p className="mt-1 max-w-md text-sm text-muted-foreground">

@@ -531,3 +531,293 @@ export const listEngineGapsAsTasks = createServerFn({ method: "POST" })
       .filter((x): x is NonNullable<typeof x> => !!x);
     return { tasks };
   });
+
+// ---------- Prompt 31: bulk pre-fill of NECTAR proposals ----------
+// Walks every requirement that has zero mappings and asks NECTAR to propose
+// applicability scope up-front, so the admin's job becomes review-and-approve
+// rather than building from scratch. Pre-filled rows stay `confirmed: false`
+// (proposed by nectar) — nothing is self-confirmed.
+
+const PREFILL_CONCURRENCY = 4;
+
+export const prefillRequirementMappings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        requirementIds: z.array(z.string().uuid()).max(500).optional(),
+        max: z.number().int().min(1).max(200).default(60),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    // Which requirements already have at least one mapping? Skip those.
+    const { data: existingMaps } = await supabase
+      .from("nectar_requirement_mappings")
+      .select("requirement_id")
+      .eq("organization_id", data.organizationId);
+    const hasMapping = new Set(
+      ((existingMaps ?? []) as Array<{ requirement_id: string }>).map(
+        (m) => m.requirement_id,
+      ),
+    );
+
+    let q = supabase
+      .from("nectar_requirements")
+      .select("id, organization_id, title, description, source_citation, jurisdiction, review_status")
+      .eq("organization_id", data.organizationId)
+      .neq("review_status", "removed");
+    if (data.requirementIds?.length) q = q.in("id", data.requirementIds);
+    const { data: reqs, error: rErr } = await q;
+    if (rErr) throw new Error(rErr.message);
+
+    const candidates = ((reqs ?? []) as Array<{
+      id: string;
+      organization_id: string;
+      title: string;
+      description: string | null;
+      source_citation: string | null;
+      jurisdiction: string | null;
+    }>).filter((r) => !hasMapping.has(r.id)).slice(0, data.max);
+
+    if (candidates.length === 0) {
+      return { processed: 0, inserted: 0, skipped: 0, alreadyMapped: hasMapping.size };
+    }
+
+    const facts = await gatherOrgFacts(supabase, data.organizationId);
+
+    let inserted = 0;
+    let processed = 0;
+    let failed = 0;
+
+    // Bounded concurrency so we don't hammer the gateway.
+    const queue = [...candidates];
+    const workers = Array.from({ length: PREFILL_CONCURRENCY }, async () => {
+      while (queue.length > 0) {
+        const req = queue.shift();
+        if (!req) break;
+        try {
+          const proposals = await aiPropose(
+            req.title,
+            req.description,
+            req.source_citation,
+            facts,
+          );
+          processed += 1;
+
+          const normalized = proposals
+            .map((p) => {
+              const kind = p.scope_kind as ScopeKind;
+              let value = (p.scope_value ?? "").trim().toUpperCase() || null;
+              if (kind === "provider" || kind === "unknown") value = null;
+              if (kind === "client") value = "*";
+              if (kind === "code" && (!value || !facts.codes.includes(value))) {
+                return {
+                  scope_kind: "unknown" as ScopeKind,
+                  scope_value: null,
+                  cadence: p.cadence ?? null,
+                  rationale: `Requirement references code "${p.scope_value ?? "?"}" which isn't active for this provider — flagged for review.`,
+                  source_excerpt: p.source_excerpt ?? null,
+                };
+              }
+              if (kind === "role" && (!value || !facts.roles.includes(value))) {
+                return {
+                  scope_kind: "unknown" as ScopeKind,
+                  scope_value: null,
+                  cadence: p.cadence ?? null,
+                  rationale: `Requirement references role "${p.scope_value ?? "?"}" which isn't on staff — flagged for review.`,
+                  source_excerpt: p.source_excerpt ?? null,
+                };
+              }
+              return {
+                scope_kind: kind,
+                scope_value: value,
+                cadence: p.cadence ?? null,
+                rationale: p.rationale ?? null,
+                source_excerpt: p.source_excerpt ?? null,
+              };
+            })
+            .filter(
+              (m, i, arr) =>
+                arr.findIndex(
+                  (x) => x.scope_kind === m.scope_kind && x.scope_value === m.scope_value,
+                ) === i,
+            );
+
+          if (normalized.length === 0) {
+            // Record an "unknown" placeholder so the admin sees NECTAR tried.
+            const { error } = await supabase
+              .from("nectar_requirement_mappings")
+              .insert({
+                organization_id: req.organization_id,
+                requirement_id: req.id,
+                scope_kind: "unknown",
+                scope_value: null,
+                cadence: null,
+                jurisdiction: req.jurisdiction ?? "UT-DSPD",
+                proposed_by: "nectar",
+                confirmed: false,
+                rationale:
+                  "NECTAR couldn't confidently determine applicability — flagged for admin review.",
+                source_excerpt: null,
+              });
+            if (!error) inserted += 1;
+            continue;
+          }
+
+          for (const m of normalized) {
+            const { error } = await supabase
+              .from("nectar_requirement_mappings")
+              .insert({
+                organization_id: req.organization_id,
+                requirement_id: req.id,
+                scope_kind: m.scope_kind,
+                scope_value: m.scope_value,
+                cadence: m.cadence,
+                jurisdiction: req.jurisdiction ?? "UT-DSPD",
+                proposed_by: "nectar",
+                confirmed: false,
+                rationale: m.rationale,
+                source_excerpt: m.source_excerpt,
+              });
+            if (!error) inserted += 1;
+          }
+        } catch {
+          failed += 1;
+          // Skip this requirement; admin can ask NECTAR to propose later.
+        }
+      }
+    });
+    await Promise.all(workers);
+
+    return {
+      processed,
+      inserted,
+      failed,
+      skipped: candidates.length - processed - failed,
+      candidates: candidates.length,
+      alreadyMapped: hasMapping.size,
+    };
+  });
+
+// ---------- Prompt 31: one-shot "looks right" confirm ----------
+// Confirms the requirement itself AND all its currently-proposed scopes that
+// aren't flagged unknown, in a single human-attested action. Unknown scopes
+// stay pending so they don't get waved through.
+
+export const confirmRequirementWithScopes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        requirementId: z.string().uuid(),
+        attestStatement: z.string().max(2000).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const nowIso = new Date().toISOString();
+
+    const { data: req, error: rErr } = await supabase
+      .from("nectar_requirements")
+      .select(
+        "id, organization_id, title, source_document_id, source_citation, review_status",
+      )
+      .eq("id", data.requirementId)
+      .single();
+    if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
+
+    // Confirm the requirement itself.
+    const { error: upErr } = await supabase
+      .from("nectar_requirements")
+      .update({
+        review_status: "confirmed",
+        verified: true,
+        verified_by: userId,
+        verified_at: nowIso,
+      })
+      .eq("id", req.id);
+    if (upErr) throw new Error(upErr.message);
+
+    // Confirm all pending, non-unknown mappings.
+    const { data: pendingMaps } = await supabase
+      .from("nectar_requirement_mappings")
+      .select("id, scope_kind, confirmed")
+      .eq("requirement_id", req.id)
+      .eq("confirmed", false);
+
+    const toConfirm = ((pendingMaps ?? []) as Array<{
+      id: string;
+      scope_kind: string;
+      confirmed: boolean;
+    }>).filter((m) => m.scope_kind !== "unknown");
+
+    let scopesConfirmed = 0;
+    if (toConfirm.length > 0) {
+      const { error: mErr } = await supabase
+        .from("nectar_requirement_mappings")
+        .update({
+          confirmed: true,
+          confirmed_by: userId,
+          confirmed_at: nowIso,
+        })
+        .in(
+          "id",
+          toConfirm.map((m) => m.id),
+        );
+      if (!mErr) scopesConfirmed = toConfirm.length;
+    }
+
+    // Source context + profile for the attestation.
+    let sourceTitle: string | null = null;
+    if (req.source_document_id) {
+      const { data: src } = await supabase
+        .from("nectar_documents")
+        .select("title")
+        .eq("id", req.source_document_id as string)
+        .maybeSingle();
+      sourceTitle = (src?.title as string | null) ?? null;
+    }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const statement =
+      data.attestStatement?.trim() ||
+      `Reviewed NECTAR's proposal and confirmed requirement "${req.title}"${
+        scopesConfirmed > 0
+          ? ` along with ${scopesConfirmed} proposed applicability scope${scopesConfirmed === 1 ? "" : "s"}`
+          : ""
+      } as accurate and applicable to my agency${
+        sourceTitle ? ` (from "${sourceTitle}")` : ""
+      }.`;
+
+    await supabase.from("nectar_attestations").insert({
+      organization_id: req.organization_id,
+      user_id: userId,
+      user_display_name:
+        (profile?.full_name as string) ?? (profile?.email as string) ?? null,
+      scope: "requirement_verify",
+      scope_ref_id: req.id,
+      scope_ref_type: "nectar_requirement",
+      statement,
+      context: {
+        requirement_title: req.title,
+        source_document_id: req.source_document_id,
+        source_document_title: sourceTitle,
+        source_citation: req.source_citation,
+        previous_status: req.review_status,
+        new_status: "confirmed",
+        scopes_confirmed: scopesConfirmed,
+        nectar_prefilled: true,
+      },
+    });
+
+    return { ok: true, scopesConfirmed };
+  });

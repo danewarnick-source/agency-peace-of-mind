@@ -189,6 +189,7 @@ function ClientCard({
 
 export function StaffClientGrid() {
   const { data: caseload, isLoading } = useCaseload();
+  const { data: activeShift } = useActiveShift();
   const [q, setQ] = useState("");
 
   const source = caseload ?? [];
@@ -239,7 +240,7 @@ export function StaffClientGrid() {
         <ul className="flex flex-col gap-3">
           {clients.map((c) => (
             <li key={c.id}>
-              <ClientCard c={c} />
+              <ClientCard c={c} activeShift={activeShift ?? null} />
             </li>
           ))}
         </ul>

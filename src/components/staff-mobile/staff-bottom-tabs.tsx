@@ -1,12 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, Clock, ClipboardCheck, GraduationCap } from "lucide-react";
 
-const TABS = [
+type Tab = { to: string; label: string; icon: typeof Clock; exact?: boolean };
+
+const TABS: Tab[] = [
   { to: "/dashboard", label: "Caseload", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/courses", label: "Trainings", icon: GraduationCap },
-] as const;
+];
 
 export function StaffBottomTabs() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

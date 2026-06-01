@@ -547,32 +547,54 @@ function SourceRow({
             className="h-7 px-2 text-[11px]"
           >
             {generate.isPending ? (
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              <Loader2 className="mr-1 h-3 w-3 animate-spin text-[color:var(--amber-600,#d97706)]" />
             ) : (
               <RefreshCw className="mr-1 h-3 w-3" />
             )}
-            Re-draft
+            {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Re-draft"}
           </Button>
         </div>
       ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => generate.mutate()}
-          disabled={generate.isPending || source.parse_status !== "parsed"}
-          title={
-            source.parse_status === "parsed"
-              ? "Use NECTAR to draft checklist items from clauses found in this document"
-              : "Parsing must finish before requirements can be drafted"
-          }
-        >
-          {generate.isPending ? (
-            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Sparkles className="mr-1 h-3.5 w-3.5" />
+        <div className="flex flex-col items-stretch gap-1 sm:items-end">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => generate.mutate()}
+            disabled={generate.isPending || source.parse_status !== "parsed"}
+            title={
+              source.parse_status === "parsed"
+                ? "Use NECTAR to draft checklist items from clauses found in this document"
+                : "Parsing must finish before requirements can be drafted"
+            }
+            className={
+              generate.isPending
+                ? "border-[color:var(--amber-500,#f4a93a)]/60 bg-[color:var(--amber-50,#fffbeb)] text-[color:var(--amber-900,#78350f)] hover:bg-[color:var(--amber-100,#fef3c7)]"
+                : undefined
+            }
+          >
+            {generate.isPending ? (
+              <Sparkles className="mr-1 h-3.5 w-3.5 animate-pulse text-[color:var(--amber-600,#d97706)]" />
+            ) : (
+              <Sparkles className="mr-1 h-3.5 w-3.5" />
+            )}
+            {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Draft requirements"}
+          </Button>
+          {generate.isPending && (
+            <div
+              className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--amber-100,#fef3c7)] sm:w-44"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progress)}
+              aria-label="NECTAR drafting progress"
+            >
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[color:var(--amber-400,#f6b94d)] to-[color:var(--amber-600,#d97706)] transition-[width] duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           )}
-          Draft requirements
-        </Button>
+        </div>
       )}
     </li>
   );

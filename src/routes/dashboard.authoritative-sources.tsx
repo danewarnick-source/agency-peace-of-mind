@@ -93,6 +93,36 @@ async function fileToBase64(file: File): Promise<string> {
 function AuthoritativeSourcesPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
+  const qc = useQueryClient();
+
+  const content = (
+    <div className="space-y-6">
+      <header className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <ShieldCheck className="h-4 w-4" />
+          Foundation · Authoritative Sources
+        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Your contracts &amp; State SOW power everything NECTAR shows
+        </h1>
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          External authority documents only — SOW, contracts, DSPD/DHS requirement
+          documents, and public-record requirements. NECTAR reads from these as the
+          source of truth; every checklist item, audit requirement, and obligation
+          HIVE surfaces traces back to a clause you uploaded. Items without a traced
+          source are flagged{" "}
+          <span className="font-medium text-amber-700 dark:text-amber-300">
+            Unverified
+          </span>{" "}
+          so authority is never implied. Client- and staff-specific files (PCSPs,
+          1056 budgets, certifications, training records) belong in{" "}
+          <span className="font-medium">Company Docs</span>.
+        </p>
+        <p className="rounded-lg border border-dashed border-[color:var(--amber-400,#f4a93a)]/60 bg-[color:var(--amber-50,#fffbeb)]/60 px-3 py-2 text-xs text-[color:var(--amber-800,#92400e)]">
+          Tip — drop a PDF, scan, Word, or spreadsheet anywhere on this page and
+          NECTAR will propose a label before saving it into the source-of-truth set.
+        </p>
+      </header>
 
   return (
     <div className="space-y-6">

@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Shield,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -82,10 +82,14 @@ function DashboardLayout() {
   const rawView = isAdminCapable ? view : "staff";
   const isMobilePreview = rawView === "staff_mobile";
   const effectiveView: "staff" | "admin" = rawView === "admin" ? "admin" : "staff";
-  const baseNav = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
-  const nav: NavItem[] = isExecutive && effectiveView === "admin"
-    ? [...baseNav, { to: "/dashboard/hive-exec", label: "HIVE Executive", icon: Shield }]
-    : baseNav;
+  const nav: NavItem[] = effectiveView === "admin" ? ADMIN_NAV : STAFF_NAV;
+  const showExecSection = isExecutive && effectiveView === "admin";
+  const execNav: NavItem[] = [
+    { to: "/dashboard/hive-exec", label: "Companies", icon: Building2, exact: true },
+    { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
+    { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },
+    { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },
+  ];
   const signOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out");
@@ -152,6 +156,36 @@ function DashboardLayout() {
             </Link>
           );
         })}
+
+        {showExecSection && (
+          <div className="mt-4 border-t border-sidebar-border pt-4">
+            <div className="mb-1 flex items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]">
+              <Lock className="h-3 w-3" />
+              <span>HIVE Executive</span>
+            </div>
+            <p className="mb-2 px-3 text-[10px] text-sidebar-foreground/50">
+              Visible to HIVE executives only
+            </p>
+            {execNav.map((item) => {
+              const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={onNavigate}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                    active
+                      ? "bg-[#0f1b3d] text-white shadow-sm ring-1 ring-[#d97a1c]/40"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" /> {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       <div className="border-t border-sidebar-border p-4">
@@ -177,8 +211,9 @@ function DashboardLayout() {
     </>
   );
 
+  const allNav = showExecSection ? [...nav, ...execNav] : nav;
   const pageTitle =
-    nav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
+    allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
   const isStaffView = effectiveView === "staff";
 
   return (

@@ -72,24 +72,183 @@ async function callAI(system: string, user: string): Promise<string> {
   return json.choices?.[0]?.message?.content ?? "{}";
 }
 
+// ─── Data-facts gathering ──────────────────────────────────────────────────
+// NECTAR must answer from real data, not deflect. Before calling the model we
+// gather a structured snapshot of the user's organization scoped to their role
+// and pass it as ground truth. The model is then instructed to answer DIRECTLY
+// from the snapshot — never "I don't know, go check yourself".
+
+// Loose shape — we only call the small subset of the Supabase client surface
+// we need, and the auth-middleware client already enforces RLS for this user.
+type SupabaseLike = {
+  from: (table: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
+};
+
+interface OrgFacts {
+  organization_id: string | null;
+  role: string;
+  scope: "organization" | "self";
+  generated_at: string;
+  totals: {
+    clients_active: number | null;
+    clients_total: number | null;
+    staff_active: number | null;
+    pba_accounts: number | null;
+  };
+  service_codes: {
+    all_distinct: string[];
+    referenced_in_question: Array<{ code: string; client_count: number }>;
+  };
+  client_matches: Array<{
+    id: string;
+    name: string;
+    status: string;
+    service_codes: string[];
+  }>;
+  notes: string[];
+}
+
+// Common DSPD / waiver service-code tokens NECTAR should recognise.
+const SERVICE_CODE_TOKENS = [
+  "PBA", "DSI", "DSL", "RES", "HCBS", "HHS", "ELS", "EVV", "PCSP",
+  "S5100", "S5101", "S5102", "S5125", "S5126", "S5135", "S5136", "S5150",
+  "T1019", "T1020", "T2017", "T2021", "T2022", "T2025",
+];
+
+function detectServiceCodes(q: string): string[] {
+  const upper = q.toUpperCase();
+  const hits = new Set<string>();
+  for (const t of SERVICE_CODE_TOKENS) {
+    const re = new RegExp(`(^|[^A-Z0-9])${t}([^A-Z0-9]|$)`);
+    if (re.test(upper)) hits.add(t);
+  }
+  return Array.from(hits);
+}
+
+async function gatherFacts(
+  supabase: SupabaseLike,
+  userId: string,
+  role: string,
+  question: string,
+): Promise<OrgFacts> {
+  const facts: OrgFacts = {
+    organization_id: null,
+    role,
+    scope: role === "employee" || role === "host_family" ? "self" : "organization",
+    generated_at: new Date().toISOString(),
+    totals: { clients_active: null, clients_total: null, staff_active: null, pba_accounts: null },
+    service_codes: { all_distinct: [], referenced_in_question: [] },
+    client_matches: [],
+    notes: [],
+  };
+
+  try {
+    const memQ = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .limit(1);
+    const orgId = (memQ.data as Array<{ organization_id: string }> | null)?.[0]?.organization_id ?? null;
+    facts.organization_id = orgId;
+    if (!orgId) {
+      facts.notes.push("No active organization membership for this user.");
+      return facts;
+    }
+
+    const [clientsActive, clientsTotal, staffActive, pbaAll, allCodes] = await Promise.all([
+      supabase.from("clients").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("account_status", "active"),
+      supabase.from("clients").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
+      supabase.from("organization_members").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("active", true),
+      supabase.from("pba_accounts").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
+      supabase.from("client_billing_codes").select("service_code,client_id").eq("organization_id", orgId).limit(1000),
+    ]);
+
+    facts.totals.clients_active = clientsActive.count ?? 0;
+    facts.totals.clients_total = clientsTotal.count ?? 0;
+    facts.totals.staff_active = staffActive.count ?? 0;
+    facts.totals.pba_accounts = pbaAll.count ?? 0;
+
+    const codeRows: Array<{ service_code: string; client_id: string }> = allCodes.data ?? [];
+    facts.service_codes.all_distinct = Array.from(new Set(codeRows.map((r) => r.service_code))).sort();
+
+    const detected = detectServiceCodes(question);
+    for (const code of detected) {
+      const clientIds = new Set<string>();
+      if (code === "PBA") {
+        const pbaClients = await supabase.from("pba_accounts").select("client_id").eq("organization_id", orgId);
+        for (const r of (pbaClients.data ?? []) as Array<{ client_id: string }>) clientIds.add(r.client_id);
+      }
+      for (const r of codeRows) {
+        if (r.service_code.toUpperCase().includes(code)) clientIds.add(r.client_id);
+      }
+      facts.service_codes.referenced_in_question.push({ code, client_count: clientIds.size });
+    }
+
+    // Best-effort client-name lookup for admin scope.
+    if (facts.scope === "organization") {
+      const tokens = (question.match(/[A-Z][a-zA-Z'-]{2,}/g) ?? [])
+        .filter((t) => !SERVICE_CODE_TOKENS.includes(t.toUpperCase()))
+        .slice(0, 4);
+      const seen = new Set<string>();
+      for (const tok of tokens) {
+        const r = await supabase
+          .from("clients")
+          .select("id,first_name,last_name,account_status,authorized_dspd_codes")
+          .eq("organization_id", orgId)
+          .ilike("last_name", `${tok}%`)
+          .limit(5);
+        for (const c of (r.data ?? []) as Array<{ id: string; first_name: string; last_name: string; account_status: string; authorized_dspd_codes: string[] | null }>) {
+          if (seen.has(c.id)) continue;
+          seen.add(c.id);
+          const codes = codeRows.filter((cr) => cr.client_id === c.id).map((cr) => cr.service_code);
+          facts.client_matches.push({
+            id: c.id,
+            name: `${c.first_name} ${c.last_name}`,
+            status: c.account_status,
+            service_codes: Array.from(new Set([...(c.authorized_dspd_codes ?? []), ...codes])),
+          });
+        }
+      }
+    }
+  } catch (e) {
+    facts.notes.push(`Data lookup partial failure: ${e instanceof Error ? e.message : "unknown"}`);
+  }
+
+  return facts;
+}
+
+
 export const askNectarHelp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
-  .handler(async ({ data }): Promise<NectarHelpReply> => {
-    const system = `You are NECTAR, HIVE's friendly in-app product guide.
+  .handler(async ({ data, context }): Promise<NectarHelpReply> => {
+    const { supabase, userId } = context;
+    const facts = await gatherFacts(supabase as unknown as SupabaseLike, userId, data.role, data.question);
 
-PERSONALITY: warm, encouraging, plain-language, patient. Never condescending. Short, friendly answers with one clear next step. 1–4 short sentences.
+    const system = `You are NECTAR, the expert system inside HIVE. You have direct access to the company's live data through the FACTS block below and you ANSWER FROM IT.
 
-GROUNDING: Only describe screens in the navigation map below. If unsure, say so honestly and offer the closest related screen.
+ABSOLUTE RULES — never violate:
+1. NEVER say "I'm not sure without looking at your data", "you can check this yourself", "I'd need to look at your specific data", or any variant. The FACTS block IS the live data. Use it.
+2. Lead with the DIRECT ANSWER as the first sentence — a definitive count, list, or fact derived from FACTS. The deepLink and follow-ups come AFTER, never instead of.
+3. If FACTS shows 0 of something, say so plainly and definitively ("As of right now there are 0 current clients with PBA services in your company."). Do not hedge.
+4. Never fabricate numbers. Every figure you state must come from FACTS. If a needed datum truly isn't in FACTS, say "I don't have that on file" — but still try to answer adjacent parts of the question from what IS in FACTS.
+5. Pair every data answer with a deepLink to the screen where the user can verify or act on it.
+6. For past-period questions ("FY24", "two plan years ago"), answer for that period and explicitly note the timeframe you used.
 
-ROLE-AWARENESS: Current user role: "${data.role}".
+PERSONALITY: warm, confident, plain-language. 1–4 short sentences. The direct answer is the headline; the link and any follow-ups are secondary.
+
+ROLE-AWARENESS: Current user role: "${data.role}". Scope of FACTS: "${facts.scope}".
 
 ${HIVE_NAV_GUIDE}
 
+FACTS (live data, generated ${facts.generated_at}):
+${JSON.stringify(facts, null, 2)}
+
 OUTPUT FORMAT — return STRICT JSON only:
 {
-  "answer": "<warm, 1–4 sentences>",
-  "deepLink": { "path": "/dashboard/...", "label": "Take me to <screen>" } | null,
+  "answer": "<direct answer first, 1–4 sentences>",
+  "deepLink": { "path": "/dashboard/...", "label": "View <screen>" } | null,
   "isDataRequest": true | false,
   "followUps": ["<short follow-up>", "<another>"]
 }`;
@@ -103,7 +262,7 @@ OUTPUT FORMAT — return STRICT JSON only:
 
     const answer = typeof parsed.answer === "string" && parsed.answer.trim().length > 0
       ? parsed.answer.trim()
-      : "I'm not sure about that one yet — try rephrasing, or check the Settings page.";
+      : "I don't have that on file yet — try rephrasing and I'll look again.";
     const dl = parsed.deepLink && typeof parsed.deepLink === "object"
       ? parsed.deepLink as { path?: unknown; label?: unknown }
       : null;

@@ -48,6 +48,10 @@ export interface AuditSummary {
   scope: {
     clientId?: string | null;
     staffId?: string | null;
+    clientIds?: string[] | null;
+    staffIds?: string[] | null;
+    sampleClients?: Array<{ id: string; name: string }> | null;
+    sampleStaff?: Array<{ id: string; name: string }> | null;
     serviceCode?: string | null;
     area?: FindingArea | null;
     dateFrom?: string | null;
@@ -64,6 +68,8 @@ const auditInput = z.object({
   organizationId: z.string().uuid(),
   clientId: z.string().uuid().optional().nullable(),
   staffId: z.string().uuid().optional().nullable(),
+  clientIds: z.array(z.string().uuid()).optional().nullable(),
+  staffIds: z.array(z.string().uuid()).optional().nullable(),
   serviceCode: z.string().max(40).optional().nullable(),
   area: z
     .enum([
@@ -80,6 +86,7 @@ const auditInput = z.object({
   dateFrom: z.string().optional().nullable(),
   dateTo: z.string().optional().nullable(),
 });
+
 
 const DAILY_CODE_HINTS = ["HOST", "HHS", "T2033", "DAILY"];
 

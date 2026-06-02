@@ -1,96 +1,84 @@
-# NECTAR Staff — Scoped Assistant for the Staff App
+## Goal
 
-A second, lower-privilege NECTAR surface for staff. It shares branding and "answer from data" behavior with admin NECTAR but is a completely separate code path with its own server function, its own context builder, and its own UI. Admin NECTAR endpoints are never reachable from the staff UI.
+Turn the platform into a true multi-state system where state is a configuration layer (template), not hardcoded logic. Utah/DSPD becomes the first reference state instance instead of the implicit default.
 
-## 1. Scope contract (enforced server-side)
+## Scope (Prompt 47)
 
-NECTAR Staff may read, per request, only:
+1. **Data model — state as a first-class entity**
+   - New tables (Executive-managed):
+     - `platform_states` — one row per US state (code, name, status: `draft` / `active` / `coming_soon`, reference flag for Utah).
+     - `state_templates` — the editable configuration blob per state (terminology overrides, training mandates, billing/service-code set, EVV specifics, required document cadences, department names). JSONB sections so we can extend per area without schema churn.
+     - `state_requirement_sources` — uploaded authoritative docs per state (mirror of provider Foundation A/B sources: file ref, title, jurisdiction, parse status, derived requirement count, source attribution metadata).
+     - `state_derived_requirements` — NECTAR-parsed per-state requirement set with source attribution (parallel to existing `nectar_requirements` but scoped to a state, not an org).
+   - Extend `organizations`: add `state_code` (FK to `platform_states.code`) + optional `additional_state_codes text[]` for multi-state providers. Backfill all existing orgs to `UT`.
+   - Extend `nectar_requirements` (provider-level) with `inherited_from_state_code` so per-provider requirements can show which ones layered on top of a state baseline.
+   - All new tables: GRANTs + RLS (HIVE Executive read/write; authenticated read on `platform_states` + the active state's published template only).
 
-- **Policies & procedures** — `nectar_documents` rows in the caller's org with `document_type IN ('policy','procedure','sop','contract')` and tagged staff-visible.
-- **Training material** — HIVE built-in lessons the caller has been assigned/completed (`course_assignments` + `lessons`), plus org-uploaded training docs (`nectar_documents` `document_type='training'`).
-- **Caller's own role/job info** — their `profiles` row, `organization_members` row (role, job_title), reimbursement & timeclock how-to policies.
-- **Caller's own pay & reimbursement** — `evv_timesheets`, `nectar_pay_period`, `reimbursements` rows where `staff_id = auth.uid()` only.
-- **Assigned clients only** — re-resolved at query time via `clients_for_staff(org, auth.uid())`. For each allowed client: PCSP goals, safety/behavioral needs, current medications/MAR-relevant info needed to deliver care.
+2. **Executive UI — state organization**
+   - New sidebar item **States** (HIVE Executive only) → `/dashboard/hive-exec/states`:
+     - List of 50 states with status chips (active / draft / coming-soon), provider count per state, last template update.
+     - Click into a state → state detail with tabs: **Template**, **Requirements & Sources**, **Providers**.
+   - Update HIVE Overview, Companies list, NECTAR queue, Account Health, Support Queue, Plans & Billing to support a **State filter** (All states / single state) so Executives can work across or drill into one state.
+   - Reference-state badge on Utah ("Reference implementation").
 
-Hard denies (enforced before the model call, not just by prompt):
-- Any client not returned by `clients_for_staff` for this user right now.
-- Any other staff member's pay, hours, or profile.
-- Billing/financial/admin/business data, agency health, audit, 520, PBA ledger, hive-exec.
-- Admin NECTAR tools (approvals, requirement mapping, authoritative-source ingestion, etc.).
+3. **State template editor (`/dashboard/hive-exec/states/$stateCode`)**
+   - Editable sections, each a JSONB slice with sensible defaults pulled from the existing Utah implementation:
+     - **Terminology**: department name, role/service display names, regulator label (e.g. DSPD vs equivalent).
+     - **Training mandates**: list of required course slugs + cadence + role applicability.
+     - **Billing & service codes**: per-state code set (reuses the existing `evv-codes` shape, but the canonical list lives in the template).
+     - **EVV specifics**: geofence default radius, variance grace window, reconciliation policy text, approved-locations cap.
+     - **Required documents & cadences**: doc types, frequency, who attests.
+     - **Department / org structure**: agency types, sub-program naming.
+   - Save = versioned write; "Publish" toggles `state_templates.published_at`. Drafts only visible to Executives.
+   - Reset-section-to-Utah-defaults button on each section (Utah = canonical reference).
 
-If the question falls outside scope, the assistant declines and points to manager/admin — it does not guess and does not fall back to broader data.
+4. **State requirements upload + NECTAR parsing**
+   - On the state detail **Requirements & Sources** tab: upload UI mirroring the provider Foundation A/B drop (`authoritative-source-drop` component) but scoped to a state.
+   - Server fns:
+     - `uploadStateRequirementSource` — stores file, kicks NECTAR parse.
+     - `parseStateRequirementSource` — reuses the existing `nectar-engine` parser; writes derived rows into `state_derived_requirements` with `source_id` attribution.
+     - `listStateRequirements(stateCode)` — for display.
+   - Provider-level requirements engine reads the state baseline first, then layers org-specific overrides on top.
 
-## 2. Backend
+5. **State-aware onboarding**
+   - `/dashboard/hive-exec/new-company` (existing route): add the state picker as the first question. Default sensible answers from the chosen state's template (terminology, training, codes, EVV).
+   - Then 3–5 simple questions: which authorized service codes from the state's set, which programs, primary contact, etc.
+   - On submit:
+     - Create the org with `state_code`.
+     - Seed provider-level: authorized codes (subset of state codes), training assignments (state mandates), terminology overrides default to inherit, requirements inherit from `state_derived_requirements`.
+   - Replace the current Utah-hardcoded onboarding defaults with the lookup against the state template.
 
-New file: `src/lib/nectar-staff.functions.ts` (client-safe wrapper) and `src/lib/nectar-staff.server.ts` (server-only context builder + Lovable AI call).
+6. **State-as-a-layer runtime (no hardcoding)**
+   - New hook `useStateTemplate()` that resolves the current org's `state_code` → published `state_templates` row + cached on React Query.
+   - Replace hardcoded "DSPD", "Utah", default geofence radius, default training set, and other Utah assumptions in shared components with `template.terminology.*` / `template.evv.*` / `template.training.*` lookups. Keep Utah's published template as the source of those exact values so behavior is unchanged for the existing tenant.
+   - Foundation D `jurisdiction` continues to be the source of legal scope; the state template is the operational config layer that drives UI + workflow.
 
-Single server function: `askNectarStaff` (`createServerFn`, POST, `requireSupabaseAuth`).
+7. **Gating & design**
+   - All Executive routes server-gated via `requireSupabaseAuth` + `assertHiveExecutive`.
+   - Admin/staff get read-only access to their state's published template via a thin server fn (`getMyStateTemplate`).
+   - HIVE design system inside Executive (existing hexagon/amber accents); state list uses the existing card+status-chip pattern.
 
-Input (zod): `{ question: string (1..2000), conversationId?: string, clientId?: string }`.
+## Files (new)
 
-Handler flow:
-1. Resolve caller: `auth.uid()`, current org via `organization_members`. Reject if no active membership.
-2. Build **allowed client id set** by calling `clients_for_staff(org, uid)`. If `clientId` is passed, assert it's in the set; otherwise return refusal.
-3. Build context bundle (each section capped, ~ token budget):
-   - Caller profile + role/job_title + worker_type/rates (own only).
-   - Recent own timesheets + current pay period summary (reuse logic from `useNectarPayPeriod` server-side).
-   - Org policies/procedures: latest N `nectar_documents` filtered to staff-visible types; include title + extracted text snippet + id for citation.
-   - Training: completed/assigned lessons (title + summary) and org training docs.
-   - For each assigned client (or the focused one): name, PCSP goals, safety notes, active medications/MAR-relevant fields. Pulled with explicit `.in('id', allowedClientIds)` guards.
-4. Call Lovable AI Gateway (`google/gemini-3-flash-preview`) with a strict system prompt:
-   - Identity: "NECTAR Staff — shift-manager assistant. Plain language, mobile-friendly."
-   - Allowed-source list mirroring section 1.
-   - Refusal rule for out-of-scope (other clients, other staff pay, billing/admin).
-   - Non-authoritative disclaimer (explains policy; doesn't make compliance/business rulings).
-   - Cite policy/training source titles inline when used.
-5. Return `{ answer, citations: [{type:'policy'|'training'|'pcsp'|'pay', id, title}], usedClientIds }`. Never echo unallowed data even if the model hallucinates — citations are filtered against the same allowed sets before returning.
+- Migration: `platform_states`, `state_templates`, `state_requirement_sources`, `state_derived_requirements`, `organizations.state_code`, `nectar_requirements.inherited_from_state_code`. Seed all 50 states (UT active+reference, others coming-soon). Seed Utah template from existing constants. Backfill all orgs to `UT`.
+- `src/lib/state-templates.ts` — TypeScript types for the template JSONB sections + Utah defaults constant (source of seed data).
+- `src/lib/state-templates.functions.ts` — list/get/upsert/publish state templates, list/get platform states, get-my-state-template.
+- `src/lib/state-requirements.functions.ts` — upload, parse, list state requirement sources & derived requirements.
+- `src/hooks/use-state-template.tsx` — React Query hook for current org's published template.
+- `src/routes/dashboard.hive-exec.states.tsx` — state list.
+- `src/routes/dashboard.hive-exec.states.$stateCode.tsx` — state detail with Template / Requirements / Providers tabs.
+- `src/components/hive-exec/state-template-editor.tsx` — the per-section editors.
+- `src/components/hive-exec/state-requirement-source-drop.tsx` — wraps the existing authoritative-source drop, scoped to a state.
 
-All Supabase reads use the auth-middleware client (RLS applies as the staff user) — service role is **not** used.
+## Files (edited)
 
-## 3. Frontend
+- `src/routes/dashboard.hive-exec.tsx` — add **States** sidebar entry.
+- `src/routes/dashboard.hive-exec.new-company.tsx` — state-first onboarding; reads from state template; seeds inherited config on submit.
+- `src/routes/dashboard.hive-exec.index.tsx`, `dashboard.hive-exec.health.tsx`, `dashboard.hive-exec.tickets.tsx`, `dashboard.hive-exec.plans.tsx`, `dashboard.hive-exec.nectar.tsx` — add state filter.
+- A small number of shared components that hardcode "DSPD" / "Utah" / default geofence — swap to `useStateTemplate()` lookups (Utah template values keep behavior identical).
 
-New component: `src/components/staff-mobile/ask-nectar-staff.tsx`
-- Bottom-sheet/full-screen chat panel using existing HIVE design tokens and NECTAR brand styling (`NectarBrand`, amber gradient).
-- Header clearly labeled **"Ask NECTAR · Staff"** to distinguish from admin NECTAR.
-- Optional client-context chip — when opened from a client workspace, auto-fills `clientId`.
-- Conversation kept in React state for the session (no DB persistence in v1).
-- Renders markdown answer + citation chips (reuse `source-citation-chip.tsx`).
-- Mobile tap targets ≥44px; works in both staff mobile shell and desktop.
+## Out of scope (this prompt)
 
-Entry points:
-- New tab in `staff-bottom-tabs.tsx`: "Ask NECTAR" (sparkle/amber icon).
-- Floating launcher button in `staff-mobile-shell.tsx` for quick access from any staff screen.
-- Embedded "Ask about this client" button inside `client-quick-info-sheet.tsx` and the workspace/HHS hub headers (pre-fills `clientId`).
-- New route `src/routes/dashboard.ask-nectar.tsx` for desktop staff access.
-
-Admin NECTAR routes/components remain untouched and are not linked from any staff surface.
-
-## 4. Privacy & assignment re-check
-
-- Allowed client set is recomputed **every** request from `clients_for_staff`. Removing the assignment immediately stops answers about that client — no caching.
-- Citation IDs returned to the client are only ones inside the allowed sets, so the UI cannot resolve restricted records even if forged.
-- Refusals include a clear "ask your manager/admin" line.
-- Add a brief one-time disclosure in the panel: "Client information shown here is for the people on your caseload. Treat it as confidential PHI."
-
-## 5. Out of scope (this plan)
-
-- Persisting conversation history to DB.
-- Voice input.
-- Streaming responses (returns full answer; can be upgraded to `streamText` later).
-- Changes to admin NECTAR.
-
-## Files
-
-New:
-- `src/lib/nectar-staff.functions.ts`
-- `src/lib/nectar-staff.server.ts`
-- `src/components/staff-mobile/ask-nectar-staff.tsx`
-- `src/routes/dashboard.ask-nectar.tsx`
-
-Edited:
-- `src/components/staff-mobile/staff-bottom-tabs.tsx` — add tab.
-- `src/components/staff-mobile/staff-mobile-shell.tsx` — mount launcher + sheet.
-- `src/components/staff-mobile/client-quick-info-sheet.tsx` — "Ask NECTAR about this client" button.
-- `src/components/workspace/about-tab.tsx` (or workspace header) — same entry, pre-filled client.
-
-No database migrations required — all data is read through existing tables with RLS + the `clients_for_staff` SECURITY DEFINER function.
+- Building the full template content for the other 49 states (the schema + editor make that an Executive content task, not a code task).
+- Cross-state migration of an existing provider (Company Migration tool already exists; multi-state move is a follow-up).
+- Per-state localization of staff app strings beyond the terminology slice.

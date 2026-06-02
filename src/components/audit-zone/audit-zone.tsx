@@ -401,7 +401,7 @@ function DocumentPull({ orgId }: { orgId?: string }) {
             </div>
             {nectarReply && (
               <div className="mt-3 rounded-md border border-[color:var(--amber-200)] bg-white/80 p-3 text-sm">
-                <p className="text-foreground">{nectarReply.answer}</p>
+                <NectarAnswer text={nectarReply.answer} />
                 {nectarReply.deepLink && (
                   <a
                     href={nectarReply.deepLink.path}

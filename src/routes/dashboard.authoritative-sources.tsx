@@ -869,6 +869,21 @@ function UploadCard({
           />
         </div>
 
+        <label className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+          <Checkbox
+            checked={assistedSetup}
+            onCheckedChange={(v) => setAssistedSetup(v === true)}
+            className="mt-0.5 shrink-0"
+          />
+          <span className="flex-1">
+            <strong className="block text-foreground">Request HIVE-assisted setup</strong>
+            NECTAR drafts the requirements, then a HIVE Executive verifies the
+            extraction is faithful to this source before it lands in your queue
+            for final confirmation. Leave unchecked to self-serve as normal.
+          </span>
+        </label>
+
+
         {isUrlMode ? (
           <>
             <div className="space-y-1.5">

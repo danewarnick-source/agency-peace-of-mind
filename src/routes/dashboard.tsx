@@ -146,10 +146,10 @@ function DashboardLayout() {
   useEffect(() => {
     if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) {
       navigate({ to: "/dashboard/hive-exec" });
-    } else if (!isHiveExecView && pathname.startsWith("/dashboard/hive-exec")) {
+    } else if (!isHiveExecView && !isStatePreview && pathname.startsWith("/dashboard/hive-exec")) {
       navigate({ to: "/dashboard" });
     }
-  }, [isHiveExecView, pathname, navigate]);
+  }, [isHiveExecView, isStatePreview, pathname, navigate]);
 
   const currentPreviewState = isStatePreview
     ? states.find((s) => s.code === stateCode) ?? null

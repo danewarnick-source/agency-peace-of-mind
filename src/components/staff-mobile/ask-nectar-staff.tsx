@@ -51,14 +51,14 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
   const [viewportInset, setViewportInset] = useState(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
-  const composerRef = useRef<HTMLDivElement | null>(null);
   const { container } = useMobileShellContainer();
   const barVisible = useActiveShiftBarVisible();
 
   const bottomOffset = useMemo(() => {
     const navHeight = 56;
     const shiftBarHeight = barVisible ? 56 : 0;
-    return navHeight + shiftBarHeight + viewportInset;
+    const persistentBarsOffset = navHeight + shiftBarHeight;
+    return viewportInset > 0 ? viewportInset : persistentBarsOffset;
   }, [barVisible, viewportInset]);
 
   const mutation = useMutation({
@@ -121,12 +121,10 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
 
   const isEmpty = messages.length === 0;
 
-  const composerMount =
-    container ?? (typeof document !== "undefined" ? document.body : null);
+  const composerMount = container;
 
   const composer = (
     <div
-      ref={composerRef}
       className="absolute inset-x-0 z-30 border-t border-border bg-background/98 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/92"
       style={{
         bottom: `${bottomOffset}px`,

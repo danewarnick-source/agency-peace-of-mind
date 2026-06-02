@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -25,6 +25,9 @@ export const Route = createFileRoute("/dashboard/hive-exec/states/$stateCode")({
 function StateDetailPage() {
   const { stateCode } = Route.useParams();
   const [tab, setTab] = useState<"template" | "requirements" | "providers">("template");
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isChild = pathname.endsWith("/onboarding");
+  if (isChild) return <Outlet />;
 
   return (
     <div className="space-y-4">

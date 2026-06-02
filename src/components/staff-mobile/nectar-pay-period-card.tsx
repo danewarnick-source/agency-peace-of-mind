@@ -109,7 +109,7 @@ export function NectarPayPeriodCard() {
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5">
                   <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
                     <Clock className="h-4 w-4 text-[#f4a93a]" />
-                    Hourly services
+                    Direct Support
                   </span>
                   <span className="font-mono text-sm tabular-nums text-white/90">
                     {fmtHours(hourlyHoursDisplay)} × {fmtUSD(hourlyRate)}
@@ -129,7 +129,7 @@ export function NectarPayPeriodCard() {
                 <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
                   <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
                     <CalendarDays className="h-4 w-4 text-[#f4a93a]" />
-                    Daily services
+                    Host Home
                   </span>
                   <span className="font-mono text-sm tabular-nums text-white/90">
                     {fmtDays(dailyDays)} × {fmtUSD(dailyRate)}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
@@ -6,6 +6,7 @@ import { useActiveShift } from "./use-active-shift";
 import { useTimePaySettings } from "./use-time-pay-settings";
 import { useWorkerProfile } from "./use-worker-profile";
 import { useMyAssignments } from "./use-my-assignments";
+import { useGeneralShift, useGeneralShiftLog } from "./use-general-shift";
 import { computePeriodBounds, type PaySchedule } from "@/lib/pay-periods";
 import { isDailyServiceCode } from "@/lib/service-billing";
 
@@ -28,8 +29,11 @@ export type NectarPayPeriod = {
   hourly_hours: number;
   /** Distinct completed daily-log days in the period. */
   daily_days: number;
+  /** Completed non-client (General Time Clock) hours in the period. */
+  general_hours: number;
   hourly_earnings: number;
   daily_earnings: number;
+  general_earnings: number;
   est_gross_pay: number;
   hourly_rate: number;
   daily_rate: number;
@@ -172,6 +176,34 @@ export function useNectarPayPeriod() {
       const hourly_earnings = has_hourly_assignment ? hourly_hours * hourly_rate : 0;
       const daily_earnings = has_daily_assignment ? daily_days * daily_rate : 0;
 
+      // Non-client (General Time Clock) hours — Training/Admin/Travel/
+      // Meeting/etc. Persisted client-side in localStorage; sum the
+      // completed entries that fall inside this pay period.
+      let general_hours = 0;
+      if (typeof window !== "undefined") {
+        try {
+          const raw = window.localStorage.getItem("hive-general-shifts-log");
+          if (raw) {
+            const arr = JSON.parse(raw) as Array<{
+              start_iso: string;
+              end_iso: string;
+              hours: number;
+            }>;
+            const startMs = start.getTime();
+            const endMs = end.getTime();
+            for (const r of arr) {
+              const t = new Date(r.end_iso).getTime();
+              if (!isFinite(t)) continue;
+              if (t < startMs || t > endMs) continue;
+              if (typeof r.hours === "number" && r.hours > 0) general_hours += r.hours;
+            }
+          }
+        } catch {
+          /* ignore corrupt log */
+        }
+      }
+      const general_earnings = general_hours * hourly_rate;
+
       const outstanding_daily_logs = has_daily_assignment
         ? Math.max(0, Math.round(hourly_hours / 8) % 4)
         : 0;
@@ -185,9 +217,11 @@ export function useNectarPayPeriod() {
         end_iso: end.toISOString(),
         hourly_hours,
         daily_days,
+        general_hours,
         hourly_earnings,
         daily_earnings,
-        est_gross_pay: hourly_earnings + daily_earnings,
+        general_earnings,
+        est_gross_pay: hourly_earnings + daily_earnings + general_earnings,
         hourly_rate,
         daily_rate,
         per_client_hours: per,
@@ -203,35 +237,78 @@ export function useNectarPayPeriod() {
 
 /**
  * Adds live shift accrual on top of the saved pay-period totals. Live
- * accrual only happens for hourly shifts — daily shifts pay in whole-day
- * steps once the daily log is filed, so they don't tick by the second.
+ * accrual ticks for either an hourly client shift OR an active non-client
+ * General Time Clock shift — both pay by the second at the hourly rate.
+ * Daily shifts pay in whole-day steps once the daily log is filed.
  */
 export function useLivePayPeriod() {
   const { data: base } = useNectarPayPeriod();
   const { data: active } = useActiveShift();
+  const { shift: generalShift } = useGeneralShift();
+  const generalLog = useGeneralShiftLog();
   const [now, setNow] = useState(() => Date.now());
 
   const isHourlyShift = !!active && !isDailyServiceCode(active.service_type_code);
+  const isGeneralShift = !!generalShift;
+  const ticking = isHourlyShift || isGeneralShift;
 
   useEffect(() => {
-    if (!isHourlyShift) return;
+    if (!ticking) return;
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [isHourlyShift]);
+  }, [ticking]);
 
   const rate = base?.hourly_rate ?? FALLBACK_HOURLY;
-  const liveHours = isHourlyShift
+
+  const liveClientHours = isHourlyShift
     ? Math.max(0, (now - new Date(active!.clock_in_timestamp).getTime()) / 3_600_000)
     : 0;
-  const liveEarnings = liveHours * rate;
+  const liveClientEarnings = liveClientHours * rate;
+
+  const liveGeneralHours = isGeneralShift
+    ? Math.max(0, (now - new Date(generalShift!.start_iso).getTime()) / 3_600_000)
+    : 0;
+  const liveGeneralEarnings = liveGeneralHours * rate;
+
+  // Recompute completed general totals from the log so the summary stays
+  // current the moment a shift ends (the base query refetches once a minute,
+  // but the log is authoritative client-side).
+  const periodGeneralHours = useMemo(() => {
+    if (!base) return 0;
+    const startMs = new Date(base.start_iso).getTime();
+    const endMs = new Date(base.end_iso).getTime();
+    let sum = 0;
+    for (const r of generalLog) {
+      const t = new Date(r.end_iso).getTime();
+      if (!isFinite(t)) continue;
+      if (t < startMs || t > endMs) continue;
+      sum += r.hours;
+    }
+    return sum;
+  }, [base, generalLog]);
+  const periodGeneralEarnings = periodGeneralHours * rate;
+
+  const liveEarnings = liveClientEarnings + liveGeneralEarnings;
 
   return {
     base,
     rate,
-    isLive: isHourlyShift,
-    liveHours,
-    liveEarnings,
-    hoursTotal: (base?.hourly_hours ?? 0) + liveHours,
-    payTotal: (base?.est_gross_pay ?? 0) + liveEarnings,
+    isLive: ticking,
+    isHourlyShift,
+    isGeneralShift,
+    liveHours: liveClientHours,
+    liveEarnings: liveClientEarnings,
+    liveGeneralHours,
+    liveGeneralEarnings,
+    /** Total non-client hours for the period including any live accrual. */
+    generalHoursTotal: periodGeneralHours + liveGeneralHours,
+    generalEarningsTotal: periodGeneralEarnings + liveGeneralEarnings,
+    hoursTotal: (base?.hourly_hours ?? 0) + liveClientHours,
+    payTotal:
+      (base?.hourly_earnings ?? 0) +
+      (base?.daily_earnings ?? 0) +
+      periodGeneralEarnings +
+      liveEarnings,
   };
 }
+

@@ -33,8 +33,24 @@ import { searchTimesheetsByVector, backfillTimesheetEmbeddings } from "@/lib/vec
 // the Pending Approvals Ledger and the Approved Timesheets Archive.
 // Records with an empty/null `outside_geofence_reason` are treated as a
 // mathematical compliance MATCH (per the structural integration rule).
-function GeofenceBadge({ reason }: { reason: string | null }) {
+function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "matched_approved_location_label" | "reconciliation_status"> }) {
+  const reason = row.outside_geofence_reason;
   const hasReason = !!(reason && reason.trim().length > 0);
+  // Approved-location punch → MATCH with site label.
+  if (!hasReason && row.matched_approved_location_label) {
+    return (
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
+              <ShieldCheck className="h-3.5 w-3.5" /> MATCH
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="text-xs">Inside approved location "{row.matched_approved_location_label}".</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
   if (!hasReason) {
     return (
       <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
@@ -42,12 +58,42 @@ function GeofenceBadge({ reason }: { reason: string | null }) {
       </span>
     );
   }
+  const status = row.reconciliation_status;
+  if (status === "accepted") {
+    return (
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
+              <CheckCircle2 className="h-3.5 w-3.5" /> RECONCILED
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  if (status === "flagged") {
+    return (
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive">
+              <Flag className="h-3.5 w-3.5" /> FLAGGED
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  // status === 'pending' (or null backfill)
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive">
-            <ShieldAlert className="h-3.5 w-3.5" /> NO MATCH
+          <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-warning/15 px-2 py-0.5 text-[13px] font-medium leading-none text-warning-foreground">
+            <AlertCircle className="h-3.5 w-3.5" /> NEEDS RECONCILIATION
           </span>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>

@@ -171,12 +171,21 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       const c = clientById.get(id);
       return c ? `${c.last_name}, ${c.first_name}` : null;
     };
-    const inScopeClient = (id: string | null | undefined) =>
-      !data.clientId || data.clientId === id;
-    const inScopeStaff = (id: string | null | undefined) =>
-      !data.staffId || data.staffId === id;
+    const clientSampleSet =
+      data.clientIds && data.clientIds.length ? new Set(data.clientIds) : null;
+    const staffSampleSet =
+      data.staffIds && data.staffIds.length ? new Set(data.staffIds) : null;
+    const inScopeClient = (id: string | null | undefined) => {
+      if (clientSampleSet) return !!id && clientSampleSet.has(id);
+      return !data.clientId || data.clientId === id;
+    };
+    const inScopeStaff = (id: string | null | undefined) => {
+      if (staffSampleSet) return !!id && staffSampleSet.has(id);
+      return !data.staffId || data.staffId === id;
+    };
     const inScopeCode = (code: string | null | undefined) =>
       !data.serviceCode || (code ?? "").toUpperCase() === data.serviceCode.toUpperCase();
+
 
     // Staff names: best-effort from profiles
     const staffIds = Array.from(

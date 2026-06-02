@@ -870,7 +870,7 @@ function PendingTable({
               <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts.</TableCell></TableRow>
             ) : rows.map((r) => (
               <Fragment key={r.id}>
-              <TableRow>
+              <TableRow className="[&>td]:border-b-0">
                 <TableCell className="whitespace-nowrap font-medium">
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
                   <EditedByAdminBadge row={r} />

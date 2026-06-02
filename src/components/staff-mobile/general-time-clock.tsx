@@ -206,25 +206,49 @@ export function GeneralTimeClock() {
 
       {/* Note */}
       <div className="mb-3">
-        <Label htmlFor="general-note" className="mb-1 block text-xs font-medium">
-          {requiresDesc && !running ? "Description (required)" : "Note (optional)"}
+        <Label htmlFor="general-note" className="mb-1 flex items-center gap-1 text-xs font-medium">
+          <span>Describe this shift</span>
+          <span aria-hidden className="text-rose-600">*</span>
+          <span className="ml-1 rounded bg-rose-100 px-1.5 py-0 text-[10px] font-bold uppercase tracking-wider text-rose-700">
+            Required
+          </span>
         </Label>
         <Textarea
           id="general-note"
           rows={2}
-          value={running ? shift!.note : note}
-          onChange={(e) => setNote(e.target.value)}
-          disabled={running}
+          value={note}
+          onChange={(e) => {
+            setNote(e.target.value);
+            setShowNoteError(false);
+            if (running) updateNote(e.target.value);
+          }}
           placeholder={
-            requiresDesc
-              ? "Describe the task — required before clocking in"
-              : "What are you working on?"
+            running
+              ? "What did you work on? (required to clock out)"
+              : requiresDesc
+                ? "Describe the task — required before clocking in"
+                : "What are you working on? (required to clock out)"
           }
           maxLength={300}
-          aria-required={requiresDesc}
-          className="min-h-[3rem] resize-none text-sm"
+          aria-required="true"
+          aria-invalid={showNoteError && !noteValid}
+          className={`min-h-[3rem] resize-none text-sm ${
+            showNoteError && !noteValid ? "border-rose-500 focus-visible:ring-rose-500" : ""
+          }`}
         />
+        <p
+          className={`mt-1 text-[11px] ${
+            showNoteError && !noteValid
+              ? "font-medium text-rose-700"
+              : "text-muted-foreground"
+          }`}
+        >
+          {showNoteError && !noteValid
+            ? `Please describe what this time was for (at least ${MIN_NOTE_LEN} characters).`
+            : `Required · at least ${MIN_NOTE_LEN} characters. You can update this anytime before clocking out.`}
+        </p>
       </div>
+
 
       {/* Timer */}
       <div className="mb-3 flex items-center justify-center rounded-xl border border-border bg-background/70 py-2.5">

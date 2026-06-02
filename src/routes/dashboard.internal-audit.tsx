@@ -30,13 +30,16 @@ import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
 import {
   runInternalAudit,
+  listAuditableStaff,
   type AuditFinding,
   type AuditSummary,
   type FindingArea,
   type Severity,
 } from "@/lib/internal-audit.functions";
 import { RequirePermission } from "@/components/rbac-guard";
+import { SamplePicker } from "@/components/internal-audit/sample-picker";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/dashboard/internal-audit")({
   head: () => ({ meta: [{ title: "Internal Audit — NECTAR — HIVE" }] }),
@@ -81,6 +84,7 @@ function InternalAuditPage() {
   const { enabled: infusionEnabled } = useNectarInfusion();
   const { data: caseload } = useCaseload();
   const run = useServerFn(runInternalAudit);
+  const listStaff = useServerFn(listAuditableStaff);
 
   const [clientId, setClientId] = useState<string>("all");
   const [area, setArea] = useState<string>("all");
@@ -88,6 +92,37 @@ function InternalAuditPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
+  const [sampleClientIds, setSampleClientIds] = useState<string[]>([]);
+  const [sampleStaffIds, setSampleStaffIds] = useState<string[]>([]);
+  const [targetClientCount, setTargetClientCount] = useState<string>("");
+  const [targetStaffCount, setTargetStaffCount] = useState<string>("");
+
+  const staffQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["internal-audit-staff", orgId],
+    queryFn: () => listStaff({ data: { organizationId: orgId } }),
+    staleTime: 60_000,
+  });
+
+  const clientOptions = useMemo(
+    () =>
+      (caseload ?? []).map((c) => ({
+        id: c.id,
+        label: `${c.last_name}, ${c.first_name}`,
+      })),
+    [caseload],
+  );
+  const staffOptions = useMemo(
+    () =>
+      (staffQ.data ?? []).map((s) => ({
+        id: s.user_id,
+        label: s.full_name || s.email || "Staff",
+        sublabel: s.job_title || s.role,
+      })),
+    [staffQ.data],
+  );
+
+  const usingSample = sampleClientIds.length > 0 || sampleStaffIds.length > 0;
 
   const auditQ = useQuery<AuditSummary>({
     enabled: !!orgId,
@@ -99,6 +134,8 @@ function InternalAuditPage() {
       serviceCode.trim().toUpperCase(),
       dateFrom,
       dateTo,
+      sampleClientIds.join(","),
+      sampleStaffIds.join(","),
     ],
     // Continuous mode: keep readiness fresh in the background.
     refetchInterval: 60_000,
@@ -107,7 +144,10 @@ function InternalAuditPage() {
       run({
         data: {
           organizationId: orgId,
-          clientId: clientId === "all" ? null : clientId,
+          clientId:
+            sampleClientIds.length > 0 ? null : clientId === "all" ? null : clientId,
+          clientIds: sampleClientIds.length ? sampleClientIds : null,
+          staffIds: sampleStaffIds.length ? sampleStaffIds : null,
           serviceCode: serviceCode.trim() ? serviceCode.trim().toUpperCase() : null,
           area: area === "all" ? null : (area as FindingArea),
           dateFrom: dateFrom || null,
@@ -115,6 +155,7 @@ function InternalAuditPage() {
         },
       }),
   });
+
 
   const findings = useMemo(() => {
     const all = auditQ.data?.findings ?? [];
@@ -126,9 +167,42 @@ function InternalAuditPage() {
       toast.error("Nothing to export yet");
       return;
     }
+    const s = auditQ.data;
+    const meta: string[][] = [
+      ["# Internal Audit Report"],
+      ["# Generated", new Date(s.generatedAt).toISOString()],
+      ["# Date range", `${dateFrom || "—"} to ${dateTo || "—"}`],
+      ["# Area", area === "all" ? "All areas" : AREA_LABEL[area as FindingArea]],
+      ["# Service code", serviceCode || "—"],
+      [
+        "# Sample clients",
+        s.scope.sampleClients?.length
+          ? `${s.scope.sampleClients.length} — ${s.scope.sampleClients
+              .map((c) => c.name)
+              .join("; ")}`
+          : clientId === "all"
+          ? "All clients"
+          : clientOptions.find((c) => c.id === clientId)?.label ?? clientId,
+      ],
+      [
+        "# Sample staff",
+        s.scope.sampleStaff?.length
+          ? `${s.scope.sampleStaff.length} — ${s.scope.sampleStaff
+              .map((p) => p.name)
+              .join("; ")}`
+          : "All staff",
+      ],
+      ["# Readiness score", `${s.readinessScore}/100`],
+      [
+        "# Totals",
+        `critical=${s.totals.critical}; attention=${s.totals.attention}; minor=${s.totals.minor}`,
+      ],
+      [""],
+    ];
     const rows: string[][] = [
+      ...meta,
       ["severity", "area", "title", "detail", "subject", "source_citation", "as_of", "fix_link"],
-      ...auditQ.data.findings.map((f) => [
+      ...s.findings.map((f) => [
         f.severity,
         AREA_LABEL[f.area],
         f.title,
@@ -151,6 +225,7 @@ function InternalAuditPage() {
     URL.revokeObjectURL(url);
     toast.success("Internal audit report downloaded");
   };
+
 
   const summary = auditQ.data;
 
@@ -198,59 +273,149 @@ function InternalAuditPage() {
         </div>
       </div>
 
-      {/* Scope filters */}
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] md:grid-cols-6">
-        <div className="md:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Client</label>
-          <Select value={clientId} onValueChange={setClientId}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All clients</SelectItem>
-              {(caseload ?? []).map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.last_name}, {c.first_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* DSPD-style sample builder */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-[#0f1b3d]">DSPD-style sample</h3>
+            <p className="text-xs text-muted-foreground">
+              Hand-pick the specific clients and staff to audit (e.g. a DSPD sample request of
+              8 clients + 5 staff). Leave both empty to use the standard scope below.
+            </p>
+          </div>
+          {usingSample && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSampleClientIds([]);
+                setSampleStaffIds([]);
+              }}
+            >
+              Clear sample
+            </Button>
+          )}
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Area</label>
-          <Select value={area} onValueChange={setArea}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All areas</SelectItem>
-              {Object.entries(AREA_LABEL).map(([k, v]) => (
-                <SelectItem key={k} value={k}>
-                  {v}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
-            Service code
-          </label>
-          <Input
-            value={serviceCode}
-            placeholder="e.g. S5125"
-            onChange={(e) => setServiceCode(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">From</label>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">To</label>
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-2">
+            <SamplePicker
+              label="Sample clients"
+              placeholder="Pick clients for the sample…"
+              options={clientOptions}
+              selected={sampleClientIds}
+              onChange={setSampleClientIds}
+              targetCount={
+                targetClientCount && /^\d+$/.test(targetClientCount)
+                  ? Number(targetClientCount)
+                  : null
+              }
+              emptyHint="No clients in your caseload"
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] text-muted-foreground">DSPD requested</label>
+              <Input
+                value={targetClientCount}
+                onChange={(e) => setTargetClientCount(e.target.value.replace(/\D/g, ""))}
+                inputMode="numeric"
+                placeholder="e.g. 8"
+                className="h-7 w-20 text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <SamplePicker
+              label="Sample staff"
+              placeholder="Pick staff for the sample…"
+              options={staffOptions}
+              selected={sampleStaffIds}
+              onChange={setSampleStaffIds}
+              targetCount={
+                targetStaffCount && /^\d+$/.test(targetStaffCount)
+                  ? Number(targetStaffCount)
+                  : null
+              }
+              emptyHint={staffQ.isLoading ? "Loading staff…" : "No active staff"}
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] text-muted-foreground">DSPD requested</label>
+              <Input
+                value={targetStaffCount}
+                onChange={(e) => setTargetStaffCount(e.target.value.replace(/\D/g, ""))}
+                inputMode="numeric"
+                placeholder="e.g. 5"
+                className="h-7 w-20 text-xs"
+              />
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Scope filters (whole company / single client / area / date) */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[#0f1b3d]">Other scope filters</h3>
+          {usingSample && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+              Sample active — single-client filter ignored
+            </span>
+          )}
+        </div>
+        <div className="grid gap-3 md:grid-cols-6">
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Client (single)
+            </label>
+            <Select value={clientId} onValueChange={setClientId} disabled={sampleClientIds.length > 0}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All clients</SelectItem>
+                {(caseload ?? []).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.last_name}, {c.first_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Area</label>
+            <Select value={area} onValueChange={setArea}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All areas</SelectItem>
+                {Object.entries(AREA_LABEL).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Service code
+            </label>
+            <Input
+              value={serviceCode}
+              placeholder="e.g. S5125"
+              onChange={(e) => setServiceCode(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">From</label>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">To</label>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+        </div>
+      </div>
+
 
       {/* Summary cards */}
       <div className="grid gap-3 md:grid-cols-4">

@@ -48,6 +48,10 @@ export interface AuditSummary {
   scope: {
     clientId?: string | null;
     staffId?: string | null;
+    clientIds?: string[] | null;
+    staffIds?: string[] | null;
+    sampleClients?: Array<{ id: string; name: string }> | null;
+    sampleStaff?: Array<{ id: string; name: string }> | null;
     serviceCode?: string | null;
     area?: FindingArea | null;
     dateFrom?: string | null;
@@ -64,6 +68,8 @@ const auditInput = z.object({
   organizationId: z.string().uuid(),
   clientId: z.string().uuid().optional().nullable(),
   staffId: z.string().uuid().optional().nullable(),
+  clientIds: z.array(z.string().uuid()).optional().nullable(),
+  staffIds: z.array(z.string().uuid()).optional().nullable(),
   serviceCode: z.string().max(40).optional().nullable(),
   area: z
     .enum([
@@ -80,6 +86,7 @@ const auditInput = z.object({
   dateFrom: z.string().optional().nullable(),
   dateTo: z.string().optional().nullable(),
 });
+
 
 const DAILY_CODE_HINTS = ["HOST", "HHS", "T2033", "DAILY"];
 
@@ -164,12 +171,21 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       const c = clientById.get(id);
       return c ? `${c.last_name}, ${c.first_name}` : null;
     };
-    const inScopeClient = (id: string | null | undefined) =>
-      !data.clientId || data.clientId === id;
-    const inScopeStaff = (id: string | null | undefined) =>
-      !data.staffId || data.staffId === id;
+    const clientSampleSet =
+      data.clientIds && data.clientIds.length ? new Set(data.clientIds) : null;
+    const staffSampleSet =
+      data.staffIds && data.staffIds.length ? new Set(data.staffIds) : null;
+    const inScopeClient = (id: string | null | undefined) => {
+      if (clientSampleSet) return !!id && clientSampleSet.has(id);
+      return !data.clientId || data.clientId === id;
+    };
+    const inScopeStaff = (id: string | null | undefined) => {
+      if (staffSampleSet) return !!id && staffSampleSet.has(id);
+      return !data.staffId || data.staffId === id;
+    };
     const inScopeCode = (code: string | null | undefined) =>
       !data.serviceCode || (code ?? "").toUpperCase() === data.serviceCode.toUpperCase();
+
 
     // Staff names: best-effort from profiles
     const staffIds = Array.from(
@@ -557,11 +573,28 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       return rank[a.severity] - rank[b.severity] || a.area.localeCompare(b.area);
     });
 
+    const sampleClients = clientSampleSet
+      ? Array.from(clientSampleSet).map((id) => ({
+          id,
+          name: clientName(id) ?? "Unknown client",
+        }))
+      : null;
+    const sampleStaff = staffSampleSet
+      ? Array.from(staffSampleSet).map((id) => ({
+          id,
+          name: profileById.get(id) ?? "Staff",
+        }))
+      : null;
+
     return {
       generatedAt: new Date().toISOString(),
       scope: {
         clientId: data.clientId ?? null,
         staffId: data.staffId ?? null,
+        clientIds: data.clientIds ?? null,
+        staffIds: data.staffIds ?? null,
+        sampleClients,
+        sampleStaff,
         serviceCode: data.serviceCode ?? null,
         area: data.area ?? null,
         dateFrom,
@@ -572,4 +605,51 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       byArea,
       findings: filtered,
     };
+
+  });
+
+export interface AuditableStaff {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  job_title: string | null;
+  role: string;
+}
+
+/**
+ * Lightweight staff roster for the Internal Audit scope picker.
+ * Returns active org members — RLS scopes the query to the caller's org.
+ */
+export const listAuditableStaff = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<AuditableStaff[]> => {
+    const { supabase } = context;
+    const { data: members, error } = await supabase
+      .from("organization_members")
+      .select("user_id, role, job_title, active")
+      .eq("organization_id", data.organizationId)
+      .eq("active", true);
+    if (error) throw error;
+    const ids = (members ?? []).map((m) => m.user_id);
+    if (!ids.length) return [];
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", ids);
+    const pMap = new Map(
+      ((profiles ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>).map(
+        (p) => [p.id, p],
+      ),
+    );
+    return (members ?? []).map((m) => {
+      const p = pMap.get(m.user_id);
+      return {
+        user_id: m.user_id,
+        full_name: p?.full_name ?? null,
+        email: p?.email ?? null,
+        job_title: m.job_title ?? null,
+        role: m.role,
+      };
+    });
   });

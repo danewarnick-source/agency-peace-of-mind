@@ -733,7 +733,7 @@ function UnifiedSearchResults({
                       onClick={() => r.outside_geofence_reason && onReason(r)}
                       className={r.outside_geofence_reason ? "cursor-pointer" : ""}
                     >
-                      <GeofenceBadge reason={r.outside_geofence_reason} />
+                      <GeofenceBadge row={r} />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1.5">
@@ -825,7 +825,7 @@ function PendingTable({
                   </Button>
                 </TableCell>
                 <TableCell onClick={() => r.outside_geofence_reason && onReason(r)} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
-                  <GeofenceBadge reason={r.outside_geofence_reason} />
+                  <GeofenceBadge row={r} />
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1.5">
@@ -1122,7 +1122,7 @@ function ArchiveTable({
                     </Button>
                   </TableCell>
                   <TableCell>
-                    <GeofenceBadge reason={r.outside_geofence_reason} />
+                    <GeofenceBadge row={r} />
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="secondary" onClick={() => onEdit(r)}>

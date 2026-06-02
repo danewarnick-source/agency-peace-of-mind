@@ -214,17 +214,22 @@ export const markAsAuthoritativeSource = createServerFn({ method: "POST" })
         documentId: z.string().uuid(),
         authoritativeKind: z.enum(AUTH_KINDS),
         isAuthoritative: z.boolean().default(true),
+        assistedSetup: z.boolean().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const update: Record<string, unknown> = {
+      is_authoritative_source: data.isAuthoritative,
+      authoritative_kind: data.isAuthoritative ? data.authoritativeKind : null,
+    };
+    if (typeof data.assistedSetup === "boolean") {
+      update.assisted_setup_requested = data.assistedSetup;
+    }
     const { error } = await supabase
       .from("nectar_documents")
-      .update({
-        is_authoritative_source: data.isAuthoritative,
-        authoritative_kind: data.isAuthoritative ? data.authoritativeKind : null,
-      })
+      .update(update)
       .eq("id", data.documentId);
     if (error) throw new Error(error.message);
     return { ok: true };

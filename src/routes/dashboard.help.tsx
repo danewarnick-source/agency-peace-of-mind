@@ -7,6 +7,7 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { askNectarHelp, escalateHelpToHive, getHelpTicketStatus, type NectarHelpReply } from "@/lib/nectar-help.functions";
 import { NectarBadge, NectarMark, NectarButton } from "@/components/nectar/nectar-brand";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
+import { NectarAnswer } from "@/components/nectar/nectar-answer";
 
 export const Route = createFileRoute("/dashboard/help")({
   head: () => ({ meta: [{ title: "Need help? — NECTAR" }] }),
@@ -361,8 +362,8 @@ function NectarBubble({
         <Hexagon className="h-4 w-4" fill="currentColor" />
       </div>
       <div className="max-w-[85%] space-y-2">
-        <div className="rounded-2xl rounded-tl-sm border border-[#fed7aa] bg-white px-3.5 py-2 text-sm text-[#0f1b3d] shadow-sm">
-          {text}
+        <div className="rounded-2xl rounded-tl-sm border border-[#fed7aa] bg-white px-3.5 py-2.5 text-sm text-[#0f1b3d] shadow-sm">
+          <NectarAnswer text={text} />
         </div>
         {reply?.isDataRequest && (
           <button

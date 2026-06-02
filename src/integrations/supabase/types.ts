@@ -4927,6 +4927,53 @@ export type Database = {
           },
         ]
       }
+      state_onboarding_sessions: {
+        Row: {
+          answers: Json
+          build_flags: Json
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          state_code: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          answers?: Json
+          build_flags?: Json
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          state_code: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json
+          build_flags?: Json
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          state_code?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "state_onboarding_sessions_state_code_fkey"
+            columns: ["state_code"]
+            isOneToOne: false
+            referencedRelation: "platform_states"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       state_requirement_sources: {
         Row: {
           created_at: string

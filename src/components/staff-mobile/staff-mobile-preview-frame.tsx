@@ -3,6 +3,7 @@ import { Smartphone } from "lucide-react";
 import { StaffTopBar } from "./staff-top-bar";
 import { StaffBottomTabs } from "./staff-bottom-tabs";
 import { ActiveShiftBar } from "./active-shift-bar";
+import { useActiveShiftBarVisible } from "@/hooks/use-active-shift-bar";
 import { CapThresholdModal } from "./cap-threshold-modal";
 import {
   MobileShellProvider,
@@ -95,6 +96,7 @@ function FrameScreen({
   children: ReactNode;
 }) {
   const { setContainer } = useMobileShellContainer();
+  const barVisible = useActiveShiftBarVisible();
   const ref = useCallback(
     (el: HTMLDivElement | null) => setContainer(el),
     [setContainer],
@@ -107,7 +109,14 @@ function FrameScreen({
     >
       <div className="absolute inset-0 flex flex-col">
         <StaffTopBar title={title} framed />
-        <main className="flex-1 overflow-y-auto overscroll-contain bg-[#f7f8fb] px-3 py-4 pb-20">
+        {/* Reserve space for the "Clocked in" bar (~56px) when it's visible
+            so page content never hides behind it. Bottom tabs already
+            accounted for via pb-20. */}
+        <main
+          className={`flex-1 overflow-y-auto overscroll-contain bg-[#f7f8fb] px-3 py-4 ${
+            barVisible ? "pb-[calc(5rem+56px)]" : "pb-20"
+          }`}
+        >
           {children}
         </main>
         <ActiveShiftBar framed />

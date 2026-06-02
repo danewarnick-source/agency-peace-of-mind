@@ -1899,6 +1899,11 @@ export type Database = {
           outside_geofence_reason: string | null
           raw_clock_in: string | null
           raw_clock_out: string | null
+          reconciliation_attestation: string | null
+          reconciliation_review_notes: string | null
+          reconciliation_reviewed_at: string | null
+          reconciliation_reviewed_by: string | null
+          reconciliation_status: string | null
           requires_followup_form: boolean
           rounded_clock_in: string | null
           rounded_clock_out: string | null
@@ -1950,6 +1955,11 @@ export type Database = {
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
           raw_clock_out?: string | null
+          reconciliation_attestation?: string | null
+          reconciliation_review_notes?: string | null
+          reconciliation_reviewed_at?: string | null
+          reconciliation_reviewed_by?: string | null
+          reconciliation_status?: string | null
           requires_followup_form?: boolean
           rounded_clock_in?: string | null
           rounded_clock_out?: string | null
@@ -2001,6 +2011,11 @@ export type Database = {
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
           raw_clock_out?: string | null
+          reconciliation_attestation?: string | null
+          reconciliation_review_notes?: string | null
+          reconciliation_reviewed_at?: string | null
+          reconciliation_reviewed_by?: string | null
+          reconciliation_status?: string | null
           requires_followup_form?: boolean
           rounded_clock_in?: string | null
           rounded_clock_out?: string | null

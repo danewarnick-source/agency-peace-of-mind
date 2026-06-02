@@ -79,6 +79,7 @@ import { Route as DashboardHiveExecNewCompanyRouteImport } from './routes/dashbo
 import { Route as DashboardHiveExecNectarRouteImport } from './routes/dashboard.hive-exec.nectar'
 import { Route as DashboardHiveExecHealthRouteImport } from './routes/dashboard.hive-exec.health'
 import { Route as DashboardHiveExecCompanyMigrationRouteImport } from './routes/dashboard.hive-exec.company-migration'
+import { Route as DashboardHiveExecApprovalsRouteImport } from './routes/dashboard.hive-exec.approvals'
 import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
@@ -456,6 +457,12 @@ const DashboardHiveExecCompanyMigrationRoute =
     path: '/company-migration',
     getParentRoute: () => DashboardHiveExecRoute,
   } as any)
+const DashboardHiveExecApprovalsRoute =
+  DashboardHiveExecApprovalsRouteImport.update({
+    id: '/approvals',
+    path: '/approvals',
+    getParentRoute: () => DashboardHiveExecRoute,
+  } as any)
 const DashboardHiveExecOrgIdRoute = DashboardHiveExecOrgIdRouteImport.update({
   id: '/$orgId',
   path: '/$orgId',
@@ -586,6 +593,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
   '/dashboard/hive-exec/nectar': typeof DashboardHiveExecNectarRoute
@@ -667,6 +675,7 @@ export interface FileRoutesByTo {
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
   '/dashboard/hive-exec/nectar': typeof DashboardHiveExecNectarRoute
@@ -752,6 +761,7 @@ export interface FileRoutesById {
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
+  '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
   '/dashboard/hive-exec/nectar': typeof DashboardHiveExecNectarRoute
@@ -838,6 +848,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/approvals'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
     | '/dashboard/hive-exec/nectar'
@@ -919,6 +930,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/approvals'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
     | '/dashboard/hive-exec/nectar'
@@ -1003,6 +1015,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/mindsmith'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
+    | '/dashboard/hive-exec/approvals'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
     | '/dashboard/hive-exec/nectar'
@@ -1538,6 +1551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHiveExecCompanyMigrationRouteImport
       parentRoute: typeof DashboardHiveExecRoute
     }
+    '/dashboard/hive-exec/approvals': {
+      id: '/dashboard/hive-exec/approvals'
+      path: '/approvals'
+      fullPath: '/dashboard/hive-exec/approvals'
+      preLoaderRoute: typeof DashboardHiveExecApprovalsRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
     '/dashboard/hive-exec/$orgId': {
       id: '/dashboard/hive-exec/$orgId'
       path: '/$orgId'
@@ -1646,6 +1666,7 @@ const DashboardBillingRouteWithChildren =
 
 interface DashboardHiveExecRouteChildren {
   DashboardHiveExecOrgIdRoute: typeof DashboardHiveExecOrgIdRoute
+  DashboardHiveExecApprovalsRoute: typeof DashboardHiveExecApprovalsRoute
   DashboardHiveExecCompanyMigrationRoute: typeof DashboardHiveExecCompanyMigrationRoute
   DashboardHiveExecHealthRoute: typeof DashboardHiveExecHealthRoute
   DashboardHiveExecNectarRoute: typeof DashboardHiveExecNectarRoute
@@ -1658,6 +1679,7 @@ interface DashboardHiveExecRouteChildren {
 
 const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
   DashboardHiveExecOrgIdRoute: DashboardHiveExecOrgIdRoute,
+  DashboardHiveExecApprovalsRoute: DashboardHiveExecApprovalsRoute,
   DashboardHiveExecCompanyMigrationRoute:
     DashboardHiveExecCompanyMigrationRoute,
   DashboardHiveExecHealthRoute: DashboardHiveExecHealthRoute,

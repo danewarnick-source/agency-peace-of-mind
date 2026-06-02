@@ -68,6 +68,7 @@ export const ingestWebSource = createServerFn({ method: "POST" })
         fiscalYear: z.string().max(20).optional().nullable(),
         effectiveStart: z.string().max(40).optional().nullable(),
         effectiveEnd: z.string().max(40).optional().nullable(),
+        assistedSetup: z.boolean().optional(),
       })
       .parse(input),
   )
@@ -167,6 +168,7 @@ export const ingestWebSource = createServerFn({ method: "POST" })
         raw_text: text.slice(0, 50000),
         is_authoritative_source: true,
         authoritative_kind: data.authoritativeKind,
+        assisted_setup_requested: data.assistedSetup ?? false,
         uploaded_by: userId,
         uploaded_by_name:
           (profile?.full_name as string) ?? (profile?.email as string) ?? null,

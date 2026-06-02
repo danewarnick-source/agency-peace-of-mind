@@ -82,6 +82,11 @@ import { AuthorizedCodesPanel } from "@/components/nectar/authorized-codes-panel
 import { ExternalLink as ExternalLinkIcon, Building } from "lucide-react";
 import { attestExternalCompletion, inferClassification } from "@/lib/external-compliance.functions";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  listProviderPendingConfirmations,
+  providerConfirmRequirement,
+  providerRejectRequirement,
+} from "@/lib/nectar-approvals.functions";
 
 
 
@@ -681,6 +686,7 @@ function UploadCard({
   const [fiscalYear, setFiscalYear] = useState("");
   const [effectiveStart, setEffectiveStart] = useState("");
   const [effectiveEnd, setEffectiveEnd] = useState("");
+  const [assistedSetup, setAssistedSetup] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const ingest = useServerFn(ingestDocument);
@@ -694,6 +700,7 @@ function UploadCard({
     setFiscalYear("");
     setEffectiveStart("");
     setEffectiveEnd("");
+    setAssistedSetup(false);
     if (fileInput.current) fileInput.current.value = "";
   };
 
@@ -726,6 +733,7 @@ function UploadCard({
           documentId: doc.id,
           authoritativeKind: kind as "state_sow" | "provider_contract" | "dspd_requirement" | "dhs_requirement" | "public_record" | "other",
           isAuthoritative: true,
+          assistedSetup,
         },
       });
       return doc.id;
@@ -757,6 +765,7 @@ function UploadCard({
           fiscalYear: fiscalYear || null,
           effectiveStart: effectiveStart || null,
           effectiveEnd: effectiveEnd || null,
+          assistedSetup,
         },
       });
     },
@@ -864,6 +873,21 @@ function UploadCard({
             onChange={(e) => setEffectiveEnd(e.target.value)}
           />
         </div>
+
+        <label className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+          <Checkbox
+            checked={assistedSetup}
+            onCheckedChange={(v) => setAssistedSetup(v === true)}
+            className="mt-0.5 shrink-0"
+          />
+          <span className="flex-1">
+            <strong className="block text-foreground">Request HIVE-assisted setup</strong>
+            NECTAR drafts the requirements, then a HIVE Executive verifies the
+            extraction is faithful to this source before it lands in your queue
+            for final confirmation. Leave unchecked to self-serve as normal.
+          </span>
+        </label>
+
 
         {isUrlMode ? (
           <>
@@ -1234,6 +1258,10 @@ function RequirementsPanel({
           <ManualRequirementDialog orgId={orgId} />
         </div>
       </div>
+
+      <AwaitingFinalConfirmationPanel orgId={orgId} />
+
+
 
 
       {removedAuthoritative > 0 && (
@@ -3290,5 +3318,203 @@ function ReviewQueueDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ---------- Three-party approval chain: provider's final-confirmation queue ----------
+
+function AwaitingFinalConfirmationPanel({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listProviderPendingConfirmations);
+  const confirmFn = useServerFn(providerConfirmRequirement);
+  const rejectFn = useServerFn(providerRejectRequirement);
+
+  const { data } = useQuery({
+    queryKey: ["provider-pending-confirmations", orgId],
+    queryFn: () => listFn({ data: { organizationId: orgId } }),
+  });
+
+  const confirm = useMutation({
+    mutationFn: (vars: { requirementId: string; note?: string }) =>
+      confirmFn({ data: { requirementId: vars.requirementId, note: vars.note ?? null } }),
+    onSuccess: () => {
+      toast.success("Requirement confirmed — now active in your compliance set.");
+      qc.invalidateQueries({ queryKey: ["provider-pending-confirmations", orgId] });
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const reject = useMutation({
+    mutationFn: (vars: { requirementId: string; reason: string }) =>
+      rejectFn({ data: { requirementId: vars.requirementId, reason: vars.reason } }),
+    onSuccess: () => {
+      toast.success("Sent back. NECTAR and HIVE Exec will see your note.");
+      qc.invalidateQueries({ queryKey: ["provider-pending-confirmations", orgId] });
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const items = ((data?.items ?? []) as Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    category: string | null;
+    source_citation: string | null;
+    applies_to: string | null;
+  }>);
+
+  if (items.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-emerald-300/60 bg-emerald-50/40 p-4 dark:bg-emerald-950/20">
+      <header className="mb-3 flex items-start gap-3">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+          <ShieldCheck className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-emerald-950 dark:text-emerald-100">
+            Awaiting your final confirmation ({items.length})
+          </h3>
+          <p className="mt-0.5 max-w-3xl text-xs text-emerald-900/80 dark:text-emerald-100/80">
+            HIVE Executive verified that NECTAR extracted these requirements
+            faithfully from your authoritative sources. <strong>You</strong> are
+            the final authority on whether they apply to your operation —
+            confirm to make them active, or send back with a note.
+          </p>
+        </div>
+      </header>
+
+      <ul className="space-y-2">
+        {items.map((r) => (
+          <FinalConfirmRow
+            key={r.id}
+            row={r}
+            onConfirm={(note) => confirm.mutate({ requirementId: r.id, note })}
+            onReject={(reason) => reject.mutate({ requirementId: r.id, reason })}
+            busy={confirm.isPending || reject.isPending}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function FinalConfirmRow({
+  row,
+  onConfirm,
+  onReject,
+  busy,
+}: {
+  row: {
+    id: string;
+    title: string;
+    description: string | null;
+    category: string | null;
+    source_citation: string | null;
+    applies_to: string | null;
+  };
+  onConfirm: (note?: string) => void;
+  onReject: (reason: string) => void;
+  busy: boolean;
+}) {
+  const [mode, setMode] = useState<"idle" | "confirm" | "reject">("idle");
+  const [note, setNote] = useState("");
+
+  return (
+    <li className="rounded-lg border border-border bg-background p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">{row.title}</p>
+          {row.description && (
+            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+              {row.description}
+            </p>
+          )}
+          {row.source_citation && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Source: {row.source_citation}
+            </p>
+          )}
+        </div>
+        {mode === "idle" && (
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              onClick={() => setMode("confirm")}
+              disabled={busy}
+              className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Confirm
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8"
+              onClick={() => setMode("reject")}
+              disabled={busy}
+            >
+              Send back
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {mode === "confirm" && (
+        <div className="mt-2 space-y-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2">
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional note (logged in audit trail)"
+            rows={2}
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={() => onConfirm(note.trim() || undefined)}
+              disabled={busy}
+            >
+              Make it active
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8" onClick={() => setMode("idle")}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {mode === "reject" && (
+        <div className="mt-2 space-y-2 rounded-md border border-amber-300 bg-amber-50/60 p-2">
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Why doesn't this apply, or what should change? (required)"
+            rows={3}
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-8"
+              onClick={() => {
+                if (note.trim().length < 3) {
+                  toast.error("Add a short reason (3+ characters).");
+                  return;
+                }
+                onReject(note.trim());
+              }}
+              disabled={busy}
+            >
+              Send back
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8" onClick={() => setMode("idle")}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </li>
   );
 }

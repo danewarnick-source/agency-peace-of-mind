@@ -28,7 +28,7 @@ function StateDetailPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Link
           to="/dashboard/hive-exec/states"
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -36,7 +36,13 @@ function StateDetailPage() {
           <ArrowLeft className="h-3 w-3" /> All states
         </Link>
         <h2 className="font-display text-lg font-semibold">{stateCode} — State Configuration</h2>
-        <span />
+        <Link
+          to="/dashboard/hive-exec/states/$stateCode/onboarding"
+          params={{ stateCode }}
+          className="inline-flex min-h-[36px] items-center gap-2 rounded-md bg-[#d97a1c] px-3 text-xs font-semibold text-white hover:bg-[#b8651a]"
+        >
+          Run state onboarding
+        </Link>
       </div>
 
       <nav className="flex gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">

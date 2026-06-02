@@ -3,6 +3,7 @@ import { Smartphone } from "lucide-react";
 import { StaffTopBar } from "./staff-top-bar";
 import { StaffBottomTabs } from "./staff-bottom-tabs";
 import { ActiveShiftBar } from "./active-shift-bar";
+import { useActiveShiftBarVisible } from "@/hooks/use-active-shift-bar";
 import { CapThresholdModal } from "./cap-threshold-modal";
 import {
   MobileShellProvider,

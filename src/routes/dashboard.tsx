@@ -61,11 +61,14 @@ const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/internal-audit", label: "Internal Audit", icon: ClipboardCheck },
 ];
 
+type PlatformStateLite = { code: string; name: string; status: "draft" | "active" | "coming_soon" };
+
 function DashboardLayout() {
   const { session, loading, user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { can } = usePermissions();
-  const { view, setView } = usePortalView();
+  const { view, setView, stateCode, setStateCode, subView, setSubView } = usePortalView();
+  const [states, setStates] = useState<PlatformStateLite[]>([]);
   const { isExecutive } = useIsHiveExecutive();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });

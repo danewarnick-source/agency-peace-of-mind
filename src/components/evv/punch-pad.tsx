@@ -475,6 +475,9 @@ export function PunchPad({
     if (!user || !org || !clientForPunch) return;
     const nowIso = new Date().toISOString();
     const isOutOfBounds = !!args.outsideReason;
+    const matched = args.pos
+      ? matchApprovedLocation({ lat: args.pos.lat, lng: args.pos.lng })
+      : null;
 
     const payload = {
       organization_id:             org.organization_id,
@@ -495,6 +498,8 @@ export function PunchPad({
       geofence_variance_justification: args.outsideReason ?? null,
       raw_clock_in:                    nowIso,
       rounded_clock_in:                roundToQuarterHourISO(nowIso),
+      matched_approved_location_id:    matched?.id ?? null,
+      matched_approved_location_label: matched?.label ?? null,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -539,8 +544,10 @@ export function PunchPad({
         isFinite(homeCoords.lat) &&
         isFinite(homeCoords.lng)
       ) {
+        // Approved locations skip the variance prompt — actual GPS still captured.
+        const matched = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
         const dist = haversineFeet(homeCoords, { lat: pos.lat, lng: pos.lng });
-        if (dist > mapRadiusFeet) {
+        if (!matched && dist > mapRadiusFeet) {
           setVariance({ distanceFeet: Math.round(dist), limitFeet: mapRadiusFeet, pos });
           setVarianceReason("");
           return;

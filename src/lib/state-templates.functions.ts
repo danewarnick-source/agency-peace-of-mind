@@ -104,12 +104,13 @@ export const updatePlatformStateBasics = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await ensureExecutive(supabase, userId);
-    const patch: Record<string, unknown> = {};
+    const patch: { status?: string; regulator_label?: string | null; notes?: string | null } = {};
     if (data.status !== undefined) patch.status = data.status;
     if (data.regulator_label !== undefined) patch.regulator_label = data.regulator_label;
     if (data.notes !== undefined) patch.notes = data.notes;
     if (Object.keys(patch).length === 0) return { ok: true };
     const { error } = await supabase.from("platform_states").update(patch).eq("code", data.code);
+
     if (error) throw new Error(error.message);
     return { ok: true };
   });

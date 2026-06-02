@@ -5034,6 +5034,7 @@ export type Database = {
           department_structure: Json
           draft: Json
           evv: Json
+          forms: Json
           id: string
           published_at: string | null
           published_by: string | null
@@ -5050,6 +5051,7 @@ export type Database = {
           department_structure?: Json
           draft?: Json
           evv?: Json
+          forms?: Json
           id?: string
           published_at?: string | null
           published_by?: string | null
@@ -5066,6 +5068,7 @@ export type Database = {
           department_structure?: Json
           draft?: Json
           evv?: Json
+          forms?: Json
           id?: string
           published_at?: string | null
           published_by?: string | null

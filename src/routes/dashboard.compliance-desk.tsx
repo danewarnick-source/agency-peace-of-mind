@@ -151,6 +151,13 @@ type Row = {
   ai_compliance_status: string | null;
   ai_coaching_iterations: number | null;
   ai_compliance_feedback: string | null;
+  matched_approved_location_id: string | null;
+  matched_approved_location_label: string | null;
+  reconciliation_status: "pending" | "accepted" | "flagged" | null;
+  reconciliation_attestation: string | null;
+  reconciliation_review_notes: string | null;
+  reconciliation_reviewed_by: string | null;
+  reconciliation_reviewed_at: string | null;
   clients: { first_name: string; last_name: string; physical_address: string | null } | null;
   staff: { full_name: string | null; email: string | null } | null;
 };

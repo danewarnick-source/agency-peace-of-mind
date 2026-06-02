@@ -681,6 +681,7 @@ function UploadCard({
   const [fiscalYear, setFiscalYear] = useState("");
   const [effectiveStart, setEffectiveStart] = useState("");
   const [effectiveEnd, setEffectiveEnd] = useState("");
+  const [assistedSetup, setAssistedSetup] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const ingest = useServerFn(ingestDocument);
@@ -694,6 +695,7 @@ function UploadCard({
     setFiscalYear("");
     setEffectiveStart("");
     setEffectiveEnd("");
+    setAssistedSetup(false);
     if (fileInput.current) fileInput.current.value = "";
   };
 

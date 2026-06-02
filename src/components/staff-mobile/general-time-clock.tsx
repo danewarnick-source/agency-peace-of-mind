@@ -47,11 +47,12 @@ function fmtElapsed(ms: number) {
  * "Other" and any custom ones) gate Clock In until the note is non-empty.
  */
 export function GeneralTimeClock() {
-  const { shift, start, stop } = useGeneralShift();
+  const { shift, start, stop, updateNote } = useGeneralShift();
   const { settings, enabledCategories } = useTimePaySettings();
   const [categoryCode, setCategoryCode] = useState<string>("");
   const [note, setNote] = useState("");
   const [now, setNow] = useState(Date.now());
+  const [showNoteError, setShowNoteError] = useState(false);
 
   const cats = enabledCategories;
   const active = useMemo<TimePayCategory | undefined>(
@@ -65,6 +66,11 @@ export function GeneralTimeClock() {
 
   const running = !!shift;
 
+  // Sync local note with the active shift so it's editable while clocked in.
+  useEffect(() => {
+    if (shift) setNote(shift.note ?? "");
+  }, [shift?.start_iso]);
+
   useEffect(() => {
     if (!running) return;
     const t = window.setInterval(() => setNow(Date.now()), 1000);
@@ -75,8 +81,11 @@ export function GeneralTimeClock() {
     ? fmtElapsed(now - new Date(shift!.start_iso).getTime())
     : "00:00:00";
 
+  const MIN_NOTE_LEN = 10;
+  const trimmedNote = note.trim();
+  const noteValid = trimmedNote.length >= MIN_NOTE_LEN;
   const requiresDesc = !!active?.requires_description;
-  const canStart = !!active && (!requiresDesc || note.trim().length > 0);
+  const canStart = !!active && (!requiresDesc || trimmedNote.length > 0);
 
   if (!settings.allow_non_client_clockins) {
     return (
@@ -98,17 +107,29 @@ export function GeneralTimeClock() {
 
   const onStart = () => {
     if (!active || !canStart) return;
-    start({ category: active.label, note: note.trim() });
+    start({ category: active.label, note: trimmedNote });
     toast.success(`${active.label} clock started`);
   };
 
   const onStop = () => {
     if (!shift) return;
+    if (!noteValid) {
+      setShowNoteError(true);
+      toast.error("Add a note describing this shift before clocking out.", {
+        description: `At least ${MIN_NOTE_LEN} characters — what did you work on?`,
+      });
+      const el = document.getElementById("general-note");
+      el?.focus();
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (!window.confirm(`End ${shift.category} shift?`)) return;
-    stop();
+    stop({ note: trimmedNote });
     setNote("");
+    setShowNoteError(false);
     toast.success("General shift ended");
   };
+
 
   return (
     <section

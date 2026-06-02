@@ -760,6 +760,7 @@ function UploadCard({
           fiscalYear: fiscalYear || null,
           effectiveStart: effectiveStart || null,
           effectiveEnd: effectiveEnd || null,
+          assistedSetup,
         },
       });
     },

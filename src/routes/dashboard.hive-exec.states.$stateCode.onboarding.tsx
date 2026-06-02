@@ -54,7 +54,7 @@ function OnboardingPage() {
   // Hydrate once when session loads
   useEffect(() => {
     if (session.data && Object.keys(answers).length === 0 && flags.length === 0) {
-      const s = session.data as { answers?: AnswersMap; build_flags?: BuildFlag[] };
+      const s = session.data as unknown as { answers?: AnswersMap; build_flags?: BuildFlag[] };
       setAnswers(s.answers ?? {});
       setFlags(s.build_flags ?? []);
     }

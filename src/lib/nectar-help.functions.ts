@@ -144,27 +144,54 @@ const STOPWORDS = new Set([
 function questionKeywords(q: string): string[] {
   const tokens = q.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? [];
   const out = new Set<string>();
-  for (const t of tokens) if (!STOPWORDS.has(t)) out.add(t);
-  return Array.from(out).slice(0, 12);
+  for (const t of tokens) {
+    if (STOPWORDS.has(t)) continue;
+    out.add(t);
+    // Light stemming so "trainings" matches "training", "hires" matches "hire".
+    if (t.endsWith("ies") && t.length > 4) out.add(t.slice(0, -3) + "y");
+    else if (t.endsWith("ing") && t.length > 5) out.add(t.slice(0, -3));
+    else if (t.endsWith("ed") && t.length > 4) out.add(t.slice(0, -2));
+    else if (t.endsWith("s") && t.length > 3) out.add(t.slice(0, -1));
+  }
+  // Conservative domain synonym expansion — helps "training" hit "orientation",
+  // "onboarding", "competency", "in-service", etc. that appear in SOW/contracts.
+  const synonyms: Record<string, string[]> = {
+    training: ["train", "orientation", "onboarding", "in-service", "inservice", "course", "education", "competency", "instruction", "curriculum"],
+    train: ["training"],
+    hire: ["hired", "hiring", "employment", "employee", "new"],
+    staff: ["employee", "personnel", "worker", "caregiver", "dsp", "direct-support"],
+    requirement: ["require", "required", "must", "shall"],
+    certification: ["certified", "certificate", "credential"],
+    cpr: ["first-aid", "first aid", "bls"],
+  };
+  for (const k of Array.from(out)) {
+    const syns = synonyms[k];
+    if (syns) for (const s of syns) out.add(s);
+  }
+  return Array.from(out).slice(0, 40);
 }
 
-function findExcerpts(text: string, keywords: string[], max = 4): string[] {
+function findExcerpts(text: string, keywords: string[], max = 14): Array<{ excerpt: string; score: number }> {
   if (!text || keywords.length === 0) return [];
-  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).filter((s) => s.length > 20 && s.length < 600);
-  const scored: Array<{ s: string; n: number }> = [];
-  for (const s of sentences) {
+  // Split on sentence boundaries AND paragraph breaks so multi-sentence procedures stay together.
+  const chunks = text
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9(])|\n{2,}/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 20 && s.length < 900);
+  const scored: Array<{ excerpt: string; score: number }> = [];
+  for (const s of chunks) {
     const lower = s.toLowerCase();
     let n = 0;
     for (const k of keywords) if (lower.includes(k)) n += 1;
-    if (n > 0) scored.push({ s: s.trim(), n });
+    if (n > 0) scored.push({ excerpt: s, score: n });
   }
-  scored.sort((a, b) => b.n - a.n);
+  scored.sort((a, b) => b.score - a.score);
   const seen = new Set<string>();
-  const out: string[] = [];
-  for (const { s } of scored) {
-    if (seen.has(s)) continue;
-    seen.add(s);
-    out.push(s);
+  const out: Array<{ excerpt: string; score: number }> = [];
+  for (const item of scored) {
+    if (seen.has(item.excerpt)) continue;
+    seen.add(item.excerpt);
+    out.push(item);
     if (out.length >= max) break;
   }
   return out;

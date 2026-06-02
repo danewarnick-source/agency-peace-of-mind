@@ -1254,6 +1254,10 @@ function RequirementsPanel({
         </div>
       </div>
 
+      <AwaitingFinalConfirmationPanel orgId={orgId} />
+
+
+
 
       {removedAuthoritative > 0 && (
         <div

@@ -1,18 +1,37 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { z } from "zod";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CommandCenter } from "./dashboard.command-center";
 import { ComplianceDeskWrapped } from "./dashboard.compliance-desk";
 import { HostHomeControl } from "./dashboard.host-home-control";
 import { AuditZone } from "@/components/audit-zone/audit-zone";
 
+const recordsDeskSearch = z.object({
+  tab: z
+    .enum(["command-center", "evv-timesheets", "host-home", "audit-zone"])
+    .optional(),
+  /** Inner Command Center tab (forwarded from deep-links). */
+  cc: z.enum(["urgent", "pending", "approved", "analytics", "nectar"]).optional(),
+});
+
 export const Route = createFileRoute("/dashboard/records-desk")({
   head: () => ({ meta: [{ title: "Records Desk — HIVE" }] }),
+  validateSearch: recordsDeskSearch,
   component: RecordsDesk,
 });
 
 function RecordsDesk() {
-  const [tab, setTab] = useState("command-center");
+  const search = useSearch({ from: "/dashboard/records-desk" });
+  const navigate = useNavigate({ from: "/dashboard/records-desk" });
+  const tab = search.tab ?? "command-center";
+
+  const setTab = (next: string) => {
+    navigate({
+      search: (prev) => ({ ...prev, tab: next as typeof search.tab }),
+      replace: true,
+    });
+  };
+
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={setTab} className="w-full">

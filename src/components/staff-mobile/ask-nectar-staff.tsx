@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Send, Loader2, Shield, AlertTriangle } from "lucide-react";
@@ -12,6 +13,8 @@ import {
   NectarButton,
 } from "@/components/nectar/nectar-brand";
 import { NectarAnswer } from "@/components/nectar/nectar-answer";
+import { useMobileShellContainer } from "./mobile-shell-context";
+import { useActiveShiftBarVisible } from "@/hooks/use-active-shift-bar";
 
 interface ChatMsg {
   id: string;
@@ -45,8 +48,18 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
   const ask = useServerFn(askNectarStaff);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
+  const [viewportInset, setViewportInset] = useState(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const { container } = useMobileShellContainer();
+  const barVisible = useActiveShiftBarVisible();
+
+  const bottomOffset = useMemo(() => {
+    const navHeight = 56;
+    const shiftBarHeight = barVisible ? 56 : 0;
+    return navHeight + shiftBarHeight + viewportInset;
+  }, [barVisible, viewportInset]);
 
   const mutation = useMutation({
     mutationFn: async (question: string) =>
@@ -75,6 +88,25 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, mutation.isPending]);
 
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+
+    const updateInset = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setViewportInset(inset);
+    };
+
+    updateInset();
+    vv.addEventListener("resize", updateInset);
+    vv.addEventListener("scroll", updateInset);
+
+    return () => {
+      vv.removeEventListener("resize", updateInset);
+      vv.removeEventListener("scroll", updateInset);
+    };
+  }, []);
+
   const send = (q: string) => {
     const text = q.trim();
     if (!text || mutation.isPending) return;
@@ -89,10 +121,59 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
 
   const isEmpty = messages.length === 0;
 
+  const composerMount =
+    container ?? (typeof document !== "undefined" ? document.body : null);
+
+  const composer = (
+    <div
+      ref={composerRef}
+      className="absolute inset-x-0 z-30 border-t border-border bg-background/98 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/92"
+      style={{
+        bottom: `${bottomOffset}px`,
+        paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+      }}
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          send(input);
+        }}
+        className="flex items-end gap-2"
+      >
+        <textarea
+          ref={taRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send(input);
+            }
+          }}
+          placeholder="Message NECTAR…"
+          rows={1}
+          className="min-h-[44px] max-h-32 flex-1 resize-none rounded-full border border-input bg-background px-4 py-2.5 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f4a93a]/40"
+          disabled={mutation.isPending}
+        />
+        <NectarButton
+          type="submit"
+          variant="amber"
+          loading={mutation.isPending}
+          icon={<Send className="h-4 w-4" />}
+          disabled={!input.trim() || mutation.isPending}
+          className="h-11 min-w-[44px] rounded-full"
+        >
+          <span className="sr-only">Send</span>
+        </NectarButton>
+      </form>
+    </div>
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {/* Header — fixed at top */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-[#0d112b] px-4 py-2.5 text-white">
+    <>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card">
+        {/* Header — fixed at top */}
+        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-[#0d112b] px-4 py-2.5 text-white">
         <NectarMark size={compact ? "sm" : "md"} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -111,13 +192,16 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
         >
           <Shield className="h-3 w-3" /> PHI
         </span>
-      </div>
+        </div>
 
-      {/* Conversation frame — internal scroll only */}
-      <div
-        ref={scrollRef}
-        className="flex-1 min-h-0 space-y-3 overflow-y-auto overscroll-contain px-4 py-3"
-      >
+        {/* Conversation frame — internal scroll only */}
+        <div
+          ref={scrollRef}
+          className="flex-1 min-h-0 space-y-3 overflow-y-auto overscroll-contain px-4 py-3"
+          style={{
+            paddingBottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom) + 5.5rem)`,
+          }}
+        >
         {isEmpty && (
           <div className="space-y-3">
             <div className="flex items-start gap-2 rounded-lg border border-[#f4a93a]/30 bg-[#fff7ed] px-3 py-2 text-[11px] leading-snug text-[#7a4a0a]">
@@ -200,46 +284,8 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
           </div>
         )}
       </div>
-
-      {/* Composer — pinned to the bottom of the frame */}
-      <div
-        className="shrink-0 border-t border-border bg-background p-2.5"
-        style={{ paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }}
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            send(input);
-          }}
-          className="flex items-end gap-2"
-        >
-          <textarea
-            ref={taRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send(input);
-              }
-            }}
-            placeholder="Message NECTAR…"
-            rows={1}
-            className="min-h-[44px] max-h-32 flex-1 resize-none rounded-full border border-input bg-background px-4 py-2.5 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f4a93a]/40"
-            disabled={mutation.isPending}
-          />
-          <NectarButton
-            type="submit"
-            variant="amber"
-            loading={mutation.isPending}
-            icon={<Send className="h-4 w-4" />}
-            disabled={!input.trim() || mutation.isPending}
-            className="h-11 min-w-[44px] rounded-full"
-          >
-            <span className="sr-only">Send</span>
-          </NectarButton>
-        </form>
       </div>
-    </div>
+      {composerMount ? createPortal(composer, composerMount) : null}
+    </>
   );
 }

@@ -219,7 +219,8 @@ export function GeneralTimeClock() {
           <Button
             type="button"
             onClick={onStop}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-rose-600 text-base font-bold uppercase tracking-wider text-white shadow-lg shadow-rose-600/30 transition-all duration-150 hover:bg-rose-700 active:scale-[0.98]"
+            style={{ backgroundColor: "#dc2626", color: "#ffffff" }}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl !bg-rose-600 text-base font-bold uppercase tracking-wider !text-white shadow-lg shadow-rose-600/30 transition-all duration-150 hover:!bg-rose-700 active:scale-[0.98]"
           >
             <Square className="h-5 w-5 fill-current" /> End {shift!.category} Shift
           </Button>
@@ -228,7 +229,8 @@ export function GeneralTimeClock() {
             type="button"
             onClick={onStart}
             disabled={!canStart}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-base font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-600/30 transition-all duration-150 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-60"
+            style={{ backgroundColor: "#059669", color: "#ffffff" }}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl !bg-emerald-600 text-base font-bold uppercase tracking-wider !text-white shadow-lg shadow-emerald-600/30 transition-all duration-150 hover:!bg-emerald-700 active:scale-[0.98] disabled:opacity-60"
           >
             <Play className="h-5 w-5 fill-current" /> Clock In · {active?.label ?? "—"}
           </Button>

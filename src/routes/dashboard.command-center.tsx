@@ -804,9 +804,24 @@ export function CommandCenter() {
 function CommandCenterInner({ orgId }: { orgId: string }) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<Tab>("urgent");
+  const search = useSearch({ strict: false }) as { cc?: Tab };
+  const navigate = useNavigate();
+  const [tab, setTabState] = useState<Tab>(search.cc ?? "urgent");
+  // Keep tab in sync with URL `?cc=` so deep-links land on the right view.
+  useEffect(() => {
+    if (search.cc && search.cc !== tab) setTabState(search.cc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.cc]);
+  const setTab = (next: Tab) => {
+    setTabState(next);
+    navigate({
+      to: ".",
+      search: (prev: Record<string, unknown>) => ({ ...prev, cc: next }),
+      replace: true,
+    });
+  };
   const [pendingFilter, setPendingFilter] = useState<PendingFilter>("all");
-  const [search, setSearch] = useState("");
+  const [search_, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [activeIncident, setActiveIncident] = useState<IncidentReport | null>(null);

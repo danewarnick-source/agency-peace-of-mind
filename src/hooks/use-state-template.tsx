@@ -21,15 +21,16 @@ export function useStateTemplate() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const stateCode = q.data?.state_code ?? null;
-  const tpl: Pick<
-    StateTemplate,
-    "terminology" | "training" | "billing_codes" | "evv" | "required_documents" | "department_structure"
-  > = q.data?.template ?? FALLBACK_TEMPLATE;
+  const data = q.data as { state_code: string | null; template: StateTemplate | null } | undefined;
+  const stateCode = data?.state_code ?? null;
+  const tpl = data?.template ?? FALLBACK_TEMPLATE;
 
   return {
     stateCode,
-    template: tpl,
+    template: tpl as Pick<
+      StateTemplate,
+      "terminology" | "training" | "billing_codes" | "evv" | "required_documents" | "department_structure"
+    >,
     isLoading: q.isLoading,
     error: q.error as Error | null,
   };

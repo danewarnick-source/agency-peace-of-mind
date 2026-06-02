@@ -48,7 +48,7 @@ export const listStateRequirementSources = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z.object({ stateCode: z.string().regex(STATE_CODE_RE) }).parse(input),
   )
-  .handler(async ({ data, context }): Promise<StateRequirementSource[]> => {
+  .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await ensureExecutive(supabase, userId);
     const { data: rows, error } = await supabase
@@ -174,16 +174,16 @@ export const listStateDerivedRequirements = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z.object({ stateCode: z.string().regex(STATE_CODE_RE) }).parse(input),
   )
-  .handler(async ({ data, context }): Promise<StateDerivedRequirement[]> => {
+  .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { data: rows, error } = await supabase
       .from("state_derived_requirements")
-      .select("*")
+      .select("id, state_code, source_id, requirement_key, title, description, category, source_citation, jurisdiction, created_at")
       .eq("state_code", data.stateCode)
       .order("category", { ascending: true })
       .order("title", { ascending: true });
     if (error) throw new Error(error.message);
-    return (rows ?? []) as StateDerivedRequirement[];
+    return (rows ?? []) as Omit<StateDerivedRequirement, "metadata">[];
   });
 
 // Providers in a state — used by the State Detail "Providers" tab.

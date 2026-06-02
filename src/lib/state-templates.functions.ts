@@ -1,15 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type {
-  PlatformState,
-  StateTemplate,
-  TemplateSectionKey,
-} from "./state-templates";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
+import type { StateTemplate, TemplateSectionKey } from "./state-templates";
 
 async function ensureExecutive(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,7 +29,7 @@ const SECTION_KEYS: TemplateSectionKey[] = [
 
 export const listPlatformStates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<(PlatformState & { provider_count: number; template_updated_at: string | null })[]> => {
+  .handler(async ({ context }) => {
     const { supabase } = context;
     const { data: states, error } = await supabase
       .from("platform_states")
@@ -47,22 +39,30 @@ export const listPlatformStates = createServerFn({ method: "GET" })
 
     const { data: tpls } = await supabase
       .from("state_templates")
-      .select("state_code, updated_at");
-    const tplByCode = new Map((tpls ?? []).map((t) => [t.state_code, t.updated_at]));
+      .select("state_code, updated_at, published_at");
+    const tplByCode = new Map((tpls ?? []).map((t) => [t.state_code, t]));
 
     const { data: orgs } = await supabase
       .from("organizations")
       .select("state_code");
     const counts = new Map<string, number>();
     for (const o of orgs ?? []) {
-      if (!o.state_code) continue;
-      counts.set(o.state_code, (counts.get(o.state_code) ?? 0) + 1);
+      const code = (o as { state_code: string | null }).state_code;
+      if (!code) continue;
+      counts.set(code, (counts.get(code) ?? 0) + 1);
     }
 
     return (states ?? []).map((s) => ({
-      ...s,
+      code: s.code,
+      name: s.name,
+      status: s.status,
+      is_reference: s.is_reference,
+      regulator_label: s.regulator_label,
+      notes: s.notes,
+      updated_at: s.updated_at,
       provider_count: counts.get(s.code) ?? 0,
-      template_updated_at: tplByCode.get(s.code) ?? null,
+      template_updated_at: tplByCode.get(s.code)?.updated_at ?? null,
+      template_published_at: tplByCode.get(s.code)?.published_at ?? null,
     }));
   });
 
@@ -96,7 +96,7 @@ export const getStateTemplate = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z.object({ stateCode: z.string().regex(STATE_CODE_RE) }).parse(input),
   )
-  .handler(async ({ data, context }): Promise<StateTemplate | null> => {
+  .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { data: row, error } = await supabase
       .from("state_templates")
@@ -104,17 +104,14 @@ export const getStateTemplate = createServerFn({ method: "GET" })
       .eq("state_code", data.stateCode)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return (row as StateTemplate | null) ?? null;
+    // Cast to unknown then JSON-shape; serverFn serializes JSONB as plain JSON.
+    return (row as unknown as StateTemplate | null) ?? null;
   });
 
 // Returns the published template for the caller's current org's state.
-// Used by useStateTemplate() on the client.
 export const getMyStateTemplate = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{
-    state_code: string | null;
-    template: StateTemplate | null;
-  }> => {
+  .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { data: m } = await supabase
       .from("organization_members")
@@ -123,21 +120,24 @@ export const getMyStateTemplate = createServerFn({ method: "GET" })
       .eq("active", true)
       .limit(1)
       .maybeSingle();
-    if (!m) return { state_code: null, template: null };
+    if (!m) return { state_code: null as string | null, template: null as StateTemplate | null };
     const { data: org } = await supabase
       .from("organizations")
       .select("state_code")
       .eq("id", m.organization_id)
       .maybeSingle();
-    const code = org?.state_code ?? null;
-    if (!code) return { state_code: null, template: null };
+    const code = (org as { state_code: string | null } | null)?.state_code ?? null;
+    if (!code) return { state_code: null as string | null, template: null as StateTemplate | null };
     const { data: tpl } = await supabase
       .from("state_templates")
       .select("*")
       .eq("state_code", code)
       .not("published_at", "is", null)
       .maybeSingle();
-    return { state_code: code, template: (tpl as StateTemplate | null) ?? null };
+    return {
+      state_code: code,
+      template: (tpl as unknown as StateTemplate | null) ?? null,
+    };
   });
 
 const SectionPatchSchema = z.object({
@@ -160,7 +160,6 @@ export const updateStateTemplateSection = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await ensureExecutive(supabase, userId);
 
-    // Upsert by state_code; preserve other sections.
     const { data: existing } = await supabase
       .from("state_templates")
       .select("id, version")
@@ -168,7 +167,8 @@ export const updateStateTemplateSection = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (existing) {
-      const patch: Record<string, unknown> = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const patch: any = {
         [data.section]: data.value,
         version: (existing.version ?? 1) + 1,
       };
@@ -178,7 +178,8 @@ export const updateStateTemplateSection = createServerFn({ method: "POST" })
         .eq("id", existing.id);
       if (error) throw new Error(error.message);
     } else {
-      const insertRow: Record<string, unknown> = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const insertRow: any = {
         state_code: data.stateCode,
         [data.section]: data.value,
       };
@@ -204,6 +205,5 @@ export const publishStateTemplate = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Re-export so callers don't have to import multiple modules.
-export type { PlatformState, StateTemplate, TemplateSectionKey };
 export { SECTION_KEYS };
+export type { StateTemplate, TemplateSectionKey };

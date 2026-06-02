@@ -804,14 +804,14 @@ export function CommandCenter() {
 function CommandCenterInner({ orgId }: { orgId: string }) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const search = useSearch({ strict: false }) as { cc?: Tab };
+  const urlSearch = useSearch({ strict: false }) as { cc?: Tab };
   const navigate = useNavigate();
-  const [tab, setTabState] = useState<Tab>(search.cc ?? "urgent");
+  const [tab, setTabState] = useState<Tab>(urlSearch.cc ?? "urgent");
   // Keep tab in sync with URL `?cc=` so deep-links land on the right view.
   useEffect(() => {
-    if (search.cc && search.cc !== tab) setTabState(search.cc);
+    if (urlSearch.cc && urlSearch.cc !== tab) setTabState(urlSearch.cc);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.cc]);
+  }, [urlSearch.cc]);
   const setTab = (next: Tab) => {
     setTabState(next);
     navigate({
@@ -821,7 +821,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     });
   };
   const [pendingFilter, setPendingFilter] = useState<PendingFilter>("all");
-  const [search_, setSearch] = useState("");
+  const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [activeIncident, setActiveIncident] = useState<IncidentReport | null>(null);

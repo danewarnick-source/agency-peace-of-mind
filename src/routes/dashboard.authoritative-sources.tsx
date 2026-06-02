@@ -728,6 +728,7 @@ function UploadCard({
           documentId: doc.id,
           authoritativeKind: kind as "state_sow" | "provider_contract" | "dspd_requirement" | "dhs_requirement" | "public_record" | "other",
           isAuthoritative: true,
+          assistedSetup,
         },
       });
       return doc.id;

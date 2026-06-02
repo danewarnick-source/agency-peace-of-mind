@@ -424,9 +424,9 @@ function FindingRow({ f }: { f: AuditFinding }) {
       {f.fixHref && (
         <div className="shrink-0">
           <Button asChild variant="outline" size="sm">
-            <Link to={f.fixHref}>
+            <a href={f.fixHref}>
               {f.fixLabel ?? "Open"} <ExternalLink className="ml-2 h-3.5 w-3.5" />
-            </Link>
+            </a>
           </Button>
         </div>
       )}

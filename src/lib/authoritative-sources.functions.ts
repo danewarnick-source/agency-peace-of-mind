@@ -919,6 +919,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     const baseLabel = (doc.title as string) ?? "Source";
 
     let inserted = 0;
+    const assisted = (doc.assisted_setup_requested as boolean | null) === true;
 
     for (const item of aiItems) {
       const titleClean = item.title.trim().slice(0, 200);
@@ -930,20 +931,31 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       const citation = item.citation
         ? `${baseLabel} — ${item.citation}${webSuffix}`
         : `${baseLabel}${webSuffix}`;
-      const { error } = await supabase.from("nectar_requirements").insert({
-        organization_id: doc.organization_id,
-        source_document_id: doc.id,
-        origin: "document",
-        requirement_key: key,
-        title: titleClean,
-        description: item.description ?? null,
-        category: item.category ?? "obligation",
-        source_citation: citation,
-        applies_to: item.applies_to ?? "company",
-      });
-      if (!error) {
+      const { data: ins, error } = await supabase
+        .from("nectar_requirements")
+        .insert({
+          organization_id: doc.organization_id,
+          source_document_id: doc.id,
+          origin: "document",
+          requirement_key: key,
+          title: titleClean,
+          description: item.description ?? null,
+          category: item.category ?? "obligation",
+          source_citation: citation,
+          applies_to: item.applies_to ?? "company",
+          approval_state: assisted ? "nectar_drafted" : null,
+        })
+        .select("id")
+        .single();
+      if (!error && ins) {
         existingKeys.add(key);
         inserted += 1;
+        if (assisted) {
+          await markDraftedByNectar({
+            organizationId: doc.organization_id as string,
+            requirementId: ins.id as string,
+          });
+        }
       }
     }
 
@@ -956,23 +968,34 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         .toLowerCase()
         .slice(0, 120);
       if (existingKeys.has(key)) continue;
-      const { error } = await supabase.from("nectar_requirements").insert({
-        organization_id: doc.organization_id,
-        source_document_id: doc.id,
-        origin: "document",
-        requirement_key: key,
-        title,
-        description: (f.value_text as string | null) ?? null,
-        category:
-          (f.field_key as string) === "required_document" ? "audit_doc" : "obligation",
-        source_citation: citation
-          ? `${baseLabel} — ${citation}${webSuffix}`
-          : `${baseLabel}${webSuffix}`,
-        applies_to: "company",
-      });
-      if (!error) {
+      const { data: ins, error } = await supabase
+        .from("nectar_requirements")
+        .insert({
+          organization_id: doc.organization_id,
+          source_document_id: doc.id,
+          origin: "document",
+          requirement_key: key,
+          title,
+          description: (f.value_text as string | null) ?? null,
+          category:
+            (f.field_key as string) === "required_document" ? "audit_doc" : "obligation",
+          source_citation: citation
+            ? `${baseLabel} — ${citation}${webSuffix}`
+            : `${baseLabel}${webSuffix}`,
+          applies_to: "company",
+          approval_state: assisted ? "nectar_drafted" : null,
+        })
+        .select("id")
+        .single();
+      if (!error && ins) {
         existingKeys.add(key);
         inserted += 1;
+        if (assisted) {
+          await markDraftedByNectar({
+            organizationId: doc.organization_id as string,
+            requirementId: ins.id as string,
+          });
+        }
       }
     }
 

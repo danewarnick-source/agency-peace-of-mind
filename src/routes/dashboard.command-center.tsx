@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useMemo, useEffect } from "react";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -20,12 +21,20 @@ import {
   AlertTriangle, CheckCircle2, Clock, ShieldAlert,
   Search, BarChart3, Loader2, TimerReset, CalendarX,
   ChevronDown, ChevronUp, MapPin, FileText, User,
-  Calendar, Pen, RefreshCcw, Printer,
+  Calendar, Pen, RefreshCcw, Printer, Sparkles, ArrowRight,
+  Home, FolderArchive, Pill,
 } from "lucide-react";
 import { toast } from "sonner";
+import { AddonLock } from "@/components/nectar/addon-lock";
+import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
+
+const cmdSearch = z.object({
+  cc: z.enum(["urgent", "pending", "approved", "analytics", "nectar"]).optional(),
+});
 
 export const Route = createFileRoute("/dashboard/command-center")({
   head: () => ({ meta: [{ title: "Agency Command Center — HIVE" }] }),
+  validateSearch: cmdSearch,
   component: CommandCenter,
 });
 

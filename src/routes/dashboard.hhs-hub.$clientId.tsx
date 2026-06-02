@@ -355,25 +355,37 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
       <CardHeader><CardTitle className="text-base">📝 24-Hour Daily Progress Note</CardTitle></CardHeader>
       <CardContent className="space-y-4">
 
-        {/* PCSP Goals */}
+        {/* PCSP Goals — phone-friendly tap rows (≥44px), full-width, easy to check */}
         <div>
           <Label>PCSP Goals Addressed Today</Label>
           <div className="mt-2 space-y-1.5">
             {pcsp.length === 0 && <p className="text-xs text-muted-foreground">No PCSP goals on file.</p>}
-            {pcsp.map((g) => (
-              <label key={g} className="flex items-start gap-2 text-sm cursor-pointer">
-                <Checkbox
-                  checked={goals.includes(g)}
-                  onCheckedChange={(c) => {
-                    setGoals(c ? [...goals, g] : goals.filter((x) => x !== g));
-                    if (coach) setCoach(null);
-                  }}
-                />
-                {g}
-              </label>
-            ))}
+            {pcsp.map((g) => {
+              const checked = goals.includes(g);
+              return (
+                <label
+                  key={g}
+                  className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-sm transition ${
+                    checked
+                      ? "border-accent/40 bg-accent/10"
+                      : "border-border bg-card hover:bg-secondary/60"
+                  }`}
+                >
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={checked}
+                    onCheckedChange={(c) => {
+                      setGoals(c ? [...goals, g] : goals.filter((x) => x !== g));
+                      if (coach) setCoach(null);
+                    }}
+                  />
+                  <span className="min-w-0 flex-1 leading-snug">{g}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
+
 
         {/* Narrative */}
         <div>

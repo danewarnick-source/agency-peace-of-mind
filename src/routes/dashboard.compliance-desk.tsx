@@ -200,37 +200,75 @@ function EditedByAdminBadge({ row }: { row: Row }) {
   );
 }
 
-/** TSheets-style inline shift narrative + goals strip, rendered under every row. */
+/** Plain-language explanation of why NECTAR flagged or cleared a shift. */
+function nectarReason(row: Row): string {
+  const fb = (row.ai_compliance_feedback ?? "").trim();
+  if (fb) return fb;
+  if (row.ai_compliance_status === "Exception") {
+    const reasons: string[] = [];
+    const inIso = effectiveIn(row);
+    const outIso = effectiveOut(row);
+    if (!outIso) {
+      reasons.push("clock-out is missing");
+    } else {
+      const ms = new Date(outIso).getTime() - new Date(inIso).getTime();
+      if (ms <= 0) reasons.push("shift duration is 0h 0m");
+    }
+    if (!(row.shift_note_text ?? "").trim()) reasons.push("no shift narrative was recorded");
+    if (row.outside_geofence_reason) reasons.push("clock-in was outside approved locations");
+    if ((row.goals_completed ?? []).length === 0) reasons.push("no PCSP goals were checkmarked");
+    return reasons.length ? reasons.join("; ") : "narrative did not pass NECTAR's documentation check";
+  }
+  return "No documentation concerns detected in this shift.";
+}
+
+/** Inline shift narrative + goals strip — visually connected to the shift row above. */
 function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
   const note = (row.shift_note_text ?? "").trim();
   const goals = row.goals_completed ?? [];
+  const isFlag = row.ai_compliance_status === "Exception";
+  const isCleared = row.ai_compliance_status === "Verified";
+  const reason = nectarReason(row);
+  const accent = isFlag
+    ? "border-l-destructive/70"
+    : isCleared
+    ? "border-l-success/60"
+    : "border-l-primary/30";
   return (
     <TableRow className="border-t-0 hover:bg-transparent">
-      <TableCell colSpan={colSpan} className="bg-muted/30 py-3">
-        <div className="rounded-lg border border-border bg-background/60 p-3 space-y-2.5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              Shift Note
-              {row.ai_compliance_status === "Verified" && (
-                <span
-                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success"
-                  title={row.ai_compliance_feedback ?? "NECTAR Documentation Coach cleared this note."}
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" /> NECTAR cleared
-                  {row.ai_coaching_iterations && row.ai_coaching_iterations > 1
+      <TableCell colSpan={colSpan} className={`border-b-2 border-b-border ${accent} border-l-[3px] bg-card/60 pt-0 pb-3`}>
+        <div className="space-y-2.5 pl-1">
+          {(isFlag || isCleared) && (
+            <div
+              className={
+                "flex items-start gap-2 rounded-md px-2.5 py-1.5 text-[13px] leading-snug " +
+                (isFlag
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-success/10 text-success")
+              }
+            >
+              {isFlag ? (
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              )}
+              <div>
+                <span className="font-semibold uppercase tracking-wider text-[11px]">
+                  {isFlag ? "NECTAR flag" : "NECTAR cleared"}
+                  {isCleared && row.ai_coaching_iterations && row.ai_coaching_iterations > 1
                     ? ` · ${row.ai_coaching_iterations}×`
                     : ""}
                 </span>
-              )}
-              {row.ai_compliance_status === "Exception" && (
-                <span
-                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive"
-                  title={row.ai_compliance_feedback ?? "Submitted with Exception Flag — review required."}
-                >
-                  <AlertTriangle className="h-3.5 w-3.5" /> NECTAR flag
+                <span className="ml-2 font-normal normal-case tracking-normal text-foreground/85">
+                  {reason}
                 </span>
-              )}
+              </div>
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <MessageSquare className="h-4 w-4" />
+              Shift Note
             </div>
             <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
               {note.length > 0 ? note : <span className="italic text-muted-foreground">No narrative recorded.</span>}
@@ -238,7 +276,7 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
           </div>
           <div>
             <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <Target className="h-4 w-4 text-muted-foreground" />
+              <Target className="h-4 w-4" />
               Goals Targeted
             </div>
             {goals.length > 0 ? (

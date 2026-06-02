@@ -86,10 +86,6 @@ function DashboardLayout() {
     return () => { cancelled = true; };
   }, [session?.user?.id, navigate]);
 
-  if (loading || !session) {
-    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
-  }
-
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
   const allowedViews: Array<"staff" | "admin" | "staff_mobile" | "hive_exec"> = ["staff"];

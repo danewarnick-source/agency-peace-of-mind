@@ -2542,10 +2542,11 @@ function ApplicabilityPanel({
                     </Badge>
                   )}
                   {m.rationale && (
-                    <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                    <span className="min-w-0 flex-1 basis-full break-words text-[11px] text-muted-foreground sm:basis-auto">
                       {m.rationale}
                     </span>
                   )}
+
                   <div className="ml-auto flex gap-1">
                     {!m.confirmed && m.scope_kind !== "unknown" && (
                       <Button
@@ -2590,8 +2591,8 @@ function ApplicabilityPanel({
               Ask NECTAR to propose
             </Button>
 
-            <div className="flex items-end gap-1.5">
-              <div>
+            <div className="flex flex-wrap items-end gap-1.5">
+              <div className="min-w-0">
                 <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Add scope
                 </Label>
@@ -2599,7 +2600,7 @@ function ApplicabilityPanel({
                   value={addKind}
                   onValueChange={(v) => setAddKind(v as MappingRow["scope_kind"])}
                 >
-                  <SelectTrigger className="h-8 w-[140px] text-[11px]">
+                  <SelectTrigger className="h-8 w-full min-w-0 text-[11px] sm:w-[140px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -2615,9 +2616,10 @@ function ApplicabilityPanel({
                   value={addValue}
                   onChange={(e) => setAddValue(e.target.value)}
                   placeholder={addKind === "code" ? "HHS" : "RN"}
-                  className="h-8 w-24 text-[11px]"
+                  className="h-8 w-full min-w-0 text-[11px] sm:w-24"
                 />
               )}
+
               <Button
                 size="sm"
                 className="h-8 text-[11px]"
@@ -2676,8 +2678,8 @@ function RequirementDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto border-border/60 bg-background/95 backdrop-blur-xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden border-border/60 bg-background/95 p-0 backdrop-blur-xl sm:w-full">
+        <DialogHeader className="shrink-0 space-y-2 border-b border-border/60 px-5 py-4 sm:px-6">
           <div className="flex flex-wrap items-center gap-2">
             {isConfirmed && (
               <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
@@ -2703,16 +2705,17 @@ function RequirementDetailDialog({
               </Badge>
             )}
           </div>
-          <DialogTitle className="mt-1 text-base leading-snug">
+          <DialogTitle className="mt-1 break-words text-base leading-snug">
             {req.title}
           </DialogTitle>
-          <DialogDescription className="text-xs">
+          <DialogDescription className="break-words text-xs">
             Review the requirement in full before confirming. Confirm and remove
             actions log to the Attestation trail.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 text-sm">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-5 py-4 text-sm sm:px-6">
+
           {/* Source attribution — primary, authoritative */}
           <section className="rounded-xl border border-border/60 bg-muted/30 p-3">
             <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2743,7 +2746,8 @@ function RequirementDetailDialog({
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Requirement text (original wording)
             </p>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+
               {req.description?.trim() || (
                 <span className="italic text-muted-foreground">
                   No extended description was extracted — the title above is the
@@ -2814,7 +2818,7 @@ function RequirementDetailDialog({
             {explanation && (
               <div className="mt-2 space-y-2">
                 <div className="rounded-md border border-amber-500/30 bg-background/60 p-2.5">
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
                     {explanation.plain_language}
                   </p>
                 </div>
@@ -2848,7 +2852,8 @@ function RequirementDetailDialog({
           </section>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-2">
+        <DialogFooter className="shrink-0 flex-wrap gap-2 border-t border-border/60 px-5 py-3 sm:px-6 sm:gap-2">
+
           <Button
             variant="ghost"
             size="sm"

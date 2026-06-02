@@ -104,8 +104,7 @@ export const getStateTemplate = createServerFn({ method: "GET" })
       .eq("state_code", data.stateCode)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    // Cast to unknown then JSON-shape; serverFn serializes JSONB as plain JSON.
-    return (row as unknown as StateTemplate | null) ?? null;
+    return row ?? null;
   });
 
 // Returns the published template for the caller's current org's state.
@@ -120,24 +119,21 @@ export const getMyStateTemplate = createServerFn({ method: "GET" })
       .eq("active", true)
       .limit(1)
       .maybeSingle();
-    if (!m) return { state_code: null as string | null, template: null as StateTemplate | null };
+    if (!m) return { state_code: null as string | null, template: null };
     const { data: org } = await supabase
       .from("organizations")
       .select("state_code")
       .eq("id", m.organization_id)
       .maybeSingle();
     const code = (org as { state_code: string | null } | null)?.state_code ?? null;
-    if (!code) return { state_code: null as string | null, template: null as StateTemplate | null };
+    if (!code) return { state_code: null as string | null, template: null };
     const { data: tpl } = await supabase
       .from("state_templates")
       .select("*")
       .eq("state_code", code)
       .not("published_at", "is", null)
       .maybeSingle();
-    return {
-      state_code: code,
-      template: (tpl as unknown as StateTemplate | null) ?? null,
-    };
+    return { state_code: code, template: tpl ?? null };
   });
 
 const SectionPatchSchema = z.object({

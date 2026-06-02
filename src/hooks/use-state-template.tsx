@@ -23,14 +23,14 @@ export function useStateTemplate() {
 
   const data = q.data as { state_code: string | null; template: StateTemplate | null } | undefined;
   const stateCode = data?.state_code ?? null;
-  const tpl = data?.template ?? FALLBACK_TEMPLATE;
+  const tpl = (data?.template ?? FALLBACK_TEMPLATE) as Pick<
+    StateTemplate,
+    "terminology" | "training" | "billing_codes" | "evv" | "required_documents" | "department_structure"
+  >;
 
   return {
     stateCode,
-    template: tpl as Pick<
-      StateTemplate,
-      "terminology" | "training" | "billing_codes" | "evv" | "required_documents" | "department_structure"
-    >,
+    template: tpl,
     isLoading: q.isLoading,
     error: q.error as Error | null,
   };

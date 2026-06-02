@@ -105,69 +105,84 @@ function HhsClientHub() {
   const fullName = `${client.first_name} ${client.last_name}`.trim();
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-4 px-3 sm:px-0">
-      <Link to="/dashboard" className="inline-flex h-11 items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-3.5 w-3.5" /> Back to my caseload
+    <div className="mx-auto w-full max-w-4xl space-y-3 px-3 sm:px-0">
+      {/* Compact back link — kept small so the safety card + tabs sit higher */}
+      <Link
+        to="/dashboard"
+        className="inline-flex h-8 items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> Back to caseload
       </Link>
 
-      {/* CLINICAL PROFILE BANNER — persistent */}
-      <Card className="border-red-300 bg-red-50/40 dark:bg-red-950/20">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            🩺 Clinical Profile · {fullName}
-            <Badge className="bg-amber-500">🏡 HHS</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-xs space-y-1">
-          <div><strong>Medical Concerns / Allergies:</strong> See client chart. Always re-verify before any med pass.</div>
-          <div className="text-amber-700"><strong>⚠️ Choking / Swallow Reflex:</strong> Confirm posture upright and crushed-med policy per care plan.</div>
-          <div className="flex flex-wrap gap-2 mt-1">
-            <Button size="sm" variant="outline" className="h-8">📄 Emergency Medical Authorization</Button>
-            <Button size="sm" variant="outline" className="h-8">📄 Advanced Directives</Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* CLINICAL PROFILE — sticky safety strip. Always visible while the host
+          scrolls through documentation tabs (med pass, daily note, etc). */}
+      <div className="sticky top-0 z-20 -mx-3 sm:mx-0">
+        <Card className="rounded-none border-x-0 border-red-300 bg-red-50/95 backdrop-blur-sm shadow-sm sm:rounded-xl sm:border-x dark:bg-red-950/40">
+          <CardContent className="space-y-1.5 p-3 text-xs">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+                <Stethoscope className="h-4 w-4 text-red-700" />
+                Clinical Profile · {fullName}
+              </span>
+              <Badge className="bg-amber-500 text-[10px]">HHS</Badge>
+            </div>
+            <div className="leading-snug">
+              <strong>Medical Concerns / Allergies:</strong> See client chart — re-verify before any med pass.
+            </div>
+            <div className="leading-snug text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="-mt-0.5 mr-1 inline h-3.5 w-3.5" />
+              <strong>Choking / Swallow Reflex:</strong> Confirm upright posture and crushed-med policy per care plan.
+            </div>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <Button size="sm" variant="outline" className="h-8 text-[11px]">
+                <FileText className="mr-1 h-3.5 w-3.5" /> Emergency Med Auth
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-[11px]">
+                <FileText className="mr-1 h-3.5 w-3.5" /> Advanced Directives
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {client.special_directions && (
-        <div className="flex items-start gap-3 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-3 dark:bg-amber-950/20">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-          <div>
-            <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500 bg-amber-50 px-3 py-2 dark:bg-amber-950/20">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
               Special Directions & Clinical Alerts
             </p>
-            <p className="mt-0.5 text-sm text-amber-700 dark:text-amber-300 whitespace-pre-wrap">
+            <p className="mt-0.5 whitespace-pre-wrap text-xs text-amber-700 dark:text-amber-300">
               {client.special_directions}
             </p>
           </div>
         </div>
       )}
 
-
-
       <Tabs
         value={tabParam ?? "note"}
         onValueChange={(val) => navigate({ to: ".", search: { tab: val }, replace: true })}
       >
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-1 p-1">
-          <TabsTrigger value="note" className="h-11 text-xs sm:text-sm"><FileText className="h-4 w-4 mr-1" />Daily Note</TabsTrigger>
-          <TabsTrigger value="emar" className="h-11 text-xs sm:text-sm"><Pill className="h-4 w-4 mr-1" />MAR</TabsTrigger>
-          <TabsTrigger value="att" className="h-11 text-xs sm:text-sm"><Calendar className="h-4 w-4 mr-1" />Attendance</TabsTrigger>
-          <TabsTrigger value="prn" className="h-11 text-xs sm:text-sm"><ClipboardList className="h-4 w-4 mr-1" />PRN Forms</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-4 gap-1 p-1">
+          <TabsTrigger value="note" className="h-11 text-[11px] sm:text-sm"><FileText className="mr-1 h-4 w-4" />Daily Note</TabsTrigger>
+          <TabsTrigger value="emar" className="h-11 text-[11px] sm:text-sm"><Pill className="mr-1 h-4 w-4" />MAR</TabsTrigger>
+          <TabsTrigger value="att" className="h-11 text-[11px] sm:text-sm"><Calendar className="mr-1 h-4 w-4" />Attendance</TabsTrigger>
+          <TabsTrigger value="prn" className="h-11 text-[11px] sm:text-sm"><ClipboardList className="mr-1 h-4 w-4" />PRN Forms</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="note" className="mt-4">
+        <TabsContent value="note" className="mt-3">
           <DailyNoteTab orgId={orgId} client={client} />
         </TabsContent>
-        <TabsContent value="emar" className="mt-4">
+        <TabsContent value="emar" className="mt-3">
           <MarEmarTab
             clientId={client.id}
             clientName={`${client.first_name} ${client.last_name}`}
           />
         </TabsContent>
-        <TabsContent value="att" className="mt-4">
+        <TabsContent value="att" className="mt-3">
           <AttendanceTab orgId={orgId} clientId={client.id} />
         </TabsContent>
-        <TabsContent value="prn" className="mt-4">
+        <TabsContent value="prn" className="mt-3">
           <PrnFormsTab orgId={orgId} clientId={client.id} />
         </TabsContent>
       </Tabs>
@@ -340,25 +355,37 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
       <CardHeader><CardTitle className="text-base">📝 24-Hour Daily Progress Note</CardTitle></CardHeader>
       <CardContent className="space-y-4">
 
-        {/* PCSP Goals */}
+        {/* PCSP Goals — phone-friendly tap rows (≥44px), full-width, easy to check */}
         <div>
           <Label>PCSP Goals Addressed Today</Label>
           <div className="mt-2 space-y-1.5">
             {pcsp.length === 0 && <p className="text-xs text-muted-foreground">No PCSP goals on file.</p>}
-            {pcsp.map((g) => (
-              <label key={g} className="flex items-start gap-2 text-sm cursor-pointer">
-                <Checkbox
-                  checked={goals.includes(g)}
-                  onCheckedChange={(c) => {
-                    setGoals(c ? [...goals, g] : goals.filter((x) => x !== g));
-                    if (coach) setCoach(null);
-                  }}
-                />
-                {g}
-              </label>
-            ))}
+            {pcsp.map((g) => {
+              const checked = goals.includes(g);
+              return (
+                <label
+                  key={g}
+                  className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-sm transition ${
+                    checked
+                      ? "border-accent/40 bg-accent/10"
+                      : "border-border bg-card hover:bg-secondary/60"
+                  }`}
+                >
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={checked}
+                    onCheckedChange={(c) => {
+                      setGoals(c ? [...goals, g] : goals.filter((x) => x !== g));
+                      if (coach) setCoach(null);
+                    }}
+                  />
+                  <span className="min-w-0 flex-1 leading-snug">{g}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
+
 
         {/* Narrative */}
         <div>

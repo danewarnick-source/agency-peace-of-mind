@@ -573,11 +573,28 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       return rank[a.severity] - rank[b.severity] || a.area.localeCompare(b.area);
     });
 
+    const sampleClients = clientSampleSet
+      ? Array.from(clientSampleSet).map((id) => ({
+          id,
+          name: clientName(id) ?? "Unknown client",
+        }))
+      : null;
+    const sampleStaff = staffSampleSet
+      ? Array.from(staffSampleSet).map((id) => ({
+          id,
+          name: profileById.get(id) ?? "Staff",
+        }))
+      : null;
+
     return {
       generatedAt: new Date().toISOString(),
       scope: {
         clientId: data.clientId ?? null,
         staffId: data.staffId ?? null,
+        clientIds: data.clientIds ?? null,
+        staffIds: data.staffIds ?? null,
+        sampleClients,
+        sampleStaff,
         serviceCode: data.serviceCode ?? null,
         area: data.area ?? null,
         dateFrom,
@@ -588,4 +605,5 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       byArea,
       findings: filtered,
     };
+
   });

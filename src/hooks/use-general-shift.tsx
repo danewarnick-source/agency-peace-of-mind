@@ -109,8 +109,9 @@ export function useGeneralShift() {
   }, []);
 
 
-  return { shift, start, stop };
+  return { shift, start, stop, updateNote };
 }
+
 
 /**
  * Read-only access to the persisted completed-general-shift log. Re-reads

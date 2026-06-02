@@ -102,6 +102,7 @@ function DashboardLayout() {
   const execNav: NavItem[] = [
     { to: "/dashboard/hive-exec", label: "HIVE Overview", icon: LayoutDashboard, exact: true },
     { to: "/dashboard/hive-exec/new-company", label: "Add Company", icon: Plus },
+    { to: "/dashboard/hive-exec/approvals", label: "Extraction Approvals", icon: ShieldCheck },
     { to: "/dashboard/hive-exec/permissions", label: "Permissions & Roles", icon: UserCog },
     { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
     { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },

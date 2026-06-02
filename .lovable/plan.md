@@ -1,101 +1,59 @@
-# Company Overview dashboard + NECTAR celebration system
+## Three-party approval chain: NECTAR → HIVE Exec → Provider
 
-This rebuilds the Company Overview into the spec'd 3-row layout, adds role variations (Company Executive billing card, HIVE Executive cross-company rollup), and ships an event-driven celebration system with server-side de-duplication.
+Defaults chosen (you skipped the questions): in-app notifications only; "assisted setup" is a flag on the existing source upload — provider toggles "Request HIVE-assisted setup" when uploading. Self-serve flow stays exactly as-is.
 
-Everything reuses the existing HIVE/NECTAR design system (navy `#141a3d`, amber `#f4a93a`, hexagon motif, Plus Jakarta Sans, `NectarSurface`/`NectarHeader`/`NectarBadge`/`NectarButton`).
+If login is still broken after this ships, tell me what you see (the recent auth logs show your sign-ins all returned 200) and I'll dig in next turn.
 
----
+### What gets built
 
-## 1. Database (one migration)
+**1. Schema** (one migration)
+- Add `approval_chain` column to the existing requirements table (or new `nectar_requirement_approvals` table if requirements live across multiple tables — I'll confirm during build by reading the schema).
+- New enum `requirement_approval_state`: `nectar_drafted | hive_exec_approved | hive_exec_rejected | provider_confirmed | provider_rejected`.
+- New table `requirement_approval_events` (append-only): `requirement_id, stage, actor_user_id, action (approved|rejected), reason, created_at`. Grants + RLS.
+- Add `assisted_setup_requested boolean default false` to authoritative sources table — drives whether new extractions enter the chain (default) or the existing self-serve confirm flow.
 
-- `celebration_events` — durable log of fired achievements per scope. Columns: `id`, `organization_id`, `event_key` (e.g. `onboarding.first_completed`, `training.completed`, `compliance.threshold_100`, `streak.30`, `cert.renewed_early`, `onboarding.completed_quickly`), `scope_user_id` (nullable — for per-staff events), `tier` (1|2|3), `payload` jsonb, `created_at`. Unique index on `(organization_id, event_key, coalesce(scope_user_id, '00000000-…'))` so each achievement fires once.
-- `celebration_acknowledgements` — per-user dismissals for Tier 2 banners and Tier 3 modals. Columns: `id`, `event_id` (fk), `user_id`, `acknowledged_at`. Unique `(event_id, user_id)`.
-- `org_celebration_settings` — `organization_id` pk, `enabled boolean default true`, `tier1_enabled`, `tier2_enabled`, `tier3_enabled`.
-- `user_celebration_mute` — `user_id` pk, `muted boolean`.
-- GRANTs + RLS scoped to org members; only admins/managers can flip org settings; HIVE-exec gets cross-org read.
+**2. Server functions** (`src/lib/nectar-approvals.functions.ts`)
+- `listPendingHiveExecApprovals({ org_id? })` — HIVE Exec queue, grouped by company + source.
+- `hiveExecApproveRequirement({ requirement_id, note? })` / `hiveExecRejectRequirement({ requirement_id, reason })` — guarded by `is_hive_executive`; transitions state, writes event, notifies provider admins of the org.
+- `providerConfirmRequirement` / `providerRejectRequirement` — guarded by `is_org_admin_or_manager` for that org; only allowed when state = `hive_exec_approved`. Confirm activates the requirement in the engine.
+- `listProviderPendingConfirmations({ org_id })` — for the provider's Requirements tab badge/section.
+- `getApprovalHistory({ requirement_id })` — full chain for the detail modal + attestation log.
 
-## 2. Server functions (`createServerFn`, all auth-middleware-gated)
+**3. NECTAR draft hookup**
+- Where NECTAR currently emits extracted requirements: if the source has `assisted_setup_requested = true`, set initial state to `nectar_drafted` instead of going straight to "needs review / confirm". Write a `nectar_drafted` event row.
 
-`src/lib/company-overview.functions.ts` (extend):
-- `getCompanyOverviewV2({ organizationId })` returning the new shape:
-  - `kpis`: `{ activeStaff, activeStaffDeltaMoM, trainingCompletionPct, complianceCurrentPct, pendingInvites }`
-  - `onboardingPipeline`: counts for Invited / In progress / Complete + a short list
-  - `expiringSoon`: certs in next 30/60d, soonest first
-  - `recentActivity`: last 5 events (completions, hires, role changes)
-  - `leaderboard`: top 5 by completion/streak
-  - `billing` (only if role can view billing): `{ seatsUsed, seatsPurchased, nextInvoiceAt }` — derived from existing org metadata; null if unknown
-  - `isFirstRun`: true when most counts are 0 (drives empty-state nudges)
-- `getHiveExecRollup()` — counts + account metadata across orgs for HIVE Execs only. No PHI.
+**4. UI — HIVE Exec portal** (`src/routes/dashboard.hive-exec.nectar.tsx` extension or a new sub-route)
+- "Pending HIVE Exec approval" queue: rows grouped by company → source, showing the drafted requirement text + source citation + raw excerpt. Approve / Send back (with reason) buttons. Empty state when clean.
+- Liability banner at the top: "You're confirming NECTAR extracted this requirement accurately from the source. You are not confirming whether the provider must follow it — that's the provider's call."
 
-`src/lib/celebrations.functions.ts` (new):
-- `listActiveCelebrations({ organizationId })` — returns unacknowledged Tier 2/3 events for this user + recent Tier 1 toasts not yet shown (last 60s window for this user).
-- `fireCelebration({ organizationId, eventKey, scopeUserId?, tier, payload })` — idempotent insert (ON CONFLICT DO NOTHING); returns whether it actually fired.
-- `acknowledgeCelebration({ eventId })` — records per-user dismissal.
-- `evaluateCelebrationTriggers({ organizationId })` — server-side scan that checks domain conditions (first onboarding done, all-training-completed-per-staff, compliance threshold reached, 7/30 day streaks, cert renewed before expiry, fast onboarding) and calls `fireCelebration` for any newly-met conditions. Invoked from a cheap polling endpoint on the dashboard.
-- `getCelebrationSettings({ organizationId })` + `setCelebrationSettings(...)` (admin) + `setUserMute({ muted })`.
+**5. UI — Provider Authoritative Sources → Requirements tab**
+- New "Awaiting your final confirmation" section above existing confirmed requirements, only showing items in `hive_exec_approved` state. Confirm / Reject (with reason) actions. Standard "confirmed" section stays as today.
+- Per-row status chip + small "approval history" popover (NECTAR drafted → HIVE Exec approved by X on Y → awaiting you).
 
-## 3. UI components
+**6. Upload flow**
+- Add a "Request HIVE-assisted setup" checkbox on the authoritative source upload dialog. Off by default. When on, sets `assisted_setup_requested = true` on the source row.
 
-`src/components/company-overview/` (split the monolith for maintainability):
-- `kpi-stat-card.tsx` — frosted-glass compact card with delta chip; progress ring variant turns amber below target.
-- `onboarding-pipeline-card.tsx` — Invited → In progress → Complete stage list.
-- `expiring-soon-card.tsx` — 30/60d certs list with empty state.
-- `recent-activity-card.tsx` — 5-row feed, "View all" link.
-- `team-leaderboard-card.tsx` — dismissible (state stored in `localStorage`).
-- `quick-actions-card.tsx` — Invite staff / Assign module / Create group; primary amber-gradient `NectarButton`, others ghost.
-- `billing-plan-card.tsx` — Company Executive only; seats + next invoice (account metadata, no PHI).
-- `hive-exec-rollup.tsx` — cross-company counts (HIVE Executive only).
-- `first-run-nudge.tsx` — replaces bleak 0% stats on brand-new companies and points at Quick Actions.
+**7. Notifications**
+- In-app only via existing `notifications` table:
+  - HIVE Exec approves → notify org admins (recipient_role: `admin`) of that company: "Requirements ready for your final confirmation".
+  - Provider rejects → notify HIVE Execs.
+  - HIVE Exec sends back → no notify (NECTAR loop only).
+- NotificationBell already handles rendering.
 
-`src/components/company-overview.tsx` is rewritten to compose those into 3 rows and to branch on role (`company_executive`, `hive_executive`, default admin). Dashboard prefs and `OVERVIEW_CARDS` are migrated to the new card keys (kept exported so the Settings card still works; old keys are gracefully ignored).
+**8. Audit trail**
+- Each event row from `requirement_approval_events` is rendered in the existing Attestation log component, alongside existing attestations. Reuse the current log feed.
 
-## 4. Celebration system
+### Technical notes
 
-`src/components/celebrations/celebration-provider.tsx` — top-level provider mounted in `src/routes/dashboard.tsx`:
-- Polls `listActiveCelebrations` every 60s and on window focus.
-- Tier 1 → amber `sonner` toast with hexagon + check, 4s auto-dismiss. Marks acknowledged immediately.
-- Tier 2 → renders `CelebrationBanner` (inline at the top of Company Overview) until dismissed.
-- Tier 3 → renders `CelebrationModal` (centered) with restrained confetti/hex-burst.
-- Honors `prefers-reduced-motion`: confetti/burst → static hex badge, no animation.
-- Honors org `enabled` + per-tier toggles + per-user mute.
-- Calls `evaluateCelebrationTriggers` on first load + after key mutations to advance fired-state.
+- All state transitions live in server functions with explicit role guards (`is_hive_executive`, `is_org_admin_or_manager`). RLS on `requirement_approval_events`: select by org members + HIVE Execs; insert only via server functions (service role).
+- The existing self-serve confirm flow is untouched — it's gated by `assisted_setup_requested = false`.
+- Reversibility preserved: a `provider_confirmed` requirement can be re-opened by the provider the same way confirm/remove works today; doing so writes a new event.
+- Liability copy is locked in two places: the HIVE Exec queue header and the provider's "awaiting confirmation" section header.
 
-`src/components/celebrations/hex-burst.tsx` — lightweight SVG/canvas hex-burst (CSS keyframes only, ~600ms), reduced-motion fallback included.
+### Out of scope (call out if you want them later)
 
-## 5. Settings integration
+- Email notifications (in-app only for now).
+- Bulk approve/reject in the HIVE Exec queue (single-item only this pass).
+- Versioning when a source is re-uploaded and produces drift against an already-confirmed requirement.
 
-`src/routes/dashboard.settings.tsx`: add a "Celebrations" panel (admin only) with org toggle + per-tier checkboxes. Add a per-user "Mute celebrations" switch (visible to everyone including Staff).
-
-## 6. Role gating
-
-All gating enforced server-side (server fns check role via `requireSupabaseAuth` + RLS):
-- Company Staff → never see the overview (existing portal switch already lands them on staff portal).
-- Company Admin → full overview minus billing/plan card.
-- Company Executive → adds the Billing/Plan card.
-- HIVE Executive → cross-company rollup variant.
-
-## Files
-
-**New**
-- `supabase/migrations/<ts>_celebrations.sql`
-- `src/lib/celebrations.functions.ts`
-- `src/components/company-overview/` (8 files above)
-- `src/components/celebrations/celebration-provider.tsx`
-- `src/components/celebrations/celebration-banner.tsx`
-- `src/components/celebrations/celebration-modal.tsx`
-- `src/components/celebrations/hex-burst.tsx`
-- `src/hooks/use-reduced-motion.tsx`
-
-**Edited**
-- `src/lib/company-overview.functions.ts` (add v2 + hive rollup)
-- `src/components/company-overview.tsx` (rewrite composition)
-- `src/components/company-overview-settings.tsx` (new card keys)
-- `src/routes/dashboard.tsx` (mount CelebrationProvider)
-- `src/routes/dashboard.settings.tsx` (Celebrations panel)
-- `src/integrations/supabase/types.ts` (auto-regenerated by migration)
-
-## Non-goals
-
-- I'm not refactoring the existing `getCompanyOverview` callers; v2 is additive.
-- No new icon library / animation library. Confetti is hand-rolled SVG to keep it brand-correct and lightweight.
-- HIVE Executive rollup shows account metadata only — no client PHI ever crosses an org boundary.
+Approve and I'll start with the migration.

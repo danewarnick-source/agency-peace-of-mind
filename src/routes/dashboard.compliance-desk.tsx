@@ -851,7 +851,7 @@ function PendingTable({
       <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
         <Table>
           <TableHeader>
-              <TableRow className="[&>td]:border-b-0">
+              <TableRow>
               <TableHead>Caregiver</TableHead>
               <TableHead>Client</TableHead>
               <TableHead>Origin</TableHead>

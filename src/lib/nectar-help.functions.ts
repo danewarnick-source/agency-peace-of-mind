@@ -282,6 +282,88 @@ async function gatherFacts(
     facts.notes.push(`Data lookup partial failure: ${e instanceof Error ? e.message : "unknown"}`);
   }
 
+
+    // ─── Requirements + authoritative sources (admin scope only) ─────────────
+    if (facts.scope === "organization") {
+      const keywords = questionKeywords(question);
+
+      // Pull confirmed + needs_attention requirements with their source docs.
+      const reqQ = await supabase
+        .from("nectar_requirements")
+        .select("id,title,description,category,applies_to,source_citation,review_status,origin,source_document_id")
+        .eq("organization_id", orgId)
+        .neq("review_status", "removed")
+        .limit(500);
+      const reqRows = (reqQ.data ?? []) as Array<{
+        id: string; title: string; description: string | null; category: string | null;
+        applies_to: string | null; source_citation: string | null; review_status: string;
+        origin: string; source_document_id: string | null;
+      }>;
+
+      // Look up source document titles for citation context.
+      const docIds = Array.from(new Set(reqRows.map((r) => r.source_document_id).filter((x): x is string => !!x)));
+      const docTitles = new Map<string, string>();
+      if (docIds.length > 0) {
+        const docQ = await supabase
+          .from("nectar_documents")
+          .select("id,title")
+          .in("id", docIds);
+        for (const d of (docQ.data ?? []) as Array<{ id: string; title: string }>) {
+          docTitles.set(d.id, d.title);
+        }
+      }
+
+      // Rank requirements: confirmed first, then by keyword hits in title/description/citation.
+      const scored = reqRows.map((r) => {
+        const hay = `${r.title} ${r.description ?? ""} ${r.category ?? ""} ${r.applies_to ?? ""} ${r.source_citation ?? ""}`.toLowerCase();
+        let score = 0;
+        for (const k of keywords) if (hay.includes(k)) score += 1;
+        if (r.review_status === "confirmed") score += 0.5;
+        return { r, score };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      facts.requirements = scored
+        .slice(0, keywords.length > 0 ? 40 : 80)
+        .map(({ r }) => ({
+          id: r.id,
+          title: r.title,
+          description: r.description,
+          category: r.category,
+          applies_to: r.applies_to,
+          source_citation: r.source_citation,
+          review_status: r.review_status,
+          origin: r.origin,
+          source_document_title: r.source_document_id ? docTitles.get(r.source_document_id) ?? null : null,
+        }));
+      facts.totals.requirements_confirmed = reqRows.filter((r) => r.review_status === "confirmed").length;
+
+      // Authoritative source documents with keyword-matched excerpts from raw_text.
+      const srcQ = await supabase
+        .from("nectar_documents")
+        .select("id,title,authoritative_kind,jurisdiction,raw_text")
+        .eq("organization_id", orgId)
+        .eq("is_authoritative_source", true)
+        .limit(50);
+      const srcRows = (srcQ.data ?? []) as Array<{
+        id: string; title: string; authoritative_kind: string | null;
+        jurisdiction: string | null; raw_text: string | null;
+      }>;
+      facts.totals.authoritative_sources = srcRows.length;
+      const withExcerpts = srcRows.map((s) => ({
+        id: s.id,
+        title: s.title,
+        authoritative_kind: s.authoritative_kind,
+        jurisdiction: s.jurisdiction,
+        excerpts: findExcerpts(s.raw_text ?? "", keywords, 4),
+      }));
+      // Prefer sources that actually have matching excerpts; cap to keep prompt size sane.
+      withExcerpts.sort((a, b) => b.excerpts.length - a.excerpts.length);
+      facts.authoritative_sources = withExcerpts.slice(0, 8);
+    }
+  } catch (e) {
+    facts.notes.push(`Data lookup partial failure: ${e instanceof Error ? e.message : "unknown"}`);
+  }
+
   return facts;
 }
 

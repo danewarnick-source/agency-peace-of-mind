@@ -2676,8 +2676,8 @@ function RequirementDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto border-border/60 bg-background/95 backdrop-blur-xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden border-border/60 bg-background/95 p-0 backdrop-blur-xl sm:w-full">
+        <DialogHeader className="shrink-0 space-y-2 border-b border-border/60 px-5 py-4 sm:px-6">
           <div className="flex flex-wrap items-center gap-2">
             {isConfirmed && (
               <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
@@ -2703,16 +2703,17 @@ function RequirementDetailDialog({
               </Badge>
             )}
           </div>
-          <DialogTitle className="mt-1 text-base leading-snug">
+          <DialogTitle className="mt-1 break-words text-base leading-snug">
             {req.title}
           </DialogTitle>
-          <DialogDescription className="text-xs">
+          <DialogDescription className="break-words text-xs">
             Review the requirement in full before confirming. Confirm and remove
             actions log to the Attestation trail.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 text-sm">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-5 py-4 text-sm sm:px-6">
+
           {/* Source attribution — primary, authoritative */}
           <section className="rounded-xl border border-border/60 bg-muted/30 p-3">
             <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">

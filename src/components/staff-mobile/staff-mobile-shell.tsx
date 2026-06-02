@@ -4,6 +4,7 @@ import { StaffBottomTabs } from "./staff-bottom-tabs";
 import { ActiveShiftBar } from "./active-shift-bar";
 import { CapThresholdModal } from "./cap-threshold-modal";
 import { MobileShellProvider, useMobileShellContainer } from "./mobile-shell-context";
+import { useActiveShiftBarVisible } from "@/hooks/use-active-shift-bar";
 
 /**
  * Mobile-only chrome for the staff portal. The shell is a fixed-viewport
@@ -28,6 +29,7 @@ export function StaffMobileShell({
 
 function ShellInner({ title, children }: { title: string; children: ReactNode }) {
   const { setContainer } = useMobileShellContainer();
+  const barVisible = useActiveShiftBarVisible();
   // Stable callback ref — only updates on mount/unmount.
   const ref = useCallback(
     (el: HTMLDivElement | null) => setContainer(el),
@@ -39,7 +41,18 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
       className="md:hidden fixed inset-0 z-30 flex flex-col overflow-hidden bg-background"
     >
       <StaffTopBar title={title} framed />
-      <main className="flex-1 overflow-y-auto overscroll-contain px-4 py-5">
+      {/*
+        Global layout rule: when the "Clocked in" bar is visible it sits
+        absolute above the bottom tabs (~52px tall). Add equivalent bottom
+        padding to the scroll area so page content (Save buttons, signature
+        fields, chat composers) never hides behind it. When the bar is gone,
+        the space is reclaimed automatically.
+      */}
+      <main
+        className={`flex-1 overflow-y-auto overscroll-contain px-4 py-5 ${
+          barVisible ? "pb-[calc(1.25rem+56px)]" : ""
+        }`}
+      >
         {children}
       </main>
       <ActiveShiftBar framed />

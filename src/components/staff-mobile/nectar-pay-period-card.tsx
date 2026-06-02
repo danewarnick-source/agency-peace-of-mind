@@ -38,9 +38,14 @@ export function NectarPayPeriodCard() {
   // once an hourly shift is running.
   const animatedHours = useCountUp(baseHourlyHours);
   const animatedPay = useCountUp((data?.est_gross_pay ?? 0));
-  const hourlyHoursDisplay = live.isLive ? live.hoursTotal : animatedHours;
-  const hourlyPayDisplay = live.isLive ? baseHourlyPay + live.liveEarnings : baseHourlyPay;
+  const hourlyHoursDisplay = live.isHourlyShift ? live.hoursTotal : animatedHours;
+  const hourlyPayDisplay = live.isHourlyShift ? baseHourlyPay + live.liveEarnings : baseHourlyPay;
   const payTotal = live.isLive ? live.payTotal : animatedPay;
+
+  // Non-client (General Time Clock) totals — Training/Admin/Travel/Meeting.
+  const generalHoursDisplay = live.generalHoursTotal;
+  const generalPayDisplay = live.generalEarningsTotal;
+  const hasGeneral = generalHoursDisplay > 0 || live.isGeneralShift;
 
   const hasHourly = data?.has_hourly_assignment ?? true;
   const hasDaily = data?.has_daily_assignment ?? false;

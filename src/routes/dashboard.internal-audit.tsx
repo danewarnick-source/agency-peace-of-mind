@@ -84,6 +84,7 @@ function InternalAuditPage() {
   const { enabled: infusionEnabled } = useNectarInfusion();
   const { data: caseload } = useCaseload();
   const run = useServerFn(runInternalAudit);
+  const listStaff = useServerFn(listAuditableStaff);
 
   const [clientId, setClientId] = useState<string>("all");
   const [area, setArea] = useState<string>("all");
@@ -91,6 +92,37 @@ function InternalAuditPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
+  const [sampleClientIds, setSampleClientIds] = useState<string[]>([]);
+  const [sampleStaffIds, setSampleStaffIds] = useState<string[]>([]);
+  const [targetClientCount, setTargetClientCount] = useState<string>("");
+  const [targetStaffCount, setTargetStaffCount] = useState<string>("");
+
+  const staffQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["internal-audit-staff", orgId],
+    queryFn: () => listStaff({ data: { organizationId: orgId } }),
+    staleTime: 60_000,
+  });
+
+  const clientOptions = useMemo(
+    () =>
+      (caseload ?? []).map((c) => ({
+        id: c.id,
+        label: `${c.last_name}, ${c.first_name}`,
+      })),
+    [caseload],
+  );
+  const staffOptions = useMemo(
+    () =>
+      (staffQ.data ?? []).map((s) => ({
+        id: s.user_id,
+        label: s.full_name || s.email || "Staff",
+        sublabel: s.job_title || s.role,
+      })),
+    [staffQ.data],
+  );
+
+  const usingSample = sampleClientIds.length > 0 || sampleStaffIds.length > 0;
 
   const auditQ = useQuery<AuditSummary>({
     enabled: !!orgId,
@@ -102,6 +134,8 @@ function InternalAuditPage() {
       serviceCode.trim().toUpperCase(),
       dateFrom,
       dateTo,
+      sampleClientIds.join(","),
+      sampleStaffIds.join(","),
     ],
     // Continuous mode: keep readiness fresh in the background.
     refetchInterval: 60_000,
@@ -110,7 +144,10 @@ function InternalAuditPage() {
       run({
         data: {
           organizationId: orgId,
-          clientId: clientId === "all" ? null : clientId,
+          clientId:
+            sampleClientIds.length > 0 ? null : clientId === "all" ? null : clientId,
+          clientIds: sampleClientIds.length ? sampleClientIds : null,
+          staffIds: sampleStaffIds.length ? sampleStaffIds : null,
           serviceCode: serviceCode.trim() ? serviceCode.trim().toUpperCase() : null,
           area: area === "all" ? null : (area as FindingArea),
           dateFrom: dateFrom || null,
@@ -118,6 +155,7 @@ function InternalAuditPage() {
         },
       }),
   });
+
 
   const findings = useMemo(() => {
     const all = auditQ.data?.findings ?? [];

@@ -198,6 +198,7 @@ function DashboardLayout() {
           const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
           const Icon = item.icon;
           const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
+          const isNectar = item.label === "NECTAR";
           return (
             <Link
               key={item.to}
@@ -206,11 +207,15 @@ function DashboardLayout() {
               data-tour={`nav.${slug}`}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                 active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  ? isNectar
+                    ? "bg-[#d97a1c] text-white shadow-sm"
+                    : "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                  : isNectar
+                    ? "text-[#f4a93a] hover:bg-[#f4a93a]/10 hover:text-[#d97a1c]"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }`}
             >
-              <Icon className="h-4 w-4" /> {item.label}
+              <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} /> {item.label}
             </Link>
           );
         })}

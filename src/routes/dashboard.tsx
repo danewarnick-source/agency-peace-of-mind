@@ -58,6 +58,7 @@ const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/authoritative-sources", label: "Authoritative Sources", icon: ShieldCheck },
   { to: "/dashboard/nectar-docs", label: "Company Docs", icon: Database },
   { to: "/dashboard/external-compliance", label: "External Compliance", icon: ExternalLink },
+  { to: "/dashboard/internal-audit", label: "Internal Audit", icon: ClipboardCheck },
 ];
 
 function DashboardLayout() {

@@ -43,6 +43,7 @@ import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.per
 import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
 import { Route as DashboardNectarDocsRouteImport } from './routes/dashboard.nectar-docs'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
+import { Route as DashboardInternalAuditRouteImport } from './routes/dashboard.internal-audit'
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
 import { Route as DashboardHiveExecRouteImport } from './routes/dashboard.hive-exec'
 import { Route as DashboardHelpRouteImport } from './routes/dashboard.help'
@@ -262,6 +263,11 @@ const DashboardNectarDocsRoute = DashboardNectarDocsRouteImport.update({
 const DashboardInvitationsRoute = DashboardInvitationsRouteImport.update({
   id: '/invitations',
   path: '/invitations',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardInternalAuditRoute = DashboardInternalAuditRouteImport.update({
+  id: '/internal-audit',
+  path: '/internal-audit',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardHostHomeControlRoute =
@@ -571,6 +577,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
+  '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -654,6 +661,7 @@ export interface FileRoutesByTo {
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
+  '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -741,6 +749,7 @@ export interface FileRoutesById {
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
+  '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -829,6 +838,7 @@ export interface FileRouteTypes {
     | '/dashboard/help'
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
+    | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
@@ -912,6 +922,7 @@ export interface FileRouteTypes {
     | '/dashboard/external-compliance'
     | '/dashboard/help'
     | '/dashboard/host-home-control'
+    | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
@@ -998,6 +1009,7 @@ export interface FileRouteTypes {
     | '/dashboard/help'
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
+    | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
@@ -1309,6 +1321,13 @@ declare module '@tanstack/react-router' {
       path: '/invitations'
       fullPath: '/dashboard/invitations'
       preLoaderRoute: typeof DashboardInvitationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/internal-audit': {
+      id: '/dashboard/internal-audit'
+      path: '/internal-audit'
+      fullPath: '/dashboard/internal-audit'
+      preLoaderRoute: typeof DashboardInternalAuditRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/host-home-control': {
@@ -1783,6 +1802,7 @@ interface DashboardRouteChildren {
   DashboardHelpRoute: typeof DashboardHelpRoute
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
+  DashboardInternalAuditRoute: typeof DashboardInternalAuditRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardNectarDocsRoute: typeof DashboardNectarDocsRoute
   DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
@@ -1831,6 +1851,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardHelpRoute: DashboardHelpRoute,
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,
+  DashboardInternalAuditRoute: DashboardInternalAuditRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardNectarDocsRoute: DashboardNectarDocsRoute,
   DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,

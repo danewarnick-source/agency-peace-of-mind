@@ -58,12 +58,15 @@ export async function reportPlatformEvent(input: {
   try {
     // If an open (not resolved) ticket with the same dedupe key exists,
     // append an audit entry instead of creating a duplicate.
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error: lookupErr } = await supabaseAdmin
       .from("hive_platform_tickets")
       .select("id, audit, affected_orgs, triggering_org_id")
       .eq("dedupe_key", input.dedupeKey)
       .neq("status", "resolved")
       .maybeSingle();
+    if (lookupErr) {
+      console.error("[hive-tickets] dedupe lookup failed", lookupErr);
+    }
 
     if (existing) {
       const prevAudit = Array.isArray(existing.audit)
@@ -79,7 +82,7 @@ export async function reportPlatformEvent(input: {
         input.organizationId &&
         existing.triggering_org_id &&
         input.organizationId !== existing.triggering_org_id;
-      await supabaseAdmin
+      const { error: updateErr } = await supabaseAdmin
         .from("hive_platform_tickets")
         .update({
           audit: [...prevAudit, entry] as unknown as Json,
@@ -88,7 +91,9 @@ export async function reportPlatformEvent(input: {
             : (existing.affected_orgs as number),
         })
         .eq("id", existing.id);
-
+      if (updateErr) {
+        console.error("[hive-tickets] dedupe update failed", updateErr);
+      }
       return;
     }
 
@@ -103,28 +108,41 @@ export async function reportPlatformEvent(input: {
     const resolution = input.nectarProposal
       ? { ...input.nectarProposal, affectedCompanies: 1, state: "drafted" }
       : {};
-    await supabaseAdmin.from("hive_platform_tickets").insert({
-      triggering_org_id: input.organizationId,
-      triggering_org_name:
-        input.organizationName ?? "Platform-wide pattern",
-      title: input.title.slice(0, 240),
-      detail: input.detail.slice(0, 4000),
-      category: input.category,
-      severity: input.severity,
-      status: "new",
-      source: "auto",
-      event_kind: input.eventKind,
-      event_ref: input.eventRef as unknown as Json,
-      dedupe_key: input.dedupeKey,
-      affected_orgs: 1,
-      resolution: resolution as unknown as Json,
-      audit: audit as unknown as Json,
-    });
-
-  } catch {
+    const { error: insertErr } = await supabaseAdmin
+      .from("hive_platform_tickets")
+      .insert({
+        triggering_org_id: input.organizationId,
+        triggering_org_name:
+          input.organizationName ?? "Platform-wide pattern",
+        title: input.title.slice(0, 240),
+        detail: input.detail.slice(0, 4000),
+        category: input.category,
+        severity: input.severity,
+        status: "new",
+        source: "auto",
+        event_kind: input.eventKind,
+        event_ref: input.eventRef as unknown as Json,
+        dedupe_key: input.dedupeKey,
+        affected_orgs: 1,
+        resolution: resolution as unknown as Json,
+        audit: audit as unknown as Json,
+      });
+    if (insertErr) {
+      console.error("[hive-tickets] auto-file insert failed", {
+        dedupeKey: input.dedupeKey,
+        eventKind: input.eventKind,
+        error: insertErr,
+      });
+    } else {
+      console.info("[hive-tickets] auto-filed", {
+        dedupeKey: input.dedupeKey,
+        eventKind: input.eventKind,
+      });
+    }
+  } catch (e) {
     // NEVER block the company-side flow on a HIVE-queue write failure.
-    // Auto-tickets are an observability nicety; the user's action must
-    // still succeed (or fail) on its own merits.
+    // Log so the failure is visible in server logs for debugging.
+    console.error("[hive-tickets] reportPlatformEvent threw", e);
   }
 }
 

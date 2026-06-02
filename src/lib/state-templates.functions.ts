@@ -147,9 +147,11 @@ const SectionPatchSchema = z.object({
     "evv",
     "required_documents",
     "department_structure",
+    "forms",
   ]),
   value: z.unknown(),
 });
+
 
 export const updateStateTemplateSection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

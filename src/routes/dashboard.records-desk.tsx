@@ -27,7 +27,10 @@ function RecordsDesk() {
 
   const setTab = (next: string) => {
     navigate({
-      search: (prev) => ({ ...prev, tab: next as typeof search.tab }),
+      search: (prev: z.infer<typeof recordsDeskSearch>) => ({
+        ...prev,
+        tab: next as z.infer<typeof recordsDeskSearch>["tab"],
+      }),
       replace: true,
     });
   };

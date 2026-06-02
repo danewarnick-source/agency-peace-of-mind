@@ -627,7 +627,8 @@ export const listAuditableStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<AuditableStaff[]> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertAddon(supabase, userId, "internal_audit");
     const { data: members, error } = await supabase
       .from("organization_members")
       .select("user_id, role, job_title, active")

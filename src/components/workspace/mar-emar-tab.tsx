@@ -164,7 +164,7 @@ function SigPad({ onSigned, label = "Electronic Signature" }: {
   const drawingRef = useRef(false);
   const hasSigRef = useRef(false);
 
-  function clear() {
+  function initCanvas() {
     const c = canvasRef.current;
     const ctx = c?.getContext("2d");
     if (!c || !ctx) return;
@@ -173,6 +173,16 @@ function SigPad({ onSigned, label = "Electronic Signature" }: {
     ctx.strokeStyle = "#1e293b";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
+  }
+
+  useEffect(() => {
+    initCanvas();
+    hasSigRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function clear() {
+    initCanvas();
     hasSigRef.current = false;
     onSigned(null);
   }
@@ -202,10 +212,15 @@ function SigPad({ onSigned, label = "Electronic Signature" }: {
     const { x, y } = pos(e);
     ctx.lineTo(x, y); ctx.stroke();
     hasSigRef.current = true;
-    onSigned(canvasRef.current?.toDataURL("image/png") ?? null);
   }
 
-  function up() { drawingRef.current = false; }
+  function up() {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    if (hasSigRef.current) {
+      onSigned(canvasRef.current?.toDataURL("image/png") ?? null);
+    }
+  }
 
   return (
     <div className="space-y-1.5">
@@ -219,14 +234,14 @@ function SigPad({ onSigned, label = "Electronic Signature" }: {
         </button>
       </div>
       <canvas
-        ref={(el) => { canvasRef.current = el; if (el) setTimeout(clear, 0); }}
+        ref={canvasRef}
         width={600} height={120}
-        onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}
-        className="w-full touch-none rounded-lg border-2 border-dashed border-border bg-white"
+        onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}
+        className="w-full touch-none rounded-lg border-2 border-dashed border-border bg-white cursor-crosshair"
         aria-label="Signature pad"
       />
       <p className="text-[11px] text-muted-foreground">
-        Sign with your finger or stylus. Your signature confirms this administration record.
+        Sign with your mouse, finger, or stylus. Your signature confirms this administration record.
       </p>
     </div>
   );

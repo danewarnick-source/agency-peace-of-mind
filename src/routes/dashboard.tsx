@@ -432,7 +432,9 @@ function DashboardLayout() {
                 <p className="truncate text-xs text-muted-foreground">
                   {isHiveExecView
                     ? "HIVE Platform · HIVE Executive"
-                    : `${org?.organization_name ?? "Workspace"} · ${ROLE_LABEL[role]}`}
+                    : isStatePreview
+                      ? `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
+                      : `${org?.organization_name ?? "Workspace"} · ${ROLE_LABEL[role]}`}
 
                 </p>
               </div>

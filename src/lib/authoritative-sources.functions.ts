@@ -220,7 +220,11 @@ export const markAsAuthoritativeSource = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const update: Record<string, unknown> = {
+    const update: {
+      is_authoritative_source: boolean;
+      authoritative_kind: string | null;
+      assisted_setup_requested?: boolean;
+    } = {
       is_authoritative_source: data.isAuthoritative,
       authoritative_kind: data.isAuthoritative ? data.authoritativeKind : null,
     };

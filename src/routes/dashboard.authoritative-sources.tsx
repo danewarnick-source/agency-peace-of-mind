@@ -2850,7 +2850,8 @@ function RequirementDetailDialog({
           </section>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-2">
+        <DialogFooter className="shrink-0 flex-wrap gap-2 border-t border-border/60 px-5 py-3 sm:px-6 sm:gap-2">
+
           <Button
             variant="ghost"
             size="sm"

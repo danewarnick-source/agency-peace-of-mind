@@ -2744,7 +2744,8 @@ function RequirementDetailDialog({
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Requirement text (original wording)
             </p>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+
               {req.description?.trim() || (
                 <span className="italic text-muted-foreground">
                   No extended description was extracted — the title above is the

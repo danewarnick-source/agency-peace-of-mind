@@ -129,7 +129,13 @@ function Overview() {
       {showAdmin && <CompanyOverview />}
 
       {!showAdmin && (
-        <div className="space-y-6">
+        <div className="space-y-5">
+          <StaffPageHeader
+            eyebrow="My Day · Active Caseload"
+            eyebrowIcon={Users}
+            title="My Caseload"
+            subtitle="Your assigned clients, today's shift, and anything that needs your attention."
+          />
           <TodayShiftBanner />
           <StaffClientGrid />
           <ComplianceInbox />

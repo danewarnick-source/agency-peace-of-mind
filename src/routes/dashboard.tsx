@@ -458,8 +458,53 @@ function DashboardLayout() {
           </header>
           <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
 
+          {isStatePreview && (
+            <div className="flex items-center justify-between gap-3 border-b border-[#f4a93a]/30 bg-[#f4a93a]/[0.08] px-4 py-2 text-xs md:px-6">
+              <div className="flex items-center gap-2 text-[#9a3412]">
+                <MapPin className="h-3.5 w-3.5" />
+                <span className="font-semibold uppercase tracking-wider">State Build/Preview</span>
+                <span className="text-[#9a3412]/80">
+                  {currentPreviewState?.name ?? "No state selected"} ·{" "}
+                  {subView === "admin" ? "Admin view" : "Staff view"} · template/sample data, not live company records
+                </span>
+              </div>
+              {currentPreviewState && (
+                <Link
+                  to="/dashboard/hive-exec/states/$stateCode"
+                  params={{ stateCode: currentPreviewState.code }}
+                  className="hidden md:inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white/60 px-2 py-0.5 text-[11px] font-medium text-[#9a3412] hover:bg-white"
+                >
+                  Edit template
+                </Link>
+              )}
+            </div>
+          )}
+
           <main className={isMobilePreview ? "flex-1 bg-secondary/40" : "flex-1 bg-secondary/40 px-4 py-6 md:px-8"}>
-            {isMobilePreview ? (
+            {isStatePreview && !stateCode ? (
+              <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
+                Select a state from the sidebar to load the platform configured as that state.
+              </div>
+            ) : isComingSoonPreview ? (
+              <div className="mx-auto max-w-xl rounded-lg border border-dashed border-[#f4a93a]/40 bg-[#f4a93a]/[0.06] p-10 text-center">
+                <MapPin className="mx-auto h-8 w-8 text-[#f4a93a]" />
+                <h2 className="mt-3 text-lg font-semibold tracking-tight">
+                  Coming soon for {currentPreviewState?.name}
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No template has been built for this state yet. Configure the state's skeleton to enable the {subView === "admin" ? "admin" : "staff"} preview.
+                </p>
+                {currentPreviewState && (
+                  <Link
+                    to="/dashboard/hive-exec/states/$stateCode"
+                    params={{ stateCode: currentPreviewState.code }}
+                    className="mt-4 inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white px-3 py-1.5 text-xs font-medium text-[#9a3412] hover:bg-[#f4a93a]/10"
+                  >
+                    Build {currentPreviewState.name} template
+                  </Link>
+                )}
+              </div>
+            ) : isMobilePreview ? (
               <StaffMobilePreviewFrame title={pageTitle}>
                 <Outlet />
               </StaffMobilePreviewFrame>

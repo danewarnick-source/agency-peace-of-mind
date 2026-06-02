@@ -80,7 +80,7 @@ export function useGeneralShift() {
     setShift(next);
   }, []);
 
-  const stop = useCallback(() => {
+  const stop = useCallback((opts?: { note?: string }) => {
     const current = read();
     if (current) {
       const end_iso = new Date().toISOString();
@@ -89,8 +89,9 @@ export function useGeneralShift() {
         (new Date(end_iso).getTime() - new Date(current.start_iso).getTime()) /
           3_600_000,
       );
+      const finalNote = opts?.note?.trim() ?? current.note;
       const log = readLog();
-      log.push({ ...current, end_iso, hours });
+      log.push({ ...current, note: finalNote, end_iso, hours });
       writeLog(log);
     }
     window.localStorage.removeItem(KEY);
@@ -98,8 +99,19 @@ export function useGeneralShift() {
     setShift(null);
   }, []);
 
-  return { shift, start, stop };
+  const updateNote = useCallback((note: string) => {
+    const current = read();
+    if (!current) return;
+    const next = { ...current, note };
+    window.localStorage.setItem(KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event(EVT));
+    setShift(next);
+  }, []);
+
+
+  return { shift, start, stop, updateNote };
 }
+
 
 /**
  * Read-only access to the persisted completed-general-shift log. Re-reads

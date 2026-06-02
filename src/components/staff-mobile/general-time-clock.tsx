@@ -47,11 +47,12 @@ function fmtElapsed(ms: number) {
  * "Other" and any custom ones) gate Clock In until the note is non-empty.
  */
 export function GeneralTimeClock() {
-  const { shift, start, stop } = useGeneralShift();
+  const { shift, start, stop, updateNote } = useGeneralShift();
   const { settings, enabledCategories } = useTimePaySettings();
   const [categoryCode, setCategoryCode] = useState<string>("");
   const [note, setNote] = useState("");
   const [now, setNow] = useState(Date.now());
+  const [showNoteError, setShowNoteError] = useState(false);
 
   const cats = enabledCategories;
   const active = useMemo<TimePayCategory | undefined>(
@@ -65,6 +66,11 @@ export function GeneralTimeClock() {
 
   const running = !!shift;
 
+  // Sync local note with the active shift so it's editable while clocked in.
+  useEffect(() => {
+    if (shift) setNote(shift.note ?? "");
+  }, [shift?.start_iso]);
+
   useEffect(() => {
     if (!running) return;
     const t = window.setInterval(() => setNow(Date.now()), 1000);
@@ -75,8 +81,11 @@ export function GeneralTimeClock() {
     ? fmtElapsed(now - new Date(shift!.start_iso).getTime())
     : "00:00:00";
 
+  const MIN_NOTE_LEN = 10;
+  const trimmedNote = note.trim();
+  const noteValid = trimmedNote.length >= MIN_NOTE_LEN;
   const requiresDesc = !!active?.requires_description;
-  const canStart = !!active && (!requiresDesc || note.trim().length > 0);
+  const canStart = !!active && (!requiresDesc || trimmedNote.length > 0);
 
   if (!settings.allow_non_client_clockins) {
     return (
@@ -98,17 +107,29 @@ export function GeneralTimeClock() {
 
   const onStart = () => {
     if (!active || !canStart) return;
-    start({ category: active.label, note: note.trim() });
+    start({ category: active.label, note: trimmedNote });
     toast.success(`${active.label} clock started`);
   };
 
   const onStop = () => {
     if (!shift) return;
+    if (!noteValid) {
+      setShowNoteError(true);
+      toast.error("Add a note describing this shift before clocking out.", {
+        description: `At least ${MIN_NOTE_LEN} characters — what did you work on?`,
+      });
+      const el = document.getElementById("general-note");
+      el?.focus();
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (!window.confirm(`End ${shift.category} shift?`)) return;
-    stop();
+    stop({ note: trimmedNote });
     setNote("");
+    setShowNoteError(false);
     toast.success("General shift ended");
   };
+
 
   return (
     <section
@@ -185,25 +206,49 @@ export function GeneralTimeClock() {
 
       {/* Note */}
       <div className="mb-3">
-        <Label htmlFor="general-note" className="mb-1 block text-xs font-medium">
-          {requiresDesc && !running ? "Description (required)" : "Note (optional)"}
+        <Label htmlFor="general-note" className="mb-1 flex items-center gap-1 text-xs font-medium">
+          <span>Describe this shift</span>
+          <span aria-hidden className="text-rose-600">*</span>
+          <span className="ml-1 rounded bg-rose-100 px-1.5 py-0 text-[10px] font-bold uppercase tracking-wider text-rose-700">
+            Required
+          </span>
         </Label>
         <Textarea
           id="general-note"
           rows={2}
-          value={running ? shift!.note : note}
-          onChange={(e) => setNote(e.target.value)}
-          disabled={running}
+          value={note}
+          onChange={(e) => {
+            setNote(e.target.value);
+            setShowNoteError(false);
+            if (running) updateNote(e.target.value);
+          }}
           placeholder={
-            requiresDesc
-              ? "Describe the task — required before clocking in"
-              : "What are you working on?"
+            running
+              ? "What did you work on? (required to clock out)"
+              : requiresDesc
+                ? "Describe the task — required before clocking in"
+                : "What are you working on? (required to clock out)"
           }
           maxLength={300}
-          aria-required={requiresDesc}
-          className="min-h-[3rem] resize-none text-sm"
+          aria-required="true"
+          aria-invalid={showNoteError && !noteValid}
+          className={`min-h-[3rem] resize-none text-sm ${
+            showNoteError && !noteValid ? "border-rose-500 focus-visible:ring-rose-500" : ""
+          }`}
         />
+        <p
+          className={`mt-1 text-[11px] ${
+            showNoteError && !noteValid
+              ? "font-medium text-rose-700"
+              : "text-muted-foreground"
+          }`}
+        >
+          {showNoteError && !noteValid
+            ? `Please describe what this time was for (at least ${MIN_NOTE_LEN} characters).`
+            : `Required · at least ${MIN_NOTE_LEN} characters. You can update this anytime before clocking out.`}
+        </p>
       </div>
+
 
       {/* Timer */}
       <div className="mb-3 flex items-center justify-center rounded-xl border border-border bg-background/70 py-2.5">

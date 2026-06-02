@@ -1571,7 +1571,8 @@ function ReconcileTable({
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
               return (
-                <TableRow key={r.id}>
+                <Fragment key={r.id}>
+                <TableRow className="[&>td]:border-b-0">
                   <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
                   <TableCell className="whitespace-nowrap font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
                   <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
@@ -1592,6 +1593,8 @@ function ReconcileTable({
                     </Button>
                   </TableCell>
                 </TableRow>
+                <InlineNotesRow row={r} colSpan={9} />
+                </Fragment>
               );
             })}
           </TableBody>

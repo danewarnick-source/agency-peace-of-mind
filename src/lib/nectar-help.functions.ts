@@ -377,11 +377,17 @@ async function gatherFacts(
         title: s.title,
         authoritative_kind: s.authoritative_kind,
         jurisdiction: s.jurisdiction,
-        excerpts: findExcerpts(s.raw_text ?? "", keywords, 4),
+        excerpts: findExcerpts(s.raw_text ?? "", keywords, 14),
       }));
-      // Prefer sources that actually have matching excerpts; cap to keep prompt size sane.
+      // Prefer sources that actually have matching excerpts; keep the full set so
+      // SOW + contract + DSPD docs all contribute to topic-wide answers.
       withExcerpts.sort((a, b) => b.excerpts.length - a.excerpts.length);
-      facts.authoritative_sources = withExcerpts.slice(0, 8);
+      facts.authoritative_sources = withExcerpts.filter((s) => s.excerpts.length > 0).slice(0, 20);
+      // If keyword matching found nothing, still include a small sample so the
+      // model can confirm sources exist and recommend opening them.
+      if (facts.authoritative_sources.length === 0) {
+        facts.authoritative_sources = withExcerpts.slice(0, 5);
+      }
     }
   } catch (e) {
     facts.notes.push(`Data lookup partial failure: ${e instanceof Error ? e.message : "unknown"}`);

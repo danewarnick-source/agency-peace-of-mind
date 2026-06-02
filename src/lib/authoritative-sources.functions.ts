@@ -68,6 +68,7 @@ export const ingestWebSource = createServerFn({ method: "POST" })
         fiscalYear: z.string().max(20).optional().nullable(),
         effectiveStart: z.string().max(40).optional().nullable(),
         effectiveEnd: z.string().max(40).optional().nullable(),
+        assistedSetup: z.boolean().optional(),
       })
       .parse(input),
   )

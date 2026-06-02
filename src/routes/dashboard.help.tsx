@@ -361,8 +361,8 @@ function NectarBubble({
         <Hexagon className="h-4 w-4" fill="currentColor" />
       </div>
       <div className="max-w-[85%] space-y-2">
-        <div className="rounded-2xl rounded-tl-sm border border-[#fed7aa] bg-white px-3.5 py-2 text-sm text-[#0f1b3d] shadow-sm">
-          {text}
+        <div className="rounded-2xl rounded-tl-sm border border-[#fed7aa] bg-white px-3.5 py-2.5 text-sm text-[#0f1b3d] shadow-sm">
+          <NectarAnswer text={text} />
         </div>
         {reply?.isDataRequest && (
           <button

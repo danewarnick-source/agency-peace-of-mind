@@ -1133,7 +1133,9 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     });
   }
 
+  const nectarCount = urgentCount + rejectedCount + pendingTimesheets.length + pendingLogs.length;
   const tabs: { id: Tab; label: string; count?: number }[] = [
+    { id: "nectar",    label: "🍯 NECTAR Infusion", count: nectarCount },
     { id: "urgent",    label: "🚨 Urgent",         count: urgentCount  },
     { id: "pending",   label: "📋 Pending Review",  count: pendingCount + rejectedCount },
     { id: "approved",  label: "✅ Approved Archive"                      },

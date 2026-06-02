@@ -123,6 +123,12 @@ function DashboardLayout() {
     }
   }, [isHiveExecView, pathname, navigate]);
 
+  if (loading || !session) {
+    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
+  }
+
+
+
 
 
   const signOut = async () => {

@@ -5,11 +5,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePortalView } from "@/hooks/use-portal-view";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Clock, FileText, ArrowRight } from "lucide-react";
+import { AlertTriangle, Clock, FileText, ArrowRight, Users } from "lucide-react";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
 import { TodayShiftBanner } from "@/components/today-shift-banner";
 import { CompanyOverview } from "@/components/company-overview";
+import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 

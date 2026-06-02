@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
@@ -6,6 +6,7 @@ import { useActiveShift } from "./use-active-shift";
 import { useTimePaySettings } from "./use-time-pay-settings";
 import { useWorkerProfile } from "./use-worker-profile";
 import { useMyAssignments } from "./use-my-assignments";
+import { useGeneralShift, useGeneralShiftLog } from "./use-general-shift";
 import { computePeriodBounds, type PaySchedule } from "@/lib/pay-periods";
 import { isDailyServiceCode } from "@/lib/service-billing";
 

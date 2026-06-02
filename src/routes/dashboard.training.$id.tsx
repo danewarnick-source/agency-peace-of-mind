@@ -82,47 +82,65 @@ function TrainingPlayer() {
   }
 
   const isCompleted = !!progress?.is_completed;
+  const isQuiz = mod.sequence_order === 6;
 
   return (
-    <div className="h-screen overflow-hidden -m-6 flex flex-col">
-      <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-border bg-card">
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-accent">
-            Module {mod.sequence_order} of 6
-          </p>
-          <h2 className="text-base font-semibold tracking-tight truncate">{mod.title}</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm">
+    // Span the full shell main area (cancel the shell's px-4 py-5) and lay out
+    // header + content as a flex column that fills the visible space without
+    // colliding with the bottom "Clocked in" bar or tabs.
+    <div className="-mx-4 -my-5 flex h-full min-h-[calc(100dvh-9rem)] flex-col bg-background md:min-h-[600px]">
+      {/* Compact, consistent header — no truncation, title wraps */}
+      <header className="border-b border-border bg-card px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0">
             <Link to="/dashboard/courses">
               <ArrowLeft className="mr-1 h-4 w-4" /> Roadmap
             </Link>
           </Button>
           <Button
             size="sm"
-            className={isCompleted ? "" : "bg-[image:var(--gradient-brand)] text-primary-foreground"}
+            className={
+              isCompleted
+                ? ""
+                : "bg-[image:var(--gradient-brand)] text-primary-foreground shrink-0"
+            }
             variant={isCompleted ? "outline" : "default"}
             disabled={completeMutation.isPending || isCompleted || !user}
             onClick={() => completeMutation.mutate()}
           >
             <CheckCircle2 className="mr-1 h-4 w-4" />
-            {isCompleted ? "Completed" : "Mark Module as Complete"}
+            {isCompleted ? "Completed" : "Mark Complete"}
           </Button>
         </div>
-      </div>
-      <div className="w-full h-[calc(100vh-5rem)] overflow-hidden bg-card">
+        <div className="mt-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">
+            {isQuiz ? "Certification Quiz" : `Module ${mod.sequence_order} of 6`}
+          </p>
+          <h1 className="mt-0.5 text-base font-semibold leading-snug tracking-tight text-foreground">
+            {mod.title}
+          </h1>
+          {mod.description && (
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {mod.description}
+            </p>
+          )}
+        </div>
+      </header>
+
+      {/* Lesson body — fills remaining space, scrolls internally if needed */}
+      <div className="flex-1 min-h-0 bg-card">
         {mod.mindsmith_url ? (
           <iframe
             src={mod.mindsmith_url}
             title={mod.title}
             scrolling="yes"
-            className="w-full h-full border-none"
+            className="h-full w-full border-none"
             allow="fullscreen; autoplay; clipboard-write"
             allowFullScreen
           />
         ) : (
           <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-            No lesson URL has been configured for this module yet.
+            No lesson content has been configured for this module yet.
           </div>
         )}
       </div>

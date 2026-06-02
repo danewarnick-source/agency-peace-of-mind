@@ -198,9 +198,14 @@ async function gatherFacts(
     role,
     scope: role === "employee" || role === "host_family" ? "self" : "organization",
     generated_at: new Date().toISOString(),
-    totals: { clients_active: null, clients_total: null, staff_active: null, pba_accounts: null },
+    totals: {
+      clients_active: null, clients_total: null, staff_active: null, pba_accounts: null,
+      requirements_confirmed: null, authoritative_sources: null,
+    },
     service_codes: { all_distinct: [], referenced_in_question: [] },
     client_matches: [],
+    requirements: [],
+    authoritative_sources: [],
     notes: [],
   };
 

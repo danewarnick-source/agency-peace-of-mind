@@ -2542,10 +2542,11 @@ function ApplicabilityPanel({
                     </Badge>
                   )}
                   {m.rationale && (
-                    <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                    <span className="min-w-0 flex-1 basis-full break-words text-[11px] text-muted-foreground sm:basis-auto">
                       {m.rationale}
                     </span>
                   )}
+
                   <div className="ml-auto flex gap-1">
                     {!m.confirmed && m.scope_kind !== "unknown" && (
                       <Button

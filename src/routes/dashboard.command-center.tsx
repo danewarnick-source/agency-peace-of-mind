@@ -100,7 +100,7 @@ type OpenShift = {
   profiles: { full_name: string | null; email: string | null } | null;
 };
 
-type Tab = "urgent" | "pending" | "approved" | "analytics";
+type Tab = "nectar" | "urgent" | "pending" | "approved" | "analytics";
 type PendingFilter = "all" | "timesheets" | "daily_logs" | "incidents";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

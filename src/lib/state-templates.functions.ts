@@ -21,7 +21,9 @@ const SECTION_KEYS: TemplateSectionKey[] = [
   "evv",
   "required_documents",
   "department_structure",
+  "forms",
 ];
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Catalog

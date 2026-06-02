@@ -172,24 +172,24 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card">
         {/* Header — fixed at top */}
         <div className="flex shrink-0 items-center gap-3 border-b border-border bg-[#0d112b] px-4 py-2.5 text-white">
-        <NectarMark size={compact ? "sm" : "md"} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <NectarBadge size="xs" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]/90">
-              Staff assistant
-            </span>
+          <NectarMark size={compact ? "sm" : "md"} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <NectarBadge size="xs" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]/90">
+                Staff assistant
+              </span>
+            </div>
+            <h2 className="truncate font-display text-sm font-bold leading-tight tracking-tight">
+              Ask NECTAR · Staff
+            </h2>
           </div>
-          <h2 className="truncate font-display text-sm font-bold leading-tight tracking-tight">
-            Ask NECTAR · Staff
-          </h2>
-        </div>
-        <span
-          title="Client information shown here is for the people on your caseload — treat it as confidential PHI."
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#f4a93a]/40 bg-[#f4a93a]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]"
-        >
-          <Shield className="h-3 w-3" /> PHI
-        </span>
+          <span
+            title="Client information shown here is for the people on your caseload — treat it as confidential PHI."
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#f4a93a]/40 bg-[#f4a93a]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]"
+          >
+            <Shield className="h-3 w-3" /> PHI
+          </span>
         </div>
 
         {/* Conversation frame — internal scroll only */}
@@ -200,88 +200,88 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
             paddingBottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom) + 5.5rem)`,
           }}
         >
-        {isEmpty && (
-          <div className="space-y-3">
-            <div className="flex items-start gap-2 rounded-lg border border-[#f4a93a]/30 bg-[#fff7ed] px-3 py-2 text-[11px] leading-snug text-[#7a4a0a]">
-              <Shield className="mt-0.5 h-3 w-3 shrink-0" />
-              <span>
-                Client info here is for people on your caseload — treat as confidential PHI.
-              </span>
-            </div>
-            <p className="text-[13px] leading-snug text-muted-foreground">
-              I help with company policies, your trainings, job duties, your pay,
-              and the people on your caseload — their goals, safety, and meds.
-            </p>
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Try asking
+          {isEmpty && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 rounded-lg border border-[#f4a93a]/30 bg-[#fff7ed] px-3 py-2 text-[11px] leading-snug text-[#7a4a0a]">
+                <Shield className="mt-0.5 h-3 w-3 shrink-0" />
+                <span>
+                  Client info here is for people on your caseload — treat as confidential PHI.
+                </span>
+              </div>
+              <p className="text-[13px] leading-snug text-muted-foreground">
+                I help with company policies, your trainings, job duties, your pay,
+                and the people on your caseload — their goals, safety, and meds.
               </p>
-              {STARTERS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => send(s)}
-                  className="block min-h-[40px] w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-[13px] leading-snug text-foreground transition hover:border-[#f4a93a]/50 hover:bg-[#fff7ed] active:scale-[0.99]"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {messages.map((m) =>
-          m.role === "user" ? (
-            <div key={m.id} className="flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[#0d112b] px-3.5 py-2 text-sm text-white shadow-sm">
-                {m.text}
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Try asking
+                </p>
+                {STARTERS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => send(s)}
+                    className="block min-h-[40px] w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-[13px] leading-snug text-foreground transition hover:border-[#f4a93a]/50 hover:bg-[#fff7ed] active:scale-[0.99]"
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
             </div>
-          ) : (
-            <div key={m.id} className="flex gap-2">
+          )}
+
+          {messages.map((m) =>
+            m.role === "user" ? (
+              <div key={m.id} className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[#0d112b] px-3.5 py-2 text-sm text-white shadow-sm">
+                  {m.text}
+                </div>
+              </div>
+            ) : (
+              <div key={m.id} className="flex gap-2">
+                <NectarMark size="sm" className="mt-0.5" />
+                <div className="max-w-[85%] flex-1 rounded-2xl rounded-tl-sm border border-border bg-card px-3.5 py-2.5 shadow-sm">
+                  {m.reply?.refused && (
+                    <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9a3412]">
+                      <AlertTriangle className="h-3 w-3" />
+                      Out of scope
+                    </div>
+                  )}
+                  <NectarAnswer text={m.text} />
+                  {m.reply && m.reply.citations.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {m.reply.citations.map((c, i) => (
+                        <span
+                          key={`${c.type}-${c.id}-${i}`}
+                          className="inline-flex items-center rounded border border-[#fed7aa] bg-[#fff7ed] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#9a3412]"
+                          title={c.title}
+                        >
+                          {c.type === "pcsp"
+                            ? "PCSP"
+                            : c.type === "medication"
+                              ? "Med"
+                              : c.type}
+                          {" · "}
+                          {c.title.length > 28 ? c.title.slice(0, 26) + "…" : c.title}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ),
+          )}
+
+          {mutation.isPending && (
+            <div className="flex gap-2">
               <NectarMark size="sm" className="mt-0.5" />
-              <div className="max-w-[85%] flex-1 rounded-2xl rounded-tl-sm border border-border bg-card px-3.5 py-2.5 shadow-sm">
-                {m.reply?.refused && (
-                  <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9a3412]">
-                    <AlertTriangle className="h-3 w-3" />
-                    Out of scope
-                  </div>
-                )}
-                <NectarAnswer text={m.text} />
-                {m.reply && m.reply.citations.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {m.reply.citations.map((c, i) => (
-                      <span
-                        key={`${c.type}-${c.id}-${i}`}
-                        className="inline-flex items-center rounded border border-[#fed7aa] bg-[#fff7ed] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#9a3412]"
-                        title={c.title}
-                      >
-                        {c.type === "pcsp"
-                          ? "PCSP"
-                          : c.type === "medication"
-                          ? "Med"
-                          : c.type}
-                        {" · "}
-                        {c.title.length > 28 ? c.title.slice(0, 26) + "…" : c.title}
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="rounded-2xl rounded-tl-sm border border-border bg-card px-3.5 py-2 text-sm text-muted-foreground shadow-sm">
+                <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />
+                Thinking…
               </div>
             </div>
-          ),
-        )}
-
-        {mutation.isPending && (
-          <div className="flex gap-2">
-            <NectarMark size="sm" className="mt-0.5" />
-            <div className="rounded-2xl rounded-tl-sm border border-border bg-card px-3.5 py-2 text-sm text-muted-foreground shadow-sm">
-              <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />
-              Thinking…
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
       </div>
       {composerMount ? createPortal(composer, composerMount) : null}
     </>

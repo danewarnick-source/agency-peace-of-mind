@@ -1176,6 +1176,29 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
         ))}
       </div>
 
+      {/* ── NECTAR INFUSION ─────────────────────────────────────────────────────── */}
+      {tab === "nectar" && (
+        <AddonLock
+          addon="nectar_infusion"
+          featureName="NECTAR Infusion — Records Desk overview"
+          benefit="One prioritized, plain-language list of everything that needs your attention across Command Center, EVV & Timesheets, Host Home, and Audit Zone — with deep-links straight to where each item is fixed."
+        >
+          <NectarInfusionView
+            orgId={orgId}
+            urgentIncidents={urgentIncidents}
+            urgentTimesheets={urgentTimesheets}
+            openShifts={openShifts}
+            medErrors={medErrors}
+            pendingTimesheets={pendingTimesheets}
+            pendingLogs={pendingLogs}
+            rejectedTimesheets={rejectedTimesheets}
+            rejectedLogs={rejectedLogs}
+            onJumpUrgent={() => setTab("urgent")}
+            onJumpPending={() => setTab("pending")}
+          />
+        </AddonLock>
+      )}
+
       {/* ── URGENT ──────────────────────────────────────────────────────────────── */}
       {tab === "urgent" && (
         <div className="space-y-6">

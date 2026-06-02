@@ -915,30 +915,33 @@ function MarCalendarView({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[11px]">
+          <table className="w-full border-collapse text-xs">
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 min-w-[160px] border border-border bg-card px-2 py-1.5 text-left font-semibold">
+                <th className="sticky left-0 z-10 min-w-[200px] border border-border bg-card px-2 py-2 text-left font-semibold">
                   Medication
                 </th>
-                {days.map((d) => (
-                  <th key={d} className={`w-7 border border-border px-1 py-1 text-center font-medium ${
-                    d === todayDate.getDate() && month === todayDate.getMonth() && year === todayDate.getFullYear()
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground"
-                  }`}>
-                    {d}
-                  </th>
-                ))}
+                {days.map((d) => {
+                  const isTodayCol = d === todayDate.getDate() && month === todayDate.getMonth() && year === todayDate.getFullYear();
+                  return (
+                    <th key={d} className={`w-10 border border-border px-1 py-1.5 text-center font-medium ${
+                      isTodayCol
+                        ? "bg-primary text-primary-foreground font-bold ring-2 ring-primary ring-inset"
+                        : "text-muted-foreground"
+                    }`}>
+                      {d}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
               {meds.filter((m) => m.is_active).flatMap((med) =>
                 (med.scheduled_times.length > 0 ? med.scheduled_times : ["PRN"]).map((time) => (
                   <tr key={`${med.id}-${time}`} className="hover:bg-muted/20">
-                    <td className="sticky left-0 z-10 border border-border bg-card px-2 py-1.5 align-top">
+                    <td className="sticky left-0 z-10 border border-border bg-card px-2 py-2 align-top">
                       <div className="font-medium">{med.medication_name}</div>
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-[11px] text-muted-foreground">
                         {med.dosage && <span>{med.dosage}</span>}
                         {time !== "PRN" && <span className="ml-1 font-mono">{time}</span>}
                         {med.is_controlled && <span className="ml-1 font-bold text-purple-600">C</span>}
@@ -954,12 +957,12 @@ function MarCalendarView({
                       const isFuture = new Date(year, month, d) > todayDate;
 
                       return (
-                        <td key={d} className="border border-border p-0">
+                        <td key={d} className={`border border-border p-0 ${isToday ? "bg-primary/5" : ""}`}>
                           {log ? (
                             <Popover>
                               <PopoverTrigger asChild>
-                                <button className={`flex h-7 w-full items-center justify-center hover:opacity-80 transition`}>
-                                  <span className={`h-4 w-4 rounded-full ${statusColor(log)}`} />
+                                <button className={`flex h-10 w-full items-center justify-center hover:opacity-80 transition relative`}>
+                                  <span className={`h-5 w-5 rounded-full ${statusColor(log)}`} />
                                   {log.is_medication_error && (
                                     <span className="absolute h-1.5 w-1.5 rounded-full bg-rose-600 top-0.5 right-0.5" />
                                   )}
@@ -998,13 +1001,13 @@ function MarCalendarView({
                             <button
                               type="button"
                               onClick={() => onCellClick(med, d, time === "PRN" ? "00:00" : time)}
-                              className="flex h-7 w-full items-center justify-center hover:bg-primary/10 transition"
+                              className="flex h-10 w-full items-center justify-center hover:bg-primary/10 transition"
                               title="Click to log administration"
                             >
-                              <span className="h-3 w-3 rounded-full border-2 border-dashed border-muted-foreground/30" />
+                              <span className="h-3.5 w-3.5 rounded-full border-2 border-dashed border-muted-foreground/30" />
                             </button>
                           ) : (
-                            <div className="h-7 w-full" />
+                            <div className="h-10 w-full" />
                           )}
                         </td>
                       );

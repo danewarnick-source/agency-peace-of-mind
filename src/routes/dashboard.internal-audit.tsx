@@ -167,9 +167,42 @@ function InternalAuditPage() {
       toast.error("Nothing to export yet");
       return;
     }
+    const s = auditQ.data;
+    const meta: string[][] = [
+      ["# Internal Audit Report"],
+      ["# Generated", new Date(s.generatedAt).toISOString()],
+      ["# Date range", `${dateFrom || "—"} to ${dateTo || "—"}`],
+      ["# Area", area === "all" ? "All areas" : AREA_LABEL[area as FindingArea]],
+      ["# Service code", serviceCode || "—"],
+      [
+        "# Sample clients",
+        s.scope.sampleClients?.length
+          ? `${s.scope.sampleClients.length} — ${s.scope.sampleClients
+              .map((c) => c.name)
+              .join("; ")}`
+          : clientId === "all"
+          ? "All clients"
+          : clientOptions.find((c) => c.id === clientId)?.label ?? clientId,
+      ],
+      [
+        "# Sample staff",
+        s.scope.sampleStaff?.length
+          ? `${s.scope.sampleStaff.length} — ${s.scope.sampleStaff
+              .map((p) => p.name)
+              .join("; ")}`
+          : "All staff",
+      ],
+      ["# Readiness score", `${s.readinessScore}/100`],
+      [
+        "# Totals",
+        `critical=${s.totals.critical}; attention=${s.totals.attention}; minor=${s.totals.minor}`,
+      ],
+      [""],
+    ];
     const rows: string[][] = [
+      ...meta,
       ["severity", "area", "title", "detail", "subject", "source_citation", "as_of", "fix_link"],
-      ...auditQ.data.findings.map((f) => [
+      ...s.findings.map((f) => [
         f.severity,
         AREA_LABEL[f.area],
         f.title,
@@ -192,6 +225,7 @@ function InternalAuditPage() {
     URL.revokeObjectURL(url);
     toast.success("Internal audit report downloaded");
   };
+
 
   const summary = auditQ.data;
 

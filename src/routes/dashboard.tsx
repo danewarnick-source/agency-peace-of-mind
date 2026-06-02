@@ -186,7 +186,7 @@ function DashboardLayout() {
           <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
             Portal View
           </label>
-          <Select value={rawView} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile" | "hive_exec")}>
+          <Select value={rawView} onValueChange={(v) => setView(v as PV)}>
             <SelectTrigger className="w-full border-sidebar-border bg-sidebar-accent/40 text-sidebar-foreground">
               <SelectValue />
             </SelectTrigger>
@@ -217,8 +217,73 @@ function DashboardLayout() {
                   </span>
                 </SelectItem>
               )}
+              {isExecutive && (
+                <SelectItem value="state_preview">
+                  <span className="inline-flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5" /> State (Build/Preview)
+                  </span>
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
+
+          {isStatePreview && (
+            <div className="mt-3 space-y-2 rounded-md border border-[#f4a93a]/30 bg-[#f4a93a]/[0.06] p-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
+                State
+              </label>
+              <Select value={stateCode ?? ""} onValueChange={(v) => setStateCode(v)}>
+                <SelectTrigger className="w-full border-sidebar-border bg-sidebar text-sidebar-foreground">
+                  <SelectValue placeholder="Select a state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {states.map((s) => (
+                    <SelectItem key={s.code} value={s.code}>
+                      <span className="inline-flex items-center gap-2">
+                        {s.name}
+                        <span className="rounded-full bg-muted px-1.5 text-[9px] uppercase tracking-wider text-muted-foreground">
+                          {s.status === "coming_soon" ? "Coming soon" : s.status}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-1 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSubView("admin")}
+                  className={`flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                    subView === "admin"
+                      ? "bg-[#d97a1c] text-white"
+                      : "bg-sidebar text-sidebar-foreground/70 hover:bg-sidebar-accent"
+                  }`}
+                >
+                  Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubView("staff")}
+                  className={`flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                    subView === "staff"
+                      ? "bg-[#d97a1c] text-white"
+                      : "bg-sidebar text-sidebar-foreground/70 hover:bg-sidebar-accent"
+                  }`}
+                >
+                  Staff
+                </button>
+              </div>
+              {currentPreviewState && (
+                <Link
+                  to="/dashboard/hive-exec/states/$stateCode"
+                  params={{ stateCode: currentPreviewState.code }}
+                  className="block rounded-md border border-[#f4a93a]/30 bg-sidebar px-2 py-1 text-center text-[11px] font-medium text-[#f4a93a] hover:bg-[#f4a93a]/10"
+                >
+                  Edit {currentPreviewState.name} template
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       )}
 

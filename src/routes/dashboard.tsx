@@ -61,11 +61,14 @@ const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/internal-audit", label: "Internal Audit", icon: ClipboardCheck },
 ];
 
+type PlatformStateLite = { code: string; name: string; status: "draft" | "active" | "coming_soon" };
+
 function DashboardLayout() {
   const { session, loading, user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { can } = usePermissions();
-  const { view, setView } = usePortalView();
+  const { view, setView, stateCode, setStateCode, subView, setSubView } = usePortalView();
+  const [states, setStates] = useState<PlatformStateLite[]>([]);
   const { isExecutive } = useIsHiveExecutive();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -89,17 +92,19 @@ function DashboardLayout() {
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
-  const allowedViews: Array<"staff" | "admin" | "staff_mobile" | "hive_exec"> = ["staff"];
+  type PV = "staff" | "admin" | "staff_mobile" | "hive_exec" | "state_preview";
+  const allowedViews: PV[] = ["staff"];
   if (isAdminCapable) { allowedViews.push("admin", "staff_mobile"); }
-  if (isExecutive) { allowedViews.push("hive_exec"); }
-  const rawView = allowedViews.includes(view as "staff" | "admin" | "staff_mobile" | "hive_exec")
-    ? (view as "staff" | "admin" | "staff_mobile" | "hive_exec")
-    : "staff";
+  if (isExecutive) { allowedViews.push("hive_exec", "state_preview"); }
+  const rawView: PV = allowedViews.includes(view as PV) ? (view as PV) : "staff";
   const isMobilePreview = rawView === "staff_mobile";
   const isHiveExecView  = rawView === "hive_exec";
+  const isStatePreview  = rawView === "state_preview";
   // HIVE Executive is its own context — never mixed with a company's admin/staff nav.
   const effectiveView: "staff" | "admin" | "hive_exec" =
-    isHiveExecView ? "hive_exec" : (rawView === "admin" ? "admin" : "staff");
+    isHiveExecView ? "hive_exec"
+    : isStatePreview ? (subView === "staff" ? "staff" : "admin")
+    : (rawView === "admin" ? "admin" : "staff");
   const execNav: NavItem[] = [
     { to: "/dashboard/hive-exec", label: "HIVE Overview", icon: LayoutDashboard, exact: true },
     { to: "/dashboard/hive-exec/new-company", label: "Add Company", icon: Plus },
@@ -117,15 +122,39 @@ function DashboardLayout() {
     effectiveView === "admin"     ? ADMIN_NAV : STAFF_NAV;
   const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");
 
+  // Load states for the State portal dropdown (executives only).
+  useEffect(() => {
+    if (!isExecutive) return;
+    let cancelled = false;
+    supabase.from("platform_states").select("code, name, status").order("name").then(({ data }) => {
+      if (cancelled) return;
+      setStates((data ?? []) as PlatformStateLite[]);
+    });
+    return () => { cancelled = true; };
+  }, [isExecutive]);
+
+  // Default the previewed state to the first reference/active when entering the mode.
+  useEffect(() => {
+    if (isStatePreview && !stateCode && states.length > 0) {
+      const pick = states.find((s) => s.status === "active") ?? states[0];
+      if (pick) setStateCode(pick.code);
+    }
+  }, [isStatePreview, stateCode, states, setStateCode]);
+
   // Keep view and content strictly aligned: leaving HIVE View must also leave
   // /dashboard/hive-exec, and entering HIVE View jumps to the platform landing.
   useEffect(() => {
     if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) {
       navigate({ to: "/dashboard/hive-exec" });
-    } else if (!isHiveExecView && pathname.startsWith("/dashboard/hive-exec")) {
+    } else if (!isHiveExecView && !isStatePreview && pathname.startsWith("/dashboard/hive-exec")) {
       navigate({ to: "/dashboard" });
     }
-  }, [isHiveExecView, pathname, navigate]);
+  }, [isHiveExecView, isStatePreview, pathname, navigate]);
+
+  const currentPreviewState = isStatePreview
+    ? states.find((s) => s.code === stateCode) ?? null
+    : null;
+  const isComingSoonPreview = isStatePreview && currentPreviewState?.status === "coming_soon";
 
   if (loading || !session) {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
@@ -157,7 +186,7 @@ function DashboardLayout() {
           <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
             Portal View
           </label>
-          <Select value={rawView} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile" | "hive_exec")}>
+          <Select value={rawView} onValueChange={(v) => setView(v as PV)}>
             <SelectTrigger className="w-full border-sidebar-border bg-sidebar-accent/40 text-sidebar-foreground">
               <SelectValue />
             </SelectTrigger>
@@ -188,8 +217,73 @@ function DashboardLayout() {
                   </span>
                 </SelectItem>
               )}
+              {isExecutive && (
+                <SelectItem value="state_preview">
+                  <span className="inline-flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5" /> State (Build/Preview)
+                  </span>
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
+
+          {isStatePreview && (
+            <div className="mt-3 space-y-2 rounded-md border border-[#f4a93a]/30 bg-[#f4a93a]/[0.06] p-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
+                State
+              </label>
+              <Select value={stateCode ?? ""} onValueChange={(v) => setStateCode(v)}>
+                <SelectTrigger className="w-full border-sidebar-border bg-sidebar text-sidebar-foreground">
+                  <SelectValue placeholder="Select a state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {states.map((s) => (
+                    <SelectItem key={s.code} value={s.code}>
+                      <span className="inline-flex items-center gap-2">
+                        {s.name}
+                        <span className="rounded-full bg-muted px-1.5 text-[9px] uppercase tracking-wider text-muted-foreground">
+                          {s.status === "coming_soon" ? "Coming soon" : s.status}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-1 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSubView("admin")}
+                  className={`flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                    subView === "admin"
+                      ? "bg-[#d97a1c] text-white"
+                      : "bg-sidebar text-sidebar-foreground/70 hover:bg-sidebar-accent"
+                  }`}
+                >
+                  Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubView("staff")}
+                  className={`flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                    subView === "staff"
+                      ? "bg-[#d97a1c] text-white"
+                      : "bg-sidebar text-sidebar-foreground/70 hover:bg-sidebar-accent"
+                  }`}
+                >
+                  Staff
+                </button>
+              </div>
+              {currentPreviewState && (
+                <Link
+                  to="/dashboard/hive-exec/states/$stateCode"
+                  params={{ stateCode: currentPreviewState.code }}
+                  className="block rounded-md border border-[#f4a93a]/30 bg-sidebar px-2 py-1 text-center text-[11px] font-medium text-[#f4a93a] hover:bg-[#f4a93a]/10"
+                >
+                  Edit {currentPreviewState.name} template
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -338,7 +432,9 @@ function DashboardLayout() {
                 <p className="truncate text-xs text-muted-foreground">
                   {isHiveExecView
                     ? "HIVE Platform · HIVE Executive"
-                    : `${org?.organization_name ?? "Workspace"} · ${ROLE_LABEL[role]}`}
+                    : isStatePreview
+                      ? `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
+                      : `${org?.organization_name ?? "Workspace"} · ${ROLE_LABEL[role]}`}
 
                 </p>
               </div>
@@ -362,8 +458,53 @@ function DashboardLayout() {
           </header>
           <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
 
+          {isStatePreview && (
+            <div className="flex items-center justify-between gap-3 border-b border-[#f4a93a]/30 bg-[#f4a93a]/[0.08] px-4 py-2 text-xs md:px-6">
+              <div className="flex items-center gap-2 text-[#9a3412]">
+                <MapPin className="h-3.5 w-3.5" />
+                <span className="font-semibold uppercase tracking-wider">State Build/Preview</span>
+                <span className="text-[#9a3412]/80">
+                  {currentPreviewState?.name ?? "No state selected"} ·{" "}
+                  {subView === "admin" ? "Admin view" : "Staff view"} · template/sample data, not live company records
+                </span>
+              </div>
+              {currentPreviewState && (
+                <Link
+                  to="/dashboard/hive-exec/states/$stateCode"
+                  params={{ stateCode: currentPreviewState.code }}
+                  className="hidden md:inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white/60 px-2 py-0.5 text-[11px] font-medium text-[#9a3412] hover:bg-white"
+                >
+                  Edit template
+                </Link>
+              )}
+            </div>
+          )}
+
           <main className={isMobilePreview ? "flex-1 bg-secondary/40" : "flex-1 bg-secondary/40 px-4 py-6 md:px-8"}>
-            {isMobilePreview ? (
+            {isStatePreview && !stateCode ? (
+              <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
+                Select a state from the sidebar to load the platform configured as that state.
+              </div>
+            ) : isComingSoonPreview ? (
+              <div className="mx-auto max-w-xl rounded-lg border border-dashed border-[#f4a93a]/40 bg-[#f4a93a]/[0.06] p-10 text-center">
+                <MapPin className="mx-auto h-8 w-8 text-[#f4a93a]" />
+                <h2 className="mt-3 text-lg font-semibold tracking-tight">
+                  Coming soon for {currentPreviewState?.name}
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No template has been built for this state yet. Configure the state's skeleton to enable the {subView === "admin" ? "admin" : "staff"} preview.
+                </p>
+                {currentPreviewState && (
+                  <Link
+                    to="/dashboard/hive-exec/states/$stateCode"
+                    params={{ stateCode: currentPreviewState.code }}
+                    className="mt-4 inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white px-3 py-1.5 text-xs font-medium text-[#9a3412] hover:bg-[#f4a93a]/10"
+                  >
+                    Build {currentPreviewState.name} template
+                  </Link>
+                )}
+              </div>
+            ) : isMobilePreview ? (
               <StaffMobilePreviewFrame title={pageTitle}>
                 <Outlet />
               </StaffMobilePreviewFrame>

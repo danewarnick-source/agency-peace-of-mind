@@ -7,6 +7,7 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { askNectarHelp, escalateHelpToHive, getHelpTicketStatus, type NectarHelpReply } from "@/lib/nectar-help.functions";
 import { NectarBadge, NectarMark, NectarButton } from "@/components/nectar/nectar-brand";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
+import { NectarAnswer } from "@/components/nectar/nectar-answer";
 
 export const Route = createFileRoute("/dashboard/help")({
   head: () => ({ meta: [{ title: "Need help? — NECTAR" }] }),

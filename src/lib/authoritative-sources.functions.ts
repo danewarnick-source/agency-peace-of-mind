@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
 import { reportPlatformEvent } from "./hive-tickets.functions";
+import { markDraftedByNectar } from "./nectar-approvals.functions";
 
 
 // =============================================================

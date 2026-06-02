@@ -92,13 +92,13 @@ function CourseLibrary() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <p className="text-xs font-medium text-accent">Utah DSPD Provider Compliance</p>
-        <h2 className="mt-1 text-xl font-semibold tracking-tight">Course Library</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          The six required compliance modules for every direct-support professional.
-        </p>
-      </div>
+      <StaffPageHeader
+        eyebrow="Utah DSPD · Provider Compliance"
+        eyebrowIcon={GraduationCap}
+        title="Course Library"
+        subtitle="The six required compliance modules for every direct-support professional."
+      />
+
 
       {isAdmin && (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">

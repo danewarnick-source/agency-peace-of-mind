@@ -26,8 +26,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
-import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
+import { AddonLock } from "@/components/nectar/addon-lock";
+import { useEntitlements } from "@/hooks/use-entitlements";
 import {
   runInternalAudit,
   listAuditableStaff,
@@ -81,7 +81,8 @@ const SEVERITY_BADGE: Record<Severity, { label: string; cls: string; Icon: typeo
 function InternalAuditPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
-  const { enabled: infusionEnabled } = useNectarInfusion();
+  const { hasAddon } = useEntitlements();
+  const auditEntitled = hasAddon("internal_audit");
   const { data: caseload } = useCaseload();
   const run = useServerFn(runInternalAudit);
   const listStaff = useServerFn(listAuditableStaff);
@@ -499,15 +500,17 @@ function InternalAuditPage() {
     </div>
   );
 
-  // Visible-but-locked when infusion tier isn't on; baseline users see the value.
-  if (!infusionEnabled) {
+  // Visible-but-locked when the tier doesn't include Internal Audit.
+  // Baseline (manual record pulls, manual billing) still works regardless.
+  if (!auditEntitled) {
     return (
-      <NectarInfusionLock
+      <AddonLock
+        addon="internal_audit"
         featureName="Internal Audit"
         benefit="Continuously audit your own HIVE data against your confirmed requirements and catch gaps before a state audit does. Includes whole-company and targeted runs, severity-ranked findings with source citations, and exportable QA reports."
       >
         {body}
-      </NectarInfusionLock>
+      </AddonLock>
     );
   }
   return body;

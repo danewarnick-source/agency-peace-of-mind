@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAddon } from "@/lib/entitlements.server";
 
 /**
  * Internal Audit (QA / audit-prep) — Foundation: NECTAR.
@@ -101,7 +102,9 @@ export const runInternalAudit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => auditInput.parse(input))
   .handler(async ({ data, context }): Promise<AuditSummary> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    // Server-side tier enforcement — the UI lock and this check must agree.
+    await assertAddon(supabase, userId, "internal_audit");
     const orgId = data.organizationId;
     const now = new Date();
     const dateFrom = data.dateFrom ?? null;

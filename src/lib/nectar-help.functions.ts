@@ -101,7 +101,7 @@ interface AuthoritativeSourceFact {
   title: string;
   authoritative_kind: string | null;
   jurisdiction: string | null;
-  excerpts: string[];
+  excerpts: Array<{ excerpt: string; score: number }>;
 }
 
 interface OrgFacts {

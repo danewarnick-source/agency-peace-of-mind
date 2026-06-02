@@ -25,7 +25,7 @@ import {
   Sparkles,
   CheckCircle2,
 } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
 import {

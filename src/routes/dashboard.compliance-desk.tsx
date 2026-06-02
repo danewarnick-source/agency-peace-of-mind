@@ -1435,3 +1435,273 @@ function EditShiftDialog({ row, onClose }: { row: Row | null; onClose: () => voi
     </Dialog>
   );
 }
+
+// ─── EVV Reconciliation Queue ──────────────────────────────────────────────
+function buildReconciliationCsv(rows: Row[]): string {
+  const header = "Shift ID,Date,Caregiver,Client,Service Code,Clock-In,Clock-Out,Begin Lat,Begin Lng,End Lat,End Lng,Reconciliation Status,Staff Reconciliation Explanation,Admin Attestation,Admin Notes,Reviewed By,Reviewed At";
+  const lines = rows.map((r) => {
+    const inIso = effectiveIn(r);
+    const outIso = effectiveOut(r);
+    return [
+      csvEscape(r.id),
+      csvEscape(fmtDateMDY(inIso)),
+      csvEscape(r.staff?.full_name ?? r.staff?.email ?? ""),
+      csvEscape(`${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim()),
+      csvEscape(r.service_type_code ?? ""),
+      csvEscape(fmtTimeHMSAmPm(inIso)),
+      csvEscape(outIso ? fmtTimeHMSAmPm(outIso) : ""),
+      String(r.gps_in_coordinates?.latitude ?? ""),
+      String(r.gps_in_coordinates?.longitude ?? ""),
+      String(r.gps_out_coordinates?.latitude ?? ""),
+      String(r.gps_out_coordinates?.longitude ?? ""),
+      csvEscape((r.reconciliation_status ?? "pending").toUpperCase()),
+      csvEscape(r.outside_geofence_reason ?? ""),
+      csvEscape(r.reconciliation_attestation ?? ""),
+      csvEscape(r.reconciliation_review_notes ?? ""),
+      csvEscape(r.reconciliation_reviewed_by ?? ""),
+      csvEscape(r.reconciliation_reviewed_at ?? ""),
+    ].join(",");
+  });
+  return [header, ...lines].join("\r\n");
+}
+
+function ReconcileTable({
+  rows, loading, onMap, onReview,
+}: {
+  rows: Row[]; loading: boolean;
+  onMap: (r: Row) => void;
+  onReview: (r: Row) => void;
+}) {
+  const [filter, setFilter] = useState<"pending" | "accepted" | "flagged" | "all">("pending");
+  const filtered = filter === "all" ? rows : rows.filter((r) => r.reconciliation_status === filter);
+
+  const onExport = () => {
+    if (!rows.length) { toast.error("No reconciliation records to export."); return; }
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    downloadCsv(`evv_reconciliation_${stamp}.csv`, buildReconciliationCsv(rows));
+    toast.success(`Exported ${rows.length} reconciliation record${rows.length === 1 ? "" : "s"}.`);
+  };
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <AlertCircle className="h-4 w-4 text-warning-foreground" /> EVV Reconciliation Queue
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Shifts that punched outside all approved client locations. Review the staff explanation and either accept with attestation or flag for follow-up. Actual GPS is always captured.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="accepted">Reconciled</SelectItem>
+              <SelectItem value="flagged">Flagged</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={onExport} variant="secondary">
+            <Download /> Export Reconciliation Report
+          </Button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Caregiver</TableHead>
+              <TableHead>Client</TableHead>
+              <TableHead>Service</TableHead>
+              <TableHead>In → Out</TableHead>
+              <TableHead>GPS</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Staff Explanation</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No shifts match this filter — geofence reconciliation is clean.</TableCell></TableRow>
+            ) : filtered.map((r) => {
+              const inIso = effectiveIn(r);
+              const outIso = effectiveOut(r);
+              return (
+                <TableRow key={r.id}>
+                  <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
+                  <TableCell className="whitespace-nowrap font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
+                  <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
+                  <TableCell className="whitespace-nowrap font-mono">{fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}</TableCell>
+                  <TableCell>
+                    <Button variant="outline" size="sm" onClick={() => onMap(r)}>
+                      <MapPin /> View
+                    </Button>
+                  </TableCell>
+                  <TableCell><GeofenceBadge row={r} /></TableCell>
+                  <TableCell className="max-w-xs truncate text-xs text-muted-foreground" title={r.outside_geofence_reason ?? ""}>
+                    {r.outside_geofence_reason ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" onClick={() => onReview(r)}>
+                      Review
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
+  );
+}
+
+function ReviewReconciliationDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const { user } = useAuthHook();
+  const [decision, setDecision] = useState<"accepted" | "flagged">("accepted");
+  const [attestation, setAttestation] = useState("");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!row) return;
+    setDecision(row.reconciliation_status === "flagged" ? "flagged" : "accepted");
+    setAttestation(row.reconciliation_attestation ?? "");
+    setNotes(row.reconciliation_review_notes ?? "");
+  }, [row]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!row) return;
+      if (decision === "accepted" && attestation.trim().length < 10) {
+        throw new Error("Please attest to the variance (at least 10 characters).");
+      }
+      const adminName = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Administrator";
+      const { error } = await supabase
+        .from("evv_timesheets")
+        .update({
+          reconciliation_status: decision,
+          reconciliation_attestation: decision === "accepted" ? attestation.trim() : null,
+          reconciliation_review_notes: notes.trim() || null,
+          reconciliation_reviewed_by: adminName,
+          reconciliation_reviewed_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success(decision === "accepted" ? "Variance reconciled and attested." : "Shift flagged for follow-up.");
+      qc.invalidateQueries({ queryKey: ["evv-reconcile"] });
+      qc.invalidateQueries({ queryKey: ["evv-pending"] });
+      qc.invalidateQueries({ queryKey: ["evv-approved"] });
+      onClose();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  return (
+    <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>EVV Reconciliation Review</DialogTitle>
+          <DialogDescription>
+            This shift was punched outside all approved client locations. Review the captured GPS and the staff's reconciliation explanation, then accept with attestation or flag for follow-up.
+          </DialogDescription>
+        </DialogHeader>
+        {row && (
+          <div className="space-y-3 text-sm">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-md border border-border bg-muted/30 p-2">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Caregiver</div>
+                <div className="font-medium">{row.staff?.full_name ?? row.staff?.email ?? "—"}</div>
+              </div>
+              <div className="rounded-md border border-border bg-muted/30 p-2">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Client</div>
+                <div className="font-medium">{row.clients?.first_name} {row.clients?.last_name}</div>
+              </div>
+              <div className="rounded-md border border-border bg-muted/30 p-2">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Service</div>
+                <div className="font-mono">{row.service_type_code}</div>
+              </div>
+              <div className="rounded-md border border-border bg-muted/30 p-2">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Shift</div>
+                <div className="font-mono text-xs">{fmtDateMDY(effectiveIn(row))} · {fmtTimeAmPm(effectiveIn(row))} → {effectiveOut(row) ? fmtTimeAmPm(effectiveOut(row)!) : "—"}</div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-warning/40 bg-warning/10 p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-warning-foreground">Staff Reconciliation Explanation</div>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-foreground/90">{row.outside_geofence_reason || "(none captured)"}</p>
+            </div>
+
+            {row.shift_note_text && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Shift Note</div>
+                <p className="mt-1 whitespace-pre-wrap text-sm">{row.shift_note_text}</p>
+              </div>
+            )}
+
+            <div className="rounded-lg border border-border p-3 text-xs">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Captured GPS</div>
+              <div className="mt-1 font-mono">
+                In: {row.gps_in_coordinates?.latitude?.toFixed?.(6)}, {row.gps_in_coordinates?.longitude?.toFixed?.(6)}
+                {row.gps_out_coordinates && (
+                  <> · Out: {row.gps_out_coordinates.latitude.toFixed(6)}, {row.gps_out_coordinates.longitude.toFixed(6)}</>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs">Decision</Label>
+              <div className="mt-1 flex gap-2">
+                <Button type="button" size="sm" variant={decision === "accepted" ? "default" : "outline"} onClick={() => setDecision("accepted")}>
+                  <CheckCircle2 /> Accept with attestation
+                </Button>
+                <Button type="button" size="sm" variant={decision === "flagged" ? "destructive" : "outline"} onClick={() => setDecision("flagged")}>
+                  <Flag /> Flag for follow-up
+                </Button>
+              </div>
+            </div>
+
+            {decision === "accepted" && (
+              <div>
+                <Label htmlFor="attest" className="text-xs">Provider attestation (required)</Label>
+                <Textarea
+                  id="attest"
+                  rows={3}
+                  value={attestation}
+                  onChange={(e) => setAttestation(e.target.value)}
+                  placeholder="e.g. Reviewed shift note and contacted staff. Variance is consistent with community outing documented in the PCSP. Provider accepts responsibility for the call."
+                />
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="rnotes" className="text-xs">Internal review notes (optional)</Label>
+              <Textarea
+                id="rnotes"
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any internal follow-up actions or context."
+              />
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save reconciliation"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

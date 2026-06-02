@@ -200,16 +200,32 @@ function HiveNectarPage() {
   };
 
   const update = useMutation({
-    mutationFn: (vars: Parameters<typeof updateFn>[0]["data"]) =>
-      updateFn({ data: vars }),
+    mutationFn: (vars: {
+      id: string;
+      patch: {
+        title?: string;
+        detail?: string;
+        category?: Category;
+        severity?: Severity;
+        status?: Status;
+        resolution?: Record<string, unknown>;
+        appendAudit?: { actor: string; action: string; note?: string };
+      };
+    }) => updateFn({ data: vars }),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ["hive-platform-tickets"] }),
     onError: (e: Error) => toast.error(e.message),
   });
 
   const create = useMutation({
-    mutationFn: (vars: Parameters<typeof createFn>[0]["data"]) =>
-      createFn({ data: vars }),
+    mutationFn: (vars: {
+      triggeringOrgId?: string | null;
+      triggeringOrgName: string;
+      title: string;
+      detail?: string;
+      category?: Category;
+      severity?: Severity;
+    }) => createFn({ data: vars }),
     onSuccess: () => {
       toast.success("Ticket filed in HIVE Executive NECTAR queue.");
       qc.invalidateQueries({ queryKey: ["hive-platform-tickets"] });

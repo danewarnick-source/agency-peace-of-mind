@@ -144,6 +144,36 @@ export function NectarPayPeriodCard() {
               </>
             )}
 
+            {hasGeneral && (
+              <>
+                <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+                    <Briefcase className="h-4 w-4 text-[#f4a93a]" />
+                    Non-client · General time clock
+                    {live.isGeneralShift && (
+                      <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-[#15a06a]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#9cf2c8]">
+                        <span className="relative inline-flex h-1 w-1">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#15a06a] opacity-75" />
+                          <span className="relative inline-flex h-1 w-1 rounded-full bg-[#15a06a]" />
+                        </span>
+                        live
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-mono text-sm tabular-nums text-white/90">
+                    {fmtHours(generalHoursDisplay)} × {fmtUSD(hourlyRate)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
+                  <span className="text-[11px] uppercase tracking-wider text-white/70">= subtotal</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-white">
+                    {fmtUSD(generalPayDisplay)}
+                  </span>
+                </div>
+              </>
+            )}
+
+
             <div className="flex items-center justify-between gap-3 border-t border-white/15 bg-white/[0.04] px-3 py-3">
               <div className="flex flex-col">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">

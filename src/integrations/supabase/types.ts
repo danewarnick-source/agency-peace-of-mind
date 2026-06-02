@@ -3034,6 +3034,7 @@ export type Database = {
       }
       nectar_documents: {
         Row: {
+          assisted_setup_requested: boolean
           authoritative_kind: string | null
           category: string | null
           client_id: string | null
@@ -3071,6 +3072,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          assisted_setup_requested?: boolean
           authoritative_kind?: string | null
           category?: string | null
           client_id?: string | null
@@ -3108,6 +3110,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          assisted_setup_requested?: boolean
           authoritative_kind?: string | null
           category?: string | null
           client_id?: string | null
@@ -3412,6 +3415,50 @@ export type Database = {
           },
         ]
       }
+      nectar_requirement_approval_events: {
+        Row: {
+          action: string
+          actor_label: string | null
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          organization_id: string
+          reason: string | null
+          requirement_id: string
+          stage: string
+        }
+        Insert: {
+          action: string
+          actor_label?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          organization_id: string
+          reason?: string | null
+          requirement_id: string
+          stage: string
+        }
+        Update: {
+          action?: string
+          actor_label?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          requirement_id?: string
+          stage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_requirement_approval_events_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nectar_requirement_mappings: {
         Row: {
           cadence: string | null
@@ -3480,6 +3527,7 @@ export type Database = {
       nectar_requirements: {
         Row: {
           applies_to: string | null
+          approval_state: string | null
           category: string | null
           created_at: string
           description: string | null
@@ -3500,6 +3548,7 @@ export type Database = {
         }
         Insert: {
           applies_to?: string | null
+          approval_state?: string | null
           category?: string | null
           created_at?: string
           description?: string | null
@@ -3520,6 +3569,7 @@ export type Database = {
         }
         Update: {
           applies_to?: string | null
+          approval_state?: string | null
           category?: string | null
           created_at?: string
           description?: string | null

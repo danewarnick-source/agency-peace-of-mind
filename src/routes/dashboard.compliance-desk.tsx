@@ -330,6 +330,23 @@ function ComplianceDeskPage() {
     },
   });
 
+  const reconcileQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["evv-reconcile", org?.organization_id],
+    queryFn: async (): Promise<Row[]> => {
+      const { data, error } = await supabase
+        .from("evv_timesheets")
+        .select(SELECT_COLS)
+        .eq("organization_id", org!.organization_id)
+        .not("reconciliation_status", "is", null)
+        .order("clock_in_timestamp", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return hydrateStaff((data ?? []) as unknown as Row[]);
+    },
+  });
+  const reconcilePendingCount = (reconcileQ.data ?? []).filter((r) => r.reconciliation_status === "pending").length;
+
   const vectorQ = useQuery({
     enabled: isSearching && !!org?.organization_id,
     queryKey: ["evv-hybrid-search", org?.organization_id, submitted?.query],

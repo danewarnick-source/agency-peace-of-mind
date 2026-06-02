@@ -96,6 +96,7 @@ import { Route as ApiPublicSeedStaffRouteImport } from './routes/api/public/seed
 import { Route as DashboardHiveExecStatesStateCodeRouteImport } from './routes/dashboard.hive-exec.states.$stateCode'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
 import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
+import { Route as DashboardHiveExecStatesStateCodeOnboardingRouteImport } from './routes/dashboard.hive-exec.states.$stateCode.onboarding'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
@@ -553,6 +554,12 @@ const ApiPublicHooksNectarSchedulesRoute =
     path: '/api/public/hooks/nectar-schedules',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DashboardHiveExecStatesStateCodeOnboardingRoute =
+  DashboardHiveExecStatesStateCodeOnboardingRouteImport.update({
+    id: '/onboarding',
+    path: '/onboarding',
+    getParentRoute: () => DashboardHiveExecStatesStateCodeRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -641,7 +648,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
-  '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRoute
+  '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -727,7 +735,8 @@ export interface FileRoutesByTo {
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
-  '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRoute
+  '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -817,7 +826,8 @@ export interface FileRoutesById {
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
-  '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRoute
+  '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -909,6 +919,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/nectar-schedules'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -995,6 +1006,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/nectar-schedules'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/hive-exec/states/$stateCode/onboarding'
   id:
     | '__root__'
     | '/'
@@ -1084,6 +1096,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/nectar-schedules'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1719,6 +1732,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksNectarSchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/hive-exec/states/$stateCode/onboarding': {
+      id: '/dashboard/hive-exec/states/$stateCode/onboarding'
+      path: '/onboarding'
+      fullPath: '/dashboard/hive-exec/states/$stateCode/onboarding'
+      preLoaderRoute: typeof DashboardHiveExecStatesStateCodeOnboardingRouteImport
+      parentRoute: typeof DashboardHiveExecStatesStateCodeRoute
+    }
   }
 }
 
@@ -1741,14 +1761,29 @@ const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
 const DashboardBillingRouteWithChildren =
   DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
 
+interface DashboardHiveExecStatesStateCodeRouteChildren {
+  DashboardHiveExecStatesStateCodeOnboardingRoute: typeof DashboardHiveExecStatesStateCodeOnboardingRoute
+}
+
+const DashboardHiveExecStatesStateCodeRouteChildren: DashboardHiveExecStatesStateCodeRouteChildren =
+  {
+    DashboardHiveExecStatesStateCodeOnboardingRoute:
+      DashboardHiveExecStatesStateCodeOnboardingRoute,
+  }
+
+const DashboardHiveExecStatesStateCodeRouteWithChildren =
+  DashboardHiveExecStatesStateCodeRoute._addFileChildren(
+    DashboardHiveExecStatesStateCodeRouteChildren,
+  )
+
 interface DashboardHiveExecStatesRouteChildren {
-  DashboardHiveExecStatesStateCodeRoute: typeof DashboardHiveExecStatesStateCodeRoute
+  DashboardHiveExecStatesStateCodeRoute: typeof DashboardHiveExecStatesStateCodeRouteWithChildren
 }
 
 const DashboardHiveExecStatesRouteChildren: DashboardHiveExecStatesRouteChildren =
   {
     DashboardHiveExecStatesStateCodeRoute:
-      DashboardHiveExecStatesStateCodeRoute,
+      DashboardHiveExecStatesStateCodeRouteWithChildren,
   }
 
 const DashboardHiveExecStatesRouteWithChildren =

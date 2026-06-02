@@ -36,10 +36,10 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
   return (
     <div
       ref={ref}
-      className="md:hidden fixed inset-0 z-30 flex flex-col overflow-hidden bg-[#f7f8fb]"
+      className="md:hidden fixed inset-0 z-30 flex flex-col overflow-hidden bg-background"
     >
       <StaffTopBar title={title} framed />
-      <main className="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
+      <main className="flex-1 overflow-y-auto overscroll-contain px-4 py-5">
         {children}
       </main>
       <ActiveShiftBar framed />

@@ -18,8 +18,12 @@ export const Route = createFileRoute("/dashboard/ask-nectar")({
 
 function AskNectarStaffPage() {
   const { clientId } = useSearch({ from: "/dashboard/ask-nectar" });
+  // Fill the staff mobile shell's <main> (which is flex-1 overflow-y-auto).
+  // Use absolute positioning so the chat occupies the entire main area
+  // without inheriting its scroll — internal scroll lives on the message
+  // thread only, and the composer stays pinned to the bottom.
   return (
-    <div className="mx-auto flex h-[calc(100vh-9rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] md:h-[calc(100vh-8rem)]">
+    <div className="absolute inset-0 mx-auto flex w-full max-w-3xl flex-col overflow-hidden bg-card md:relative md:inset-auto md:h-[calc(100vh-8rem)] md:rounded-2xl md:border md:border-border md:shadow-[var(--shadow-card)]">
       <AskNectarStaff clientId={clientId} />
     </div>
   );

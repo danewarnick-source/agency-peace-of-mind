@@ -4000,33 +4000,47 @@ export type Database = {
       }
       organizations: {
         Row: {
+          additional_state_codes: string[]
           created_at: string
           created_by: string | null
           id: string
           logo_url: string | null
           name: string
           slug: string
+          state_code: string | null
           updated_at: string
         }
         Insert: {
+          additional_state_codes?: string[]
           created_at?: string
           created_by?: string | null
           id?: string
           logo_url?: string | null
           name: string
           slug: string
+          state_code?: string | null
           updated_at?: string
         }
         Update: {
+          additional_state_codes?: string[]
           created_at?: string
           created_by?: string | null
           id?: string
           logo_url?: string | null
           name?: string
           slug?: string
+          state_code?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organizations_state_code_fkey"
+            columns: ["state_code"]
+            isOneToOne: false
+            referencedRelation: "platform_states"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       pba_accounts: {
         Row: {
@@ -4166,6 +4180,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_states: {
+        Row: {
+          code: string
+          created_at: string
+          is_reference: boolean
+          name: string
+          notes: string | null
+          regulator_label: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          is_reference?: boolean
+          name: string
+          notes?: string | null
+          regulator_label?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          is_reference?: boolean
+          name?: string
+          notes?: string | null
+          regulator_label?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -4822,6 +4869,175 @@ export type Database = {
           staff_id?: string
         }
         Relationships: []
+      }
+      state_derived_requirements: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          jurisdiction: string | null
+          metadata: Json
+          requirement_key: string
+          source_citation: string | null
+          source_id: string | null
+          state_code: string
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          jurisdiction?: string | null
+          metadata?: Json
+          requirement_key: string
+          source_citation?: string | null
+          source_id?: string | null
+          state_code: string
+          title: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          jurisdiction?: string | null
+          metadata?: Json
+          requirement_key?: string
+          source_citation?: string | null
+          source_id?: string | null
+          state_code?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "state_derived_requirements_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "state_requirement_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "state_derived_requirements_state_code_fkey"
+            columns: ["state_code"]
+            isOneToOne: false
+            referencedRelation: "platform_states"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      state_requirement_sources: {
+        Row: {
+          created_at: string
+          derived_count: number
+          id: string
+          jurisdiction: string | null
+          parse_error: string | null
+          parse_status: string
+          source_type: string
+          state_code: string
+          storage_path: string | null
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          derived_count?: number
+          id?: string
+          jurisdiction?: string | null
+          parse_error?: string | null
+          parse_status?: string
+          source_type?: string
+          state_code: string
+          storage_path?: string | null
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          derived_count?: number
+          id?: string
+          jurisdiction?: string | null
+          parse_error?: string | null
+          parse_status?: string
+          source_type?: string
+          state_code?: string
+          storage_path?: string | null
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "state_requirement_sources_state_code_fkey"
+            columns: ["state_code"]
+            isOneToOne: false
+            referencedRelation: "platform_states"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      state_templates: {
+        Row: {
+          billing_codes: Json
+          created_at: string
+          department_structure: Json
+          draft: Json
+          evv: Json
+          id: string
+          published_at: string | null
+          published_by: string | null
+          required_documents: Json
+          state_code: string
+          terminology: Json
+          training: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          billing_codes?: Json
+          created_at?: string
+          department_structure?: Json
+          draft?: Json
+          evv?: Json
+          id?: string
+          published_at?: string | null
+          published_by?: string | null
+          required_documents?: Json
+          state_code: string
+          terminology?: Json
+          training?: Json
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          billing_codes?: Json
+          created_at?: string
+          department_structure?: Json
+          draft?: Json
+          evv?: Json
+          id?: string
+          published_at?: string | null
+          published_by?: string | null
+          required_documents?: Json
+          state_code?: string
+          terminology?: Json
+          training?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "state_templates_state_code_fkey"
+            columns: ["state_code"]
+            isOneToOne: true
+            referencedRelation: "platform_states"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       submitted_forms: {
         Row: {

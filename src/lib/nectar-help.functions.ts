@@ -84,6 +84,26 @@ type SupabaseLike = {
   from: (table: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
 };
 
+interface RequirementFact {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  applies_to: string | null;
+  source_citation: string | null;
+  review_status: string;
+  origin: string;
+  source_document_title: string | null;
+}
+
+interface AuthoritativeSourceFact {
+  id: string;
+  title: string;
+  authoritative_kind: string | null;
+  jurisdiction: string | null;
+  excerpts: string[];
+}
+
 interface OrgFacts {
   organization_id: string | null;
   role: string;
@@ -94,6 +114,8 @@ interface OrgFacts {
     clients_total: number | null;
     staff_active: number | null;
     pba_accounts: number | null;
+    requirements_confirmed: number | null;
+    authoritative_sources: number | null;
   };
   service_codes: {
     all_distinct: string[];
@@ -105,7 +127,47 @@ interface OrgFacts {
     status: string;
     service_codes: string[];
   }>;
+  requirements: RequirementFact[];
+  authoritative_sources: AuthoritativeSourceFact[];
   notes: string[];
+}
+
+const STOPWORDS = new Set([
+  "the","a","an","and","or","of","to","in","for","on","at","by","with","from","is","are","be",
+  "what","which","who","whom","that","this","these","those","do","does","did","have","has","had",
+  "will","would","should","can","could","may","might","must","i","you","we","they","it","my",
+  "your","our","their","its","as","if","then","than","there","here","about","into","within",
+  "over","under","between","also","any","all","some","each","per","not","no","yes","how","when",
+  "where","why","need","needs","require","required","requires"
+]);
+
+function questionKeywords(q: string): string[] {
+  const tokens = q.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? [];
+  const out = new Set<string>();
+  for (const t of tokens) if (!STOPWORDS.has(t)) out.add(t);
+  return Array.from(out).slice(0, 12);
+}
+
+function findExcerpts(text: string, keywords: string[], max = 4): string[] {
+  if (!text || keywords.length === 0) return [];
+  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).filter((s) => s.length > 20 && s.length < 600);
+  const scored: Array<{ s: string; n: number }> = [];
+  for (const s of sentences) {
+    const lower = s.toLowerCase();
+    let n = 0;
+    for (const k of keywords) if (lower.includes(k)) n += 1;
+    if (n > 0) scored.push({ s: s.trim(), n });
+  }
+  scored.sort((a, b) => b.n - a.n);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const { s } of scored) {
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 // Common DSPD / waiver service-code tokens NECTAR should recognise.
@@ -136,9 +198,14 @@ async function gatherFacts(
     role,
     scope: role === "employee" || role === "host_family" ? "self" : "organization",
     generated_at: new Date().toISOString(),
-    totals: { clients_active: null, clients_total: null, staff_active: null, pba_accounts: null },
+    totals: {
+      clients_active: null, clients_total: null, staff_active: null, pba_accounts: null,
+      requirements_confirmed: null, authoritative_sources: null,
+    },
     service_codes: { all_distinct: [], referenced_in_question: [] },
     client_matches: [],
+    requirements: [],
+    authoritative_sources: [],
     notes: [],
   };
 
@@ -211,6 +278,84 @@ async function gatherFacts(
         }
       }
     }
+
+    // ─── Requirements + authoritative sources (admin scope only) ─────────────
+    if (facts.scope === "organization") {
+      const keywords = questionKeywords(question);
+
+      // Pull confirmed + needs_attention requirements with their source docs.
+      const reqQ = await supabase
+        .from("nectar_requirements")
+        .select("id,title,description,category,applies_to,source_citation,review_status,origin,source_document_id")
+        .eq("organization_id", orgId)
+        .neq("review_status", "removed")
+        .limit(500);
+      const reqRows = (reqQ.data ?? []) as Array<{
+        id: string; title: string; description: string | null; category: string | null;
+        applies_to: string | null; source_citation: string | null; review_status: string;
+        origin: string; source_document_id: string | null;
+      }>;
+
+      // Look up source document titles for citation context.
+      const docIds = Array.from(new Set(reqRows.map((r) => r.source_document_id).filter((x): x is string => !!x)));
+      const docTitles = new Map<string, string>();
+      if (docIds.length > 0) {
+        const docQ = await supabase
+          .from("nectar_documents")
+          .select("id,title")
+          .in("id", docIds);
+        for (const d of (docQ.data ?? []) as Array<{ id: string; title: string }>) {
+          docTitles.set(d.id, d.title);
+        }
+      }
+
+      // Rank requirements: confirmed first, then by keyword hits in title/description/citation.
+      const scored = reqRows.map((r) => {
+        const hay = `${r.title} ${r.description ?? ""} ${r.category ?? ""} ${r.applies_to ?? ""} ${r.source_citation ?? ""}`.toLowerCase();
+        let score = 0;
+        for (const k of keywords) if (hay.includes(k)) score += 1;
+        if (r.review_status === "confirmed") score += 0.5;
+        return { r, score };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      facts.requirements = scored
+        .slice(0, keywords.length > 0 ? 40 : 80)
+        .map(({ r }) => ({
+          id: r.id,
+          title: r.title,
+          description: r.description,
+          category: r.category,
+          applies_to: r.applies_to,
+          source_citation: r.source_citation,
+          review_status: r.review_status,
+          origin: r.origin,
+          source_document_title: r.source_document_id ? docTitles.get(r.source_document_id) ?? null : null,
+        }));
+      facts.totals.requirements_confirmed = reqRows.filter((r) => r.review_status === "confirmed").length;
+
+      // Authoritative source documents with keyword-matched excerpts from raw_text.
+      const srcQ = await supabase
+        .from("nectar_documents")
+        .select("id,title,authoritative_kind,jurisdiction,raw_text")
+        .eq("organization_id", orgId)
+        .eq("is_authoritative_source", true)
+        .limit(50);
+      const srcRows = (srcQ.data ?? []) as Array<{
+        id: string; title: string; authoritative_kind: string | null;
+        jurisdiction: string | null; raw_text: string | null;
+      }>;
+      facts.totals.authoritative_sources = srcRows.length;
+      const withExcerpts = srcRows.map((s) => ({
+        id: s.id,
+        title: s.title,
+        authoritative_kind: s.authoritative_kind,
+        jurisdiction: s.jurisdiction,
+        excerpts: findExcerpts(s.raw_text ?? "", keywords, 4),
+      }));
+      // Prefer sources that actually have matching excerpts; cap to keep prompt size sane.
+      withExcerpts.sort((a, b) => b.excerpts.length - a.excerpts.length);
+      facts.authoritative_sources = withExcerpts.slice(0, 8);
+    }
   } catch (e) {
     facts.notes.push(`Data lookup partial failure: ${e instanceof Error ? e.message : "unknown"}`);
   }
@@ -232,9 +377,14 @@ ABSOLUTE RULES — never violate:
 1. NEVER say "I'm not sure without looking at your data", "you can check this yourself", "I'd need to look at your specific data", or any variant. The FACTS block IS the live data. Use it.
 2. Lead with the DIRECT ANSWER as the first sentence — a definitive count, list, or fact derived from FACTS. The deepLink and follow-ups come AFTER, never instead of.
 3. If FACTS shows 0 of something, say so plainly and definitively ("As of right now there are 0 current clients with PBA services in your company."). Do not hedge.
-4. Never fabricate numbers. Every figure you state must come from FACTS. If a needed datum truly isn't in FACTS, say "I don't have that on file" — but still try to answer adjacent parts of the question from what IS in FACTS.
+4. Never fabricate numbers. Every figure you state must come from FACTS. Before saying "I don't have that on file", you MUST scan FACTS.requirements AND FACTS.authoritative_sources.excerpts — if a matching requirement or excerpt exists, ANSWER FROM IT and cite source_citation or the source document title. Only say "I don't have that on file" if no requirement, excerpt, or count in FACTS is relevant.
 5. Pair every data answer with a deepLink to the screen where the user can verify or act on it.
 6. For past-period questions ("FY24", "two plan years ago"), answer for that period and explicitly note the timeframe you used.
+7. REQUIREMENTS & AUTHORITATIVE SOURCES are primary data, not background. When the question is about rules/obligations/timelines/training/policy:
+   - First check FACTS.requirements. Quote the title + key text and append the source_citation (or source_document_title) in parentheses.
+   - If a confirmed requirement matches, present it as the company's confirmed answer.
+   - If only a needs_attention requirement or a raw authoritative-source excerpt matches, give the substantive answer AND add a one-line caveat: "Drawn from the uploaded source [title]; not yet confirmed — review in Authoritative Sources." Use /dashboard/authoritative-sources as the deepLink.
+   - You answer factual lookups ("what does the SOW say", "what requirements exist"), but you do NOT issue compliance verdicts or rule on business judgment calls. If asked for a verdict, state the relevant facts and recommend an admin make the call.
 
 PERSONALITY: warm, confident, plain-language. 1–4 short sentences. The direct answer is the headline; the link and any follow-ups are secondary.
 

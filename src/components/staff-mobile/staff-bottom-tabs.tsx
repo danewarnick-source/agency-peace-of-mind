@@ -25,8 +25,11 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
   return (
     <nav
       aria-label="Primary"
-      className={`${positioning} border-t border-white/10 bg-[#0d112b] text-white`}
-      style={framed ? undefined : { paddingBottom: "env(safe-area-inset-bottom)" }}
+      className={`${positioning} border-t border-white/10 text-white shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.45)]`}
+      style={{
+        backgroundImage: "var(--gradient-navy)",
+        ...(framed ? {} : { paddingBottom: "env(safe-area-inset-bottom)" }),
+      }}
     >
       <ul
         className="grid"
@@ -39,13 +42,18 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
             <li key={t.to}>
               <Link
                 to={t.to}
-                className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium transition-all duration-150 active:scale-[0.95] ${
-                  active ? "text-[#f4a93a]" : "text-white/70 hover:text-white"
+                className={`relative flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight transition-all duration-150 active:scale-[0.95] ${
+                  active ? "text-[oklch(var(--accent-2))]" : "text-white/65 hover:text-white"
                 }`}
               >
                 <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
                 <span className="truncate">{t.label}</span>
-                {active && <span className="mt-0.5 h-0.5 w-6 rounded-full bg-[#f4a93a]" />}
+                {active && (
+                  <span
+                    className="absolute top-0 h-0.5 w-8 rounded-full"
+                    style={{ backgroundImage: "var(--gradient-amber)" }}
+                  />
+                )}
               </Link>
             </li>
           );

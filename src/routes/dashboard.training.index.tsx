@@ -5,8 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlayCircle, Award, UserPlus, BookOpen } from "lucide-react";
+import { PlayCircle, Award, UserPlus, BookOpen, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
+import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/training/")({ component: CourseLibrary });
 
@@ -91,13 +92,13 @@ function CourseLibrary() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <p className="text-xs font-medium text-accent">Utah DSPD Provider Compliance</p>
-        <h2 className="mt-1 text-xl font-semibold tracking-tight">Course Library</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          The six required compliance modules for every direct-support professional.
-        </p>
-      </div>
+      <StaffPageHeader
+        eyebrow="Utah DSPD · Provider Compliance"
+        eyebrowIcon={GraduationCap}
+        title="Course Library"
+        subtitle="The six required compliance modules for every direct-support professional."
+      />
+
 
       {isAdmin && (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">

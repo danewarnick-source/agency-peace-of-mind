@@ -33,6 +33,7 @@ import {
   type CoachResult, type ScanResult,
 } from "@/lib/ai-coach.functions";
 import { useServerFn } from "@tanstack/react-start";
+import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
   head: () => ({ meta: [{ title: "Daily Logs — HIVE" }] }),
@@ -175,12 +176,13 @@ function StaffDailyJournal() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Daily Logs</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Host Home Daily Compliance Journal. Select a client to submit today's PCSP narrative and signature.
-        </p>
-      </div>
+      <StaffPageHeader
+        eyebrow="Host Home · Daily Compliance Journal"
+        eyebrowIcon={ClipboardCheck}
+        title="Daily Logs"
+        subtitle="Select a client to submit today's PCSP narrative and signature."
+      />
+
 
       {/* Rejected logs — needs resubmission */}
       {rejectedLogs.length > 0 && (

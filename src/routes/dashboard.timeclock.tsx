@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Clock } from "lucide-react";
 import { GeneralTimeClock } from "@/components/staff-mobile/general-time-clock";
+import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/timeclock")({
   head: () => ({ meta: [{ title: "General Time Clock — HIVE" }] }),
@@ -8,16 +10,17 @@ export const Route = createFileRoute("/dashboard/timeclock")({
 
 function TimeClockPage() {
   return (
-    <div className="mx-auto w-full max-w-xl space-y-4 px-3 sm:px-0">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">⏱️ General Time Clock</h1>
-        <p className="text-sm text-muted-foreground">
-          Non-client work only — Training, Admin, Travel, or Meeting time. To
-          start a client shift with EVV, open My Caseload and tap a client.
-        </p>
-      </header>
+    <div className="mx-auto w-full max-w-xl space-y-5">
+      <StaffPageHeader
+        eyebrow="Time · Non-client"
+        eyebrowIcon={Clock}
+        title="General Time Clock"
+        subtitle="Training, Admin, Travel, or Meeting time only. To start a client shift with EVV, open My Caseload and tap a client."
+      />
 
-      <GeneralTimeClock />
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
+        <GeneralTimeClock />
+      </div>
     </div>
   );
 }

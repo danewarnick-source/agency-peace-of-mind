@@ -38,17 +38,20 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
   const headerCls = framed
-    ? "relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#0d112b] px-3 text-white"
-    : "sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 bg-[#0d112b] px-3 text-white md:hidden";
+    ? "relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-3 text-white"
+    : "sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 px-3 text-white md:hidden";
 
   return (
     <header
       className={headerCls}
-      style={framed ? undefined : { paddingTop: "env(safe-area-inset-top)" }}
+      style={{
+        backgroundImage: "var(--gradient-navy)",
+        ...(framed ? {} : { paddingTop: "env(safe-area-inset-top)" }),
+      }}
     >
       <div className="flex min-w-0 items-center gap-2.5">
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06]">
-          <Hexagon className="h-4 w-4 text-[#f4a93a]" strokeWidth={2.5} />
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] shadow-[0_0_0_1px_rgba(244,169,58,0.08)_inset]">
+          <Hexagon className="h-4 w-4 text-[oklch(var(--accent-2))]" strokeWidth={2.5} />
         </span>
         <h1 className="truncate text-base font-semibold tracking-tight">{title}</h1>
       </div>

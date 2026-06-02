@@ -5,11 +5,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePortalView } from "@/hooks/use-portal-view";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Clock, FileText, ArrowRight } from "lucide-react";
+import { AlertTriangle, Clock, FileText, ArrowRight, Users } from "lucide-react";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
 import { TodayShiftBanner } from "@/components/today-shift-banner";
 import { CompanyOverview } from "@/components/company-overview";
+import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 
@@ -62,9 +63,9 @@ function ComplianceInbox() {
   if (totalItems === 0) return null;
 
   return (
-    <div className="rounded-lg border border-warning/40 bg-warning/5 p-4">
+    <div className="rounded-2xl border border-amber-300/40 bg-amber-500/5 p-4 shadow-[var(--shadow-card)]">
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-        <AlertTriangle className="h-4 w-4 text-warning-foreground" />
+        <AlertTriangle className="h-4 w-4 text-amber-600" />
         Needs Your Attention ({totalItems})
       </h2>
       <ul className="space-y-2">
@@ -128,7 +129,13 @@ function Overview() {
       {showAdmin && <CompanyOverview />}
 
       {!showAdmin && (
-        <div className="space-y-6">
+        <div className="space-y-5">
+          <StaffPageHeader
+            eyebrow="My Day · Active Caseload"
+            eyebrowIcon={Users}
+            title="My Caseload"
+            subtitle="Your assigned clients, today's shift, and anything that needs your attention."
+          />
           <TodayShiftBanner />
           <StaffClientGrid />
           <ComplianceInbox />

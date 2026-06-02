@@ -341,6 +341,47 @@ export function PunchPad({
   const active = activeQuery.data ?? null;
   const activeMatchesThisPad = active && (!lockedClient || active.client_id === lockedClient.id);
 
+  // ── Approved locations (per-client allowlist for variance flagging) ─────────
+  // EVV still records actual GPS for every clock-in; this only suppresses the
+  // variance prompt when staff is at a pre-approved community site and notes
+  // which approved location matched on the EVV record.
+  type ApprovedLoc = {
+    id: string;
+    label: string;
+    latitude: number;
+    longitude: number;
+    geofence_radius_feet: number;
+  };
+  const approvedClientId = lockedClient?.id ?? selectedClientId ?? active?.client_id ?? null;
+  const approvedLocsQuery = useQuery({
+    enabled: !!approvedClientId,
+    queryKey: ["client-approved-locations", approvedClientId],
+    queryFn: async (): Promise<ApprovedLoc[]> => {
+      const { data, error } = await supabase
+        .from("client_approved_locations")
+        .select("id, label, latitude, longitude, geofence_radius_feet")
+        .eq("client_id", approvedClientId!);
+      if (error) throw error;
+      return (data ?? []).map((r) => ({
+        id: r.id as string,
+        label: r.label as string,
+        latitude: Number(r.latitude),
+        longitude: Number(r.longitude),
+        geofence_radius_feet: Number(r.geofence_radius_feet),
+      }));
+    },
+  });
+  const approvedLocs = approvedLocsQuery.data ?? [];
+
+  function matchApprovedLocation(pos: { lat: number; lng: number }): ApprovedLoc | null {
+    for (const loc of approvedLocs) {
+      if (!isFinite(loc.latitude) || !isFinite(loc.longitude)) continue;
+      const d = haversineFeet({ lat: loc.latitude, lng: loc.longitude }, pos);
+      if (d <= loc.geofence_radius_feet) return loc;
+    }
+    return null;
+  }
+
   // Live elapsed timer
   useEffect(() => {
     if (!activeMatchesThisPad) return;

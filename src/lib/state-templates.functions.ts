@@ -89,6 +89,32 @@ export const setStateStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const updatePlatformStateBasics = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        code: z.string().regex(STATE_CODE_RE),
+        status: z.enum(["draft", "active", "coming_soon"]).optional(),
+        regulator_label: z.string().max(120).nullable().optional(),
+        notes: z.string().max(2000).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await ensureExecutive(supabase, userId);
+    const patch: Record<string, unknown> = {};
+    if (data.status !== undefined) patch.status = data.status;
+    if (data.regulator_label !== undefined) patch.regulator_label = data.regulator_label;
+    if (data.notes !== undefined) patch.notes = data.notes;
+    if (Object.keys(patch).length === 0) return { ok: true };
+    const { error } = await supabase.from("platform_states").update(patch).eq("code", data.code);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Templates
 // ─────────────────────────────────────────────────────────────────────────────

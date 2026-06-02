@@ -87,10 +87,12 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
     requestAnimationFrame(() => taRef.current?.focus());
   };
 
+  const isEmpty = messages.length === 0;
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border bg-[#0d112b] px-4 py-3 text-white">
+      {/* Header — fixed at top */}
+      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-[#0d112b] px-4 py-2.5 text-white">
         <NectarMark size={compact ? "sm" : "md"} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -99,34 +101,37 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
               Staff assistant
             </span>
           </div>
-          <h2 className="mt-0.5 truncate font-display text-base font-bold tracking-tight">
+          <h2 className="truncate font-display text-sm font-bold leading-tight tracking-tight">
             Ask NECTAR · Staff
           </h2>
         </div>
+        <span
+          title="Client information shown here is for the people on your caseload — treat it as confidential PHI."
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#f4a93a]/40 bg-[#f4a93a]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]"
+        >
+          <Shield className="h-3 w-3" /> PHI
+        </span>
       </div>
 
-      {/* PHI disclosure (one-time per render) */}
-      {messages.length === 0 && (
-        <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-[#f4a93a]/30 bg-[#fff7ed] px-3 py-2 text-[12px] leading-snug text-[#7a4a0a]">
-          <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            Client information shown here is for the people on your caseload.
-            Treat it as confidential PHI.
-          </span>
-        </div>
-      )}
-
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 min-h-0 space-y-3 overflow-y-auto px-4 py-4">
-        {messages.length === 0 && (
+      {/* Conversation frame — internal scroll only */}
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 space-y-3 overflow-y-auto overscroll-contain px-4 py-3"
+      >
+        {isEmpty && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              I help with company policies, training you've received, your job
-              duties, your own pay, and the people on your caseload — their
-              goals, safety needs, and medications.
+            <div className="flex items-start gap-2 rounded-lg border border-[#f4a93a]/30 bg-[#fff7ed] px-3 py-2 text-[11px] leading-snug text-[#7a4a0a]">
+              <Shield className="mt-0.5 h-3 w-3 shrink-0" />
+              <span>
+                Client info here is for people on your caseload — treat as confidential PHI.
+              </span>
+            </div>
+            <p className="text-[13px] leading-snug text-muted-foreground">
+              I help with company policies, your trainings, job duties, your pay,
+              and the people on your caseload — their goals, safety, and meds.
             </p>
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Try asking
               </p>
               {STARTERS.map((s) => (
@@ -134,7 +139,7 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
                   key={s}
                   type="button"
                   onClick={() => send(s)}
-                  className="block min-h-[44px] w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground transition hover:border-[#f4a93a]/50 hover:bg-[#fff7ed] active:scale-[0.99]"
+                  className="block min-h-[40px] w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-[13px] leading-snug text-foreground transition hover:border-[#f4a93a]/50 hover:bg-[#fff7ed] active:scale-[0.99]"
                 >
                   {s}
                 </button>
@@ -196,8 +201,11 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
         )}
       </div>
 
-      {/* Composer */}
-      <div className="border-t border-border bg-background p-3" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+      {/* Composer — pinned to the bottom of the frame */}
+      <div
+        className="shrink-0 border-t border-border bg-background p-2.5"
+        style={{ paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }}
+      >
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -215,9 +223,9 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
                 send(input);
               }
             }}
-            placeholder="Ask about your job, your clients, or a policy…"
+            placeholder="Message NECTAR…"
             rows={1}
-            className="min-h-[44px] max-h-32 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f4a93a]/40"
+            className="min-h-[44px] max-h-32 flex-1 resize-none rounded-full border border-input bg-background px-4 py-2.5 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f4a93a]/40"
             disabled={mutation.isPending}
           />
           <NectarButton
@@ -226,7 +234,7 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
             loading={mutation.isPending}
             icon={<Send className="h-4 w-4" />}
             disabled={!input.trim() || mutation.isPending}
-            className="h-11 min-w-[44px]"
+            className="h-11 min-w-[44px] rounded-full"
           >
             <span className="sr-only">Send</span>
           </NectarButton>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays,
+  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays, Briefcase,
 } from "lucide-react";
 import {
   useNectarPayPeriod, useLivePayPeriod,

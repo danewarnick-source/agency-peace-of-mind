@@ -29,8 +29,11 @@ export type NectarPayPeriod = {
   hourly_hours: number;
   /** Distinct completed daily-log days in the period. */
   daily_days: number;
+  /** Completed non-client (General Time Clock) hours in the period. */
+  general_hours: number;
   hourly_earnings: number;
   daily_earnings: number;
+  general_earnings: number;
   est_gross_pay: number;
   hourly_rate: number;
   daily_rate: number;

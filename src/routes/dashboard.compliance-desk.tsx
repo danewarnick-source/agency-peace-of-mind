@@ -514,10 +514,11 @@ function ComplianceDeskPage() {
       {!isSearching && (
         <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1 shadow-soft">
           {[
-            { id: "pending" as const, label: "Pending Review", Icon: Inbox },
-            { id: "evv-archive" as const, label: "State EVV Archive", Icon: FolderArchive },
-            { id: "non-evv-archive" as const, label: "Internal / Non-EVV Archive", Icon: Briefcase },
-          ].map(({ id, label, Icon }) => (
+            { id: "pending" as const, label: "Pending Review", Icon: Inbox, count: undefined as number | undefined },
+            { id: "reconcile" as const, label: "EVV Reconciliation", Icon: AlertCircle, count: reconcilePendingCount },
+            { id: "evv-archive" as const, label: "State EVV Archive", Icon: FolderArchive, count: undefined },
+            { id: "non-evv-archive" as const, label: "Internal / Non-EVV Archive", Icon: Briefcase, count: undefined },
+          ].map(({ id, label, Icon, count }) => (
             <button
               key={id}
               type="button"
@@ -526,6 +527,9 @@ function ComplianceDeskPage() {
             >
               <Icon className="h-4 w-4" />
               {label}
+              {count !== undefined && count > 0 && (
+                <span className="ml-1 rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-bold text-warning-foreground">{count}</span>
+              )}
             </button>
           ))}
         </nav>
@@ -556,6 +560,13 @@ function ComplianceDeskPage() {
           approving={approve.isPending}
           onReason={setReasonRow}
         />
+      ) : sub === "reconcile" ? (
+        <ReconcileTable
+          rows={reconcileQ.data ?? []}
+          loading={reconcileQ.isLoading}
+          onMap={setMapOpen}
+          onReview={setReviewRow}
+        />
       ) : sub === "evv-archive" ? (
         <ArchiveTable
           variant="evv"
@@ -577,6 +588,7 @@ function ComplianceDeskPage() {
       <GpsMatchDialog row={mapOpen} onClose={() => setMapOpen(null)} />
       <EditShiftDialog row={editRow} onClose={() => setEditRow(null)} />
       <ReasonDialog row={reasonRow} onClose={() => setReasonRow(null)} />
+      <ReviewReconciliationDialog row={reviewRow} onClose={() => setReviewRow(null)} />
     </div>
   );
 }

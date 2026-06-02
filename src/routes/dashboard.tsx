@@ -92,17 +92,19 @@ function DashboardLayout() {
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
-  const allowedViews: Array<"staff" | "admin" | "staff_mobile" | "hive_exec"> = ["staff"];
+  type PV = "staff" | "admin" | "staff_mobile" | "hive_exec" | "state_preview";
+  const allowedViews: PV[] = ["staff"];
   if (isAdminCapable) { allowedViews.push("admin", "staff_mobile"); }
-  if (isExecutive) { allowedViews.push("hive_exec"); }
-  const rawView = allowedViews.includes(view as "staff" | "admin" | "staff_mobile" | "hive_exec")
-    ? (view as "staff" | "admin" | "staff_mobile" | "hive_exec")
-    : "staff";
+  if (isExecutive) { allowedViews.push("hive_exec", "state_preview"); }
+  const rawView: PV = allowedViews.includes(view as PV) ? (view as PV) : "staff";
   const isMobilePreview = rawView === "staff_mobile";
   const isHiveExecView  = rawView === "hive_exec";
+  const isStatePreview  = rawView === "state_preview";
   // HIVE Executive is its own context — never mixed with a company's admin/staff nav.
   const effectiveView: "staff" | "admin" | "hive_exec" =
-    isHiveExecView ? "hive_exec" : (rawView === "admin" ? "admin" : "staff");
+    isHiveExecView ? "hive_exec"
+    : isStatePreview ? (subView === "staff" ? "staff" : "admin")
+    : (rawView === "admin" ? "admin" : "staff");
   const execNav: NavItem[] = [
     { to: "/dashboard/hive-exec", label: "HIVE Overview", icon: LayoutDashboard, exact: true },
     { to: "/dashboard/hive-exec/new-company", label: "Add Company", icon: Plus },
@@ -120,6 +122,25 @@ function DashboardLayout() {
     effectiveView === "admin"     ? ADMIN_NAV : STAFF_NAV;
   const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");
 
+  // Load states for the State portal dropdown (executives only).
+  useEffect(() => {
+    if (!isExecutive) return;
+    let cancelled = false;
+    supabase.from("platform_states").select("code, name, status").order("name").then(({ data }) => {
+      if (cancelled) return;
+      setStates((data ?? []) as PlatformStateLite[]);
+    });
+    return () => { cancelled = true; };
+  }, [isExecutive]);
+
+  // Default the previewed state to the first reference/active when entering the mode.
+  useEffect(() => {
+    if (isStatePreview && !stateCode && states.length > 0) {
+      const pick = states.find((s) => s.status === "active") ?? states[0];
+      if (pick) setStateCode(pick.code);
+    }
+  }, [isStatePreview, stateCode, states, setStateCode]);
+
   // Keep view and content strictly aligned: leaving HIVE View must also leave
   // /dashboard/hive-exec, and entering HIVE View jumps to the platform landing.
   useEffect(() => {
@@ -129,6 +150,11 @@ function DashboardLayout() {
       navigate({ to: "/dashboard" });
     }
   }, [isHiveExecView, pathname, navigate]);
+
+  const currentPreviewState = isStatePreview
+    ? states.find((s) => s.code === stateCode) ?? null
+    : null;
+  const isComingSoonPreview = isStatePreview && currentPreviewState?.status === "coming_soon";
 
   if (loading || !session) {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;

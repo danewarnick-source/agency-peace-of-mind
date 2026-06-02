@@ -82,6 +82,11 @@ import { AuthorizedCodesPanel } from "@/components/nectar/authorized-codes-panel
 import { ExternalLink as ExternalLinkIcon, Building } from "lucide-react";
 import { attestExternalCompletion, inferClassification } from "@/lib/external-compliance.functions";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  listProviderPendingConfirmations,
+  providerConfirmRequirement,
+  providerRejectRequirement,
+} from "@/lib/nectar-approvals.functions";
 
 
 

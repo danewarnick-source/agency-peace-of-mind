@@ -30,13 +30,16 @@ import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
 import {
   runInternalAudit,
+  listAuditableStaff,
   type AuditFinding,
   type AuditSummary,
   type FindingArea,
   type Severity,
 } from "@/lib/internal-audit.functions";
 import { RequirePermission } from "@/components/rbac-guard";
+import { SamplePicker } from "@/components/internal-audit/sample-picker";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/dashboard/internal-audit")({
   head: () => ({ meta: [{ title: "Internal Audit — NECTAR — HIVE" }] }),

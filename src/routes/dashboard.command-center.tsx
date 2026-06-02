@@ -1726,3 +1726,254 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     </div>
   );
 }
+
+// ─── NECTAR Infusion view ────────────────────────────────────────────────────
+
+type NectarItem = {
+  id: string;
+  severity: "critical" | "high" | "medium";
+  source: "Command Center" | "EVV & Timesheets" | "Host Home" | "Audit Zone";
+  area: string;
+  title: string;
+  why: string;
+  to?: { pathname: string; search?: Record<string, string> };
+  onClick?: () => void;
+};
+
+const SEVERITY_RANK: Record<NectarItem["severity"], number> = { critical: 0, high: 1, medium: 2 };
+const SEVERITY_STYLE: Record<NectarItem["severity"], string> = {
+  critical: "bg-rose-100 text-rose-800 border-rose-200",
+  high: "bg-amber-100 text-amber-800 border-amber-200",
+  medium: "bg-blue-100 text-blue-800 border-blue-200",
+};
+
+type IncidentLite = { id: string; report_number: string; state_submission_deadline: string;
+  clients: { first_name: string; last_name: string } | null };
+type TsLite = { id: string; ai_compliance_status: string | null; is_out_of_bounds: boolean | null;
+  outside_geofence_reason: string | null; clock_in_timestamp: string;
+  clients: { first_name: string; last_name: string } | null;
+  profiles: { full_name: string | null; email: string | null } | null };
+type OpenShiftLite = { id: string; clock_in_timestamp: string;
+  clients: { first_name: string; last_name: string } | null;
+  profiles: { full_name: string | null; email: string | null } | null };
+type MedErrLite = { id: string; medication_id: string;
+  clients: { first_name: string; last_name: string } | null; staff_name: string | null };
+type DlLite = { id: string; log_date: string;
+  clients: { first_name: string; last_name: string } | null;
+  profiles: { full_name: string | null; email: string | null } | null };
+
+function NectarInfusionView(props: {
+  orgId: string;
+  urgentIncidents: IncidentLite[];
+  urgentTimesheets: TsLite[];
+  openShifts: OpenShiftLite[];
+  medErrors: MedErrLite[];
+  pendingTimesheets: TsLite[];
+  pendingLogs: DlLite[];
+  rejectedTimesheets: TsLite[];
+  rejectedLogs: DlLite[];
+  onJumpUrgent: () => void;
+  onJumpPending: () => void;
+}) {
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [taskGoal, setTaskGoal] = useState<string>("");
+
+  const items = useMemo<NectarItem[]>(() => {
+    const out: NectarItem[] = [];
+    const cn = (r: { clients: { first_name: string; last_name: string } | null }) =>
+      r.clients ? `${r.clients.first_name} ${r.clients.last_name}` : "—";
+    const sn = (r: { profiles: { full_name: string | null; email: string | null } | null }) =>
+      r.profiles?.full_name ?? r.profiles?.email ?? "—";
+
+    props.urgentIncidents.forEach((i) => out.push({
+      id: `inc-${i.id}`, severity: "critical", source: "Command Center", area: "Incidents",
+      title: `Incident ${i.report_number} — ${cn(i)}`,
+      why: `State submission required by ${new Date(i.state_submission_deadline).toLocaleString()}. Until it's submitted to the state database with a confirmation number, it remains an open compliance liability.`,
+      onClick: props.onJumpUrgent,
+    }));
+    props.openShifts.forEach((s) => out.push({
+      id: `open-${s.id}`, severity: "critical", source: "Command Center", area: "Open shifts",
+      title: `${sn(s)} still clocked in for ${cn(s)}`,
+      why: `Clocked in over 16 hours ago without a clock-out. EVV cannot be billed until the shift is closed — review and resolve before the next payroll cycle.`,
+      onClick: props.onJumpUrgent,
+    }));
+    props.medErrors.forEach((m) => out.push({
+      id: `med-${m.id}`, severity: "critical", source: "Host Home", area: "eMAR",
+      title: `Medication error reported — ${cn(m)}`,
+      why: `A staff member flagged a medication event as an error. Per policy this needs admin review and a written follow-up before it can be closed.`,
+      to: { pathname: "/dashboard/records-desk", search: { tab: "host-home" } },
+    }));
+    props.urgentTimesheets.forEach((t) => out.push({
+      id: `uts-${t.id}`, severity: "high", source: "EVV & Timesheets", area: "Geofence / NECTAR flag",
+      title: `${sn(t)} — ${cn(t)}`,
+      why: t.outside_geofence_reason
+        ? `Clock-in was outside approved locations: "${t.outside_geofence_reason}". Reconcile with attestation or flag for follow-up.`
+        : `NECTAR flagged this shift's narrative. Review and either approve or return it to staff for correction.`,
+      to: { pathname: "/dashboard/records-desk", search: { tab: "evv-timesheets" } },
+    }));
+    props.pendingTimesheets.slice(0, 25).forEach((t) => out.push({
+      id: `pts-${t.id}`, severity: "medium", source: "EVV & Timesheets", area: "Pending Review",
+      title: `Timesheet pending — ${sn(t)} for ${cn(t)}`,
+      why: `Submitted and waiting on admin review before it can be billed.`,
+      to: { pathname: "/dashboard/records-desk", search: { tab: "evv-timesheets" } },
+    }));
+    props.pendingLogs.slice(0, 25).forEach((l) => out.push({
+      id: `pdl-${l.id}`, severity: "medium", source: "Command Center", area: "Daily Logs",
+      title: `Daily log pending — ${sn(l)} for ${cn(l)}`,
+      why: `Daily log submitted and waiting on admin review. Approve or return for correction.`,
+      onClick: props.onJumpPending,
+    }));
+    props.rejectedTimesheets.forEach((t) => out.push({
+      id: `rts-${t.id}`, severity: "high", source: "EVV & Timesheets", area: "Returned to staff",
+      title: `Returned timesheet — ${sn(t)} for ${cn(t)}`,
+      why: `Returned to caregiver for correction. Track until resubmitted so it doesn't fall off the radar.`,
+      to: { pathname: "/dashboard/records-desk", search: { tab: "evv-timesheets" } },
+    }));
+    props.rejectedLogs.forEach((l) => out.push({
+      id: `rdl-${l.id}`, severity: "high", source: "Command Center", area: "Returned daily log",
+      title: `Returned daily log — ${sn(l)} for ${cn(l)}`,
+      why: `Returned to caregiver for correction. Follow up to make sure it gets resubmitted and re-reviewed.`,
+      onClick: props.onJumpPending,
+    }));
+
+    out.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
+    return out;
+  }, [props]);
+
+  const grouped = useMemo(() => {
+    const g: Record<string, NectarItem[]> = {};
+    items.forEach((it) => { (g[it.source] ??= []).push(it); });
+    return g;
+  }, [items]);
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border border-[color:var(--amber-200)] bg-gradient-to-br from-[color:var(--amber-50)] to-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span
+              className="mt-0.5 inline-flex h-9 w-9 items-center justify-center text-[color:var(--amber-700)]"
+              style={{
+                clipPath: "polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)",
+                background: "linear-gradient(135deg, var(--amber-100), var(--amber-200))",
+              }}
+            >
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--amber-700)]">
+                NECTAR Infusion
+              </div>
+              <h2 className="font-display text-lg font-bold text-[color:var(--navy-900)]">
+                Everything that needs your attention, in priority order
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                NECTAR pulls flags, pending items, and exceptions from across the entire Records Desk
+                — Command Center, EVV &amp; Timesheets, Host Home, and Audit Zone — and surfaces them
+                here with plain-language explanations. Click any item to jump to where it's fixed.
+                NECTAR surfaces and routes; you review and decide.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => { setTaskGoal("Walk me through the top items in my NECTAR Infusion overview"); setTaskOpen(true); }}
+            className="bg-[color:var(--amber-600)] text-white hover:bg-[color:var(--amber-700)]"
+          >
+            <Sparkles className="mr-1 h-3.5 w-3.5" /> Guide me
+          </Button>
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <Card className="p-12 text-center">
+          <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-500" />
+          <p className="text-lg font-semibold text-emerald-700 dark:text-emerald-400">All clear</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            NECTAR isn't seeing anything that needs attention across the Records Desk right now.
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-5">
+          {(["Command Center", "EVV & Timesheets", "Host Home", "Audit Zone"] as const).map((src) => {
+            const list = grouped[src];
+            if (!list || list.length === 0) return null;
+            return (
+              <section key={src}>
+                <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {src === "Command Center" && <ShieldAlert className="h-3.5 w-3.5" />}
+                  {src === "EVV & Timesheets" && <Clock className="h-3.5 w-3.5" />}
+                  {src === "Host Home" && <Home className="h-3.5 w-3.5" />}
+                  {src === "Audit Zone" && <FolderArchive className="h-3.5 w-3.5" />}
+                  {src} <span className="text-muted-foreground/70">({list.length})</span>
+                </h3>
+                <div className="space-y-2">
+                  {list.map((it) => (
+                    <NectarItemRow
+                      key={it.id}
+                      item={it}
+                      onGuide={() => { setTaskGoal(`Help me resolve: ${it.title}`); setTaskOpen(true); }}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      <NectarTaskCenter open={taskOpen} onOpenChange={setTaskOpen} initialGoal={taskGoal} />
+    </div>
+  );
+}
+
+function NectarItemRow({ item, onGuide }: { item: NectarItem; onGuide: () => void }) {
+  const body = (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${SEVERITY_STYLE[item.severity]}`}>
+            {item.severity}
+          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {item.area}
+          </span>
+        </div>
+        <p className="mt-1 font-semibold text-sm text-[color:var(--navy-900)]">{item.title}</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.why}</p>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-[color:var(--amber-700)]">
+          Open <ArrowRight className="h-3 w-3" />
+        </span>
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onGuide(); }}
+          className="inline-flex items-center gap-1 rounded-md border border-[color:var(--amber-300)] bg-white px-2 py-0.5 text-[11px] font-semibold text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
+        >
+          <Sparkles className="h-3 w-3" /> Guide me
+        </button>
+      </div>
+    </div>
+  );
+  const cardClass =
+    "block rounded-lg border border-l-4 border-border bg-white p-3 shadow-sm transition hover:border-[color:var(--amber-300)] hover:shadow-md " +
+    (item.severity === "critical"
+      ? "border-l-rose-500"
+      : item.severity === "high"
+      ? "border-l-amber-500"
+      : "border-l-blue-400");
+
+  if (item.to) {
+    return (
+      <Link to={item.to.pathname} search={item.to.search as never} className={cardClass}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={item.onClick} className={`${cardClass} w-full text-left`}>
+      {body}
+    </button>
+  );
+}

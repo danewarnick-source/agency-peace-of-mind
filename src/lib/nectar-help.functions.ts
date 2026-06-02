@@ -84,6 +84,26 @@ type SupabaseLike = {
   from: (table: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
 };
 
+interface RequirementFact {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  applies_to: string | null;
+  source_citation: string | null;
+  review_status: string;
+  origin: string;
+  source_document_title: string | null;
+}
+
+interface AuthoritativeSourceFact {
+  id: string;
+  title: string;
+  authoritative_kind: string | null;
+  jurisdiction: string | null;
+  excerpts: string[];
+}
+
 interface OrgFacts {
   organization_id: string | null;
   role: string;
@@ -94,6 +114,8 @@ interface OrgFacts {
     clients_total: number | null;
     staff_active: number | null;
     pba_accounts: number | null;
+    requirements_confirmed: number | null;
+    authoritative_sources: number | null;
   };
   service_codes: {
     all_distinct: string[];
@@ -105,7 +127,47 @@ interface OrgFacts {
     status: string;
     service_codes: string[];
   }>;
+  requirements: RequirementFact[];
+  authoritative_sources: AuthoritativeSourceFact[];
   notes: string[];
+}
+
+const STOPWORDS = new Set([
+  "the","a","an","and","or","of","to","in","for","on","at","by","with","from","is","are","be",
+  "what","which","who","whom","that","this","these","those","do","does","did","have","has","had",
+  "will","would","should","can","could","may","might","must","i","you","we","they","it","my",
+  "your","our","their","its","as","if","then","than","there","here","about","into","within",
+  "over","under","between","also","any","all","some","each","per","not","no","yes","how","when",
+  "where","why","need","needs","require","required","requires"
+]);
+
+function questionKeywords(q: string): string[] {
+  const tokens = q.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? [];
+  const out = new Set<string>();
+  for (const t of tokens) if (!STOPWORDS.has(t)) out.add(t);
+  return Array.from(out).slice(0, 12);
+}
+
+function findExcerpts(text: string, keywords: string[], max = 4): string[] {
+  if (!text || keywords.length === 0) return [];
+  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).filter((s) => s.length > 20 && s.length < 600);
+  const scored: Array<{ s: string; n: number }> = [];
+  for (const s of sentences) {
+    const lower = s.toLowerCase();
+    let n = 0;
+    for (const k of keywords) if (lower.includes(k)) n += 1;
+    if (n > 0) scored.push({ s: s.trim(), n });
+  }
+  scored.sort((a, b) => b.n - a.n);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const { s } of scored) {
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 // Common DSPD / waiver service-code tokens NECTAR should recognise.

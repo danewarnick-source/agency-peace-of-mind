@@ -10,7 +10,7 @@ export const Route = createFileRoute("/dashboard/timeclock")({
 
 function TimeClockPage() {
   return (
-    <div className="mx-auto w-full max-w-xl space-y-5">
+    <div className="mx-auto w-full max-w-xl">
       <StaffPageHeader
         eyebrow="Time · Non-client"
         eyebrowIcon={Clock}
@@ -18,9 +18,7 @@ function TimeClockPage() {
         subtitle="Training, Admin, Travel, or Meeting time only. To start a client shift with EVV, open My Caseload and tap a client."
       />
 
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
-        <GeneralTimeClock />
-      </div>
+      <GeneralTimeClock />
     </div>
   );
 }

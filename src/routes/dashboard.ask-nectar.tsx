@@ -19,7 +19,7 @@ export const Route = createFileRoute("/dashboard/ask-nectar")({
 function AskNectarStaffPage() {
   const { clientId } = useSearch({ from: "/dashboard/ask-nectar" });
   return (
-    <div className="-mx-3 -my-4 h-[calc(100vh-9rem)] md:mx-0 md:my-0 md:h-[calc(100vh-8rem)] md:overflow-hidden md:rounded-2xl md:border md:border-border md:bg-card md:shadow-sm">
+    <div className="mx-auto flex h-[calc(100vh-9rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] md:h-[calc(100vh-8rem)]">
       <AskNectarStaff clientId={clientId} />
     </div>
   );

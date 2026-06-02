@@ -127,12 +127,12 @@ export const completeOnboardingSession = createServerFn({ method: "POST" })
       .maybeSingle();
 
     const baseUpdate = {
-      terminology: projected.terminology,
-      billing_codes: projected.billing_codes,
-      training: projected.training,
-      evv: projected.evv,
-      required_documents: projected.required_documents,
-      department_structure: projected.department_structure,
+      terminology: projected.terminology as never,
+      billing_codes: projected.billing_codes as never,
+      training: projected.training as never,
+      evv: projected.evv as never,
+      required_documents: projected.required_documents as never,
+      department_structure: projected.department_structure as never,
     };
 
     if (existing) {

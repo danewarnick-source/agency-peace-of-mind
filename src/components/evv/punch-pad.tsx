@@ -1110,8 +1110,10 @@ export function PunchPad({
         typeof lat === "number" && typeof lng === "number" &&
         isFinite(lat) && isFinite(lng)
       ) {
+        // Approved locations suppress the variance prompt on clock-out too.
+        const matchedOut = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
         const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
-        if (dist > radius) {
+        if (!matchedOut && dist > radius) {
           setOutVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });
           setOutVarianceReason("");
           return;

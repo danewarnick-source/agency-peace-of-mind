@@ -607,3 +607,49 @@ export const runInternalAudit = createServerFn({ method: "POST" })
     };
 
   });
+
+export interface AuditableStaff {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  job_title: string | null;
+  role: string;
+}
+
+/**
+ * Lightweight staff roster for the Internal Audit scope picker.
+ * Returns active org members — RLS scopes the query to the caller's org.
+ */
+export const listAuditableStaff = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<AuditableStaff[]> => {
+    const { supabase } = context;
+    const { data: members, error } = await supabase
+      .from("organization_members")
+      .select("user_id, role, job_title, active")
+      .eq("organization_id", data.organizationId)
+      .eq("active", true);
+    if (error) throw error;
+    const ids = (members ?? []).map((m) => m.user_id);
+    if (!ids.length) return [];
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", ids);
+    const pMap = new Map(
+      ((profiles ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>).map(
+        (p) => [p.id, p],
+      ),
+    );
+    return (members ?? []).map((m) => {
+      const p = pMap.get(m.user_id);
+      return {
+        user_id: m.user_id,
+        full_name: p?.full_name ?? null,
+        email: p?.email ?? null,
+        job_title: m.job_title ?? null,
+        role: m.role,
+      };
+    });
+  });

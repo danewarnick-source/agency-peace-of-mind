@@ -5,6 +5,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { useGeneralShift } from "@/hooks/use-general-shift";
 import { useTimePaySettings, type TimePayCategory } from "@/hooks/use-time-pay-settings";
@@ -106,9 +113,10 @@ export function GeneralTimeClock() {
   return (
     <section
       aria-label="General Time Clock"
-      className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-card to-primary/5 p-4 shadow-[0_10px_30px_-18px_rgba(13,17,43,0.18)] sm:p-5"
+      className="rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)] sm:p-4"
     >
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
+      {/* Status bar */}
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span
             aria-hidden
@@ -125,102 +133,88 @@ export function GeneralTimeClock() {
         </span>
       </header>
 
-      <div className="mb-4 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2">
-        <p className="text-sm font-semibold">
-          {running
-            ? `Logging: ${shift!.category}`
-            : "Choose a work category below"}
-        </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          General Time Clock is for non-client work. Use My Caseload to clock
-          into a client shift with EVV.
+      {/* Compact info strip */}
+      <div className="mb-3 rounded-lg border border-border bg-muted/40 px-3 py-1.5">
+        <p className="text-[11px] text-muted-foreground">
+          General Time Clock is for non-client work only. Use My Caseload to clock into a client shift with EVV.
         </p>
       </div>
 
-      <div className="grid gap-3">
-        <div>
-          <Label className="mb-1 block text-xs font-medium">
-            🗂️ Select Work Category
-          </Label>
-          <div role="radiogroup" aria-label="Work category" className="grid grid-cols-2 gap-2">
+      {/* Category dropdown */}
+      <div className="mb-3">
+        <Label className="mb-1 block text-xs font-medium">
+          Work Category
+        </Label>
+        <Select
+          value={categoryCode}
+          onValueChange={setCategoryCode}
+          disabled={running}
+        >
+          <SelectTrigger className="h-11 w-full text-sm font-medium">
+            <SelectValue placeholder="Select a category…" />
+          </SelectTrigger>
+          <SelectContent>
             {cats.map((c) => {
-              const isActive = active?.code === c.code;
-              const locked = running && shift!.category !== c.label;
               const Icon = ICON_BY_CODE[c.code] ?? Briefcase;
               const hint = HINT_BY_CODE[c.code] ?? (c.requires_description ? "Describe before clocking in" : "Custom category");
               return (
-                <button
-                  key={c.code}
-                  type="button"
-                  role="radio"
-                  aria-checked={isActive}
-                  disabled={locked || running}
-                  onClick={() => setCategoryCode(c.code)}
-                  className={[
-                    "min-h-[64px] rounded-lg border px-3 py-2 text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
-                    isActive
-                      ? "border-[color:var(--amber-600,#f59324)] bg-[image:var(--gradient-amber)] text-[color:var(--navy-900,#0d112b)] shadow-sm"
-                      : locked
-                        ? "border-border bg-muted/40 text-muted-foreground opacity-60"
-                        : "border-border bg-background text-foreground hover:border-[color:var(--amber-600,#f59324)]/60",
-                  ].join(" ")}
-                >
-                  <span className="flex items-center gap-2 text-sm font-semibold">
-                    <Icon className="h-4 w-4" /> {c.label}
+                <SelectItem key={c.code} value={c.code} className="text-sm">
+                  <span className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span>{c.label}</span>
                     {c.requires_description && (
-                      <span
-                        className={`ml-auto text-[9px] font-bold uppercase tracking-wider ${
-                          isActive ? "text-[#412402]" : "text-amber-700"
-                        }`}
-                      >
+                      <span className="ml-1 rounded bg-amber-100 px-1.5 py-0 text-[10px] font-bold uppercase tracking-wider text-amber-700">
                         Note req.
                       </span>
                     )}
                   </span>
-                  <span
-                    className={`mt-0.5 block text-[11px] leading-tight ${
-                      isActive
-                        ? "text-[color:var(--navy-900,#0d112b)]/70"
-                        : "text-muted-foreground"
-                    }`}
-                  >
+                  <span className="mt-0.5 block pl-6 text-[11px] text-muted-foreground">
                     {hint}
                   </span>
-                </button>
+                </SelectItem>
               );
             })}
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="general-note" className="mb-1 block text-xs font-medium">
-            📝 {requiresDesc && !running ? "Description (required)" : "Note (optional)"}
-          </Label>
-          <Textarea
-            id="general-note"
-            rows={2}
-            value={running ? shift!.note : note}
-            onChange={(e) => setNote(e.target.value)}
-            disabled={running}
-            placeholder={
-              requiresDesc
-                ? "Describe the task — required before clocking in"
-                : "What are you working on?"
-            }
-            maxLength={300}
-            aria-required={requiresDesc}
-          />
-        </div>
+          </SelectContent>
+        </Select>
+        {active && (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {HINT_BY_CODE[active.code] ?? (active.requires_description ? "Describe before clocking in" : "Custom category")}
+          </p>
+        )}
       </div>
 
-      <div className="mt-5 flex items-center justify-center rounded-xl border border-border bg-background/70 py-3">
+      {/* Note */}
+      <div className="mb-3">
+        <Label htmlFor="general-note" className="mb-1 block text-xs font-medium">
+          {requiresDesc && !running ? "Description (required)" : "Note (optional)"}
+        </Label>
+        <Textarea
+          id="general-note"
+          rows={2}
+          value={running ? shift!.note : note}
+          onChange={(e) => setNote(e.target.value)}
+          disabled={running}
+          placeholder={
+            requiresDesc
+              ? "Describe the task — required before clocking in"
+              : "What are you working on?"
+          }
+          maxLength={300}
+          aria-required={requiresDesc}
+          className="min-h-[3rem] resize-none text-sm"
+        />
+      </div>
+
+      {/* Timer */}
+      <div className="mb-3 flex items-center justify-center rounded-xl border border-border bg-background/70 py-2.5">
         <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
         <span className="font-mono text-2xl font-bold tabular-nums tracking-tight">
           {elapsed}
         </span>
       </div>
 
-      <div className="mt-5">
+      {/* Action button */}
+      <div>
         {running ? (
           <Button
             type="button"
@@ -234,7 +228,7 @@ export function GeneralTimeClock() {
             type="button"
             onClick={onStart}
             disabled={!canStart}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#117a52] text-base font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-700/30 transition-all duration-150 hover:bg-[#0f6b48] active:scale-[0.98] disabled:opacity-60"
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-base font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-600/30 transition-all duration-150 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-60"
           >
             <Play className="h-5 w-5 fill-current" /> Clock In · {active?.label ?? "—"}
           </Button>

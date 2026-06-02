@@ -793,6 +793,14 @@ function ProfileTab({
             <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
               <p className="text-[11px] font-semibold text-primary">Current: {radius.toLocaleString()} ft</p>
             </div>
+
+            <div className="mt-4 border-t border-primary/20 pt-3">
+              <ApprovedLocationsEditor
+                clientId={client.id}
+                organizationId={orgId}
+                canEdit={true}
+              />
+            </div>
           </CardContent>
         </Card>
 

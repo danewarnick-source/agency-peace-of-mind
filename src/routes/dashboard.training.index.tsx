@@ -5,8 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlayCircle, Award, UserPlus, BookOpen } from "lucide-react";
+import { PlayCircle, Award, UserPlus, BookOpen, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
+import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/training/")({ component: CourseLibrary });
 

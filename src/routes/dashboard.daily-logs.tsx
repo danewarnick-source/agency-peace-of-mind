@@ -33,6 +33,7 @@ import {
   type CoachResult, type ScanResult,
 } from "@/lib/ai-coach.functions";
 import { useServerFn } from "@tanstack/react-start";
+import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
   head: () => ({ meta: [{ title: "Daily Logs — HIVE" }] }),

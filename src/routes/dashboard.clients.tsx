@@ -41,6 +41,7 @@ import { CustomAttributesSection } from "@/components/custom-attributes-section"
 import { LifecyclePanel } from "@/components/lifecycle-panel";
 import { MedicationsManager } from "@/components/medications-manager";
 import { MarCalendar } from "@/components/mar-calendar";
+import { ApprovedLocationsEditor } from "@/components/evv/approved-locations-editor";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

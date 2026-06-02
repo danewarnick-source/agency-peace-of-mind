@@ -278,10 +278,6 @@ async function gatherFacts(
         }
       }
     }
-  } catch (e) {
-    facts.notes.push(`Data lookup partial failure: ${e instanceof Error ? e.message : "unknown"}`);
-  }
-
 
     // ─── Requirements + authoritative sources (admin scope only) ─────────────
     if (facts.scope === "organization") {

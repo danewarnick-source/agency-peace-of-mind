@@ -1,4 +1,5 @@
 import { useCallback, type ReactNode } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { StaffTopBar } from "./staff-top-bar";
 import { StaffBottomTabs } from "./staff-bottom-tabs";
 import { ActiveShiftBar } from "./active-shift-bar";
@@ -30,6 +31,8 @@ export function StaffMobileShell({
 function ShellInner({ title, children }: { title: string; children: ReactNode }) {
   const { setContainer } = useMobileShellContainer();
   const barVisible = useActiveShiftBarVisible();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAskNectar = pathname.startsWith("/dashboard/ask-nectar");
   // Stable callback ref — only updates on mount/unmount.
   const ref = useCallback(
     (el: HTMLDivElement | null) => setContainer(el),
@@ -49,9 +52,11 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
         the space is reclaimed automatically.
       */}
       <main
-        className={`flex-1 overflow-y-auto overscroll-contain px-4 py-5 ${
-          barVisible ? "pb-[calc(1.25rem+56px)]" : ""
-        }`}
+        className={
+          isAskNectar
+            ? "flex-1 overflow-hidden overscroll-none"
+            : `flex-1 overflow-y-auto overscroll-contain px-4 py-5 ${barVisible ? "pb-[calc(1.25rem+56px)]" : ""}`
+        }
       >
         {children}
       </main>

@@ -97,13 +97,22 @@ function StatesIndexPage() {
                       : "No template yet"}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <Link
-                    to="/dashboard/hive-exec/states/$stateCode"
-                    params={{ stateCode: r.code }}
-                    className="inline-flex min-h-[36px] items-center rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted"
-                  >
-                    Open
-                  </Link>
+                  <div className="inline-flex gap-1">
+                    <Link
+                      to="/dashboard/hive-exec/states/$stateCode"
+                      params={{ stateCode: r.code }}
+                      className="inline-flex min-h-[36px] items-center rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted"
+                    >
+                      Open
+                    </Link>
+                    <Link
+                      to="/dashboard/hive-exec/states/$stateCode/onboarding"
+                      params={{ stateCode: r.code }}
+                      className="inline-flex min-h-[36px] items-center rounded-md bg-[#d97a1c] px-3 text-xs font-semibold text-white hover:bg-[#b8651a]"
+                    >
+                      {r.template_updated_at ? "Resume onboarding" : "Onboard"}
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}

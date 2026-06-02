@@ -223,34 +223,66 @@ function StaffDailyJournal() {
         </div>
       )}
 
-      {/* Missing entries strip */}
+      {/* Missing entries — grouped by client, full-width rows */}
       {missingEntries.length > 0 && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-50 p-4 dark:bg-amber-950/20">
-          <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
-            <CalendarClock className="h-4 w-4" />
-            {missingEntries.length} Missing Entr{missingEntries.length === 1 ? "y" : "ies"} — Last {LOOKBACK_DAYS} Days
+        <div className="w-full max-w-full overflow-hidden rounded-xl border border-amber-500/40 bg-amber-50 p-4 dark:bg-amber-950/20">
+          <p className="mb-1 flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
+            <CalendarClock className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-words">
+              {missingEntries.length} Missing Entr{missingEntries.length === 1 ? "y" : "ies"} — Last {LOOKBACK_DAYS} Days
+            </span>
           </p>
-          <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:grid-cols-3">
-            {missingEntries.slice(0, 12).map(({ client, date }) => (
-              <button
-                key={`${client.id}-${date}`}
-                type="button"
-                onClick={() => setBackdateFor({ client, date })}
-                className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-white px-3 py-2 text-left text-xs hover:bg-amber-50 transition dark:bg-amber-950/30"
-              >
-                <span className="font-medium">{client.first_name} {client.last_name}</span>
-                <span className="text-muted-foreground">{fmtDate(date)}</span>
-              </button>
-            ))}
-          </div>
-          {missingEntries.length > 12 && (
-            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              +{missingEntries.length - 12} more missing entries not shown.
-            </p>
-          )}
-          <p className="mt-2 text-[11px] text-amber-600/80 dark:text-amber-400/80">
+          <p className="mb-3 text-[11px] text-amber-600/80 dark:text-amber-400/80">
             Backdated submissions are accepted. A late note is always better than no note.
           </p>
+
+          {(() => {
+            // Group missing entries by client, preserving most-recent-first order within each group.
+            const groups = new Map<string, { client: CaseloadClient; dates: string[] }>();
+            for (const { client, date } of missingEntries) {
+              const g = groups.get(client.id) ?? { client, dates: [] };
+              g.dates.push(date);
+              groups.set(client.id, g);
+            }
+            return (
+              <div className="max-h-[26rem] space-y-4 overflow-y-auto pr-1">
+                {Array.from(groups.values()).map(({ client, dates }) => (
+                  <div key={client.id} className="w-full min-w-0">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                        <User className="h-3.5 w-3.5" />
+                      </span>
+                      <p className="min-w-0 truncate text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        {client.first_name} {client.last_name}
+                      </p>
+                      <span className="ml-auto shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                        {dates.length} missing
+                      </span>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {dates.map((date) => (
+                        <li key={`${client.id}-${date}`} className="w-full min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => setBackdateFor({ client, date })}
+                            className="flex w-full min-w-0 items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-white px-3 py-3 text-left transition hover:border-amber-500/60 hover:bg-amber-50 active:scale-[0.99] dark:bg-amber-950/30"
+                          >
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                              {fmtDate(date)}
+                            </span>
+                            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                              <Pen className="h-3 w-3" />
+                              Complete log
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 

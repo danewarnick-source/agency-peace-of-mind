@@ -1173,7 +1173,7 @@ function ArchiveTable({
               const outIso = effectiveOut(r);
               return (
                 <Fragment key={r.id}>
-                <TableRow>
+                <TableRow className="[&>td]:border-b-0">
                   <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
                   <TableCell className="whitespace-nowrap font-medium">
                     {r.staff?.full_name ?? r.staff?.email ?? "—"}

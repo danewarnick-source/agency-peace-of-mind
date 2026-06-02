@@ -273,59 +273,149 @@ function InternalAuditPage() {
         </div>
       </div>
 
-      {/* Scope filters */}
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] md:grid-cols-6">
-        <div className="md:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Client</label>
-          <Select value={clientId} onValueChange={setClientId}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All clients</SelectItem>
-              {(caseload ?? []).map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.last_name}, {c.first_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* DSPD-style sample builder */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-[#0f1b3d]">DSPD-style sample</h3>
+            <p className="text-xs text-muted-foreground">
+              Hand-pick the specific clients and staff to audit (e.g. a DSPD sample request of
+              8 clients + 5 staff). Leave both empty to use the standard scope below.
+            </p>
+          </div>
+          {usingSample && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSampleClientIds([]);
+                setSampleStaffIds([]);
+              }}
+            >
+              Clear sample
+            </Button>
+          )}
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Area</label>
-          <Select value={area} onValueChange={setArea}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All areas</SelectItem>
-              {Object.entries(AREA_LABEL).map(([k, v]) => (
-                <SelectItem key={k} value={k}>
-                  {v}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
-            Service code
-          </label>
-          <Input
-            value={serviceCode}
-            placeholder="e.g. S5125"
-            onChange={(e) => setServiceCode(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">From</label>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">To</label>
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-2">
+            <SamplePicker
+              label="Sample clients"
+              placeholder="Pick clients for the sample…"
+              options={clientOptions}
+              selected={sampleClientIds}
+              onChange={setSampleClientIds}
+              targetCount={
+                targetClientCount && /^\d+$/.test(targetClientCount)
+                  ? Number(targetClientCount)
+                  : null
+              }
+              emptyHint="No clients in your caseload"
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] text-muted-foreground">DSPD requested</label>
+              <Input
+                value={targetClientCount}
+                onChange={(e) => setTargetClientCount(e.target.value.replace(/\D/g, ""))}
+                inputMode="numeric"
+                placeholder="e.g. 8"
+                className="h-7 w-20 text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <SamplePicker
+              label="Sample staff"
+              placeholder="Pick staff for the sample…"
+              options={staffOptions}
+              selected={sampleStaffIds}
+              onChange={setSampleStaffIds}
+              targetCount={
+                targetStaffCount && /^\d+$/.test(targetStaffCount)
+                  ? Number(targetStaffCount)
+                  : null
+              }
+              emptyHint={staffQ.isLoading ? "Loading staff…" : "No active staff"}
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] text-muted-foreground">DSPD requested</label>
+              <Input
+                value={targetStaffCount}
+                onChange={(e) => setTargetStaffCount(e.target.value.replace(/\D/g, ""))}
+                inputMode="numeric"
+                placeholder="e.g. 5"
+                className="h-7 w-20 text-xs"
+              />
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Scope filters (whole company / single client / area / date) */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[#0f1b3d]">Other scope filters</h3>
+          {usingSample && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+              Sample active — single-client filter ignored
+            </span>
+          )}
+        </div>
+        <div className="grid gap-3 md:grid-cols-6">
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Client (single)
+            </label>
+            <Select value={clientId} onValueChange={setClientId} disabled={sampleClientIds.length > 0}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All clients</SelectItem>
+                {(caseload ?? []).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.last_name}, {c.first_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Area</label>
+            <Select value={area} onValueChange={setArea}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All areas</SelectItem>
+                {Object.entries(AREA_LABEL).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Service code
+            </label>
+            <Input
+              value={serviceCode}
+              placeholder="e.g. S5125"
+              onChange={(e) => setServiceCode(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">From</label>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">To</label>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+        </div>
+      </div>
+
 
       {/* Summary cards */}
       <div className="grid gap-3 md:grid-cols-4">

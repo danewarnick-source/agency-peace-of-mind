@@ -294,7 +294,7 @@ function StaffDailyJournal() {
           No HHS clients currently assigned to your caseload. Please contact an Administrator.
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3">
           {hhsClients.map((c) => {
             if (!allowedIds.has(c.id)) return null;
             const todayStr = new Date().toISOString().split("T")[0];
@@ -305,13 +305,15 @@ function StaffDailyJournal() {
               <button
                 key={c.id}
                 onClick={() => setActiveClient(c)}
-                className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+                className="group flex w-full min-w-0 items-start gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
               >
                 <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <User className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{c.first_name} {c.last_name}</p>
+                  <p className="break-words font-medium leading-tight">
+                    {c.first_name} {c.last_name}
+                  </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {c.pcsp_goals?.length ?? 0} PCSP goal{(c.pcsp_goals?.length ?? 0) === 1 ? "" : "s"}
                   </p>
@@ -320,7 +322,7 @@ function StaffDailyJournal() {
                       <CheckCircle2 className="h-3 w-3" /> Today's log submitted
                     </p>
                   ) : (
-                    <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition group-hover:opacity-100">
+                    <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary">
                       <ClipboardCheck className="h-3 w-3" /> Open daily journal
                     </p>
                   )}

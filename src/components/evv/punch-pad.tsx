@@ -341,6 +341,47 @@ export function PunchPad({
   const active = activeQuery.data ?? null;
   const activeMatchesThisPad = active && (!lockedClient || active.client_id === lockedClient.id);
 
+  // ── Approved locations (per-client allowlist for variance flagging) ─────────
+  // EVV still records actual GPS for every clock-in; this only suppresses the
+  // variance prompt when staff is at a pre-approved community site and notes
+  // which approved location matched on the EVV record.
+  type ApprovedLoc = {
+    id: string;
+    label: string;
+    latitude: number;
+    longitude: number;
+    geofence_radius_feet: number;
+  };
+  const approvedClientId = lockedClient?.id ?? selectedClientId ?? active?.client_id ?? null;
+  const approvedLocsQuery = useQuery({
+    enabled: !!approvedClientId,
+    queryKey: ["client-approved-locations", approvedClientId],
+    queryFn: async (): Promise<ApprovedLoc[]> => {
+      const { data, error } = await supabase
+        .from("client_approved_locations")
+        .select("id, label, latitude, longitude, geofence_radius_feet")
+        .eq("client_id", approvedClientId!);
+      if (error) throw error;
+      return (data ?? []).map((r) => ({
+        id: r.id as string,
+        label: r.label as string,
+        latitude: Number(r.latitude),
+        longitude: Number(r.longitude),
+        geofence_radius_feet: Number(r.geofence_radius_feet),
+      }));
+    },
+  });
+  const approvedLocs = approvedLocsQuery.data ?? [];
+
+  function matchApprovedLocation(pos: { lat: number; lng: number }): ApprovedLoc | null {
+    for (const loc of approvedLocs) {
+      if (!isFinite(loc.latitude) || !isFinite(loc.longitude)) continue;
+      const d = haversineFeet({ lat: loc.latitude, lng: loc.longitude }, pos);
+      if (d <= loc.geofence_radius_feet) return loc;
+    }
+    return null;
+  }
+
   // Live elapsed timer
   useEffect(() => {
     if (!activeMatchesThisPad) return;
@@ -411,6 +452,9 @@ export function PunchPad({
       return { text: "📍 GPS confirmed. Select a service code above.", color: "neutral" as const };
     if (!isEvvLockedCode(serviceCode))
       return { text: `🛈 ${serviceCode} — GPS logged passively, geofence not enforced for this code.`, color: "neutral" as const };
+    const matchedHere = livePos ? matchApprovedLocation({ lat: livePos.lat, lng: livePos.lng }) : null;
+    if (matchedHere)
+      return { text: `🟢 GPS confirmed — inside approved location "${matchedHere.label}". No variance required.`, color: "green" as const };
     if (insideZone)
       return { text: `🟢 GPS confirmed — you are within the ${mapRadiusFeet} ft compliance zone.`, color: "green" as const };
     return { text: `🔴 Outside the ${mapRadiusFeet} ft zone — a written variance will be required when you clock in.`, color: "red" as const };
@@ -434,6 +478,9 @@ export function PunchPad({
     if (!user || !org || !clientForPunch) return;
     const nowIso = new Date().toISOString();
     const isOutOfBounds = !!args.outsideReason;
+    const matched = args.pos
+      ? matchApprovedLocation({ lat: args.pos.lat, lng: args.pos.lng })
+      : null;
 
     const payload = {
       organization_id:             org.organization_id,
@@ -454,6 +501,8 @@ export function PunchPad({
       geofence_variance_justification: args.outsideReason ?? null,
       raw_clock_in:                    nowIso,
       rounded_clock_in:                roundToQuarterHourISO(nowIso),
+      matched_approved_location_id:    matched?.id ?? null,
+      matched_approved_location_label: matched?.label ?? null,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -498,8 +547,10 @@ export function PunchPad({
         isFinite(homeCoords.lat) &&
         isFinite(homeCoords.lng)
       ) {
+        // Approved locations skip the variance prompt — actual GPS still captured.
+        const matched = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
         const dist = haversineFeet(homeCoords, { lat: pos.lat, lng: pos.lng });
-        if (dist > mapRadiusFeet) {
+        if (!matched && dist > mapRadiusFeet) {
           setVariance({ distanceFeet: Math.round(dist), limitFeet: mapRadiusFeet, pos });
           setVarianceReason("");
           return;
@@ -1059,8 +1110,10 @@ export function PunchPad({
         typeof lat === "number" && typeof lng === "number" &&
         isFinite(lat) && isFinite(lng)
       ) {
+        // Approved locations suppress the variance prompt on clock-out too.
+        const matchedOut = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
         const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
-        if (dist > radius) {
+        if (!matchedOut && dist > radius) {
           setOutVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });
           setOutVarianceReason("");
           return;

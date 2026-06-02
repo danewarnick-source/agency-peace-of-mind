@@ -827,6 +827,99 @@ export type Database = {
           },
         ]
       }
+      client_approved_location_audit: {
+        Row: {
+          action: string
+          actor_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          location_id: string | null
+          organization_id: string
+          snapshot: Json
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          location_id?: string | null
+          organization_id: string
+          snapshot: Json
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          location_id?: string | null
+          organization_id?: string
+          snapshot?: Json
+        }
+        Relationships: []
+      }
+      client_approved_locations: {
+        Row: {
+          address: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          geofence_radius_feet: number
+          id: string
+          label: string
+          latitude: number
+          longitude: number
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          address?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          geofence_radius_feet?: number
+          id?: string
+          label: string
+          latitude: number
+          longitude: number
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          address?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          geofence_radius_feet?: number
+          id?: string
+          label?: string
+          latitude?: number
+          longitude?: number
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_approved_locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_approved_locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_belongings: {
         Row: {
           client_id: string
@@ -1797,6 +1890,8 @@ export type Database = {
           is_edited_by_admin: boolean
           is_out_of_bounds: boolean
           late_submission_reason: string | null
+          matched_approved_location_id: string | null
+          matched_approved_location_label: string | null
           nectar_drafted: boolean
           nectar_drafted_confirmed_at: string | null
           nectar_drafted_confirmed_by: string | null
@@ -1846,6 +1941,8 @@ export type Database = {
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
           late_submission_reason?: string | null
+          matched_approved_location_id?: string | null
+          matched_approved_location_label?: string | null
           nectar_drafted?: boolean
           nectar_drafted_confirmed_at?: string | null
           nectar_drafted_confirmed_by?: string | null
@@ -1895,6 +1992,8 @@ export type Database = {
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
           late_submission_reason?: string | null
+          matched_approved_location_id?: string | null
+          matched_approved_location_label?: string | null
           nectar_drafted?: boolean
           nectar_drafted_confirmed_at?: string | null
           nectar_drafted_confirmed_by?: string | null
@@ -1924,6 +2023,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evv_timesheets_matched_approved_location_id_fkey"
+            columns: ["matched_approved_location_id"]
+            isOneToOne: false
+            referencedRelation: "client_approved_locations"
             referencedColumns: ["id"]
           },
           {

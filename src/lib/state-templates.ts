@@ -59,6 +59,17 @@ export interface StateRequiredDocsSection {
   docs: StateRequiredDoc[];
 }
 
+export interface StateForm {
+  slug: string;
+  name: string;
+  cadence: string;
+  submission: string;
+  produced_by: string;
+}
+export interface StateFormsSection {
+  forms: StateForm[];
+}
+
 export interface StateDepartmentStructure {
   agency_types: string[];
   program_levels: string[];
@@ -74,6 +85,7 @@ export interface StateTemplate {
   evv: StateEvvSection;
   required_documents: StateRequiredDocsSection;
   department_structure: StateDepartmentStructure;
+  forms: StateFormsSection;
   draft: Record<string, unknown>;
   published_at: string | null;
   published_by: string | null;
@@ -101,6 +113,7 @@ export const FALLBACK_TEMPLATE: Omit<StateTemplate, "id" | "state_code" | "updat
   },
   required_documents: { docs: [] },
   department_structure: { agency_types: [], program_levels: [] },
+  forms: { forms: [] },
   draft: {},
   published_at: null,
   published_by: null,
@@ -108,10 +121,12 @@ export const FALLBACK_TEMPLATE: Omit<StateTemplate, "id" | "state_code" | "updat
 
 export const TEMPLATE_SECTIONS = [
   { key: "terminology", label: "Terminology" },
+  { key: "billing_codes", label: "Service & Billing Codes" },
+  { key: "forms", label: "State Forms" },
   { key: "training", label: "Training Mandates" },
-  { key: "billing_codes", label: "Billing & Service Codes" },
-  { key: "evv", label: "EVV Specifics" },
+  { key: "evv", label: "EVV Configuration" },
   { key: "required_documents", label: "Required Documents" },
   { key: "department_structure", label: "Department Structure" },
 ] as const;
 export type TemplateSectionKey = (typeof TEMPLATE_SECTIONS)[number]["key"];
+

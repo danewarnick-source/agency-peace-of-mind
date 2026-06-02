@@ -1,0 +1,237 @@
+import { useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Send, Loader2, Shield, AlertTriangle } from "lucide-react";
+import {
+  askNectarStaff,
+  type NectarStaffReply,
+} from "@/lib/nectar-staff.functions";
+import {
+  NectarMark,
+  NectarBadge,
+  NectarButton,
+} from "@/components/nectar/nectar-brand";
+import { NectarAnswer } from "@/components/nectar/nectar-answer";
+
+interface ChatMsg {
+  id: string;
+  role: "user" | "nectar";
+  text: string;
+  reply?: NectarStaffReply;
+}
+
+const STARTERS = [
+  "What are my client's PCSP goals today?",
+  "Walk me through the reimbursement process.",
+  "What's the medication procedure for a missed dose?",
+  "How many hours have I worked this period?",
+];
+
+export interface AskNectarStaffProps {
+  /** Pre-fill a focused client (only used if the staff is actually assigned). */
+  clientId?: string;
+  /** Compact heading variant for embedding into sheets. */
+  compact?: boolean;
+}
+
+/**
+ * Mobile-friendly scoped NECTAR chat for staff.
+ *
+ * Server-side scope enforcement lives in `askNectarStaff` — this component
+ * just renders the conversation. No DB persistence: each session is in
+ * React state only.
+ */
+export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProps) {
+  const ask = useServerFn(askNectarStaff);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: async (question: string) =>
+      ask({ data: { question, clientId } }),
+    onSuccess: (reply) => {
+      setMessages((m) => [
+        ...m,
+        {
+          id: crypto.randomUUID(),
+          role: "nectar",
+          text: reply.answer,
+          reply,
+        },
+      ]);
+    },
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : "Something went wrong.";
+      setMessages((m) => [
+        ...m,
+        { id: crypto.randomUUID(), role: "nectar", text: msg },
+      ]);
+    },
+  });
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, mutation.isPending]);
+
+  const send = (q: string) => {
+    const text = q.trim();
+    if (!text || mutation.isPending) return;
+    setMessages((m) => [
+      ...m,
+      { id: crypto.randomUUID(), role: "user", text },
+    ]);
+    setInput("");
+    mutation.mutate(text);
+    requestAnimationFrame(() => taRef.current?.focus());
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-3 border-b border-border bg-[#0d112b] px-4 py-3 text-white">
+        <NectarMark size={compact ? "sm" : "md"} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <NectarBadge size="xs" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]/90">
+              Staff assistant
+            </span>
+          </div>
+          <h2 className="mt-0.5 truncate font-display text-base font-bold tracking-tight">
+            Ask NECTAR · Staff
+          </h2>
+        </div>
+      </div>
+
+      {/* PHI disclosure (one-time per render) */}
+      {messages.length === 0 && (
+        <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-[#f4a93a]/30 bg-[#fff7ed] px-3 py-2 text-[12px] leading-snug text-[#7a4a0a]">
+          <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Client information shown here is for the people on your caseload.
+            Treat it as confidential PHI.
+          </span>
+        </div>
+      )}
+
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 min-h-0 space-y-3 overflow-y-auto px-4 py-4">
+        {messages.length === 0 && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              I help with company policies, training you've received, your job
+              duties, your own pay, and the people on your caseload — their
+              goals, safety needs, and medications.
+            </p>
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Try asking
+              </p>
+              {STARTERS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => send(s)}
+                  className="block min-h-[44px] w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground transition hover:border-[#f4a93a]/50 hover:bg-[#fff7ed] active:scale-[0.99]"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((m) =>
+          m.role === "user" ? (
+            <div key={m.id} className="flex justify-end">
+              <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[#0d112b] px-3.5 py-2 text-sm text-white shadow-sm">
+                {m.text}
+              </div>
+            </div>
+          ) : (
+            <div key={m.id} className="flex gap-2">
+              <NectarMark size="sm" className="mt-0.5" />
+              <div className="max-w-[85%] flex-1 rounded-2xl rounded-tl-sm border border-border bg-card px-3.5 py-2.5 shadow-sm">
+                {m.reply?.refused && (
+                  <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9a3412]">
+                    <AlertTriangle className="h-3 w-3" />
+                    Out of scope
+                  </div>
+                )}
+                <NectarAnswer text={m.text} />
+                {m.reply && m.reply.citations.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {m.reply.citations.map((c, i) => (
+                      <span
+                        key={`${c.type}-${c.id}-${i}`}
+                        className="inline-flex items-center rounded border border-[#fed7aa] bg-[#fff7ed] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#9a3412]"
+                        title={c.title}
+                      >
+                        {c.type === "pcsp"
+                          ? "PCSP"
+                          : c.type === "medication"
+                          ? "Med"
+                          : c.type}
+                        {" · "}
+                        {c.title.length > 28 ? c.title.slice(0, 26) + "…" : c.title}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ),
+        )}
+
+        {mutation.isPending && (
+          <div className="flex gap-2">
+            <NectarMark size="sm" className="mt-0.5" />
+            <div className="rounded-2xl rounded-tl-sm border border-border bg-card px-3.5 py-2 text-sm text-muted-foreground shadow-sm">
+              <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />
+              Thinking…
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Composer */}
+      <div className="border-t border-border bg-background p-3" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            send(input);
+          }}
+          className="flex items-end gap-2"
+        >
+          <textarea
+            ref={taRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send(input);
+              }
+            }}
+            placeholder="Ask about your job, your clients, or a policy…"
+            rows={1}
+            className="min-h-[44px] max-h-32 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f4a93a]/40"
+            disabled={mutation.isPending}
+          />
+          <NectarButton
+            type="submit"
+            variant="amber"
+            loading={mutation.isPending}
+            icon={<Send className="h-4 w-4" />}
+            disabled={!input.trim() || mutation.isPending}
+            className="h-11 min-w-[44px]"
+          >
+            <span className="sr-only">Send</span>
+          </NectarButton>
+        </form>
+      </div>
+    </div>
+  );
+}

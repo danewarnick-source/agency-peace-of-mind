@@ -2591,8 +2591,8 @@ function ApplicabilityPanel({
               Ask NECTAR to propose
             </Button>
 
-            <div className="flex items-end gap-1.5">
-              <div>
+            <div className="flex flex-wrap items-end gap-1.5">
+              <div className="min-w-0">
                 <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Add scope
                 </Label>
@@ -2600,7 +2600,7 @@ function ApplicabilityPanel({
                   value={addKind}
                   onValueChange={(v) => setAddKind(v as MappingRow["scope_kind"])}
                 >
-                  <SelectTrigger className="h-8 w-[140px] text-[11px]">
+                  <SelectTrigger className="h-8 w-full min-w-0 text-[11px] sm:w-[140px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -2616,9 +2616,10 @@ function ApplicabilityPanel({
                   value={addValue}
                   onChange={(e) => setAddValue(e.target.value)}
                   placeholder={addKind === "code" ? "HHS" : "RN"}
-                  className="h-8 w-24 text-[11px]"
+                  className="h-8 w-full min-w-0 text-[11px] sm:w-24"
                 />
               )}
+
               <Button
                 size="sm"
                 className="h-8 text-[11px]"

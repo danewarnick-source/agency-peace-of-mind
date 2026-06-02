@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, Clock, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -36,8 +36,8 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/timeclock", label: "General Time Clock", icon: Clock },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
+  { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
-  { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
 ];
 
 const ADMIN_NAV: NavItem[] = [

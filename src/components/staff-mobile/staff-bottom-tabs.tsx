@@ -1,11 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Clock, ClipboardCheck, GraduationCap } from "lucide-react";
+import { LayoutDashboard, Clock, ClipboardCheck, GraduationCap, Sparkles } from "lucide-react";
 import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
 
 const TABS = [
   { to: "/dashboard", label: "Caseload", icon: LayoutDashboard, exact: true, code: "caseload" },
   { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock, exact: false, code: "timeclock" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck, exact: false, code: "logs" },
+  { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, exact: false, code: "nectar" },
   { to: "/dashboard/courses", label: "Trainings", icon: GraduationCap, exact: false, code: "courses" },
 ] as const;
 

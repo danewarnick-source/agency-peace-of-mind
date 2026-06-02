@@ -61,6 +61,7 @@ import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing
 import { Route as DashboardAuthoritativeSourcesRouteImport } from './routes/dashboard.authoritative-sources'
 import { Route as DashboardAuditRouteImport } from './routes/dashboard.audit'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
+import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-nectar'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardHiveExecIndexRouteImport } from './routes/dashboard.hive-exec.index'
@@ -358,6 +359,11 @@ const DashboardAssignmentsRoute = DashboardAssignmentsRouteImport.update({
   path: '/assignments',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardAskNectarRoute = DashboardAskNectarRouteImport.update({
+  id: '/ask-nectar',
+  path: '/ask-nectar',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const CertificateCodeRoute = CertificateCodeRouteImport.update({
   id: '/certificate/$code',
   path: '/certificate/$code',
@@ -546,6 +552,7 @@ export interface FileRoutesByFullPath {
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
+  '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
   '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
@@ -630,6 +637,7 @@ export interface FileRoutesByTo {
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
+  '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
   '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
@@ -714,6 +722,7 @@ export interface FileRoutesById {
   '/super-admin': typeof SuperAdminRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
+  '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
   '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
@@ -801,6 +810,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/unauthorized'
     | '/certificate/$code'
+    | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
     | '/dashboard/audit'
     | '/dashboard/authoritative-sources'
@@ -885,6 +895,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/unauthorized'
     | '/certificate/$code'
+    | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
     | '/dashboard/audit'
     | '/dashboard/authoritative-sources'
@@ -968,6 +979,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/unauthorized'
     | '/certificate/$code'
+    | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
     | '/dashboard/audit'
     | '/dashboard/authoritative-sources'
@@ -1425,6 +1437,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAssignmentsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/ask-nectar': {
+      id: '/dashboard/ask-nectar'
+      path: '/ask-nectar'
+      fullPath: '/dashboard/ask-nectar'
+      preLoaderRoute: typeof DashboardAskNectarRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/certificate/$code': {
       id: '/certificate/$code'
       path: '/certificate/$code'
@@ -1745,6 +1764,7 @@ const DashboardCoursesCourseIdRouteWithChildren =
   )
 
 interface DashboardRouteChildren {
+  DashboardAskNectarRoute: typeof DashboardAskNectarRoute
   DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
   DashboardAuditRoute: typeof DashboardAuditRoute
   DashboardAuthoritativeSourcesRoute: typeof DashboardAuthoritativeSourcesRoute
@@ -1792,6 +1812,7 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardAskNectarRoute: DashboardAskNectarRoute,
   DashboardAssignmentsRoute: DashboardAssignmentsRoute,
   DashboardAuditRoute: DashboardAuditRoute,
   DashboardAuthoritativeSourcesRoute: DashboardAuthoritativeSourcesRoute,
@@ -1866,13 +1887,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

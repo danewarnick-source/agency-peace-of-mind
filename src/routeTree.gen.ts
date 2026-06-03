@@ -47,6 +47,7 @@ import { Route as DashboardInternalAuditRouteImport } from './routes/dashboard.i
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
 import { Route as DashboardHiveExecRouteImport } from './routes/dashboard.hive-exec'
 import { Route as DashboardHelpRouteImport } from './routes/dashboard.help'
+import { Route as DashboardFinancialRouteImport } from './routes/dashboard.financial'
 import { Route as DashboardExternalComplianceRouteImport } from './routes/dashboard.external-compliance'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
@@ -288,6 +289,11 @@ const DashboardHiveExecRoute = DashboardHiveExecRouteImport.update({
 const DashboardHelpRoute = DashboardHelpRouteImport.update({
   id: '/help',
   path: '/help',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardFinancialRoute = DashboardFinancialRouteImport.update({
+  id: '/financial',
+  path: '/financial',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardExternalComplianceRoute =
@@ -601,6 +607,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
+  '/dashboard/financial': typeof DashboardFinancialRoute
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -690,6 +697,7 @@ export interface FileRoutesByTo {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
+  '/dashboard/financial': typeof DashboardFinancialRoute
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
@@ -781,6 +789,7 @@ export interface FileRoutesById {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
+  '/dashboard/financial': typeof DashboardFinancialRoute
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -874,6 +883,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
+    | '/dashboard/financial'
     | '/dashboard/help'
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
@@ -963,6 +973,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
+    | '/dashboard/financial'
     | '/dashboard/help'
     | '/dashboard/host-home-control'
     | '/dashboard/internal-audit'
@@ -1053,6 +1064,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
+    | '/dashboard/financial'
     | '/dashboard/help'
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
@@ -1400,6 +1412,13 @@ declare module '@tanstack/react-router' {
       path: '/help'
       fullPath: '/dashboard/help'
       preLoaderRoute: typeof DashboardHelpRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/financial': {
+      id: '/dashboard/financial'
+      path: '/financial'
+      fullPath: '/dashboard/financial'
+      preLoaderRoute: typeof DashboardFinancialRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/external-compliance': {
@@ -1912,6 +1931,7 @@ interface DashboardRouteChildren {
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardExternalComplianceRoute: typeof DashboardExternalComplianceRoute
+  DashboardFinancialRoute: typeof DashboardFinancialRoute
   DashboardHelpRoute: typeof DashboardHelpRoute
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
@@ -1961,6 +1981,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardExternalComplianceRoute: DashboardExternalComplianceRoute,
+  DashboardFinancialRoute: DashboardFinancialRoute,
   DashboardHelpRoute: DashboardHelpRoute,
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,

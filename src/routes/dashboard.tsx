@@ -304,7 +304,7 @@ function DashboardLayout() {
             </div>
           </header>
           <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
-          {!isHiveExecView && !isStatePreview && <DemoOrgBanner org={org} isLoading={orgLoading} />}
+          {!isHiveExecView && !isStatePreview && <DemoOrgBanner />}
 
           {isStatePreview && (
             <div className="flex items-center justify-between gap-3 border-b border-[#f4a93a]/30 bg-[#f4a93a]/[0.08] px-4 py-2 text-xs md:px-6">

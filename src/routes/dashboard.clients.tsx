@@ -123,9 +123,9 @@ const DOCUMENT_TYPES = [
   "Other",
 ];
 
-const FEATURE_TOGGLES: { key: string; label: string; description: string }[] = [
+const FEATURE_TOGGLES: { key: string; label: string; description: string; wired?: boolean }[] = [
+  { key: "emar",          label: "MAR / eMAR",     description: "Electronic medication administration records", wired: true },
   { key: "daily_notes",   label: "Daily Notes",    description: "Staff daily progress note submission" },
-  { key: "emar",          label: "MAR / eMAR",     description: "Electronic medication administration records" },
   { key: "attendance",    label: "Attendance",     description: "Monthly attendance tracking" },
   { key: "trust_ledger",  label: "Trust Ledger",   description: "PBA financial trust account tracking" },
   { key: "incident_forms",label: "Incident Forms", description: "Critical event and incident reporting" },

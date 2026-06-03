@@ -158,6 +158,7 @@ export const searchTimesheetsByVector = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateSearch)
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");
     const route = await routeQueryWithLLM(data.query);
 
     let vecLiteral: string | null = null;

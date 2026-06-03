@@ -651,12 +651,7 @@ function EmployeesPage() {
                 entityKind="employee"
                 entityId={editingMember.userId}
               />
-              {org?.organization_id && (
-                <StaffHrChecklistCard
-                  organizationId={org.organization_id}
-                  staffId={editingMember.userId}
-                />
-              )}
+              {/* HR checklist + PII live on the staff profile page (HR tab). */}
               <LifecyclePanel
                 kind="employee"
                 id={editingMember.userId}

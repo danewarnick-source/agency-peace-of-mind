@@ -314,7 +314,7 @@ function UploadButton({
   orgId: string | undefined;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUploaded: () => void;
+  onUploaded: (docId?: string) => void;
 }) {
   const ingest = useServerFn(ingestDocument);
   const [title, setTitle] = useState("");
@@ -350,10 +350,12 @@ function UploadButton({
       );
       setTitle(""); setFile(null); setFiscalYear(""); setMedicaidId("");
       onOpenChange(false);
-      onUploaded();
+      const docId = (res as { document?: { id?: string } }).document?.id;
+      onUploaded(docId);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

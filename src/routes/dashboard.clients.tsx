@@ -94,6 +94,7 @@ type ClientDocument = {
   file_name: string;
   document_type: string;
   file_url: string;
+  storage_path: string | null;
   uploaded_at: string;
   uploaded_by_name: string | null;
   file_size_bytes: number | null;
@@ -1246,7 +1247,7 @@ function DocumentsTab({ clientId, orgId }: { clientId: string; orgId: string }) 
     queryFn: async (): Promise<ClientDocument[]> => {
       const { data, error } = await (supabase as any)
         .from("client_documents")
-        .select("id, file_name, document_type, file_url, uploaded_at, uploaded_by_name, file_size_bytes")
+        .select("id, file_name, document_type, file_url, storage_path, uploaded_at, uploaded_by_name, file_size_bytes")
         .eq("client_id", clientId)
         .order("uploaded_at", { ascending: false });
       if (error) {
@@ -1271,9 +1272,9 @@ function DocumentsTab({ clientId, orgId }: { clientId: string; orgId: string }) 
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from("client-documents")
-        .getPublicUrl(path);
+      // Bucket is private + org-scoped; keep a stable reference but the UI
+      // resolves a short-lived signed URL on demand via storage_path.
+      const fileUrlRef = `storage://client-documents/${path}`;
 
       // Insert record
       const { error: insertError } = await (supabase as any)
@@ -1283,7 +1284,7 @@ function DocumentsTab({ clientId, orgId }: { clientId: string; orgId: string }) 
           organization_id:   orgId,
           file_name:         file.name,
           document_type:     docType,
-          file_url:          urlData.publicUrl,
+          file_url:          fileUrlRef,
           storage_path:      path,
           file_size_bytes:   file.size,
           uploaded_by_name:  null,
@@ -1418,11 +1419,31 @@ function DocumentsTab({ clientId, orgId }: { clientId: string; orgId: string }) 
               {docs.map((doc) => (
                 <TableRow key={doc.id}>
                   <TableCell>
-                    <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 font-medium text-primary hover:underline">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          if (doc.storage_path) {
+                            const { data, error } = await supabase.storage
+                              .from("client-documents")
+                              .createSignedUrl(doc.storage_path, 60 * 10);
+                            if (error) throw error;
+                            window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+                          } else if (doc.file_url && /^https?:\/\//.test(doc.file_url)) {
+                            // Legacy public URL fallback (will only work if RLS allows)
+                            window.open(doc.file_url, "_blank", "noopener,noreferrer");
+                          } else {
+                            toast.error("This document is missing a storage path.");
+                          }
+                        } catch (e: any) {
+                          toast.error(e?.message ?? "Could not open document.");
+                        }
+                      }}
+                      className="flex items-center gap-1.5 font-medium text-primary hover:underline"
+                    >
                       <FileText className="h-3.5 w-3.5 shrink-0" />
                       {doc.file_name}
-                    </a>
+                    </button>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-[10px]">{doc.document_type}</Badge>

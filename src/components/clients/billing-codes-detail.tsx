@@ -179,7 +179,9 @@ function BudgetUploadButton({ clientId }: { clientId: string }) {
         .upload(path, file, { upsert: false });
       if (upErr) throw upErr;
 
-      const { data: urlData } = supabase.storage.from("client-documents").getPublicUrl(path);
+      // Bucket is private + org-scoped; store a stable reference and use
+      // signed URLs at read time.
+      const fileUrlRef = `storage://client-documents/${path}`;
       const { data: insertData, error: insErr } = await (supabase as any)
         .from("client_documents")
         .insert({
@@ -187,7 +189,7 @@ function BudgetUploadButton({ clientId }: { clientId: string }) {
           organization_id: org.organization_id,
           file_name: file.name,
           document_type: docType,
-          file_url: urlData.publicUrl,
+          file_url: fileUrlRef,
           storage_path: path,
           file_size_bytes: file.size,
         })

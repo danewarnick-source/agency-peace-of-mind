@@ -360,6 +360,19 @@ export const markIncidentFiled = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Resolve the incident's org so we can verify caller membership before mutating.
+    const { data: incident, error: lookupErr } = await supabase
+      .from("hhs_incident_reports" as never)
+      .select("organization_id")
+      .eq("id", data.incidentId)
+      .maybeSingle();
+    if (lookupErr || !incident) throw new Error("Incident not found");
+    await requireOrgMembership(
+      supabase,
+      userId,
+      (incident as { organization_id: string }).organization_id,
+      "employee",
+    );
     const { error } = await supabase
       .from("hhs_incident_reports" as never)
       .update({

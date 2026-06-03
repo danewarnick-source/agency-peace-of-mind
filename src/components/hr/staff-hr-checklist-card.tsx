@@ -348,16 +348,22 @@ export function StaffHrChecklistCard({
                                   row.category ?? "checklist_evidence",
                                 );
                                 if (docId) {
+                                  // PREFILL ONLY — never auto-mark complete.
+                                  // Attach the evidence + move to in_progress;
+                                  // a human must click "complete" in the
+                                  // status dropdown to attest completion.
                                   await upsertFn({
                                     data: {
                                       organization_id: organizationId,
                                       staff_id: staffId,
                                       requirement_id: row.requirement_id,
-                                      status: "complete",
-                                      completed_date: new Date().toISOString().slice(0, 10),
+                                      status: "in_progress",
                                       evidence_document_id: docId,
                                     },
                                   });
+                                  toast.message(
+                                    "Evidence attached — confirm to mark complete",
+                                  );
                                   invalidate();
                                 }
                                 e.target.value = "";

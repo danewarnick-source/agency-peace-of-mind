@@ -66,7 +66,7 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
 
   const mutation = useMutation({
     mutationFn: async (question: string) =>
-      ask({ data: { question, clientId } }),
+      ask({ data: { question, clientId, organizationId: organizationId ?? "" } }),
     onSuccess: (reply) => {
       setMessages((m) => [
         ...m,

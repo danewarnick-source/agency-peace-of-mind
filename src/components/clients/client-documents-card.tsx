@@ -36,6 +36,7 @@ import {
   queryDocuments,
   deleteDocument,
 } from "@/lib/nectar-documents.functions";
+import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
 
 const CLIENT_DOC_TYPES = [
   { value: "pcsp", label: "PCSP" },
@@ -242,7 +243,7 @@ function UploadDocDialog({
   clientName: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUploaded: () => void;
+  onUploaded: (docId?: string) => void;
 }) {
   const ingest = useServerFn(ingestDocument);
   const [title, setTitle] = useState("");

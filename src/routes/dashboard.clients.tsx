@@ -526,17 +526,19 @@ function ClientWorkspace({
           <StaffAssignmentTab clientId={client.id} orgId={orgId} />
         </TabsContent>
 
-        {/* ── MEDICATIONS TAB ── */}
-        <TabsContent value="medications" className="mt-5 space-y-4">
-          <div>
-            <h3 className="text-base font-semibold">Medications & MAR Overview</h3>
-            <p className="text-xs text-muted-foreground">
-              Active prescriptions, administration schedules, and monthly MAR calendar.
-            </p>
-          </div>
-          <MedicationsManager clientId={client.id} organizationId={orgId} />
-          <MarCalendar clientId={client.id} />
-        </TabsContent>
+        {/* ── MEDICATIONS TAB (gated by per-client eMAR feature) ── */}
+        {emarEnabled && (
+          <TabsContent value="medications" className="mt-5 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold">Medications & MAR Overview</h3>
+              <p className="text-xs text-muted-foreground">
+                Active prescriptions, administration schedules, and monthly MAR calendar.
+              </p>
+            </div>
+            <MedicationsManager clientId={client.id} organizationId={orgId} />
+            <MarCalendar clientId={client.id} />
+          </TabsContent>
+        )}
 
         {/* ── DOCUMENTS TAB ── */}
         <TabsContent value="documents" className="mt-5">

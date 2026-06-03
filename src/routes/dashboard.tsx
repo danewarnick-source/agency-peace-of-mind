@@ -244,13 +244,13 @@ function DashboardLayout() {
 
       {/* Desktop layout (md+) — unchanged. Also used on mobile for Admin View. */}
       <div
-        className={`grid flex-1 md:grid-cols-[260px_1fr] ${isStaffView && !isMobilePreview ? "hidden md:grid" : ""}`}
+        className={`grid w-full flex-1 md:grid-cols-[260px_minmax(0,1fr)] ${isStaffView && !isMobilePreview ? "hidden md:grid" : ""}`}
       >
         <aside className="hidden flex-col bg-sidebar text-sidebar-foreground md:flex">
           <SidebarBody {...sidebarProps} />
         </aside>
 
-        <div className="flex flex-col">
+        <div className="flex min-w-0 flex-col">
           <header className="flex h-16 items-center justify-between gap-2 border-b border-border bg-background px-4 md:px-6">
             <div className="flex items-center gap-2 min-w-0">
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -328,7 +328,7 @@ function DashboardLayout() {
             </div>
           )}
 
-          <main className={isMobilePreview ? "flex-1 bg-secondary/40" : "flex-1 bg-secondary/40 px-4 py-6 md:px-8"}>
+          <main className={isMobilePreview ? "min-w-0 flex-1 overflow-x-hidden bg-secondary/40" : "min-w-0 flex-1 overflow-x-hidden bg-secondary/40 px-4 py-6 md:px-8"}>
             {isStatePreview && !stateCode ? (
               <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
                 Select a state from the sidebar to load the platform configured as that state.

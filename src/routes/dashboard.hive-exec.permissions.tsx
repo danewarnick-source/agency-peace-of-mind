@@ -311,7 +311,7 @@ function AuditSection() {
         <h2 className="font-display text-lg font-semibold">HIVE Executive Audit Trail</h2>
         <Shield className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
       </div>
-      <div className="max-h-[400px] overflow-y-auto rounded-lg border border-border">
+      <div className="max-h-[400px] overflow-x-auto overflow-y-auto rounded-lg border border-border">
         <table className="w-full min-w-[700px] text-sm">
           <thead className="sticky top-0 bg-muted/50 text-left text-xs uppercase text-muted-foreground">
             <tr>

@@ -78,6 +78,10 @@ export const listLedgerEntries = createServerFn({ method: "POST" })
       .in("organization_id", orgIds)
       .eq("period_year", data.year)
       .eq("period_month", data.month)
+      // `billed_manual` is the base-tier fallback for HIVE-Verified billed
+      // revenue (see financial-revenue.functions.ts). It is rendered in the
+      // top "Billed Revenue" card, NOT in the Your Inputs ledger.
+      .neq("category", "billed_manual")
       .order("category", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);

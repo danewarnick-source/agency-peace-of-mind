@@ -101,6 +101,7 @@ function ClientWorkspace() {
 
 
   const codes = allowedHourly.length ? allowedHourly : clientCodes;
+  const { enabled: emarEnabled } = useClientFeature(client, "emar");
 
   return (
     <>

@@ -81,11 +81,14 @@ export function useCurrentOrg() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Track the active selection so re-renders happen on switch.
-  const [activeOrgId, setActiveOrgIdState] = useState<string | null>(() => readActiveOrgId());
+  // SSR-safe: initialize to null so server and first-client paint match.
+  // LocalStorage is read inside useEffect (after mount) to avoid hydration mismatch.
+  const [activeOrgId, setActiveOrgIdState] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // Hydration-safe: read persisted choice after mount.
+    setActiveOrgIdState(readActiveOrgId());
     const onStorage = (e: StorageEvent) => {
       if (e.key === ACTIVE_ORG_KEY) setActiveOrgIdState(e.newValue);
     };

@@ -19,7 +19,11 @@ type Row = {
   provider_count: number;
   template_updated_at: string | null;
   template_published_at: string | null;
+  base_template_version: number | null;
+  base_template_upgraded_at: string | null;
+  current_base_template_version: number;
 };
+
 
 function StatusChip({ status, isRef }: { status: string; isRef: boolean }) {
   const isActive = status === "active";
@@ -45,18 +49,27 @@ function StatesIndexPage() {
   return (
     <div className="space-y-4">
       <header className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
-            <MapPin className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="font-display text-lg font-semibold">States</h2>
-            <p className="text-xs text-muted-foreground">
-              State is a configuration layer. Each state inherits the platform model and is edited as a template. Utah is the reference implementation.
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
+              <MapPin className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="font-display text-lg font-semibold">States</h2>
+              <p className="text-xs text-muted-foreground">
+                State is a configuration layer. Each state inherits the platform model and is edited as a template. Utah is the reference implementation.
+              </p>
+            </div>
           </div>
+          <Link
+            to="/dashboard/hive-exec/base-template"
+            className="inline-flex min-h-[36px] items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold hover:bg-muted"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[#d97a1c]" /> Base template versions
+          </Link>
         </div>
       </header>
+
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
@@ -67,16 +80,20 @@ function StatesIndexPage() {
               <th className="px-4 py-2 text-left">Regulator</th>
               <th className="px-4 py-2 text-right">Providers</th>
               <th className="px-4 py-2 text-left">Template</th>
+              <th className="px-4 py-2 text-left">Base version</th>
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {q.isLoading ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">Loading…</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No states yet.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">No states yet.</td></tr>
             ) : rows.map((r) => {
               const hasDraft = !!r.template_updated_at;
+              const stateVer = r.base_template_version;
+              const curVer = r.current_base_template_version;
+              const outdated = stateVer != null && stateVer < curVer;
               return (
                 <tr key={r.code} className="border-t border-border">
                   <td className="px-4 py-2 font-medium">
@@ -99,6 +116,20 @@ function StatesIndexPage() {
                         ? `Draft updated ${new Date(r.template_updated_at!).toLocaleDateString()}`
                         : "No template yet"}
                   </td>
+                  <td className="px-4 py-2 text-xs">
+                    {stateVer == null ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : outdated ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-900">
+                        v{stateVer} → v{curVer} available
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-900">
+                        v{stateVer} · current
+                      </span>
+                    )}
+                  </td>
+
                   <td className="px-4 py-2 text-right">
                     <div className="inline-flex gap-1">
                       <Link

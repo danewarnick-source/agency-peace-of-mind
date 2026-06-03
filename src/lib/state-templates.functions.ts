@@ -45,8 +45,20 @@ export const listPlatformStates = createServerFn({ method: "GET" })
 
     const { data: tpls } = await supabase
       .from("state_templates")
-      .select("state_code, updated_at, published_at");
-    const tplByCode = new Map((tpls ?? []).map((t) => [t.state_code, t]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("state_code, updated_at, published_at, base_template_version, base_template_upgraded_at" as any);
+    const tplByCode = new Map(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (tpls ?? []).map((t: any) => [t.state_code, t]),
+    );
+
+    const { data: cur } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("hive_base_template_versions" as any)
+      .select("version")
+      .eq("is_current", true)
+      .maybeSingle();
+    const currentBaseVersion = ((cur ?? null) as unknown as { version?: number } | null)?.version ?? 1;
 
     const { data: orgs } = await supabase
       .from("organizations")
@@ -58,19 +70,27 @@ export const listPlatformStates = createServerFn({ method: "GET" })
       counts.set(code, (counts.get(code) ?? 0) + 1);
     }
 
-    return (states ?? []).map((s) => ({
-      code: s.code,
-      name: s.name,
-      status: s.status,
-      is_reference: s.is_reference,
-      regulator_label: s.regulator_label,
-      notes: s.notes,
-      updated_at: s.updated_at,
-      provider_count: counts.get(s.code) ?? 0,
-      template_updated_at: tplByCode.get(s.code)?.updated_at ?? null,
-      template_published_at: tplByCode.get(s.code)?.published_at ?? null,
-    }));
+    return (states ?? []).map((s) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const t = tplByCode.get(s.code) as any;
+      return {
+        code: s.code,
+        name: s.name,
+        status: s.status,
+        is_reference: s.is_reference,
+        regulator_label: s.regulator_label,
+        notes: s.notes,
+        updated_at: s.updated_at,
+        provider_count: counts.get(s.code) ?? 0,
+        template_updated_at: t?.updated_at ?? null,
+        template_published_at: t?.published_at ?? null,
+        base_template_version: (t?.base_template_version ?? null) as number | null,
+        base_template_upgraded_at: t?.base_template_upgraded_at ?? null,
+        current_base_template_version: currentBaseVersion,
+      };
+    });
   });
+
 
 export const setStateStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

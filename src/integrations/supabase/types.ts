@@ -2569,6 +2569,45 @@ export type Database = {
         }
         Relationships: []
       }
+      hive_base_template_versions: {
+        Row: {
+          changelog: Json
+          created_at: string
+          id: string
+          is_current: boolean
+          released_at: string
+          released_by: string | null
+          schema: Json
+          summary: string
+          title: string
+          version: number
+        }
+        Insert: {
+          changelog?: Json
+          created_at?: string
+          id?: string
+          is_current?: boolean
+          released_at?: string
+          released_by?: string | null
+          schema?: Json
+          summary?: string
+          title: string
+          version: number
+        }
+        Update: {
+          changelog?: Json
+          created_at?: string
+          id?: string
+          is_current?: boolean
+          released_at?: string
+          released_by?: string | null
+          schema?: Json
+          summary?: string
+          title?: string
+          version?: number
+        }
+        Relationships: []
+      }
       hive_executive_audit_log: {
         Row: {
           action: string
@@ -5068,6 +5107,8 @@ export type Database = {
       }
       state_templates: {
         Row: {
+          base_template_upgraded_at: string | null
+          base_template_version: number
           billing_codes: Json
           caps: Json
           citations: Json
@@ -5088,6 +5129,8 @@ export type Database = {
           version: number
         }
         Insert: {
+          base_template_upgraded_at?: string | null
+          base_template_version?: number
           billing_codes?: Json
           caps?: Json
           citations?: Json
@@ -5108,6 +5151,8 @@ export type Database = {
           version?: number
         }
         Update: {
+          base_template_upgraded_at?: string | null
+          base_template_version?: number
           billing_codes?: Json
           caps?: Json
           citations?: Json

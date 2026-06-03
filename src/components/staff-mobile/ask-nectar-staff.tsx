@@ -15,6 +15,7 @@ import {
 import { NectarAnswer } from "@/components/nectar/nectar-answer";
 import { useMobileShellContainer } from "./mobile-shell-context";
 import { useActiveShiftBarVisible } from "@/hooks/use-active-shift-bar";
+import { useCurrentOrg } from "@/hooks/use-org";
 
 interface ChatMsg {
   id: string;

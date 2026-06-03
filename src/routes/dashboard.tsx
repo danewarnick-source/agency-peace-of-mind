@@ -454,7 +454,13 @@ function DashboardLayout() {
                     ? "HIVE Platform · HIVE Executive"
                     : isStatePreview
                       ? `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
-                      : `${org?.organization_name ?? "Workspace"} · ${ROLE_LABEL[role]}`}
+                      : (
+                        <span className="inline-flex items-center gap-1.5">
+                          {org?.organization_name ?? "Workspace"}
+                          {org?.is_demo && <DemoBadge />}
+                          <span>· {ROLE_LABEL[role]}</span>
+                        </span>
+                      )}
 
                 </p>
               </div>

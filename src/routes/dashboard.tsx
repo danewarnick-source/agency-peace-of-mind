@@ -123,7 +123,7 @@ function DashboardLayout() {
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
-  type PV = "staff" | "admin" | "staff_mobile" | "hive_exec" | "state_preview";
+  // PV type is hoisted to module scope.
   const allowedViews: PV[] = ["staff"];
   if (isAdminCapable) { allowedViews.push("admin", "staff_mobile"); }
   if (isExecutive) { allowedViews.push("hive_exec", "state_preview"); }

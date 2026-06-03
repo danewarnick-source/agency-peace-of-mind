@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,7 @@ async function callAI(system: string, user: string): Promise<string> {
 // ─── Documentation Quality Coach ─────────────────────────────────────────────
 
 export const evaluateShiftNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateCoach)
   .handler(async ({ data }): Promise<CoachResult> => {
     const system = `You are an encouraging, professional Medicaid DSPD Documentation Coach reviewing a caregiver's end-of-shift progress note.
@@ -166,6 +168,7 @@ export interface DraftResult {
 }
 
 export const draftShiftNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateDraft)
   .handler(async ({ data }): Promise<DraftResult> => {
     const system = `You are NECTAR, a Medicaid DSPD progress-note drafting assistant for direct-support caregivers.
@@ -244,6 +247,7 @@ function validateVariance(input: unknown): VarianceDraftInput {
 export interface VarianceDraftResult { draft: string; }
 
 export const draftVarianceJustification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateVariance)
   .handler(async ({ data }): Promise<VarianceDraftResult> => {
     const system = `You are NECTAR, drafting an EVV geofence variance justification for a Medicaid DSPD caregiver.
@@ -314,6 +318,7 @@ export interface ProceduralResult {
 }
 
 export const answerProceduralQuestion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateProcedural)
   .handler(async ({ data }): Promise<ProceduralResult> => {
     const system = `You are NECTAR, a procedural assistant for Medicaid DSPD direct-support staff. The caregiver is asking a plain-language "am I allowed to…?" question mid-shift. Answer directly. Do NOT deflect with "contact your supervisor" unless the question is genuinely outside policy guidance (active emergency, suspected abuse/neglect, clinical decision).
@@ -365,6 +370,7 @@ ${data.question}
 // Returns structured JSON so the client can decide which modal to show.
 
 export const scanNoteForTriggers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateScan)
   .handler(async ({ data }): Promise<ScanResult> => {
     const system = `You are a compliance trigger scanner for a Medicaid DSPD caregiving platform. 

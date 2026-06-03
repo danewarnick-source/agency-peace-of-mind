@@ -92,6 +92,7 @@ async function callAI(system: string, user: string): Promise<string> {
 // ─── Documentation Quality Coach ─────────────────────────────────────────────
 
 export const evaluateShiftNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateCoach)
   .handler(async ({ data }): Promise<CoachResult> => {
     const system = `You are an encouraging, professional Medicaid DSPD Documentation Coach reviewing a caregiver's end-of-shift progress note.

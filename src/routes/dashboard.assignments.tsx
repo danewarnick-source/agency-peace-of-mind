@@ -53,7 +53,7 @@ function AssignmentsPage() {
       const ids = (mems ?? []).map((m) => m.user_id);
       if (!ids.length) return [] as { id: string; name: string }[];
       const { data: profs } = await supabase
-        .from("profiles")
+        .from("org_member_directory")
         .select("id, full_name, email")
         .in("id", ids);
       return (profs ?? [])

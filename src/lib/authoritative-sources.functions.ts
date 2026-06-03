@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import type { Json } from "@/integrations/supabase/types";
 import { reportPlatformEvent } from "./hive-tickets.functions";
 import { markDraftedByNectar } from "./nectar-approvals.functions";
@@ -74,6 +75,8 @@ export const ingestWebSource = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
 
     const parsedUrl = new URL(data.url);
     if (!/^https?:$/.test(parsedUrl.protocol)) {
@@ -221,7 +224,14 @@ export const markAsAuthoritativeSource = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const { data: docRow } = await supabase
+      .from("nectar_documents")
+      .select("organization_id")
+      .eq("id", data.documentId)
+      .maybeSingle();
+    if (!docRow?.organization_id) throw new Error("Document not found");
+    await requireOrgMembership(supabase, userId, docRow.organization_id as string, "manager");
     const update: {
       is_authoritative_source: boolean;
       authoritative_kind: string | null;

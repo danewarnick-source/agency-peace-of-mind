@@ -1045,6 +1045,7 @@ export const upsertAuthorizedCode = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const code = data.code.trim().toUpperCase();
     if (!code) throw new Error("Code required");
 

@@ -6,6 +6,8 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
+import { listStaffPii, updateStaffPii, type StaffPii } from "@/lib/hr-staff.functions";
+import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

@@ -157,7 +157,7 @@ export function YourInputsSection({
           year={year}
           month={month}
           onSubmit={(payload) =>
-            createM.mutateAsync({ data: { ...payload, year, month } })
+            createM.mutateAsync({ data: { ...payload, year, month, organizationId } })
           }
         />
       </header>

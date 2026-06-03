@@ -69,7 +69,7 @@ export const getOrCreateOnboardingSession = createServerFn({ method: "POST" })
       .insert({
         state_code: data.stateCode,
         created_by: userId,
-        answers: seedAnswers,
+        answers: seedAnswers as never,
       })
       .select("*")
       .single();

@@ -884,3 +884,495 @@ Per-pending-row: `Approve` / `Deny` buttons → opens `decisioning` dialog with 
 ---
 
 *End of FEATURE_INVENTORY.md — Part 1*
+
+---
+
+## 4. Server Functions
+
+All server functions use `@tanstack/react-start` `createServerFn`. Auth gate minimum is always `requireSupabaseAuth` middleware. Org-membership is a secondary runtime check via `requireOrgMembership(supabase, userId, orgId, role?)` or an RPC call.
+
+### agency-health.functions.ts
+- **`getAgencyHealthSnapshot`** — POST — input: `{ organizationId: uuid }` — reads cross-table compliance snapshot for dashboard — gate: `requireOrgMembership(..., "employee")`
+
+### ai-coach.functions.ts
+- **`evaluateShiftNote`** — POST — input: `{ note, clientGoals, shiftContext }` — sends note to AI for compliance evaluation — gate: `requireSupabaseAuth` only ⚠️ no org-membership check
+- **`draftShiftNote`** — POST — input: `{ goals, keyEvents, duration }` — AI drafts a shift note — gate: `requireSupabaseAuth` only ⚠️
+- **`draftVarianceJustification`** — POST — input: `{ context, varianceType }` — AI drafts billing variance justification — gate: `requireSupabaseAuth` only ⚠️
+- **`answerProceduralQuestion`** — POST — input: `{ question, orgContext }` — AI answers procedural compliance question — gate: `requireSupabaseAuth` only ⚠️
+- **`scanNoteForTriggers`** — POST — input: `{ note }` — scans shift note for incident/reportable triggers — gate: `requireSupabaseAuth` only ⚠️
+
+### audit-packet.functions.ts
+- **`parseAndProduceAuditPacket`** — POST — input: `{ organization_id, provider_name, letter_text, audit_letter_path?, fallback_fiscal_year? }` — AI parses audit letter, inserts audit packet + items — gate: `requireSupabaseAuth` only ⚠️ no org-membership check on write
+
+### auditor-shares.functions.ts
+- **`createAuditorShare`** — POST — input: `{ organization_id, packet_id, recipient_emails[], starts_at, ends_at, message?, share_all_items, packet_item_ids?, audit_file_ids? }` — creates timed share link for external auditors — gate: `requireSupabaseAuth` + internal `assertAdmin`
+- **`revokeAuditorShare`** — POST — input: `{ share_id }` — revokes share — gate: `requireSupabaseAuth` + `assertAdmin` (looks up org from share row)
+- **`extendAuditorShare`** — POST — input: `{ share_id, ends_at }` — extends expiry — gate: same
+- **`listMyAuditorShares`** — GET — no input — lists shares visible to current user — gate: `requireSupabaseAuth`
+- **`getAuditorShareView`** — POST — input: `{ share_id }` — returns full share payload including documents — gate: `requireSupabaseAuth`
+- **`listSharesForPacket`** — POST — input: `{ packet_id }` — lists shares for a packet — gate: `requireSupabaseAuth` ⚠️ no explicit org-membership check
+- **`listActiveSharesForOrg`** — POST — input: `{ organization_id }` — gate: `requireSupabaseAuth` ⚠️ no explicit org-membership check
+
+### authoritative-sources.functions.ts
+- **`ingestWebSource`** — POST — input: `{ organizationId, url, title, authoritativeKind, fiscalYear?, effectiveStart?, effectiveEnd?, assistedSetup? }` — fetches URL, stores as authoritative document — gate: `requireOrgMembership(..., "manager")`
+- **`listAuthoritativeSources`** — POST — input: `{ organizationId }` — gate: `requireSupabaseAuth` ⚠️ no org-membership check
+- **`markAsAuthoritativeSource`** — POST — input: `{ documentId, authoritativeKind, isAuthoritative, assistedSetup? }` — gate: `requireOrgMembership` (resolved from doc row)
+- **`setSourceIgnoreState`** — POST — input: `{ documentId, action: ignore|duplicate|reactivate, reason?, duplicateOfId? }` — gate: `requireOrgMembership` (resolved from doc row)
+- **`listRequirements`** — POST — input: `{ organizationId, origin?, category? }` — gate: `requireSupabaseAuth` ⚠️ no org-membership check
+- **`upsertRequirement`** — POST — input: `{ id?, organizationId, sourceDocumentId?, origin, requirementKey, title, description?, category?, sourceCitation?, appliesTo? }` — gate: `requireOrgMembership(..., "manager")`
+- **`deleteRequirement`** — POST — input: `{ id }` — gate: `requireOrgMembership` (resolved from row)
+- **`setRequirementReviewStatus`** — POST — gate: `requireOrgMembership` (resolved from row)
+- **`verifyRequirement`** — POST — gate: `requireOrgMembership(..., "manager")`
+- **`generateRequirementsFromSource`** — POST — AI extracts requirements from authoritative doc — gate: `requireOrgMembership(..., "manager")`
+- **`recordAttestation`** — POST — input: `{ organizationId, requirementId, ... }` — gate: `requireOrgMembership(..., "employee")`
+- **`listAttestations`** — POST — gate: `requireSupabaseAuth` ⚠️ no org-membership check
+- **`explainRequirement`** — POST — AI plain-language explanation — gate: `requireSupabaseAuth` ⚠️ no org-membership check
+
+### billing-budget-parse.functions.ts
+- **`parseClientBudgetDocument`** — POST — input: `{ storagePath, mimeType }` — downloads PDF from storage, AI parses PCSP/1056 budget rows — gate: `requireSupabaseAuth` only ⚠️ no org check; caller must own storage path
+
+### bulk-import.functions.ts
+- **`bulkImportRoster`** — POST — input: `{ organizationId, rows[] }` — bulk-inserts staff/client roster — gate: `requireSupabaseAuth` only ⚠️ no org-membership check on write
+
+### celebrations.functions.ts
+- **`fireCelebration`** — POST — input: `{ organizationId, ... }` — gate: `requireOrgMembership(..., "employee")`
+- **`listActiveCelebrations`** — POST — gate: `requireOrgMembership(..., "employee")`
+- **`acknowledgeCelebration`** — POST — gate: `requireSupabaseAuth` ⚠️ no org check
+- **`evaluateCelebrationTriggers`** — POST — gate: `requireOrgMembership(..., "manager")`
+- **`getCelebrationSettings`** — POST — gate: `requireOrgMembership(..., "employee")`
+- **`setCelebrationSettings`** — POST — gate: `requireOrgMembership(..., "admin")`
+- **`setUserCelebrationMute`** — POST — gate: `requireSupabaseAuth` only ⚠️
+
+### client-hr.functions.ts
+- **`getClientIntakeChecklist`** — GET — input: `{ organization_id, client_id }` — gate: `requireOrgMembership` + RPC `can_view_client_intake`
+- **`upsertClientIntakeCompletion`** — POST — gate: `requireOrgMembership` + RPC `can_view_client_intake`
+
+### company-overview.functions.ts
+- **`getCompanyOverview`** — POST — input: `{ organizationId }` — reads org-wide overview metrics — gate: `requireOrgMembership(..., "employee")`
+
+### employees.functions.ts
+- **`createEmployeeManually`** — POST — creates org member record — gate: `requireSupabaseAuth` ⚠️ no explicit org-membership check shown
+- **`adminResetEmployeePassword`** — POST — triggers password reset — gate: `requireSupabaseAuth` ⚠️
+
+### entitlements.functions.ts
+- **`getMyEntitlements`** — GET — no input — reads caller's org subscription/tier/addons — gate: `requireSupabaseAuth` (inherently self-scoped)
+
+### financial-revenue.functions.ts
+- **`getBilledRevenueByYear`** — POST — input: `{ organizationId, year }` — gate: `requireOrgMembership(..., "admin")`
+- **`listBilledManualEntries`** — POST — gate: `requireOrgMembership(..., "admin")`
+- **`upsertBilledManualEntry`** — POST — gate: `requireOrgMembership(..., "admin")`
+- **`deleteBilledManualEntry`** — POST — gate: `requireOrgMembership(..., "admin")`
+
+### hhs.functions.ts
+- All exported fns — POST — gate: `requireOrgMembership(..., "employee")` — reads/writes HHS daily records, EMAR logs, attendance, summaries for HHS group-home clients
+
+### hive-exec.functions.ts / hive-exec-admin.functions.ts
+- HIVE executive and platform-admin operations — gate details require further read (not fully traced)
+
+### hive-tickets.functions.ts
+- Support ticket CRUD — gate: `requireSupabaseAuth`
+
+### hr-staff.functions.ts
+- **`getStaffPii`** — GET — input: `{ organization_id, staff_id }` — gate: `requireOrgMembership` + RPC `can_view_staff_pii`; returns `ssn_last4, date_of_birth, home_address, pay_rate`
+- **`listStaffPii`** — GET — gate: same
+- **`getStaffChecklist`** — GET — gate: `requireOrgMembership` + `can_view_staff_pii`
+- **`upsertChecklistCompletion`** — POST — gate: `requireOrgMembership`
+- **`updateStaffPii`** — POST — input includes `ssn_last4, date_of_birth, home_address` — gate: `requireOrgMembership` + `can_view_staff_pii`
+- **`listHrDocuments`** — GET — gate: `requireOrgMembership`
+- **`createHrDocumentUploadUrl`** — POST — gate: `requireOrgMembership` (role not shown in grep)
+
+### lifecycle.functions.ts
+- **`archiveEntity`** — POST — input: `{ table, id, orgId }` — soft-archives any entity — gate: `requireSupabaseAuth` ⚠️ no org-membership check confirmed
+- **`deleteEntity`** — POST — hard-deletes entity — gate: `requireSupabaseAuth` ⚠️ unguarded delete
+
+### login.functions.ts
+- Login helpers — gate: `requireSupabaseAuth` or public (unauthenticated)
+
+### medications.functions.ts
+- **`parseMedicationsAI`** — POST — input: `{ text }` — AI parses medication list from free text — gate: `requireSupabaseAuth` only ⚠️
+
+### nectar-approvals.functions.ts / nectar-document-actions.functions.ts / nectar-documents.functions.ts
+- NECTAR document ingestion, approval workflow, action dispatch — gates vary; org-membership checked on most write paths
+
+### nectar-engine.functions.ts
+- **`proposeRequirementMappings`** — POST — gate: `requireOrgMembership(..., "manager")`
+- **`setRequirementMapping`** / **`deleteRequirementMapping`** — POST — gate: `requireOrgMembership(..., "manager")`
+- **`listRequirementMappings`** / **`getApplicableRequirements`** / **`getBillingReadinessForCode`** / **`listEngineGapsAsTasks`** — POST — gate: `requireSupabaseAuth` ⚠️ no org-membership check
+- **`prefillRequirementMappings`** / **`confirmRequirementWithScopes`** — POST — gate: `requireOrgMembership(..., "manager")`
+- **`listAuthorizedCodes`** — POST — gate: `requireSupabaseAuth` ⚠️
+- **`upsertAuthorizedCode`** — POST — gate: `requireOrgMembership(..., "manager")`
+
+### nectar-guide.functions.ts / nectar-help.functions.ts / nectar-reports.functions.ts / nectar-staff.functions.ts
+- NECTAR guided-mode, help, saved reports, staff Q&A — `nectar-staff.functions.ts` `askNectarStaff` gates with `requireOrgMembership(..., "employee")`
+
+### pdf-import.functions.ts
+- PDF upload/ingest — gate: `requireOrgMembership(..., "manager")`
+
+### provider-ledger.functions.ts
+- **`listLedgerEntries`** / **`createLedgerEntry`** / **`updateLedgerEntry`** / **`deleteLedgerEntry`** — POST — gate: `requireOrgMembership(..., "admin")`
+
+### saved-reports.functions.ts / state-*.functions.ts / internal-audit.functions.ts / external-compliance.functions.ts
+- State onboarding, state templates, structural gaps, internal audit — gates vary per function
+
+### team-access.functions.ts
+- **`listTeamAccess`** — GET — gate: `requireSupabaseAuth` ⚠️ no explicit org check
+- **`setMemberGrants`** — POST — gate: `requireSupabaseAuth` ⚠️
+- **`inviteTeamMember`** — POST — gate: `requireSupabaseAuth` ⚠️
+
+### vector-search.functions.ts
+- Semantic search over org documents — gate: `requireOrgMembership(..., "employee")`
+
+### ⚠️ Functions flagged as lacking org-membership checks or performing unguarded writes
+- `evaluateShiftNote`, `draftShiftNote`, `draftVarianceJustification`, `answerProceduralQuestion`, `scanNoteForTriggers` — AI coach fns; auth-only; no org gate (all purely read/generate, no DB write)
+- `parseAndProduceAuditPacket` — **writes** audit_packets rows with no org-membership verification
+- `bulkImportRoster` — **writes** staff/client rows with no org-membership verification
+- `createEmployeeManually`, `adminResetEmployeePassword` — no org gate confirmed
+- `archiveEntity`, `deleteEntity` — `lifecycle.functions.ts` performs destructive writes with only `requireSupabaseAuth`
+- `listSharesForPacket`, `listActiveSharesForOrg` — read-only but unguarded
+- `listRequirements`, `listAuthoritativeSources`, `listAttestations`, `explainRequirement` — read-only but unguarded
+- `listBillingReadinessForCode`, `listEngineGapsAsTasks`, `listAuthorizedCodes` — read-only but unguarded
+- `listTeamAccess`, `setMemberGrants`, `inviteTeamMember` — `team-access.functions.ts` performs writes with only `requireSupabaseAuth`
+
+---
+
+## 5. Database
+
+All migrations are in `supabase/migrations/` (60 files, `20260521…` through `20260603…`).
+
+### Tables
+
+#### Core identity & org
+- **`profiles`** — `id` (FK auth.users), `email`, `full_name`, `agency_name`, `tenant_id`, `system_role`, `evv_gps_consent_status` — PII: email, full_name — RLS: SELECT/UPDATE/INSERT scoped to `auth.uid() = id`
+- **`organizations`** — `id`, `name`, `slug`, `logo_url`, `created_by` — RLS: members read (`is_org_member`); admins update/delete; auth insert
+- **`organization_members`** — `id`, `organization_id`, `user_id`, `role` (app_role enum: admin/manager/employee), `job_title`, `manager_id`, `active` — RLS: members read; admins manage all; self-insert
+- **`invitations`** — `organization_id`, `email`, `role`, `token`, `status`, `expires_at` — RLS: admins manage; invitee reads own by email
+
+#### Training / LMS
+- **`training_modules`** (legacy seed table) — `title`, `description`, `duration_minutes`, `progress`, `category` — RLS: any authenticated can read
+- **`staff_certifications`** (legacy seed table) — `staff_name`, `role`, `certification`, `issued_date`, `expiration_date`, `status` — RLS: any authenticated can read (no org scoping ⚠️)
+- **`courses`** — `organization_id`, `title`, `category`, `duration_minutes`, `certificate_validity_months`, `is_published`, `is_global` — RLS: members/globals read; managers write
+- **`course_modules`** — FK courses — RLS: read via course; managers write
+- **`lessons`** — FK course_modules — RLS: read via course; managers write
+- **`course_assignments`** — `course_id`, `user_id`, `organization_id`, `due_date`, `status`, `progress` — RLS: user reads own or managers; managers assign/delete
+- **`module_progress`** / **`lesson_progress`** — per-user completion — RLS: user reads/writes own
+- **`lesson_quiz_attempts`** — quiz scores — RLS: user reads/writes own
+- **`certifications`** — `user_id`, `course_id`, `verification_code`, `recipient_name`, `expires_at` — RLS: **public (anon+auth)** can read ⚠️ (for public certificate verification)
+- **`training_programs`** / **`program_courses`** / **`program_assignments`** / **`program_acknowledgements`** — training program grouping — RLS: members read; managers write
+- **`training_tracks`** / **`track_programs`** / **`track_assignments`** — learning path assignments
+- **`certification_types`** / **`external_certifications`** — external cert tracking — RLS: org-scoped
+- **`user_training_progress`** — aggregate training progress
+
+#### Clients & shifts
+- **`clients`** — `organization_id`, `first_name`, `last_name`, `phone_number` (PHI), `physical_address` (PHI), `medicaid_id` (PHI), `date_of_birth` (PHI), `emergency_contact_name`, `emergency_contact_phone` (PHI), `pcsp_goals`, `authorized_dspd_codes`, `diagnosis` (PHI), `geofence_radius_feet`, `feature_config` JSONB — RLS: members read; managers write
+- **`shifts`** — `organization_id`, `user_id`, `client_id`, `clock_in_time`, `clock_out_time`, `clock_in_lat/long`, `clock_out_lat/long`, `outside_geofence`, `device_fingerprint`, `status` — RLS: user reads own or managers; user inserts own; managers delete
+- **`shift_notes`** — `shift_id`, `user_id`, `narrative_summary` (PHI), `goals_addressed[]` — RLS: read via shift; user inserts own
+- **`daily_logs`** — EVV daily logs with `ai_compliance_status`, `denial_reason`, `word_count`, `submitted_late`, `ai_trigger_reasons[]`
+- **`evv_timesheets`** — `staff_id`, `client_id`, `status`, `denial_reason`, `denied_by`, `submitted_late`, `ai_trigger_reasons[]`
+- **`scheduled_shifts`** / **`staff_assignments`** — scheduling tables
+- **`shift_completeness_flags`** — flags for incomplete shift data
+- **`submitted_forms`** — generic form submissions
+- **`staff_nudges`** — compliance nudge records
+- **`compliance_overrides`** — manager overrides on compliance flags
+
+#### Staff HR / PII
+- **`hr_documents`** — `organization_id`, `staff_id`, `requirement_id`, `file_path`, `file_name`, `expires_at` — RLS: `can_view_staff_pii` RPC gates all access
+- **`hr_document_access_log`** — immutable audit log of HR doc reads
+- **`staff_checklist_completion`** — per-staff checklist item tracking — RLS: `can_view_staff_pii`
+- **`role_permissions`** — org-level role permission overrides
+- **`time_pay_categories`** / **`time_pay_settings`** — payroll category configs
+
+Staff PII fields (stored on `organization_members` or a linked table per migration `20260603214316`):
+- `ssn_last4 char(4)` (PHI) — added to staff PII table
+- `date_of_birth date` (PHI)
+- `home_address text` (PHI)
+- `pay_rate numeric` (PHI)
+
+#### Medications / eMAR
+- **`client_medications`** — `client_id`, `organization_id`, `name` (PHI), `dosage`, `frequency`, `prescriber`, `start_date`, `end_date`, `instructions`
+- **`emar_logs`** — medication administration records — PHI
+- **`hhs_emar_logs`** — HHS-specific eMAR
+- **`hhs_medical_logs`** — medical observations (PHI)
+
+#### HHS group-home tables
+- **`hhs_daily_records`** — daily group-home records
+- **`hhs_monthly_attendance`** — monthly attendance summary
+- **`hhs_monthly_summaries`** — admin monthly roll-up
+- **`hhs_incident_reports`** — HHS-specific incident reports
+- **`hhs_client_inventories`** — client personal inventory
+- **`hhs_evacuation_drills`** — drill log
+- **`hhs_transfer_logs`** — client transfer records
+
+#### Financial / billing
+- **`pba_accounts`** — Personal Bank Account trust accounts per client — `medicaid_threshold`, `balance`
+- **`pba_transactions`** — PBA debit/credit records with receipt snapshots
+- **`pba_audit_samples`** — audit sample selections
+- **`els_usage_ledger`** — ELS unit tracking with DB-enforced daily cap (24 units) and annual day cap triggers
+- **`respite_stays`** — respite service records
+- **`agency_bank_accounts`** / **`agency_bank_mappings`** — agency financial accounts
+- **`billing_submissions`** / **`billing_submission_audit_log`** / **`billing_submission_warnings`** — billing export records
+- **`client_billing_codes`** — per-client authorized billing codes
+- **`provider_authorized_codes`** — org-level authorized service codes
+- **`provider_ledger_entries`** — general ledger entries (admin-only access)
+- **`client_spending_log`** / **`activity_reimbursement_requests`** — client spending/activity receipts
+
+#### Client documents & belongings
+- **`client_documents`** — uploaded client files
+- **`client_belongings`** — personal belongings inventory with DB trigger enforcing guardian-signature requirement for items ≥$50 (Section 11.3(5) compliance)
+- **`client_approved_locations`** / **`client_approved_location_audit`** — geofence-approved locations
+- **`client_intake_completion`** — per-client intake checklist completion
+
+#### Audit & compliance
+- **`audit_packets`** / **`audit_packet_items`** / **`audit_files`** / **`audit_file_documents`** — audit preparation packages
+- **`auditor_shares`** / **`auditor_share_items`** / **`auditor_share_access_log`** — time-limited external auditor access
+- **`incident_reports`** — full incident report with 24-hour state submission deadline enforced by DB trigger; fields: `incident_types[]`, `medical_attention_required`, `aps_notified`, `law_enforcement_called`, `staff_signature_url`, `ai_trigger_reasons[]`
+- **`notifications`** — org notification inbox (admin/manager only); types: `incident_report_filed`, `timesheet_exception`, `daily_log_exception`, `open_shift_warning`
+
+#### NECTAR / intelligence
+- **`nectar_documents`** / **`nectar_document_entities`** / **`nectar_extracted_fields`** — document store with AI extraction
+- **`nectar_requirements`** / **`nectar_requirement_mappings`** / **`nectar_requirement_approval_events`** — requirements engine
+- **`nectar_attestations`** — staff attestation records
+- **`nectar_guides`** / **`nectar_guide_tasks`** — guided-mode task lists
+- **`nectar_report_runs`** / **`nectar_report_schedules`** / **`nectar_saved_reports`** — reporting engine
+- **`state_derived_requirements`** / **`state_requirement_sources`** / **`state_templates`** / **`state_onboarding_sessions`** / **`state_structural_gaps`** — state compliance engine
+- **`hive_base_template_versions`** — versioned base templates
+
+#### Platform admin
+- **`provider_tenants`** — `agency_name`, `owner_email`, `client_tier_limit`, `is_active`, `feature_quickbooks_sync`, `feature_pba_bank_feed`, `feature_ai_receipt_ocr`, `feature_lms_training` — RLS: super_admins manage; owner reads own
+- **`system_features`** / **`tenant_features`** — feature flag catalog and per-tenant toggles
+- **`org_subscriptions`** — tier/subscription records
+- **`platform_states`** — platform-level state config
+- **`hive_executives`** / **`hive_executive_audit_log`** — HIVE-level exec access
+- **`org_support_tickets`** / **`hive_platform_tickets`** — support queue
+- **`celebrations`** / **`celebration_events`** / **`celebration_acknowledgements`** / **`org_celebration_settings`** / **`user_celebration_mute`** — gamification
+
+#### Custom fields
+- **`custom_field_definitions`** / **`custom_field_values`** — org-defined extra fields on any entity
+
+### RLS Summary by sensitive table
+| Table | Key policies |
+|---|---|
+| `profiles` | SELECT/UPDATE/INSERT: `auth.uid() = id` only |
+| `organizations` | SELECT: `is_org_member`; UPDATE/DELETE: `is_org_admin`; INSERT: `created_by = uid` |
+| `organization_members` | SELECT: `is_org_member`; ALL: admins; INSERT: self |
+| `clients` | SELECT: `is_org_member` or super_admin; ALL: `is_org_admin_or_manager` |
+| `client_medications` / `emar_logs` | SELECT: `is_org_member`; write: managers |
+| `hr_documents` / `staff_checklist_completion` | ALL operations: `can_view_staff_pii` RPC |
+| `incident_reports` | SELECT: org members; INSERT: self + org member; UPDATE: self or managers |
+| `certifications` | SELECT: **public (anon)** — intentional for certificate verification |
+| `staff_certifications` (legacy) | SELECT: any authenticated — **no org scoping** ⚠️ |
+| `training_modules` (legacy) | SELECT: any authenticated — **no org scoping** ⚠️ |
+| `provider_tenants` | ALL: super_admins; SELECT: owner email match |
+| `tenant_features` | ALL: super_admins; SELECT: owner via provider_tenants join |
+| `pba_accounts` / `pba_transactions` | org-scoped, managers |
+| `auditor_shares` | org-scoped via assertAdmin server-side |
+
+### SECURITY DEFINER Functions
+(`src`: `supabase/migrations/`)
+
+| Function | Args | Purpose |
+|---|---|---|
+| `handle_new_user()` | trigger | Auto-creates profile + org + admin member on auth signup |
+| `issue_certificate_on_completion()` | trigger | Auto-issues certification row when course_assignment → completed |
+| `is_org_member(_org, _user)` | uuid, uuid | RLS helper — checks active org membership |
+| `has_org_role(_org, _user, _role)` | uuid, uuid, app_role | RLS helper — checks specific role |
+| `is_org_admin_or_manager(_org, _user)` | uuid, uuid | RLS helper — admin or manager check |
+| `user_org_ids(_user)` | uuid | Returns set of org UUIDs for a user |
+| `is_super_admin(_user)` | uuid | Checks `profiles.system_role = 'super_admin'` |
+| `is_hive_executive(_user)` | uuid | Checks hive_executives table |
+| `is_company_executive(_org, _user)` | uuid, uuid | Checks company executive role |
+| `can_view_staff_pii(_org, _staff, _viewer)` | uuid×3 | Gates HR PII access; checks org role and team grants |
+| `can_view_client_intake(_org, _client, _viewer)` | uuid×3 | Gates client intake checklist access |
+| `get_staff_pii(_org, _staff)` | uuid, uuid | Returns PII row if `can_view_staff_pii` passes |
+| `list_staff_pii(_org)` | uuid | Returns filtered PII list |
+| `get_hr_client_intake_base(_org, _client)` | uuid, uuid | Returns intake checklist base |
+| `get_hr_staff_checklist_base(_org, _staff)` | uuid, uuid | Returns staff checklist base |
+| `accept_invitation(token)` | text | Consumes invite token, inserts org_member |
+| `restore_my_admin_role(_org)` | uuid | Allows org creator to restore admin role |
+| `set_company_executive` / `set_hive_executive` | — | Elevates user to exec role |
+| `generate_pba_audit_sample(_org, _period)` | — | Randomly selects PBA audit sample |
+| `clients_for_staff(_org, _staff)` | uuid, uuid | Returns clients assigned to a staff member |
+| `recalc_assignment_progress` | trigger | Recalculates course assignment progress % |
+| `hr_document_access_log_immutable` | trigger | Blocks UPDATE/DELETE on hr_document_access_log |
+| `log_approved_location_change` | trigger | Audit-logs changes to client_approved_locations |
+| `notify_incident_filed(...)` | — | Inserts critical notification on incident creation |
+| `set_incident_state_deadline` | trigger | Sets state_submission_deadline = submitted_at + 24h |
+| `touch_updated_at` | trigger | Generic updated_at updater |
+
+### Storage Buckets
+
+| Bucket | Public | Access rules |
+|---|---|---|
+| `certificates` | false | User reads/writes/deletes own folder (`uid = foldername[1]`); managers can read org certs |
+| `training-assets` | false | Any authenticated can read; any authenticated can upload/update/delete ⚠️ (no org scope) |
+| `client_receipt_snapshots` | false | Org-scoped read/write via RLS |
+| `client-documents` | false | Org-scoped; members read; managers write/delete |
+| `client-photos` | false | Org-scoped; members read; managers write/delete |
+| `audit-documents` | false | Org-scoped; members read; managers write/delete |
+| `activity-receipts` | false | Org-scoped |
+| `client-spending-receipts` | false | Org-scoped |
+| `nectar-documents` | false | Org-scoped; members read; managers write |
+| `hr-documents` | false | `can_view_staff_pii` RPC gates read; managers write |
+
+---
+
+## 6. NECTAR Capability Registry
+
+Source: `src/lib/nectar-capability-registry.ts`
+
+Detected document types: `staff_checklist`, `scope_of_work`, `insurance_certificate`, `training_certificate`, `policy_document`, `client_intake`, `unknown`
+
+### Live Actions (`is_live: true`)
+
+- **`add_to_authoritative_sources`** — label: "Add this to your authoritative sources" — `applies_to_types`: ALL types — handler: `add_to_authoritative_sources` — marks document as authoritative source for HIVE requirements engine
+- **`propose_staff_checklist`** — label: "Draft a trackable checklist from this for your review" — `applies_to_types`: `staff_checklist`, `scope_of_work` — handler: `propose_staff_checklist_from_document` — AI extracts items as pending checklist entries
+- **`per_staff_tracking`** — label: "Open per-staff tracking for items in this checklist" — `applies_to_types`: `staff_checklist` — handler: `noop` (UI-only, opens HR Admin tab)
+- **`renewal_alerts`** — label: "Set renewal reminders for dates found in this document" — `applies_to_types`: `insurance_certificate`, `training_certificate`, `staff_checklist` — handler: `noop`
+- **`client_intake_checklist`** — label: "Open per-client intake tracking for items in this document" — `applies_to_types`: `client_intake`, `scope_of_work` — handler: `noop` — **note: marked `is_live: true` in code but comment says "DORMANT"** ⚠️ inconsistency
+
+### Dormant Actions (`is_live: false`)
+
+- **`sow_requirement_mapping`** — label: "Map SOW clauses to platform requirements" — `applies_to_types`: `scope_of_work` — handler: `noop` — not shown in menu until `is_live` flips
+
+### Guardrail
+`liveActionsForType(type)` at `nectar-capability-registry.ts` (bottom of file) filters to `is_live && applies_to_types.includes(type)`. All offer UI must use this filter — no ad-hoc capability buttons permitted per file comment.
+
+---
+
+## 7. Feature Gates & Toggles
+
+### 7a. `tenant_features` keys (org-level on/off per tenant)
+
+Defined as seed data in `supabase/migrations/20260525030431`:
+
+| feature_key | category | ENFORCED / DECORATIVE |
+|---|---|---|
+| `overview` | Core | **ENFORCED** — `routeToFeatureKey("/dashboard")` returns `"overview"`; `useDisabledFeatures()` checked at route level (`src/hooks/use-tenant-features.tsx`) |
+| `time_clock` | Workforce | **DECORATIVE** — seeded but not in `routeToFeatureKey` map, no read-site found |
+| `daily_notes` | Documentation | **ENFORCED** — `routeToFeatureKey("/dashboard/daily-logs")` |
+| `scheduler` | Workforce | **DECORATIVE** — seeded, not in route map |
+| `submissions` | Documentation | **DECORATIVE** — seeded, not in route map |
+| `audit_portal` | Compliance | **DECORATIVE** — seeded, not in route map |
+| `dspd_controls` | Compliance | **ENFORCED** — `routeToFeatureKey("/dashboard/dspd-controls")` |
+| `emar_pass` | Clinical | **ENFORCED** — `routeToFeatureKey("/dashboard/emar")` |
+| `emar_audit` | Compliance | **ENFORCED** — `routeToFeatureKey("/dashboard/admin/emar-audit")` |
+| `pba_trust_ledger` | Financial | **ENFORCED** — `routeToFeatureKey("/dashboard/pba-ledger")` |
+| `employees` | Roster | **ENFORCED** — `routeToFeatureKey("/dashboard/employees")` |
+| `clients` | Roster | **ENFORCED** — `routeToFeatureKey("/dashboard/clients")` |
+| `teams_homes` | Roster | **ENFORCED** — `routeToFeatureKey("/dashboard/teams")` |
+| `ai_assistance` | Intelligence | **DECORATIVE** — seeded, not in `routeToFeatureKey` |
+
+Gate mechanism: `useDisabledFeatures()` hook (`src/hooks/use-tenant-features.tsx`) queries `tenant_features` where `is_enabled = false` and returns a `Set<FeatureKey>`. The caller (route guard) checks membership. Enforcement is client-side only — no server-fn checks `tenant_features`. ⚠️
+
+### 7b. `provider_tenants` boolean feature columns
+
+Stored in `provider_tenants` table (`supabase/migrations/20260524065945`):
+
+| Column | ENFORCED / DECORATIVE |
+|---|---|
+| `feature_quickbooks_sync` | **DECORATIVE** — column exists, no read-site found in `src/` |
+| `feature_pba_bank_feed` | **DECORATIVE** — column exists, no read-site found |
+| `feature_ai_receipt_ocr` | **DECORATIVE** — column exists, no read-site found |
+| `feature_lms_training` | **DECORATIVE** — column exists, no read-site found |
+
+### 7c. Hive-tier add-ons (`src/lib/hive-tiers.ts`)
+
+| AddonId | Tiers included | ENFORCED / DECORATIVE |
+|---|---|---|
+| `nectar_infusion` | pro, enterprise, custom | **PARTIALLY ENFORCED** — `getMyEntitlements` reads addon list; `src/lib/entitlements.server.ts` exports addon checks; UI conditionally renders NECTAR features |
+| `internal_audit` | enterprise, custom | **PARTIALLY ENFORCED** — entitlements read, used to gate Internal Audit UI |
+| `requirements_engine` | enterprise, custom | **PARTIALLY ENFORCED** — entitlements read, used to gate Requirements Engine |
+| `priority_support` | enterprise, custom | **DECORATIVE** — stored, no enforcement code found |
+
+Tier assignment is read from `org_subscriptions` table via `getMyEntitlements` (`src/lib/entitlements.functions.ts`). Payment collection is described in `hive-tiers.ts` comments as "skeletoned."
+
+### 7d. Per-client `feature_config` JSONB flags (`src/lib/client-features.ts`)
+
+| ClientFeatureKey | Tier counterpart | ENFORCED / DECORATIVE |
+|---|---|---|
+| `daily_notes` | `daily_notes` | **ENFORCED** — `isClientFeatureEnabled()` checks tier first, then `client.feature_config`; used in `src/routes/dashboard.hhs-hub.$clientId.tsx` and `src/hooks/use-caseload.tsx` |
+| `emar` | `emar_pass` | **ENFORCED** — same mechanism |
+| `trust_ledger` | `pba_trust_ledger` | **ENFORCED** — same mechanism |
+| `attendance` | none | **ENFORCED** — checked via `isClientFeatureEnabled()` with no tier gate |
+| `incident_forms` | none | **ENFORCED** — same |
+| `scheduling` | none | **ENFORCED** — same |
+
+Default is ON when `feature_config` is null or key absent. Toggle UI is in `src/routes/dashboard.clients.tsx` (FEATURE_TOGGLES array), writing `client.feature_config` via direct Supabase `.update()`.
+
+---
+
+## 8. Integrations
+
+### From `package.json` dependencies
+- **Supabase** (`@supabase/supabase-js`) — primary database, auth, storage, realtime
+- **TanStack Router + Start** — SSR framework, server functions transport
+- **TanStack React Query** — client-side data fetching/caching
+- **Radix UI** (full suite) — headless component primitives
+- **Recharts** — data visualization / charts
+- **React Hook Form** + `@hookform/resolvers` + `zod` — form validation
+- **React Leaflet** + `leaflet` — map/geofence visualization
+- **date-fns** — date manipulation
+- **papaparse** — CSV parsing (bulk import)
+- **xlsx** — Excel file parsing/export
+- **unpdf** — PDF text extraction (client-side)
+- **react-markdown** + `remark-gfm` — markdown rendering
+- **embla-carousel-react** — carousel UI
+- **input-otp** — OTP input
+- **vaul** — drawer UI
+- **sonner** — toast notifications
+- **cmdk** — command palette
+- **@lovable.dev/cloud-auth-js** — Lovable platform auth integration
+- **@cloudflare/vite-plugin** — Cloudflare Workers deployment target
+- **nitro** — server runtime
+- **Tailwind CSS** v4 + `tw-animate-css` — styling
+
+### From `src/integrations/`
+- `src/integrations/supabase/` — Supabase client, auth middleware (`requireSupabaseAuth`), org guard (`requireOrgMembership`), generated types
+
+### From `.lovable/project.json`
+- Template: `tanstack_start_ts_2026-05-12` — schemaVersion 1
+
+### External AI service
+- AI coach, requirement extraction, note evaluation, and document parsing all call an LLM via `fetch` POST (internal API route, not a named SDK) — inferred from `ai-coach.functions.ts` pattern with `method: "POST"` fetch blocks; provider not named in source
+
+### No evidence found for
+- Stripe / payment processor (tiers described as "skeletoned" in `hive-tiers.ts`)
+- QuickBooks API client (column `feature_quickbooks_sync` exists but no SDK or API call found)
+- Twilio / SMS
+- SendGrid / email provider SDK (invitations use Supabase Auth email)
+- Plaid / bank feed (column `feature_pba_bank_feed` exists but no SDK found)
+
+---
+
+## Gaps / Not Found
+
+### Missing routes for existing DB tables
+- **`billing_submissions`** / **`billing_submission_audit_log`** — tables exist, no dedicated billing-submission review route found
+- **`state_structural_gaps`** / **`state_derived_requirements`** / **`state_requirement_sources`** — tables and server fns exist, no standalone route identified
+- **`nectar_guides`** / **`nectar_guide_tasks`** — tables and guide fns exist; no `/dashboard/nectar-guide` route found in inventory
+- **`notifications`** — table exists, notification center UI not found as a dedicated route
+- **`org_support_tickets`** / **`hive_platform_tickets`** — support ticket tables exist; no customer-facing ticket detail route found
+
+### Missing CRUD for existing tables
+- **`training_tracks`** / **`track_programs`** / **`track_assignments`** — tables seeded, no UI route for track management
+- **`certification_types`** — table exists, no admin UI for managing cert types
+- **`time_pay_categories`** / **`time_pay_settings`** — payroll config tables, no route found
+- **`scheduled_shifts`** — table exists; scheduler feature key exists in `system_features` but `routeToFeatureKey` has no scheduler mapping (DECORATIVE)
+- **`program_acknowledgements`** — table exists, no acknowledgement UI route found
+
+### Dormant NECTAR registry actions with no backing flow
+- **`sow_requirement_mapping`** (`is_live: false`) — SOW clause → requirement mapping has no UI
+- **`client_intake_checklist`** — marked `is_live: true` in registry but handler is `noop` and comment says dormant ⚠️
+
+### Unimplemented integrations (columns/flags with no code)
+- `provider_tenants.feature_quickbooks_sync` — no QuickBooks client or route
+- `provider_tenants.feature_pba_bank_feed` — no bank feed client
+- `provider_tenants.feature_ai_receipt_ocr` — no OCR pipeline found (AI receipt parsing uses `billing-budget-parse.functions.ts` which is PDF-based, not camera OCR)
+- `provider_tenants.feature_lms_training` — separate LMS flag, but LMS tables/routes already exist unconditionally
+- Payment collection for HIVE tiers — `hive-tiers.ts` explicitly notes payment is "skeletoned"
+
+### Security observations
+- `staff_certifications` and `training_modules` (first migration, legacy seed tables) have RLS `FOR SELECT TO authenticated USING (true)` — **no org scoping**, any authenticated user can read all rows across all orgs
+- `training-assets` storage bucket allows any authenticated user to upload/update/delete — no org-level restriction
+- Several server fns (`bulkImportRoster`, `parseAndProduceAuditPacket`, `archiveEntity`, `deleteEntity`, `team-access` writes) perform DB writes with only `requireSupabaseAuth` and no `requireOrgMembership` — rely solely on RLS for isolation
+- Tenant feature gates are enforced **client-side only** — no server function checks `tenant_features`; a direct API call bypasses all feature gates
+- `certifications` table RLS allows `anon` SELECT — intentional (public cert verification) but means all issued cert records are publicly readable by UUID

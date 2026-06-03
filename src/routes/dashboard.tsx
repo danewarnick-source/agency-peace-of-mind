@@ -244,13 +244,13 @@ function DashboardLayout() {
 
       {/* Desktop layout (md+) — unchanged. Also used on mobile for Admin View. */}
       <div
-        className={`grid flex-1 md:grid-cols-[260px_1fr] ${isStaffView && !isMobilePreview ? "hidden md:grid" : ""}`}
+        className={`grid w-full flex-1 md:grid-cols-[260px_minmax(0,1fr)] ${isStaffView && !isMobilePreview ? "hidden md:grid" : ""}`}
       >
         <aside className="hidden flex-col bg-sidebar text-sidebar-foreground md:flex">
           <SidebarBody {...sidebarProps} />
         </aside>
 
-        <div className="flex flex-col">
+        <div className="flex min-w-0 flex-col">
           <header className="flex h-16 items-center justify-between gap-2 border-b border-border bg-background px-4 md:px-6">
             <div className="flex items-center gap-2 min-w-0">
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>

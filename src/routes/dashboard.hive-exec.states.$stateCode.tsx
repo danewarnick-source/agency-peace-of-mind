@@ -86,7 +86,7 @@ function StateDetailPage() {
         ))}
       </nav>
 
-      {tab === "profile" ? <ProfileTab stateCode={stateCode} /> : null}
+      {tab === "profile" ? <ProfileTab stateCode={stateCode} onJumpToSources={() => setTab("sources")} /> : null}
       {tab === "inventory" ? <InventoryTab stateCode={stateCode} /> : null}
       {tab === "sources" ? <SourcesTab stateCode={stateCode} /> : null}
       {tab === "providers" ? <ProvidersTab stateCode={stateCode} /> : null}

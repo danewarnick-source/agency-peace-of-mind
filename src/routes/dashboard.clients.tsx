@@ -43,6 +43,12 @@ import { MedicationsManager } from "@/components/medications-manager";
 import { MarCalendar } from "@/components/mar-calendar";
 import { ApprovedLocationsEditor } from "@/components/evv/approved-locations-editor";
 import { ClientPhoto } from "@/components/client-photo";
+import {
+  isClientFeatureEnabled,
+  isFeatureTierDisabled,
+  useDisabledTierFeatures,
+  type ClientFeatureKey,
+} from "@/lib/client-features";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,9 +129,9 @@ const DOCUMENT_TYPES = [
   "Other",
 ];
 
-const FEATURE_TOGGLES: { key: string; label: string; description: string }[] = [
+const FEATURE_TOGGLES: { key: string; label: string; description: string; wired?: boolean }[] = [
+  { key: "emar",          label: "MAR / eMAR",     description: "Electronic medication administration records", wired: true },
   { key: "daily_notes",   label: "Daily Notes",    description: "Staff daily progress note submission" },
-  { key: "emar",          label: "MAR / eMAR",     description: "Electronic medication administration records" },
   { key: "attendance",    label: "Attendance",     description: "Monthly attendance tracking" },
   { key: "trust_ledger",  label: "Trust Ledger",   description: "PBA financial trust account tracking" },
   { key: "incident_forms",label: "Incident Forms", description: "Critical event and incident reporting" },
@@ -442,6 +448,8 @@ function ClientWorkspace({
   saving: boolean;
 }) {
   const [activeTab, setActiveTab] = useState("profile");
+  const { data: disabledTier } = useDisabledTierFeatures();
+  const emarEnabled = isClientFeatureEnabled(client, "emar", disabledTier ?? null);
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col space-y-4">
@@ -480,13 +488,13 @@ function ClientWorkspace({
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
         <TabsList className="h-10 w-full justify-start rounded-none border-b border-border bg-transparent p-0">
           {[
-            { value: "profile",    label: "Client Profile",     icon: User      },
-            { value: "pcsp",       label: "PCSP & Directives",  icon: FileText  },
-            { value: "staff",      label: "Staff Assignment",   icon: Users     },
-            { value: "medications",label: "Medications & MAR",  icon: Pill      },
-            { value: "documents",  label: "Documents",          icon: Shield    },
-            { value: "settings",   label: "Settings",           icon: Settings2 },
-          ].map(({ value, label, icon: Icon }) => (
+            { value: "profile",    label: "Client Profile",     icon: User,     show: true        },
+            { value: "pcsp",       label: "PCSP & Directives",  icon: FileText, show: true        },
+            { value: "staff",      label: "Staff Assignment",   icon: Users,    show: true        },
+            { value: "medications",label: "Medications & MAR",  icon: Pill,     show: emarEnabled },
+            { value: "documents",  label: "Documents",          icon: Shield,   show: true        },
+            { value: "settings",   label: "Settings",           icon: Settings2, show: true       },
+          ].filter((t) => t.show).map(({ value, label, icon: Icon }) => (
             <button
               key={value}
               type="button"
@@ -518,17 +526,19 @@ function ClientWorkspace({
           <StaffAssignmentTab clientId={client.id} orgId={orgId} />
         </TabsContent>
 
-        {/* ── MEDICATIONS TAB ── */}
-        <TabsContent value="medications" className="mt-5 space-y-4">
-          <div>
-            <h3 className="text-base font-semibold">Medications & MAR Overview</h3>
-            <p className="text-xs text-muted-foreground">
-              Active prescriptions, administration schedules, and monthly MAR calendar.
-            </p>
-          </div>
-          <MedicationsManager clientId={client.id} organizationId={orgId} />
-          <MarCalendar clientId={client.id} />
-        </TabsContent>
+        {/* ── MEDICATIONS TAB (gated by per-client eMAR feature) ── */}
+        {emarEnabled && (
+          <TabsContent value="medications" className="mt-5 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold">Medications & MAR Overview</h3>
+              <p className="text-xs text-muted-foreground">
+                Active prescriptions, administration schedules, and monthly MAR calendar.
+              </p>
+            </div>
+            <MedicationsManager clientId={client.id} organizationId={orgId} />
+            <MarCalendar clientId={client.id} />
+          </TabsContent>
+        )}
 
         {/* ── DOCUMENTS TAB ── */}
         <TabsContent value="documents" className="mt-5">
@@ -1475,6 +1485,62 @@ function DocumentsTab({ clientId, orgId }: { clientId: string; orgId: string }) 
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
+function FeatureTogglesList({
+  features,
+  onToggle,
+}: {
+  features: Record<string, boolean>;
+  onToggle: (key: string) => void;
+}) {
+  const { data: disabledTier } = useDisabledTierFeatures();
+  return (
+    <>
+      {FEATURE_TOGGLES.map((item) => {
+        const tierOff = isFeatureTierDisabled(item.key as ClientFeatureKey, disabledTier ?? null);
+        const wired = !!item.wired;
+        const checked = features[item.key] ?? true;
+        const disabled = tierOff || !wired;
+        const stateLabel = tierOff
+          ? "Requires plan upgrade"
+          : !wired
+          ? "Coming soon"
+          : checked
+          ? "Enabled"
+          : "Disabled";
+        const stateClass = tierOff
+          ? "text-amber-600"
+          : !wired
+          ? "text-muted-foreground italic"
+          : checked
+          ? "text-emerald-600"
+          : "text-muted-foreground";
+        return (
+          <div
+            key={item.key}
+            className={`flex items-center justify-between rounded-lg border border-border px-4 py-3 transition ${
+              disabled ? "opacity-60" : "hover:bg-muted/30"
+            }`}
+          >
+            <div>
+              <p className="text-sm font-medium">{item.label}</p>
+              <p className="text-[11px] text-muted-foreground">{item.description}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] font-medium ${stateClass}`}>{stateLabel}</span>
+              <Switch
+                checked={checked && wired && !tierOff}
+                disabled={disabled}
+                onCheckedChange={() => onToggle(item.key)}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+
 function SettingsTab({
   client, orgId, onSave, saving,
 }: { client: Client; orgId: string; onSave: (v: ClientFormValues) => void; saving: boolean }) {
@@ -1514,26 +1580,13 @@ function SettingsTab({
           <CardContent className="space-y-1">
             <p className="mb-4 text-xs text-muted-foreground">
               Enable or disable specific platform features for this individual client profile.
-              Disabled features are hidden from caregivers working with this client.
+              Wired features are hidden from caregivers working with this client when disabled.
+              Items marked <span className="font-medium">Coming soon</span> are not yet enforced.
             </p>
-            {FEATURE_TOGGLES.map((toggle_item) => (
-              <div key={toggle_item.key}
-                className="flex items-center justify-between rounded-lg border border-border px-4 py-3 hover:bg-muted/30 transition">
-                <div>
-                  <p className="text-sm font-medium">{toggle_item.label}</p>
-                  <p className="text-[11px] text-muted-foreground">{toggle_item.description}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[11px] font-medium ${features[toggle_item.key] ? "text-emerald-600" : "text-muted-foreground"}`}>
-                    {features[toggle_item.key] ? "Enabled" : "Disabled"}
-                  </span>
-                  <Switch
-                    checked={features[toggle_item.key] ?? true}
-                    onCheckedChange={() => toggle(toggle_item.key)}
-                  />
-                </div>
-              </div>
-            ))}
+            <FeatureTogglesList
+              features={features}
+              onToggle={toggle}
+            />
             {featureDirty && (
               <div className="pt-3">
                 <Button onClick={saveFeatures} disabled={saving} className="w-full">

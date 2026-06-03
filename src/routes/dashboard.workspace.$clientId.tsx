@@ -35,6 +35,7 @@ import { ReimbursementShiftPanel } from "@/components/staff-mobile/reimbursement
 import { ClientSpendingShiftPanel } from "@/components/staff-mobile/client-spending-shift-panel";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { ClientPhoto } from "@/components/client-photo";
+import { useClientFeature } from "@/lib/client-features";
 
 function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
   const { data: active } = useActiveShift();
@@ -100,6 +101,7 @@ function ClientWorkspace() {
 
 
   const codes = allowedHourly.length ? allowedHourly : clientCodes;
+  const { enabled: emarEnabled } = useClientFeature(client, "emar");
 
   return (
     <>
@@ -184,11 +186,11 @@ function ClientWorkspace() {
           {/* Touch-friendly tab bar — amber active w/ 2px underline, navy inactive (tappable, never dimmed) */}
           <TabsList className="grid h-auto w-full grid-cols-4 gap-1 border-b border-border bg-transparent p-0 text-foreground">
             {[
-              { v: "about", label: "About", Icon: User },
-              { v: "clock-in", label: "Clock In", Icon: Clock },
-              { v: "emar", label: "MAR", Icon: Pill },
-              { v: "forms", label: "Forms", Icon: FileText },
-            ].map(({ v, label, Icon }) => (
+              { v: "about", label: "About", Icon: User, show: true },
+              { v: "clock-in", label: "Clock In", Icon: Clock, show: true },
+              { v: "emar", label: "MAR", Icon: Pill, show: emarEnabled },
+              { v: "forms", label: "Forms", Icon: FileText, show: true },
+            ].filter((t) => t.show).map(({ v, label, Icon }) => (
               <TabsTrigger
                 key={v}
                 value={v}
@@ -224,12 +226,14 @@ function ClientWorkspace() {
             <ActiveShiftReimbursementSlot clientId={client.id} />
           </TabsContent>
 
-          <TabsContent value="emar" className="mt-5">
-            <MarEmarTab
-              clientId={client.id}
-              clientName={`${client.first_name} ${client.last_name}`}
-            />
-          </TabsContent>
+          {emarEnabled && (
+            <TabsContent value="emar" className="mt-5">
+              <MarEmarTab
+                clientId={client.id}
+                clientName={`${client.first_name} ${client.last_name}`}
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="forms" className="mt-5">
             <FormsHubTab

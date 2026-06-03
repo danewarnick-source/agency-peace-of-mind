@@ -19,7 +19,11 @@ type Row = {
   provider_count: number;
   template_updated_at: string | null;
   template_published_at: string | null;
+  base_template_version: number | null;
+  base_template_upgraded_at: string | null;
+  current_base_template_version: number;
 };
+
 
 function StatusChip({ status, isRef }: { status: string; isRef: boolean }) {
   const isActive = status === "active";

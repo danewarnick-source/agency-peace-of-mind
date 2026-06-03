@@ -54,7 +54,7 @@ export interface ChecklistRow {
   source_citation: string | null;
   evidence_type: string | null;
   renewal_frequency: string | null;
-  metadata: Record<string, unknown> | null;
+  checklist_layer: string | null;
   completion: {
     id: string | null;
     status: string;

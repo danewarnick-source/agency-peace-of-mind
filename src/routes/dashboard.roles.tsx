@@ -50,7 +50,7 @@ function RolesPage() {
       if (error) throw error;
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase
-        .from("profiles")
+        .from("org_member_directory")
         .select("id, full_name, email")
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       const map = new Map((profs ?? []).map((p) => [p.id, p]));

@@ -1,11 +1,36 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { timingSafeEqual } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { computeNextRunAt } from "@/lib/saved-reports.functions";
+
+function verifyCronSecret(request: Request): boolean {
+  const expected = process.env.NECTAR_CRON_SECRET;
+  if (!expected) return false;
+  const provided =
+    request.headers.get("x-cron-secret") ??
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+    "";
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
 
 export const Route = createFileRoute("/api/public/hooks/nectar-schedules")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        if (!verifyCronSecret(request)) {
+          return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
         const now = new Date();
         const { data: due, error } = await supabaseAdmin
           .from("nectar_report_schedules")
@@ -21,7 +46,6 @@ export const Route = createFileRoute("/api/public/hooks/nectar-schedules")({
           id: string; saved_report_id: string; cadence: "weekly" | "monthly";
           day_of_week: number | null; day_of_month: number | null; hour: number;
         }>) {
-          // Log a stub run (actual execution would re-invoke askNectarReport with the saved prompt)
           await supabaseAdmin.from("nectar_report_runs").insert({
             saved_report_id: s.saved_report_id,
             ran_at: now.toISOString(),

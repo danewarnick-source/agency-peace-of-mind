@@ -225,7 +225,7 @@ export function YourInputsSection({
                           month={month}
                           entry={e}
                           onSubmit={(payload) =>
-                            updateM.mutateAsync({ data: { id: e.id, ...payload } })
+                            updateM.mutateAsync({ data: { id: e.id, organizationId, ...payload } })
                           }
                         />
                         <Button
@@ -234,7 +234,7 @@ export function YourInputsSection({
                           className="h-7 w-7 text-muted-foreground hover:text-destructive"
                           onClick={() => {
                             if (confirm(`Delete "${e.label}"?`)) {
-                              deleteM.mutate({ data: { id: e.id } });
+                              deleteM.mutate({ data: { id: e.id, organizationId } });
                             }
                           }}
                         >

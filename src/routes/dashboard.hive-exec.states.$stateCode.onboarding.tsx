@@ -19,8 +19,16 @@ import {
   saveOnboardingProgress,
   type BuildFlag,
 } from "@/lib/state-onboarding.functions";
+import { z } from "zod";
+
+const onboardingSearchSchema = z.object({
+  startFrom: z
+    .union([z.literal("blank"), z.string().regex(/^[A-Z]{2}$/)])
+    .optional(),
+});
 
 export const Route = createFileRoute("/dashboard/hive-exec/states/$stateCode/onboarding")({
+  validateSearch: onboardingSearchSchema,
   head: ({ params }) => ({
     meta: [{ title: `${params.stateCode} — New State Onboarding` }],
   }),

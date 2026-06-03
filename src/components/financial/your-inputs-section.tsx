@@ -54,11 +54,13 @@ type Entry = {
 export function YourInputsSection({
   year,
   month,
+  organizationId,
   onTotalsChange,
 }: {
   year: number;
   /** 1–12 (UTC month index + 1). For YTD/quarterly views, this section is hidden by the parent. */
   month: number;
+  organizationId: string;
   onTotalsChange?: (totals: { inputsSubtotal: number; entriesCount: number }) => void;
 }) {
   const qc = useQueryClient();
@@ -67,10 +69,10 @@ export function YourInputsSection({
   const updateFn = useServerFn(updateLedgerEntry);
   const deleteFn = useServerFn(deleteLedgerEntry);
 
-  const queryKey = ["provider-ledger", year, month] as const;
+  const queryKey = ["provider-ledger", year, month, organizationId] as const;
   const q = useQuery({
     queryKey,
-    queryFn: () => listFn({ data: { year, month } }),
+    queryFn: () => listFn({ data: { year, month, organizationId } }),
   });
 
   const entries: Entry[] = useMemo(

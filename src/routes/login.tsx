@@ -89,33 +89,43 @@ function LoginPage() {
     const identifier = String(fd.get("identifier")).trim();
     const password = String(fd.get("password"));
     setBusy(true);
-    let email = identifier;
-    if (!identifier.includes("@")) {
-      try {
-        const r = await resolveUsername({ data: { username: identifier } });
-        if (!r.email) { setBusy(false); return toast.error("No account with that username"); }
-        email = r.email;
-      } catch (err) {
-        setBusy(false);
-        return toast.error((err as Error).message);
+
+    try {
+      if (identifier.includes("@")) {
+        // Email path — normal client sign-in (preserves session persistence).
+        const { data: signInRes, error } = await supabase.auth.signInWithPassword({
+          email: identifier,
+          password,
+        });
+        if (error) { setBusy(false); return toast.error("Invalid username or password"); }
+        if (signInRes.user) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .select("account_status" as any)
+            .eq("id", signInRes.user.id)
+            .maybeSingle();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((prof as any)?.account_status === "archived") {
+            await supabase.auth.signOut();
+            setBusy(false);
+            return toast.error("Account suspended. Contact your administrator.");
+          }
+        }
+      } else {
+        // Username path — server resolves username + signs in; we never see the email.
+        const tokens = await signIn({ data: { identifier, password } });
+        const { error } = await supabase.auth.setSession({
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+        });
+        if (error) { setBusy(false); return toast.error("Invalid username or password"); }
       }
+    } catch (err) {
+      setBusy(false);
+      return toast.error((err as Error).message || "Invalid username or password");
     }
-    const { data: signIn, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { setBusy(false); return toast.error(error.message); }
-    if (signIn.user) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("account_status" as any)
-        .eq("id", signIn.user.id)
-        .maybeSingle();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((prof as any)?.account_status === "archived") {
-        await supabase.auth.signOut();
-        setBusy(false);
-        return toast.error("Account suspended. Contact your administrator.");
-      }
-    }
+
     setBusy(false);
     toast.success("Signed in");
   };

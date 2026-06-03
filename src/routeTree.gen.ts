@@ -47,6 +47,7 @@ import { Route as DashboardInternalAuditRouteImport } from './routes/dashboard.i
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
 import { Route as DashboardHiveExecRouteImport } from './routes/dashboard.hive-exec'
 import { Route as DashboardHelpRouteImport } from './routes/dashboard.help'
+import { Route as DashboardFinancialRouteImport } from './routes/dashboard.financial'
 import { Route as DashboardExternalComplianceRouteImport } from './routes/dashboard.external-compliance'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
 import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
@@ -66,6 +67,7 @@ import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-n
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardHiveExecIndexRouteImport } from './routes/dashboard.hive-exec.index'
+import { Route as DashboardFinancialIndexRouteImport } from './routes/dashboard.financial.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
 import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.billing.index'
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
@@ -86,6 +88,7 @@ import { Route as DashboardHiveExecBaseTemplateRouteImport } from './routes/dash
 import { Route as DashboardHiveExecApprovalsRouteImport } from './routes/dashboard.hive-exec.approvals'
 import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
+import { Route as DashboardFinancialRevenueRouteImport } from './routes/dashboard.financial.revenue'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
 import { Route as DashboardBillingNectarRouteImport } from './routes/dashboard.billing.nectar'
@@ -290,6 +293,11 @@ const DashboardHelpRoute = DashboardHelpRouteImport.update({
   path: '/help',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardFinancialRoute = DashboardFinancialRouteImport.update({
+  id: '/financial',
+  path: '/financial',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardExternalComplianceRoute =
   DashboardExternalComplianceRouteImport.update({
     id: '/external-compliance',
@@ -388,6 +396,11 @@ const DashboardHiveExecIndexRoute = DashboardHiveExecIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => DashboardHiveExecRoute,
+} as any)
+const DashboardFinancialIndexRoute = DashboardFinancialIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardFinancialRoute,
 } as any)
 const DashboardCoursesIndexRoute = DashboardCoursesIndexRouteImport.update({
   id: '/courses/',
@@ -500,6 +513,12 @@ const DashboardHhsHubClientIdRoute = DashboardHhsHubClientIdRouteImport.update({
   path: '/hhs-hub/$clientId',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardFinancialRevenueRoute =
+  DashboardFinancialRevenueRouteImport.update({
+    id: '/revenue',
+    path: '/revenue',
+    getParentRoute: () => DashboardFinancialRoute,
+  } as any)
 const DashboardCoursesMindsmithRoute =
   DashboardCoursesMindsmithRouteImport.update({
     id: '/courses/mindsmith',
@@ -601,6 +620,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
+  '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -632,6 +652,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
@@ -652,6 +673,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
+  '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
@@ -720,6 +742,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
@@ -740,6 +763,7 @@ export interface FileRoutesByTo {
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/billing': typeof DashboardBillingIndexRoute
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
+  '/dashboard/financial': typeof DashboardFinancialIndexRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
@@ -781,6 +805,7 @@ export interface FileRoutesById {
   '/dashboard/employees': typeof DashboardEmployeesRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
+  '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -812,6 +837,7 @@ export interface FileRoutesById {
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
@@ -832,6 +858,7 @@ export interface FileRoutesById {
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
+  '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
@@ -874,6 +901,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
+    | '/dashboard/financial'
     | '/dashboard/help'
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
@@ -905,6 +933,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/financial/revenue'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/approvals'
@@ -925,6 +954,7 @@ export interface FileRouteTypes {
     | '/dashboard/workspace/$clientId'
     | '/dashboard/billing/'
     | '/dashboard/courses/'
+    | '/dashboard/financial/'
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
@@ -993,6 +1023,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/financial/revenue'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/approvals'
@@ -1013,6 +1044,7 @@ export interface FileRouteTypes {
     | '/dashboard/workspace/$clientId'
     | '/dashboard/billing'
     | '/dashboard/courses'
+    | '/dashboard/financial'
     | '/dashboard/hive-exec'
     | '/dashboard/training'
     | '/api/public/hooks/nectar-schedules'
@@ -1053,6 +1085,7 @@ export interface FileRouteTypes {
     | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
+    | '/dashboard/financial'
     | '/dashboard/help'
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
@@ -1084,6 +1117,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/financial/revenue'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/approvals'
@@ -1104,6 +1138,7 @@ export interface FileRouteTypes {
     | '/dashboard/workspace/$clientId'
     | '/dashboard/billing/'
     | '/dashboard/courses/'
+    | '/dashboard/financial/'
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
@@ -1402,6 +1437,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHelpRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/financial': {
+      id: '/dashboard/financial'
+      path: '/financial'
+      fullPath: '/dashboard/financial'
+      preLoaderRoute: typeof DashboardFinancialRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/external-compliance': {
       id: '/dashboard/external-compliance'
       path: '/external-compliance'
@@ -1534,6 +1576,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/hive-exec/'
       preLoaderRoute: typeof DashboardHiveExecIndexRouteImport
       parentRoute: typeof DashboardHiveExecRoute
+    }
+    '/dashboard/financial/': {
+      id: '/dashboard/financial/'
+      path: '/'
+      fullPath: '/dashboard/financial/'
+      preLoaderRoute: typeof DashboardFinancialIndexRouteImport
+      parentRoute: typeof DashboardFinancialRoute
     }
     '/dashboard/courses/': {
       id: '/dashboard/courses/'
@@ -1675,6 +1724,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHhsHubClientIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/financial/revenue': {
+      id: '/dashboard/financial/revenue'
+      path: '/revenue'
+      fullPath: '/dashboard/financial/revenue'
+      preLoaderRoute: typeof DashboardFinancialRevenueRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
     '/dashboard/courses/mindsmith': {
       id: '/dashboard/courses/mindsmith'
       path: '/courses/mindsmith'
@@ -1780,6 +1836,19 @@ const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
 
 const DashboardBillingRouteWithChildren =
   DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
+
+interface DashboardFinancialRouteChildren {
+  DashboardFinancialRevenueRoute: typeof DashboardFinancialRevenueRoute
+  DashboardFinancialIndexRoute: typeof DashboardFinancialIndexRoute
+}
+
+const DashboardFinancialRouteChildren: DashboardFinancialRouteChildren = {
+  DashboardFinancialRevenueRoute: DashboardFinancialRevenueRoute,
+  DashboardFinancialIndexRoute: DashboardFinancialIndexRoute,
+}
+
+const DashboardFinancialRouteWithChildren =
+  DashboardFinancialRoute._addFileChildren(DashboardFinancialRouteChildren)
 
 interface DashboardHiveExecStatesStateCodeRouteChildren {
   DashboardHiveExecStatesStateCodeOnboardingRoute: typeof DashboardHiveExecStatesStateCodeOnboardingRoute
@@ -1912,6 +1981,7 @@ interface DashboardRouteChildren {
   DashboardEmployeesRoute: typeof DashboardEmployeesRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardExternalComplianceRoute: typeof DashboardExternalComplianceRoute
+  DashboardFinancialRoute: typeof DashboardFinancialRouteWithChildren
   DashboardHelpRoute: typeof DashboardHelpRoute
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
@@ -1961,6 +2031,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardEmployeesRoute: DashboardEmployeesRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardExternalComplianceRoute: DashboardExternalComplianceRoute,
+  DashboardFinancialRoute: DashboardFinancialRouteWithChildren,
   DashboardHelpRoute: DashboardHelpRoute,
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,

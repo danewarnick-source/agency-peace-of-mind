@@ -31,7 +31,7 @@ function genPassword(len = 14) {
   return Array.from(arr, (n) => charset[n % charset.length]).join("");
 }
 
-export const Route = createFileRoute("/dashboard/employees")({
+export const Route = createFileRoute("/dashboard/employees/")({
   component: () => (
     <RequirePermission perm="manage_users">
       <EmployeesPage />

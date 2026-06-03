@@ -52,7 +52,6 @@ import { Route as DashboardHelpRouteImport } from './routes/dashboard.help'
 import { Route as DashboardFinancialRouteImport } from './routes/dashboard.financial'
 import { Route as DashboardExternalComplianceRouteImport } from './routes/dashboard.external-compliance'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
-import { Route as DashboardEmployeesRouteImport } from './routes/dashboard.employees'
 import { Route as DashboardEmarRouteImport } from './routes/dashboard.emar'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
 import { Route as DashboardComplianceDeskRouteImport } from './routes/dashboard.compliance-desk'
@@ -70,6 +69,7 @@ import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardHiveExecIndexRouteImport } from './routes/dashboard.hive-exec.index'
 import { Route as DashboardFinancialIndexRouteImport } from './routes/dashboard.financial.index'
+import { Route as DashboardEmployeesIndexRouteImport } from './routes/dashboard.employees.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
 import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.billing.index'
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
@@ -322,11 +322,6 @@ const DashboardExternalCertificationsRoute =
     path: '/external-certifications',
     getParentRoute: () => DashboardRoute,
   } as any)
-const DashboardEmployeesRoute = DashboardEmployeesRouteImport.update({
-  id: '/employees',
-  path: '/employees',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardEmarRoute = DashboardEmarRouteImport.update({
   id: '/emar',
   path: '/emar',
@@ -413,6 +408,11 @@ const DashboardFinancialIndexRoute = DashboardFinancialIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => DashboardFinancialRoute,
+} as any)
+const DashboardEmployeesIndexRoute = DashboardEmployeesIndexRouteImport.update({
+  id: '/employees/',
+  path: '/employees/',
+  getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardCoursesIndexRoute = DashboardCoursesIndexRouteImport.update({
   id: '/courses/',
@@ -533,9 +533,9 @@ const DashboardFinancialRevenueRoute =
   } as any)
 const DashboardEmployeesStaffIdRoute =
   DashboardEmployeesStaffIdRouteImport.update({
-    id: '/$staffId',
-    path: '/$staffId',
-    getParentRoute: () => DashboardEmployeesRoute,
+    id: '/employees/$staffId',
+    path: '/employees/$staffId',
+    getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardCoursesMindsmithRoute =
   DashboardCoursesMindsmithRouteImport.update({
@@ -630,7 +630,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
-  '/dashboard/employees': typeof DashboardEmployeesRouteWithChildren
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
@@ -688,6 +687,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
+  '/dashboard/employees/': typeof DashboardEmployeesIndexRoute
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
@@ -724,7 +724,6 @@ export interface FileRoutesByTo {
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
-  '/dashboard/employees': typeof DashboardEmployeesRouteWithChildren
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/help': typeof DashboardHelpRoute
@@ -780,6 +779,7 @@ export interface FileRoutesByTo {
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/billing': typeof DashboardBillingIndexRoute
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
+  '/dashboard/employees': typeof DashboardEmployeesIndexRoute
   '/dashboard/financial': typeof DashboardFinancialIndexRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
@@ -819,7 +819,6 @@ export interface FileRoutesById {
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
-  '/dashboard/employees': typeof DashboardEmployeesRouteWithChildren
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
@@ -877,6 +876,7 @@ export interface FileRoutesById {
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
+  '/dashboard/employees/': typeof DashboardEmployeesIndexRoute
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
@@ -917,7 +917,6 @@ export interface FileRouteTypes {
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/emar'
-    | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/financial'
@@ -975,6 +974,7 @@ export interface FileRouteTypes {
     | '/dashboard/workspace/$clientId'
     | '/dashboard/billing/'
     | '/dashboard/courses/'
+    | '/dashboard/employees/'
     | '/dashboard/financial/'
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
@@ -1011,7 +1011,6 @@ export interface FileRouteTypes {
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/emar'
-    | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/help'
@@ -1067,6 +1066,7 @@ export interface FileRouteTypes {
     | '/dashboard/workspace/$clientId'
     | '/dashboard/billing'
     | '/dashboard/courses'
+    | '/dashboard/employees'
     | '/dashboard/financial'
     | '/dashboard/hive-exec'
     | '/dashboard/training'
@@ -1105,7 +1105,6 @@ export interface FileRouteTypes {
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/emar'
-    | '/dashboard/employees'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/financial'
@@ -1163,6 +1162,7 @@ export interface FileRouteTypes {
     | '/dashboard/workspace/$clientId'
     | '/dashboard/billing/'
     | '/dashboard/courses/'
+    | '/dashboard/employees/'
     | '/dashboard/financial/'
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
@@ -1496,13 +1496,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardExternalCertificationsRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/employees': {
-      id: '/dashboard/employees'
-      path: '/employees'
-      fullPath: '/dashboard/employees'
-      preLoaderRoute: typeof DashboardEmployeesRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/dashboard/emar': {
       id: '/dashboard/emar'
       path: '/emar'
@@ -1621,6 +1614,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/financial/'
       preLoaderRoute: typeof DashboardFinancialIndexRouteImport
       parentRoute: typeof DashboardFinancialRoute
+    }
+    '/dashboard/employees/': {
+      id: '/dashboard/employees/'
+      path: '/employees'
+      fullPath: '/dashboard/employees/'
+      preLoaderRoute: typeof DashboardEmployeesIndexRouteImport
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/courses/': {
       id: '/dashboard/courses/'
@@ -1771,10 +1771,10 @@ declare module '@tanstack/react-router' {
     }
     '/dashboard/employees/$staffId': {
       id: '/dashboard/employees/$staffId'
-      path: '/$staffId'
+      path: '/employees/$staffId'
       fullPath: '/dashboard/employees/$staffId'
       preLoaderRoute: typeof DashboardEmployeesStaffIdRouteImport
-      parentRoute: typeof DashboardEmployeesRoute
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/courses/mindsmith': {
       id: '/dashboard/courses/mindsmith'
@@ -1874,17 +1874,6 @@ const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
 
 const DashboardBillingRouteWithChildren =
   DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
-
-interface DashboardEmployeesRouteChildren {
-  DashboardEmployeesStaffIdRoute: typeof DashboardEmployeesStaffIdRoute
-}
-
-const DashboardEmployeesRouteChildren: DashboardEmployeesRouteChildren = {
-  DashboardEmployeesStaffIdRoute: DashboardEmployeesStaffIdRoute,
-}
-
-const DashboardEmployeesRouteWithChildren =
-  DashboardEmployeesRoute._addFileChildren(DashboardEmployeesRouteChildren)
 
 interface DashboardFinancialRouteChildren {
   DashboardFinancialRevenueRoute: typeof DashboardFinancialRevenueRoute
@@ -2027,7 +2016,6 @@ interface DashboardRouteChildren {
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardEmarRoute: typeof DashboardEmarRoute
-  DashboardEmployeesRoute: typeof DashboardEmployeesRouteWithChildren
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardExternalComplianceRoute: typeof DashboardExternalComplianceRoute
   DashboardFinancialRoute: typeof DashboardFinancialRouteWithChildren
@@ -2058,10 +2046,12 @@ interface DashboardRouteChildren {
   DashboardAdminEmarAuditRoute: typeof DashboardAdminEmarAuditRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesMindsmithRoute: typeof DashboardCoursesMindsmithRoute
+  DashboardEmployeesStaffIdRoute: typeof DashboardEmployeesStaffIdRoute
   DashboardHhsHubClientIdRoute: typeof DashboardHhsHubClientIdRoute
   DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
   DashboardWorkspaceClientIdRoute: typeof DashboardWorkspaceClientIdRoute
   DashboardCoursesIndexRoute: typeof DashboardCoursesIndexRoute
+  DashboardEmployeesIndexRoute: typeof DashboardEmployeesIndexRoute
   DashboardTrainingIndexRoute: typeof DashboardTrainingIndexRoute
 }
 
@@ -2079,7 +2069,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardEmarRoute: DashboardEmarRoute,
-  DashboardEmployeesRoute: DashboardEmployeesRouteWithChildren,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardExternalComplianceRoute: DashboardExternalComplianceRoute,
   DashboardFinancialRoute: DashboardFinancialRouteWithChildren,
@@ -2110,10 +2099,12 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAdminEmarAuditRoute: DashboardAdminEmarAuditRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesMindsmithRoute: DashboardCoursesMindsmithRoute,
+  DashboardEmployeesStaffIdRoute: DashboardEmployeesStaffIdRoute,
   DashboardHhsHubClientIdRoute: DashboardHhsHubClientIdRoute,
   DashboardTrainingIdRoute: DashboardTrainingIdRoute,
   DashboardWorkspaceClientIdRoute: DashboardWorkspaceClientIdRoute,
   DashboardCoursesIndexRoute: DashboardCoursesIndexRoute,
+  DashboardEmployeesIndexRoute: DashboardEmployeesIndexRoute,
   DashboardTrainingIndexRoute: DashboardTrainingIndexRoute,
 }
 
@@ -2144,3 +2135,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

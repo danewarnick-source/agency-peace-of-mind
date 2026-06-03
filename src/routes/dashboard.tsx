@@ -67,7 +67,7 @@ type PlatformStateLite = { code: string; name: string; status: "draft" | "active
 
 function DashboardLayout() {
   const { session, loading, user } = useAuth();
-  const { data: org } = useCurrentOrg();
+  const { data: org, isLoading: orgLoading } = useCurrentOrg();
   const { can } = usePermissions();
   const { view, setView, stateCode, setStateCode, subView, setSubView } = usePortalView();
   const [states, setStates] = useState<PlatformStateLite[]>([]);
@@ -483,7 +483,7 @@ function DashboardLayout() {
             </div>
           </header>
           <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
-          {!isHiveExecView && !isStatePreview && <DemoOrgBanner />}
+          {!isHiveExecView && !isStatePreview && <DemoOrgBanner org={org} isLoading={orgLoading} />}
 
           {isStatePreview && (
             <div className="flex items-center justify-between gap-3 border-b border-[#f4a93a]/30 bg-[#f4a93a]/[0.08] px-4 py-2 text-xs md:px-6">

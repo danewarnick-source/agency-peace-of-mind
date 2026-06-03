@@ -36,6 +36,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { NectarGuidanceStrip } from "@/components/nectar/nectar-guidance-strip";
+import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
 import {
   ingestDocument,
   queryDocuments,
@@ -110,6 +111,7 @@ function NectarDocsPage() {
   const [clientFilter, setClientFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [offerDocId, setOfferDocId] = useState<string | null>(null);
 
   const queryFn = useServerFn(queryDocuments);
   const qc = useQueryClient();
@@ -218,9 +220,19 @@ function NectarDocsPage() {
           orgId={orgId}
           open={uploadOpen}
           onOpenChange={setUploadOpen}
-          onUploaded={() => qc.invalidateQueries({ queryKey: ["nectar-docs"] })}
+          onUploaded={(docId) => {
+            qc.invalidateQueries({ queryKey: ["nectar-docs"] });
+            if (docId) setOfferDocId(docId);
+          }}
+        />
+        <NectarDocumentActionsDialog
+          documentId={offerDocId}
+          open={!!offerDocId}
+          onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
         />
       </div>
+
+
 
       <div className="grid gap-3">
         {isLoading && (
@@ -302,7 +314,7 @@ function UploadButton({
   orgId: string | undefined;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUploaded: () => void;
+  onUploaded: (docId?: string) => void;
 }) {
   const ingest = useServerFn(ingestDocument);
   const [title, setTitle] = useState("");
@@ -338,10 +350,12 @@ function UploadButton({
       );
       setTitle(""); setFile(null); setFiscalYear(""); setMedicaidId("");
       onOpenChange(false);
-      onUploaded();
+      const docId = (res as { document?: { id?: string } }).document?.id;
+      onUploaded(docId);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

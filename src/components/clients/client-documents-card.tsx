@@ -36,6 +36,7 @@ import {
   queryDocuments,
   deleteDocument,
 } from "@/lib/nectar-documents.functions";
+import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
 
 const CLIENT_DOC_TYPES = [
   { value: "pcsp", label: "PCSP" },
@@ -84,6 +85,7 @@ export function ClientDocumentsCard({
   const queryFn = useServerFn(queryDocuments);
   const delFn = useServerFn(deleteDocument);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [offerDocId, setOfferDocId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["client-docs", orgId, clientId],
@@ -125,10 +127,16 @@ export function ClientDocumentsCard({
             clientName={clientName}
             open={uploadOpen}
             onOpenChange={setUploadOpen}
-            onUploaded={() => {
+            onUploaded={(docId) => {
               qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
               qc.invalidateQueries({ queryKey: ["nectar-docs"] });
+              if (docId) setOfferDocId(docId);
             }}
+          />
+          <NectarDocumentActionsDialog
+            documentId={offerDocId}
+            open={!!offerDocId}
+            onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
           />
         </div>
         <p className="text-xs text-muted-foreground">
@@ -235,7 +243,7 @@ function UploadDocDialog({
   clientName: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUploaded: () => void;
+  onUploaded: (docId?: string) => void;
 }) {
   const ingest = useServerFn(ingestDocument);
   const [title, setTitle] = useState("");
@@ -272,7 +280,7 @@ function UploadDocDialog({
       toast.success(`Uploaded — NECTAR extracted ${res.extracted?.length ?? 0} field(s)`);
       setTitle(""); setFile(null); setFiscalYear("");
       onOpenChange(false);
-      onUploaded();
+      onUploaded((res as { document?: { id?: string } }).document?.id);
     },
     onError: (e: Error) => toast.error(e.message),
   });

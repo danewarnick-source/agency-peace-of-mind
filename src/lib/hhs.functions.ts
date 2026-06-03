@@ -28,6 +28,7 @@ export const saveDailyRecord = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       .from("daily_logs")
       .insert({

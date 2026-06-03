@@ -162,25 +162,25 @@ export const previewStateBaseUpgrade = createServerFn({ method: "GET" })
       .maybeSingle();
 
     if (!to) throw new Error("No current base template version.");
-    if ((to as { version: number }).version === currentStateVersion) {
+    const toRow = to as unknown as { version: number; schema: BaseTemplateSchema; title: string; summary: string };
+    const fromRow = (from ?? null) as unknown as { schema?: BaseTemplateSchema } | null;
+    if (toRow.version === currentStateVersion) {
       return { upToDate: true as const, fromVersion: currentStateVersion, toVersion: currentStateVersion, added: [], removed: [] };
     }
 
-    const diff = diffBaseSchemas(
-      ((from as { schema?: BaseTemplateSchema } | null)?.schema) ?? null,
-      (to as { schema: BaseTemplateSchema }).schema,
-    );
+    const diff = diffBaseSchemas(fromRow?.schema ?? null, toRow.schema);
 
     return {
       upToDate: false as const,
       fromVersion: currentStateVersion,
-      toVersion: (to as { version: number }).version,
-      toTitle: (to as { title: string }).title,
-      toSummary: (to as { summary: string }).summary,
+      toVersion: toRow.version,
+      toTitle: toRow.title,
+      toSummary: toRow.summary,
       added: diff.added,
       removed: diff.removed,
     };
   });
+
 
 export const upgradeStateToBaseVersion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

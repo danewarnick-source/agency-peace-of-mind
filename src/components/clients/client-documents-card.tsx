@@ -138,7 +138,6 @@ export function ClientDocumentsCard({
             onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
           />
         </div>
-        </div>
         <p className="text-xs text-muted-foreground">
           Guardian papers, PCSP, 1056, intake/referrals, assessments, consents.
           NECTAR parses each file on upload — billing fields from a PCSP/1056

@@ -202,236 +202,33 @@ function DashboardLayout() {
   };
 
 
-  const SidebarBody = ({ onNavigate }: { onNavigate?: () => void }) => (
-    <>
-      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-display text-lg font-bold tracking-tight">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <Hexagon className="h-4 w-4" strokeWidth={2.5} />
-        </span>
-        HIVE
-      </div>
+  const nectarNavForView = effectiveView === "admin" ? NECTAR_NAV : [];
+  const allNav = [...nav, ...nectarNavForView];
+  const pageTitle =
+    allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
+  const isStaffView = effectiveView === "staff";
 
+  const sidebarProps: Omit<SidebarBodyProps, "onNavigate"> = {
+    user,
+    role,
+    isAdminCapable,
+    isExecutive,
+    isHiveExecView,
+    rawView,
+    setView,
+    isStatePreview,
+    stateCode,
+    setStateCode,
+    subView,
+    setSubView,
+    states,
+    currentPreviewState,
+    nav,
+    showNectarCluster: effectiveView === "admin",
+    pathname,
+    signOut,
+  };
 
-      {(isAdminCapable || isExecutive) && (
-        <div className="border-b border-sidebar-border px-4 py-4">
-          <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
-            Portal View
-          </label>
-          <Select value={rawView} onValueChange={(v) => setView(v as PV)}>
-            <SelectTrigger className="w-full border-sidebar-border bg-sidebar-accent/40 text-sidebar-foreground">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="staff">
-                <span className="inline-flex items-center gap-2">
-                  <GraduationCap className="h-3.5 w-3.5" /> Staff View
-                </span>
-              </SelectItem>
-              {isAdminCapable && (
-                <SelectItem value="admin">
-                  <span className="inline-flex items-center gap-2">
-                    <Building2 className="h-3.5 w-3.5" /> Admin View
-                  </span>
-                </SelectItem>
-              )}
-              {isAdminCapable && (
-                <SelectItem value="staff_mobile">
-                  <span className="inline-flex items-center gap-2">
-                    <GraduationCap className="h-3.5 w-3.5" /> Staff Mobile (Preview)
-                  </span>
-                </SelectItem>
-              )}
-              {isExecutive && (
-                <SelectItem value="hive_exec">
-                  <span className="inline-flex items-center gap-2">
-                    <Lock className="h-3.5 w-3.5" /> HIVE Executive
-                  </span>
-                </SelectItem>
-              )}
-              {isExecutive && (
-                <SelectItem value="state_preview">
-                  <span className="inline-flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5" /> State (Build/Preview)
-                  </span>
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-
-          {isStatePreview && (
-            <div className="mt-3 space-y-2 rounded-md border border-[#f4a93a]/30 bg-[#f4a93a]/[0.06] p-2">
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
-                State
-              </label>
-              <Select value={stateCode ?? ""} onValueChange={(v) => setStateCode(v)}>
-                <SelectTrigger className="w-full border-sidebar-border bg-sidebar text-sidebar-foreground">
-                  <SelectValue placeholder="Select a state" />
-                </SelectTrigger>
-                <SelectContent>
-                  {states.map((s) => {
-                    const isActive = s.status === "active";
-                    return (
-                      <SelectItem key={s.code} value={s.code}>
-                        <span className="inline-flex items-center gap-2">
-                          {s.name}
-                          <span
-                            className={`rounded-full px-1.5 text-[9px] font-semibold uppercase tracking-wider ${
-                              isActive
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-slate-200 text-slate-600"
-                            }`}
-                          >
-                            {isActive ? "Active" : s.status === "coming_soon" ? "Coming soon" : "Inactive"}
-                          </span>
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-
-                </SelectContent>
-              </Select>
-              <div className="flex gap-1 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setSubView("admin")}
-                  className={`flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-                    subView === "admin"
-                      ? "bg-[#d97a1c] text-white"
-                      : "bg-sidebar text-sidebar-foreground/70 hover:bg-sidebar-accent"
-                  }`}
-                >
-                  Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSubView("staff")}
-                  className={`flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-                    subView === "staff"
-                      ? "bg-[#d97a1c] text-white"
-                      : "bg-sidebar text-sidebar-foreground/70 hover:bg-sidebar-accent"
-                  }`}
-                >
-                  Staff
-                </button>
-              </div>
-              {currentPreviewState && (
-                <Link
-                  to="/dashboard/hive-exec/states/$stateCode"
-                  params={{ stateCode: currentPreviewState.code }}
-                  className="block rounded-md border border-[#f4a93a]/30 bg-sidebar px-2 py-1 text-center text-[11px] font-medium text-[#f4a93a] hover:bg-[#f4a93a]/10"
-                >
-                  Edit {currentPreviewState.name} template
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {nav.map((item) => {
-          const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
-          const Icon = item.icon;
-          const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
-          const isNectar = item.label === "NECTAR";
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={onNavigate}
-              data-tour={`nav.${slug}`}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                active
-                  ? isNectar
-                    ? "bg-[#d97a1c] text-white shadow-sm"
-                    : "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : isNectar
-                    ? "text-[#f4a93a] hover:bg-[#f4a93a]/10 hover:text-[#d97a1c]"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              }`}
-            >
-              <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} /> {item.label}
-            </Link>
-          );
-        })}
-
-        {effectiveView === "admin" && (
-          <div className="mt-5 border-t border-sidebar-border pt-5">
-            {/* Premium NECTAR section header */}
-            <div className="mb-2.5 flex items-start gap-2.5 px-3">
-              <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f4a93a]/15 ring-1 ring-[#f4a93a]/20">
-                <Hexagon className="h-4 w-4 text-[#f4a93a]" strokeWidth={2} />
-              </span>
-              <div className="min-w-0">
-                <span className="text-sm font-bold tracking-wide text-[#f4a93a]">NECTAR</span>
-                <p className="text-[11px] leading-relaxed text-sidebar-foreground/50">
-                  The brain. Tabs below feed it the data the rest of HIVE reads from.
-                </p>
-              </div>
-            </div>
-
-            {/* NECTAR nav cluster — unified amber family */}
-            <div className="mx-1 space-y-0.5 rounded-xl border border-[#f4a93a]/10 bg-[#f4a93a]/[0.04] p-1.5">
-              {NECTAR_NAV.map((item) => {
-                const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
-                const Icon = item.icon;
-                const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    onClick={onNavigate}
-                    data-tour={`nav.${slug}`}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                      active
-                        ? "bg-[#d97a1c] text-white shadow-sm"
-                        : "text-sidebar-foreground/80 hover:bg-[#f4a93a]/10 hover:text-[#f4a93a]"
-                    }`}
-                  >
-                    <Icon className={`h-4 w-4 ${active ? "text-white" : "text-[#f4a93a]/80"}`} />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </nav>
-
-      <div className="border-t border-sidebar-border p-4">
-        <div className="mb-3 text-xs text-sidebar-foreground/60">
-          <div className="font-medium text-sidebar-foreground">{user?.user_metadata?.full_name ?? user?.email}</div>
-          <div className="mt-2">
-            {isHiveExecView ? (
-              <div className="flex items-center justify-between">
-                <span className="truncate">HIVE Platform</span>
-                <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">HIVE Exec</span>
-              </div>
-            ) : (
-              <>
-                <OrgSwitcher />
-                <div className="mt-1.5 flex justify-end">
-                  <span className="rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">
-                    {ROLE_LABEL[role]}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <Button
-          onClick={signOut}
-          variant="outline"
-          size="sm"
-          className="w-full border-sidebar-border bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        >
-          <LogOut className="mr-2 h-3.5 w-3.5" /> Sign out
-        </Button>
-      </div>
-    </>
-  );
 
   const nectarNavForView = effectiveView === "admin" ? NECTAR_NAV : [];
   const allNav = [...nav, ...nectarNavForView];

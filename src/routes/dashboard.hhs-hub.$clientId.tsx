@@ -534,7 +534,7 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
     queryFn: async () => {
       const t = today();
       const { count } = await supabase
-        .from("hhs_emar_logs" as never)
+        .from("emar_logs")
         .select("id", { count: "exact", head: true })
         .eq("client_id", clientId)
         .eq("is_medication_error", true)
@@ -542,6 +542,27 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
       return (count ?? 0) > 0;
     },
   });
+
+  // Cross-hub visibility: today's doses already recorded for this client
+  // (in any hub). Used to show attribution and prevent double-recording.
+  const { data: todaysLogs = [] } = useQuery({
+    queryKey: ["hhs-emar-today", clientId, today()],
+    queryFn: async () => {
+      const t = today();
+      const { data } = await supabase
+        .from("emar_logs")
+        .select("id, medication_id, status, scheduled_for, administered_at, staff_name, recorded_in")
+        .eq("client_id", clientId)
+        .gte("scheduled_for", `${t}T00:00:00Z`)
+        .lt("scheduled_for", `${t}T23:59:59Z`);
+      return (data ?? []) as Array<{ id: string; medication_id: string | null; status: string; scheduled_for: string; administered_at: string | null; staff_name: string | null; recorded_in: string | null }>;
+    },
+  });
+  const loggedByMed = useMemo(() => {
+    const m = new Map<string, typeof todaysLogs[number]>();
+    todaysLogs.forEach((l) => { if (l.medication_id) m.set(l.medication_id, l); });
+    return m;
+  }, [todaysLogs]);
   const qc = useQueryClient();
   const errorLockActive = hasUnresolvedMedError && medErrorIncidentCount === 0;
 

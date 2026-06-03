@@ -94,31 +94,56 @@ export const saveEmarLog = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+
+    // Map HHS status enum → unified emar_logs status enum.
+    // Held is a first-class status (clinically distinct from omitted).
+    const statusMap: Record<typeof data.status, "administered" | "refused" | "missed" | "held"> = {
+      Passed: "administered",
+      Refused: "refused",
+      Missed: "missed",
+      Held: "held",
+    };
+    const unifiedStatus = statusMap[data.status];
+
+    // Cross-hub dedupe: if another hub already recorded this exact dose
+    // (same client + medication + scheduled_for), return that row instead of
+    // inserting a duplicate.
+    if (data.medicationId) {
+      const { data: existing } = await supabase
+        .from("emar_logs")
+        .select("*")
+        .eq("client_id", data.clientId)
+        .eq("medication_id", data.medicationId)
+        .eq("scheduled_for", data.scheduledFor)
+        .maybeSingle();
+      if (existing) return existing;
+    }
+
     const { error, data: row } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("hhs_emar_logs" as never)
+      .from("emar_logs")
       .insert({
         organization_id:       data.organizationId,
         client_id:             data.clientId,
         medication_id:         data.medicationId ?? null,
-        medication_name:       data.medicationName,
-        dosage:                data.dosage ?? null,
-        route:                 data.route ?? null,
         scheduled_for:         data.scheduledFor,
-        status:                data.status,
+        administered_at:       unifiedStatus === "administered" ? new Date().toISOString() : null,
+        status:                unifiedStatus,
         is_prn:                data.isPrn,
         prn_reason:            data.prnReason ?? null,
         is_controlled:         data.isControlled,
         pill_count_verified:   data.pillCountVerified ?? null,
         pill_count_value:      data.pillCountValue ?? null,
-        exception_reason:      data.exceptionReason ?? data.varianceNote ?? null,
+        exception_reason:      data.exceptionReason ?? null,
+        variance_note:         data.varianceNote ?? null,
+        notes:                 data.varianceNote ?? null,
         is_medication_error:   data.isMedicationError,
         attestation_signed:    data.attestationSigned,
         signature_attestation: data.signatureAttestation ?? null,
+        staff_id:              userId,
         staff_name:            data.staffName ?? null,
-        recorded_by:           userId,
+        recorded_in:           "hhs",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as never)
+      } as any)
       .select()
       .single();
     if (error) throw new Error(error.message);

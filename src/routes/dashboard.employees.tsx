@@ -219,6 +219,7 @@ function EmployeesPage() {
 
   const editMemberMutation = useMutation({
     mutationFn: async (input: EditableMember) => {
+      // Non-PII profile fields go through the regular client.
       const { error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -228,11 +229,20 @@ function EmployeesPage() {
           employee_id: input.employeeId || null,
           position: input.position || null,
           worker_type: input.workerType,
-          hourly_rate: input.hourlyRate === "" ? null : Number(input.hourlyRate),
-          daily_rate: input.dailyRate === "" ? null : Number(input.dailyRate),
         } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;
+
+      // Rates are PII-gated: route through the server fn so the
+      // can_view_staff_pii() check applies on writes too.
+      await updatePiiFn({
+        data: {
+          organization_id: org!.organization_id,
+          staff_id: input.userId,
+          hourly_rate: input.hourlyRate === "" ? null : Number(input.hourlyRate),
+          daily_rate: input.dailyRate === "" ? null : Number(input.dailyRate),
+        },
+      });
 
       const { error: mErr } = await supabase
         .from("organization_members")
@@ -243,6 +253,7 @@ function EmployeesPage() {
     onSuccess: () => {
       toast.success("Employee updated");
       qc.invalidateQueries({ queryKey: ["members"] });
+      qc.invalidateQueries({ queryKey: ["staff-pii"] });
       setEditingMember(null);
     },
     onError: (e: Error) => toast.error(e.message),

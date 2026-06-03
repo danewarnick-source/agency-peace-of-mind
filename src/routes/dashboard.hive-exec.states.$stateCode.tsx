@@ -186,7 +186,7 @@ function ProfileTab({ stateCode, onJumpToSources }: { stateCode: string; onJumpT
           <Upload className="h-3.5 w-3.5" /> Upload state-specific documents
         </div>
         Provider contract, billing manual, EVV policy, code book — upload authoritative sources on the{" "}
-        <button onClick={() => document.dispatchEvent(new CustomEvent("hive-states-tab", { detail: "sources" }))} className="font-semibold underline">
+        <button onClick={() => onJumpToSources?.()} className="font-semibold underline">
           Authoritative Sources
         </button>{" "}
         tab. NECTAR parses uploads into per-state requirements with source attribution.

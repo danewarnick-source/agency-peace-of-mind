@@ -221,12 +221,13 @@ function detectServiceCodes(q: string): string[] {
 
 async function gatherFacts(
   supabase: SupabaseLike,
-  userId: string,
+  _userId: string,
   role: string,
   question: string,
+  orgId: string,
 ): Promise<OrgFacts> {
   const facts: OrgFacts = {
-    organization_id: null,
+    organization_id: orgId,
     role,
     scope: role === "employee" || role === "host_family" ? "self" : "organization",
     generated_at: new Date().toISOString(),
@@ -242,18 +243,6 @@ async function gatherFacts(
   };
 
   try {
-    const memQ = await supabase
-      .from("organization_members")
-      .select("organization_id")
-      .eq("user_id", userId)
-      .eq("active", true)
-      .limit(1);
-    const orgId = (memQ.data as Array<{ organization_id: string }> | null)?.[0]?.organization_id ?? null;
-    facts.organization_id = orgId;
-    if (!orgId) {
-      facts.notes.push("No active organization membership for this user.");
-      return facts;
-    }
 
     const [clientsActive, clientsTotal, staffActive, pbaAll, allCodes] = await Promise.all([
       supabase.from("clients").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("account_status", "active"),

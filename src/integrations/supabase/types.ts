@@ -4043,6 +4043,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_demo: boolean
           logo_url: string | null
           name: string
           slug: string
@@ -4054,6 +4055,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_demo?: boolean
           logo_url?: string | null
           name: string
           slug: string
@@ -4065,6 +4067,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_demo?: boolean
           logo_url?: string | null
           name?: string
           slug?: string

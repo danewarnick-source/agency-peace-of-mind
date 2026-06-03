@@ -291,24 +291,29 @@ function BasicsCard({
 // ─── Generic section shell ───────────────────────────────────────────────────
 
 function SectionShell({
-  title, dirty, saving, onSave, children,
+  title, dirty, saving, onSave, children, id, blurb,
 }: {
   title: string;
   dirty: boolean;
   saving: boolean;
   onSave: () => void;
   children: React.ReactNode;
+  id?: string;
+  blurb?: string;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-display text-sm font-semibold">{title}</h3>
+    <section id={id} className="scroll-mt-24 rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-display text-sm font-semibold">{title}</h3>
+          {blurb ? <p className="mt-0.5 text-[11px] text-muted-foreground">{blurb}</p> : null}
+        </div>
         <button
           onClick={onSave}
           disabled={!dirty || saving}
-          className="inline-flex min-h-[32px] items-center gap-1 rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
+          className="inline-flex min-h-[32px] shrink-0 items-center gap-1 rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
         >
-          <Save className="h-3 w-3" /> {saving ? "Saving…" : "Save"}
+          <Save className="h-3 w-3" /> {saving ? "Saving…" : dirty ? "Save" : "Saved"}
         </button>
       </div>
       {children}

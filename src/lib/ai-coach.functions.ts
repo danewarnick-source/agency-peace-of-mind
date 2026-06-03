@@ -168,6 +168,7 @@ export interface DraftResult {
 }
 
 export const draftShiftNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateDraft)
   .handler(async ({ data }): Promise<DraftResult> => {
     const system = `You are NECTAR, a Medicaid DSPD progress-note drafting assistant for direct-support caregivers.

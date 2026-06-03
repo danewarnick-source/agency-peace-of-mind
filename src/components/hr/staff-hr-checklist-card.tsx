@@ -1,0 +1,461 @@
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Loader2, Upload, FileText, Eye, Trash2, ShieldAlert } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  getStaffChecklist,
+  getStaffPii,
+  upsertChecklistCompletion,
+  updateStaffPii,
+  listHrDocuments,
+  createHrDocumentUploadUrl,
+  getHrDocumentUrl,
+  deleteHrDocument,
+} from "@/lib/hr-staff.functions";
+import { useAuth } from "@/hooks/use-auth";
+
+const STATUSES = ["not_started", "in_progress", "complete", "expired", "waived"] as const;
+
+function maskSsn(last4: string | null) {
+  return last4 ? `•••-••-${last4}` : "—";
+}
+
+/**
+ * Per-staff HR section. All data here is fail-closed PII: the server fns
+ * verify caller is admin / team-manager-of-staff / self before returning
+ * anything. Staff viewing their own record see read-only data — edit
+ * controls are hidden and the server denies writes regardless.
+ */
+export function StaffHrChecklistCard({
+  organizationId,
+  staffId,
+}: {
+  organizationId: string;
+  staffId: string;
+}) {
+  const { user } = useAuth();
+  const isSelf = user?.id === staffId;
+  const qc = useQueryClient();
+  const fetchChecklist = useServerFn(getStaffChecklist);
+  const fetchPii = useServerFn(getStaffPii);
+  const upsertFn = useServerFn(upsertChecklistCompletion);
+  const updatePiiFn = useServerFn(updateStaffPii);
+  const listDocs = useServerFn(listHrDocuments);
+  const createUpload = useServerFn(createHrDocumentUploadUrl);
+  const getDocUrl = useServerFn(getHrDocumentUrl);
+  const delDoc = useServerFn(deleteHrDocument);
+
+  const piiQ = useQuery({
+    queryKey: ["staff-pii", organizationId, staffId],
+    queryFn: () => fetchPii({ data: { organization_id: organizationId, staff_id: staffId } }),
+  });
+  const checklistQ = useQuery({
+    queryKey: ["staff-checklist", organizationId, staffId],
+    queryFn: () =>
+      fetchChecklist({ data: { organization_id: organizationId, staff_id: staffId } }),
+  });
+  const docsQ = useQuery({
+    queryKey: ["hr-docs", organizationId, staffId],
+    queryFn: () => listDocs({ data: { organization_id: organizationId, staff_id: staffId } }),
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["staff-checklist", organizationId, staffId] });
+    qc.invalidateQueries({ queryKey: ["hr-docs", organizationId, staffId] });
+  };
+
+  const setStatus = useMutation({
+    mutationFn: async (v: { requirement_id: string; status: typeof STATUSES[number] }) =>
+      upsertFn({
+        data: {
+          organization_id: organizationId,
+          staff_id: staffId,
+          requirement_id: v.requirement_id,
+          status: v.status,
+          completed_date: v.status === "complete" ? new Date().toISOString().slice(0, 10) : null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Updated");
+      invalidate();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const [piiDraft, setPiiDraft] = useState<{ ssn_last4: string; date_of_birth: string; home_address: string } | null>(null);
+  const startEditPii = () => {
+    setPiiDraft({
+      ssn_last4: piiQ.data?.ssn_last4 ?? "",
+      date_of_birth: piiQ.data?.date_of_birth ?? "",
+      home_address: piiQ.data?.home_address ?? "",
+    });
+  };
+  const savePii = useMutation({
+    mutationFn: async () => {
+      if (!piiDraft) return;
+      await updatePiiFn({
+        data: {
+          organization_id: organizationId,
+          staff_id: staffId,
+          ssn_last4: piiDraft.ssn_last4 ? piiDraft.ssn_last4 : null,
+          date_of_birth: piiDraft.date_of_birth || null,
+          home_address: piiDraft.home_address || null,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("PII saved");
+      setPiiDraft(null);
+      qc.invalidateQueries({ queryKey: ["staff-pii", organizationId, staffId] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const uploadEvidence = async (file: File, requirementId: string | null, kind: string) => {
+    try {
+      const r = await createUpload({
+        data: {
+          organization_id: organizationId,
+          staff_id: staffId,
+          requirement_id: requirementId,
+          document_kind: kind,
+          file_name: file.name,
+          mime_type: file.type,
+          size_bytes: file.size,
+        },
+      });
+      const up = await fetch(r.upload.signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!up.ok) throw new Error(`Upload failed (${up.status})`);
+      toast.success("Document uploaded");
+      invalidate();
+      return r.hr_document_id;
+    } catch (e) {
+      toast.error((e as Error).message);
+      return null;
+    }
+  };
+
+  const viewDoc = async (id: string) => {
+    try {
+      const r = await getDocUrl({ data: { organization_id: organizationId, hr_document_id: id } });
+      window.open(r.signed_url, "_blank", "noopener");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  // Fail-closed UI: if PII query failed/returned null, we are not authorized.
+  if (piiQ.isLoading || checklistQ.isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-sm text-muted-foreground">
+          <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading HR record…
+        </CardContent>
+      </Card>
+    );
+  }
+  if (piiQ.error || checklistQ.error || !piiQ.data) {
+    return (
+      <Card className="border-rose-200 bg-rose-50/30">
+        <CardContent className="p-6 text-sm text-rose-700">
+          <ShieldAlert className="mr-2 inline h-4 w-4" />
+          You don't have access to this staffer's HR record. Only the organization admin, this
+          staffer's team manager, and the staffer themselves may view it.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const pii = piiQ.data;
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">HR — Sensitive Information</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {piiDraft ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <Label className="text-xs">SSN (last 4 only)</Label>
+                <Input
+                  inputMode="numeric"
+                  maxLength={4}
+                  pattern="[0-9]{4}"
+                  value={piiDraft.ssn_last4}
+                  onChange={(e) =>
+                    setPiiDraft({ ...piiDraft, ssn_last4: e.target.value.replace(/\D/g, "") })
+                  }
+                  placeholder="1234"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Full SSN never stored — keep it inside the I-9/SS card upload.
+                </p>
+              </div>
+              <div>
+                <Label className="text-xs">Date of birth</Label>
+                <Input
+                  type="date"
+                  value={piiDraft.date_of_birth}
+                  onChange={(e) => setPiiDraft({ ...piiDraft, date_of_birth: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Home address</Label>
+                <Input
+                  value={piiDraft.home_address}
+                  onChange={(e) => setPiiDraft({ ...piiDraft, home_address: e.target.value })}
+                />
+              </div>
+              <div className="sm:col-span-3 flex gap-2">
+                <Button size="sm" onClick={() => savePii.mutate()} disabled={savePii.isPending}>
+                  Save
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setPiiDraft(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-3 text-sm">
+              <Field label="SSN" value={maskSsn(pii.ssn_last4)} />
+              <Field label="DOB" value={pii.date_of_birth ?? "—"} />
+              <Field label="Home address" value={pii.home_address ?? "—"} />
+              <Field
+                label="Hourly rate"
+                value={pii.hourly_rate != null ? `$${pii.hourly_rate}` : "—"}
+              />
+              <Field
+                label="Daily rate"
+                value={pii.daily_rate != null ? `$${pii.daily_rate}` : "—"}
+              />
+              {!isSelf && (
+                <div className="sm:col-span-3">
+                  <Button size="sm" variant="outline" onClick={startEditPii}>
+                    Edit
+                  </Button>
+                </div>
+              )}
+              {isSelf && (
+                <p className="sm:col-span-3 text-[11px] text-muted-foreground">
+                  You can view your own record. Edits to completion status and PII are done by your
+                  admin or team manager.
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Compliance Checklist</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(checklistQ.data ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No live base items yet. Confirm the HR base checklist in HIVE Exec / Approvals.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {(checklistQ.data ?? []).map((row) => {
+                const completionDoc = (docsQ.data ?? []).find(
+                  (d) => d.id === row.completion.evidence_document_id,
+                );
+                return (
+                  <div
+                    key={row.requirement_id}
+                    className="rounded-lg border border-border/60 p-3 text-sm"
+                  >
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <div className="min-w-0">
+                        <div className="font-medium">{row.title}</div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                          {row.category && <Badge variant="outline">{row.category}</Badge>}
+                          {row.checklist_layer && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {row.checklist_layer}
+                            </Badge>
+                          )}
+                          {row.renewal_frequency && (
+                            <span>renews: {row.renewal_frequency}</span>
+                          )}
+                          {row.source_citation && <span>· {row.source_citation}</span>}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isSelf ? (
+                          <Badge>{row.completion.status}</Badge>
+                        ) : (
+                          <Select
+                            value={row.completion.status}
+                            onValueChange={(v) =>
+                              setStatus.mutate({
+                                requirement_id: row.requirement_id,
+                                status: v as typeof STATUSES[number],
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[140px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUSES.map((s) => (
+                                <SelectItem key={s} value={s} className="text-xs">
+                                  {s}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {completionDoc ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => viewDoc(completionDoc.id)}
+                          >
+                            <Eye className="mr-1 h-3.5 w-3.5" /> Evidence
+                          </Button>
+                        ) : isSelf ? null : (
+                          <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted">
+                            <Upload className="h-3.5 w-3.5" /> Evidence
+                            <input
+                              type="file"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const f = e.target.files?.[0];
+                                if (!f) return;
+                                const docId = await uploadEvidence(
+                                  f,
+                                  row.requirement_id,
+                                  row.category ?? "checklist_evidence",
+                                );
+                                if (docId) {
+                                  await upsertFn({
+                                    data: {
+                                      organization_id: organizationId,
+                                      staff_id: staffId,
+                                      requirement_id: row.requirement_id,
+                                      status: "complete",
+                                      completed_date: new Date().toISOString().slice(0, 10),
+                                      evidence_document_id: docId,
+                                    },
+                                  });
+                                  invalidate();
+                                }
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                    {row.completion.completed_date && (
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        Completed {row.completion.completed_date}
+                        {row.completion.expires_at && ` · expires ${row.completion.expires_at}`}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">HR Documents</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(docsQ.data ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
+          ) : (
+            <ul className="divide-y">
+              {(docsQ.data ?? []).map((d) => (
+                <li key={d.id} className="flex items-center justify-between py-2 text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <div className="truncate">{d.file_name}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {d.document_kind} · {new Date(d.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => viewDoc(d.id)}>
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    {!isSelf && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={async () => {
+                          if (!confirm(`Delete ${d.file_name}?`)) return;
+                          try {
+                            await delDoc({
+                              data: { organization_id: organizationId, hr_document_id: d.id },
+                            });
+                            toast.success("Deleted");
+                            invalidate();
+                          } catch (e) {
+                            toast.error((e as Error).message);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!isSelf && (
+            <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground hover:bg-muted">
+              <Upload className="h-3.5 w-3.5" /> Upload HR document
+              <input
+                type="file"
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  await uploadEvidence(f, null, "hr_document");
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="font-mono">{value}</div>
+    </div>
+  );
+}

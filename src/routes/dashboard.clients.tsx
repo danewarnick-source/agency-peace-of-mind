@@ -569,15 +569,16 @@ function ProfileTab({
     setPhotoUploading(true);
     try {
       const ext = file.name.split(".").pop() ?? "jpg";
+      // client-photos bucket is PRIVATE (PHI). Store the storage path; the UI
+      // resolves it to a short-lived signed URL via <ClientPhoto>.
       const path = `${orgId}/${client.id}/profile.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from("client-photos")
         .upload(path, file, { upsert: true });
       if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from("client-photos").getPublicUrl(path);
-      setPhotoUrl(urlData.publicUrl);
+      setPhotoUrl(path);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("clients").update({ profile_photo_url: urlData.publicUrl }).eq("id", client.id);
+      await (supabase as any).from("clients").update({ profile_photo_url: path }).eq("id", client.id);
       toast.success("Profile photo updated.");
       qc.invalidateQueries({ queryKey: ["clients"] });
     } catch (e) {
@@ -639,13 +640,17 @@ function ProfileTab({
                   className="relative h-16 w-16 rounded-full overflow-hidden border-2 border-border hover:border-primary transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   title="Upload profile photo"
                 >
-                  {photoUrl ? (
-                    <img src={photoUrl} alt="Profile" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary">
-                      {client.first_name[0]}{client.last_name[0]}
-                    </span>
-                  )}
+                  <ClientPhoto
+                    path={photoUrl}
+                    alt="Profile"
+                    className="h-full w-full object-cover"
+                    fallback={
+                      <span className="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary">
+                        {client.first_name[0]}{client.last_name[0]}
+                      </span>
+                    }
+                  />
+
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition">
                     {photoUploading
                       ? <Loader2 className="h-5 w-5 animate-spin text-white" />

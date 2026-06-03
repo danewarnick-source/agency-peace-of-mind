@@ -154,6 +154,8 @@ export const listNectarGuides = createServerFn({ method: "POST" })
   .inputValidator((input: { orgId: string }) => ({ orgId: strField(input.orgId, 100) }))
   .handler(async ({ context, data }): Promise<Guide[]> => {
     const { supabase, userId } = context;
+    const { requireOrgMembership } = await import("@/integrations/supabase/require-org");
+    await requireOrgMembership(supabase, userId, data.orgId, "employee");
     const { data: guides, error } = await supabase
       .from("nectar_guides")
       .select("id, goal, summary, status, surface, created_at")

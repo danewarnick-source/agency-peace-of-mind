@@ -90,12 +90,12 @@ export const publishBaseTemplateVersion = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
 
-    const nextVersion = ((top as { version?: number } | null)?.version ?? 0) + 1;
+    const topRow = (top ?? null) as unknown as { version?: number } | null;
+    const curRow = (cur ?? null) as unknown as { schema?: BaseTemplateSchema; version?: number } | null;
+    const nextVersion = (topRow?.version ?? 0) + 1;
 
-    const diff = diffBaseSchemas(
-      (cur as { schema?: BaseTemplateSchema } | null)?.schema ?? null,
-      data.schema as BaseTemplateSchema,
-    );
+    const diff = diffBaseSchemas(curRow?.schema ?? null, data.schema as BaseTemplateSchema);
+
     const changelog = [...diff.added, ...diff.removed];
     if (data.notes) changelog.push({ type: "changed", section: "_notes", note: data.notes });
 

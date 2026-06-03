@@ -39,6 +39,7 @@ export const fireCelebration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => FireInput.parse(i))
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row, error } = await sb

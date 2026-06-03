@@ -140,6 +140,8 @@ function ProfileTab({ stateCode, onJumpToSources }: { stateCode: string; onJumpT
     <div className="space-y-4">
       <BasicsCard stateCode={stateCode} row={stateRow} />
 
+      <BaseVersionBanner stateCode={stateCode} />
+
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card p-3 text-sm">
         <div className="text-muted-foreground">
           {tpl?.published_at
@@ -156,6 +158,7 @@ function ProfileTab({ stateCode, onJumpToSources }: { stateCode: string; onJumpT
           <CheckCircle2 className="h-3.5 w-3.5" /> {publish.isPending ? "Publishing…" : "Publish template"}
         </button>
       </div>
+
 
       {tplQ.isLoading ? (
         <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">

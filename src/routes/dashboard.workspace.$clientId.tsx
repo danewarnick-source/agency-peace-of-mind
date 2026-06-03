@@ -226,12 +226,14 @@ function ClientWorkspace() {
             <ActiveShiftReimbursementSlot clientId={client.id} />
           </TabsContent>
 
-          <TabsContent value="emar" className="mt-5">
-            <MarEmarTab
-              clientId={client.id}
-              clientName={`${client.first_name} ${client.last_name}`}
-            />
-          </TabsContent>
+          {emarEnabled && (
+            <TabsContent value="emar" className="mt-5">
+              <MarEmarTab
+                clientId={client.id}
+                clientName={`${client.first_name} ${client.last_name}`}
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="forms" className="mt-5">
             <FormsHubTab

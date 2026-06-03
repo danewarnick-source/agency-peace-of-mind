@@ -70,7 +70,6 @@ export const getOrCreateOnboardingSession = createServerFn({ method: "POST" })
         state_code: data.stateCode,
         created_by: userId,
         answers: seedAnswers,
-        started_from: data.startFrom ?? "blank",
       })
       .select("*")
       .single();

@@ -63,7 +63,31 @@ const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/internal-audit", label: "Internal Audit", icon: ClipboardCheck },
 ];
 
-type PlatformStateLite = { code: string; name: string; status: "draft" | "active" | "coming_soon" };
+type PV = "staff" | "admin" | "staff_mobile" | "hive_exec" | "state_preview";
+
+type SidebarBodyProps = {
+  user: ReturnType<typeof useAuth>["user"];
+  role: Role;
+  isAdminCapable: boolean;
+  isExecutive: boolean;
+  isHiveExecView: boolean;
+  rawView: PV;
+  setView: (v: PV) => void;
+  isStatePreview: boolean;
+  stateCode: string | null;
+  setStateCode: (code: string | null) => void;
+  subView: "admin" | "staff";
+  setSubView: (s: "admin" | "staff") => void;
+  states: PlatformStateLite[];
+  currentPreviewState: PlatformStateLite | null;
+  nav: NavItem[];
+  showNectarCluster: boolean;
+  pathname: string;
+  signOut: () => Promise<void>;
+  onNavigate?: () => void;
+};
+
+
 
 function DashboardLayout() {
   const { session, loading, user } = useAuth();

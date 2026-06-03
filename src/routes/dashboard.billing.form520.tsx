@@ -25,8 +25,9 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Copy, Download, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Lock, FileSearch,
 } from "lucide-react";
-import { hoursToUnits, fmtHours } from "@/lib/billing-units";
+import { fmtHours } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
+import { aggregateHourlyUnits, aggregateDailyDays } from "@/lib/accrual";
 import { RequireRole } from "@/components/rbac-guard";
 
 export const Route = createFileRoute("/dashboard/billing/form520")({

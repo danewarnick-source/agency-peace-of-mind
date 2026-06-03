@@ -1,4 +1,4 @@
 project_id = "mmknqtdrefbzwfdtykza"
 
 [functions.parse-receipt-ocr]
-verify_jwt = false
+verify_jwt = true

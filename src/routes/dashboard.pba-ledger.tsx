@@ -310,11 +310,11 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
     setTimeout(() => setAutofilled({}), 6000);
   };
 
-  const runParse = async (signedOrPublicUrl: string) => {
+  const runParse = async (storagePath: string) => {
     setParsing(true);
     try {
       const { data, error } = await supabase.functions.invoke("parse-receipt-ocr", {
-        body: { imageUrl: signedOrPublicUrl },
+        body: { bucket: "client_receipt_snapshots", path: storagePath },
       });
       if (error) throw error;
       const d = data as { merchant_name?: string; total_amount?: number; transaction_date?: string; error?: string };
@@ -340,9 +340,7 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
       const { error: upErr } = await supabase.storage.from("client_receipt_snapshots").upload(path, file, { upsert: false });
       if (upErr) throw upErr;
       setReceiptUrl(path);
-      const { data: signed, error: sErr } = await supabase.storage.from("client_receipt_snapshots").createSignedUrl(path, 600);
-      if (sErr) throw sErr;
-      await runParse(signed.signedUrl);
+      await runParse(path);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {

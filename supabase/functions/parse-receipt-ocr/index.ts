@@ -1,12 +1,37 @@
 // Receipt OCR via Lovable AI Gateway (vision)
-// Accepts { imageUrl: string } OR { imageBase64: string, mime?: string }
+// Accepts { bucket: string, path: string }  -- preferred; resolved server-side via storage
+//      OR { imageBase64: string, mime?: string }  -- inline data
 // Returns { merchant_name, total_amount, transaction_date }
+//
+// SECURITY:
+// - verify_jwt = true in supabase/config.toml: unauthenticated callers are rejected before this code runs.
+// - We do NOT accept a caller-supplied URL. Previously this function fetched an arbitrary `imageUrl`,
+//   which was a Server-Side Request Forgery (SSRF) hole (e.g. http://169.254.169.254 cloud metadata).
+//   Instead, callers pass a storage bucket+path and we download via the service-role client.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// Buckets the OCR function is allowed to read from. Anything else is rejected.
+const ALLOWED_BUCKETS = new Set([
+  "client_receipt_snapshots",
+  "client-spending-receipts",
+  "activity-receipts",
+]);
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -15,22 +40,57 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const { imageUrl, imageBase64, mime } = await req.json();
+    // Defense-in-depth: verify_jwt=true already enforces this, but require the
+    // authorization header explicitly so any misconfiguration fails closed.
+    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
+      return json({ error: "Unauthorized" }, 401);
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { bucket, path, imageBase64, mime } = body ?? {};
 
     let dataUrl: string | undefined;
-    if (imageBase64) {
-      dataUrl = `data:${mime || "image/jpeg"};base64,${imageBase64}`;
-    } else if (imageUrl) {
-      // Fetch the image server-side and convert to base64 (handles signed URLs / private buckets)
-      const r = await fetch(imageUrl);
-      if (!r.ok) throw new Error(`Failed to fetch image: ${r.status}`);
-      const ct = r.headers.get("content-type") || "image/jpeg";
-      const buf = new Uint8Array(await r.arrayBuffer());
+
+    if (typeof imageBase64 === "string" && imageBase64.length > 0) {
+      // Inline base64 — no network fetch, no SSRF risk.
+      const safeMime = typeof mime === "string" && /^image\/[a-zA-Z0-9.+-]+$/.test(mime) ? mime : "image/jpeg";
+      dataUrl = `data:${safeMime};base64,${imageBase64}`;
+    } else if (typeof bucket === "string" && typeof path === "string") {
+      if (!ALLOWED_BUCKETS.has(bucket)) {
+        return json({ error: "Bucket not allowed" }, 400);
+      }
+      // Reject any path traversal / absolute URL trickery.
+      if (
+        path.length === 0 ||
+        path.length > 1024 ||
+        path.includes("..") ||
+        path.startsWith("/") ||
+        /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(path)
+      ) {
+        return json({ error: "Invalid path" }, 400);
+      }
+
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+      const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (!SUPABASE_URL || !SERVICE_ROLE) throw new Error("Storage not configured");
+
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+      const { data: blob, error: dlErr } = await admin.storage.from(bucket).download(path);
+      if (dlErr || !blob) {
+        return json({ error: `Failed to read receipt: ${dlErr?.message ?? "not found"}` }, 400);
+      }
+      const ab = await blob.arrayBuffer();
+      if (ab.byteLength > MAX_IMAGE_BYTES) {
+        return json({ error: "Image too large" }, 413);
+      }
+      const ct = (blob.type && /^image\//.test(blob.type)) ? blob.type : "image/jpeg";
+      const buf = new Uint8Array(ab);
       let bin = "";
       for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
       dataUrl = `data:${ct};base64,${btoa(bin)}`;
     } else {
-      throw new Error("Provide imageUrl or imageBase64");
+      return json({ error: "Provide { bucket, path } or { imageBase64 }" }, 400);
     }
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -82,12 +142,12 @@ Deno.serve(async (req) => {
       const t = await aiRes.text();
       console.error("AI gateway error", aiRes.status, t);
       if (aiRes.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded, try again shortly." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return json({ error: "Rate limit exceeded, try again shortly." }, 429);
       }
       if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Lovable AI workspace." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return json({ error: "AI credits exhausted. Add funds in Lovable AI workspace." }, 402);
       }
-      return new Response(JSON.stringify({ error: "AI gateway error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ error: "AI gateway error" }, 500);
     }
 
     const j = await aiRes.json();
@@ -95,15 +155,9 @@ Deno.serve(async (req) => {
     const args = call?.function?.arguments ? JSON.parse(call.function.arguments) : null;
     if (!args) throw new Error("AI did not return structured receipt data");
 
-    return new Response(JSON.stringify(args), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(args, 200);
   } catch (e) {
     console.error("parse-receipt-ocr error", e);
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: (e as Error).message }, 500);
   }
 });

@@ -1091,6 +1091,7 @@ export const recordAttestation = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { data: profile } = await supabase
       .from("profiles")
       .select("full_name, email")

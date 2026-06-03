@@ -119,10 +119,15 @@ function ComplianceInbox() {
 
 function Overview() {
   const { data: org } = useCurrentOrg();
-  const { view } = usePortalView();
+  const { view, subView } = usePortalView();
 
   const isManager = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
-  const showAdmin = isManager && view === "admin";
+  // State (Build/Preview) renders the REAL admin/staff surfaces parameterized by the
+  // selected state's template. When Admin sub-view is selected, show the real
+  // Company Overview (not the staff caseload).
+  const isStatePreviewAdmin = view === "state_preview" && subView === "admin";
+  const showAdmin = (isManager && view === "admin") || isStatePreviewAdmin;
+
 
   return (
     <div className="space-y-8">

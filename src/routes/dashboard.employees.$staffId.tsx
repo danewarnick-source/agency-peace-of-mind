@@ -137,11 +137,8 @@ function StaffProfilePage() {
             </div>
           </div>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => navigate({ to: "/dashboard/employees", search: { edit: staffId } as never })}
-        >
-          Quick edit
+        <Button variant="outline" asChild>
+          <Link to="/dashboard/employees">Back to list (quick edit)</Link>
         </Button>
       </div>
 

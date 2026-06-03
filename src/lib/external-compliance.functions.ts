@@ -19,6 +19,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import type { Json } from "@/integrations/supabase/types";
 
 export const EXTERNAL_SYSTEMS = [

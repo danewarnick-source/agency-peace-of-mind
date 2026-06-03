@@ -370,6 +370,7 @@ ${data.question}
 // Returns structured JSON so the client can decide which modal to show.
 
 export const scanNoteForTriggers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateScan)
   .handler(async ({ data }): Promise<ScanResult> => {
     const system = `You are a compliance trigger scanner for a Medicaid DSPD caregiving platform. 

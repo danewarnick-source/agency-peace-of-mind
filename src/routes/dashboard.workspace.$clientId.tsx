@@ -34,6 +34,7 @@ import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
 import { ReimbursementShiftPanel } from "@/components/staff-mobile/reimbursement-shift-panel";
 import { ClientSpendingShiftPanel } from "@/components/staff-mobile/client-spending-shift-panel";
 import { useActiveShift } from "@/hooks/use-active-shift";
+import { ClientPhoto } from "@/components/client-photo";
 
 function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
   const { data: active } = useActiveShift();

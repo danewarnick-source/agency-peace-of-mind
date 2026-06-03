@@ -67,6 +67,7 @@ function StateDetailPage() {
         {(
           [
             ["profile", "Profile & Template"],
+            ["inventory", "Inventory & Gaps"],
             ["sources", "Authoritative Sources"],
             ["providers", "Providers"],
           ] as const
@@ -84,8 +85,10 @@ function StateDetailPage() {
       </nav>
 
       {tab === "profile" ? <ProfileTab stateCode={stateCode} /> : null}
+      {tab === "inventory" ? <InventoryTab stateCode={stateCode} /> : null}
       {tab === "sources" ? <SourcesTab stateCode={stateCode} /> : null}
       {tab === "providers" ? <ProvidersTab stateCode={stateCode} /> : null}
+
     </div>
   );
 }

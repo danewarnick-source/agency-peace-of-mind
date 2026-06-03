@@ -251,6 +251,7 @@ export const attestExternalCompletion = createServerFn({ method: "POST" })
       .eq("id", data.requirementId)
       .single();
     if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "employee");
 
     const md = ((req.metadata as Record<string, unknown> | null) ?? {});
     const system = (md["external_system"] as string | null) ?? "external system";

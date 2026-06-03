@@ -299,7 +299,7 @@ export const listEmarLogs = createServerFn({ method: "POST" })
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
     const { data: rows, error } = await context.supabase
-      .from("hhs_emar_logs" as never)
+      .from("emar_logs")
       .select("*")
       .eq("organization_id", data.organizationId)
       .order("created_at", { ascending: false })

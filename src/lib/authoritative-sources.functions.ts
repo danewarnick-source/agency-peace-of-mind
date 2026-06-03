@@ -787,7 +787,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
       .select(
@@ -796,6 +796,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       .eq("id", data.documentId)
       .single();
     if (dErr || !doc) throw new Error(dErr?.message ?? "Document not found");
+    await requireOrgMembership(supabase, userId, doc.organization_id as string, "manager");
     if (!doc.is_authoritative_source)
       throw new Error("Document is not marked as an authoritative source.");
 

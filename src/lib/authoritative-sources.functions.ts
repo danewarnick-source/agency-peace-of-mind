@@ -667,6 +667,8 @@ export const verifyRequirement = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (getErr || !req) throw new Error(getErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
+
 
     const { error } = await supabase
       .from("nectar_requirements")

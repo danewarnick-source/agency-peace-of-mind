@@ -600,6 +600,7 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
     onSuccess: () => {
       toast.success(`Med ${status}${isMedError ? " — flagged as medication error" : ""}.`);
       qc.invalidateQueries({ queryKey: ["hhs-emar-error-flag"] });
+      qc.invalidateQueries({ queryKey: ["hhs-emar-today"] });
       resetDialog();
     },
     onError: (e: Error) => toast.error(e.message),

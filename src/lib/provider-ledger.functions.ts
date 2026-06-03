@@ -43,9 +43,7 @@ export const CATEGORY_SIGN: Record<LedgerCategory, 1 | -1> = {
 const CategoryEnum = z.enum(LEDGER_CATEGORIES);
 
 async function adminOrgIds(
-  supabase: Awaited<ReturnType<typeof requireSupabaseAuth.server>> extends never
-    ? never
-    : import("@supabase/supabase-js").SupabaseClient,
+  supabase: import("@supabase/supabase-js").SupabaseClient,
   userId: string,
 ): Promise<string[]> {
   const { data, error } = await supabase
@@ -55,8 +53,8 @@ async function adminOrgIds(
     .eq("active", true);
   if (error) throw new Error(error.message);
   return (data ?? [])
-    .filter((m) => m.role === "admin" || m.role === "super_admin")
-    .map((m) => m.organization_id);
+    .filter((m: { role: string }) => m.role === "admin" || m.role === "super_admin")
+    .map((m: { organization_id: string }) => m.organization_id);
 }
 
 // ─── LIST ────────────────────────────────────────────────────────────────

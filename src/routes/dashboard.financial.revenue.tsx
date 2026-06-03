@@ -453,9 +453,11 @@ type ManualEntry = {
 
 function ManualBilledEditor({
   year,
+  organizationId,
   onChanged,
 }: {
   year: number;
+  organizationId: string;
   onChanged?: () => void;
 }) {
   const qc = useQueryClient();
@@ -463,10 +465,10 @@ function ManualBilledEditor({
   const upsertFn = useServerFn(upsertBilledManualEntry);
   const deleteFn = useServerFn(deleteBilledManualEntry);
 
-  const queryKey = ["billed-manual", year] as const;
+  const queryKey = ["billed-manual", year, organizationId] as const;
   const q = useQuery({
     queryKey,
-    queryFn: () => listFn({ data: { year } }),
+    queryFn: () => listFn({ data: { year, organizationId } }),
   });
 
   const byMonth = useMemo(() => {

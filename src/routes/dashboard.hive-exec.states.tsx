@@ -21,20 +21,20 @@ type Row = {
 };
 
 function StatusChip({ status, isRef }: { status: string; isRef: boolean }) {
-  const styles =
-    status === "active"
-      ? "bg-emerald-100 text-emerald-900 border-emerald-200"
-      : status === "draft"
-        ? "bg-amber-100 text-amber-900 border-amber-200"
-        : "bg-muted text-muted-foreground border-border";
+  const isActive = status === "active";
+  const styles = isActive
+    ? "bg-emerald-100 text-emerald-900 border-emerald-200"
+    : "bg-slate-100 text-slate-600 border-slate-200";
+  const label = isActive ? "Active" : status === "coming_soon" ? "Coming soon" : "Inactive";
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${styles}`}>
       {isRef ? <Star className="h-3 w-3" /> : null}
-      {status === "coming_soon" ? "Coming soon" : status === "active" ? "Active" : "Draft"}
+      {label}
       {isRef ? " · Reference" : ""}
     </span>
   );
 }
+
 
 function StatesIndexPage() {
   const fn = useServerFn(listPlatformStates);

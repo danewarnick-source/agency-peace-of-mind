@@ -49,6 +49,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
   { to: "/dashboard/billing", label: "Billing", icon: Receipt, perm: "view_billing" },
+  { to: "/dashboard/financial", label: "Financial", icon: TrendingUp, perm: "manage_billing" },
   { to: "/dashboard/audit", label: "Audit", icon: FolderArchive },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

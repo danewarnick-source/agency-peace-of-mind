@@ -47,6 +47,30 @@ export const getStaffPii = createServerFn({ method: "GET" })
     return rows[0] as StaffPii;
   });
 
+/**
+ * Bulk variant: returns one row per staff in the org that the caller is
+ * permitted to see (admin → all; team manager → their team; staff → self).
+ * Server-side `list_staff_pii(_org)` enforces the gate row-by-row; no other
+ * rows leak. Use this for the employees roster instead of selecting
+ * `hourly_rate`/`daily_rate` directly from `profiles` (those columns are
+ * REVOKEd from `authenticated`).
+ */
+export const listStaffPii = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ organization_id: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<StaffPii[]> => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: rows, error } = await (supabase as any).rpc("list_staff_pii", {
+      _org: data.organization_id,
+    });
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as StaffPii[];
+  });
+
 export interface ChecklistRow {
   requirement_id: string;
   title: string;

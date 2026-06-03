@@ -22,6 +22,7 @@ import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 import { ListChecks } from "lucide-react";
+import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
 
 
 export const Route = createFileRoute("/dashboard")({
@@ -372,15 +373,23 @@ function DashboardLayout() {
       <div className="border-t border-sidebar-border p-4">
         <div className="mb-3 text-xs text-sidebar-foreground/60">
           <div className="font-medium text-sidebar-foreground">{user?.user_metadata?.full_name ?? user?.email}</div>
-          <div className="flex items-center justify-between">
-            <span className="truncate">
-              {isHiveExecView ? "HIVE Platform" : (org?.organization_name ?? "Your workspace")}
-            </span>
-            <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">
-              {isHiveExecView ? "HIVE Exec" : ROLE_LABEL[role]}
-            </span>
+          <div className="mt-2">
+            {isHiveExecView ? (
+              <div className="flex items-center justify-between">
+                <span className="truncate">HIVE Platform</span>
+                <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">HIVE Exec</span>
+              </div>
+            ) : (
+              <>
+                <OrgSwitcher />
+                <div className="mt-1.5 flex justify-end">
+                  <span className="rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">
+                    {ROLE_LABEL[role]}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
-
         </div>
 
         <Button
@@ -445,7 +454,13 @@ function DashboardLayout() {
                     ? "HIVE Platform · HIVE Executive"
                     : isStatePreview
                       ? `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
-                      : `${org?.organization_name ?? "Workspace"} · ${ROLE_LABEL[role]}`}
+                      : (
+                        <span className="inline-flex items-center gap-1.5">
+                          {org?.organization_name ?? "Workspace"}
+                          {org?.is_demo && <DemoBadge />}
+                          <span>· {ROLE_LABEL[role]}</span>
+                        </span>
+                      )}
 
                 </p>
               </div>
@@ -468,6 +483,7 @@ function DashboardLayout() {
             </div>
           </header>
           <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
+          {!isHiveExecView && !isStatePreview && <DemoOrgBanner />}
 
           {isStatePreview && (
             <div className="flex items-center justify-between gap-3 border-b border-[#f4a93a]/30 bg-[#f4a93a]/[0.08] px-4 py-2 text-xs md:px-6">

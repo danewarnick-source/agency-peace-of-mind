@@ -400,7 +400,7 @@ function TerminologyEditor({ value, onSave }: { value: { department_name?: strin
   );
 
   return (
-    <SectionShell title="Terminology" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-terminology" title="Terminology" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Department / division name">
           <input
@@ -484,7 +484,7 @@ function BillingCodesEditor({ value, onSave }: { value: { codes?: StateBillingCo
   };
 
   return (
-    <SectionShell title="Service & Billing Codes" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-billing_codes" title="Service & Billing Codes" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -546,7 +546,7 @@ function FormsEditor({ value, onSave }: { value: { forms?: StateForm[] }; onSave
   };
 
   return (
-    <SectionShell title="State Forms (520, 1056, PCSP equivalents)" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-forms" title="State Forms (520, 1056, PCSP equivalents)" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="space-y-2">
         {s.value.forms.length === 0 ? (
           <p className="text-sm text-muted-foreground">No state forms yet.</p>
@@ -588,7 +588,7 @@ function TrainingEditor({ value, onSave }: { value: { mandates?: StateTrainingMa
   };
 
   return (
-    <SectionShell title="Training Mandates" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-training" title="Training Mandates" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="space-y-2">
         {s.value.mandates.length === 0 ? (
           <p className="text-sm text-muted-foreground">No training mandates yet.</p>
@@ -641,7 +641,7 @@ function EvvEditor({ value, onSave }: { value: { default_geofence_feet?: number;
   );
 
   return (
-    <SectionShell title="EVV Configuration" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-evv" title="EVV Configuration" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="grid gap-3 md:grid-cols-4">
         <Field label="Geofence (ft)"><input type="number" min={0} value={s.value.default_geofence_feet} onChange={(e) => s.update({ ...s.value, default_geofence_feet: Number(e.target.value) })} className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" /></Field>
         <Field label="Grace minutes"><input type="number" min={0} value={s.value.variance_grace_minutes} onChange={(e) => s.update({ ...s.value, variance_grace_minutes: Number(e.target.value) })} className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" /></Field>
@@ -669,7 +669,7 @@ function RequiredDocsEditor({ value, onSave }: { value: { docs?: StateRequiredDo
   };
 
   return (
-    <SectionShell title="Required Documents (recurring attestations)" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-required_documents" title="Required Documents (recurring attestations)" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="space-y-2">
         {s.value.docs.length === 0 ? (
           <p className="text-sm text-muted-foreground">No required documents yet.</p>
@@ -705,7 +705,7 @@ function DepartmentStructureEditor({ value, onSave }: { value: { agency_types?: 
   );
 
   return (
-    <SectionShell title="Department Structure & Jurisdiction" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-department_structure" title="Department Structure & Jurisdiction" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="grid gap-4 md:grid-cols-2">
         <StringListEditor label="Agency / provider types" value={s.value.agency_types} onChange={(v) => s.update({ ...s.value, agency_types: v })} placeholder="e.g. Supported Living" />
         <StringListEditor label="Program / service levels" value={s.value.program_levels} onChange={(v) => s.update({ ...s.value, program_levels: v })} placeholder="e.g. Level 3" />

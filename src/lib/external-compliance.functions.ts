@@ -109,7 +109,8 @@ export const listExternalRequirements = createServerFn({ method: "POST" })
     z.object({ organizationId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     const { data: reqs, error } = await supabase
       .from("nectar_requirements")

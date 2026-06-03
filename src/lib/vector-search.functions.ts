@@ -197,6 +197,7 @@ export const backfillTimesheetEmbeddings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateBackfill)
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "admin");
     const { data: rows, error } = await context.supabase
       .from("evv_timesheets")
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

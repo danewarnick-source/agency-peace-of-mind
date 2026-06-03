@@ -66,6 +66,7 @@ export const listActiveCelebrations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const userId = context.userId as string;

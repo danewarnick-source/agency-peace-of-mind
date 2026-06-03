@@ -237,16 +237,26 @@ function DashboardLayout() {
                   <SelectValue placeholder="Select a state" />
                 </SelectTrigger>
                 <SelectContent>
-                  {states.map((s) => (
-                    <SelectItem key={s.code} value={s.code}>
-                      <span className="inline-flex items-center gap-2">
-                        {s.name}
-                        <span className="rounded-full bg-muted px-1.5 text-[9px] uppercase tracking-wider text-muted-foreground">
-                          {s.status === "coming_soon" ? "Coming soon" : s.status}
+                  {states.map((s) => {
+                    const isActive = s.status === "active";
+                    return (
+                      <SelectItem key={s.code} value={s.code}>
+                        <span className="inline-flex items-center gap-2">
+                          {s.name}
+                          <span
+                            className={`rounded-full px-1.5 text-[9px] font-semibold uppercase tracking-wider ${
+                              isActive
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-200 text-slate-600"
+                            }`}
+                          >
+                            {isActive ? "Active" : s.status === "coming_soon" ? "Coming soon" : "Inactive"}
+                          </span>
                         </span>
-                      </span>
-                    </SelectItem>
-                  ))}
+                      </SelectItem>
+                    );
+                  })}
+
                 </SelectContent>
               </Select>
               <div className="flex gap-1 pt-1">

@@ -1111,6 +1111,80 @@ export type Database = {
           },
         ]
       }
+      client_intake_completion: {
+        Row: {
+          client_id: string
+          completed_by: string | null
+          completed_date: string | null
+          created_at: string
+          evidence_document_id: string | null
+          expires_at: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          requirement_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          evidence_document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          requirement_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          evidence_document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          requirement_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_intake_completion_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_intake_completion_evidence_document_id_fkey"
+            columns: ["evidence_document_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_intake_completion_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_intake_completion_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_medications: {
         Row: {
           adverse_effects: string | null
@@ -6148,6 +6222,10 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: string }
+      can_view_client_intake: {
+        Args: { _client: string; _org: string; _viewer: string }
+        Returns: boolean
+      }
       can_view_staff_pii: {
         Args: { _org: string; _staff: string; _viewer: string }
         Returns: boolean
@@ -6196,6 +6274,36 @@ export type Database = {
           unit_type: string
           weekly_cap_units: number
         }[]
+      }
+      get_hr_client_intake_base: {
+        Args: { _org: string }
+        Returns: {
+          applies_to: string | null
+          approval_state: string | null
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          jurisdiction: string | null
+          metadata: Json
+          organization_id: string
+          origin: string
+          requirement_key: string
+          review_status: string
+          source_citation: string | null
+          source_document_id: string | null
+          title: string
+          updated_at: string
+          verified: boolean
+          verified_at: string | null
+          verified_by: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "nectar_requirements"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_hr_staff_checklist_base: {
         Args: { _org: string }

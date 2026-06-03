@@ -107,13 +107,21 @@ export function DemoBadge({ subtle = false }: { subtle?: boolean }) {
 /**
  * Persistent banner shown across the dashboard when the active org is a
  * sandbox/demo workspace. Mirrors the State Build/Preview banner style.
- * Renders a height-placeholder while loading to prevent post-paint layout shift.
+ *
+ * Reads directly from `useCurrentOrg()` — the same single source of truth
+ * the `OrgSwitcher` uses — so the two can never disagree (no stale prop
+ * pipeline). Renders a transparent height-placeholder while loading OR while
+ * `is_demo` is unknown to prevent post-paint layout shift, and renders
+ * nothing once a non-demo org is confirmed.
  */
-export function DemoOrgBanner({ org, isLoading }: { org?: import("@/hooks/use-org").CurrentMembership | null; isLoading: boolean }) {
-  if (isLoading) {
+export function DemoOrgBanner() {
+  const { data: org, isLoading } = useCurrentOrg();
+  // While loading, or before we have a definitive org, reserve the row but
+  // show nothing — never default-on to the amber banner.
+  if (isLoading || !org) {
     return <div className="h-8 border-b border-transparent" aria-hidden="true" />;
   }
-  if (!org?.is_demo) return null;
+  if (!org.is_demo) return null;
   return (
     <div className="flex items-center gap-2 border-b border-amber-300 bg-amber-100/80 px-4 py-1.5 text-xs text-amber-900 md:px-6">
       <FlaskConical className="h-3.5 w-3.5" />

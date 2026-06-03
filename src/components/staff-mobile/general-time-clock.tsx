@@ -32,7 +32,7 @@ const HINT_BY_CODE: Record<string, string> = {
   other: "Describe the task before clocking in",
 };
 
-function fmtElapsed(ms: number) {
+export function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
   const s = Math.floor(ms / 1000);
   const h = String(Math.floor(s / 3600)).padStart(2, "0");

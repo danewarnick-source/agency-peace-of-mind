@@ -1,12 +1,27 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, User, ArrowRight } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Clock,
+  User,
+  ArrowRight,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
+import { useGeneralShift } from "@/hooks/use-general-shift";
+import { fmtElapsed } from "@/components/staff-mobile/general-time-clock";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { GeneralTimeClock } from "@/components/staff-mobile/general-time-clock";
 
@@ -377,25 +392,99 @@ function SchedulePage() {
         )}
       </section>
 
-      {/* Non-client time — clearly secondary */}
+      {/* Non-client time — collapsible, clearly secondary */}
       {settings.allow_non_client_clockins && (
-        <section
-          aria-label="Non-client time"
-          className="mt-2 rounded-xl border border-border bg-muted/30 p-4"
-        >
-          <header className="mb-3 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-foreground">Non-client time</h2>
-              <p className="text-xs text-muted-foreground">
-                Admin, training, travel & meetings only. Client shifts must be
-                started from a scheduled shift or from My Caseload.
-              </p>
-            </div>
-          </header>
-          <GeneralTimeClock />
-        </section>
+        <CollapsibleGeneralClock />
       )}
     </div>
+  );
+}
+
+function CollapsibleGeneralClock() {
+  const { shift } = useGeneralShift();
+  const [open, setOpen] = useState(!!shift);
+  const [now, setNow] = useState(Date.now());
+
+  const running = !!shift;
+
+  // Default to expanded when on the clock so staff see their running shift.
+  useEffect(() => {
+    setOpen(!!shift);
+  }, [shift?.start_iso]);
+
+  // Keep elapsed time ticking while collapsed + running.
+  useEffect(() => {
+    if (!shift) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [shift]);
+
+  const elapsed = running
+    ? fmtElapsed(now - new Date(shift!.start_iso).getTime())
+    : "00:00:00";
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="mt-2 rounded-xl border border-border bg-muted/30">
+        {/* Collapsed pill / toggle header */}
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[0.99]"
+            aria-label={
+              running
+                ? "Non-client time is running. Tap to manage or clock out."
+                : "Tap to start non-client time clock"
+            }
+          >
+            <span
+              aria-hidden
+              className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                running ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+              }`}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">
+                {running
+                  ? `On non-client time · ${elapsed} · ${shift!.category}`
+                  : "Non-client time clock"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {running ? (
+                  <>
+                    Tap to manage / clock out{" "}
+                    <span className="ml-1 rounded bg-amber-100 px-1 py-0 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                      NO EVV
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Admin · training · travel · meetings{" "}
+                    <span className="ml-1 rounded bg-amber-100 px-1 py-0 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                      NO EVV
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+            <ChevronUp
+              className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                open ? "" : "rotate-180"
+              }`}
+            />
+          </button>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <div className="border-t border-border px-4 pb-4 pt-1">
+            <p className="mb-3 text-[11px] text-muted-foreground">
+              Client shifts start from a scheduled shift or My Caseload — with
+              EVV.
+            </p>
+            <GeneralTimeClock />
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
   );
 }

@@ -109,7 +109,7 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         source_citation: (r.source_citation as string) ?? null,
         evidence_type: (r.evidence_type as string) ?? null,
         renewal_frequency: (r.renewal_frequency as string) ?? null,
-        metadata: meta,
+        checklist_layer: (meta.checklist_layer as string) ?? null,
         completion: {
           id: (c?.id as string) ?? null,
           status: (c?.status as string) ?? "not_started",

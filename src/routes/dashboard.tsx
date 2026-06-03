@@ -252,7 +252,7 @@ function DashboardLayout() {
 
         <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
 
-          <header className="flex h-16 items-center justify-between gap-2 border-b border-border bg-background px-4 md:px-6">
+          <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-4 md:px-6">
             <div className="flex items-center gap-2 min-w-0">
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                 <SheetTrigger asChild>

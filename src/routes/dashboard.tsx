@@ -262,7 +262,7 @@ function DashboardLayout() {
                 <SheetContent side="left" className="w-[280px] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground">
                   <SheetTitle className="sr-only">Navigation</SheetTitle>
                   <div className="flex h-full flex-col">
-                    <SidebarBody onNavigate={() => setMobileOpen(false)} />
+                    <SidebarBody {...sidebarProps} onNavigate={() => setMobileOpen(false)} />
                   </div>
                 </SheetContent>
               </Sheet>

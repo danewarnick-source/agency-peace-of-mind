@@ -3,34 +3,31 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { hoursToUnits } from "@/lib/billing-units";
-import { resolveCallerEntitlements } from "@/lib/entitlements.server";
+import { assertAddonForOrg } from "@/lib/entitlements.server";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
 /**
  * Financial — Revenue (Billed vs Received), View 1.
  *
  * TIERING (NECTAR Infusion gate, server-enforced):
- *   • Entitled (NECTAR Infusion add-on present) → auto-fill billed revenue
- *     LIVE from the same data the existing 520 Billing submission reads:
- *       - public.client_billing_codes (rate_per_unit, service_code)
- *       - public.evv_timesheets       (hourly unit accrual)
- *       - public.hhs_daily_records    (daily unit accrual)
- *       - public.clients              (org scoping only)
- *     Math mirrors src/routes/dashboard.billing.form520.tsx exactly:
- *       - hourly codes: sum(clock_out - clock_in) hrs → hoursToUnits()
- *       - daily codes : count distinct record_date per client × rate
- *       - amount      : units × rate_per_unit
+ *   • Entitled (NECTAR Infusion add-on present on the PASSED org) → auto-fill
+ *     billed revenue LIVE from the same data the existing 520 Billing
+ *     submission reads:
+ *       - public.client_billing_codes
+ *       - public.evv_timesheets
+ *       - public.hhs_daily_records
  *   • NOT entitled (base tier) → return MANUALLY entered billed figures
- *     from provider_ledger_entries WHERE category='billed_manual'
- *     (admin-only RLS, same table as the rest of the Financial ledger).
- *     The 520 auto-fill is NEVER run for a non-entitled org.
+ *     from provider_ledger_entries WHERE category='billed_manual'.
  *
- * The entitlement check is server-side, using the same mechanism
- * (resolveCallerEntitlements → org tier → addonsForTier) that every other
- * NECTAR Infusion gate in the app already uses.
+ * Tier 3 Stage 3: every fn now ACCEPTS `organizationId` (the active org from
+ * the client) and verifies admin membership against THAT org — single-org
+ * semantics, not the legacy multi-org `.in(adminOrgIds)` aggregate, and not
+ * the FIRST_MEMBERSHIP "primary org" pick.
  */
 
 const Input = z.object({
   year: z.number().int().min(2000).max(2100),
+  organizationId: z.string().uuid(),
 });
 
 type MonthBucket = { month: number; billed: number };
@@ -40,25 +37,18 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const organizationId = data.organizationId;
 
-    // ─── Server-side admin gate (Company Admin only) ────────────────────────
-    const { data: memberships, error: mErr } = await supabase
-      .from("organization_members")
-      .select("organization_id, role, active")
-      .eq("user_id", userId)
-      .eq("active", true);
-    if (mErr) throw new Error(mErr.message);
-    const adminOrgs = (memberships ?? []).filter(
-      (m) => m.role === "admin" || m.role === "super_admin",
-    );
-    if (adminOrgs.length === 0) {
-      throw new Error("Forbidden: Company Admin role required.");
+    // ─── Server-side admin gate (Company Admin only) on the PASSED org ───
+    await requireOrgMembership(supabase, userId, organizationId, "admin");
+
+    // ─── NECTAR Infusion entitlement gate (on the PASSED org) ─────────────
+    let nectarEntitled = true;
+    try {
+      await assertAddonForOrg(supabase, userId, "nectar_infusion", organizationId);
+    } catch {
+      nectarEntitled = false;
     }
-    const orgIds = adminOrgs.map((m) => m.organization_id);
-
-    // ─── NECTAR Infusion entitlement gate (server-side) ────────────────────
-    const ent = await resolveCallerEntitlements(supabase, userId);
-    const nectarEntitled = ent.addons.includes("nectar_infusion");
 
     const months: MonthBucket[] = Array.from({ length: 12 }, (_, i) => ({
       month: i + 1,
@@ -66,11 +56,10 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
     }));
 
     if (!nectarEntitled) {
-      // ─── BASE TIER: manual billed entries only. Never touch the 520 source.
       const { data: manual, error: manErr } = await supabase
         .from("provider_ledger_entries")
         .select("period_month, amount")
-        .in("organization_id", orgIds)
+        .eq("organization_id", organizationId)
         .eq("period_year", data.year)
         .eq("category", "billed_manual");
       if (manErr) throw new Error(manErr.message);
@@ -95,7 +84,6 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
       };
     }
 
-    // ─── ENTITLED: live 520-sourced accrual (unchanged math) ───────────────
     const yearStart = `${data.year}-01-01`;
     const yearEndExclusive = `${data.year + 1}-01-01`;
     const yearEndInclusive = `${data.year}-12-31`;
@@ -104,18 +92,18 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
       supabase
         .from("client_billing_codes")
         .select("organization_id, client_id, service_code, rate_per_unit")
-        .in("organization_id", orgIds),
+        .eq("organization_id", organizationId),
       supabase
         .from("evv_timesheets")
         .select("organization_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
-        .in("organization_id", orgIds)
+        .eq("organization_id", organizationId)
         .gte("clock_in_timestamp", `${yearStart}T00:00:00Z`)
         .lt("clock_in_timestamp", `${yearEndExclusive}T00:00:00Z`)
         .not("clock_out_timestamp", "is", null),
       supabase
         .from("hhs_daily_records")
         .select("organization_id, client_id, record_date")
-        .in("organization_id", orgIds)
+        .eq("organization_id", organizationId)
         .gte("record_date", yearStart)
         .lte("record_date", yearEndInclusive),
     ]);
@@ -188,37 +176,19 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
 
 const BilledManualListInput = z.object({
   year: z.number().int().min(2000).max(2100),
+  organizationId: z.string().uuid(),
 });
-
-async function adminOrgIds(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
-  userId: string,
-): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("organization_members")
-    .select("organization_id, role, active")
-    .eq("user_id", userId)
-    .eq("active", true);
-  if (error) throw new Error(error.message);
-  return (data ?? [])
-    .filter((m: { role: string }) => m.role === "admin" || m.role === "super_admin")
-    .map((m: { organization_id: string }) => m.organization_id);
-}
 
 export const listBilledManualEntries = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => BilledManualListInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const orgIds = await adminOrgIds(supabase, userId);
-    if (orgIds.length === 0) {
-      throw new Error("Forbidden: Company Admin role required.");
-    }
+    await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { data: rows, error } = await supabase
       .from("provider_ledger_entries")
       .select("id, period_month, amount, label, note, is_estimate, updated_at")
-      .in("organization_id", orgIds)
+      .eq("organization_id", data.organizationId)
       .eq("period_year", data.year)
       .eq("category", "billed_manual")
       .order("period_month", { ascending: true });
@@ -227,6 +197,7 @@ export const listBilledManualEntries = createServerFn({ method: "POST" })
   });
 
 const UpsertInput = z.object({
+  organizationId: z.string().uuid(),
   year: z.number().int().min(2000).max(2100),
   month: z.number().int().min(1).max(12),
   amount: z.number().finite(),
@@ -239,14 +210,9 @@ export const upsertBilledManualEntry = createServerFn({ method: "POST" })
   .inputValidator((i) => UpsertInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const orgIds = await adminOrgIds(supabase, userId);
-    if (orgIds.length === 0) {
-      throw new Error("Forbidden: Company Admin role required.");
-    }
-    const organization_id = orgIds[0];
+    const organization_id = data.organizationId;
+    await requireOrgMembership(supabase, userId, organization_id, "admin");
 
-    // Try to find the existing row for this month and update it in place,
-    // otherwise insert. Keeps the table "one row per month" for billed_manual.
     const { data: existing, error: findErr } = await supabase
       .from("provider_ledger_entries")
       .select("id")
@@ -269,7 +235,7 @@ export const upsertBilledManualEntry = createServerFn({ method: "POST" })
           label,
         })
         .eq("id", existing.id)
-        .in("organization_id", orgIds)
+        .eq("organization_id", organization_id)
         .select("*")
         .single();
       if (error) throw new Error(error.message);
@@ -295,23 +261,23 @@ export const upsertBilledManualEntry = createServerFn({ method: "POST" })
     return { entry: row };
   });
 
-const DeleteBilledInput = z.object({ id: z.string().uuid() });
+const DeleteBilledInput = z.object({
+  id: z.string().uuid(),
+  organizationId: z.string().uuid(),
+});
 
 export const deleteBilledManualEntry = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => DeleteBilledInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const orgIds = await adminOrgIds(supabase, userId);
-    if (orgIds.length === 0) {
-      throw new Error("Forbidden: Company Admin role required.");
-    }
+    await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { error } = await supabase
       .from("provider_ledger_entries")
       .delete()
       .eq("id", data.id)
       .eq("category", "billed_manual")
-      .in("organization_id", orgIds);
+      .eq("organization_id", data.organizationId);
     if (error) throw new Error(error.message);
     return { ok: true as const };
   });

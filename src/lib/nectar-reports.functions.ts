@@ -180,15 +180,19 @@ Examples:
 
 // ───── Server function ──────────────────────────────────────────────────────
 
-interface AskInput { prompt: string }
+interface AskInput { prompt: string; organizationId: string }
+
+const UUID_RE_RPT = /^[0-9a-f-]{36}$/i;
 
 function validateInput(input: unknown): AskInput {
   const i = (input ?? {}) as Record<string, unknown>;
   const prompt = typeof i.prompt === "string" ? i.prompt.trim() : "";
+  const organizationId = typeof i.organizationId === "string" ? i.organizationId : "";
   if (prompt.length < 3 || prompt.length > 2000) {
     throw new Error("Prompt must be 3–2000 characters.");
   }
-  return { prompt };
+  if (!UUID_RE_RPT.test(organizationId)) throw new Error("Invalid organizationId.");
+  return { prompt, organizationId };
 }
 
 export const askNectarReport = createServerFn({ method: "POST" })
@@ -196,25 +200,12 @@ export const askNectarReport = createServerFn({ method: "POST" })
   .inputValidator(validateInput)
   .handler(async ({ data, context }): Promise<NectarReportResult> => {
     const { supabase, userId } = context;
+    const orgId = data.organizationId;
 
-    // Resolve current org and require admin/manager/super_admin (no staff access).
-    const { data: memberships } = await supabase
-      .from("organization_members")
-      .select("organization_id, role")
-      .eq("user_id", userId)
-      .eq("active", true);
-    if (!memberships || memberships.length === 0) {
-      throw new Error("No active organization membership.");
-    }
-    const rank: Record<string, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3 };
-    const primary = [...memberships].sort(
-      (a, b) => (rank[a.role] ?? 99) - (rank[b.role] ?? 99),
-    )[0];
-    const orgId = primary.organization_id;
-    const role = primary.role;
-    if (!["super_admin", "admin", "manager"].includes(role)) {
-      throw new Error("NECTAR billing reports are admin-only.");
-    }
+    // Verify manager+ membership on the PASSED org (not first-membership).
+    const { requireOrgMembership } = await import("@/integrations/supabase/require-org");
+    await requireOrgMembership(supabase, userId, orgId, "manager");
+
 
     const plan = await planFromPrompt(data.prompt);
 

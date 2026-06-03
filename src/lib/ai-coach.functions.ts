@@ -247,6 +247,7 @@ function validateVariance(input: unknown): VarianceDraftInput {
 export interface VarianceDraftResult { draft: string; }
 
 export const draftVarianceJustification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateVariance)
   .handler(async ({ data }): Promise<VarianceDraftResult> => {
     const system = `You are NECTAR, drafting an EVV geofence variance justification for a Medicaid DSPD caregiver.

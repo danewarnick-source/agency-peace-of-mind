@@ -443,3 +443,206 @@ export const deleteHrDocument = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+// --- HR Admin org-wide roll-up --------------------------------------------
+//
+// Aggregate read for the HR Admin tab. The PII gate is applied at the
+// AGGREGATE level: `list_staff_pii(_org)` already returns only the staff the
+// caller may view (admin → all; team manager → own team; self → self).
+// We compose per-staff rollup stats from the resulting set ONLY — no fan-out
+// over staff the caller can't see. Capability-only framing: counts + due
+// dates + completion %. No advice copy.
+
+export interface HrRollupRow {
+  staff_id: string;
+  full_name: string;
+  team_id: string | null;
+  team_name: string | null;
+  hire_date: string | null;
+  total_required: number;
+  complete_count: number;
+  completion_pct: number;
+  open_gaps: number;
+  expired_count: number;
+  next_renewal: { requirement_id: string; title: string; due_date: string } | null;
+  is_new_hire: boolean;
+}
+
+export interface HrRollupSummary {
+  staff_count: number;
+  total_open_gaps: number;
+  upcoming_renewals_30d: number;
+  overdue_renewals: number;
+  onboarding_in_progress: number;
+}
+
+export interface HrRollup {
+  summary: HrRollupSummary;
+  rows: HrRollupRow[];
+}
+
+export const getHrAdminRollup = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ organization_id: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<HrRollup> => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    // 1. Gated staff set — fail-closed; do not fall back to all-org.
+    const { data: piiRows, error: piiErr } = await sb.rpc("list_staff_pii", {
+      _org: data.organization_id,
+    });
+    if (piiErr) throw new Error(piiErr.message);
+    const staffIds: string[] = (piiRows ?? []).map(
+      (r: { staff_id: string }) => r.staff_id,
+    );
+    if (staffIds.length === 0) {
+      return {
+        summary: {
+          staff_count: 0,
+          total_open_gaps: 0,
+          upcoming_renewals_30d: 0,
+          overdue_renewals: 0,
+          onboarding_in_progress: 0,
+        },
+        rows: [],
+      };
+    }
+
+    // 2. Live base checklist (state_base + company_custom, provider_confirmed).
+    const { data: base, error: baseErr } = await sb.rpc(
+      "get_hr_staff_checklist_base",
+      { _org: data.organization_id },
+    );
+    if (baseErr) throw new Error(baseErr.message);
+    const baseItems: Array<{ id: string; title: string }> = (base ?? []).map(
+      (r: Record<string, unknown>) => ({
+        id: r.id as string,
+        title:
+          (r.title as string) ?? (r.short_label as string) ?? "Untitled",
+      }),
+    );
+    const totalRequired = baseItems.length;
+    const baseIds = new Set(baseItems.map((b) => b.id));
+    const titleById = new Map(baseItems.map((b) => [b.id, b.title]));
+
+    // 3. Names / team / hire_date (non-PII) for the gated staff set.
+    const { data: profs } = await sb
+      .from("profiles")
+      .select("id, full_name, team_id, hire_date")
+      .in("id", staffIds);
+    const profMap = new Map<string, { full_name: string | null; team_id: string | null; hire_date: string | null }>();
+    for (const p of profs ?? []) {
+      profMap.set(p.id, {
+        full_name: p.full_name,
+        team_id: p.team_id,
+        hire_date: p.hire_date,
+      });
+    }
+    const teamIds = Array.from(
+      new Set(
+        (profs ?? [])
+          .map((p: { team_id: string | null }) => p.team_id)
+          .filter((x: string | null): x is string => !!x),
+      ),
+    );
+    const teamMap = new Map<string, string>();
+    if (teamIds.length > 0) {
+      const { data: teams } = await sb
+        .from("teams")
+        .select("id, team_name")
+        .in("id", teamIds);
+      for (const t of teams ?? []) teamMap.set(t.id, t.team_name);
+    }
+
+    // 4. Completions for those staff only.
+    const { data: comps } = await sb
+      .from("staff_checklist_completion")
+      .select("staff_id, requirement_id, status, expires_at")
+      .eq("organization_id", data.organization_id)
+      .in("staff_id", staffIds);
+    const compByStaff = new Map<
+      string,
+      Map<string, { status: string; expires_at: string | null }>
+    >();
+    for (const c of comps ?? []) {
+      if (!baseIds.has(c.requirement_id)) continue;
+      if (!compByStaff.has(c.staff_id)) compByStaff.set(c.staff_id, new Map());
+      compByStaff
+        .get(c.staff_id)!
+        .set(c.requirement_id, { status: c.status, expires_at: c.expires_at });
+    }
+
+    const todayMs = Date.now();
+    const in30Ms = todayMs + 30 * 86400_000;
+    const newHireCutoffMs = todayMs - 60 * 86400_000;
+
+    const rows: HrRollupRow[] = staffIds.map((sid) => {
+      const p = profMap.get(sid);
+      const cmap = compByStaff.get(sid) ?? new Map();
+      let complete = 0;
+      let expired = 0;
+      let nextRenewal: HrRollupRow["next_renewal"] = null;
+      let nextRenewalTs = Infinity;
+      for (const b of baseItems) {
+        const c = cmap.get(b.id);
+        if (c?.status === "complete") complete++;
+        if (c?.status === "expired") expired++;
+        if (c?.expires_at) {
+          const ts = new Date(c.expires_at).getTime();
+          if (!Number.isNaN(ts) && ts < nextRenewalTs) {
+            nextRenewalTs = ts;
+            nextRenewal = {
+              requirement_id: b.id,
+              title: titleById.get(b.id) ?? b.title,
+              due_date: c.expires_at,
+            };
+          }
+        }
+      }
+      const openGaps = Math.max(0, totalRequired - complete);
+      const hire = p?.hire_date ?? null;
+      const hireMs = hire ? new Date(hire).getTime() : null;
+      const isNewHire =
+        hireMs !== null && hireMs >= newHireCutoffMs && openGaps > 0;
+      return {
+        staff_id: sid,
+        full_name: p?.full_name ?? "—",
+        team_id: p?.team_id ?? null,
+        team_name: p?.team_id ? (teamMap.get(p.team_id) ?? null) : null,
+        hire_date: hire,
+        total_required: totalRequired,
+        complete_count: complete,
+        completion_pct: totalRequired
+          ? Math.round((complete / totalRequired) * 100)
+          : 100,
+        open_gaps: openGaps,
+        expired_count: expired,
+        next_renewal: nextRenewal,
+        is_new_hire: isNewHire,
+      };
+    });
+
+    const summary: HrRollupSummary = {
+      staff_count: rows.length,
+      total_open_gaps: rows.reduce((a, r) => a + r.open_gaps, 0),
+      upcoming_renewals_30d: rows.filter(
+        (r) =>
+          r.next_renewal &&
+          new Date(r.next_renewal.due_date).getTime() <= in30Ms &&
+          new Date(r.next_renewal.due_date).getTime() >= todayMs,
+      ).length,
+      overdue_renewals: rows.filter(
+        (r) =>
+          r.next_renewal &&
+          new Date(r.next_renewal.due_date).getTime() < todayMs,
+      ).length,
+      onboarding_in_progress: rows.filter((r) => r.is_new_hire).length,
+    };
+
+    return { summary, rows };
+  });

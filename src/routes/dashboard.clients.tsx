@@ -1524,26 +1524,14 @@ function SettingsTab({
           <CardContent className="space-y-1">
             <p className="mb-4 text-xs text-muted-foreground">
               Enable or disable specific platform features for this individual client profile.
-              Disabled features are hidden from caregivers working with this client.
+              Wired features are hidden from caregivers working with this client when disabled.
+              Items marked <span className="font-medium">Coming soon</span> are not yet enforced.
             </p>
-            {FEATURE_TOGGLES.map((toggle_item) => (
-              <div key={toggle_item.key}
-                className="flex items-center justify-between rounded-lg border border-border px-4 py-3 hover:bg-muted/30 transition">
-                <div>
-                  <p className="text-sm font-medium">{toggle_item.label}</p>
-                  <p className="text-[11px] text-muted-foreground">{toggle_item.description}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[11px] font-medium ${features[toggle_item.key] ? "text-emerald-600" : "text-muted-foreground"}`}>
-                    {features[toggle_item.key] ? "Enabled" : "Disabled"}
-                  </span>
-                  <Switch
-                    checked={features[toggle_item.key] ?? true}
-                    onCheckedChange={() => toggle(toggle_item.key)}
-                  />
-                </div>
-              </div>
-            ))}
+            <FeatureTogglesList
+              features={features}
+              onToggle={toggle}
+            />
+          </CardContent>
             {featureDirty && (
               <div className="pt-3">
                 <Button onClick={saveFeatures} disabled={saving} className="w-full">

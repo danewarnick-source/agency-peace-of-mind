@@ -823,22 +823,8 @@ function ProfileTab({
           </CardContent>
         </Card>
 
-        {/* Save */}
-        {dirty && (
-          <Card className="border-amber-500/40 bg-amber-50 dark:bg-amber-950/20">
-            <CardContent className="pt-4 space-y-3">
-              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                <p className="text-sm font-medium">Unsaved changes</p>
-              </div>
-              <Button onClick={handleSave} disabled={saving || !first.trim() || !last.trim()}
-                className="w-full">
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Profile
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        {/* (Save promoted to sticky bottom bar — see end of ProfileTab) */}
+
 
         {/* Custom attributes */}
         <Card>

@@ -40,6 +40,7 @@ export interface NectarStaffReply {
 interface AskStaffInput {
   question: string;
   clientId?: string;
+  organizationId: string;
 }
 
 function validate(input: unknown): AskStaffInput {
@@ -52,8 +53,11 @@ function validate(input: unknown): AskStaffInput {
     typeof i.clientId === "string" && /^[0-9a-f-]{36}$/i.test(i.clientId)
       ? i.clientId
       : undefined;
-  return { question, clientId };
+  const organizationId = typeof i.organizationId === "string" ? i.organizationId : "";
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organizationId.");
+  return { question, clientId, organizationId };
 }
+
 
 const STAFF_DOC_TYPES = ["policy", "procedure", "sop", "training", "contract"];
 

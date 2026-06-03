@@ -47,8 +47,8 @@ function TeamPage() {
         <p className="text-sm text-muted-foreground">Track training completion and overdue assignments across your team.</p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
             <tr><th className="p-4 text-left">Employee</th><th className="p-4 text-left">Assigned</th><th className="p-4 text-left">Completed</th><th className="p-4 text-left">Overdue</th><th className="p-4 text-left">Avg progress</th></tr>
           </thead>

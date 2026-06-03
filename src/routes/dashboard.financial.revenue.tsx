@@ -554,7 +554,7 @@ function ManualBilledEditor({
                     month={month}
                     entry={entry}
                     onSubmit={(payload) =>
-                      upsertM.mutateAsync({ data: { year, month, ...payload } })
+                      upsertM.mutateAsync({ data: { year, month, organizationId, ...payload } })
                     }
                   />
                   {entry && (
@@ -564,7 +564,7 @@ function ManualBilledEditor({
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
                       onClick={() => {
                         if (confirm(`Clear billed revenue for ${label} ${year}?`)) {
-                          deleteM.mutate({ data: { id: entry.id } });
+                          deleteM.mutate({ data: { id: entry.id, organizationId } });
                         }
                       }}
                     >

@@ -35,6 +35,7 @@ import { ReimbursementShiftPanel } from "@/components/staff-mobile/reimbursement
 import { ClientSpendingShiftPanel } from "@/components/staff-mobile/client-spending-shift-panel";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { ClientPhoto } from "@/components/client-photo";
+import { useClientFeature } from "@/lib/client-features";
 
 function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
   const { data: active } = useActiveShift();

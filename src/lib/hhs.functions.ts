@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 
 // ---------- Schemas ----------
@@ -27,6 +28,7 @@ export const saveDailyRecord = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       .from("daily_logs")
       .insert({
@@ -94,6 +96,8 @@ export const saveEmarLog = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
 
     // Map HHS status enum → unified emar_logs status enum.
     // Held is a first-class status (clinically distinct from omitted).
@@ -167,6 +171,7 @@ export const setAttendance = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("hhs_monthly_attendance" as never)
@@ -221,6 +226,7 @@ export const savePrnForm = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("submitted_forms" as never)
@@ -264,6 +270,7 @@ export const saveIncidentReport = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("hhs_incident_reports" as never)
@@ -353,6 +360,19 @@ export const markIncidentFiled = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Resolve the incident's org so we can verify caller membership before mutating.
+    const { data: incident, error: lookupErr } = await supabase
+      .from("hhs_incident_reports" as never)
+      .select("organization_id")
+      .eq("id", data.incidentId)
+      .maybeSingle();
+    if (lookupErr || !incident) throw new Error("Incident not found");
+    await requireOrgMembership(
+      supabase,
+      userId,
+      (incident as { organization_id: string }).organization_id,
+      "employee",
+    );
     const { error } = await supabase
       .from("hhs_incident_reports" as never)
       .update({

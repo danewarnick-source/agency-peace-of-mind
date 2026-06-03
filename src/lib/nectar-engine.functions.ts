@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
 // =============================================================
 // Foundation D — NECTAR Requirements Engine.
@@ -232,7 +233,7 @@ export const proposeRequirementMappings = createServerFn({ method: "POST" })
     z.object({ requirementId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { data: req, error: rErr } = await supabase
       .from("nectar_requirements")
       .select(
@@ -241,6 +242,7 @@ export const proposeRequirementMappings = createServerFn({ method: "POST" })
       .eq("id", data.requirementId)
       .single();
     if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
 
     const facts = await gatherOrgFacts(supabase, req.organization_id as string);
     const proposals = await aiPropose(
@@ -364,6 +366,20 @@ export const setRequirementMapping = createServerFn({ method: "POST" })
     const nowIso = new Date().toISOString();
 
     if (data.id) {
+      // Resolve org from the existing mapping row so we can verify membership.
+      const { data: existing, error: exErr } = await supabase
+        .from("nectar_requirement_mappings")
+        .select("organization_id")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (exErr || !existing) throw new Error("Mapping not found");
+      await requireOrgMembership(
+        supabase,
+        userId,
+        (existing as { organization_id: string }).organization_id,
+        "manager",
+      );
+
       const patch: {
         scope_kind?: ScopeKind;
         scope_value?: string | null;
@@ -396,6 +412,7 @@ export const setRequirementMapping = createServerFn({ method: "POST" })
     if (!data.organizationId || !data.requirementId || !data.scopeKind) {
       throw new Error("organizationId, requirementId, scopeKind required to create");
     }
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: row, error } = await supabase
       .from("nectar_requirement_mappings")
       .insert({
@@ -421,7 +438,19 @@ export const deleteRequirementMapping = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const { data: existing, error: exErr } = await supabase
+      .from("nectar_requirement_mappings")
+      .select("organization_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (exErr || !existing) throw new Error("Mapping not found");
+    await requireOrgMembership(
+      supabase,
+      userId,
+      (existing as { organization_id: string }).organization_id,
+      "manager",
+    );
     const { error } = await supabase
       .from("nectar_requirement_mappings")
       .delete()
@@ -608,7 +637,9 @@ export const prefillRequirementMappings = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
 
     // Which requirements already have at least one mapping? Skip those.
     const { data: existingMaps } = await supabase
@@ -786,6 +817,7 @@ export const confirmRequirementWithScopes = createServerFn({ method: "POST" })
       .eq("id", data.requirementId)
       .single();
     if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
 
     // Confirm the requirement itself.
     const { error: upErr } = await supabase
@@ -1013,6 +1045,7 @@ export const upsertAuthorizedCode = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const code = data.code.trim().toUpperCase();
     if (!code) throw new Error("Code required");
 
@@ -1041,7 +1074,19 @@ export const removeAuthorizedCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const { data: existing, error: exErr } = await supabase
+      .from("provider_authorized_codes")
+      .select("organization_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (exErr || !existing) throw new Error("Authorized code not found");
+    await requireOrgMembership(
+      supabase,
+      userId,
+      (existing as { organization_id: string }).organization_id,
+      "manager",
+    );
     const { error } = await supabase
       .from("provider_authorized_codes")
       .delete()

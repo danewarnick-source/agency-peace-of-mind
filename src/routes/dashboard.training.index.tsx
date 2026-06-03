@@ -48,7 +48,7 @@ function CourseLibrary() {
       const ids = (mems ?? []).map((m) => m.user_id);
       if (!ids.length) return [];
       const { data: profs } = await supabase
-        .from("profiles")
+        .from("org_member_directory")
         .select("id, full_name, email, username")
         .in("id", ids);
       return (profs ?? []).map((p) => ({

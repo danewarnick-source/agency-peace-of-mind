@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
-import { lookupEmailByUsername } from "@/lib/login.functions";
+import { signInWithUsername } from "@/lib/login.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({

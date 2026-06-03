@@ -42,6 +42,7 @@ import {
   UserPen,
 } from "lucide-react";
 import { YourInputsSection } from "@/components/financial/your-inputs-section";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/financial/revenue")({

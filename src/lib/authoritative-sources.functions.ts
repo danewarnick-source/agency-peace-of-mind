@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import type { Json } from "@/integrations/supabase/types";
 import { reportPlatformEvent } from "./hive-tickets.functions";
 import { markDraftedByNectar } from "./nectar-approvals.functions";
@@ -74,6 +75,8 @@ export const ingestWebSource = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
 
     const parsedUrl = new URL(data.url);
     if (!/^https?:$/.test(parsedUrl.protocol)) {
@@ -221,7 +224,14 @@ export const markAsAuthoritativeSource = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const { data: docRow } = await supabase
+      .from("nectar_documents")
+      .select("organization_id")
+      .eq("id", data.documentId)
+      .maybeSingle();
+    if (!docRow?.organization_id) throw new Error("Document not found");
+    await requireOrgMembership(supabase, userId, docRow.organization_id as string, "manager");
     const update: {
       is_authoritative_source: boolean;
       authoritative_kind: string | null;
@@ -272,6 +282,7 @@ export const setSourceIgnoreState = createServerFn({ method: "POST" })
       .eq("id", data.documentId)
       .single();
     if (dErr || !doc) throw new Error(dErr?.message ?? "Source not found");
+    await requireOrgMembership(supabase, userId, doc.organization_id as string, "manager");
 
     let duplicateOfTitle: string | null = null;
     if (data.action === "duplicate") {
@@ -477,7 +488,8 @@ export const upsertRequirement = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const payload = {
       organization_id: data.organizationId,
       source_document_id: data.sourceDocumentId ?? null,
@@ -516,7 +528,14 @@ export const deleteRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const { data: reqRow } = await supabase
+      .from("nectar_requirements")
+      .select("organization_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!reqRow?.organization_id) throw new Error("Requirement not found");
+    await requireOrgMembership(supabase, userId, reqRow.organization_id as string, "manager");
     const { error } = await supabase
       .from("nectar_requirements")
       .delete()
@@ -551,6 +570,8 @@ export const setRequirementReviewStatus = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (gErr || !req) throw new Error(gErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
+
 
     const nowIso = new Date().toISOString();
     const patch =
@@ -646,6 +667,8 @@ export const verifyRequirement = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (getErr || !req) throw new Error(getErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
+
 
     const { error } = await supabase
       .from("nectar_requirements")
@@ -764,7 +787,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
       .select(
@@ -773,6 +796,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       .eq("id", data.documentId)
       .single();
     if (dErr || !doc) throw new Error(dErr?.message ?? "Document not found");
+    await requireOrgMembership(supabase, userId, doc.organization_id as string, "manager");
     if (!doc.is_authoritative_source)
       throw new Error("Document is not marked as an authoritative source.");
 
@@ -1067,6 +1091,7 @@ export const recordAttestation = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { data: profile } = await supabase
       .from("profiles")
       .select("full_name, email")

@@ -570,6 +570,8 @@ export const setRequirementReviewStatus = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (gErr || !req) throw new Error(gErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
+
 
     const nowIso = new Date().toISOString();
     const patch =

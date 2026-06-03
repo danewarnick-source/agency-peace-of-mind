@@ -249,8 +249,8 @@ function RevenuePage() {
           )}
 
           {/* Manual editor (base tier only) */}
-          {isManualMode && (
-            <ManualBilledEditor year={year} onChanged={() => q.refetch()} />
+          {isManualMode && organizationId && (
+            <ManualBilledEditor year={year} organizationId={organizationId} onChanged={() => q.refetch()} />
           )}
 
           {/* Visible-but-locked NECTAR upsell (base tier only) */}

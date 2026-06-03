@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, Save, Upload, FileText, CheckCircle2, Building2, Plus, Trash2,
-  MapPin, Sparkles, AlertTriangle,
+  MapPin, Sparkles, AlertTriangle, ListChecks, Gauge, BookOpen, Scale,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -22,7 +22,9 @@ import {
 } from "@/lib/state-requirements.functions";
 import type {
   StateBillingCode, StateRequiredDoc, StateForm, StateTrainingMandate,
+  StateCitation, StateCapsSection, StateRegulatorSection,
 } from "@/lib/state-templates";
+import { TEMPLATE_SECTIONS } from "@/lib/state-templates";
 import { STATE_INVENTORY, INVENTORY_AREAS, type InventoryItem } from "@/lib/state-inventory";
 import { listStructuralGaps, fileStructuralGap, updateStructuralGap } from "@/lib/state-structural-gaps.functions";
 

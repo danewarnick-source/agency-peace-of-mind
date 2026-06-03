@@ -166,9 +166,11 @@ function HhsClientHub() {
         value={tabParam ?? "note"}
         onValueChange={(val) => navigate({ to: ".", search: { tab: val }, replace: true })}
       >
-        <TabsList className="grid h-auto w-full grid-cols-4 gap-1 p-1">
+        <TabsList className={`grid h-auto w-full ${emarEnabled ? "grid-cols-4" : "grid-cols-3"} gap-1 p-1`}>
           <TabsTrigger value="note" className="h-11 text-[11px] sm:text-sm"><FileText className="mr-1 h-4 w-4" />Daily Note</TabsTrigger>
-          <TabsTrigger value="emar" className="h-11 text-[11px] sm:text-sm"><Pill className="mr-1 h-4 w-4" />MAR</TabsTrigger>
+          {emarEnabled && (
+            <TabsTrigger value="emar" className="h-11 text-[11px] sm:text-sm"><Pill className="mr-1 h-4 w-4" />MAR</TabsTrigger>
+          )}
           <TabsTrigger value="att" className="h-11 text-[11px] sm:text-sm"><Calendar className="mr-1 h-4 w-4" />Attendance</TabsTrigger>
           <TabsTrigger value="prn" className="h-11 text-[11px] sm:text-sm"><ClipboardList className="mr-1 h-4 w-4" />PRN Forms</TabsTrigger>
         </TabsList>
@@ -176,12 +178,14 @@ function HhsClientHub() {
         <TabsContent value="note" className="mt-3">
           <DailyNoteTab orgId={orgId} client={client} />
         </TabsContent>
-        <TabsContent value="emar" className="mt-3">
-          <MarEmarTab
-            clientId={client.id}
-            clientName={`${client.first_name} ${client.last_name}`}
-          />
-        </TabsContent>
+        {emarEnabled && (
+          <TabsContent value="emar" className="mt-3">
+            <MarEmarTab
+              clientId={client.id}
+              clientName={`${client.first_name} ${client.last_name}`}
+            />
+          </TabsContent>
+        )}
         <TabsContent value="att" className="mt-3">
           <AttendanceTab orgId={orgId} clientId={client.id} />
         </TabsContent>

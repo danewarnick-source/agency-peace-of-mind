@@ -770,7 +770,7 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
       </div>
 
       {/* Log table */}
-      <div className="overflow-hidden rounded-lg border border-border">
+      <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-muted/40">

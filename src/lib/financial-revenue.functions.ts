@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isDailyServiceCode } from "@/lib/service-billing";
-import { hoursToUnits } from "@/lib/billing-units";
+import { aggregateHourlyUnits, aggregateDailyDays } from "@/lib/accrual";
 import { assertAddonForOrg } from "@/lib/entitlements.server";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 

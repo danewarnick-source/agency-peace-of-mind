@@ -22,7 +22,11 @@ const SECTION_KEYS: TemplateSectionKey[] = [
   "required_documents",
   "department_structure",
   "forms",
+  "citations",
+  "caps",
+  "regulator",
 ];
+
 
 
 // ─────────────────────────────────────────────────────────────────────────────

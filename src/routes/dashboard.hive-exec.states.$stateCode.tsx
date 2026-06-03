@@ -23,6 +23,9 @@ import {
 import type {
   StateBillingCode, StateRequiredDoc, StateForm, StateTrainingMandate,
 } from "@/lib/state-templates";
+import { STATE_INVENTORY, INVENTORY_AREAS, type InventoryItem } from "@/lib/state-inventory";
+import { listStructuralGaps, fileStructuralGap, updateStructuralGap } from "@/lib/state-structural-gaps.functions";
+
 
 export const Route = createFileRoute("/dashboard/hive-exec/states/$stateCode")({
   head: ({ params }) => ({ meta: [{ title: `${params.stateCode} — State Profile` }] }),

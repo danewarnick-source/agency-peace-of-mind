@@ -96,6 +96,8 @@ export const saveEmarLog = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
 
     // Map HHS status enum → unified emar_logs status enum.
     // Held is a first-class status (clinically distinct from omitted).

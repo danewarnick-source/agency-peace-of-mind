@@ -47,6 +47,8 @@ export interface AskNectarStaffProps {
  */
 export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProps) {
   const ask = useServerFn(askNectarStaff);
+  const { data: org } = useCurrentOrg();
+  const organizationId = org?.organization_id;
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [viewportInset, setViewportInset] = useState(0);

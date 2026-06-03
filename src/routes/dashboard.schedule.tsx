@@ -424,67 +424,72 @@ function CollapsibleGeneralClock() {
     : "00:00:00";
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="mt-2 rounded-xl border border-border bg-muted/30">
-        {/* Collapsed pill / toggle header */}
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[0.99]"
-            aria-label={
-              running
-                ? "Non-client time is running. Tap to manage or clock out."
-                : "Tap to start non-client time clock"
-            }
-          >
-            <span
-              aria-hidden
-              className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
-                running ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
-              }`}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground">
-                {running
-                  ? `On non-client time · ${elapsed} · ${shift!.category}`
-                  : "Non-client time clock"}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {running ? (
-                  <>
-                    Tap to manage / clock out{" "}
-                    <span className="ml-1 rounded bg-amber-100 px-1 py-0 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                      NO EVV
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    Admin · training · travel · meetings{" "}
-                    <span className="ml-1 rounded bg-amber-100 px-1 py-0 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                      NO EVV
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-            <ChevronUp
-              className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ${
-                open ? "" : "rotate-180"
-              }`}
-            />
-          </button>
-        </CollapsibleTrigger>
+    <section className="mt-6 border-t border-border pt-5" aria-label="General time clock">
+      <h2 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+        Time Clock
+      </h2>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="rounded-xl border border-border bg-muted/50">
+          {/* Collapsed pill / toggle header */}
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[0.99]"
+              aria-label={
+                running
+                  ? "Non-client time is running. Tap to manage or clock out."
+                  : "Tap to start non-client time clock"
+              }
+            >
+              <span
+                aria-hidden
+                className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                  running ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                }`}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">
+                  {running
+                    ? `Time Clock — On non-client time · ${elapsed}`
+                    : "Time Clock — Clock In"}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {running ? (
+                    <>
+                      Tap to manage / clock out{" "}
+                      <span className="ml-1 inline-flex items-center rounded bg-amber-100 px-1 py-0 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                        NO EVV
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Non-client work · no EVV{" "}
+                      <span className="ml-1 inline-flex items-center rounded bg-amber-100 px-1 py-0 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                        NO EVV
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <ChevronUp
+                className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                  open ? "" : "rotate-180"
+                }`}
+              />
+            </button>
+          </CollapsibleTrigger>
 
-        <CollapsibleContent>
-          <div className="border-t border-border px-4 pb-4 pt-1">
-            <p className="mb-3 text-[11px] text-muted-foreground">
-              Client shifts start from a scheduled shift or My Caseload — with
-              EVV.
-            </p>
-            <GeneralTimeClock />
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
+          <CollapsibleContent>
+            <div className="border-t border-border px-4 pb-4 pt-1">
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                Client shifts start from a scheduled shift or My Caseload — with
+                EVV.
+              </p>
+              <GeneralTimeClock />
+            </div>
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+    </section>
   );
 }

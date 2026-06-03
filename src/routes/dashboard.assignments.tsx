@@ -57,6 +57,7 @@ function AssignmentsPage() {
         .select("id, full_name, email")
         .in("id", ids);
       return (profs ?? [])
+        .filter((p): p is typeof p & { id: string } => !!p.id)
         .map((p) => ({ id: p.id, name: p.full_name || p.email || "—" }))
         .sort((a, b) => a.name.localeCompare(b.name));
     },

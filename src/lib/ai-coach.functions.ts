@@ -318,6 +318,7 @@ export interface ProceduralResult {
 }
 
 export const answerProceduralQuestion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(validateProcedural)
   .handler(async ({ data }): Promise<ProceduralResult> => {
     const system = `You are NECTAR, a procedural assistant for Medicaid DSPD direct-support staff. The caregiver is asking a plain-language "am I allowed to…?" question mid-shift. Answer directly. Do NOT deflect with "contact your supervisor" unless the question is genuinely outside policy guidance (active emergency, suspected abuse/neglect, clinical decision).

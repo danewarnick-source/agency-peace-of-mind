@@ -817,6 +817,7 @@ export const confirmRequirementWithScopes = createServerFn({ method: "POST" })
       .eq("id", data.requirementId)
       .single();
     if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
 
     // Confirm the requirement itself.
     const { error: upErr } = await supabase

@@ -1485,6 +1485,62 @@ function DocumentsTab({ clientId, orgId }: { clientId: string; orgId: string }) 
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
+function FeatureTogglesList({
+  features,
+  onToggle,
+}: {
+  features: Record<string, boolean>;
+  onToggle: (key: string) => void;
+}) {
+  const { data: disabledTier } = useDisabledTierFeatures();
+  return (
+    <>
+      {FEATURE_TOGGLES.map((item) => {
+        const tierOff = isFeatureTierDisabled(item.key as ClientFeatureKey, disabledTier ?? null);
+        const wired = !!item.wired;
+        const checked = features[item.key] ?? true;
+        const disabled = tierOff || !wired;
+        const stateLabel = tierOff
+          ? "Requires plan upgrade"
+          : !wired
+          ? "Coming soon"
+          : checked
+          ? "Enabled"
+          : "Disabled";
+        const stateClass = tierOff
+          ? "text-amber-600"
+          : !wired
+          ? "text-muted-foreground italic"
+          : checked
+          ? "text-emerald-600"
+          : "text-muted-foreground";
+        return (
+          <div
+            key={item.key}
+            className={`flex items-center justify-between rounded-lg border border-border px-4 py-3 transition ${
+              disabled ? "opacity-60" : "hover:bg-muted/30"
+            }`}
+          >
+            <div>
+              <p className="text-sm font-medium">{item.label}</p>
+              <p className="text-[11px] text-muted-foreground">{item.description}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] font-medium ${stateClass}`}>{stateLabel}</span>
+              <Switch
+                checked={checked && wired && !tierOff}
+                disabled={disabled}
+                onCheckedChange={() => onToggle(item.key)}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+
 function SettingsTab({
   client, orgId, onSave, saving,
 }: { client: Client; orgId: string; onSave: (v: ClientFormValues) => void; saving: boolean }) {

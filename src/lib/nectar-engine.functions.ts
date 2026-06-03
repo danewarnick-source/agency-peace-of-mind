@@ -233,7 +233,7 @@ export const proposeRequirementMappings = createServerFn({ method: "POST" })
     z.object({ requirementId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { data: req, error: rErr } = await supabase
       .from("nectar_requirements")
       .select(
@@ -242,6 +242,7 @@ export const proposeRequirementMappings = createServerFn({ method: "POST" })
       .eq("id", data.requirementId)
       .single();
     if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
 
     const facts = await gatherOrgFacts(supabase, req.organization_id as string);
     const proposals = await aiPropose(

@@ -1,5 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
+
+/**
+ * Saved reports + schedules.
+ *
+ * Tier 3 Stage 3:
+ *   - list/save now ACCEPT `organizationId` and verify manager+ membership
+ *     against THAT org. The legacy `resolveAdminOrg()` FIRST_MEMBERSHIP
+ *     resolver is gone.
+ *   - togglePinReport / deleteSavedReport / upsertReportSchedule /
+ *     unscheduleReport gain a defense-in-depth membership guard via
+ *     record→org lookup (RLS is still the backstop).
+ */
 
 export interface SavedReport {
   id: string;
@@ -25,30 +38,40 @@ export interface ReportSchedule {
   active: boolean;
 }
 
-async function resolveAdminOrg(supabase: any, userId: string): Promise<string> {
-  const { data: memberships } = await supabase
-    .from("organization_members")
-    .select("organization_id, role")
-    .eq("user_id", userId)
-    .eq("active", true);
-  if (!memberships || memberships.length === 0) throw new Error("No active organization membership.");
-  const rank: Record<string, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3 };
-  const primary = [...memberships].sort((a: any, b: any) => (rank[a.role] ?? 99) - (rank[b.role] ?? 99))[0];
-  if (!["super_admin", "admin", "manager"].includes(primary.role)) {
-    throw new Error("Admin-only feature.");
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+
+function requireUuid(value: unknown, label: string): string {
+  if (typeof value !== "string" || !UUID_RE.test(value)) {
+    throw new Error(`Invalid ${label}.`);
   }
-  return primary.organization_id;
+  return value;
 }
 
-export const listSavedReports = createServerFn({ method: "GET" })
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function orgForSavedReport(supabase: any, savedReportId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from("nectar_saved_reports")
+    .select("organization_id")
+    .eq("id", savedReportId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.organization_id) throw new Error("Saved report not found.");
+  return data.organization_id as string;
+}
+
+export const listSavedReports = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<SavedReport[]> => {
+  .inputValidator((input: unknown) => {
+    const i = (input ?? {}) as Record<string, unknown>;
+    return { organizationId: requireUuid(i.organizationId, "organizationId") };
+  })
+  .handler(async ({ data, context }): Promise<SavedReport[]> => {
     const { supabase, userId } = context;
-    const orgId = await resolveAdminOrg(supabase, userId);
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: reports, error } = await supabase
       .from("nectar_saved_reports")
       .select("id, name, prompt, pinned, created_at, updated_at")
-      .eq("organization_id", orgId)
+      .eq("organization_id", data.organizationId)
       .order("pinned", { ascending: false })
       .order("updated_at", { ascending: false });
     if (error) throw error;
@@ -69,13 +92,14 @@ export const listSavedReports = createServerFn({ method: "GET" })
     return reports.map((r: any) => ({ ...r, schedule: byReport.get(r.id) ?? null }));
   });
 
-function validateSaveInput(input: unknown): { name: string; prompt: string; pinned?: boolean } {
+function validateSaveInput(input: unknown): { organizationId: string; name: string; prompt: string; pinned?: boolean } {
   const i = (input ?? {}) as Record<string, unknown>;
+  const organizationId = requireUuid(i.organizationId, "organizationId");
   const name = typeof i.name === "string" ? i.name.trim() : "";
   const prompt = typeof i.prompt === "string" ? i.prompt.trim() : "";
   if (name.length < 1 || name.length > 120) throw new Error("Name must be 1–120 characters.");
   if (prompt.length < 3 || prompt.length > 2000) throw new Error("Prompt must be 3–2000 characters.");
-  return { name, prompt, pinned: !!i.pinned };
+  return { organizationId, name, prompt, pinned: !!i.pinned };
 }
 
 export const saveReport = createServerFn({ method: "POST" })
@@ -83,10 +107,10 @@ export const saveReport = createServerFn({ method: "POST" })
   .inputValidator(validateSaveInput)
   .handler(async ({ data, context }): Promise<{ id: string }> => {
     const { supabase, userId } = context;
-    const orgId = await resolveAdminOrg(supabase, userId);
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: inserted, error } = await supabase
       .from("nectar_saved_reports")
-      .insert({ organization_id: orgId, owner_user_id: userId, name: data.name, prompt: data.prompt, pinned: !!data.pinned })
+      .insert({ organization_id: data.organizationId, owner_user_id: userId, name: data.name, prompt: data.prompt, pinned: !!data.pinned })
       .select("id")
       .single();
     if (error) throw error;
@@ -95,24 +119,24 @@ export const saveReport = createServerFn({ method: "POST" })
 
 function validateIdInput(input: unknown): { id: string } {
   const i = (input ?? {}) as Record<string, unknown>;
-  const id = typeof i.id === "string" ? i.id : "";
-  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Invalid id.");
-  return { id };
+  return { id: requireUuid(i.id, "id") };
 }
 
 export const togglePinReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => {
     const i = (input ?? {}) as Record<string, unknown>;
-    if (typeof i.id !== "string") throw new Error("Invalid id.");
-    return { id: i.id, pinned: !!i.pinned };
+    return { id: requireUuid(i.id, "id"), pinned: !!i.pinned };
   })
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const orgId = await orgForSavedReport(supabase, data.id);
+    await requireOrgMembership(supabase, userId, orgId, "manager");
     const { error } = await supabase
       .from("nectar_saved_reports")
       .update({ pinned: data.pinned })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("organization_id", orgId);
     if (error) throw error;
     return { ok: true };
   });
@@ -121,8 +145,14 @@ export const deleteSavedReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateIdInput)
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    const { error } = await supabase.from("nectar_saved_reports").delete().eq("id", data.id);
+    const { supabase, userId } = context;
+    const orgId = await orgForSavedReport(supabase, data.id);
+    await requireOrgMembership(supabase, userId, orgId, "manager");
+    const { error } = await supabase
+      .from("nectar_saved_reports")
+      .delete()
+      .eq("id", data.id)
+      .eq("organization_id", orgId);
     if (error) throw error;
     return { ok: true };
   });
@@ -161,8 +191,7 @@ function validateScheduleInput(input: unknown): {
   deliver_save: boolean;
 } {
   const i = (input ?? {}) as Record<string, unknown>;
-  const id = typeof i.saved_report_id === "string" ? i.saved_report_id : "";
-  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Invalid saved_report_id.");
+  const id = requireUuid(i.saved_report_id, "saved_report_id");
   const cadence = i.cadence === "monthly" ? "monthly" : "weekly";
   const hour = Math.min(Math.max(typeof i.hour === "number" ? i.hour : 8, 0), 23);
   const recipients = Array.isArray(i.recipients)
@@ -184,7 +213,9 @@ export const upsertReportSchedule = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateScheduleInput)
   .handler(async ({ data, context }): Promise<{ id: string; next_run_at: string }> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const orgId = await orgForSavedReport(supabase, data.saved_report_id);
+    await requireOrgMembership(supabase, userId, orgId, "manager");
     const next = computeNextRunAt(data);
     const { data: existing } = await supabase
       .from("nectar_report_schedules")
@@ -221,7 +252,9 @@ export const unscheduleReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateIdInput)
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const orgId = await orgForSavedReport(supabase, data.id);
+    await requireOrgMembership(supabase, userId, orgId, "manager");
     const { error } = await supabase
       .from("nectar_report_schedules")
       .update({ active: false })

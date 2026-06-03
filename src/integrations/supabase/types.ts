@@ -1782,6 +1782,7 @@ export type Database = {
           admin_reviewed_at: string | null
           admin_reviewed_by: string | null
           administered_at: string | null
+          attestation_signed: boolean
           client_id: string
           created_at: string
           error_description: string | null
@@ -1796,6 +1797,8 @@ export type Database = {
           pill_count_value: number | null
           pill_count_verified: boolean | null
           prn_reason: string | null
+          provider_id: string | null
+          recorded_in: string
           scheduled_for: string
           scheduled_time_label: string | null
           signature_attestation: string | null
@@ -1803,6 +1806,7 @@ export type Database = {
           staff_id: string | null
           staff_name: string | null
           status: string
+          variance_note: string | null
         }
         Insert: {
           admin_review_notes?: string | null
@@ -1810,6 +1814,7 @@ export type Database = {
           admin_reviewed_at?: string | null
           admin_reviewed_by?: string | null
           administered_at?: string | null
+          attestation_signed?: boolean
           client_id: string
           created_at?: string
           error_description?: string | null
@@ -1824,6 +1829,8 @@ export type Database = {
           pill_count_value?: number | null
           pill_count_verified?: boolean | null
           prn_reason?: string | null
+          provider_id?: string | null
+          recorded_in?: string
           scheduled_for: string
           scheduled_time_label?: string | null
           signature_attestation?: string | null
@@ -1831,6 +1838,7 @@ export type Database = {
           staff_id?: string | null
           staff_name?: string | null
           status: string
+          variance_note?: string | null
         }
         Update: {
           admin_review_notes?: string | null
@@ -1838,6 +1846,7 @@ export type Database = {
           admin_reviewed_at?: string | null
           admin_reviewed_by?: string | null
           administered_at?: string | null
+          attestation_signed?: boolean
           client_id?: string
           created_at?: string
           error_description?: string | null
@@ -1852,6 +1861,8 @@ export type Database = {
           pill_count_value?: number | null
           pill_count_verified?: boolean | null
           prn_reason?: string | null
+          provider_id?: string | null
+          recorded_in?: string
           scheduled_for?: string
           scheduled_time_label?: string | null
           signature_attestation?: string | null
@@ -1859,6 +1870,7 @@ export type Database = {
           staff_id?: string | null
           staff_name?: string | null
           status?: string
+          variance_note?: string | null
         }
         Relationships: [
           {
@@ -2217,7 +2229,7 @@ export type Database = {
         }
         Relationships: []
       }
-      hhs_emar_logs: {
+      hhs_emar_logs_deprecated: {
         Row: {
           administered_at: string | null
           attestation_signed: boolean

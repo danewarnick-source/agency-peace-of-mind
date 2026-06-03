@@ -534,7 +534,7 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
     queryFn: async () => {
       const t = today();
       const { count } = await supabase
-        .from("hhs_emar_logs" as never)
+        .from("emar_logs")
         .select("id", { count: "exact", head: true })
         .eq("client_id", clientId)
         .eq("is_medication_error", true)
@@ -542,6 +542,27 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
       return (count ?? 0) > 0;
     },
   });
+
+  // Cross-hub visibility: today's doses already recorded for this client
+  // (in any hub). Used to show attribution and prevent double-recording.
+  const { data: todaysLogs = [] } = useQuery({
+    queryKey: ["hhs-emar-today", clientId, today()],
+    queryFn: async () => {
+      const t = today();
+      const { data } = await supabase
+        .from("emar_logs")
+        .select("id, medication_id, status, scheduled_for, administered_at, staff_name, recorded_in")
+        .eq("client_id", clientId)
+        .gte("scheduled_for", `${t}T00:00:00Z`)
+        .lt("scheduled_for", `${t}T23:59:59Z`);
+      return (data ?? []) as Array<{ id: string; medication_id: string | null; status: string; scheduled_for: string; administered_at: string | null; staff_name: string | null; recorded_in: string | null }>;
+    },
+  });
+  const loggedByMed = useMemo(() => {
+    const m = new Map<string, typeof todaysLogs[number]>();
+    todaysLogs.forEach((l) => { if (l.medication_id) m.set(l.medication_id, l); });
+    return m;
+  }, [todaysLogs]);
   const qc = useQueryClient();
   const errorLockActive = hasUnresolvedMedError && medErrorIncidentCount === 0;
 
@@ -579,6 +600,7 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
     onSuccess: () => {
       toast.success(`Med ${status}${isMedError ? " — flagged as medication error" : ""}.`);
       qc.invalidateQueries({ queryKey: ["hhs-emar-error-flag"] });
+      qc.invalidateQueries({ queryKey: ["hhs-emar-today"] });
       resetDialog();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -608,21 +630,35 @@ function EmarTab({ orgId, clientId, meds }: { orgId: string; clientId: string; m
       )}
       <CardContent className="space-y-2">
         {meds.length === 0 && <p className="text-sm text-muted-foreground">No active medications on file.</p>}
-        {meds.map((m) => (
-          <div key={String(m.id)} className="rounded-lg border p-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold">{String(m.medication_name)} <span className="text-xs text-muted-foreground">{String(m.dosage ?? "")}</span></div>
-                <div className="text-xs text-muted-foreground">Route: {String(m.route ?? "—")} · {String(m.frequency ?? "")}</div>
-                {m.instructions ? <div className="text-xs">Indication / Schedule: {String(m.instructions)}</div> : null}
-                <div className="mt-1 rounded bg-yellow-100 dark:bg-yellow-950/40 border border-yellow-300 px-2 py-1 text-[11px] text-yellow-900 dark:text-yellow-200">
-                  ⚠️ Side-effects: monitor for drowsiness, swallowing/choking risk. Confirm upright posture.
+        {meds.map((m) => {
+          const existing = loggedByMed.get(String(m.id));
+          const sourceLabel = existing?.recorded_in === "hhs" ? "HHS" : existing?.recorded_in === "dsi" ? "DSI" : existing?.recorded_in === "general" ? "general" : "another hub";
+          const whenStr = existing ? new Date(existing.administered_at ?? existing.scheduled_for).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+          return (
+            <div key={String(m.id)} className="rounded-lg border p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold">{String(m.medication_name)} <span className="text-xs text-muted-foreground">{String(m.dosage ?? "")}</span></div>
+                  <div className="text-xs text-muted-foreground">Route: {String(m.route ?? "—")} · {String(m.frequency ?? "")}</div>
+                  {m.instructions ? <div className="text-xs">Indication / Schedule: {String(m.instructions)}</div> : null}
+                  <div className="mt-1 rounded bg-yellow-100 dark:bg-yellow-950/40 border border-yellow-300 px-2 py-1 text-[11px] text-yellow-900 dark:text-yellow-200">
+                    ⚠️ Side-effects: monitor for drowsiness, swallowing/choking risk. Confirm upright posture.
+                  </div>
+                  {existing && (
+                    <div className="mt-2 rounded border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1.5 text-[11px] text-emerald-900 dark:text-emerald-200">
+                      ✅ Already recorded ({existing.status}) by <strong>{existing.staff_name ?? "staff"}</strong> in {sourceLabel} at {whenStr}.
+                    </div>
+                  )}
                 </div>
+                {existing ? (
+                  <Button size="sm" variant="outline" disabled className="opacity-70">Recorded</Button>
+                ) : (
+                  <Button size="sm" onClick={() => setActive(m)}>Record Pass</Button>
+                )}
               </div>
-              <Button size="sm" onClick={() => setActive(m)}>Record Pass</Button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </CardContent>
 
       <Dialog open={!!active} onOpenChange={(o) => !o && resetDialog()}>

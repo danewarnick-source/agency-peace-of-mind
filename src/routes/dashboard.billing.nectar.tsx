@@ -391,6 +391,8 @@ function csvCell(v: string | number | null | undefined): string {
 // ─── Saved reports + schedules ─────────────────────────────────────────────
 
 function SavedReportsSection({ onRunPrompt }: { onRunPrompt: (p: string) => void }) {
+  const { data: org } = useCurrentOrg();
+  const organizationId = org?.organization_id;
   const list = useServerFn(listSavedReports);
   const del = useServerFn(deleteSavedReport);
   const togglePin = useServerFn(togglePinReport);
@@ -399,8 +401,9 @@ function SavedReportsSection({ onRunPrompt }: { onRunPrompt: (p: string) => void
   const qc = useQueryClient();
 
   const q = useQuery({
-    queryKey: ["saved-reports"],
-    queryFn: () => list(),
+    queryKey: ["saved-reports", organizationId],
+    enabled: !!organizationId,
+    queryFn: () => list({ data: { organizationId: organizationId! } }),
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["saved-reports"] });

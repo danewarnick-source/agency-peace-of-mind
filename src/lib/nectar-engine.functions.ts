@@ -366,6 +366,20 @@ export const setRequirementMapping = createServerFn({ method: "POST" })
     const nowIso = new Date().toISOString();
 
     if (data.id) {
+      // Resolve org from the existing mapping row so we can verify membership.
+      const { data: existing, error: exErr } = await supabase
+        .from("nectar_requirement_mappings")
+        .select("organization_id")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (exErr || !existing) throw new Error("Mapping not found");
+      await requireOrgMembership(
+        supabase,
+        userId,
+        (existing as { organization_id: string }).organization_id,
+        "manager",
+      );
+
       const patch: {
         scope_kind?: ScopeKind;
         scope_value?: string | null;

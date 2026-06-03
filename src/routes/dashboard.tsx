@@ -329,7 +329,7 @@ function DashboardLayout() {
             </div>
           )}
 
-          <main className={isMobilePreview ? "min-w-0 flex-1 overflow-x-hidden bg-secondary/40" : "min-w-0 flex-1 overflow-x-hidden bg-secondary/40 px-4 py-6 md:px-8"}>
+          <main className={isMobilePreview ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40" : "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40 px-4 py-6 md:px-8"}>
             {isStatePreview && !stateCode ? (
               <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
                 Select a state from the sidebar to load the platform configured as that state.

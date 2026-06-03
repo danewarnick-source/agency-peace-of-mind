@@ -76,6 +76,8 @@ function EmployeesPage() {
 
   const createManual = useServerFn(createEmployeeManually);
   const resetPwFn = useServerFn(adminResetEmployeePassword);
+  const fetchStaffPii = useServerFn(listStaffPii);
+  const updatePiiFn = useServerFn(updateStaffPii);
 
   const { data: tracks } = useQuery({
     enabled: !!org,

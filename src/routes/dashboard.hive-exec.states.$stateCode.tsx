@@ -168,13 +168,29 @@ function ProfileTab({ stateCode }: { stateCode: string }) {
         </div>
       ) : null}
 
+      <TemplateSectionNav />
+
       <TerminologyEditor value={tpl?.terminology ?? {}} onSave={(v) => saveSection("terminology", v)} />
+      <RegulatorEditor value={tpl?.regulator ?? {}} onSave={(v) => saveSection("regulator", v)} />
       <BillingCodesEditor value={tpl?.billing_codes ?? { codes: [] }} onSave={(v) => saveSection("billing_codes", v)} />
       <FormsEditor value={tpl?.forms ?? { forms: [] }} onSave={(v) => saveSection("forms", v)} />
       <TrainingEditor value={tpl?.training ?? { mandates: [] }} onSave={(v) => saveSection("training", v)} />
       <EvvEditor value={tpl?.evv ?? {}} onSave={(v) => saveSection("evv", v)} />
+      <CapsEditor value={tpl?.caps ?? {}} onSave={(v) => saveSection("caps", v)} />
+      <CitationsEditor value={tpl?.citations ?? { sections: [] }} onSave={(v) => saveSection("citations", v)} />
       <RequiredDocsEditor value={tpl?.required_documents ?? { docs: [] }} onSave={(v) => saveSection("required_documents", v)} />
       <DepartmentStructureEditor value={tpl?.department_structure ?? { agency_types: [], program_levels: [] }} onSave={(v) => saveSection("department_structure", v)} />
+
+      <div id="sources-pointer" className="scroll-mt-24 rounded-xl border border-sky-200 bg-sky-50/50 p-4 text-xs text-sky-900">
+        <div className="mb-1 inline-flex items-center gap-1 font-semibold">
+          <Upload className="h-3.5 w-3.5" /> Upload state-specific documents
+        </div>
+        Provider contract, billing manual, EVV policy, code book — upload authoritative sources on the{" "}
+        <button onClick={() => document.dispatchEvent(new CustomEvent("hive-states-tab", { detail: "sources" }))} className="font-semibold underline">
+          Authoritative Sources
+        </button>{" "}
+        tab. NECTAR parses uploads into per-state requirements with source attribution.
+      </div>
 
       <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 text-xs text-amber-900">
         <div className="mb-1 inline-flex items-center gap-1 font-semibold">
@@ -183,6 +199,30 @@ function ProfileTab({ stateCode }: { stateCode: string }) {
         Use <Link to="/dashboard/hive-exec/states/$stateCode/onboarding" params={{ stateCode }} className="font-semibold underline">state onboarding</Link> to flag structural gaps — those open NECTAR tickets for the platform team instead of silently failing.
       </div>
     </div>
+  );
+}
+
+// ─── Section anchor nav ──────────────────────────────────────────────────────
+
+function TemplateSectionNav() {
+  return (
+    <nav className="sticky top-2 z-10 -mx-1 flex flex-wrap gap-1 rounded-xl border border-border bg-card/95 p-2 shadow-sm backdrop-blur">
+      {TEMPLATE_SECTIONS.map((s) => (
+        <a
+          key={s.key}
+          href={`#section-${s.key}`}
+          className="inline-flex min-h-[32px] items-center rounded-md border border-transparent bg-muted/40 px-2.5 text-[11px] font-medium text-muted-foreground hover:border-border hover:bg-background hover:text-foreground"
+        >
+          {s.label}
+        </a>
+      ))}
+      <a
+        href="#sources-pointer"
+        className="inline-flex min-h-[32px] items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-[11px] font-semibold text-sky-900 hover:bg-sky-100"
+      >
+        <Upload className="h-3 w-3" /> Documents
+      </a>
+    </nav>
   );
 }
 

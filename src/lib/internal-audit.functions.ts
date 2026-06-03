@@ -104,7 +104,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<AuditSummary> => {
     const { supabase, userId } = context;
     // Server-side tier enforcement — the UI lock and this check must agree.
-    await assertAddon(supabase, userId, "internal_audit");
+    await assertAddonForOrg(supabase, userId, "internal_audit", data.organizationId);
     const orgId = data.organizationId;
     const now = new Date();
     const dateFrom = data.dateFrom ?? null;
@@ -628,7 +628,7 @@ export const listAuditableStaff = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<AuditableStaff[]> => {
     const { supabase, userId } = context;
-    await assertAddon(supabase, userId, "internal_audit");
+    await assertAddonForOrg(supabase, userId, "internal_audit", data.organizationId);
     const { data: members, error } = await supabase
       .from("organization_members")
       .select("user_id, role, job_title, active")

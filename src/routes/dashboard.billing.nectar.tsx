@@ -182,7 +182,7 @@ function ReportBuilder() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const saveM = useMutation({
-    mutationFn: async (name: string) => saveSrv({ data: { name, prompt: prompt.trim(), pinned: true } }),
+    mutationFn: async (name: string) => saveSrv({ data: { name, prompt: prompt.trim(), pinned: true, organizationId } }),
     onSuccess: () => {
       setSaveOpen(false);
       setSaveName("");
@@ -192,7 +192,7 @@ function ReportBuilder() {
 
 
   const m = useMutation({
-    mutationFn: async (p: string) => ask({ data: { prompt: p } }),
+    mutationFn: async (p: string) => ask({ data: { prompt: p, organizationId } }),
     onSuccess: (r, p) => {
       setResult(r);
       setError(null);

@@ -77,6 +77,21 @@ function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [taskCenterOpen, setTaskCenterOpen] = useState(false);
 
+  // [DIAG-SIDEBAR] temp render-rate logger (remove with real fix)
+  if (typeof window !== "undefined") {
+    const w = window as unknown as { __dashRenders?: number[]; __dashLastLog?: number };
+    w.__dashRenders = w.__dashRenders ?? [];
+    const now = Date.now();
+    w.__dashRenders.push(now);
+    w.__dashRenders = w.__dashRenders.filter((t) => now - t < 5000);
+    if (!w.__dashLastLog || now - w.__dashLastLog > 1000) {
+      w.__dashLastLog = now;
+      // eslint-disable-next-line no-console
+      console.log(`[DIAG-SIDEBAR] DashboardLayout renders in last 5s: ${w.__dashRenders.length}`);
+    }
+  }
+
+
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/login" });
   }, [loading, session, navigate]);

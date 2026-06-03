@@ -612,7 +612,7 @@ function SchedulerInner({ orgId, role }: { orgId: string; role: string | null })
       const mgrIds = Array.from(new Set(teams.map((t) => t.manager_id).filter(Boolean) as string[]));
       if (mgrIds.length) {
         const { data: profs } = await (supabase as any)
-          .from("profiles").select("id, full_name, email").in("id", mgrIds);
+          .from("org_member_directory").select("id, full_name, email").in("id", mgrIds);
         const map = new Map<string, { full_name: string | null; email: string | null }>(
           ((profs ?? []) as any[]).map((p) => [p.id, p]),
         );

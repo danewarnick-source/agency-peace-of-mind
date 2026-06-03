@@ -88,6 +88,7 @@ import { Route as DashboardHiveExecBaseTemplateRouteImport } from './routes/dash
 import { Route as DashboardHiveExecApprovalsRouteImport } from './routes/dashboard.hive-exec.approvals'
 import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
+import { Route as DashboardFinancialRevenueRouteImport } from './routes/dashboard.financial.revenue'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
 import { Route as DashboardBillingNectarRouteImport } from './routes/dashboard.billing.nectar'
@@ -512,6 +513,12 @@ const DashboardHhsHubClientIdRoute = DashboardHhsHubClientIdRouteImport.update({
   path: '/hhs-hub/$clientId',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardFinancialRevenueRoute =
+  DashboardFinancialRevenueRouteImport.update({
+    id: '/revenue',
+    path: '/revenue',
+    getParentRoute: () => DashboardFinancialRoute,
+  } as any)
 const DashboardCoursesMindsmithRoute =
   DashboardCoursesMindsmithRouteImport.update({
     id: '/courses/mindsmith',
@@ -645,6 +652,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
@@ -734,6 +742,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
@@ -828,6 +837,7 @@ export interface FileRoutesById {
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
@@ -923,6 +933,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/financial/revenue'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/approvals'
@@ -1012,6 +1023,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/financial/revenue'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/approvals'
@@ -1105,6 +1117,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/financial/revenue'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/approvals'
@@ -1711,6 +1724,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHhsHubClientIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/financial/revenue': {
+      id: '/dashboard/financial/revenue'
+      path: '/revenue'
+      fullPath: '/dashboard/financial/revenue'
+      preLoaderRoute: typeof DashboardFinancialRevenueRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
     '/dashboard/courses/mindsmith': {
       id: '/dashboard/courses/mindsmith'
       path: '/courses/mindsmith'
@@ -1818,10 +1838,12 @@ const DashboardBillingRouteWithChildren =
   DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
 
 interface DashboardFinancialRouteChildren {
+  DashboardFinancialRevenueRoute: typeof DashboardFinancialRevenueRoute
   DashboardFinancialIndexRoute: typeof DashboardFinancialIndexRoute
 }
 
 const DashboardFinancialRouteChildren: DashboardFinancialRouteChildren = {
+  DashboardFinancialRevenueRoute: DashboardFinancialRevenueRoute,
   DashboardFinancialIndexRoute: DashboardFinancialIndexRoute,
 }
 

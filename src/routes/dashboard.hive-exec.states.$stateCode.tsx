@@ -1218,3 +1218,106 @@ function InventoryTab({ stateCode }: { stateCode: string }) {
     </div>
   );
 }
+
+// ─── Base template version banner ────────────────────────────────────────────
+
+function BaseVersionBanner({ stateCode }: { stateCode: string }) {
+  const qc = useQueryClient();
+  const previewFn = useServerFn(previewStateBaseUpgrade);
+  const upgradeFn = useServerFn(upgradeStateToBaseVersion);
+  const q = useQuery({
+    queryKey: ["state-base-upgrade", stateCode],
+    queryFn: () => previewFn({ data: { stateCode } }),
+    retry: false,
+  });
+  const upgrade = useMutation({
+    mutationFn: (toVersion: number) => upgradeFn({ data: { stateCode, toVersion } }),
+    onSuccess: () => {
+      toast.success("State upgraded to the new base template. State-specific data preserved; new fields are blank for you to fill in.");
+      qc.invalidateQueries({ queryKey: ["state-base-upgrade", stateCode] });
+      qc.invalidateQueries({ queryKey: ["state-template", stateCode] });
+      qc.invalidateQueries({ queryKey: ["platform-states"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  if (q.isLoading) return null;
+  if (q.isError || !q.data) return null;
+  const d = q.data;
+
+  if (d.upToDate) {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900">
+        <CheckCircle2 className="h-3.5 w-3.5" /> Base template v{d.fromVersion} · current
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="inline-flex items-center gap-2 text-amber-900">
+            <Sparkles className="h-4 w-4" />
+            <span className="font-semibold">Base template update available</span>
+            <span className="rounded-full border border-amber-300 bg-white/70 px-2 py-0.5 font-mono text-[11px]">
+              v{d.fromVersion} → v{d.toVersion}
+            </span>
+          </div>
+          {("toTitle" in d) && d.toTitle ? (
+            <div className="mt-1 text-xs font-medium text-amber-950">{d.toTitle}</div>
+          ) : null}
+          {("toSummary" in d) && d.toSummary ? (
+            <p className="mt-0.5 text-xs text-amber-900/80">{d.toSummary}</p>
+          ) : null}
+          {(d.added.length > 0 || d.removed.length > 0) ? (
+            <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+              {d.added.length > 0 ? (
+                <div className="rounded-md border border-amber-200 bg-white/70 p-2">
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-900">New / added</div>
+                  <ul className="space-y-0.5 text-[11px] text-amber-950">
+                    {d.added.slice(0, 12).map((c, i) => (
+                      <li key={i}>
+                        <span className="font-mono">{c.section}</span>
+                        {c.field ? <span> · {c.field}</span> : null}
+                        {c.note ? <span className="text-amber-900/70"> — {c.note}</span> : null}
+                      </li>
+                    ))}
+                    {d.added.length > 12 ? <li className="text-amber-900/70">+ {d.added.length - 12} more</li> : null}
+                  </ul>
+                </div>
+              ) : null}
+              {d.removed.length > 0 ? (
+                <div className="rounded-md border border-amber-200 bg-white/70 p-2">
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-rose-900">Removed</div>
+                  <ul className="space-y-0.5 text-[11px] text-amber-950">
+                    {d.removed.slice(0, 12).map((c, i) => (
+                      <li key={i}>
+                        <span className="font-mono">{c.section}</span>
+                        {c.field ? <span> · {c.field}</span> : null}
+                      </li>
+                    ))}
+                    {d.removed.length > 12 ? <li className="text-amber-900/70">+ {d.removed.length - 12} more</li> : null}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-amber-900/80">No field-level changes — version metadata only.</p>
+          )}
+          <p className="mt-2 text-[11px] text-amber-900/80">
+            Upgrading preserves all state-specific values you've already entered. New fields appear blank for you to fill in.
+          </p>
+        </div>
+        <button
+          onClick={() => upgrade.mutate(d.toVersion)}
+          disabled={upgrade.isPending}
+          className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-md bg-[#d97a1c] px-3 text-xs font-semibold text-white hover:bg-[#b8651a] disabled:opacity-50"
+        >
+          <Sparkles className="h-3.5 w-3.5" /> {upgrade.isPending ? "Upgrading…" : `Update to v${d.toVersion}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+

@@ -479,16 +479,19 @@ OUTPUT FORMAT — return STRICT JSON only:
 interface EscalateInput {
   question: string;
   context: string;
+  organizationId: string;
 }
 
 function validateEscalate(input: unknown): EscalateInput {
   const i = (input ?? {}) as Record<string, unknown>;
   const question = typeof i.question === "string" ? i.question.trim() : "";
   const context = typeof i.context === "string" ? i.context.trim() : "";
+  const organizationId = typeof i.organizationId === "string" ? i.organizationId : "";
   if (question.length < 2 || question.length > 2000) {
     throw new Error("Question must be 2–2000 characters.");
   }
-  return { question, context: context.slice(0, 8000) };
+  if (!UUID_RE.test(organizationId)) throw new Error("Invalid organizationId.");
+  return { question, context: context.slice(0, 8000), organizationId };
 }
 
 export const escalateHelpToHive = createServerFn({ method: "POST" })
@@ -496,15 +499,9 @@ export const escalateHelpToHive = createServerFn({ method: "POST" })
   .inputValidator(validateEscalate)
   .handler(async ({ data, context }): Promise<{ ticketId: string; status: string }> => {
     const { supabase, userId } = context;
+    const orgId = data.organizationId;
+    await requireOrgMembership(supabase, userId, orgId, "employee");
 
-    const { data: memberships } = await supabase
-      .from("organization_members")
-      .select("organization_id")
-      .eq("user_id", userId)
-      .eq("active", true)
-      .limit(1);
-    const orgId = memberships?.[0]?.organization_id;
-    if (!orgId) throw new Error("No active organization membership.");
 
     const subject = data.question.length > 120 ? data.question.slice(0, 117) + "…" : data.question;
 

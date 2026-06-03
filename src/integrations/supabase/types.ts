@@ -5027,9 +5027,50 @@ export type Database = {
           },
         ]
       }
+      state_structural_gaps: {
+        Row: {
+          area: string
+          created_at: string
+          created_by: string | null
+          detail: string | null
+          id: string
+          state_code: string
+          status: string
+          summary: string
+          ticket_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          area: string
+          created_at?: string
+          created_by?: string | null
+          detail?: string | null
+          id?: string
+          state_code: string
+          status?: string
+          summary: string
+          ticket_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          area?: string
+          created_at?: string
+          created_by?: string | null
+          detail?: string | null
+          id?: string
+          state_code?: string
+          status?: string
+          summary?: string
+          ticket_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       state_templates: {
         Row: {
           billing_codes: Json
+          caps: Json
+          citations: Json
           created_at: string
           department_structure: Json
           draft: Json
@@ -5038,6 +5079,7 @@ export type Database = {
           id: string
           published_at: string | null
           published_by: string | null
+          regulator: Json
           required_documents: Json
           state_code: string
           terminology: Json
@@ -5047,6 +5089,8 @@ export type Database = {
         }
         Insert: {
           billing_codes?: Json
+          caps?: Json
+          citations?: Json
           created_at?: string
           department_structure?: Json
           draft?: Json
@@ -5055,6 +5099,7 @@ export type Database = {
           id?: string
           published_at?: string | null
           published_by?: string | null
+          regulator?: Json
           required_documents?: Json
           state_code: string
           terminology?: Json
@@ -5064,6 +5109,8 @@ export type Database = {
         }
         Update: {
           billing_codes?: Json
+          caps?: Json
+          citations?: Json
           created_at?: string
           department_structure?: Json
           draft?: Json
@@ -5072,6 +5119,7 @@ export type Database = {
           id?: string
           published_at?: string | null
           published_by?: string | null
+          regulator?: Json
           required_documents?: Json
           state_code?: string
           terminology?: Json

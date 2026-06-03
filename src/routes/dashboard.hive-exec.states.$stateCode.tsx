@@ -23,6 +23,9 @@ import {
 import type {
   StateBillingCode, StateRequiredDoc, StateForm, StateTrainingMandate,
 } from "@/lib/state-templates";
+import { STATE_INVENTORY, INVENTORY_AREAS, type InventoryItem } from "@/lib/state-inventory";
+import { listStructuralGaps, fileStructuralGap, updateStructuralGap } from "@/lib/state-structural-gaps.functions";
+
 
 export const Route = createFileRoute("/dashboard/hive-exec/states/$stateCode")({
   head: ({ params }) => ({ meta: [{ title: `${params.stateCode} — State Profile` }] }),
@@ -37,7 +40,7 @@ const STATUS_OPTIONS: Array<{ value: "coming_soon" | "draft" | "active"; label: 
 
 function StateDetailPage() {
   const { stateCode } = Route.useParams();
-  const [tab, setTab] = useState<"profile" | "sources" | "providers">("profile");
+  const [tab, setTab] = useState<"profile" | "inventory" | "sources" | "providers">("profile");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   if (pathname.endsWith("/onboarding")) return <Outlet />;
 
@@ -64,6 +67,7 @@ function StateDetailPage() {
         {(
           [
             ["profile", "Profile & Template"],
+            ["inventory", "Inventory & Gaps"],
             ["sources", "Authoritative Sources"],
             ["providers", "Providers"],
           ] as const
@@ -81,8 +85,10 @@ function StateDetailPage() {
       </nav>
 
       {tab === "profile" ? <ProfileTab stateCode={stateCode} /> : null}
+      {tab === "inventory" ? <InventoryTab stateCode={stateCode} /> : null}
       {tab === "sources" ? <SourcesTab stateCode={stateCode} /> : null}
       {tab === "providers" ? <ProvidersTab stateCode={stateCode} /> : null}
+
     </div>
   );
 }
@@ -816,5 +822,176 @@ function ProvidersTab({ stateCode }: { stateCode: string }) {
         </ul>
       )}
     </section>
+  );
+}
+
+// ═══ INVENTORY TAB ═══════════════════════════════════════════════════════════
+// NECTAR-driven inventory of Utah-specific values + structural gap tracking.
+
+function InventoryTab({ stateCode }: { stateCode: string }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listStructuralGaps);
+  const fileFn = useServerFn(fileStructuralGap);
+  const updateFn = useServerFn(updateStructuralGap);
+
+  const gapsQ = useQuery({
+    queryKey: ["state-structural-gaps", stateCode],
+    queryFn: () => listFn({ data: { stateCode } }),
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gaps = (gapsQ.data ?? []) as Array<any>;
+
+  const fileGap = useMutation({
+    mutationFn: (item: InventoryItem) =>
+      fileFn({
+        data: {
+          stateCode,
+          area: item.area,
+          summary: item.label,
+          detail: `${item.utah_value}\n\nSource: ${item.source}${item.note ? "\n\n" + item.note : ""}`,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Structural gap filed — HIVE Executive ticket created.");
+      qc.invalidateQueries({ queryKey: ["state-structural-gaps", stateCode] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const setStatus = useMutation({
+    mutationFn: (vars: { id: string; status: "open" | "in_progress" | "resolved" | "wont_fix" }) =>
+      updateFn({ data: vars }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["state-structural-gaps", stateCode] }),
+  });
+
+  const isUtah = stateCode === "UT";
+  const total = STATE_INVENTORY.length;
+  const extracted = STATE_INVENTORY.filter((i) => i.extracted).length;
+  const configCount = STATE_INVENTORY.filter((i) => i.kind === "config").length;
+  const structuralCount = STATE_INVENTORY.filter((i) => i.kind === "structural").length;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-[#f4a93a]/30 bg-[#f4a93a]/[0.06] p-4">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#f4a93a]/15 ring-1 ring-[#f4a93a]/30">
+            <Sparkles className="h-4 w-4 text-[#9a3412]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display text-sm font-semibold text-[#9a3412]">
+              NECTAR Inventory — Utah-specific values
+            </h3>
+            <p className="mt-1 text-xs text-[#9a3412]/80">
+              Every value the platform currently assumes is Utah. Items tagged{" "}
+              <strong>config</strong> are (or will be) editable on each state's template.
+              Items tagged <strong>structural</strong> need real engineering — flag them to open a HIVE Executive ticket.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[#9a3412]/80">
+              <span>{total} total · {extracted} extracted to template · {total - extracted} pending</span>
+              <span>{configCount} config · {structuralCount} structural</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {INVENTORY_AREAS.map((area) => {
+        const items = STATE_INVENTORY.filter((i) => i.area === area.key);
+        if (items.length === 0) return null;
+        return (
+          <section key={area.key} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <h4 className="mb-2 text-sm font-semibold tracking-tight">{area.label}</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/40 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left">Item</th>
+                    <th className="px-2 py-1.5 text-left">Utah value</th>
+                    <th className="px-2 py-1.5 text-left">Source</th>
+                    <th className="px-2 py-1.5 text-left">Status</th>
+                    <th className="px-2 py-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-t border-border align-top">
+                      <td className="px-2 py-2">
+                        <div className="font-medium text-foreground">{item.label}</div>
+                        {item.note && <div className="mt-0.5 text-[10px] text-muted-foreground">{item.note}</div>}
+                      </td>
+                      <td className="px-2 py-2 font-mono text-[11px] text-muted-foreground">
+                        {isUtah ? item.utah_value : "—"}
+                      </td>
+                      <td className="px-2 py-2 text-[10px] text-muted-foreground">{item.source}</td>
+                      <td className="px-2 py-2">
+                        {item.kind === "structural" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-900">
+                            Structural
+                          </span>
+                        ) : item.extracted ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-900">
+                            Extracted
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900">
+                            Pending Phase 2
+                          </span>
+                        )}
+                        {item.template_path && (
+                          <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{item.template_path}</div>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {item.kind === "structural" && (
+                          <button
+                            type="button"
+                            onClick={() => fileGap.mutate(item)}
+                            disabled={fileGap.isPending}
+                            className="inline-flex min-h-[28px] items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-[10px] font-medium text-rose-900 hover:bg-rose-50 disabled:opacity-50"
+                          >
+                            <AlertTriangle className="h-3 w-3" /> File HIVE ticket
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })}
+
+      <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <h4 className="mb-2 text-sm font-semibold tracking-tight">Filed structural gaps</h4>
+        {gapsQ.isLoading ? (
+          <div className="text-xs text-muted-foreground">Loading…</div>
+        ) : gaps.length === 0 ? (
+          <div className="text-xs text-muted-foreground">
+            No structural gaps filed for {stateCode} yet. Use the "File HIVE ticket" buttons above to flag items that can't be solved with configuration.
+          </div>
+        ) : (
+          <ul className="space-y-1.5">
+            {gaps.map((g) => (
+              <li key={g.id} className="flex items-start justify-between gap-2 rounded-md border border-border bg-background p-2 text-xs">
+                <div className="min-w-0">
+                  <div className="font-medium">{g.summary}</div>
+                  <div className="text-[10px] text-muted-foreground">{g.area} · filed {new Date(g.created_at).toLocaleDateString()}</div>
+                </div>
+                <select
+                  value={g.status}
+                  onChange={(e) => setStatus.mutate({ id: g.id, status: e.target.value as "open" | "in_progress" | "resolved" | "wont_fix" })}
+                  className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 text-[11px]"
+                >
+                  <option value="open">Open</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="wont_fix">Won't fix</option>
+                </select>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   );
 }

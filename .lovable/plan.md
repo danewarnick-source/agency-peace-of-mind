@@ -1,84 +1,109 @@
-## Goal
+# Make HIVE state-neutral — Utah as the reference instance
 
-Turn the platform into a true multi-state system where state is a configuration layer (template), not hardcoded logic. Utah/DSPD becomes the first reference state instance instead of the implicit default.
+This is an architectural change. The app currently has Utah values (DSPD/DHHS, DSI/HHS/RHS codes, Form 520/1056, 14-day respite, ELS caps, etc.) embedded in components, server functions, and even DB triggers. The goal is to move what *can* be configuration into the editable state template, leave a clean "skeleton" for new states, keep Utah's behavior identical, and have NECTAR flag what truly can't be config.
 
-## Scope (Prompt 47)
+I'll do this in four focused phases so each one is reviewable and Utah never breaks. Phase 1 is mostly inventory + schema; phases 2–4 are the refactor.
 
-1. **Data model — state as a first-class entity**
-   - New tables (Executive-managed):
-     - `platform_states` — one row per US state (code, name, status: `draft` / `active` / `coming_soon`, reference flag for Utah).
-     - `state_templates` — the editable configuration blob per state (terminology overrides, training mandates, billing/service-code set, EVV specifics, required document cadences, department names). JSONB sections so we can extend per area without schema churn.
-     - `state_requirement_sources` — uploaded authoritative docs per state (mirror of provider Foundation A/B sources: file ref, title, jurisdiction, parse status, derived requirement count, source attribution metadata).
-     - `state_derived_requirements` — NECTAR-parsed per-state requirement set with source attribution (parallel to existing `nectar_requirements` but scoped to a state, not an org).
-   - Extend `organizations`: add `state_code` (FK to `platform_states.code`) + optional `additional_state_codes text[]` for multi-state providers. Backfill all existing orgs to `UT`.
-   - Extend `nectar_requirements` (provider-level) with `inherited_from_state_code` so per-provider requirements can show which ones layered on top of a state baseline.
-   - All new tables: GRANTs + RLS (HIVE Executive read/write; authenticated read on `platform_states` + the active state's published template only).
+---
 
-2. **Executive UI — state organization**
-   - New sidebar item **States** (HIVE Executive only) → `/dashboard/hive-exec/states`:
-     - List of 50 states with status chips (active / draft / coming-soon), provider count per state, last template update.
-     - Click into a state → state detail with tabs: **Template**, **Requirements & Sources**, **Providers**.
-   - Update HIVE Overview, Companies list, NECTAR queue, Account Health, Support Queue, Plans & Billing to support a **State filter** (All states / single state) so Executives can work across or drill into one state.
-   - Reference-state badge on Utah ("Reference implementation").
+## Phase 1 — NECTAR inventory + expanded template schema
 
-3. **State template editor (`/dashboard/hive-exec/states/$stateCode`)**
-   - Editable sections, each a JSONB slice with sensible defaults pulled from the existing Utah implementation:
-     - **Terminology**: department name, role/service display names, regulator label (e.g. DSPD vs equivalent).
-     - **Training mandates**: list of required course slugs + cadence + role applicability.
-     - **Billing & service codes**: per-state code set (reuses the existing `evv-codes` shape, but the canonical list lives in the template).
-     - **EVV specifics**: geofence default radius, variance grace window, reconciliation policy text, approved-locations cap.
-     - **Required documents & cadences**: doc types, frequency, who attests.
-     - **Department / org structure**: agency types, sub-program naming.
-   - Save = versioned write; "Publish" toggles `state_templates.published_at`. Drafts only visible to Executives.
-   - Reset-section-to-Utah-defaults button on each section (Utah = canonical reference).
+**A. Inventory (NECTAR-assisted, surfaced as an artifact + UI list)**
 
-4. **State requirements upload + NECTAR parsing**
-   - On the state detail **Requirements & Sources** tab: upload UI mirroring the provider Foundation A/B drop (`authoritative-source-drop` component) but scoped to a state.
-   - Server fns:
-     - `uploadStateRequirementSource` — stores file, kicks NECTAR parse.
-     - `parseStateRequirementSource` — reuses the existing `nectar-engine` parser; writes derived rows into `state_derived_requirements` with `source_id` attribution.
-     - `listStateRequirements(stateCode)` — for display.
-   - Provider-level requirements engine reads the state baseline first, then layers org-specific overrides on top.
+Scan the repo for Utah-specific literals and group them. Initial pass already shows these categories:
 
-5. **State-aware onboarding**
-   - `/dashboard/hive-exec/new-company` (existing route): add the state picker as the first question. Default sensible answers from the chosen state's template (terminology, training, codes, EVV).
-   - Then 3–5 simple questions: which authorized service codes from the state's set, which programs, primary contact, etc.
-   - On submit:
-     - Create the org with `state_code`.
-     - Seed provider-level: authorized codes (subset of state codes), training assignments (state mandates), terminology overrides default to inherit, requirements inherit from `state_derived_requirements`.
-   - Replace the current Utah-hardcoded onboarding defaults with the lookup against the state template.
+- **Terminology / agencies**: DSPD, DHHS, "Division of Services for People with Disabilities", Utah Medicaid, regulator labels in `state-templates.ts`, `nectar-*` copy, route headers.
+- **Service / billing codes**: DSI, HHS, RHS, DSG, RL6, RP3, RP4, RP5, S5151, S5102, S5125 — hardcoded in `src/lib/evv-codes.ts`, `src/lib/service-billing.ts`, `src/lib/job-codes.ts`, `src/lib/billing-units.ts`, `src/lib/variable-rate-codes.ts`, and DB triggers `enforce_client_spending_hourly_shift`, `enforce_els_caps`, `enforce_respite_caps`.
+- **State forms**: Form 520, Form 1056, PCSP, BSP, HRC — `dashboard.billing-520.tsx`, `dashboard.billing.form520.tsx`, `components/workspace/forms-hub-tab.tsx`, AI prompts in `pdf-import.functions.ts`.
+- **Training mandates**: CPR/First Aid cadences, HIPAA, abuse/neglect, BSP refresher — `dashboard.tracks.tsx`, course seed data.
+- **EVV config**: 500ft default geofence, 7-min variance, 5 approved locations cap, reconciliation policy text — partly in template already, partly in `components/evv/*` and `enforce_approved_location_cap` trigger.
+- **Requirement phrasing / citations**: "Section 11.3(5)", "Article 10", "Section 1.28" embedded in triggers + nectar copy.
+- **Role labels** ("Direct Support Professional", "House Manager"), department structure (agency types, program levels).
+- **Required documents**: PCSP annual, BSP quarterly, HRC, fire drill cadence.
+- **Respite / ELS caps**: 14-day stay, 21-day annual, 24 units/day, 260 days/year.
 
-6. **State-as-a-layer runtime (no hardcoding)**
-   - New hook `useStateTemplate()` that resolves the current org's `state_code` → published `state_templates` row + cached on React Query.
-   - Replace hardcoded "DSPD", "Utah", default geofence radius, default training set, and other Utah assumptions in shared components with `template.terminology.*` / `template.evv.*` / `template.training.*` lookups. Keep Utah's published template as the source of those exact values so behavior is unchanged for the existing tenant.
-   - Foundation D `jurisdiction` continues to be the source of legal scope; the state template is the operational config layer that drives UI + workflow.
+Output: a generated `/mnt/documents/utah-inventory.md` artifact (grouped, with file:line refs) + a new `Inventory` tab on the State Profile page that renders the same list from a JSON inventory file checked into `src/lib/state-inventory.ts`. Each item is tagged **config** (extractable) or **structural** (needs a HIVE Exec ticket).
 
-7. **Gating & design**
-   - All Executive routes server-gated via `requireSupabaseAuth` + `assertHiveExecutive`.
-   - Admin/staff get read-only access to their state's published template via a thin server fn (`getMyStateTemplate`).
-   - HIVE design system inside Executive (existing hexagon/amber accents); state list uses the existing card+status-chip pattern.
+**B. Expanded template schema**
 
-## Files (new)
+Extend `state_templates` and `StateTemplate` type with the missing sections (kept additive — existing fields untouched):
 
-- Migration: `platform_states`, `state_templates`, `state_requirement_sources`, `state_derived_requirements`, `organizations.state_code`, `nectar_requirements.inherited_from_state_code`. Seed all 50 states (UT active+reference, others coming-soon). Seed Utah template from existing constants. Backfill all orgs to `UT`.
-- `src/lib/state-templates.ts` — TypeScript types for the template JSONB sections + Utah defaults constant (source of seed data).
-- `src/lib/state-templates.functions.ts` — list/get/upsert/publish state templates, list/get platform states, get-my-state-template.
-- `src/lib/state-requirements.functions.ts` — upload, parse, list state requirement sources & derived requirements.
-- `src/hooks/use-state-template.tsx` — React Query hook for current org's published template.
-- `src/routes/dashboard.hive-exec.states.tsx` — state list.
-- `src/routes/dashboard.hive-exec.states.$stateCode.tsx` — state detail with Template / Requirements / Providers tabs.
-- `src/components/hive-exec/state-template-editor.tsx` — the per-section editors.
-- `src/components/hive-exec/state-requirement-source-drop.tsx` — wraps the existing authoritative-source drop, scoped to a state.
+```
+terminology           (existing — add: agency_short, agency_long, medicaid_program_name, role_labels[])
+billing_codes         (existing — add: rate, modifier, daily_or_hourly, cap_units/day, cap_units/year)
+forms                 (existing — add: schema_ref, ai_extractor_slug)
+training              (existing — add: required_for_roles[], grace_days)
+evv                   (existing — already has geofence/variance/cap; add: variance_reason_required, reconciliation_required_after_min)
+required_documents    (existing)
+department_structure  (existing)
++ NEW citations       { section: code, label, url } map for trigger error messages
++ NEW caps            { respite_max_consecutive_days, respite_annual_days, els_daily_units, els_annual_days }
++ NEW regulator       { name_short, name_long, submission_portal_url, incident_deadline_hours }
+```
 
-## Files (edited)
+DB migration adds `citations`, `caps`, `regulator` JSONB columns + seeds Utah values.
 
-- `src/routes/dashboard.hive-exec.tsx` — add **States** sidebar entry.
-- `src/routes/dashboard.hive-exec.new-company.tsx` — state-first onboarding; reads from state template; seeds inherited config on submit.
-- `src/routes/dashboard.hive-exec.index.tsx`, `dashboard.hive-exec.health.tsx`, `dashboard.hive-exec.tickets.tsx`, `dashboard.hive-exec.plans.tsx`, `dashboard.hive-exec.nectar.tsx` — add state filter.
-- A small number of shared components that hardcode "DSPD" / "Utah" / default geofence — swap to `useStateTemplate()` lookups (Utah template values keep behavior identical).
+---
 
-## Out of scope (this prompt)
+## Phase 2 — Route platform reads through the template
 
-- Building the full template content for the other 49 states (the schema + editor make that an Executive content task, not a code task).
-- Cross-state migration of an existing provider (Company Migration tool already exists; multi-state move is a follow-up).
-- Per-state localization of staff app strings beyond the terminology slice.
+Introduce a single `useStateConfig()` (extending today's `useStateTemplate`) that returns a fully-typed, fallback-safe config object. Then replace hardcoded reads:
+
+- `src/lib/evv-codes.ts`, `service-billing.ts`, `job-codes.ts`, `billing-units.ts`, `variable-rate-codes.ts` → re-export functions that take a `config` arg (or read from a small `StateConfigContext` provider mounted in `dashboard.tsx`). Keep the existing exports as thin compatibility wrappers that read the active state config so call sites don't all change at once.
+- Form labels in `dashboard.billing-520.tsx`, `forms-hub-tab.tsx`, etc. read `config.forms` by slug.
+- Terminology pulled via `config.terminology.agency_short` etc. wherever DSPD/DHHS strings appear in JSX.
+- Trigger error messages stay in SQL (they're structural protection), but the user-facing copy that paraphrases them moves to `config.citations`.
+
+**Server-side**: `useStateConfig` has a server counterpart `getStateConfig(orgId)` used inside `createServerFn` handlers that currently hardcode codes (Form 520 generator, billing rules, NECTAR prompts).
+
+---
+
+## Phase 3 — Utah as the populated reference + clean skeleton
+
+- Seed Utah's `platform_states` + `state_templates` row with every value moved out in phase 2, mirroring today's literals exactly. This is the "do not break Utah" gate: a regression test script (`scripts/verify-utah-parity.ts`) loads Utah's config and asserts the resolved values equal the previous hardcoded constants.
+- For all other states in `platform_states`, leave the new fields empty so the State Profile editor surfaces them as "No value yet" prompts.
+- Update the State Onboarding wizard (`dashboard.hive-exec.states.$stateCode.onboarding.tsx`) to walk through each new section, so onboarding becomes the expansive flow the spec asks for.
+
+---
+
+## Phase 4 — NECTAR flagging of structural gaps
+
+- Add a small `state_structural_gaps` table (state_code, area, summary, status, created_by, ticket_id).
+- In the Inventory tab, items tagged **structural** render a "File HIVE ticket" button that creates a row + a HIVE Exec ticket (reusing existing `hive_tickets`).
+- NECTAR Task Center surfaces open structural gaps per state alongside config TODOs.
+
+---
+
+## Technical details
+
+**Files touched (high-level)**
+
+- DB migration: add `citations`, `caps`, `regulator` JSONB to `state_templates`; create `state_structural_gaps`; seed Utah.
+- `src/lib/state-templates.ts` — extend `StateTemplate` type + `FALLBACK_TEMPLATE`.
+- `src/lib/state-templates.functions.ts` — extend update fns + add `getStateConfig` server helper.
+- `src/lib/state-config.ts` (new) — pure resolver: `(template) => StateConfig`.
+- `src/hooks/use-state-config.tsx` (new) — wraps `useStateTemplate`, exposes typed accessors.
+- `src/lib/evv-codes.ts`, `service-billing.ts`, `job-codes.ts`, `billing-units.ts`, `variable-rate-codes.ts` — switch from module-level constants to functions parameterized by `StateConfig`; keep backward-compatible default exports that read the active config.
+- Components: `components/workspace/forms-hub-tab.tsx`, `dashboard.billing-520.tsx`, `dashboard.billing.form520.tsx`, NECTAR copy in `components/nectar/*`, `dashboard.compliance-desk.tsx`, `dashboard.records-desk.tsx` — replace literals with `config.*` reads.
+- `dashboard.hive-exec.states.$stateCode.tsx` — new editor sections for `citations`, `caps`, `regulator`, plus an **Inventory** tab.
+- `dashboard.hive-exec.states.$stateCode.onboarding.tsx` — extend wizard steps.
+- `scripts/verify-utah-parity.ts` — regression script.
+
+**Out of scope (deliberately)**
+
+- Changing DB trigger logic (caps, receipts, deadlines). Triggers stay as-is in phase 1–3; their numeric thresholds will be parameterizable in a follow-up phase that rewrites the trigger to read from `state_templates` (it's a riskier change and deserves its own pass).
+- Translating non-English copy.
+- Multi-tenant per-provider overrides of state config (already a separate layer per Prompt 47).
+
+---
+
+## Suggested execution order
+
+Because this touches a lot of files, I'd like to ship it as four reviewable PR-sized chunks rather than one mega-change:
+
+1. **Phase 1** — migration + inventory artifact + Inventory tab (no behavior change).
+2. **Phase 2a** — terminology + forms (low risk, mostly JSX label swaps).
+3. **Phase 2b** — billing/EVV codes + caps (touches more files; gated by the Utah parity script).
+4. **Phase 3 + 4** — onboarding wizard expansion + structural-gap flagging.
+
+If you approve the plan I'll start with Phase 1 in the next turn and stop for your review before Phase 2.

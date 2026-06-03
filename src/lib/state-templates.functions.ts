@@ -22,7 +22,11 @@ const SECTION_KEYS: TemplateSectionKey[] = [
   "required_documents",
   "department_structure",
   "forms",
+  "citations",
+  "caps",
+  "regulator",
 ];
+
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,9 +179,13 @@ const SectionPatchSchema = z.object({
     "required_documents",
     "department_structure",
     "forms",
+    "citations",
+    "caps",
+    "regulator",
   ]),
   value: z.unknown(),
 });
+
 
 
 export const updateStateTemplateSection = createServerFn({ method: "POST" })

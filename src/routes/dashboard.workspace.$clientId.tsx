@@ -186,11 +186,11 @@ function ClientWorkspace() {
           {/* Touch-friendly tab bar — amber active w/ 2px underline, navy inactive (tappable, never dimmed) */}
           <TabsList className="grid h-auto w-full grid-cols-4 gap-1 border-b border-border bg-transparent p-0 text-foreground">
             {[
-              { v: "about", label: "About", Icon: User },
-              { v: "clock-in", label: "Clock In", Icon: Clock },
-              { v: "emar", label: "MAR", Icon: Pill },
-              { v: "forms", label: "Forms", Icon: FileText },
-            ].map(({ v, label, Icon }) => (
+              { v: "about", label: "About", Icon: User, show: true },
+              { v: "clock-in", label: "Clock In", Icon: Clock, show: true },
+              { v: "emar", label: "MAR", Icon: Pill, show: emarEnabled },
+              { v: "forms", label: "Forms", Icon: FileText, show: true },
+            ].filter((t) => t.show).map(({ v, label, Icon }) => (
               <TabsTrigger
                 key={v}
                 value={v}

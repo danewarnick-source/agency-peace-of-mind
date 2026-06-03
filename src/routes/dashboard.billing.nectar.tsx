@@ -6,6 +6,7 @@ import { AlertTriangle, TrendingDown, TrendingUp, Download, History, Loader2, Se
 import { useNectarAlerts, DEFAULT_NECTAR_ALERT_SETTINGS, type NectarAlert, type NectarAlertSettings } from "@/hooks/use-nectar-alerts";
 import { askNectarReport, type NectarReportResult } from "@/lib/nectar-reports.functions";
 import { listSavedReports, saveReport, deleteSavedReport, togglePinReport, upsertReportSchedule, unscheduleReport, type SavedReport } from "@/lib/saved-reports.functions";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { NectarBadge, NectarMark, NectarButton } from "@/components/nectar/nectar-brand";
 
 
@@ -152,6 +153,8 @@ function AlertCard({ alert: a }: { alert: NectarAlert }) {
 // ─── Report builder ────────────────────────────────────────────────────────
 
 function ReportBuilder() {
+  const { data: org } = useCurrentOrg();
+  const organizationId = org?.organization_id ?? "";
   const [prompt, setPrompt] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [result, setResult] = useState<NectarReportResult | null>(null);
@@ -179,7 +182,7 @@ function ReportBuilder() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const saveM = useMutation({
-    mutationFn: async (name: string) => saveSrv({ data: { name, prompt: prompt.trim(), pinned: true } }),
+    mutationFn: async (name: string) => saveSrv({ data: { name, prompt: prompt.trim(), pinned: true, organizationId } }),
     onSuccess: () => {
       setSaveOpen(false);
       setSaveName("");
@@ -189,7 +192,7 @@ function ReportBuilder() {
 
 
   const m = useMutation({
-    mutationFn: async (p: string) => ask({ data: { prompt: p } }),
+    mutationFn: async (p: string) => ask({ data: { prompt: p, organizationId } }),
     onSuccess: (r, p) => {
       setResult(r);
       setError(null);
@@ -388,6 +391,8 @@ function csvCell(v: string | number | null | undefined): string {
 // ─── Saved reports + schedules ─────────────────────────────────────────────
 
 function SavedReportsSection({ onRunPrompt }: { onRunPrompt: (p: string) => void }) {
+  const { data: org } = useCurrentOrg();
+  const organizationId = org?.organization_id;
   const list = useServerFn(listSavedReports);
   const del = useServerFn(deleteSavedReport);
   const togglePin = useServerFn(togglePinReport);
@@ -396,8 +401,9 @@ function SavedReportsSection({ onRunPrompt }: { onRunPrompt: (p: string) => void
   const qc = useQueryClient();
 
   const q = useQuery({
-    queryKey: ["saved-reports"],
-    queryFn: () => list(),
+    queryKey: ["saved-reports", organizationId],
+    enabled: !!organizationId,
+    queryFn: () => list({ data: { organizationId: organizationId! } }),
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["saved-reports"] });

@@ -15,6 +15,7 @@ import {
 import { NectarAnswer } from "@/components/nectar/nectar-answer";
 import { useMobileShellContainer } from "./mobile-shell-context";
 import { useActiveShiftBarVisible } from "@/hooks/use-active-shift-bar";
+import { useCurrentOrg } from "@/hooks/use-org";
 
 interface ChatMsg {
   id: string;
@@ -46,6 +47,8 @@ export interface AskNectarStaffProps {
  */
 export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProps) {
   const ask = useServerFn(askNectarStaff);
+  const { data: org } = useCurrentOrg();
+  const organizationId = org?.organization_id;
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [viewportInset, setViewportInset] = useState(0);
@@ -63,7 +66,7 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
 
   const mutation = useMutation({
     mutationFn: async (question: string) =>
-      ask({ data: { question, clientId } }),
+      ask({ data: { question, clientId, organizationId: organizationId ?? "" } }),
     onSuccess: (reply) => {
       setMessages((m) => [
         ...m,

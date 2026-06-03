@@ -262,7 +262,7 @@ function DocumentPull({ orgId }: { orgId?: string }) {
   const [nectarReply, setNectarReply] = useState<NectarHelpReply | null>(null);
   const ask = useServerFn(askNectarHelp);
   const askMutation = useMutation({
-    mutationFn: async (q: string) => ask({ data: { question: q, role: "admin" } }),
+    mutationFn: async (q: string) => ask({ data: { question: q, role: "admin", organizationId: orgId ?? "" } }),
     onSuccess: (r: NectarHelpReply) => setNectarReply(r),
     onError: (e: any) => toast.error(e?.message ?? "NECTAR couldn't answer that."),
   });

@@ -42,6 +42,7 @@ import {
   UserPen,
 } from "lucide-react";
 import { YourInputsSection } from "@/components/financial/your-inputs-section";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/financial/revenue")({
@@ -57,6 +58,8 @@ const MONTH_LABELS = [
 ];
 
 function RevenuePage() {
+  const { data: org } = useCurrentOrg();
+  const organizationId = org?.organization_id;
   const nowYear = new Date().getFullYear();
   const nowMonth = new Date().getMonth() + 1;
   const [year, setYear] = useState<number>(nowYear);
@@ -71,8 +74,9 @@ function RevenuePage() {
 
   const fetchRevenue = useServerFn(getBilledRevenueByYear);
   const q = useQuery({
-    queryKey: ["financial-revenue", year],
-    queryFn: () => fetchRevenue({ data: { year } }),
+    queryKey: ["financial-revenue", year, organizationId],
+    enabled: !!organizationId,
+    queryFn: () => fetchRevenue({ data: { year, organizationId: organizationId! } }),
   });
 
   const yearOptions = useMemo(() => {
@@ -245,8 +249,8 @@ function RevenuePage() {
           )}
 
           {/* Manual editor (base tier only) */}
-          {isManualMode && (
-            <ManualBilledEditor year={year} onChanged={() => q.refetch()} />
+          {isManualMode && organizationId && (
+            <ManualBilledEditor year={year} organizationId={organizationId} onChanged={() => q.refetch()} />
           )}
 
           {/* Visible-but-locked NECTAR upsell (base tier only) */}
@@ -303,11 +307,14 @@ function RevenuePage() {
           </div>
         </CardHeader>
         <CardContent>
-          <YourInputsSection
-            year={year}
-            month={inputsMonth}
-            onTotalsChange={setInputsTotals}
-          />
+          {organizationId && (
+            <YourInputsSection
+              year={year}
+              month={inputsMonth}
+              organizationId={organizationId}
+              onTotalsChange={setInputsTotals}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -446,9 +453,11 @@ type ManualEntry = {
 
 function ManualBilledEditor({
   year,
+  organizationId,
   onChanged,
 }: {
   year: number;
+  organizationId: string;
   onChanged?: () => void;
 }) {
   const qc = useQueryClient();
@@ -456,10 +465,10 @@ function ManualBilledEditor({
   const upsertFn = useServerFn(upsertBilledManualEntry);
   const deleteFn = useServerFn(deleteBilledManualEntry);
 
-  const queryKey = ["billed-manual", year] as const;
+  const queryKey = ["billed-manual", year, organizationId] as const;
   const q = useQuery({
     queryKey,
-    queryFn: () => listFn({ data: { year } }),
+    queryFn: () => listFn({ data: { year, organizationId } }),
   });
 
   const byMonth = useMemo(() => {
@@ -545,7 +554,7 @@ function ManualBilledEditor({
                     month={month}
                     entry={entry}
                     onSubmit={(payload) =>
-                      upsertM.mutateAsync({ data: { year, month, ...payload } })
+                      upsertM.mutateAsync({ data: { year, month, organizationId, ...payload } })
                     }
                   />
                   {entry && (
@@ -555,7 +564,7 @@ function ManualBilledEditor({
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
                       onClick={() => {
                         if (confirm(`Clear billed revenue for ${label} ${year}?`)) {
-                          deleteM.mutate({ data: { id: entry.id } });
+                          deleteM.mutate({ data: { id: entry.id, organizationId } });
                         }
                       }}
                     >

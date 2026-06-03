@@ -180,25 +180,29 @@ export const askNectarStaff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<NectarStaffReply> => {
     const supabase = context.supabase as unknown as SupabaseLike;
     const userId = context.userId;
+    const orgId = data.organizationId;
     const kw = keywords(data.question);
 
-    // 1. Resolve org membership (must be active employee in some org).
+    // 1. Verify caller is an active member of the PASSED org (employee+).
+    await requireOrgMembership(
+      context.supabase as unknown as Parameters<typeof requireOrgMembership>[0],
+      userId,
+      orgId,
+      "employee",
+    );
+
+    // Load the caller's role/job_title within this org for prompt context.
     const memQ = await supabase
       .from("organization_members")
-      .select("organization_id, role, job_title")
+      .select("role, job_title")
+      .eq("organization_id", orgId)
       .eq("user_id", userId)
       .eq("active", true)
-      .limit(1);
-    const mem = (memQ.data as Array<{ organization_id: string; role: string; job_title: string | null }> | null)?.[0];
-    if (!mem) {
-      return {
-        answer: "I can't find an active staff membership for your account. Please ask an admin to check your status.",
-        citations: [],
-        usedClientIds: [],
-        refused: true,
-      };
-    }
-    const orgId = mem.organization_id;
+      .maybeSingle();
+    const mem = (memQ.data as { role: string; job_title: string | null } | null) ?? {
+      role: "employee",
+      job_title: null,
+    };
 
     // 2. Build allowed client set via SECURITY DEFINER function.
     const assignedRpc = await supabase.rpc("clients_for_staff", {

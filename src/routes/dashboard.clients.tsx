@@ -36,6 +36,7 @@ import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselect";
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+import { ClientIntakeChecklistCard } from "@/components/clients/client-intake-checklist-card";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
@@ -488,12 +489,13 @@ function ClientWorkspace({
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
         <TabsList className="h-10 w-full justify-start rounded-none border-b border-border bg-transparent p-0">
           {[
-            { value: "profile",    label: "Client Profile",     icon: User,     show: true        },
-            { value: "pcsp",       label: "PCSP & Directives",  icon: FileText, show: true        },
-            { value: "staff",      label: "Staff Assignment",   icon: Users,    show: true        },
-            { value: "medications",label: "Medications & MAR",  icon: Pill,     show: emarEnabled },
-            { value: "documents",  label: "Documents",          icon: Shield,   show: true        },
-            { value: "settings",   label: "Settings",           icon: Settings2, show: true       },
+            { value: "profile",    label: "Client Profile",     icon: User,      show: true        },
+            { value: "intake",     label: "Intake",             icon: Shield,    show: true        },
+            { value: "pcsp",       label: "PCSP & Directives",  icon: FileText,  show: true        },
+            { value: "staff",      label: "Staff Assignment",   icon: Users,     show: true        },
+            { value: "medications",label: "Medications & MAR",  icon: Pill,      show: emarEnabled },
+            { value: "documents",  label: "Documents",          icon: Shield,    show: true        },
+            { value: "settings",   label: "Settings",           icon: Settings2, show: true        },
           ].filter((t) => t.show).map(({ value, label, icon: Icon }) => (
             <button
               key={value}
@@ -511,22 +513,26 @@ function ClientWorkspace({
           ))}
         </TabsList>
 
-        {/* ── PROFILE TAB ── */}
         <TabsContent value="profile" className="mt-5">
           <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
         </TabsContent>
 
-        {/* ── PCSP TAB ── */}
+        <TabsContent value="intake" className="mt-5">
+          <ClientIntakeChecklistCard
+            organizationId={orgId}
+            clientId={client.id}
+            clientName={`${client.first_name} ${client.last_name}`.trim()}
+          />
+        </TabsContent>
+
         <TabsContent value="pcsp" className="mt-5">
           <PcspTab client={client} onSave={onSave} saving={saving} />
         </TabsContent>
 
-        {/* ── STAFF ASSIGNMENT TAB ── */}
         <TabsContent value="staff" className="mt-5">
           <StaffAssignmentTab clientId={client.id} orgId={orgId} />
         </TabsContent>
 
-        {/* ── MEDICATIONS TAB (gated by per-client eMAR feature) ── */}
         {emarEnabled && (
           <TabsContent value="medications" className="mt-5 space-y-4">
             <div>
@@ -540,12 +546,10 @@ function ClientWorkspace({
           </TabsContent>
         )}
 
-        {/* ── DOCUMENTS TAB ── */}
         <TabsContent value="documents" className="mt-5">
           <DocumentsTab clientId={client.id} orgId={orgId} />
         </TabsContent>
 
-        {/* ── SETTINGS TAB ── */}
         <TabsContent value="settings" className="mt-5">
           <SettingsTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
         </TabsContent>

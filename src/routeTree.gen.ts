@@ -33,6 +33,7 @@ import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardSchedulingRouteImport } from './routes/dashboard.scheduling'
+import { Route as DashboardScheduleRouteImport } from './routes/dashboard.schedule'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
 import { Route as DashboardReimbursementsRouteImport } from './routes/dashboard.reimbursements'
@@ -219,6 +220,11 @@ const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
 const DashboardSchedulingRoute = DashboardSchedulingRouteImport.update({
   id: '/scheduling',
   path: '/scheduling',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardScheduleRoute = DashboardScheduleRouteImport.update({
+  id: '/schedule',
+  path: '/schedule',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardRolesRoute = DashboardRolesRouteImport.update({
@@ -629,6 +635,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/reimbursements': typeof DashboardReimbursementsRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
+  '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
@@ -718,6 +725,7 @@ export interface FileRoutesByTo {
   '/dashboard/reimbursements': typeof DashboardReimbursementsRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
+  '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
@@ -812,6 +820,7 @@ export interface FileRoutesById {
   '/dashboard/reimbursements': typeof DashboardReimbursementsRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
+  '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
@@ -907,6 +916,7 @@ export interface FileRouteTypes {
     | '/dashboard/reimbursements'
     | '/dashboard/reports'
     | '/dashboard/roles'
+    | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
@@ -996,6 +1006,7 @@ export interface FileRouteTypes {
     | '/dashboard/reimbursements'
     | '/dashboard/reports'
     | '/dashboard/roles'
+    | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
@@ -1089,6 +1100,7 @@ export interface FileRouteTypes {
     | '/dashboard/reimbursements'
     | '/dashboard/reports'
     | '/dashboard/roles'
+    | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
@@ -1324,6 +1336,13 @@ declare module '@tanstack/react-router' {
       path: '/scheduling'
       fullPath: '/dashboard/scheduling'
       preLoaderRoute: typeof DashboardSchedulingRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/schedule': {
+      id: '/dashboard/schedule'
+      path: '/schedule'
+      fullPath: '/dashboard/schedule'
+      preLoaderRoute: typeof DashboardScheduleRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/roles': {
@@ -1976,6 +1995,7 @@ interface DashboardRouteChildren {
   DashboardReimbursementsRoute: typeof DashboardReimbursementsRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
+  DashboardScheduleRoute: typeof DashboardScheduleRoute
   DashboardSchedulingRoute: typeof DashboardSchedulingRoute
   DashboardSettingsRoute: typeof DashboardSettingsRouteWithChildren
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
@@ -2026,6 +2046,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardReimbursementsRoute: DashboardReimbursementsRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,
+  DashboardScheduleRoute: DashboardScheduleRoute,
   DashboardSchedulingRoute: DashboardSchedulingRoute,
   DashboardSettingsRoute: DashboardSettingsRouteWithChildren,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,

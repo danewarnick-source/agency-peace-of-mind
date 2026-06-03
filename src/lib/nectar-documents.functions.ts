@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
 // =============================================================
 // NECTAR Universal Document Store — server functions
@@ -153,6 +154,8 @@ export const ingestDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
 
     // 1. Upload to storage
     const binary = Uint8Array.from(atob(data.fileBase64), (c) => c.charCodeAt(0));
@@ -427,6 +430,14 @@ export const reviewExtractedField = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Resolve org via the field → document; verify caller is a manager+ there.
+    const { data: fieldRow } = await supabase
+      .from("nectar_extracted_fields")
+      .select("organization_id")
+      .eq("id", data.fieldId)
+      .maybeSingle();
+    if (!fieldRow?.organization_id) throw new Error("Extracted field not found");
+    await requireOrgMembership(supabase, userId, fieldRow.organization_id as string, "manager");
     const update: Record<string, unknown> = {
       status: data.action === "confirm" ? "confirmed" : data.action === "override" ? "overridden" : "rejected",
       reviewed_by: userId,
@@ -450,12 +461,14 @@ export const deleteDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ documentId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { data: doc } = await supabase
       .from("nectar_documents")
-      .select("storage_path, storage_bucket")
+      .select("storage_path, storage_bucket, organization_id")
       .eq("id", data.documentId)
       .maybeSingle();
+    if (!doc?.organization_id) throw new Error("Document not found");
+    await requireOrgMembership(supabase, userId, doc.organization_id as string, "manager");
     if (doc?.storage_path) {
       await supabase.storage.from(doc.storage_bucket as string).remove([doc.storage_path as string]);
     }

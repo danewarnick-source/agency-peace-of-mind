@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, Save, Upload, FileText, CheckCircle2, Building2, Plus, Trash2,
-  MapPin, Sparkles, AlertTriangle,
+  MapPin, Sparkles, AlertTriangle, ListChecks, Gauge, BookOpen, Scale,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -22,7 +22,9 @@ import {
 } from "@/lib/state-requirements.functions";
 import type {
   StateBillingCode, StateRequiredDoc, StateForm, StateTrainingMandate,
+  StateCitation, StateCapsSection, StateRegulatorSection,
 } from "@/lib/state-templates";
+import { TEMPLATE_SECTIONS } from "@/lib/state-templates";
 import { STATE_INVENTORY, INVENTORY_AREAS, type InventoryItem } from "@/lib/state-inventory";
 import { listStructuralGaps, fileStructuralGap, updateStructuralGap } from "@/lib/state-structural-gaps.functions";
 
@@ -84,7 +86,7 @@ function StateDetailPage() {
         ))}
       </nav>
 
-      {tab === "profile" ? <ProfileTab stateCode={stateCode} /> : null}
+      {tab === "profile" ? <ProfileTab stateCode={stateCode} onJumpToSources={() => setTab("sources")} /> : null}
       {tab === "inventory" ? <InventoryTab stateCode={stateCode} /> : null}
       {tab === "sources" ? <SourcesTab stateCode={stateCode} /> : null}
       {tab === "providers" ? <ProvidersTab stateCode={stateCode} /> : null}
@@ -95,7 +97,7 @@ function StateDetailPage() {
 
 // ═══ PROFILE TAB ═════════════════════════════════════════════════════════════
 
-function ProfileTab({ stateCode }: { stateCode: string }) {
+function ProfileTab({ stateCode, onJumpToSources }: { stateCode: string; onJumpToSources?: () => void }) {
   const qc = useQueryClient();
   const getFn = useServerFn(getStateTemplate);
   const saveFn = useServerFn(updateStateTemplateSection);
@@ -166,13 +168,29 @@ function ProfileTab({ stateCode }: { stateCode: string }) {
         </div>
       ) : null}
 
+      <TemplateSectionNav />
+
       <TerminologyEditor value={tpl?.terminology ?? {}} onSave={(v) => saveSection("terminology", v)} />
+      <RegulatorEditor value={tpl?.regulator ?? {}} onSave={(v) => saveSection("regulator", v)} />
       <BillingCodesEditor value={tpl?.billing_codes ?? { codes: [] }} onSave={(v) => saveSection("billing_codes", v)} />
       <FormsEditor value={tpl?.forms ?? { forms: [] }} onSave={(v) => saveSection("forms", v)} />
       <TrainingEditor value={tpl?.training ?? { mandates: [] }} onSave={(v) => saveSection("training", v)} />
       <EvvEditor value={tpl?.evv ?? {}} onSave={(v) => saveSection("evv", v)} />
+      <CapsEditor value={tpl?.caps ?? {}} onSave={(v) => saveSection("caps", v)} />
+      <CitationsEditor value={tpl?.citations ?? { sections: [] }} onSave={(v) => saveSection("citations", v)} />
       <RequiredDocsEditor value={tpl?.required_documents ?? { docs: [] }} onSave={(v) => saveSection("required_documents", v)} />
       <DepartmentStructureEditor value={tpl?.department_structure ?? { agency_types: [], program_levels: [] }} onSave={(v) => saveSection("department_structure", v)} />
+
+      <div id="sources-pointer" className="scroll-mt-24 rounded-xl border border-sky-200 bg-sky-50/50 p-4 text-xs text-sky-900">
+        <div className="mb-1 inline-flex items-center gap-1 font-semibold">
+          <Upload className="h-3.5 w-3.5" /> Upload state-specific documents
+        </div>
+        Provider contract, billing manual, EVV policy, code book — upload authoritative sources on the{" "}
+        <button onClick={() => onJumpToSources?.()} className="font-semibold underline">
+          Authoritative Sources
+        </button>{" "}
+        tab. NECTAR parses uploads into per-state requirements with source attribution.
+      </div>
 
       <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 text-xs text-amber-900">
         <div className="mb-1 inline-flex items-center gap-1 font-semibold">
@@ -181,6 +199,30 @@ function ProfileTab({ stateCode }: { stateCode: string }) {
         Use <Link to="/dashboard/hive-exec/states/$stateCode/onboarding" params={{ stateCode }} className="font-semibold underline">state onboarding</Link> to flag structural gaps — those open NECTAR tickets for the platform team instead of silently failing.
       </div>
     </div>
+  );
+}
+
+// ─── Section anchor nav ──────────────────────────────────────────────────────
+
+function TemplateSectionNav() {
+  return (
+    <nav className="sticky top-2 z-10 -mx-1 flex flex-wrap gap-1 rounded-xl border border-border bg-card/95 p-2 shadow-sm backdrop-blur">
+      {TEMPLATE_SECTIONS.map((s) => (
+        <a
+          key={s.key}
+          href={`#section-${s.key}`}
+          className="inline-flex min-h-[32px] items-center rounded-md border border-transparent bg-muted/40 px-2.5 text-[11px] font-medium text-muted-foreground hover:border-border hover:bg-background hover:text-foreground"
+        >
+          {s.label}
+        </a>
+      ))}
+      <a
+        href="#sources-pointer"
+        className="inline-flex min-h-[32px] items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-[11px] font-semibold text-sky-900 hover:bg-sky-100"
+      >
+        <Upload className="h-3 w-3" /> Documents
+      </a>
+    </nav>
   );
 }
 
@@ -289,24 +331,29 @@ function BasicsCard({
 // ─── Generic section shell ───────────────────────────────────────────────────
 
 function SectionShell({
-  title, dirty, saving, onSave, children,
+  title, dirty, saving, onSave, children, id, blurb,
 }: {
   title: string;
   dirty: boolean;
   saving: boolean;
   onSave: () => void;
   children: React.ReactNode;
+  id?: string;
+  blurb?: string;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-display text-sm font-semibold">{title}</h3>
+    <section id={id} className="scroll-mt-24 rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-display text-sm font-semibold">{title}</h3>
+          {blurb ? <p className="mt-0.5 text-[11px] text-muted-foreground">{blurb}</p> : null}
+        </div>
         <button
           onClick={onSave}
           disabled={!dirty || saving}
-          className="inline-flex min-h-[32px] items-center gap-1 rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
+          className="inline-flex min-h-[32px] shrink-0 items-center gap-1 rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
         >
-          <Save className="h-3 w-3" /> {saving ? "Saving…" : "Save"}
+          <Save className="h-3 w-3" /> {saving ? "Saving…" : dirty ? "Save" : "Saved"}
         </button>
       </div>
       {children}
@@ -353,7 +400,7 @@ function TerminologyEditor({ value, onSave }: { value: { department_name?: strin
   );
 
   return (
-    <SectionShell title="Terminology" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-terminology" title="Terminology" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Department / division name">
           <input
@@ -437,7 +484,7 @@ function BillingCodesEditor({ value, onSave }: { value: { codes?: StateBillingCo
   };
 
   return (
-    <SectionShell title="Service & Billing Codes" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-billing_codes" title="Service & Billing Codes" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -499,7 +546,7 @@ function FormsEditor({ value, onSave }: { value: { forms?: StateForm[] }; onSave
   };
 
   return (
-    <SectionShell title="State Forms (520, 1056, PCSP equivalents)" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-forms" title="State Forms (520, 1056, PCSP equivalents)" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="space-y-2">
         {s.value.forms.length === 0 ? (
           <p className="text-sm text-muted-foreground">No state forms yet.</p>
@@ -541,7 +588,7 @@ function TrainingEditor({ value, onSave }: { value: { mandates?: StateTrainingMa
   };
 
   return (
-    <SectionShell title="Training Mandates" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-training" title="Training Mandates" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="space-y-2">
         {s.value.mandates.length === 0 ? (
           <p className="text-sm text-muted-foreground">No training mandates yet.</p>
@@ -594,7 +641,7 @@ function EvvEditor({ value, onSave }: { value: { default_geofence_feet?: number;
   );
 
   return (
-    <SectionShell title="EVV Configuration" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-evv" title="EVV Configuration" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="grid gap-3 md:grid-cols-4">
         <Field label="Geofence (ft)"><input type="number" min={0} value={s.value.default_geofence_feet} onChange={(e) => s.update({ ...s.value, default_geofence_feet: Number(e.target.value) })} className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" /></Field>
         <Field label="Grace minutes"><input type="number" min={0} value={s.value.variance_grace_minutes} onChange={(e) => s.update({ ...s.value, variance_grace_minutes: Number(e.target.value) })} className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" /></Field>
@@ -622,7 +669,7 @@ function RequiredDocsEditor({ value, onSave }: { value: { docs?: StateRequiredDo
   };
 
   return (
-    <SectionShell title="Required Documents (recurring attestations)" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-required_documents" title="Required Documents (recurring attestations)" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="space-y-2">
         {s.value.docs.length === 0 ? (
           <p className="text-sm text-muted-foreground">No required documents yet.</p>
@@ -658,11 +705,179 @@ function DepartmentStructureEditor({ value, onSave }: { value: { agency_types?: 
   );
 
   return (
-    <SectionShell title="Department Structure & Jurisdiction" dirty={s.dirty} saving={s.saving} onSave={s.save}>
+    <SectionShell id="section-department_structure" title="Department Structure & Jurisdiction" dirty={s.dirty} saving={s.saving} onSave={s.save}>
       <div className="grid gap-4 md:grid-cols-2">
         <StringListEditor label="Agency / provider types" value={s.value.agency_types} onChange={(v) => s.update({ ...s.value, agency_types: v })} placeholder="e.g. Supported Living" />
         <StringListEditor label="Program / service levels" value={s.value.program_levels} onChange={(v) => s.update({ ...s.value, program_levels: v })} placeholder="e.g. Level 3" />
       </div>
+    </SectionShell>
+  );
+}
+
+// ─── Regulator Identity ──────────────────────────────────────────────────────
+
+function RegulatorEditor({ value, onSave }: { value: Partial<StateRegulatorSection>; onSave: (v: unknown) => Promise<void> }) {
+  const s = useSectionState<StateRegulatorSection>(
+    {
+      name_short: value.name_short ?? "",
+      name_long: value.name_long ?? "",
+      parent_agency_short: value.parent_agency_short ?? "",
+      parent_agency_long: value.parent_agency_long ?? "",
+      medicaid_program_name: value.medicaid_program_name ?? "",
+      submission_portal_url: value.submission_portal_url ?? "",
+      incident_deadline_hours: value.incident_deadline_hours ?? 24,
+    },
+    onSave,
+  );
+  return (
+    <SectionShell
+      id="section-regulator"
+      title="Regulator Identity"
+      blurb="The regulating body's full identity — short/long names, parent agency, Medicaid program, where reports are filed, and incident-reporting deadline."
+      dirty={s.dirty} saving={s.saving} onSave={s.save}
+    >
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Regulator short name (e.g. DSPD)">
+          <input value={s.value.name_short ?? ""} onChange={(e) => s.update({ ...s.value, name_short: e.target.value })}
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Regulator full name">
+          <input value={s.value.name_long ?? ""} onChange={(e) => s.update({ ...s.value, name_long: e.target.value })}
+            placeholder="Division of Services for People with Disabilities"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Parent agency short name (e.g. DHHS)">
+          <input value={s.value.parent_agency_short ?? ""} onChange={(e) => s.update({ ...s.value, parent_agency_short: e.target.value })}
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Parent agency full name">
+          <input value={s.value.parent_agency_long ?? ""} onChange={(e) => s.update({ ...s.value, parent_agency_long: e.target.value })}
+            placeholder="Department of Health and Human Services"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Medicaid program name">
+          <input value={s.value.medicaid_program_name ?? ""} onChange={(e) => s.update({ ...s.value, medicaid_program_name: e.target.value })}
+            placeholder="e.g. Utah Medicaid"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Submission portal URL">
+          <input type="url" value={s.value.submission_portal_url ?? ""} onChange={(e) => s.update({ ...s.value, submission_portal_url: e.target.value })}
+            placeholder="https://…"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Incident-report deadline (hours)">
+          <input type="number" min={1} max={168}
+            value={s.value.incident_deadline_hours ?? 24}
+            onChange={(e) => s.update({ ...s.value, incident_deadline_hours: Number(e.target.value) })}
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+      </div>
+    </SectionShell>
+  );
+}
+
+// ─── Numeric Caps & Limits ───────────────────────────────────────────────────
+
+function CapsEditor({ value, onSave }: { value: Partial<StateCapsSection>; onSave: (v: unknown) => Promise<void> }) {
+  const s = useSectionState<StateCapsSection>(
+    {
+      respite_max_consecutive_days: value.respite_max_consecutive_days,
+      respite_annual_days: value.respite_annual_days,
+      els_daily_units: value.els_daily_units,
+      els_annual_days: value.els_annual_days,
+      pba_receipt_threshold_usd: value.pba_receipt_threshold_usd,
+      belongings_signature_threshold_usd: value.belongings_signature_threshold_usd,
+    },
+    onSave,
+  );
+  const num = (v: number | undefined) => (v === undefined || v === null ? "" : String(v));
+  const set = (k: keyof StateCapsSection, raw: string) =>
+    s.update({ ...s.value, [k]: raw === "" ? undefined : Number(raw) });
+  return (
+    <SectionShell
+      id="section-caps"
+      title="Numeric Caps & Limits"
+      blurb="State-specific numeric thresholds enforced by the platform. Leave blank to surface 'Not yet configured' to providers."
+      dirty={s.dirty} saving={s.saving} onSave={s.save}
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        <Field label="Respite — max consecutive days">
+          <input type="number" min={0} value={num(s.value.respite_max_consecutive_days)} onChange={(e) => set("respite_max_consecutive_days", e.target.value)}
+            placeholder="e.g. 14"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Respite — annual day ceiling">
+          <input type="number" min={0} value={num(s.value.respite_annual_days)} onChange={(e) => set("respite_annual_days", e.target.value)}
+            placeholder="e.g. 21"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="ELS — daily unit cap">
+          <input type="number" min={0} value={num(s.value.els_daily_units)} onChange={(e) => set("els_daily_units", e.target.value)}
+            placeholder="e.g. 24"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="ELS — annual service days">
+          <input type="number" min={0} value={num(s.value.els_annual_days)} onChange={(e) => set("els_annual_days", e.target.value)}
+            placeholder="e.g. 260"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="PBA receipt threshold (USD)">
+          <input type="number" min={0} value={num(s.value.pba_receipt_threshold_usd)} onChange={(e) => set("pba_receipt_threshold_usd", e.target.value)}
+            placeholder="e.g. 50"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Belongings signature threshold (USD)">
+          <input type="number" min={0} value={num(s.value.belongings_signature_threshold_usd)} onChange={(e) => set("belongings_signature_threshold_usd", e.target.value)}
+            placeholder="e.g. 50"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+      </div>
+    </SectionShell>
+  );
+}
+
+// ─── Regulation Citations ────────────────────────────────────────────────────
+
+function CitationsEditor({ value, onSave }: { value: { sections?: StateCitation[] }; onSave: (v: unknown) => Promise<void> }) {
+  const s = useSectionState<{ sections: StateCitation[] }>({ sections: value.sections ?? [] }, onSave);
+  const update = (i: number, patch: Partial<StateCitation>) => {
+    const next = [...s.value.sections];
+    next[i] = { ...next[i], ...patch };
+    s.update({ sections: next });
+  };
+  return (
+    <SectionShell
+      id="section-citations"
+      title="Regulation Citations"
+      blurb="The text and source the UI quotes when blocking an action (e.g. 'Section 7.4 — Respite caps')."
+      dirty={s.dirty} saving={s.saving} onSave={s.save}
+    >
+      <div className="space-y-2">
+        {s.value.sections.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No citations yet.</p>
+        ) : s.value.sections.map((c, i) => (
+          <div key={i} className="grid gap-2 rounded-md border border-border bg-muted/20 p-2 md:grid-cols-12">
+            <input value={c.key} onChange={(e) => update(i, { key: e.target.value })} placeholder="key (e.g. respite_caps)"
+              className="min-h-[36px] rounded-md border border-border bg-background px-2 font-mono text-xs md:col-span-3" />
+            <input value={c.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="Label (e.g. Respite caps)"
+              className="min-h-[36px] rounded-md border border-border bg-background px-2 text-sm md:col-span-3" />
+            <input value={c.cite} onChange={(e) => update(i, { cite: e.target.value })} placeholder="Citation (e.g. Section 7.4)"
+              className="min-h-[36px] rounded-md border border-border bg-background px-2 text-sm md:col-span-3" />
+            <input type="url" value={c.url ?? ""} onChange={(e) => update(i, { url: e.target.value || null })} placeholder="Source URL (optional)"
+              className="min-h-[36px] rounded-md border border-border bg-background px-2 text-xs md:col-span-2" />
+            <button onClick={() => s.update({ sections: s.value.sections.filter((_, x) => x !== i) })}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted md:col-span-1" aria-label="Remove">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={() => s.update({ sections: [...s.value.sections, { key: "", label: "", cite: "", url: null }] })}
+        className="mt-2 inline-flex min-h-[36px] items-center gap-1 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground hover:bg-muted"
+      >
+        <Plus className="h-3 w-3" /> Add citation
+      </button>
     </SectionShell>
   );
 }

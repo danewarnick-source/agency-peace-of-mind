@@ -55,6 +55,7 @@ export const getCompanyOverview = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");
     const orgId = data.organizationId;
     const now = new Date();
     const in30 = new Date(now.getTime() + 30 * 86_400_000).toISOString();

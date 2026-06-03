@@ -336,7 +336,7 @@ function EmployeesPage() {
               const position = (m.profile?.position ?? "") as Position | "";
               return (
                 <tr key={m.id} className="border-b border-border last:border-0">
-                  <td className="p-4 font-medium">{name}{needsReset && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">Pending first login</span>}</td>
+                  <td className="p-4 font-medium"><Link to="/dashboard/employees/$staffId" params={{ staffId: m.user_id }} className="hover:underline">{name}</Link>{needsReset && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">Pending first login</span>}</td>
                   <td className="p-4 text-muted-foreground">{login}</td>
                   <td className="p-4"><span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span></td>
                   <td className="p-4">{position ? <Badge variant="outline" className="font-normal">{position}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</td>

@@ -488,13 +488,13 @@ function ClientWorkspace({
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
         <TabsList className="h-10 w-full justify-start rounded-none border-b border-border bg-transparent p-0">
           {[
-            { value: "profile",    label: "Client Profile",     icon: User      },
-            { value: "pcsp",       label: "PCSP & Directives",  icon: FileText  },
-            { value: "staff",      label: "Staff Assignment",   icon: Users     },
-            { value: "medications",label: "Medications & MAR",  icon: Pill      },
-            { value: "documents",  label: "Documents",          icon: Shield    },
-            { value: "settings",   label: "Settings",           icon: Settings2 },
-          ].map(({ value, label, icon: Icon }) => (
+            { value: "profile",    label: "Client Profile",     icon: User,     show: true        },
+            { value: "pcsp",       label: "PCSP & Directives",  icon: FileText, show: true        },
+            { value: "staff",      label: "Staff Assignment",   icon: Users,    show: true        },
+            { value: "medications",label: "Medications & MAR",  icon: Pill,     show: emarEnabled },
+            { value: "documents",  label: "Documents",          icon: Shield,   show: true        },
+            { value: "settings",   label: "Settings",           icon: Settings2, show: true       },
+          ].filter((t) => t.show).map(({ value, label, icon: Icon }) => (
             <button
               key={value}
               type="button"

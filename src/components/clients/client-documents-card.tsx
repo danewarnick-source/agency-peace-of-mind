@@ -84,6 +84,7 @@ export function ClientDocumentsCard({
   const queryFn = useServerFn(queryDocuments);
   const delFn = useServerFn(deleteDocument);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [offerDocId, setOfferDocId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["client-docs", orgId, clientId],
@@ -125,11 +126,18 @@ export function ClientDocumentsCard({
             clientName={clientName}
             open={uploadOpen}
             onOpenChange={setUploadOpen}
-            onUploaded={() => {
+            onUploaded={(docId) => {
               qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
               qc.invalidateQueries({ queryKey: ["nectar-docs"] });
+              if (docId) setOfferDocId(docId);
             }}
           />
+          <NectarDocumentActionsDialog
+            documentId={offerDocId}
+            open={!!offerDocId}
+            onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
+          />
+        </div>
         </div>
         <p className="text-xs text-muted-foreground">
           Guardian papers, PCSP, 1056, intake/referrals, assessments, consents.

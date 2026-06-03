@@ -307,11 +307,14 @@ function RevenuePage() {
           </div>
         </CardHeader>
         <CardContent>
-          <YourInputsSection
-            year={year}
-            month={inputsMonth}
-            onTotalsChange={setInputsTotals}
-          />
+          {organizationId && (
+            <YourInputsSection
+              year={year}
+              month={inputsMonth}
+              organizationId={organizationId}
+              onTotalsChange={setInputsTotals}
+            />
+          )}
         </CardContent>
       </Card>
 

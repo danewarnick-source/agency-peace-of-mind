@@ -15,6 +15,11 @@ import {
   listPlatformStates,
 } from "@/lib/state-templates.functions";
 import {
+  previewStateBaseUpgrade,
+  upgradeStateToBaseVersion,
+} from "@/lib/state-base-versions.functions";
+
+import {
   listStateRequirementSources,
   createStateRequirementSource,
   deleteStateRequirementSource,

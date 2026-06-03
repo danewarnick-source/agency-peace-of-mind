@@ -1531,7 +1531,6 @@ function SettingsTab({
               features={features}
               onToggle={toggle}
             />
-          </CardContent>
             {featureDirty && (
               <div className="pt-3">
                 <Button onClick={saveFeatures} disabled={saving} className="w-full">

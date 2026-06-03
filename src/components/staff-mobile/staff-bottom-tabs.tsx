@@ -1,10 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Clock, ClipboardCheck, GraduationCap, Sparkles } from "lucide-react";
-import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
+import { LayoutDashboard, CalendarDays, ClipboardCheck, GraduationCap, Sparkles } from "lucide-react";
 
 const TABS = [
   { to: "/dashboard", label: "Caseload", icon: LayoutDashboard, exact: true, code: "caseload" },
-  { to: "/dashboard/timeclock", label: "Time Clock", icon: Clock, exact: false, code: "timeclock" },
+  // Schedule replaces the old Time Clock tab. The General Time Clock (non-client
+  // admin/training time) is nested below the schedule inside that screen.
+  { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, exact: false, code: "schedule" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck, exact: false, code: "logs" },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, exact: false, code: "nectar" },
   { to: "/dashboard/courses", label: "Trainings", icon: GraduationCap, exact: false, code: "courses" },
@@ -12,11 +13,8 @@ const TABS = [
 
 export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { settings } = useTimePaySettings();
 
-  const tabs = TABS.filter(
-    (t) => t.code !== "timeclock" || settings.allow_non_client_clockins,
-  );
+  const tabs = TABS;
 
   const positioning = framed
     ? "absolute inset-x-0 bottom-0 z-40"

@@ -571,7 +571,7 @@ function SchedulerInner({ orgId, role }: { orgId: string; role: string | null })
         .filter(Boolean);
       if (userIds.length === 0) return [];
       const { data: profs, error: pErr } = await (supabase as any)
-        .from("profiles")
+        .from("org_member_directory")
         .select("id, full_name, email")
         .in("id", userIds);
       if (pErr) throw pErr;

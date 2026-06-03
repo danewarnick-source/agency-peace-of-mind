@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
 import type { Role } from "@/lib/rbac";
@@ -72,14 +72,32 @@ export function useMyMemberships() {
 }
 
 /**
- * Returns the active membership for the signed-in user. The user can pick
- * which org is active via the org switcher; their choice persists in
- * localStorage. Falls back to the highest-privilege membership if no choice
- * has been made (or the saved choice is no longer valid).
+ * Deterministic default picker: prefer a non-demo org so a demo workspace
+ * can never win as an accidental load-time fallback. Within each group
+ * (non-demo / demo) sort by role rank, then organization_id for stability.
+ */
+function pickDefaultMembership(memberships: CurrentMembership[]): CurrentMembership | null {
+  if (!memberships.length) return null;
+  const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3 };
+  const sorted = [...memberships].sort((a, b) => {
+    if (a.is_demo !== b.is_demo) return a.is_demo ? 1 : -1; // non-demo first
+    const r = rank[a.role] - rank[b.role];
+    if (r !== 0) return r;
+    return a.organization_id.localeCompare(b.organization_id);
+  });
+  return sorted[0];
+}
+
+/**
+ * Returns the active membership for the signed-in user. Resolution is
+ * deterministic:
+ *   1. persisted activeOrgId (localStorage), if it still maps to an active membership
+ *   2. otherwise a stable non-demo-preferred default (see pickDefaultMembership)
+ * A demo org is NEVER selected as an accidental load-time fallback, which
+ * kills the demo-banner race on multi-org users.
  */
 export function useCurrentOrg() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
 
   // SSR-safe: initialize to null so server and first-client paint match.
   // LocalStorage is read inside useEffect (after mount) to avoid hydration mismatch.
@@ -87,7 +105,6 @@ export function useCurrentOrg() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Hydration-safe: read persisted choice after mount.
     setActiveOrgIdState(readActiveOrgId());
     const onStorage = (e: StorageEvent) => {
       if (e.key === ACTIVE_ORG_KEY) setActiveOrgIdState(e.newValue);
@@ -106,20 +123,27 @@ export function useCurrentOrg() {
         const picked = memberships.find((m) => m.organization_id === activeOrgId);
         if (picked) return picked;
       }
-      return memberships[0]; // highest-privilege fallback
+      return pickDefaultMembership(memberships);
     },
   });
 
-  const setActiveOrgId = useCallback(
-    (orgId: string | null) => {
+  /**
+   * Switch active org with a full app reload. Bulletproof: persist the new
+   * id, then reload so every query, hook, and component re-initializes from
+   * a single deterministic source — no half-switched state where chrome and
+   * data disagree. Switching to the same org is a no-op.
+   */
+  const setActiveOrgId = useCallback((orgId: string | null) => {
+    if (typeof window === "undefined") {
       writeActiveOrgId(orgId);
       setActiveOrgIdState(orgId);
-      // Drop cached queries that depend on org context so the UI re-fetches.
-      queryClient.cancelQueries();
-      queryClient.invalidateQueries();
-    },
-    [queryClient],
-  );
+      return;
+    }
+    const current = readActiveOrgId();
+    if (current === orgId) return;
+    writeActiveOrgId(orgId);
+    window.location.assign("/dashboard");
+  }, []);
 
   return { ...q, activeOrgId, setActiveOrgId };
 }

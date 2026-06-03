@@ -282,6 +282,7 @@ export const setSourceIgnoreState = createServerFn({ method: "POST" })
       .eq("id", data.documentId)
       .single();
     if (dErr || !doc) throw new Error(dErr?.message ?? "Source not found");
+    await requireOrgMembership(supabase, userId, doc.organization_id as string, "manager");
 
     let duplicateOfTitle: string | null = null;
     if (data.action === "duplicate") {
@@ -487,7 +488,8 @@ export const upsertRequirement = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const payload = {
       organization_id: data.organizationId,
       source_document_id: data.sourceDocumentId ?? null,

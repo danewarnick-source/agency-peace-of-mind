@@ -110,6 +110,21 @@ function EmployeesPage() {
         .filter((m) => (m.profile?.account_status ?? "active") !== "archived");
     },
   });
+  // Gated rate lookup: server-side `list_staff_pii` returns only staff the
+  // caller may view (admin / team-manager-of-staff / self). Direct selects
+  // of hourly_rate / daily_rate against `profiles` are REVOKEd.
+  const { data: staffPii } = useQuery({
+    enabled: !!org,
+    queryKey: ["staff-pii", org?.organization_id],
+    queryFn: async (): Promise<StaffPii[]> =>
+      await fetchStaffPii({ data: { organization_id: org!.organization_id } }),
+  });
+  const piiByStaff = useMemo(() => {
+    const m = new Map<string, StaffPii>();
+    for (const row of staffPii ?? []) m.set(row.staff_id, row);
+    return m;
+  }, [staffPii]);
+
 
   const { data: invites } = useQuery({
     enabled: !!org,

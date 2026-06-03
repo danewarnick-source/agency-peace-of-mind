@@ -36,6 +36,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { NectarGuidanceStrip } from "@/components/nectar/nectar-guidance-strip";
+import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
 import {
   ingestDocument,
   queryDocuments,
@@ -218,8 +219,17 @@ function NectarDocsPage() {
           orgId={orgId}
           open={uploadOpen}
           onOpenChange={setUploadOpen}
-          onUploaded={() => qc.invalidateQueries({ queryKey: ["nectar-docs"] })}
+          onUploaded={(docId) => {
+            qc.invalidateQueries({ queryKey: ["nectar-docs"] });
+            if (docId) setOfferDocId(docId);
+          }}
         />
+        <NectarDocumentActionsDialog
+          documentId={offerDocId}
+          open={!!offerDocId}
+          onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
+        />
+      </div>
       </div>
 
       <div className="grid gap-3">

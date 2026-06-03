@@ -230,11 +230,6 @@ function DashboardLayout() {
   };
 
 
-  const nectarNavForView = effectiveView === "admin" ? NECTAR_NAV : [];
-  const allNav = [...nav, ...nectarNavForView];
-  const pageTitle =
-    allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
-  const isStaffView = effectiveView === "staff";
 
   return (
     <div className="flex min-h-screen flex-col">

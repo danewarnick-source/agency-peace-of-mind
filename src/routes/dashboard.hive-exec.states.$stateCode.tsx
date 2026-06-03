@@ -714,6 +714,174 @@ function DepartmentStructureEditor({ value, onSave }: { value: { agency_types?: 
   );
 }
 
+// ─── Regulator Identity ──────────────────────────────────────────────────────
+
+function RegulatorEditor({ value, onSave }: { value: Partial<StateRegulatorSection>; onSave: (v: unknown) => Promise<void> }) {
+  const s = useSectionState<StateRegulatorSection>(
+    {
+      name_short: value.name_short ?? "",
+      name_long: value.name_long ?? "",
+      parent_agency_short: value.parent_agency_short ?? "",
+      parent_agency_long: value.parent_agency_long ?? "",
+      medicaid_program_name: value.medicaid_program_name ?? "",
+      submission_portal_url: value.submission_portal_url ?? "",
+      incident_deadline_hours: value.incident_deadline_hours ?? 24,
+    },
+    onSave,
+  );
+  return (
+    <SectionShell
+      id="section-regulator"
+      title="Regulator Identity"
+      blurb="The regulating body's full identity — short/long names, parent agency, Medicaid program, where reports are filed, and incident-reporting deadline."
+      dirty={s.dirty} saving={s.saving} onSave={s.save}
+    >
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Regulator short name (e.g. DSPD)">
+          <input value={s.value.name_short ?? ""} onChange={(e) => s.update({ ...s.value, name_short: e.target.value })}
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Regulator full name">
+          <input value={s.value.name_long ?? ""} onChange={(e) => s.update({ ...s.value, name_long: e.target.value })}
+            placeholder="Division of Services for People with Disabilities"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Parent agency short name (e.g. DHHS)">
+          <input value={s.value.parent_agency_short ?? ""} onChange={(e) => s.update({ ...s.value, parent_agency_short: e.target.value })}
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Parent agency full name">
+          <input value={s.value.parent_agency_long ?? ""} onChange={(e) => s.update({ ...s.value, parent_agency_long: e.target.value })}
+            placeholder="Department of Health and Human Services"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Medicaid program name">
+          <input value={s.value.medicaid_program_name ?? ""} onChange={(e) => s.update({ ...s.value, medicaid_program_name: e.target.value })}
+            placeholder="e.g. Utah Medicaid"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Submission portal URL">
+          <input type="url" value={s.value.submission_portal_url ?? ""} onChange={(e) => s.update({ ...s.value, submission_portal_url: e.target.value })}
+            placeholder="https://…"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Incident-report deadline (hours)">
+          <input type="number" min={1} max={168}
+            value={s.value.incident_deadline_hours ?? 24}
+            onChange={(e) => s.update({ ...s.value, incident_deadline_hours: Number(e.target.value) })}
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+      </div>
+    </SectionShell>
+  );
+}
+
+// ─── Numeric Caps & Limits ───────────────────────────────────────────────────
+
+function CapsEditor({ value, onSave }: { value: Partial<StateCapsSection>; onSave: (v: unknown) => Promise<void> }) {
+  const s = useSectionState<StateCapsSection>(
+    {
+      respite_max_consecutive_days: value.respite_max_consecutive_days,
+      respite_annual_days: value.respite_annual_days,
+      els_daily_units: value.els_daily_units,
+      els_annual_days: value.els_annual_days,
+      pba_receipt_threshold_usd: value.pba_receipt_threshold_usd,
+      belongings_signature_threshold_usd: value.belongings_signature_threshold_usd,
+    },
+    onSave,
+  );
+  const num = (v: number | undefined) => (v === undefined || v === null ? "" : String(v));
+  const set = (k: keyof StateCapsSection, raw: string) =>
+    s.update({ ...s.value, [k]: raw === "" ? undefined : Number(raw) });
+  return (
+    <SectionShell
+      id="section-caps"
+      title="Numeric Caps & Limits"
+      blurb="State-specific numeric thresholds enforced by the platform. Leave blank to surface 'Not yet configured' to providers."
+      dirty={s.dirty} saving={s.saving} onSave={s.save}
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        <Field label="Respite — max consecutive days">
+          <input type="number" min={0} value={num(s.value.respite_max_consecutive_days)} onChange={(e) => set("respite_max_consecutive_days", e.target.value)}
+            placeholder="e.g. 14"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Respite — annual day ceiling">
+          <input type="number" min={0} value={num(s.value.respite_annual_days)} onChange={(e) => set("respite_annual_days", e.target.value)}
+            placeholder="e.g. 21"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="ELS — daily unit cap">
+          <input type="number" min={0} value={num(s.value.els_daily_units)} onChange={(e) => set("els_daily_units", e.target.value)}
+            placeholder="e.g. 24"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="ELS — annual service days">
+          <input type="number" min={0} value={num(s.value.els_annual_days)} onChange={(e) => set("els_annual_days", e.target.value)}
+            placeholder="e.g. 260"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="PBA receipt threshold (USD)">
+          <input type="number" min={0} value={num(s.value.pba_receipt_threshold_usd)} onChange={(e) => set("pba_receipt_threshold_usd", e.target.value)}
+            placeholder="e.g. 50"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+        <Field label="Belongings signature threshold (USD)">
+          <input type="number" min={0} value={num(s.value.belongings_signature_threshold_usd)} onChange={(e) => set("belongings_signature_threshold_usd", e.target.value)}
+            placeholder="e.g. 50"
+            className="min-h-[40px] w-full rounded-md border border-border bg-background px-3 text-sm" />
+        </Field>
+      </div>
+    </SectionShell>
+  );
+}
+
+// ─── Regulation Citations ────────────────────────────────────────────────────
+
+function CitationsEditor({ value, onSave }: { value: { sections?: StateCitation[] }; onSave: (v: unknown) => Promise<void> }) {
+  const s = useSectionState<{ sections: StateCitation[] }>({ sections: value.sections ?? [] }, onSave);
+  const update = (i: number, patch: Partial<StateCitation>) => {
+    const next = [...s.value.sections];
+    next[i] = { ...next[i], ...patch };
+    s.update({ sections: next });
+  };
+  return (
+    <SectionShell
+      id="section-citations"
+      title="Regulation Citations"
+      blurb="The text and source the UI quotes when blocking an action (e.g. 'Section 7.4 — Respite caps')."
+      dirty={s.dirty} saving={s.saving} onSave={s.save}
+    >
+      <div className="space-y-2">
+        {s.value.sections.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No citations yet.</p>
+        ) : s.value.sections.map((c, i) => (
+          <div key={i} className="grid gap-2 rounded-md border border-border bg-muted/20 p-2 md:grid-cols-12">
+            <input value={c.key} onChange={(e) => update(i, { key: e.target.value })} placeholder="key (e.g. respite_caps)"
+              className="min-h-[36px] rounded-md border border-border bg-background px-2 font-mono text-xs md:col-span-3" />
+            <input value={c.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="Label (e.g. Respite caps)"
+              className="min-h-[36px] rounded-md border border-border bg-background px-2 text-sm md:col-span-3" />
+            <input value={c.cite} onChange={(e) => update(i, { cite: e.target.value })} placeholder="Citation (e.g. Section 7.4)"
+              className="min-h-[36px] rounded-md border border-border bg-background px-2 text-sm md:col-span-3" />
+            <input type="url" value={c.url ?? ""} onChange={(e) => update(i, { url: e.target.value || null })} placeholder="Source URL (optional)"
+              className="min-h-[36px] rounded-md border border-border bg-background px-2 text-xs md:col-span-2" />
+            <button onClick={() => s.update({ sections: s.value.sections.filter((_, x) => x !== i) })}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted md:col-span-1" aria-label="Remove">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={() => s.update({ sections: [...s.value.sections, { key: "", label: "", cite: "", url: null }] })}
+        className="mt-2 inline-flex min-h-[36px] items-center gap-1 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground hover:bg-muted"
+      >
+        <Plus className="h-3 w-3" /> Add citation
+      </button>
+    </SectionShell>
+  );
+}
+
 function StringListEditor({ label, value, onChange, placeholder }: { label: string; value: string[]; onChange: (v: string[]) => void; placeholder?: string }) {
   return (
     <div>

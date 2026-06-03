@@ -40,7 +40,7 @@ const STATUS_OPTIONS: Array<{ value: "coming_soon" | "draft" | "active"; label: 
 
 function StateDetailPage() {
   const { stateCode } = Route.useParams();
-  const [tab, setTab] = useState<"profile" | "sources" | "providers">("profile");
+  const [tab, setTab] = useState<"profile" | "inventory" | "sources" | "providers">("profile");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   if (pathname.endsWith("/onboarding")) return <Outlet />;
 

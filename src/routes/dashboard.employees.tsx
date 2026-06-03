@@ -6,6 +6,8 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
+import { listStaffPii, updateStaffPii, type StaffPii } from "@/lib/hr-staff.functions";
+import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,6 +76,8 @@ function EmployeesPage() {
 
   const createManual = useServerFn(createEmployeeManually);
   const resetPwFn = useServerFn(adminResetEmployeePassword);
+  const fetchStaffPii = useServerFn(listStaffPii);
+  const updatePiiFn = useServerFn(updateStaffPii);
 
   const { data: tracks } = useQuery({
     enabled: !!org,
@@ -95,7 +99,7 @@ function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position, account_status, worker_type, hourly_rate, daily_rate" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position, account_status, worker_type" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
@@ -106,6 +110,21 @@ function EmployeesPage() {
         .filter((m) => (m.profile?.account_status ?? "active") !== "archived");
     },
   });
+  // Gated rate lookup: server-side `list_staff_pii` returns only staff the
+  // caller may view (admin / team-manager-of-staff / self). Direct selects
+  // of hourly_rate / daily_rate against `profiles` are REVOKEd.
+  const { data: staffPii } = useQuery({
+    enabled: !!org,
+    queryKey: ["staff-pii", org?.organization_id],
+    queryFn: async (): Promise<StaffPii[]> =>
+      await fetchStaffPii({ data: { organization_id: org!.organization_id } }),
+  });
+  const piiByStaff = useMemo(() => {
+    const m = new Map<string, StaffPii>();
+    for (const row of staffPii ?? []) m.set(row.staff_id, row);
+    return m;
+  }, [staffPii]);
+
 
   const { data: invites } = useQuery({
     enabled: !!org,
@@ -200,6 +219,7 @@ function EmployeesPage() {
 
   const editMemberMutation = useMutation({
     mutationFn: async (input: EditableMember) => {
+      // Non-PII profile fields go through the regular client.
       const { error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -209,11 +229,20 @@ function EmployeesPage() {
           employee_id: input.employeeId || null,
           position: input.position || null,
           worker_type: input.workerType,
-          hourly_rate: input.hourlyRate === "" ? null : Number(input.hourlyRate),
-          daily_rate: input.dailyRate === "" ? null : Number(input.dailyRate),
         } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;
+
+      // Rates are PII-gated: route through the server fn so the
+      // can_view_staff_pii() check applies on writes too.
+      await updatePiiFn({
+        data: {
+          organization_id: org!.organization_id,
+          staff_id: input.userId,
+          hourly_rate: input.hourlyRate === "" ? null : Number(input.hourlyRate),
+          daily_rate: input.dailyRate === "" ? null : Number(input.dailyRate),
+        },
+      });
 
       const { error: mErr } = await supabase
         .from("organization_members")
@@ -224,6 +253,7 @@ function EmployeesPage() {
     onSuccess: () => {
       toast.success("Employee updated");
       qc.invalidateQueries({ queryKey: ["members"] });
+      qc.invalidateQueries({ queryKey: ["staff-pii"] });
       setEditingMember(null);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -323,8 +353,8 @@ function EmployeesPage() {
                       active: m.active,
                       position,
                       workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
-                      hourlyRate: m.profile?.hourly_rate != null ? String(m.profile.hourly_rate) : "",
-                      dailyRate: m.profile?.daily_rate != null ? String(m.profile.daily_rate) : "",
+                      hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
+                      dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
                     })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
                       <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload
@@ -621,6 +651,12 @@ function EmployeesPage() {
                 entityKind="employee"
                 entityId={editingMember.userId}
               />
+              {org?.organization_id && (
+                <StaffHrChecklistCard
+                  organizationId={org.organization_id}
+                  staffId={editingMember.userId}
+                />
+              )}
               <LifecyclePanel
                 kind="employee"
                 id={editingMember.userId}

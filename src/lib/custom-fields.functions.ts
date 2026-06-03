@@ -1,9 +1,28 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const Kind = z.enum(["employee", "client"]);
+
+// Verifies caller is an active member of the org before any DB access.
+// Uses the user-scoped supabase client from requireSupabaseAuth context,
+// so RLS on custom_field_definitions / custom_field_values is the enforced
+// safety net even if this check is ever bypassed.
+async function assertOrgMember(
+  supabase: any,
+  userId: string,
+  organizationId: string,
+) {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .eq("active", true)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden: not a member of this organization");
+}
 
 export const getCustomFields = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -14,22 +33,28 @@ export const getCustomFields = createServerFn({ method: "POST" })
       entityId: z.string().uuid(),
     }).parse(d)
   )
-  .handler(async ({ data }) => {
-    const { data: defs } = await supabaseAdmin
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await assertOrgMember(supabase, userId, data.organizationId);
+
+    const { data: defs, error: defsErr } = await supabase
       .from("custom_field_definitions")
       .select("id, field_key, field_label, data_type")
       .eq("organization_id", data.organizationId)
       .eq("entity_kind", data.entityKind)
       .order("created_at", { ascending: true });
+    if (defsErr) throw new Error(defsErr.message);
 
-    const { data: vals } = await supabaseAdmin
+    const { data: vals, error: valsErr } = await supabase
       .from("custom_field_values")
       .select("definition_id, value_text, value_number, value_boolean, value_date")
+      .eq("organization_id", data.organizationId)
       .eq("entity_kind", data.entityKind)
       .eq("entity_id", data.entityId);
+    if (valsErr) throw new Error(valsErr.message);
 
-    const valMap = new Map((vals ?? []).map((v) => [v.definition_id, v]));
-    return (defs ?? []).map((d) => ({
+    const valMap = new Map((vals ?? []).map((v: any) => [v.definition_id, v]));
+    return (defs ?? []).map((d: any) => ({
       id: d.id,
       field_key: d.field_key,
       field_label: d.field_label,
@@ -52,8 +77,22 @@ export const setCustomFieldValue = createServerFn({ method: "POST" })
       value_date: z.string().nullable().optional(),
     }).parse(d)
   )
-  .handler(async ({ data }) => {
-    const { error } = await supabaseAdmin.from("custom_field_values").upsert({
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await assertOrgMember(supabase, userId, data.organizationId);
+
+    // Confirm the definition belongs to the same org — prevents writing a
+    // value referencing another org's definition.
+    const { data: def, error: defErr } = await supabase
+      .from("custom_field_definitions")
+      .select("id")
+      .eq("id", data.definitionId)
+      .eq("organization_id", data.organizationId)
+      .maybeSingle();
+    if (defErr) throw new Error(defErr.message);
+    if (!def) throw new Error("Forbidden: definition not in this organization");
+
+    const { error } = await supabase.from("custom_field_values").upsert({
       organization_id: data.organizationId,
       definition_id: data.definitionId,
       entity_kind: data.entityKind,

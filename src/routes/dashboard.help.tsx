@@ -81,7 +81,7 @@ function HelpPage() {
 
 
   const m = useMutation({
-    mutationFn: async (q: string) => ask({ data: { question: q, role } }),
+    mutationFn: async (q: string) => ask({ data: { question: q, role, organizationId: org?.organization_id ?? "" } }),
     onSuccess: (reply, q) => {
       setMessages((prev) => [
         ...prev,

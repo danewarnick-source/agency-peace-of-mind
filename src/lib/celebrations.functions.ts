@@ -165,6 +165,7 @@ export const evaluateCelebrationTriggers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "manager");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const orgId = data.organizationId;

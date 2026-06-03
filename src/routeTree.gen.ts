@@ -90,6 +90,7 @@ import { Route as DashboardHiveExecApprovalsRouteImport } from './routes/dashboa
 import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
 import { Route as DashboardFinancialRevenueRouteImport } from './routes/dashboard.financial.revenue'
+import { Route as DashboardEmployeesStaffIdRouteImport } from './routes/dashboard.employees.$staffId'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
 import { Route as DashboardBillingNectarRouteImport } from './routes/dashboard.billing.nectar'
@@ -524,6 +525,12 @@ const DashboardFinancialRevenueRoute =
     path: '/revenue',
     getParentRoute: () => DashboardFinancialRoute,
   } as any)
+const DashboardEmployeesStaffIdRoute =
+  DashboardEmployeesStaffIdRouteImport.update({
+    id: '/$staffId',
+    path: '/$staffId',
+    getParentRoute: () => DashboardEmployeesRoute,
+  } as any)
 const DashboardCoursesMindsmithRoute =
   DashboardCoursesMindsmithRouteImport.update({
     id: '/courses/mindsmith',
@@ -617,7 +624,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
-  '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/employees': typeof DashboardEmployeesRouteWithChildren
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
@@ -652,6 +659,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
@@ -709,7 +717,7 @@ export interface FileRoutesByTo {
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
-  '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/employees': typeof DashboardEmployeesRouteWithChildren
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/help': typeof DashboardHelpRoute
@@ -742,6 +750,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
@@ -802,7 +811,7 @@ export interface FileRoutesById {
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/emar': typeof DashboardEmarRoute
-  '/dashboard/employees': typeof DashboardEmployeesRoute
+  '/dashboard/employees': typeof DashboardEmployeesRouteWithChildren
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
@@ -837,6 +846,7 @@ export interface FileRoutesById {
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
@@ -933,6 +943,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/employees/$staffId'
     | '/dashboard/financial/revenue'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
@@ -1023,6 +1034,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/employees/$staffId'
     | '/dashboard/financial/revenue'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
@@ -1117,6 +1129,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/employees/$staffId'
     | '/dashboard/financial/revenue'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
@@ -1737,6 +1750,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardFinancialRevenueRouteImport
       parentRoute: typeof DashboardFinancialRoute
     }
+    '/dashboard/employees/$staffId': {
+      id: '/dashboard/employees/$staffId'
+      path: '/$staffId'
+      fullPath: '/dashboard/employees/$staffId'
+      preLoaderRoute: typeof DashboardEmployeesStaffIdRouteImport
+      parentRoute: typeof DashboardEmployeesRoute
+    }
     '/dashboard/courses/mindsmith': {
       id: '/dashboard/courses/mindsmith'
       path: '/courses/mindsmith'
@@ -1835,6 +1855,17 @@ const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
 
 const DashboardBillingRouteWithChildren =
   DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
+
+interface DashboardEmployeesRouteChildren {
+  DashboardEmployeesStaffIdRoute: typeof DashboardEmployeesStaffIdRoute
+}
+
+const DashboardEmployeesRouteChildren: DashboardEmployeesRouteChildren = {
+  DashboardEmployeesStaffIdRoute: DashboardEmployeesStaffIdRoute,
+}
+
+const DashboardEmployeesRouteWithChildren =
+  DashboardEmployeesRoute._addFileChildren(DashboardEmployeesRouteChildren)
 
 interface DashboardFinancialRouteChildren {
   DashboardFinancialRevenueRoute: typeof DashboardFinancialRevenueRoute
@@ -1977,7 +2008,7 @@ interface DashboardRouteChildren {
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardEmarRoute: typeof DashboardEmarRoute
-  DashboardEmployeesRoute: typeof DashboardEmployeesRoute
+  DashboardEmployeesRoute: typeof DashboardEmployeesRouteWithChildren
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardExternalComplianceRoute: typeof DashboardExternalComplianceRoute
   DashboardFinancialRoute: typeof DashboardFinancialRouteWithChildren
@@ -2028,7 +2059,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardEmarRoute: DashboardEmarRoute,
-  DashboardEmployeesRoute: DashboardEmployeesRoute,
+  DashboardEmployeesRoute: DashboardEmployeesRouteWithChildren,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardExternalComplianceRoute: DashboardExternalComplianceRoute,
   DashboardFinancialRoute: DashboardFinancialRouteWithChildren,

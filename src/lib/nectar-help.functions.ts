@@ -396,7 +396,8 @@ export const askNectarHelp = createServerFn({ method: "POST" })
   .inputValidator(validate)
   .handler(async ({ data, context }): Promise<NectarHelpReply> => {
     const { supabase, userId } = context;
-    const facts = await gatherFacts(supabase as unknown as SupabaseLike, userId, data.role, data.question);
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    const facts = await gatherFacts(supabase as unknown as SupabaseLike, userId, data.role, data.question, data.organizationId);
 
     const system = `You are NECTAR, the expert system inside HIVE. You have direct access to the company's live data through the FACTS block below and you ANSWER FROM IT.
 

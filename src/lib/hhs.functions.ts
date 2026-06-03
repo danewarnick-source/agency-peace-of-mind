@@ -226,6 +226,7 @@ export const savePrnForm = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("submitted_forms" as never)

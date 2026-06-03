@@ -153,6 +153,8 @@ function AlertCard({ alert: a }: { alert: NectarAlert }) {
 // ─── Report builder ────────────────────────────────────────────────────────
 
 function ReportBuilder() {
+  const { data: org } = useCurrentOrg();
+  const organizationId = org?.organization_id ?? "";
   const [prompt, setPrompt] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [result, setResult] = useState<NectarReportResult | null>(null);

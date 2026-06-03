@@ -1855,6 +1855,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "emar_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "emar_logs_medication_id_fkey"
             columns: ["medication_id"]
             isOneToOne: false
@@ -2890,7 +2897,22 @@ export type Database = {
           updated_at?: string
           witnesses?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "incident_reports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_reports_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invitations: {
         Row: {

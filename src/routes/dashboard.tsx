@@ -92,9 +92,38 @@ function DashboardLayout() {
   }
 
 
+  // [DIAG-SIDEBAR] capture-phase pointer probe — logs the real target on every pointerdown
+  // and flags any time something OTHER than the sidebar link/aside intercepts a click in the sidebar area.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handler = (e: PointerEvent) => {
+      const aside = document.querySelector("aside");
+      const asideRect = aside?.getBoundingClientRect();
+      const inSidebar =
+        asideRect &&
+        e.clientX >= asideRect.left && e.clientX <= asideRect.right &&
+        e.clientY >= asideRect.top  && e.clientY <= asideRect.bottom;
+      if (!inSidebar) return;
+      const target = e.target as HTMLElement | null;
+      const top = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const insideAside = !!target?.closest("aside");
+      // eslint-disable-next-line no-console
+      console.log("[DIAG-SIDEBAR] pointerdown in sidebar area", {
+        target: target?.tagName + "." + (target?.className || "").toString().slice(0, 60),
+        topElem: top?.tagName + "." + (top?.className || "").toString().slice(0, 60),
+        insideAside,
+        targetIsTopElem: target === top,
+        defaultPrevented: e.defaultPrevented,
+      });
+    };
+    document.addEventListener("pointerdown", handler, true);
+    return () => document.removeEventListener("pointerdown", handler, true);
+  }, []);
+
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/login" });
   }, [loading, session, navigate]);
+
 
   useEffect(() => {
     const uid = session?.user?.id;

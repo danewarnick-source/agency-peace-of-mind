@@ -51,10 +51,12 @@ function CourseLibrary() {
         .from("org_member_directory")
         .select("id, full_name, email, username")
         .in("id", ids);
-      return (profs ?? []).map((p) => ({
-        id: p.id,
-        label: p.full_name || p.email || p.username || "—",
-      }));
+      return (profs ?? [])
+        .filter((p): p is typeof p & { id: string } => !!p.id)
+        .map((p) => ({
+          id: p.id,
+          label: p.full_name || p.email || p.username || "—",
+        }));
     },
   });
 

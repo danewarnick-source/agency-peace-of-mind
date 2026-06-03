@@ -179,9 +179,13 @@ const SectionPatchSchema = z.object({
     "required_documents",
     "department_structure",
     "forms",
+    "citations",
+    "caps",
+    "regulator",
   ]),
   value: z.unknown(),
 });
+
 
 
 export const updateStateTemplateSection = createServerFn({ method: "POST" })

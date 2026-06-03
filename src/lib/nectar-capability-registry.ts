@@ -106,10 +106,11 @@ export const CAPABILITY_REGISTRY: ReadonlyArray<CapabilityAction> = [
   // ---------- DORMANT (documented; will appear automatically when is_live flips) ----------
   {
     action_key: "client_intake_checklist",
-    label: "Draft a per-client intake checklist from this",
-    helper: "Turn intake paperwork into a trackable per-client checklist.",
-    applies_to_types: ["client_intake"],
-    is_live: false,
+    label: "Open per-client intake tracking for items in this document",
+    helper:
+      "Track each client's intake completion against these items in the client's Intake tab. Completion still requires a one-click human confirm.",
+    applies_to_types: ["client_intake", "scope_of_work"],
+    is_live: true,
     handler: "noop",
   },
   {

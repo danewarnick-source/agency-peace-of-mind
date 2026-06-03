@@ -110,7 +110,7 @@ export function NectarAutoAssignDialog({
       );
       if (!ids.length) return [] as Array<{ id: string; full_name: string | null; email: string | null }>;
       const { data, error } = await (supabase as any)
-        .from("profiles")
+        .from("org_member_directory")
         .select("id, full_name, email")
         .in("id", ids);
       if (error) throw error;

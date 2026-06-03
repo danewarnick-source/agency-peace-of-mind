@@ -125,7 +125,7 @@ function HelpPage() {
       const lastUser = [...messages].reverse().find((mm) => mm.role === "user");
       const context = messages.slice(-6).map((mm) => `${mm.role === "user" ? "Me" : "NECTAR"}: ${mm.text}`).join("\n");
       const question = lastUser?.text ?? "I'd like to talk to a human at HIVE.";
-      return escalate({ data: { question, context } });
+      return escalate({ data: { question, context, organizationId: org?.organization_id ?? "" } });
     },
     onSuccess: (r) => {
       setTicketId(r.ticketId);

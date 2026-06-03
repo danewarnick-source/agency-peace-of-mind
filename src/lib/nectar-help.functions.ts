@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
 export interface NectarHelpReply {
   answer: string;
@@ -8,16 +9,20 @@ export interface NectarHelpReply {
   followUps: string[];
 }
 
-interface AskInput { question: string; role: string }
+interface AskInput { question: string; role: string; organizationId: string }
+
+const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 function validate(input: unknown): AskInput {
   const i = (input ?? {}) as Record<string, unknown>;
   const question = typeof i.question === "string" ? i.question.trim() : "";
   const role = typeof i.role === "string" ? i.role : "employee";
+  const organizationId = typeof i.organizationId === "string" ? i.organizationId : "";
   if (question.length < 2 || question.length > 1000) {
     throw new Error("Question must be 2–1000 characters.");
   }
-  return { question, role };
+  if (!UUID_RE.test(organizationId)) throw new Error("Invalid organizationId.");
+  return { question, role, organizationId };
 }
 
 const HIVE_NAV_GUIDE = `HIVE NAVIGATION MAP (use these paths verbatim — never invent screens):

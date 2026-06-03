@@ -43,6 +43,7 @@ function makeFlagId(section: string, field: string) {
 
 function OnboardingPage() {
   const { stateCode } = Route.useParams();
+  const { startFrom } = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -51,8 +52,8 @@ function OnboardingPage() {
   const completeFn = useServerFn(completeOnboardingSession);
 
   const session = useQuery({
-    queryKey: ["state-onboarding-session", stateCode],
-    queryFn: () => initFn({ data: { stateCode } }),
+    queryKey: ["state-onboarding-session", stateCode, startFrom ?? "blank"],
+    queryFn: () => initFn({ data: { stateCode, startFrom } }),
   });
 
   const [stepIdx, setStepIdx] = useState(0);

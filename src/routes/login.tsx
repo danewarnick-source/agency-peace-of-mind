@@ -76,7 +76,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
   const [busy, setBusy] = useState(false);
-  const resolveUsername = useServerFn(lookupEmailByUsername);
+  const signIn = useServerFn(signInWithUsername);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {

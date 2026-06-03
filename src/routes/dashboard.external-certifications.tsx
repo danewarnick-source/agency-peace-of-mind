@@ -69,10 +69,10 @@ function ExternalCertsPage() {
       let profileMap = new Map<string, { full_name: string | null; email: string }>();
       if (userIds.length) {
         const { data: profs } = await supabase
-          .from("profiles")
+          .from("org_member_directory")
           .select("id, full_name, email")
           .in("id", userIds);
-        profileMap = new Map((profs ?? []).map((p) => [p.id, { full_name: p.full_name, email: p.email ?? "" }]));
+        profileMap = new Map((profs ?? []).filter((p) => !!p.id).map((p) => [p.id as string, { full_name: p.full_name, email: p.email ?? "" }]));
       }
       return rows.map((r) => ({ ...r, profiles: profileMap.get(r.user_id) ?? null }));
     },

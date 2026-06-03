@@ -304,8 +304,8 @@ const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_me
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));
   if (!ids.length) return list;
-  const { data: profiles } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
-  const map = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const { data: profiles } = await supabase.from("org_member_directory").select("id, full_name, email").in("id", ids);
+  const map = new Map((profiles ?? []).filter((p) => !!p.id).map((p) => [p.id as string, p]));
   list.forEach((r) => {
     const p = map.get(r.staff_id);
     r.staff = p ? { full_name: p.full_name, email: p.email } : null;

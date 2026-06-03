@@ -28,7 +28,7 @@ function TeamPage() {
       const userIds = (members ?? []).map((m) => m.user_id);
       const safeIds = userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"];
       const [{ data: profiles }, { data: assigns }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email").in("id", safeIds),
+        supabase.from("org_member_directory").select("id, full_name, email").in("id", safeIds),
         supabase.from("course_assignments").select("user_id, status, progress, due_date").eq("organization_id", org!.organization_id),
       ]);
       return (profiles ?? []).map((p) => {

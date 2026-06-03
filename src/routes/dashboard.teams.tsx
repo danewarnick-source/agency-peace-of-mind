@@ -63,9 +63,8 @@ function TeamsPage() {
       const ids = (mems ?? []).map((m) => m.user_id);
       const roleMap = new Map((mems ?? []).map((m) => [m.user_id, m.role as string]));
       if (!ids.length) return [];
-      const { data: profs } = await supabase.from("profiles")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, team_id, account_status" as any).in("id", ids);
+      const { data: profs } = await (supabase as any).from("org_member_directory")
+        .select("id, full_name, email, team_id, account_status").in("id", ids);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ((profs ?? []) as any[])
         .filter((p) => (p.account_status ?? "active") !== "archived")

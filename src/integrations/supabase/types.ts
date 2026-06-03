@@ -1730,6 +1730,13 @@ export type Database = {
             foreignKeyName: "daily_logs_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -2903,6 +2910,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_reports_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
             referencedColumns: ["id"]
           },
           {
@@ -4812,6 +4826,13 @@ export type Database = {
             foreignKeyName: "scheduled_shifts_staff_id_fkey"
             columns: ["staff_id"]
             isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_shifts_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -5362,6 +5383,13 @@ export type Database = {
             foreignKeyName: "teams_manager_id_fkey"
             columns: ["manager_id"]
             isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -5792,6 +5820,53 @@ export type Database = {
           tenant_id?: string | null
         }
         Relationships: []
+      }
+      org_member_directory: {
+        Row: {
+          account_status: string | null
+          email: string | null
+          first_name: string | null
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          last_name: string | null
+          position: string | null
+          team_id: string | null
+          username: string | null
+        }
+        Insert: {
+          account_status?: string | null
+          email?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_name?: string | null
+          position?: string | null
+          team_id?: string | null
+          username?: string | null
+        }
+        Update: {
+          account_status?: string | null
+          email?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_name?: string | null
+          position?: string | null
+          team_id?: string | null
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {

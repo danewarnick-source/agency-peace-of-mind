@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { projectAnswersToTemplate } from "./state-onboarding";
+import { projectAnswersToTemplate, templateToAnswers } from "./state-onboarding";
 
 const STATE_CODE_RE = /^[A-Z]{2}$/;
 
@@ -24,10 +24,22 @@ export interface BuildFlag {
 }
 
 // ── Get-or-create the open onboarding session for a state ───────────────────
+// Accepts an optional `startFrom` starting-point:
+//   - "blank" (or omitted): generic HIVE base template, no pre-fill
+//   - a 2-letter state code: copy that state's current template values into
+//     the session answers as a starting point (only on first creation; an
+//     existing in-progress session is returned untouched so work isn't lost).
 export const getOrCreateOnboardingSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ stateCode: z.string().regex(STATE_CODE_RE) }).parse(input),
+    z
+      .object({
+        stateCode: z.string().regex(STATE_CODE_RE),
+        startFrom: z
+          .union([z.literal("blank"), z.string().regex(STATE_CODE_RE)])
+          .optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -41,9 +53,24 @@ export const getOrCreateOnboardingSession = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) return existing;
 
+    // Seed answers from a source state's template when requested.
+    let seedAnswers: Record<string, Record<string, string>> = {};
+    if (data.startFrom && data.startFrom !== "blank" && data.startFrom !== data.stateCode) {
+      const { data: srcTpl } = await supabase
+        .from("state_templates")
+        .select("*")
+        .eq("state_code", data.startFrom)
+        .maybeSingle();
+      if (srcTpl) seedAnswers = templateToAnswers(srcTpl);
+    }
+
     const { data: inserted, error } = await supabase
       .from("state_onboarding_sessions")
-      .insert({ state_code: data.stateCode, created_by: userId })
+      .insert({
+        state_code: data.stateCode,
+        created_by: userId,
+        answers: seedAnswers as never,
+      })
       .select("*")
       .single();
     if (error) throw new Error(error.message);

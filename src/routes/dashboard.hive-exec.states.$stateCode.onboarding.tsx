@@ -19,8 +19,16 @@ import {
   saveOnboardingProgress,
   type BuildFlag,
 } from "@/lib/state-onboarding.functions";
+import { z } from "zod";
+
+const onboardingSearchSchema = z.object({
+  startFrom: z
+    .union([z.literal("blank"), z.string().regex(/^[A-Z]{2}$/)])
+    .optional(),
+});
 
 export const Route = createFileRoute("/dashboard/hive-exec/states/$stateCode/onboarding")({
+  validateSearch: onboardingSearchSchema,
   head: ({ params }) => ({
     meta: [{ title: `${params.stateCode} — New State Onboarding` }],
   }),
@@ -35,6 +43,7 @@ function makeFlagId(section: string, field: string) {
 
 function OnboardingPage() {
   const { stateCode } = Route.useParams();
+  const { startFrom } = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -43,8 +52,8 @@ function OnboardingPage() {
   const completeFn = useServerFn(completeOnboardingSession);
 
   const session = useQuery({
-    queryKey: ["state-onboarding-session", stateCode],
-    queryFn: () => initFn({ data: { stateCode } }),
+    queryKey: ["state-onboarding-session", stateCode, startFrom ?? "blank"],
+    queryFn: () => initFn({ data: { stateCode, startFrom } }),
   });
 
   const [stepIdx, setStepIdx] = useState(0);

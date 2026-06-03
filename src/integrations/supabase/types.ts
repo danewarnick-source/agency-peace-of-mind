@@ -2762,6 +2762,167 @@ export type Database = {
           },
         ]
       }
+      hr_document_access_log: {
+        Row: {
+          action: string
+          at: string
+          hr_document_id: string | null
+          id: string
+          object_path: string | null
+          organization_id: string
+          staff_id: string
+          viewer_id: string
+        }
+        Insert: {
+          action: string
+          at?: string
+          hr_document_id?: string | null
+          id?: string
+          object_path?: string | null
+          organization_id: string
+          staff_id: string
+          viewer_id: string
+        }
+        Update: {
+          action?: string
+          at?: string
+          hr_document_id?: string | null
+          id?: string
+          object_path?: string | null
+          organization_id?: string
+          staff_id?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_document_access_log_hr_document_id_fkey"
+            columns: ["hr_document_id"]
+            isOneToOne: false
+            referencedRelation: "hr_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_document_access_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_document_access_log_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_document_access_log_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_document_access_log_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_document_access_log_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_documents: {
+        Row: {
+          created_at: string
+          document_kind: string
+          file_name: string
+          id: string
+          mime_type: string | null
+          object_path: string
+          organization_id: string
+          requirement_id: string | null
+          size_bytes: number | null
+          staff_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          document_kind: string
+          file_name: string
+          id?: string
+          mime_type?: string | null
+          object_path: string
+          organization_id: string
+          requirement_id?: string | null
+          size_bytes?: number | null
+          staff_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          document_kind?: string
+          file_name?: string
+          id?: string
+          mime_type?: string | null
+          object_path?: string
+          organization_id?: string
+          requirement_id?: string | null
+          size_bytes?: number | null
+          staff_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_documents_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_documents_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_documents_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incident_reports: {
         Row: {
           additional_client_ids: string[] | null
@@ -4310,6 +4471,7 @@ export type Database = {
           agency_name: string | null
           created_at: string
           daily_rate: number | null
+          date_of_birth: string | null
           department: string | null
           email: string | null
           employee_id: string | null
@@ -4318,12 +4480,14 @@ export type Database = {
           first_name: string | null
           full_name: string | null
           hire_date: string | null
+          home_address: string | null
           hourly_rate: number | null
           id: string
           is_active: boolean
           last_name: string | null
           must_change_password: boolean
           position: string | null
+          ssn_last4: string | null
           system_role: string
           team_id: string | null
           tenant_id: string | null
@@ -4335,6 +4499,7 @@ export type Database = {
           agency_name?: string | null
           created_at?: string
           daily_rate?: number | null
+          date_of_birth?: string | null
           department?: string | null
           email?: string | null
           employee_id?: string | null
@@ -4343,12 +4508,14 @@ export type Database = {
           first_name?: string | null
           full_name?: string | null
           hire_date?: string | null
+          home_address?: string | null
           hourly_rate?: number | null
           id: string
           is_active?: boolean
           last_name?: string | null
           must_change_password?: boolean
           position?: string | null
+          ssn_last4?: string | null
           system_role?: string
           team_id?: string | null
           tenant_id?: string | null
@@ -4360,6 +4527,7 @@ export type Database = {
           agency_name?: string | null
           created_at?: string
           daily_rate?: number | null
+          date_of_birth?: string | null
           department?: string | null
           email?: string | null
           employee_id?: string | null
@@ -4368,12 +4536,14 @@ export type Database = {
           first_name?: string | null
           full_name?: string | null
           hire_date?: string | null
+          home_address?: string | null
           hourly_rate?: number | null
           id?: string
           is_active?: boolean
           last_name?: string | null
           must_change_password?: boolean
           position?: string | null
+          ssn_last4?: string | null
           system_role?: string
           team_id?: string | null
           tenant_id?: string | null
@@ -4977,6 +5147,101 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      staff_checklist_completion: {
+        Row: {
+          completed_by: string | null
+          completed_date: string | null
+          created_at: string
+          evidence_document_id: string | null
+          expires_at: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          requirement_id: string
+          staff_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          evidence_document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          requirement_id: string
+          staff_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          evidence_document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          requirement_id?: string
+          staff_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scc_evidence_fk"
+            columns: ["evidence_document_id"]
+            isOneToOne: false
+            referencedRelation: "hr_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_checklist_completion_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_checklist_completion_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_checklist_completion_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_checklist_completion_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_checklist_completion_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_checklist_completion_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_nudges: {
         Row: {
@@ -5883,6 +6148,10 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: string }
+      can_view_staff_pii: {
+        Args: { _org: string; _staff: string; _viewer: string }
+        Returns: boolean
+      }
       clients_for_staff: {
         Args: { _org: string; _staff: string }
         Returns: {
@@ -5928,6 +6197,47 @@ export type Database = {
           weekly_cap_units: number
         }[]
       }
+      get_hr_staff_checklist_base: {
+        Args: { _org: string }
+        Returns: {
+          applies_to: string | null
+          approval_state: string | null
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          jurisdiction: string | null
+          metadata: Json
+          organization_id: string
+          origin: string
+          requirement_key: string
+          review_status: string
+          source_citation: string | null
+          source_document_id: string | null
+          title: string
+          updated_at: string
+          verified: boolean
+          verified_at: string | null
+          verified_by: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "nectar_requirements"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_staff_pii: {
+        Args: { _org: string; _staff: string }
+        Returns: {
+          daily_rate: number
+          date_of_birth: string
+          home_address: string
+          hourly_rate: number
+          ssn_last4: string
+          staff_id: string
+        }[]
+      }
       has_org_role: {
         Args: {
           _org: string
@@ -5963,6 +6273,17 @@ export type Database = {
       }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
       is_super_admin: { Args: { _user: string }; Returns: boolean }
+      list_staff_pii: {
+        Args: { _org: string }
+        Returns: {
+          daily_rate: number
+          date_of_birth: string
+          home_address: string
+          hourly_rate: number
+          ssn_last4: string
+          staff_id: string
+        }[]
+      }
       match_timesheets: {
         Args: {
           _org?: string

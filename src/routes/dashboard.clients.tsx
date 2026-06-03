@@ -448,6 +448,8 @@ function ClientWorkspace({
   saving: boolean;
 }) {
   const [activeTab, setActiveTab] = useState("profile");
+  const { data: disabledTier } = useDisabledTierFeatures();
+  const emarEnabled = isClientFeatureEnabled(client, "emar", disabledTier ?? null);
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col space-y-4">

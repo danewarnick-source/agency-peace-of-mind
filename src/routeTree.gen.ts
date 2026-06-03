@@ -96,7 +96,6 @@ import { Route as DashboardBillingImportsRouteImport } from './routes/dashboard.
 import { Route as DashboardBillingForm520RouteImport } from './routes/dashboard.billing.form520'
 import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard.billing.$clientId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
-import { Route as ApiPublicSeedStaffRouteImport } from './routes/api/public/seed-staff'
 import { Route as DashboardHiveExecStatesStateCodeRouteImport } from './routes/dashboard.hive-exec.states.$stateCode'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
 import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
@@ -557,11 +556,6 @@ const DashboardAdminEmarAuditRoute = DashboardAdminEmarAuditRouteImport.update({
   path: '/admin/emar-audit',
   getParentRoute: () => DashboardRoute,
 } as any)
-const ApiPublicSeedStaffRoute = ApiPublicSeedStaffRouteImport.update({
-  id: '/api/public/seed-staff',
-  path: '/api/public/seed-staff',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DashboardHiveExecStatesStateCodeRoute =
   DashboardHiveExecStatesStateCodeRouteImport.update({
     id: '/$stateCode',
@@ -644,7 +638,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
-  '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
@@ -734,7 +727,6 @@ export interface FileRoutesByTo {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
-  '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
@@ -829,7 +821,6 @@ export interface FileRoutesById {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
-  '/api/public/seed-staff': typeof ApiPublicSeedStaffRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
@@ -925,7 +916,6 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
-    | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/form520'
@@ -1015,7 +1005,6 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard'
-    | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/form520'
@@ -1109,7 +1098,6 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
-    | '/api/public/seed-staff'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/form520'
@@ -1165,7 +1153,6 @@ export interface RootRouteChildren {
   UnauthorizedRoute: typeof UnauthorizedRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
-  ApiPublicSeedStaffRoute: typeof ApiPublicSeedStaffRoute
   ApiPublicHooksNectarSchedulesRoute: typeof ApiPublicHooksNectarSchedulesRoute
 }
 
@@ -1780,13 +1767,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminEmarAuditRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/api/public/seed-staff': {
-      id: '/api/public/seed-staff'
-      path: '/api/public/seed-staff'
-      fullPath: '/api/public/seed-staff'
-      preLoaderRoute: typeof ApiPublicSeedStaffRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/dashboard/hive-exec/states/$stateCode': {
       id: '/dashboard/hive-exec/states/$stateCode'
       path: '/$stateCode'
@@ -2086,9 +2066,18 @@ const rootRouteChildren: RootRouteChildren = {
   UnauthorizedRoute: UnauthorizedRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
-  ApiPublicSeedStaffRoute: ApiPublicSeedStaffRoute,
   ApiPublicHooksNectarSchedulesRoute: ApiPublicHooksNectarSchedulesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

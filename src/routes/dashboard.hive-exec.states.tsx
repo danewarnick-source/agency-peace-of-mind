@@ -49,18 +49,27 @@ function StatesIndexPage() {
   return (
     <div className="space-y-4">
       <header className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
-            <MapPin className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="font-display text-lg font-semibold">States</h2>
-            <p className="text-xs text-muted-foreground">
-              State is a configuration layer. Each state inherits the platform model and is edited as a template. Utah is the reference implementation.
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
+              <MapPin className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="font-display text-lg font-semibold">States</h2>
+              <p className="text-xs text-muted-foreground">
+                State is a configuration layer. Each state inherits the platform model and is edited as a template. Utah is the reference implementation.
+              </p>
+            </div>
           </div>
+          <Link
+            to="/dashboard/hive-exec/base-template"
+            className="inline-flex min-h-[36px] items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold hover:bg-muted"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[#d97a1c]" /> Base template versions
+          </Link>
         </div>
       </header>
+
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full text-sm">

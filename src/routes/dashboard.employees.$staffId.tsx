@@ -21,7 +21,7 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
 function StaffProfilePage() {
   const { staffId } = Route.useParams();
   const { data: org } = useCurrentOrg();
-  const navigate = useNavigate();
+  const orgId2 = null;
   const orgId = org?.organization_id;
 
   // Membership + basic non-PII profile. Org-scoped — RLS denies cross-org reads.

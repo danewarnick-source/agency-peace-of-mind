@@ -1,10 +1,27 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getBilledRevenueByYear } from "@/lib/financial-revenue.functions";
+import {
+  getBilledRevenueByYear,
+  listBilledManualEntries,
+  upsertBilledManualEntry,
+  deleteBilledManualEntry,
+} from "@/lib/financial-revenue.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -13,8 +30,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { fmtUSD } from "@/lib/billing-units";
-import { Info, ShieldCheck, Upload, UserPen } from "lucide-react";
+import {
+  Info,
+  Lock,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  Upload,
+  UserPen,
+} from "lucide-react";
 import { YourInputsSection } from "@/components/financial/your-inputs-section";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/financial/revenue")({
   head: () => ({ meta: [{ title: "Revenue — Financial — HIVE" }] }),
@@ -30,12 +58,9 @@ const MONTH_LABELS = [
 
 function RevenuePage() {
   const nowYear = new Date().getFullYear();
-  const nowMonth = new Date().getMonth() + 1; // 1–12
+  const nowMonth = new Date().getMonth() + 1;
   const [year, setYear] = useState<number>(nowYear);
   const [granularity, setGranularity] = useState<Granularity>("monthly");
-  // The "Your Inputs" layer is month-scoped. When the user is on Quarterly/YTD,
-  // we still surface inputs for a focus month (default = current month, but only
-  // if the selected year matches; otherwise default to January).
   const [inputsMonth, setInputsMonth] = useState<number>(
     year === nowYear ? nowMonth : 1,
   );
@@ -57,6 +82,8 @@ function RevenuePage() {
   }, [nowYear]);
 
   const months = q.data?.months ?? [];
+  const sourceMode = q.data?.source.mode ?? "auto_520";
+  const isManualMode = sourceMode === "manual";
   const receivedAvailable = q.data?.received.available ?? false;
 
   const rows = useMemo(() => {
@@ -84,9 +111,6 @@ function RevenuePage() {
     ];
   }, [months, granularity, year]);
 
-  // HIVE-verified subtotal scope:
-  //   - monthly view: just the inputsMonth (so it matches what's on screen below)
-  //   - quarterly/ytd: total of the table rows
   const hiveVerifiedSubtotal = useMemo(() => {
     if (granularity === "monthly") {
       return months.find((m) => m.month === inputsMonth)?.billed ?? 0;
@@ -98,19 +122,34 @@ function RevenuePage() {
   const totalBilledTable = rows.reduce((s, r) => s + r.billed, 0);
   const allZero = !q.isLoading && totalBilledTable === 0;
 
+  // Honest labeling for the top band, depending on source mode.
+  const topBandTitle = isManualMode
+    ? "Billed Revenue (entered manually)"
+    : "HIVE-Verified Subtotal";
+  const topBandTone: "verified" | "manual" = isManualMode ? "manual" : "verified";
+
   return (
     <div className="space-y-4">
-      {/* ─── LAYER 1: HIVE-Verified billed revenue (read-only, from 520) ── */}
+      {/* ─── LAYER 1: Billed revenue (auto-filled or manual, gated) ────── */}
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              HIVE-Verified
-            </div>
+            {isManualMode ? (
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                <UserPen className="h-3.5 w-3.5" />
+                Entered by you
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                HIVE-Verified
+              </div>
+            )}
             <CardTitle className="mt-0.5">Billed Revenue</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Sourced from your 520 submissions — read-only.
+              {isManualMode
+                ? "You're on the base plan — enter your billed revenue per month below."
+                : "Sourced from your 520 submissions — read-only."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -148,7 +187,7 @@ function RevenuePage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {q.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : q.isError ? (
@@ -157,9 +196,15 @@ function RevenuePage() {
             </p>
           ) : allZero ? (
             <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center">
-              <p className="text-sm font-medium">No billing recorded for {year} yet.</p>
+              <p className="text-sm font-medium">
+                {isManualMode
+                  ? `No billed revenue entered for ${year} yet.`
+                  : `No billing recorded for ${year} yet.`}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Billed figures appear here automatically once billing is run.
+                {isManualMode
+                  ? "Add a monthly billed figure in the table below."
+                  : "Billed figures appear here automatically once billing is run."}
               </p>
             </div>
           ) : (
@@ -199,7 +244,15 @@ function RevenuePage() {
             </div>
           )}
 
-          <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+          {/* Manual editor (base tier only) */}
+          {isManualMode && (
+            <ManualBilledEditor year={year} onChanged={() => q.refetch()} />
+          )}
+
+          {/* Visible-but-locked NECTAR upsell (base tier only) */}
+          {isManualMode && <NectarBilledUpsell />}
+
+          <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <p>
               Received amounts come from outside HIVE (your bank or accounting
@@ -262,12 +315,16 @@ function RevenuePage() {
       <Card>
         <CardContent className="space-y-2 p-4">
           <SubtotalBand
-            tone="verified"
-            title="HIVE-Verified Subtotal"
+            tone={topBandTone}
+            title={topBandTitle}
             note={
-              granularity === "monthly"
-                ? `Billed for ${MONTH_LABELS[inputsMonth - 1]} ${year} — sourced from your billing, read-only.`
-                : `Billed for the periods above — sourced from your billing, read-only.`
+              isManualMode
+                ? granularity === "monthly"
+                  ? `Manually entered for ${MONTH_LABELS[inputsMonth - 1]} ${year} — provider-entered, not HIVE-verified.`
+                  : "Manually entered for the periods above — provider-entered, not HIVE-verified."
+                : granularity === "monthly"
+                  ? `Billed for ${MONTH_LABELS[inputsMonth - 1]} ${year} — sourced from your billing, read-only.`
+                  : "Billed for the periods above — sourced from your billing, read-only."
             }
             amount={hiveVerifiedSubtotal}
           />
@@ -281,7 +338,7 @@ function RevenuePage() {
           <SubtotalBand
             tone="combined"
             title="Combined"
-            note="HIVE-verified billed revenue + your inputs (received adds; expenses, taxes, and payroll subtract; custom lines add by default — use negative amounts to subtract)."
+            note="Billed revenue + your inputs (received adds; expenses, taxes, and payroll subtract; custom lines add by default — use negative amounts to subtract)."
             amount={combinedTotal}
             big
           />
@@ -305,7 +362,7 @@ function SubtotalBand({
   signed,
   big,
 }: {
-  tone: "verified" | "inputs" | "combined";
+  tone: "verified" | "inputs" | "combined" | "manual";
   title: string;
   note: string;
   amount: number;
@@ -315,9 +372,11 @@ function SubtotalBand({
   const styles =
     tone === "verified"
       ? "border-emerald-500/30 bg-emerald-500/[0.06]"
-      : tone === "inputs"
+      : tone === "manual"
         ? "border-primary/30 bg-primary/[0.05]"
-        : "border-foreground/20 bg-muted/40";
+        : tone === "inputs"
+          ? "border-primary/30 bg-primary/[0.05]"
+          : "border-foreground/20 bg-muted/40";
   const display = signed && amount !== 0
     ? `${amount > 0 ? "+" : "−"} ${fmtUSD(Math.abs(amount))}`
     : fmtUSD(amount);
@@ -335,5 +394,303 @@ function SubtotalBand({
         {display}
       </p>
     </div>
+  );
+}
+
+// ─── Visible-but-locked NECTAR upsell card ───────────────────────────────
+
+function NectarBilledUpsell() {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-[color:var(--amber-400)] bg-gradient-to-br from-[color:var(--amber-50)] to-white p-4">
+      <div className="flex items-start gap-3">
+        <span
+          className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center text-[color:var(--amber-600)]"
+          style={{
+            clipPath:
+              "polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)",
+            background:
+              "linear-gradient(135deg, var(--amber-100), var(--amber-200))",
+          }}
+        >
+          <Sparkles className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
+            <Lock className="h-3 w-3" /> NECTAR Infusion
+          </div>
+          <p className="mt-1 text-sm font-semibold text-[color:var(--navy-900)]">
+            Let NECTAR fill your billed revenue automatically from your 520 billing.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Skip the manual entry — NECTAR pulls hours, daily units, and rates
+            live from the same source that powers your 520 submissions.
+          </p>
+        </div>
+        <Button size="sm" variant="cta" asChild>
+          <a href="/pricing">Learn about NECTAR</a>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Manual billed editor (per-month) ───────────────────────────────────
+
+type ManualEntry = {
+  id: string;
+  period_month: number;
+  amount: number | string;
+  note: string | null;
+  is_estimate: boolean;
+};
+
+function ManualBilledEditor({
+  year,
+  onChanged,
+}: {
+  year: number;
+  onChanged?: () => void;
+}) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listBilledManualEntries);
+  const upsertFn = useServerFn(upsertBilledManualEntry);
+  const deleteFn = useServerFn(deleteBilledManualEntry);
+
+  const queryKey = ["billed-manual", year] as const;
+  const q = useQuery({
+    queryKey,
+    queryFn: () => listFn({ data: { year } }),
+  });
+
+  const byMonth = useMemo(() => {
+    const m = new Map<number, ManualEntry>();
+    for (const e of (q.data?.entries ?? []) as ManualEntry[]) {
+      m.set(Number(e.period_month), e);
+    }
+    return m;
+  }, [q.data]);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey });
+    onChanged?.();
+  };
+
+  const upsertM = useMutation({
+    mutationFn: upsertFn,
+    onSuccess: () => {
+      toast.success("Saved");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteM = useMutation({
+    mutationFn: deleteFn,
+    onSuccess: () => {
+      toast.success("Deleted");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <section className="rounded-xl border border-dashed border-primary/40 bg-primary/[0.03] p-4">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <UserPen className="h-4 w-4 text-primary" />
+            Enter billed revenue by month
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            One total per month — what you billed (e.g. from your Medicaid
+            portal). These figures feed the Billed column above.
+          </p>
+        </div>
+      </header>
+
+      {q.isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <ul className="divide-y divide-border/40 rounded-lg border border-border/60 bg-background">
+          {MONTH_LABELS.map((label, i) => {
+            const month = i + 1;
+            const entry = byMonth.get(month);
+            return (
+              <li
+                key={month}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+              >
+                <div className="min-w-[160px] flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">
+                      {label} {year}
+                    </span>
+                    {entry?.is_estimate && (
+                      <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                        Estimate
+                      </span>
+                    )}
+                  </div>
+                  {entry?.note && (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                      {entry.note}
+                    </p>
+                  )}
+                </div>
+                <span className="tabular-nums">
+                  {entry ? fmtUSD(Number(entry.amount ?? 0)) : "—"}
+                </span>
+                <div className="flex items-center gap-1">
+                  <BilledMonthDialog
+                    year={year}
+                    month={month}
+                    entry={entry}
+                    onSubmit={(payload) =>
+                      upsertM.mutateAsync({ data: { year, month, ...payload } })
+                    }
+                  />
+                  {entry && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (confirm(`Clear billed revenue for ${label} ${year}?`)) {
+                          deleteM.mutate({ data: { id: entry.id } });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+type BilledPayload = {
+  amount: number;
+  is_estimate: boolean;
+  note: string | null;
+};
+
+function BilledMonthDialog({
+  year,
+  month,
+  entry,
+  onSubmit,
+}: {
+  year: number;
+  month: number;
+  entry?: ManualEntry;
+  onSubmit: (payload: BilledPayload) => Promise<unknown>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState<string>(
+    entry?.amount != null ? String(entry.amount) : "",
+  );
+  const [isEstimate, setIsEstimate] = useState<boolean>(entry?.is_estimate ?? false);
+  const [note, setNote] = useState<string>(entry?.note ?? "");
+  const [busy, setBusy] = useState(false);
+
+  // Reset form when reopening with new entry data.
+  useEffect(() => {
+    if (open) {
+      setAmount(entry?.amount != null ? String(entry.amount) : "");
+      setIsEstimate(entry?.is_estimate ?? false);
+      setNote(entry?.note ?? "");
+    }
+  }, [open, entry]);
+
+  const submit = async () => {
+    const amt = Number(amount);
+    if (!isFinite(amt)) {
+      toast.error("Enter a numeric amount.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await onSubmit({
+        amount: amt,
+        is_estimate: isEstimate,
+        note: note.trim() ? note.trim() : null,
+      });
+      setOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {entry ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" className="gap-1">
+            <Plus className="h-3.5 w-3.5" /> Add
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            Billed revenue — {MONTH_LABELS[month - 1]} {year}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Amount (USD)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-border p-3">
+            <div>
+              <Label htmlFor="billed-estimate-toggle">Mark as estimate</Label>
+              <p className="text-xs text-muted-foreground">
+                Flags this month as a best-guess figure.
+              </p>
+            </div>
+            <Switch
+              id="billed-estimate-toggle"
+              checked={isEstimate}
+              onCheckedChange={setIsEstimate}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Note (optional)</Label>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="e.g. From Medicaid portal export"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={busy}>
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

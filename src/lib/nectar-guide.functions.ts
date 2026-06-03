@@ -71,6 +71,8 @@ export const planNectarGuide = createServerFn({ method: "POST" })
     if (data.goal.length < 3) throw new Error("Tell NECTAR what you want help with.");
     if (!data.orgId) throw new Error("Missing organization.");
     const { supabase, userId } = context;
+    const { requireOrgMembership } = await import("@/integrations/supabase/require-org");
+    await requireOrgMembership(supabase, userId, data.orgId, "employee");
 
     const system = `You are NECTAR, a guide inside HIVE (a DSPD/DHS provider platform).
 You generate a short, ordered task list (3–7 tasks) that helps an admin achieve a goal.
@@ -152,6 +154,8 @@ export const listNectarGuides = createServerFn({ method: "POST" })
   .inputValidator((input: { orgId: string }) => ({ orgId: strField(input.orgId, 100) }))
   .handler(async ({ context, data }): Promise<Guide[]> => {
     const { supabase, userId } = context;
+    const { requireOrgMembership } = await import("@/integrations/supabase/require-org");
+    await requireOrgMembership(supabase, userId, data.orgId, "employee");
     const { data: guides, error } = await supabase
       .from("nectar_guides")
       .select("id, goal, summary, status, surface, created_at")

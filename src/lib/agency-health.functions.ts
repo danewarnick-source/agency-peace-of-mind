@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 
 const Input = z.object({ organizationId: z.string().uuid() });
@@ -13,7 +14,8 @@ export const getAgencyHealthSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const orgId = data.organizationId;
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 

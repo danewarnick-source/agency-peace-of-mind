@@ -103,12 +103,27 @@ export const deleteEntity = createServerFn({ method: "POST" })
         throw new Error("Confirmation name does not match. Deletion aborted.");
       }
 
-      // Cascade-friendly cleanup of related rows that don't have ON DELETE CASCADE.
-      await supabaseAdmin.from("organization_members").delete().eq("user_id", data.id);
-      await supabaseAdmin.from("course_assignments").delete().eq("user_id", data.id);
-      await supabaseAdmin.from("external_certifications").delete().eq("user_id", data.id);
-      await supabaseAdmin.from("profiles").delete().eq("id", data.id);
-      await supabaseAdmin.auth.admin.deleteUser(data.id).catch(() => {});
+      // Scope the membership removal to the org the caller actually administers.
+      // (Previously this stripped the user's membership in ALL orgs — breaks
+      //  multi-org users.)
+      await supabaseAdmin
+        .from("organization_members")
+        .delete()
+        .eq("user_id", data.id)
+        .eq("organization_id", data.organizationId);
+
+      // Only when this was their LAST membership do we wipe their profile / auth.
+      const { data: remaining } = await supabaseAdmin
+        .from("organization_members")
+        .select("id")
+        .eq("user_id", data.id)
+        .limit(1);
+      if (!remaining || remaining.length === 0) {
+        await supabaseAdmin.from("course_assignments").delete().eq("user_id", data.id);
+        await supabaseAdmin.from("external_certifications").delete().eq("user_id", data.id);
+        await supabaseAdmin.from("profiles").delete().eq("id", data.id);
+        await supabaseAdmin.auth.admin.deleteUser(data.id).catch(() => {});
+      }
     } else {
       const blocker = await clientActiveBlockers(data.id, data.organizationId);
       if (blocker) throw new Error(blocker);

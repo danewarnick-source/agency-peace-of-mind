@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 
 // ---------- Schemas ----------
@@ -156,7 +157,8 @@ export const commitClientFromPdf = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => CommitInput.parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const c = data.client;
 
     // Try to find an existing client to update (match medicaid_id within org, else name)

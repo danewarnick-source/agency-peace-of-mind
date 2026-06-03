@@ -19,6 +19,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import type { Json } from "@/integrations/supabase/types";
 
 export const EXTERNAL_SYSTEMS = [
@@ -108,7 +109,8 @@ export const listExternalRequirements = createServerFn({ method: "POST" })
     z.object({ organizationId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     const { data: reqs, error } = await supabase
       .from("nectar_requirements")
@@ -204,13 +206,14 @@ export const setRequirementClassification = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { data: req, error: rErr } = await supabase
       .from("nectar_requirements")
-      .select("id, metadata")
+      .select("id, organization_id, metadata")
       .eq("id", data.requirementId)
       .single();
     if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
     const md = ((req.metadata as Record<string, unknown> | null) ?? {});
     const nextMd: Record<string, unknown> = {
       ...md,
@@ -248,6 +251,7 @@ export const attestExternalCompletion = createServerFn({ method: "POST" })
       .eq("id", data.requirementId)
       .single();
     if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "employee");
 
     const md = ((req.metadata as Record<string, unknown> | null) ?? {});
     const system = (md["external_system"] as string | null) ?? "external system";
@@ -305,7 +309,8 @@ export const autoClassifyRequirements = createServerFn({ method: "POST" })
     z.object({ organizationId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: rows, error } = await supabase
       .from("nectar_requirements")
       .select("id, title, description, source_citation, metadata")

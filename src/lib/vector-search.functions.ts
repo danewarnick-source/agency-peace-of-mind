@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
 const EMBED_MODEL = "google/gemini-embedding-001";
 const EMBED_DIMS = 1536;
@@ -157,6 +158,7 @@ export const searchTimesheetsByVector = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateSearch)
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");
     const route = await routeQueryWithLLM(data.query);
 
     let vecLiteral: string | null = null;
@@ -195,6 +197,7 @@ export const backfillTimesheetEmbeddings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateBackfill)
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "admin");
     const { data: rows, error } = await context.supabase
       .from("evv_timesheets")
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

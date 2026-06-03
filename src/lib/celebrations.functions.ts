@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 
 const OrgInput = z.object({ organizationId: z.string().uuid() });
@@ -38,6 +39,7 @@ export const fireCelebration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => FireInput.parse(i))
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row, error } = await sb
@@ -64,6 +66,7 @@ export const listActiveCelebrations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const userId = context.userId as string;
@@ -162,6 +165,7 @@ export const evaluateCelebrationTriggers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "manager");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const orgId = data.organizationId;
@@ -269,6 +273,7 @@ export const getCelebrationSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row } = await sb
@@ -305,6 +310,7 @@ export const setCelebrationSettings = createServerFn({ method: "POST" })
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
+    await requireOrgMembership(context.supabase, context.userId, data.organizationId, "admin");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { error } = await sb

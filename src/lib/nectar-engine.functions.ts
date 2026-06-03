@@ -412,6 +412,7 @@ export const setRequirementMapping = createServerFn({ method: "POST" })
     if (!data.organizationId || !data.requirementId || !data.scopeKind) {
       throw new Error("organizationId, requirementId, scopeKind required to create");
     }
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: row, error } = await supabase
       .from("nectar_requirement_mappings")
       .insert({

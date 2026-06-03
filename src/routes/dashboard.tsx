@@ -247,7 +247,7 @@ function DashboardLayout() {
         className={`grid flex-1 md:grid-cols-[260px_1fr] ${isStaffView && !isMobilePreview ? "hidden md:grid" : ""}`}
       >
         <aside className="hidden flex-col bg-sidebar text-sidebar-foreground md:flex">
-          <SidebarBody />
+          <SidebarBody {...sidebarProps} />
         </aside>
 
         <div className="flex flex-col">

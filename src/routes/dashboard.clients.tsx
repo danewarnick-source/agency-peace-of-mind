@@ -632,7 +632,8 @@ function ProfileTab({
   }
 
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 ${dirty ? "pb-24" : ""}`}>
+
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-5">
 

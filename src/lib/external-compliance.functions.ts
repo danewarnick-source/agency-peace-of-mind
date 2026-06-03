@@ -309,7 +309,8 @@ export const autoClassifyRequirements = createServerFn({ method: "POST" })
     z.object({ organizationId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: rows, error } = await supabase
       .from("nectar_requirements")
       .select("id, title, description, source_citation, metadata")

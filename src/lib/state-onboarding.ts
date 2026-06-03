@@ -191,3 +191,55 @@ export function projectAnswersToTemplate(answers: AnyAnswers): Record<string, un
     },
   };
 }
+
+// ─── Inverse: hydrate onboarding answers from an existing template ──────────
+// Powers the "Copy from existing state" starting-point so the wizard opens
+// pre-filled with the source state's values, ready to edit.
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function templateToAnswers(tpl: any): AnyAnswers {
+  if (!tpl) return {};
+  const term = tpl.terminology ?? {};
+  const dept = tpl.department_structure ?? {};
+  const codes: Array<{ code?: string; name?: string; unit_type?: string; evv_required?: boolean }> =
+    tpl.billing_codes?.codes ?? [];
+  const mandates: Array<{ slug?: string; name?: string; cadence_months?: number | null; roles?: string[] }> =
+    tpl.training?.mandates ?? [];
+  const docs: Array<{ slug?: string; name?: string; cadence?: string; attestor?: string }> =
+    tpl.required_documents?.docs ?? [];
+  const evv = tpl.evv ?? {};
+
+  return {
+    agency: {
+      department_name: term.department_name ?? "",
+      regulator: term.regulator ?? "",
+      program_names: (dept.agency_types ?? []).join("\n"),
+      service_names: Object.values(term.service_labels ?? {}).join("\n"),
+      role_names: Object.values(term.role_labels ?? {}).join("\n"),
+    },
+    billing_codes: {
+      codes: codes
+        .map((c) => `${c.code ?? ""} | ${c.name ?? ""} | ${c.unit_type ?? "hourly"} | ${c.evv_required ? "true" : "false"}`)
+        .join("\n"),
+      rate_model: "",
+      structural_differences: "",
+    },
+    training: {
+      mandates: mandates
+        .map((m) => `${m.slug ?? ""} | ${m.name ?? ""} | ${m.cadence_months ?? ""} | ${(m.roles ?? []).join(",")}`)
+        .join("\n"),
+    },
+    evv: {
+      aggregator: "",
+      default_geofence_feet: String(evv.default_geofence_feet ?? 500),
+      variance_grace_minutes: String(evv.variance_grace_minutes ?? 7),
+      reconciliation_policy: evv.reconciliation_policy ?? "",
+    },
+    documents: {
+      docs: docs
+        .map((d) => `${d.slug ?? ""} | ${d.name ?? ""} | ${d.cadence ?? "as_needed"} | ${d.attestor ?? "admin"}`)
+        .join("\n"),
+    },
+  };
+}
+

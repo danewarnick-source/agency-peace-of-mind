@@ -230,7 +230,8 @@ function NectarDocsPage() {
           onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
         />
       </div>
-      </div>
+
+
 
       <div className="grid gap-3">
         {isLoading && (

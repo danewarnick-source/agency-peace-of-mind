@@ -438,7 +438,19 @@ export const deleteRequirementMapping = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const { data: existing, error: exErr } = await supabase
+      .from("nectar_requirement_mappings")
+      .select("organization_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (exErr || !existing) throw new Error("Mapping not found");
+    await requireOrgMembership(
+      supabase,
+      userId,
+      (existing as { organization_id: string }).organization_id,
+      "manager",
+    );
     const { error } = await supabase
       .from("nectar_requirement_mappings")
       .delete()

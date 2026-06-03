@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isDailyServiceCode } from "@/lib/service-billing";
-import { hoursToUnits } from "@/lib/billing-units";
+import { aggregateHourlyUnits, aggregateDailyDays } from "@/lib/accrual";
 import { assertAddonForOrg } from "@/lib/entitlements.server";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
@@ -119,34 +119,25 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
       );
     }
 
-    const hourlyAgg = new Map<string, number>();
-    for (const t of tsRes.data ?? []) {
-      if (!t.service_type_code || !t.clock_out_timestamp) continue;
-      if (isDailyServiceCode(t.service_type_code)) continue;
-      const start = new Date(t.clock_in_timestamp);
-      const end = new Date(t.clock_out_timestamp);
-      const hrs = (end.getTime() - start.getTime()) / 3_600_000;
-      if (!isFinite(hrs) || hrs <= 0) continue;
-      const m = start.getUTCMonth();
-      const k = `${m}|${t.client_id}|${t.service_type_code}`;
-      hourlyAgg.set(k, (hourlyAgg.get(k) ?? 0) + hrs);
-    }
-    for (const [k, hrs] of hourlyAgg) {
+    // ─── Hourly units per (month|client|code) via shared aggregator ────────
+    const hourlyUnits = aggregateHourlyUnits(
+      (tsRes.data ?? []) as Parameters<typeof aggregateHourlyUnits>[0],
+      (t, _hrs, start) =>
+        `${start.getUTCMonth()}|${t.client_id}|${t.service_type_code}`,
+    );
+    for (const [k, units] of hourlyUnits) {
       const [mStr, clientId, code] = k.split("|");
       const m = Number(mStr);
       const rate = rateByKey.get(`${clientId}|${code}`);
       if (!rate) continue;
-      months[m].billed += hoursToUnits(hrs) * rate;
+      months[m].billed += units * rate;
     }
 
-    const dailyDaysPerClientMonth = new Map<string, Set<string>>();
-    for (const r of dailyRes.data ?? []) {
-      if (!r.record_date) continue;
-      const m = new Date(`${r.record_date}T00:00:00Z`).getUTCMonth();
-      const k = `${m}|${r.client_id}`;
-      if (!dailyDaysPerClientMonth.has(k)) dailyDaysPerClientMonth.set(k, new Set());
-      dailyDaysPerClientMonth.get(k)!.add(r.record_date);
-    }
+    // ─── Daily days per (month|client) via shared aggregator ───────────────
+    const dailyDaysPerClientMonth = aggregateDailyDays(
+      (dailyRes.data ?? []) as Parameters<typeof aggregateDailyDays>[0],
+      (r) => `${new Date(`${r.record_date}T00:00:00Z`).getUTCMonth()}|${r.client_id}`,
+    );
     for (const c of codesRes.data ?? []) {
       if (!isDailyServiceCode(c.service_code)) continue;
       const rate = Number(c.rate_per_unit ?? 0);

@@ -25,8 +25,9 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Copy, Download, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Lock, FileSearch,
 } from "lucide-react";
-import { hoursToUnits, fmtHours } from "@/lib/billing-units";
+import { fmtHours } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
+import { aggregateHourlyUnits, aggregateDailyDays } from "@/lib/accrual";
 import { RequireRole } from "@/components/rbac-guard";
 
 export const Route = createFileRoute("/dashboard/billing/form520")({
@@ -158,22 +159,17 @@ function Billing520Page() {
         .map((c) => [c.id, c]),
     );
 
-    const hoursByKey = new Map<string, number>();
-    for (const r of (tsQ.data ?? []) as Array<{ client_id: string; service_type_code: string | null; clock_in_timestamp: string; clock_out_timestamp: string | null }>) {
-      if (!r.service_type_code || !r.clock_out_timestamp) continue;
-      if (isDailyServiceCode(r.service_type_code)) continue;
-      const hrs = (new Date(r.clock_out_timestamp).getTime() - new Date(r.clock_in_timestamp).getTime()) / 3_600_000;
-      if (!isFinite(hrs) || hrs <= 0) continue;
-      const k = `${r.client_id}|${r.service_type_code}`;
-      hoursByKey.set(k, (hoursByKey.get(k) ?? 0) + hrs);
-    }
+    // Hourly units per (client|code) via shared aggregator
+    const unitsByKey = aggregateHourlyUnits(
+      (tsQ.data ?? []) as Parameters<typeof aggregateHourlyUnits>[0],
+      (r) => `${r.client_id}|${r.service_type_code}`,
+    );
 
-    const daysByClient = new Map<string, Set<string>>();
-    for (const r of (dailyQ.data ?? []) as Array<{ client_id: string; record_date: string }>) {
-      if (!r.record_date) continue;
-      if (!daysByClient.has(r.client_id)) daysByClient.set(r.client_id, new Set());
-      daysByClient.get(r.client_id)!.add(r.record_date);
-    }
+    // Daily distinct days per client via shared aggregator
+    const daysByClient = aggregateDailyDays(
+      (dailyQ.data ?? []) as Parameters<typeof aggregateDailyDays>[0],
+      (r) => r.client_id,
+    );
 
     const out: Row[] = [];
     let line = 1;
@@ -184,8 +180,7 @@ function Billing520Page() {
       if (isDailyServiceCode(b.service_code)) {
         units = daysByClient.get(b.client_id)?.size ?? 0;
       } else {
-        const hrs = hoursByKey.get(`${b.client_id}|${b.service_code}`) ?? 0;
-        units = hoursToUnits(hrs);
+        units = unitsByKey.get(`${b.client_id}|${b.service_code}`) ?? 0;
       }
       const remaining = Math.max(0, (b.annual_unit_authorization ?? 0) - units);
       out.push({

@@ -4544,6 +4544,59 @@ export type Database = {
           },
         ]
       }
+      provider_ledger_entries: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_estimate: boolean
+          label: string
+          note: string | null
+          organization_id: string
+          period_month: number
+          period_year: number
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_estimate?: boolean
+          label: string
+          note?: string | null
+          organization_id: string
+          period_month: number
+          period_year: number
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_estimate?: boolean
+          label?: string
+          note?: string | null
+          organization_id?: string
+          period_month?: number
+          period_year?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_ledger_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_tenants: {
         Row: {
           agency_name: string

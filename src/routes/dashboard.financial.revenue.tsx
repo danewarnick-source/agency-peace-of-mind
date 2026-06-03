@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { fmtUSD } from "@/lib/billing-units";
-import { Info, Upload } from "lucide-react";
+import { Info, ShieldCheck, Upload, UserPen } from "lucide-react";
+import { YourInputsSection } from "@/components/financial/your-inputs-section";
 
 export const Route = createFileRoute("/dashboard/financial/revenue")({
   head: () => ({ meta: [{ title: "Revenue — Financial — HIVE" }] }),
@@ -29,8 +30,19 @@ const MONTH_LABELS = [
 
 function RevenuePage() {
   const nowYear = new Date().getFullYear();
+  const nowMonth = new Date().getMonth() + 1; // 1–12
   const [year, setYear] = useState<number>(nowYear);
   const [granularity, setGranularity] = useState<Granularity>("monthly");
+  // The "Your Inputs" layer is month-scoped. When the user is on Quarterly/YTD,
+  // we still surface inputs for a focus month (default = current month, but only
+  // if the selected year matches; otherwise default to January).
+  const [inputsMonth, setInputsMonth] = useState<number>(
+    year === nowYear ? nowMonth : 1,
+  );
+  const [inputsTotals, setInputsTotals] = useState<{
+    inputsSubtotal: number;
+    entriesCount: number;
+  }>({ inputsSubtotal: 0, entriesCount: 0 });
 
   const fetchRevenue = useServerFn(getBilledRevenueByYear);
   const q = useQuery({
@@ -72,22 +84,41 @@ function RevenuePage() {
     ];
   }, [months, granularity, year]);
 
-  const totalBilled = rows.reduce((s, r) => s + r.billed, 0);
-  const allZero = !q.isLoading && totalBilled === 0;
+  // HIVE-verified subtotal scope:
+  //   - monthly view: just the inputsMonth (so it matches what's on screen below)
+  //   - quarterly/ytd: total of the table rows
+  const hiveVerifiedSubtotal = useMemo(() => {
+    if (granularity === "monthly") {
+      return months.find((m) => m.month === inputsMonth)?.billed ?? 0;
+    }
+    return rows.reduce((s, r) => s + r.billed, 0);
+  }, [granularity, months, inputsMonth, rows]);
+
+  const combinedTotal = hiveVerifiedSubtotal + inputsTotals.inputsSubtotal;
+  const totalBilledTable = rows.reduce((s, r) => s + r.billed, 0);
+  const allZero = !q.isLoading && totalBilledTable === 0;
 
   return (
     <div className="space-y-4">
+      {/* ─── LAYER 1: HIVE-Verified billed revenue (read-only, from 520) ── */}
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <CardTitle>Billed vs Received</CardTitle>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              HIVE-Verified
+            </div>
+            <CardTitle className="mt-0.5">Billed Revenue</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Billed is read live from your 520 submissions. Received is
-              populated once payments are imported or attested.
+              Sourced from your 520 submissions — read-only.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+            <Select value={String(year)} onValueChange={(v) => {
+              const y = Number(v);
+              setYear(y);
+              setInputsMonth(y === nowYear ? nowMonth : 1);
+            }}>
               <SelectTrigger className="h-9 w-[120px]">
                 <SelectValue />
               </SelectTrigger>
@@ -163,14 +194,6 @@ function RevenuePage() {
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-muted/30 font-semibold">
-                    <td className="px-3 py-2">Total</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {fmtUSD(totalBilled)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-                  </tr>
                 </tbody>
               </table>
             </div>
@@ -193,11 +216,123 @@ function RevenuePage() {
         </CardContent>
       </Card>
 
-      <p className="px-1 text-xs text-muted-foreground">
-        Billed figures are read directly from your 520 billing submissions.
-        This overview is for tracking only and is not a substitute for
-        professional accounting or tax advice.{" "}
-        <span className="opacity-60">(Disclaimer pending legal review.)</span>
+      {/* ─── LAYER 2: Your Inputs (editable, provider-entered) ──────────── */}
+      <Card>
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+              <UserPen className="h-3.5 w-3.5" />
+              Your Inputs
+            </div>
+            <CardTitle className="mt-0.5">Manual entries</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Add expenses, payroll, taxes, and payments received for a given month.
+              These are separate from your billed revenue above.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Month</span>
+            <Select
+              value={String(inputsMonth)}
+              onValueChange={(v) => setInputsMonth(Number(v))}
+            >
+              <SelectTrigger className="h-9 w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_LABELS.map((m, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    {m} {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <YourInputsSection
+            year={year}
+            month={inputsMonth}
+            onTotalsChange={setInputsTotals}
+          />
+        </CardContent>
+      </Card>
+
+      {/* ─── Subtotal bands ─────────────────────────────────────────────── */}
+      <Card>
+        <CardContent className="space-y-2 p-4">
+          <SubtotalBand
+            tone="verified"
+            title="HIVE-Verified Subtotal"
+            note={
+              granularity === "monthly"
+                ? `Billed for ${MONTH_LABELS[inputsMonth - 1]} ${year} — sourced from your billing, read-only.`
+                : `Billed for the periods above — sourced from your billing, read-only.`
+            }
+            amount={hiveVerifiedSubtotal}
+          />
+          <SubtotalBand
+            tone="inputs"
+            title="Your Inputs Subtotal"
+            note={`Entered by you for ${MONTH_LABELS[inputsMonth - 1]} ${year} — may include estimates. (${inputsTotals.entriesCount} entr${inputsTotals.entriesCount === 1 ? "y" : "ies"})`}
+            amount={inputsTotals.inputsSubtotal}
+            signed
+          />
+          <SubtotalBand
+            tone="combined"
+            title="Combined"
+            note="HIVE-verified billed revenue + your inputs (received adds; expenses, taxes, and payroll subtract; custom lines add by default — use negative amounts to subtract)."
+            amount={combinedTotal}
+            big
+          />
+          <p className="pt-1 text-[11px] text-muted-foreground">
+            Includes figures you entered, some of which may be estimates. This
+            overview is for tracking only and is not a substitute for
+            professional accounting or tax advice.{" "}
+            <span className="opacity-60">(Disclaimer pending legal review.)</span>
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SubtotalBand({
+  tone,
+  title,
+  note,
+  amount,
+  signed,
+  big,
+}: {
+  tone: "verified" | "inputs" | "combined";
+  title: string;
+  note: string;
+  amount: number;
+  signed?: boolean;
+  big?: boolean;
+}) {
+  const styles =
+    tone === "verified"
+      ? "border-emerald-500/30 bg-emerald-500/[0.06]"
+      : tone === "inputs"
+        ? "border-primary/30 bg-primary/[0.05]"
+        : "border-foreground/20 bg-muted/40";
+  const display = signed && amount !== 0
+    ? `${amount > 0 ? "+" : "−"} ${fmtUSD(Math.abs(amount))}`
+    : fmtUSD(amount);
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-3 ${styles}`}
+    >
+      <div className="min-w-0 flex-1">
+        <p className={`font-semibold ${big ? "text-base" : "text-sm"}`}>{title}</p>
+        <p className="text-xs text-muted-foreground">{note}</p>
+      </div>
+      <p
+        className={`tabular-nums ${big ? "text-2xl font-bold" : "text-lg font-semibold"}`}
+      >
+        {display}
       </p>
     </div>
   );

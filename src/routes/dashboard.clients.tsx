@@ -864,6 +864,28 @@ function ProfileTab({
       clientId={client.id}
       clientName={`${client.first_name} ${client.last_name}`.trim()}
     />
+
+    {/* Sticky save bar — visible whenever there are unsaved profile edits,
+        regardless of which field/column the user is editing. Reuses the
+        existing editMutation (user-scoped supabase client → RLS enforced). */}
+    {dirty && (
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-amber-500/40 bg-amber-50/95 shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.1)] backdrop-blur dark:bg-amber-950/80">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
+          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <p className="text-sm font-medium">You have unsaved changes to this client profile.</p>
+          </div>
+          <Button
+            onClick={handleSave}
+            disabled={saving || !first.trim() || !last.trim()}
+            className="min-w-[160px]"
+          >
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Profile
+          </Button>
+        </div>
+      </div>
+    )}
     </div>
   );
 }

@@ -96,8 +96,7 @@ export function YourInputsSection({
     return Math.round(total * 100) / 100;
   }, [entries]);
 
-  // Notify parent
-  useMemo(() => {
+  useEffect(() => {
     onTotalsChange?.({ inputsSubtotal, entriesCount: entries.length });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputsSubtotal, entries.length]);

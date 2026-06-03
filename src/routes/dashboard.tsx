@@ -373,15 +373,23 @@ function DashboardLayout() {
       <div className="border-t border-sidebar-border p-4">
         <div className="mb-3 text-xs text-sidebar-foreground/60">
           <div className="font-medium text-sidebar-foreground">{user?.user_metadata?.full_name ?? user?.email}</div>
-          <div className="flex items-center justify-between">
-            <span className="truncate">
-              {isHiveExecView ? "HIVE Platform" : (org?.organization_name ?? "Your workspace")}
-            </span>
-            <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">
-              {isHiveExecView ? "HIVE Exec" : ROLE_LABEL[role]}
-            </span>
+          <div className="mt-2">
+            {isHiveExecView ? (
+              <div className="flex items-center justify-between">
+                <span className="truncate">HIVE Platform</span>
+                <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">HIVE Exec</span>
+              </div>
+            ) : (
+              <>
+                <OrgSwitcher />
+                <div className="mt-1.5 flex justify-end">
+                  <span className="rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">
+                    {ROLE_LABEL[role]}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
-
         </div>
 
         <Button

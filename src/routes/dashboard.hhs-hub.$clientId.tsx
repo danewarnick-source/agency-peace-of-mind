@@ -100,6 +100,8 @@ function HhsClientHub() {
     }
   }, [isLoading, client, assignments, allowedDaily.length, navigate]);
 
+  const { enabled: emarEnabled } = useClientFeature(client ?? null, "emar");
+
   if (isLoading) return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   if (!client || !orgId) return <p className="p-6 text-sm text-muted-foreground">Client unavailable.</p>;
 

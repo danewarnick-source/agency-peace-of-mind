@@ -97,7 +97,7 @@ function StateDetailPage() {
 
 // ═══ PROFILE TAB ═════════════════════════════════════════════════════════════
 
-function ProfileTab({ stateCode }: { stateCode: string }) {
+function ProfileTab({ stateCode, onJumpToSources }: { stateCode: string; onJumpToSources?: () => void }) {
   const qc = useQueryClient();
   const getFn = useServerFn(getStateTemplate);
   const saveFn = useServerFn(updateStateTemplateSection);

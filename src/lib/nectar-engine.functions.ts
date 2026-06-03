@@ -609,7 +609,9 @@ export const prefillRequirementMappings = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
 
     // Which requirements already have at least one mapping? Skip those.
     const { data: existingMaps } = await supabase

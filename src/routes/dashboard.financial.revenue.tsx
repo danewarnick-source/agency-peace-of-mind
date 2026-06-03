@@ -58,6 +58,8 @@ const MONTH_LABELS = [
 ];
 
 function RevenuePage() {
+  const { data: org } = useCurrentOrg();
+  const organizationId = org?.organization_id;
   const nowYear = new Date().getFullYear();
   const nowMonth = new Date().getMonth() + 1;
   const [year, setYear] = useState<number>(nowYear);
@@ -72,8 +74,9 @@ function RevenuePage() {
 
   const fetchRevenue = useServerFn(getBilledRevenueByYear);
   const q = useQuery({
-    queryKey: ["financial-revenue", year],
-    queryFn: () => fetchRevenue({ data: { year } }),
+    queryKey: ["financial-revenue", year, organizationId],
+    enabled: !!organizationId,
+    queryFn: () => fetchRevenue({ data: { year, organizationId: organizationId! } }),
   });
 
   const yearOptions = useMemo(() => {

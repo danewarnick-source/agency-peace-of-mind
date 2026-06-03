@@ -63,6 +63,8 @@ const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/internal-audit", label: "Internal Audit", icon: ClipboardCheck },
 ];
 
+type PlatformStateLite = { code: string; name: string; status: "draft" | "active" | "coming_soon" };
+
 type PV = "staff" | "admin" | "staff_mobile" | "hive_exec" | "state_preview";
 
 type SidebarBodyProps = {

@@ -1,92 +1,80 @@
-# Fix: Hoist `SidebarBody` to a stable module-level component
+## Root cause
 
-## Goal
+Dane is both a `super_admin` of an org AND a HIVE Executive, and his browser has `portal-view=hive_exec` persisted in localStorage from a prior session.
 
-Stop the dashboard sidebar from unmounting and remounting on every parent re-render. This is what was making sidebar nav clicks fail intermittently throughout the session.
+In `src/routes/dashboard.tsx` (lines ~125–184) the layout computes:
 
-## Scope (only this)
-
-- Move `SidebarBody` out of `DashboardLayout` in `src/routes/dashboard.tsx` to a top-level component in the same file.
-- Pass everything it needs as explicit props.
-- Remove the two `[DIAG-SIDEBAR]` instrumentation blocks added during diagnosis.
-
-## Not in scope (deferred, per user)
-
-- No changes to `refetchOnWindowFocus` on `useCurrentOrg` or `CelebrationProvider`.
-- No memoization of the `nav` array.
-- No changes to security policies, storage buckets, FKs, Financial tab, or any other file.
-
-## Implementation
-
-### 1. Remove temporary instrumentation in `src/routes/dashboard.tsx`
-
-- Delete the render-rate logger block (the `if (typeof window !== "undefined") { … __dashRenders … }` block at the top of `DashboardLayout`).
-- Delete the capture-phase `pointerdown` probe `useEffect` (the one that logs `[DIAG-SIDEBAR] pointerdown in sidebar area`).
-
-### 2. Hoist `SidebarBody`
-
-Move the `SidebarBody` arrow function out of `DashboardLayout` and define it at module scope as `function SidebarBody(props: SidebarBodyProps) { … }`.
-
-Define a `SidebarBodyProps` type for everything currently captured from the closure:
-
-```text
-SidebarBodyProps {
-  // identity / role
-  user, role, isAdminCapable, isExecutive, isHiveExecView,
-
-  // view + state controls
-  rawView, setView,            // portal-view select
-  isStatePreview,              // toggles state-picker block
-  stateCode, setStateCode,
-  subView, setSubView,
-  states, currentPreviewState,
-
-  // nav data (already computed in DashboardLayout)
-  nav: NavItem[],
-  showNectarCluster: boolean,  // === (effectiveView === "admin")
-  pathname,
-
-  // actions
-  signOut: () => Promise<void>,
-  onNavigate?: () => void,     // used by the mobile Sheet to auto-close
-}
+```ts
+const allowedViews: PV[] = ["staff"];
+if (isAdminCapable) allowedViews.push("admin", "staff_mobile");
+if (isExecutive)    allowedViews.push("hive_exec", "state_preview");   // ← gated on isExecutive
+const rawView = allowedViews.includes(view) ? view : "staff";
+const isHiveExecView = rawView === "hive_exec";
 ```
 
-Inside the hoisted `SidebarBody`:
+and a reconciler effect:
 
-- Render the HIVE header, Portal View select, State picker, primary nav list, NECTAR cluster (only when `showNectarCluster`), and the bottom user/org/sign-out block — identical JSX to today, just reading from `props` instead of closure.
-- The `<OrgSwitcher />` keeps using its own `useCurrentOrg`/`useMyMemberships` hooks — no prop drilling needed for it.
-
-### 3. Update both call sites in `DashboardLayout`
-
-Compute the props once in the parent, then pass them to both renders so desktop sidebar and mobile Sheet share the same stable component instance:
-
-```text
-<aside …>
-  <SidebarBody {...sidebarProps} />
-</aside>
-…
-<SheetContent …>
-  <SidebarBody {...sidebarProps} onNavigate={() => setMobileOpen(false)} />
-</SheetContent>
+```ts
+useEffect(() => {
+  if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) navigate({ to: "/dashboard/hive-exec" });
+  else if (!isHiveExecView && !isStatePreview && pathname.startsWith("/dashboard/hive-exec")) navigate({ to: "/dashboard" });
+}, [isHiveExecView, isStatePreview, pathname, navigate]);
 ```
 
-`signOut` stays defined in `DashboardLayout` (it uses `navigate`) and is passed in.
+`isExecutive` comes from `useIsHiveExecutive()`, which returns `false` whenever the query is **loading** (initial fetch, refetch after `queryClient.clear()` in `use-auth`, window-focus refetch, etc.).
 
-### 4. Verification checklist (manual smoke + code review)
+Sequence on login:
+1. Mount: `view="staff"` (initial). Render at `/dashboard` → caseload.
+2. `usePortalView` effect reads localStorage → `view="hive_exec"`.
+3. Exec query still loading → `isExecutive=false` → `hive_exec` is stripped from `allowedViews` → `rawView` falls back to `"staff"` → `isHiveExecView=false`. Still on `/dashboard`. Caseload renders.
+4. Exec query resolves true → `isHiveExecView=true` → effect redirects to `/dashboard/hive-exec` → HIVE Overview renders.
+5. `useAuth`'s `onAuthStateChange` (TOKEN_REFRESHED, second `INITIAL_SESSION`, or any user-id transition during boot) calls `queryClient.clear()` → exec query is dropped → `isExecutive=false` again → `isHiveExecView=false` → effect sees we're on `/dashboard/hive-exec` and bounces back to `/dashboard` → caseload renders.
+6. Exec query resolves true again → back to HIVE Overview. Loop.
 
-After the edit:
+The reconciler does not consider the loading state of the executive check, so every flicker of `isExecutive` causes a real navigation, and the page oscillates.
 
-- Build passes (harness runs it automatically).
-- Desktop sidebar nav: every tab clicks on the first try, repeatedly, while the page sits idle (no more random misses).
-- Mobile Sheet (md breakpoint, hamburger): opens, nav items click, `onNavigate` closes the sheet.
-- Portal View `<Select>` switches between Staff / Admin / Staff Mobile / HIVE Executive / State Build-Preview as before.
-- State Build/Preview sub-panel: state picker dropdown, Admin/Staff sub-view toggle, and "Edit … template" link all still work.
-- Role-gated items still filter (`nav` is computed in the parent with `can()` + role checks; `SidebarBody` just renders the array it gets).
-- `OrgSwitcher` still shows the active org, lets multi-org users switch, and `DemoBadge` still renders for sandbox orgs.
-- Sign-out button signs out and redirects to `/`.
-- No `[DIAG-SIDEBAR]` log lines remain in the console.
+## Fix
 
-## Files touched
+Treat the executive check's loading state as "undetermined" and do not reconcile view↔route while it's unknown. Frontend-only; no RLS/security/data changes.
 
-- `src/routes/dashboard.tsx` — only this file.
+### Edits
+
+**1. `src/routes/dashboard.tsx`**
+
+- Destructure `isLoading` from `useIsHiveExecutive` (rename to `execLoading` locally).
+- While `execLoading` is true, treat `hive_exec` and `state_preview` as still allowed in `allowedViews` (preserve the persisted view instead of demoting to staff), OR equivalently skip the reconciler effect entirely until known.
+- Gate the reconciliation effect on `!execLoading`:
+
+  ```ts
+  useEffect(() => {
+    if (execLoading) return;
+    if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) {
+      navigate({ to: "/dashboard/hive-exec" });
+    } else if (!isHiveExecView && !isStatePreview && pathname.startsWith("/dashboard/hive-exec")) {
+      navigate({ to: "/dashboard" });
+    }
+  }, [execLoading, isHiveExecView, isStatePreview, pathname, navigate]);
+  ```
+
+- Also include `execLoading` in the initial `Loading…` gate so the layout doesn't render a "wrong" sidebar/page for one frame on first load when the persisted view is `hive_exec`/`state_preview`:
+
+  ```ts
+  if (loading || !session || execLoading) {
+    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
+  }
+  ```
+
+That eliminates the flicker: the route is only changed once the executive status is known, and any later refetch of the exec query keeps the cached `true` (react-query keeps `data` during background refetches), so `isExecutive` won't flap.
+
+### Out of scope
+
+- No changes to `useIsHiveExecutive`, `useAuth`, `useCurrentOrg`, or `RequireHiveExecutive`.
+- No changes to RLS, server functions, HR/PII gating, or the registry.
+- Don't clear the user's persisted `portal-view`; we just stop reacting to it before we know the user's executive status.
+
+## Verification
+
+1. Sign in as `danewarnick@gmail.com`.
+2. Expect: a brief "Loading…" → land directly on **HIVE Overview** (because his persisted view is `hive_exec`) with no flicker back to My Caseload. If his persisted view is staff/admin, lands there with no flicker.
+3. Switch portal view back and forth via the sidebar switcher — still works (the reconciler still runs once exec status is known).
+4. Sign out and sign in as a non-executive user → no HIVE pages ever appear; lands on the role-appropriate dashboard.

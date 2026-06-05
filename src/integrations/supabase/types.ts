@@ -4934,6 +4934,78 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_training_modules: {
+        Row: {
+          attestation_statement: string
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          est_min: number
+          id: string
+          intro: string | null
+          kind: Database["public"]["Enums"]["provider_training_kind"]
+          organization_id: string
+          person_label: string | null
+          source_doc_name: string | null
+          status: Database["public"]["Enums"]["provider_training_status"]
+          steps: Json
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          attestation_statement: string
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          est_min?: number
+          id?: string
+          intro?: string | null
+          kind: Database["public"]["Enums"]["provider_training_kind"]
+          organization_id: string
+          person_label?: string | null
+          source_doc_name?: string | null
+          status?: Database["public"]["Enums"]["provider_training_status"]
+          steps?: Json
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          attestation_statement?: string
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          est_min?: number
+          id?: string
+          intro?: string | null
+          kind?: Database["public"]["Enums"]["provider_training_kind"]
+          organization_id?: string
+          person_label?: string | null
+          source_doc_name?: string | null
+          status?: Database["public"]["Enums"]["provider_training_status"]
+          steps?: Json
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_training_modules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_training_modules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       respite_stays: {
         Row: {
           created_at: string
@@ -6645,6 +6717,8 @@ export type Database = {
       hive_ticket_source: "auto" | "manual"
       hive_ticket_status: "new" | "in_progress" | "resolved"
       invitation_status: "pending" | "accepted" | "revoked"
+      provider_training_kind: "policies" | "person"
+      provider_training_status: "draft" | "published"
       report_cadence: "weekly" | "monthly"
       sub_plan: "starter" | "pro" | "enterprise" | "custom"
       sub_status: "trial" | "active" | "past_due" | "canceled" | "paused"
@@ -6806,6 +6880,8 @@ export const Constants = {
       hive_ticket_source: ["auto", "manual"],
       hive_ticket_status: ["new", "in_progress", "resolved"],
       invitation_status: ["pending", "accepted", "revoked"],
+      provider_training_kind: ["policies", "person"],
+      provider_training_status: ["draft", "published"],
       report_cadence: ["weekly", "monthly"],
       sub_plan: ["starter", "pro", "enterprise", "custom"],
       sub_status: ["trial", "active", "past_due", "canceled", "paused"],

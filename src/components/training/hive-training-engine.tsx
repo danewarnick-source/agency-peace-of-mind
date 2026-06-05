@@ -1799,31 +1799,62 @@ function Check({ step, onPass }: { step: CheckStep; onPass: () => void }) {
 }
 
 /* ───────────────────────── Module engine ───────────────────────── */
+export type AttestPayload = {
+  signature: string;
+  consentStatement: string;
+  consentAccepted: true;
+  contentVersion: string;
+};
+
+export const TRAINING_ENGINE_VERSION = "hive-training-engine@2026.06.05";
+
+export const ESIGN_CONSENT_STATEMENT =
+  "By typing my full legal name below and clicking Sign & Complete, I intend this to be my legal electronic signature, I confirm I am the named person, and I consent to signing and receiving this record electronically.";
+
 export function TrainingModule({
   topic,
   onExit,
   onComplete,
+  readOnly = false,
+  previousCompletion,
+  onRetake,
 }: {
   topic: Topic;
   onExit: () => void;
-  onComplete?: (signature: string) => Promise<void> | void;
+  onComplete?: (payload: AttestPayload) => Promise<void> | void;
+  readOnly?: boolean;
+  previousCompletion?: { signedName: string; completedAt: string } | null;
+  onRetake?: () => void;
 }) {
-  const flow: ({ type: "intro" } | Step | { type: "attest" } | { type: "complete" })[] =
-    [{ type: "intro" }, ...(topic.steps || []), { type: "attest" }, { type: "complete" }];
-  const checks = (topic.steps || []).filter(s => s.type === "check").length;
-  const lessons = (topic.steps || []).filter(s => s.type === "lesson").length;
+  // In read-only review mode, skip the attest + complete steps. The staff
+  // member can re-read lessons but their record never changes.
+  const baseSteps: Step[] = topic.steps || [];
+  const flow: ({ type: "intro" } | Step | { type: "attest" } | { type: "complete" })[] = readOnly
+    ? [{ type: "intro" }, ...baseSteps]
+    : [{ type: "intro" }, ...baseSteps, { type: "attest" }, { type: "complete" }];
+  const checks = baseSteps.filter(s => s.type === "check").length;
+  const lessons = baseSteps.filter(s => s.type === "lesson").length;
   const [i, setI] = useState(0);
   const [name, setName] = useState("");
   const [agree, setAgree] = useState(false);
+  const [esignConsent, setEsignConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const step = flow[i] as any;
-  const pct = Math.round((i / (flow.length - 1)) * 100);
+  const pct = Math.round((i / Math.max(1, flow.length - 1)) * 100);
   const next = () => setI(i + 1), back = () => setI(i - 1);
+  const canSign = agree && esignConsent && name.trim().length > 1;
   const submitAttestAndContinue = async () => {
-    if (submitting) return;
+    if (submitting || !canSign) return;
     try {
       setSubmitting(true);
-      if (onComplete) await onComplete(name.trim());
+      if (onComplete) {
+        await onComplete({
+          signature: name.trim(),
+          consentStatement: ESIGN_CONSENT_STATEMENT,
+          consentAccepted: true,
+          contentVersion: TRAINING_ENGINE_VERSION,
+        });
+      }
       setI(i + 1);
     } finally {
       setSubmitting(false);
@@ -1835,21 +1866,32 @@ export function TrainingModule({
       <div style={{ background: NAVY, padding: "13px 17px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <span style={{ width: 26, height: 26, background: GOLD, clipPath: "polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)" }} />
-          <div><div style={{ color: GOLD, fontSize: 10, fontWeight: 600, letterSpacing: ".1em" }}>Hive Launchpad · code {topic.code}</div><div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{topic.title}</div></div>
+          <div><div style={{ color: GOLD, fontSize: 10, fontWeight: 600, letterSpacing: ".1em" }}>Hive Launchpad · code {topic.code}{readOnly ? " · review mode" : ""}</div><div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{topic.title}</div></div>
         </div>
       </div>
       <div style={{ height: 5, background: "#eef0f5" }}><div style={{ height: "100%", width: pct + "%", background: GOLD, transition: "width .35s" }} /></div>
+
+      {readOnly && (
+        <div style={{ background: "#e1f5ee", borderBottom: "1px solid #9fe1cb", color: "#0f6e56", fontSize: 12.5, padding: "10px 17px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span>
+            <b>Completed</b>{previousCompletion ? ` · signed by ${previousCompletion.signedName} on ${new Date(previousCompletion.completedAt).toLocaleDateString()}` : ""}. Reviewing the material won't change your record.
+          </span>
+          {onRetake && (
+            <button style={{ ...btn("out"), padding: "6px 12px", fontSize: 12 }} onClick={onRetake}>Retake training</button>
+          )}
+        </div>
+      )}
 
       <div style={{ padding: 20, minHeight: 400, color: "#2a3040" }}>
         {step.type === "intro" && (
           <>
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#b07819" }}>Code {topic.code}</div>
             <div style={{ fontSize: 21, fontWeight: 700, color: INK, margin: "3px 0 8px" }}>{topic.title}</div>
-            <div style={{ fontSize: 12, color: "#8a8f9e", marginBottom: 14 }}>About {topic.estMin} minutes · {lessons} lessons, {checks} scenarios, then you sign</div>
+            <div style={{ fontSize: 12, color: "#8a8f9e", marginBottom: 14 }}>About {topic.estMin} minutes · {lessons} lessons, {checks} scenarios{readOnly ? "" : ", then you sign"}</div>
             <div style={{ background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 12, padding: "13px 14px", fontSize: 13.5, lineHeight: 1.6 }}>{topic.intro}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
               <button style={btn("out")} onClick={onExit}>All topics</button>
-              <button style={btn("pri")} onClick={next}>Begin</button>
+              <button style={btn("pri")} onClick={next}>{readOnly ? "Review" : "Begin"}</button>
             </div>
           </>
         )}
@@ -1875,7 +1917,11 @@ export function TrainingModule({
             {step.drops && <Accordion drops={step.drops} />}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
               <button style={btn("out")} onClick={back}>Back</button>
-              <button style={btn("pri")} onClick={next}>Continue</button>
+              {i < flow.length - 1 ? (
+                <button style={btn("pri")} onClick={next}>Continue</button>
+              ) : (
+                <button style={btn("pri")} onClick={onExit}>Done reviewing</button>
+              )}
             </div>
           </>
         )}
@@ -1884,19 +1930,32 @@ export function TrainingModule({
 
         {step.type === "attest" && (
           <>
-            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#4e1f81" }}>Attestation</div>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#4e1f81" }}>Attestation · Electronic signature</div>
             <div style={{ fontSize: 17, fontWeight: 600, color: INK, margin: "4px 0 14px" }}>Confirm and sign</div>
             <label style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 12, padding: "13px 14px", cursor: "pointer" }}>
               <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17, accentColor: "#1C2A5E" }} />
               <span style={{ fontSize: 12.5, lineHeight: 1.5 }}>{topic.attest}</span>
             </label>
+            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#fff8e6", border: "1px solid #f5d889", borderRadius: 12, padding: "13px 14px", cursor: "pointer", marginTop: 10 }}>
+              <input type="checkbox" checked={esignConsent} onChange={e => setEsignConsent(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17, accentColor: "#b07819" }} />
+              <span style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+                <b style={{ display: "block", marginBottom: 3, color: "#7a5208" }}>Electronic signature consent (ESIGN / Utah UETA)</b>
+                {ESIGN_CONSENT_STATEMENT}
+              </span>
+            </label>
             <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 11, color: "#8a8f9e", marginBottom: 5 }}>Type your full name to sign</div>
+              <div style={{ fontSize: 11, color: "#8a8f9e", marginBottom: 5 }}>Type your full legal name to sign</div>
               <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Jordan Rivera" style={{ width: "100%", boxSizing: "border-box", font: "inherit", fontSize: 13.5, padding: "10px 12px", border: "1px solid #cdd2e0", borderRadius: 10 }} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
               <button style={btn("out")} onClick={back}>Back</button>
-              <button style={btn(agree && name.trim().length > 1 && !submitting ? "pri" : "dis")} disabled={!(agree && name.trim().length > 1) || submitting} onClick={submitAttestAndContinue}>{submitting ? "Saving…" : "Complete topic \u2713"}</button>
+              <button
+                style={btn(canSign && !submitting ? "pri" : "dis")}
+                disabled={!canSign || submitting}
+                onClick={submitAttestAndContinue}
+              >
+                {submitting ? "Saving…" : "Sign & Complete"}
+              </button>
             </div>
           </>
         )}
@@ -1904,7 +1963,7 @@ export function TrainingModule({
         {step.type === "complete" && (
           <>
             <div style={{ textAlign: "center", paddingTop: 6 }}>
-              <div style={{ width: 48, height: 48, margin: "0 auto", borderRadius: "50%", background: "#e1f5ee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, color: "#0f6e56" }}>\u2713</div>
+              <div style={{ width: 48, height: 48, margin: "0 auto", borderRadius: "50%", background: "#e1f5ee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, color: "#0f6e56" }}>{"\u2713"}</div>
               <div style={{ fontSize: 19, fontWeight: 700, color: INK, marginTop: 12 }}>Topic complete</div>
               <div style={{ fontSize: 12.5, color: "#8a8f9e", marginTop: 4 }}>Signed by {name || "\u2014"} · {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
             </div>
@@ -1915,7 +1974,7 @@ export function TrainingModule({
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 11.5, color: TEAL, textAlign: "center", marginTop: 13 }}>Logged to the staff training record — timestamped for audit.</div>
+            <div style={{ fontSize: 11.5, color: TEAL, textAlign: "center", marginTop: 13 }}>Logged to the staff training record — timestamped, signed, and tamper-evident for audit.</div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><button style={btn("pri")} onClick={onExit}>All topics</button></div>
           </>
         )}
@@ -1925,4 +1984,5 @@ export function TrainingModule({
 }
 
 export type { Topic, Step, LessonStep, CheckStep, Callout, Fact };
+
 

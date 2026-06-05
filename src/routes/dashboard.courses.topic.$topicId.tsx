@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, CheckCircle2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { TRAINING_TOPICS, TrainingModule } from "@/components/training/hive-training-engine";
 
 export const Route = createFileRoute("/dashboard/courses/topic/$topicId")({
   component: TopicPlayer,
@@ -61,37 +62,56 @@ function TopicPlayer() {
       .then(() => qc.invalidateQueries({ queryKey: ["my-core-progress"] }));
   }, [user, topic, progress?.status, topicId, qc]);
 
+  const persistCompletion = async (sig: string) => {
+    if (!user || !topic) throw new Error("Missing data");
+    const trimmed = sig.trim();
+    if (trimmed.length < 3) throw new Error("Type your full name to attest.");
+    const { error: insErr } = await supabase.from("training_completions").insert({
+      user_id: user.id,
+      topic_kind: "core",
+      ref_id: topic.id,
+      topic_code: topic.code,
+      topic_title: topic.title,
+      dspd_letter: topic.dspd_letter,
+      attestation_statement: topic.attestation_statement,
+      typed_signature: trimmed,
+    });
+    if (insErr) throw insErr;
+    const { error: progErr } = await supabase.from("training_topic_progress").upsert(
+      { user_id: user.id, topic_kind: "core", ref_id: topic.id, status: "completed", updated_at: new Date().toISOString() },
+      { onConflict: "user_id,topic_kind,ref_id" },
+    );
+    if (progErr) throw progErr;
+    qc.invalidateQueries({ queryKey: ["my-core-progress"] });
+    qc.invalidateQueries({ queryKey: ["my-core-progress-count"] });
+    qc.invalidateQueries({ queryKey: ["topic-progress"] });
+  };
+
   const completeMutation = useMutation({
-    mutationFn: async () => {
-      if (!user || !topic) throw new Error("Missing data");
-      const sig = signature.trim();
-      if (sig.length < 3) throw new Error("Type your full name to attest.");
-      const { error: insErr } = await supabase.from("training_completions").insert({
-        user_id: user.id,
-        topic_kind: "core",
-        ref_id: topic.id,
-        topic_code: topic.code,
-        topic_title: topic.title,
-        dspd_letter: topic.dspd_letter,
-        attestation_statement: topic.attestation_statement,
-        typed_signature: sig,
-      });
-      if (insErr) throw insErr;
-      const { error: progErr } = await supabase.from("training_topic_progress").upsert(
-        { user_id: user.id, topic_kind: "core", ref_id: topic.id, status: "completed", updated_at: new Date().toISOString() },
-        { onConflict: "user_id,topic_kind,ref_id" },
-      );
-      if (progErr) throw progErr;
-    },
+    mutationFn: () => persistCompletion(signature),
     onSuccess: () => {
       toast.success("Training completed — record saved.");
-      qc.invalidateQueries({ queryKey: ["my-core-progress"] });
-      qc.invalidateQueries({ queryKey: ["my-core-progress-count"] });
-      qc.invalidateQueries({ queryKey: ["topic-progress"] });
       navigate({ to: "/dashboard/courses/core" });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // Find rich content from the bundled engine registry (by DSPD letter, or
+  // by slug→letter fallback for topics whose dspd_letter isn't populated).
+  const SLUG_TO_LETTER: Record<string, string> = {
+    call_911: "A", call_medical: "B", call_mental_health: "C", incident_reporting: "D",
+    seizure_disorders: "E", whereabouts_unknown: "F", choking_rescue: "G", choking_prevention: "H",
+    positive_behavior_supports: "I", legal_rights_ada: "J", ane_reporting: "K", hipaa_confidentiality: "L",
+    idrc_abi_orientation: "M", communicable_disease: "N", person_specific: "O", agency_policies: "P",
+    dspd_philosophy: "Q", dhhs_medicaid_101: "R", oig_fraud_reporting: "S", hcbs_settings_rule: "T",
+    crisis_deescalation: "U", trauma_informed: "V", suicide_prevention: "W",
+  };
+  const engineTopic = useMemo(() => {
+    if (!topic) return null;
+    const letter = (topic.dspd_letter || SLUG_TO_LETTER[topic.code ?? ""] || "").toUpperCase();
+    if (!letter) return null;
+    return TRAINING_TOPICS.find((t) => t.code.toUpperCase() === letter && t.status === "ready" && t.steps?.length) || null;
+  }, [topic]);
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading topic…</p>;
   if (!topic)
@@ -108,6 +128,43 @@ function TopicPlayer() {
 
   const isCompleted = progress?.status === "completed";
 
+  // Rich engine path — replaces the Mindsmith iframe + manual attestation
+  // when we have full lesson content for this topic.
+  if (engineTopic) {
+    return (
+      <div className="-mx-4 -my-5 flex h-full min-h-[calc(100dvh-9rem)] flex-col bg-[#eef0f5] md:min-h-[600px]">
+        <header className="flex items-center justify-between border-b border-border bg-card px-4 py-2.5">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0">
+            <Link to="/dashboard/courses/core">
+              <ArrowLeft className="mr-1 h-4 w-4" /> Core Training
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/dashboard/ask-nectar">
+              <Sparkles className="mr-1 h-4 w-4" /> Ask Nectar
+            </Link>
+          </Button>
+        </header>
+        <div className="flex-1 overflow-y-auto px-3 py-5">
+          <TrainingModule
+            topic={engineTopic}
+            onExit={() => navigate({ to: "/dashboard/courses/core" })}
+            onComplete={async (sig) => {
+              try {
+                await persistCompletion(sig);
+                toast.success("Training completed — record saved.");
+              } catch (e) {
+                toast.error((e as Error).message);
+                throw e;
+              }
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback: Mindsmith iframe or empty-state with manual attestation
   return (
     <div className="-mx-4 -my-5 flex h-full min-h-[calc(100dvh-9rem)] flex-col bg-background md:min-h-[600px]">
       <header className="border-b border-border bg-card px-4 py-3">

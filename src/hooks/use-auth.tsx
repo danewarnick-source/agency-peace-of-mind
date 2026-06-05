@@ -19,6 +19,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let prevUserId: string | null | undefined = undefined;
+    const clearPortalRoutingState = () => {
+      // Routing-only preferences. Anything that decides which dashboard
+      // surface the user lands on must NOT survive a logout or an account
+      // switch — otherwise a stale `hive_exec` view from the previous
+      // session races the fresh executive check on next login and the
+      // dashboard shell flips between /dashboard and /dashboard/hive-exec
+      // repeatedly. Non-routing prefs (active org, etc.) are left intact.
+      try {
+        window.localStorage.removeItem("portal-view");
+        window.localStorage.removeItem("portal-view-state-code");
+        window.localStorage.removeItem("portal-view-state-sub");
+        window.dispatchEvent(new Event("portal-view-change"));
+      } catch { /* ignore */ }
+    };
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       setLoading(false);
@@ -28,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (prevUserId !== undefined && prevUserId !== nextUserId) {
         queryClient.cancelQueries();
         queryClient.clear();
+        clearPortalRoutingState();
         router.invalidate();
       }
       prevUserId = nextUserId;

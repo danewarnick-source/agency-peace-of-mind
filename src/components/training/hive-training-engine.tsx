@@ -1799,7 +1799,15 @@ function Check({ step, onPass }: { step: CheckStep; onPass: () => void }) {
 }
 
 /* ───────────────────────── Module engine ───────────────────────── */
-function TrainingModule({ topic, onExit }: { topic: Topic; onExit: () => void }) {
+export function TrainingModule({
+  topic,
+  onExit,
+  onComplete,
+}: {
+  topic: Topic;
+  onExit: () => void;
+  onComplete?: (signature: string) => Promise<void> | void;
+}) {
   const flow: ({ type: "intro" } | Step | { type: "attest" } | { type: "complete" })[] =
     [{ type: "intro" }, ...(topic.steps || []), { type: "attest" }, { type: "complete" }];
   const checks = (topic.steps || []).filter(s => s.type === "check").length;
@@ -1807,9 +1815,20 @@ function TrainingModule({ topic, onExit }: { topic: Topic; onExit: () => void })
   const [i, setI] = useState(0);
   const [name, setName] = useState("");
   const [agree, setAgree] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const step = flow[i] as any;
   const pct = Math.round((i / (flow.length - 1)) * 100);
   const next = () => setI(i + 1), back = () => setI(i - 1);
+  const submitAttestAndContinue = async () => {
+    if (submitting) return;
+    try {
+      setSubmitting(true);
+      if (onComplete) await onComplete(name.trim());
+      setI(i + 1);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", ...card }}>

@@ -110,7 +110,7 @@ export function TrainingRecordsAdmin() {
     queryFn: async (): Promise<Completion[]> => {
       const { data } = await supabase
         .from("training_completions")
-        .select("id, user_id, topic_kind, ref_id, topic_code, topic_title, dspd_letter, attestation_statement, typed_signature, completed_at, is_current")
+        .select("id, user_id, topic_kind, ref_id, topic_code, topic_title, dspd_letter, attestation_statement, typed_signature, completed_at, is_current, signer_full_name, signer_email, consent_statement, consent_accepted, content_version, ip_address, user_agent, time_zone, content_hash")
         .in("user_id", memberIds)
         .eq("is_current", true)
         .order("completed_at", { ascending: false });

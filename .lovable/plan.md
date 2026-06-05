@@ -1,80 +1,34 @@
-## Root cause
+## Diagnosis
+The most likely remaining loop is in the dashboard shell, not the HIVE Overview page itself.
 
-Dane is both a `super_admin` of an org AND a HIVE Executive, and his browser has `portal-view=hive_exec` persisted in localStorage from a prior session.
+- `src/routes/dashboard.tsx` still reconciles the current route against `rawView`.
+- `src/hooks/use-portal-view.ts` initializes `view` to `"staff"` and only restores the persisted `portal-view` from local storage in an effect after mount.
+- For a user like Dane with persisted `portal-view = "hive_exec"`, the first render can still look like `staff` before hydration finishes.
+- That means the dashboard shell can briefly treat `/dashboard/hive-exec` as the wrong route and force navigation away, then flip back once the persisted view is restored. That presents as repeated refresh/reload behavior.
 
-In `src/routes/dashboard.tsx` (lines ~125–184) the layout computes:
+The earlier fix covered executive-permission loading, but not portal-view hydration timing.
 
-```ts
-const allowedViews: PV[] = ["staff"];
-if (isAdminCapable) allowedViews.push("admin", "staff_mobile");
-if (isExecutive)    allowedViews.push("hive_exec", "state_preview");   // ← gated on isExecutive
-const rawView = allowedViews.includes(view) ? view : "staff";
-const isHiveExecView = rawView === "hive_exec";
-```
+## Plan
+1. **Make portal-view hydration explicit**
+   - Update `src/hooks/use-portal-view.ts` to expose a `hydrated`/`ready` flag once local storage has been read.
+   - Keep the persisted portal view as the single source of truth; do not change security, org access, or executive checks.
 
-and a reconciler effect:
+2. **Gate dashboard reconciliation on portal readiness**
+   - Update `src/routes/dashboard.tsx` so it does not run the view↔route reconciliation effect until both are true:
+     - executive status is resolved
+     - portal view has hydrated from storage
+   - Extend the dashboard loading guard so it does not render the wrong shell/view for one frame while portal state is still restoring.
 
-```ts
-useEffect(() => {
-  if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) navigate({ to: "/dashboard/hive-exec" });
-  else if (!isHiveExecView && !isStatePreview && pathname.startsWith("/dashboard/hive-exec")) navigate({ to: "/dashboard" });
-}, [isHiveExecView, isStatePreview, pathname, navigate]);
-```
+3. **Keep the HIVE Executive route stable during login boot**
+   - Ensure the dashboard shell does not redirect away from `/dashboard/hive-exec` during the login/bootstrap window just because the pre-hydration default is `staff`.
+   - Leave `RequireHiveExecutive`, org membership logic, auth clearing, and security boundaries unchanged.
 
-`isExecutive` comes from `useIsHiveExecutive()`, which returns `false` whenever the query is **loading** (initial fetch, refetch after `queryClient.clear()` in `use-auth`, window-focus refetch, etc.).
+4. **Validate the exact user flow**
+   - Sign in as Dane in preview.
+   - Confirm the app settles on `/dashboard/hive-exec` without repeated reloads.
+   - Confirm the HIVE Overview renders steadily (header, executive tabs, KPI row, and company list), with no bounce back to `/dashboard`.
 
-Sequence on login:
-1. Mount: `view="staff"` (initial). Render at `/dashboard` → caseload.
-2. `usePortalView` effect reads localStorage → `view="hive_exec"`.
-3. Exec query still loading → `isExecutive=false` → `hive_exec` is stripped from `allowedViews` → `rawView` falls back to `"staff"` → `isHiveExecView=false`. Still on `/dashboard`. Caseload renders.
-4. Exec query resolves true → `isHiveExecView=true` → effect redirects to `/dashboard/hive-exec` → HIVE Overview renders.
-5. `useAuth`'s `onAuthStateChange` (TOKEN_REFRESHED, second `INITIAL_SESSION`, or any user-id transition during boot) calls `queryClient.clear()` → exec query is dropped → `isExecutive=false` again → `isHiveExecView=false` → effect sees we're on `/dashboard/hive-exec` and bounces back to `/dashboard` → caseload renders.
-6. Exec query resolves true again → back to HIVE Overview. Loop.
-
-The reconciler does not consider the loading state of the executive check, so every flicker of `isExecutive` causes a real navigation, and the page oscillates.
-
-## Fix
-
-Treat the executive check's loading state as "undetermined" and do not reconcile view↔route while it's unknown. Frontend-only; no RLS/security/data changes.
-
-### Edits
-
-**1. `src/routes/dashboard.tsx`**
-
-- Destructure `isLoading` from `useIsHiveExecutive` (rename to `execLoading` locally).
-- While `execLoading` is true, treat `hive_exec` and `state_preview` as still allowed in `allowedViews` (preserve the persisted view instead of demoting to staff), OR equivalently skip the reconciler effect entirely until known.
-- Gate the reconciliation effect on `!execLoading`:
-
-  ```ts
-  useEffect(() => {
-    if (execLoading) return;
-    if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) {
-      navigate({ to: "/dashboard/hive-exec" });
-    } else if (!isHiveExecView && !isStatePreview && pathname.startsWith("/dashboard/hive-exec")) {
-      navigate({ to: "/dashboard" });
-    }
-  }, [execLoading, isHiveExecView, isStatePreview, pathname, navigate]);
-  ```
-
-- Also include `execLoading` in the initial `Loading…` gate so the layout doesn't render a "wrong" sidebar/page for one frame on first load when the persisted view is `hive_exec`/`state_preview`:
-
-  ```ts
-  if (loading || !session || execLoading) {
-    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
-  }
-  ```
-
-That eliminates the flicker: the route is only changed once the executive status is known, and any later refetch of the exec query keeps the cached `true` (react-query keeps `data` during background refetches), so `isExecutive` won't flap.
-
-### Out of scope
-
-- No changes to `useIsHiveExecutive`, `useAuth`, `useCurrentOrg`, or `RequireHiveExecutive`.
-- No changes to RLS, server functions, HR/PII gating, or the registry.
-- Don't clear the user's persisted `portal-view`; we just stop reacting to it before we know the user's executive status.
-
-## Verification
-
-1. Sign in as `danewarnick@gmail.com`.
-2. Expect: a brief "Loading…" → land directly on **HIVE Overview** (because his persisted view is `hive_exec`) with no flicker back to My Caseload. If his persisted view is staff/admin, lands there with no flicker.
-3. Switch portal view back and forth via the sidebar switcher — still works (the reconciler still runs once exec status is known).
-4. Sign out and sign in as a non-executive user → no HIVE pages ever appear; lands on the role-appropriate dashboard.
+## Technical notes
+- Files expected: `src/hooks/use-portal-view.ts`, `src/routes/dashboard.tsx`
+- No changes planned to RLS, data access, org switching, auth policies, or HR/security gating.
+- If a second trigger appears during validation, the next place to inspect would be login-time navigation (`src/routes/login.tsx`) only after the portal hydration fix is proven insufficient.

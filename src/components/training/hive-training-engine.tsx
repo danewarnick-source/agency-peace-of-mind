@@ -1924,45 +1924,5 @@ export function TrainingModule({
   );
 }
 
-/* ───────────────────────── Training center (index) ───────────────────────── */
-export default function TrainingCenter() {
-  const [active, setActive] = useState<Topic | null>(null);
-  if (active) return <div style={{ padding: "26px 14px", background: "#eef0f5", minHeight: "100vh" }}><TrainingModule topic={active} onExit={() => setActive(null)} /></div>;
+export type { Topic, Step, LessonStep, CheckStep, Callout, Fact };
 
-  const cats = Array.from(new Set(TRAINING_TOPICS.map(t => t.category)));
-  const ready = TRAINING_TOPICS.filter(t => t.status === "ready").length;
-  const total = TRAINING_TOPICS.filter(t => t.code !== "O").length;
-
-  return (
-    <div style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", padding: "26px 14px", background: "#eef0f5", minHeight: "100vh", color: "#2a3040" }}>
-      <div style={card}>
-        <div style={{ background: NAVY, padding: "14px 18px", display: "flex", alignItems: "center", gap: 9 }}>
-          <span style={{ width: 26, height: 26, background: GOLD, clipPath: "polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)" }} />
-          <div><div style={{ color: GOLD, fontSize: 10, fontWeight: 600, letterSpacing: ".1em" }}>Hive Launchpad · 30-day core</div><div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>Required training</div></div>
-        </div>
-        <div style={{ padding: 20 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: INK }}>30-day core training</div>
-          <div style={{ fontSize: 12.5, color: "#8a8f9e", margin: "3px 0 16px" }}>Required before working alone with persons · {ready} of {total} modules built</div>
-          {cats.map(cat => (
-            <div key={cat}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".08em", margin: "16px 0 8px" }}>{cat}</div>
-              {TRAINING_TOPICS.filter(t => t.category === cat).map(t => {
-                const ready = t.status === "ready";
-                return (
-                  <button key={t.code} disabled={!ready} onClick={() => ready && setActive(t)}
-                    style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", font: "inherit", background: "#fff", border: "1px solid #e4e7ef", borderRadius: 12, padding: "11px 13px", marginBottom: 8, cursor: ready ? "pointer" : "default", opacity: ready ? 1 : .72 }}>
-                    <span style={{ width: 26, height: 26, borderRadius: 7, background: "#eef0f5", color: "#1C2A5E", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{t.code}</span>
-                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: "#1a2030" }}>{t.title}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: ready ? "#e1f5ee" : t.status === "pp" ? "#efe7fa" : "#f1f2f6", color: ready ? "#0f6e56" : t.status === "pp" ? "#5b2e9c" : "#9aa0b0" }}>
-                      {ready ? "Start" : t.status === "pp" ? "Per person" : "In development"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}

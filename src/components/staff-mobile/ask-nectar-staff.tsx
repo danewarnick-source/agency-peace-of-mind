@@ -204,9 +204,11 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
         <div
           ref={scrollRef}
           className="flex-1 min-h-0 space-y-3 overflow-y-auto overscroll-contain px-4 py-3"
-          style={{
-            paddingBottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom) + 5.5rem)`,
-          }}
+          style={
+            composerMount
+              ? { paddingBottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom) + 5.5rem)` }
+              : undefined
+          }
         >
           {isEmpty && (
             <div className="space-y-3">

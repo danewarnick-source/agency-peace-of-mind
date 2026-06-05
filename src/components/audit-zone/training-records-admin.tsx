@@ -5,7 +5,8 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, Circle, Loader2, Printer, GraduationCap, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { CheckCircle2, Circle, Loader2, Printer, GraduationCap, Search, FileSignature } from "lucide-react";
 
 type Topic = {
   id: string;
@@ -28,6 +29,15 @@ type Completion = {
   typed_signature: string;
   completed_at: string;
   is_current: boolean;
+  signer_full_name: string | null;
+  signer_email: string | null;
+  consent_statement: string | null;
+  consent_accepted: boolean | null;
+  content_version: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  time_zone: string | null;
+  content_hash: string | null;
 };
 
 type PersonModule = { id: string; title: string; user_id: string };

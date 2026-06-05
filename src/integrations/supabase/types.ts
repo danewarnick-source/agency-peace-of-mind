@@ -5959,40 +5959,67 @@ export type Database = {
         Row: {
           attestation_statement: string
           completed_at: string
+          consent_accepted: boolean
+          consent_statement: string | null
+          content_hash: string | null
+          content_version: string | null
           dspd_letter: string | null
           id: string
+          ip_address: string | null
           is_current: boolean
           ref_id: string
+          signer_email: string | null
+          signer_full_name: string | null
+          time_zone: string | null
           topic_code: string | null
           topic_kind: Database["public"]["Enums"]["training_topic_kind"]
           topic_title: string
           typed_signature: string
+          user_agent: string | null
           user_id: string
         }
         Insert: {
           attestation_statement: string
           completed_at?: string
+          consent_accepted?: boolean
+          consent_statement?: string | null
+          content_hash?: string | null
+          content_version?: string | null
           dspd_letter?: string | null
           id?: string
+          ip_address?: string | null
           is_current?: boolean
           ref_id: string
+          signer_email?: string | null
+          signer_full_name?: string | null
+          time_zone?: string | null
           topic_code?: string | null
           topic_kind: Database["public"]["Enums"]["training_topic_kind"]
           topic_title: string
           typed_signature: string
+          user_agent?: string | null
           user_id: string
         }
         Update: {
           attestation_statement?: string
           completed_at?: string
+          consent_accepted?: boolean
+          consent_statement?: string | null
+          content_hash?: string | null
+          content_version?: string | null
           dspd_letter?: string | null
           id?: string
+          ip_address?: string | null
           is_current?: boolean
           ref_id?: string
+          signer_email?: string | null
+          signer_full_name?: string | null
+          time_zone?: string | null
           topic_code?: string | null
           topic_kind?: Database["public"]["Enums"]["training_topic_kind"]
           topic_title?: string
           typed_signature?: string
+          user_agent?: string | null
           user_id?: string
         }
         Relationships: []

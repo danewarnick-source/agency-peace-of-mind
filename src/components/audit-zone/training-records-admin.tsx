@@ -5,7 +5,8 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, Circle, Loader2, Printer, GraduationCap, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { CheckCircle2, Circle, Loader2, Printer, GraduationCap, Search, FileSignature } from "lucide-react";
 
 type Topic = {
   id: string;
@@ -28,6 +29,15 @@ type Completion = {
   typed_signature: string;
   completed_at: string;
   is_current: boolean;
+  signer_full_name: string | null;
+  signer_email: string | null;
+  consent_statement: string | null;
+  consent_accepted: boolean | null;
+  content_version: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  time_zone: string | null;
+  content_hash: string | null;
 };
 
 type PersonModule = { id: string; title: string; user_id: string };
@@ -100,7 +110,7 @@ export function TrainingRecordsAdmin() {
     queryFn: async (): Promise<Completion[]> => {
       const { data } = await supabase
         .from("training_completions")
-        .select("id, user_id, topic_kind, ref_id, topic_code, topic_title, dspd_letter, attestation_statement, typed_signature, completed_at, is_current")
+        .select("id, user_id, topic_kind, ref_id, topic_code, topic_title, dspd_letter, attestation_statement, typed_signature, completed_at, is_current, signer_full_name, signer_email, consent_statement, consent_accepted, content_version, ip_address, user_agent, time_zone, content_hash")
         .in("user_id", memberIds)
         .eq("is_current", true)
         .order("completed_at", { ascending: false });
@@ -290,6 +300,7 @@ function StaffRecordTable({
   completions: Completion[];
   statusFilter: "all" | "completed" | "in_progress" | "not_started";
 }) {
+  const [openRecord, setOpenRecord] = useState<Completion | null>(null);
   const progressMap = useMemo(() => {
     const m = new Map<string, Progress["status"]>();
     progress.forEach((p) => m.set(`${p.topic_kind}:${p.ref_id}`, p.status));
@@ -302,7 +313,6 @@ function StaffRecordTable({
     return m;
   }, [completions]);
 
-  // DSPD a–n ordered first using dspd_letter; then person modules under (o); then extras
   const dspdTopics = DSPD_ORDER.map((letter) => topics.find((t) => t.dspd_letter === letter)).filter(
     (t): t is Topic => !!t,
   );
@@ -371,6 +381,13 @@ function StaffRecordTable({
         </td>
         <td className="py-2 pr-3 text-xs font-medium">
           {completion?.typed_signature ?? "—"}
+        </td>
+        <td className="py-2 pr-3 text-right">
+          {completion && (
+            <Button size="sm" variant="outline" onClick={() => setOpenRecord(completion)}>
+              <FileSignature className="mr-1 h-3.5 w-3.5" /> View record
+            </Button>
+          )}
         </td>
       </tr>
     );

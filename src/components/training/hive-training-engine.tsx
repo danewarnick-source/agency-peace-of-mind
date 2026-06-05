@@ -2005,7 +2005,7 @@ export function TrainingModule({
           </>
         )}
 
-        {step.type === "check" && <Check step={step as CheckStep} onPass={next} />}
+        {step.type === "check" && <Check step={step as CheckStep} onPass={next} speaking={speaking} onSpeak={speakCurrentCheck} onStop={stop} />}
 
         {step.type === "attest" && (
           <>

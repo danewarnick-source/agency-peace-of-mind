@@ -90,7 +90,7 @@ function PersonSpecificList() {
             return (
               <li key={m.id}>
                 <Link
-                  to="/dashboard/courses/person/$assignmentId"
+                  to="/dashboard/courses/person-module/$assignmentId"
                   params={{ assignmentId: m.id }}
                   className="flex items-center gap-3 px-3 py-2.5 transition hover:bg-muted/40"
                 >

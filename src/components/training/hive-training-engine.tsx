@@ -1876,6 +1876,50 @@ export function TrainingModule({
   const [submitting, setSubmitting] = useState(false);
   const step = flow[i] as any;
   const pct = Math.round((i / Math.max(1, flow.length - 1)) * 100);
+
+  // ── Read aloud (on-device Web Speech only) ──
+  const { supported: ttsSupported, speaking, speak, stop } = useTrainingSpeech();
+  const [autoRead, setAutoReadState] = useState<boolean>(() => getSessionAutoRead());
+  const [showOptIn, setShowOptIn] = useState<boolean>(false);
+  const [openDrop, setOpenDrop] = useState<number | null>(null);
+  const setAutoRead = (on: boolean) => { setAutoReadState(on); setSessionAutoRead(on); if (!on) stop(); };
+
+  // Show the opt-in once per topic open, only on the intro step, only if
+  // they haven't already turned it on in this session.
+  useEffect(() => {
+    if (ttsSupported && !autoRead) setShowOptIn(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttsSupported, topic.code]);
+
+  // Reset the expanded "Go further" drop and stop any speech when the slide changes.
+  useEffect(() => {
+    setOpenDrop(null);
+    stop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i]);
+
+  // Auto-read the current slide if the staff member opted in.
+  useEffect(() => {
+    if (!autoRead || !ttsSupported) return;
+    if (step?.type === "lesson") {
+      const text = buildLessonSpeech(step, null);
+      if (text) speak(text);
+    } else if (step?.type === "check") {
+      const text = buildCheckSpeech(step);
+      if (text) speak(text);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i, autoRead]);
+
+  const speakCurrentLesson = () => {
+    const text = buildLessonSpeech(step, openDrop);
+    if (text) speak(text);
+  };
+  const speakCurrentCheck = () => {
+    const text = buildCheckSpeech(step);
+    if (text) speak(text);
+  };
+
   const next = () => setI(i + 1), back = () => setI(i - 1);
   const canSign = agree && esignConsent && name.trim().length > 1;
   const submitAttestAndContinue = async () => {

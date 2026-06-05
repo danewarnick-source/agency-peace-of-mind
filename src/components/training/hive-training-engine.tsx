@@ -6,7 +6,14 @@
 // every topic then automatically gets the same lessons / dropdowns /
 // knowledge-checks / attestation flow.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  useTrainingSpeech,
+  getSessionAutoRead,
+  setSessionAutoRead,
+  buildLessonSpeech,
+  buildCheckSpeech,
+} from "./use-training-speech";
 
 /* ───────────────────────── Types ───────────────────────── */
 type Callout = { v: "info" | "crit"; t: string; b: string };
@@ -1752,29 +1759,57 @@ const btn = (kind: "pri" | "out" | "dis"): React.CSSProperties => ({
   background: kind === "pri" ? GOLD : kind === "dis" ? "#eef0f5" : "#fff", color: kind === "pri" ? NAVY : kind === "dis" ? "#a3a8b8" : "#1C2A5E",
 });
 
-function Accordion({ drops }: { drops: [string, string][] }) {
-  const [open, setOpen] = useState<number | null>(null);
+function Accordion({ drops, open, onOpenChange }: { drops: [string, string][]; open?: number | null; onOpenChange?: (n: number | null) => void }) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState<number | null>(null);
+  const isControlled = open !== undefined;
+  const value = isControlled ? open! : uncontrolledOpen;
+  const set = (n: number | null) => { if (isControlled) { onOpenChange?.(n); } else { setUncontrolledOpen(n); } };
   return (
     <div>
       {drops.map(([t, b], i) => (
         <div key={i}>
-          <button onClick={() => setOpen(open === i ? null : i)} style={{ width: "100%", textAlign: "left", font: "inherit", fontSize: 13, fontWeight: 600, color: "#1C2A5E", background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 10, padding: "11px 13px", marginBottom: 7, cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10 }}>
-            <span>{t}</span><span>{open === i ? "\u25B4" : "\u25BE"}</span>
+          <button onClick={() => set(value === i ? null : i)} style={{ width: "100%", textAlign: "left", font: "inherit", fontSize: 13, fontWeight: 600, color: "#1C2A5E", background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 10, padding: "11px 13px", marginBottom: 7, cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10 }}>
+            <span>{t}</span><span>{value === i ? "\u25B4" : "\u25BE"}</span>
           </button>
-          {open === i && <div style={{ fontSize: 12.8, color: "#42485a", lineHeight: 1.6, padding: "2px 4px 12px" }} dangerouslySetInnerHTML={{ __html: b }} />}
+          {value === i && <div style={{ fontSize: 12.8, color: "#42485a", lineHeight: 1.6, padding: "2px 4px 12px" }} dangerouslySetInnerHTML={{ __html: b }} />}
         </div>
       ))}
     </div>
   );
 }
 
-function Check({ step, onPass }: { step: CheckStep; onPass: () => void }) {
+function SpeakerButton({ speaking, onClick, label }: { speaking: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        font: "inherit", fontSize: 11.5, fontWeight: 600,
+        background: speaking ? "#137182" : "#fff",
+        color: speaking ? "#fff" : "#137182",
+        border: "1px solid #137182",
+        borderRadius: 999, padding: "5px 10px", cursor: "pointer",
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>{speaking ? "\u25A0" : "\u{1F50A}"}</span>
+      <span>{speaking ? "Stop" : "Read aloud"}</span>
+    </button>
+  );
+}
+
+function Check({ step, onPass, speaking, onSpeak, onStop }: { step: CheckStep; onPass: () => void; speaking: boolean; onSpeak: () => void; onStop: () => void }) {
   const [done, setDone] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const chosen = step.options.find(o => o.k === picked);
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#b07819" }}>{step.kicker}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#b07819" }}>{step.kicker}</div>
+        <SpeakerButton speaking={speaking} onClick={speaking ? onStop : onSpeak} label="Read this slide aloud" />
+      </div>
       <div style={{ fontSize: 15.5, fontWeight: 600, color: INK, margin: "5px 0 14px", lineHeight: 1.4 }}>{step.stem}</div>
       {step.options.map(o => {
         const isPicked = picked === o.k;
@@ -1841,6 +1876,50 @@ export function TrainingModule({
   const [submitting, setSubmitting] = useState(false);
   const step = flow[i] as any;
   const pct = Math.round((i / Math.max(1, flow.length - 1)) * 100);
+
+  // ── Read aloud (on-device Web Speech only) ──
+  const { supported: ttsSupported, speaking, speak, stop } = useTrainingSpeech();
+  const [autoRead, setAutoReadState] = useState<boolean>(() => getSessionAutoRead());
+  const [showOptIn, setShowOptIn] = useState<boolean>(false);
+  const [openDrop, setOpenDrop] = useState<number | null>(null);
+  const setAutoRead = (on: boolean) => { setAutoReadState(on); setSessionAutoRead(on); if (!on) stop(); };
+
+  // Show the opt-in once per topic open, only on the intro step, only if
+  // they haven't already turned it on in this session.
+  useEffect(() => {
+    if (ttsSupported && !autoRead) setShowOptIn(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttsSupported, topic.code]);
+
+  // Reset the expanded "Go further" drop and stop any speech when the slide changes.
+  useEffect(() => {
+    setOpenDrop(null);
+    stop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i]);
+
+  // Auto-read the current slide if the staff member opted in.
+  useEffect(() => {
+    if (!autoRead || !ttsSupported) return;
+    if (step?.type === "lesson") {
+      const text = buildLessonSpeech(step, null);
+      if (text) speak(text);
+    } else if (step?.type === "check") {
+      const text = buildCheckSpeech(step);
+      if (text) speak(text);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i, autoRead]);
+
+  const speakCurrentLesson = () => {
+    const text = buildLessonSpeech(step, openDrop);
+    if (text) speak(text);
+  };
+  const speakCurrentCheck = () => {
+    const text = buildCheckSpeech(step);
+    if (text) speak(text);
+  };
+
   const next = () => setI(i + 1), back = () => setI(i - 1);
   const canSign = agree && esignConsent && name.trim().length > 1;
   const submitAttestAndContinue = async () => {
@@ -1871,6 +1950,39 @@ export function TrainingModule({
       </div>
       <div style={{ height: 5, background: "#eef0f5" }}><div style={{ height: "100%", width: pct + "%", background: GOLD, transition: "width .35s" }} /></div>
 
+      {ttsSupported && (
+        <div style={{ background: "#f7f8fb", borderBottom: "1px solid #e4e7ef", padding: "8px 17px", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 11.5, color: "#5b6172" }}>Auto read-aloud</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoRead}
+            onClick={() => setAutoRead(!autoRead)}
+            style={{
+              width: 38, height: 22, borderRadius: 999, border: "1px solid #cdd2e0",
+              background: autoRead ? TEAL : "#fff", position: "relative", cursor: "pointer", padding: 0,
+            }}
+          >
+            <span style={{
+              position: "absolute", top: 2, left: autoRead ? 18 : 2,
+              width: 16, height: 16, borderRadius: "50%", background: "#fff",
+              boxShadow: "0 1px 2px rgba(0,0,0,.2)", transition: "left .15s",
+            }} />
+          </button>
+        </div>
+      )}
+
+      {ttsSupported && showOptIn && !autoRead && step.type === "intro" && (
+        <div style={{ background: "#eaf3fc", borderBottom: "1px solid #b9d6f2", color: "#1c4e80", fontSize: 12.5, padding: "10px 17px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span>Would you like this training read aloud?</span>
+          <span style={{ display: "flex", gap: 8 }}>
+            <button style={{ ...btn("pri"), padding: "6px 12px", fontSize: 12 }} onClick={() => { setAutoRead(true); setShowOptIn(false); }}>Yes, read aloud</button>
+            <button style={{ ...btn("out"), padding: "6px 12px", fontSize: 12 }} onClick={() => setShowOptIn(false)}>No thanks</button>
+            <button aria-label="Dismiss" onClick={() => setShowOptIn(false)} style={{ background: "transparent", border: 0, color: "#1c4e80", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px" }}>{"\u00D7"}</button>
+          </span>
+        </div>
+      )}
+
       {readOnly && (
         <div style={{ background: "#e1f5ee", borderBottom: "1px solid #9fe1cb", color: "#0f6e56", fontSize: 12.5, padding: "10px 17px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <span>
@@ -1898,7 +2010,10 @@ export function TrainingModule({
 
         {step.type === "lesson" && (
           <>
-            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: TEAL }}>{step.kicker}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: TEAL }}>{step.kicker}</div>
+              {ttsSupported && <SpeakerButton speaking={speaking} onClick={speaking ? stop : speakCurrentLesson} label="Read this slide aloud" />}
+            </div>
             <div style={{ fontSize: 21, fontWeight: 700, color: INK, margin: "3px 0 8px" }}>{step.title}</div>
             {step.lead && <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 13 }}>{step.lead}</div>}
             {step.callout && (
@@ -1914,7 +2029,7 @@ export function TrainingModule({
               </div>
             ))}
             {step.dropHeading && <div style={{ fontSize: 11, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".06em", margin: "16px 0 9px" }}>{step.dropHeading}</div>}
-            {step.drops && <Accordion drops={step.drops} />}
+            {step.drops && <Accordion drops={step.drops} open={openDrop} onOpenChange={setOpenDrop} />}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
               <button style={btn("out")} onClick={back}>Back</button>
               {i < flow.length - 1 ? (
@@ -1926,7 +2041,7 @@ export function TrainingModule({
           </>
         )}
 
-        {step.type === "check" && <Check step={step as CheckStep} onPass={next} />}
+        {step.type === "check" && <Check step={step as CheckStep} onPass={next} speaking={speaking} onSpeak={speakCurrentCheck} onStop={stop} />}
 
         {step.type === "attest" && (
           <>

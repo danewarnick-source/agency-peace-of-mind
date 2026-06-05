@@ -6,10 +6,11 @@ import { ComplianceDeskWrapped } from "./dashboard.compliance-desk";
 import { HostHomeControl } from "./dashboard.host-home-control";
 import { AuditZone } from "@/components/audit-zone/audit-zone";
 import { TrainingRecordsAdmin } from "@/components/audit-zone/training-records-admin";
+import { TrainingContentAdmin } from "@/components/audit-zone/training-content-admin";
 
 const recordsDeskSearch = z.object({
   tab: z
-    .enum(["command-center", "evv-timesheets", "host-home", "audit-zone", "training-records"])
+    .enum(["command-center", "evv-timesheets", "host-home", "audit-zone", "training-records", "training-content"])
     .optional(),
   /** Inner Command Center tab (forwarded from deep-links). */
   cc: z.enum(["urgent", "pending", "approved", "analytics", "nectar"]).optional(),

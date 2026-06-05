@@ -1791,7 +1791,7 @@ function Check({ step, onPass }: { step: CheckStep; onPass: () => void }) {
       {chosen && chosen.correct && (
         <>
           <div style={{ fontSize: 12.5, color: "#0f6e56", background: "#e1f5ee", border: "1px solid #9fe1cb", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>{chosen.fb}</div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}><button style={btn("pri")} onClick={onPass}>Continue \u2192</button></div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}><button style={btn("pri")} onClick={onPass}>Continue</button></div>
         </>
       )}
     </div>
@@ -1848,8 +1848,8 @@ export function TrainingModule({
             <div style={{ fontSize: 12, color: "#8a8f9e", marginBottom: 14 }}>About {topic.estMin} minutes · {lessons} lessons, {checks} scenarios, then you sign</div>
             <div style={{ background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 12, padding: "13px 14px", fontSize: 13.5, lineHeight: 1.6 }}>{topic.intro}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
-              <button style={btn("out")} onClick={onExit}>\u2190 All topics</button>
-              <button style={btn("pri")} onClick={next}>Begin \u2192</button>
+              <button style={btn("out")} onClick={onExit}>All topics</button>
+              <button style={btn("pri")} onClick={next}>Begin</button>
             </div>
           </>
         )}
@@ -1874,8 +1874,8 @@ export function TrainingModule({
             {step.dropHeading && <div style={{ fontSize: 11, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".06em", margin: "16px 0 9px" }}>{step.dropHeading}</div>}
             {step.drops && <Accordion drops={step.drops} />}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
-              <button style={btn("out")} onClick={back}>\u2190 Back</button>
-              <button style={btn("pri")} onClick={next}>Continue \u2192</button>
+              <button style={btn("out")} onClick={back}>Back</button>
+              <button style={btn("pri")} onClick={next}>Continue</button>
             </div>
           </>
         )}
@@ -1895,7 +1895,7 @@ export function TrainingModule({
               <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Jordan Rivera" style={{ width: "100%", boxSizing: "border-box", font: "inherit", fontSize: 13.5, padding: "10px 12px", border: "1px solid #cdd2e0", borderRadius: 10 }} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
-              <button style={btn("out")} onClick={back}>\u2190 Back</button>
+              <button style={btn("out")} onClick={back}>Back</button>
               <button style={btn(agree && name.trim().length > 1 && !submitting ? "pri" : "dis")} disabled={!(agree && name.trim().length > 1) || submitting} onClick={submitAttestAndContinue}>{submitting ? "Saving…" : "Complete topic \u2713"}</button>
             </div>
           </>

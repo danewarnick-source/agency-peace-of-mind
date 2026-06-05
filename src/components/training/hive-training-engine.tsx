@@ -1848,8 +1848,8 @@ export function TrainingModule({
             <div style={{ fontSize: 12, color: "#8a8f9e", marginBottom: 14 }}>About {topic.estMin} minutes · {lessons} lessons, {checks} scenarios, then you sign</div>
             <div style={{ background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 12, padding: "13px 14px", fontSize: 13.5, lineHeight: 1.6 }}>{topic.intro}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
-              <button style={btn("out")} onClick={onExit}>\u2190 All topics</button>
-              <button style={btn("pri")} onClick={next}>Begin \u2192</button>
+              <button style={btn("out")} onClick={onExit}>All topics</button>
+              <button style={btn("pri")} onClick={next}>Begin</button>
             </div>
           </>
         )}

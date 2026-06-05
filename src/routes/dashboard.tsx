@@ -96,7 +96,7 @@ function DashboardLayout() {
   const { session, loading, user } = useAuth();
   const { data: org, isLoading: orgLoading } = useCurrentOrg();
   const { can } = usePermissions();
-  const { view, setView, stateCode, setStateCode, subView, setSubView } = usePortalView();
+  const { view, setView, stateCode, setStateCode, subView, setSubView, hydrated: viewHydrated } = usePortalView();
   const [states, setStates] = useState<PlatformStateLite[]>([]);
   const { isExecutive, isLoading: execLoading } = useIsHiveExecutive();
   const navigate = useNavigate();
@@ -176,24 +176,25 @@ function DashboardLayout() {
   // Keep view and content strictly aligned: leaving HIVE View must also leave
   // /dashboard/hive-exec, and entering HIVE View jumps to the platform landing.
   useEffect(() => {
-    // Don't reconcile view↔route until we know the user's executive status.
-    // While the exec query is loading, `isExecutive` is false, which would
-    // strip `hive_exec` from allowedViews and bounce the user off
-    // /dashboard/hive-exec on every refetch — causing a flicker loop.
-    if (execLoading) return;
+    // Don't reconcile view↔route until we know the user's executive status
+    // AND the persisted portal view has hydrated from localStorage. Otherwise
+    // the default `staff` view briefly bounces the user off
+    // /dashboard/hive-exec on login before hydration restores `hive_exec`,
+    // causing a refresh/reload loop.
+    if (execLoading || !viewHydrated) return;
     if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) {
       navigate({ to: "/dashboard/hive-exec" });
     } else if (!isHiveExecView && !isStatePreview && pathname.startsWith("/dashboard/hive-exec")) {
       navigate({ to: "/dashboard" });
     }
-  }, [execLoading, isHiveExecView, isStatePreview, pathname, navigate]);
+  }, [execLoading, viewHydrated, isHiveExecView, isStatePreview, pathname, navigate]);
 
   const currentPreviewState = isStatePreview
     ? states.find((s) => s.code === stateCode) ?? null
     : null;
   const isComingSoonPreview = isStatePreview && currentPreviewState?.status === "coming_soon";
 
-  if (loading || !session || execLoading) {
+  if (loading || !session || execLoading || !viewHydrated) {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
   }
 

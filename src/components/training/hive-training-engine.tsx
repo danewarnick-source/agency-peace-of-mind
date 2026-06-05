@@ -1977,7 +1977,10 @@ export function TrainingModule({
 
         {step.type === "lesson" && (
           <>
-            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: TEAL }}>{step.kicker}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: TEAL }}>{step.kicker}</div>
+              {ttsSupported && <SpeakerButton speaking={speaking} onClick={speaking ? stop : speakCurrentLesson} label="Read this slide aloud" />}
+            </div>
             <div style={{ fontSize: 21, fontWeight: 700, color: INK, margin: "3px 0 8px" }}>{step.title}</div>
             {step.lead && <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 13 }}>{step.lead}</div>}
             {step.callout && (
@@ -1993,7 +1996,7 @@ export function TrainingModule({
               </div>
             ))}
             {step.dropHeading && <div style={{ fontSize: 11, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".06em", margin: "16px 0 9px" }}>{step.dropHeading}</div>}
-            {step.drops && <Accordion drops={step.drops} />}
+            {step.drops && <Accordion drops={step.drops} open={openDrop} onOpenChange={setOpenDrop} />}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
               <button style={btn("out")} onClick={back}>Back</button>
               {i < flow.length - 1 ? (

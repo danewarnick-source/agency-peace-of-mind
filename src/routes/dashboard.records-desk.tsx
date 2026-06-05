@@ -45,6 +45,7 @@ function RecordsDesk() {
           <TabsTrigger value="evv-timesheets">EVV &amp; Timesheets</TabsTrigger>
           <TabsTrigger value="host-home">Host Home</TabsTrigger>
           <TabsTrigger value="training-records">Training Records</TabsTrigger>
+          <TabsTrigger value="training-content">Training Content</TabsTrigger>
           <TabsTrigger value="audit-zone">Audit Zone</TabsTrigger>
         </TabsList>
         <TabsContent value="command-center" className="mt-4">
@@ -58,6 +59,9 @@ function RecordsDesk() {
         </TabsContent>
         <TabsContent value="training-records" className="mt-4">
           <TrainingRecordsAdmin />
+        </TabsContent>
+        <TabsContent value="training-content" className="mt-4">
+          <TrainingContentAdmin />
         </TabsContent>
         <TabsContent value="audit-zone" className="mt-4">
           <AuditZone />

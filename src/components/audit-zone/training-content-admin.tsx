@@ -382,7 +382,7 @@ function ComposerDialog({
         title: draft.title.trim() || "Training Module",
         intro: draft.intro?.trim() || null,
         est_min: draft.estMin,
-        steps: draft.steps as unknown as object,
+        steps: draft.steps as unknown as any,
         attestation_statement:
           draft.attest?.trim() ||
           "I attest that I have read and understood this training material and will apply it in my role.",

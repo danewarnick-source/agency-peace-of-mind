@@ -1874,8 +1874,8 @@ export function TrainingModule({
             {step.dropHeading && <div style={{ fontSize: 11, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".06em", margin: "16px 0 9px" }}>{step.dropHeading}</div>}
             {step.drops && <Accordion drops={step.drops} />}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
-              <button style={btn("out")} onClick={back}>\u2190 Back</button>
-              <button style={btn("pri")} onClick={next}>Continue \u2192</button>
+              <button style={btn("out")} onClick={back}>Back</button>
+              <button style={btn("pri")} onClick={next}>Continue</button>
             </div>
           </>
         )}

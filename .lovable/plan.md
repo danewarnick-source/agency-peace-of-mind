@@ -1,34 +1,37 @@
-## Diagnosis
-The most likely remaining loop is in the dashboard shell, not the HIVE Overview page itself.
-
-- `src/routes/dashboard.tsx` still reconciles the current route against `rawView`.
-- `src/hooks/use-portal-view.ts` initializes `view` to `"staff"` and only restores the persisted `portal-view` from local storage in an effect after mount.
-- For a user like Dane with persisted `portal-view = "hive_exec"`, the first render can still look like `staff` before hydration finishes.
-- That means the dashboard shell can briefly treat `/dashboard/hive-exec` as the wrong route and force navigation away, then flip back once the persisted view is restored. That presents as repeated refresh/reload behavior.
-
-The earlier fix covered executive-permission loading, but not portal-view hydration timing.
-
 ## Plan
-1. **Make portal-view hydration explicit**
-   - Update `src/hooks/use-portal-view.ts` to expose a `hydrated`/`ready` flag once local storage has been read.
-   - Keep the persisted portal view as the single source of truth; do not change security, org access, or executive checks.
 
-2. **Gate dashboard reconciliation on portal readiness**
-   - Update `src/routes/dashboard.tsx` so it does not run the view↔route reconciliation effect until both are true:
-     - executive status is resolved
-     - portal view has hydrated from storage
-   - Extend the dashboard loading guard so it does not render the wrong shell/view for one frame while portal state is still restoring.
+1. Make dashboard boot state deterministic across logout/login
+- Treat persisted dashboard preferences as session-scoped for routing purposes.
+- Clear or reset the saved portal view when a user signs out or when the authenticated user identity changes, so a stale prior-session `hive_exec` preference cannot steer the next login before fresh auth/org checks finish.
+- Keep any non-routing preferences that should survive untouched.
 
-3. **Keep the HIVE Executive route stable during login boot**
-   - Ensure the dashboard shell does not redirect away from `/dashboard/hive-exec` during the login/bootstrap window just because the pre-hydration default is `staff`.
-   - Leave `RequireHiveExecutive`, org membership logic, auth clearing, and security boundaries unchanged.
+2. Stop using an unconditional login redirect target
+- Replace the current login-page behavior that always navigates authenticated users to `/dashboard`.
+- Route post-login based on confirmed state: auth ready, portal state hydrated, executive status resolved, and current allowed view.
+- Ensure executives can land directly in HIVE Executive when appropriate without a `/dashboard` ↔ `/dashboard/hive-exec` tug-of-war.
 
-4. **Validate the exact user flow**
-   - Sign in as Dane in preview.
-   - Confirm the app settles on `/dashboard/hive-exec` without repeated reloads.
-   - Confirm the HIVE Overview renders steadily (header, executive tabs, KPI row, and company list), with no bounce back to `/dashboard`.
+3. Harden the dashboard shell against cross-session stale view state
+- Update the `/dashboard` layout so route reconciliation only runs after all required bootstrap signals are ready, including the persisted view and any user-scoped reset that happens after logout/login.
+- Prevent the shell from redirecting away from `/dashboard/hive-exec` during the brief window where auth has returned but view/org state is still catching up.
+- Avoid any effect that can keep rewriting the route on every auth/bootstrap pass.
 
-## Technical notes
-- Files expected: `src/hooks/use-portal-view.ts`, `src/routes/dashboard.tsx`
-- No changes planned to RLS, data access, org switching, auth policies, or HR/security gating.
-- If a second trigger appears during validation, the next place to inspect would be login-time navigation (`src/routes/login.tsx`) only after the portal hydration fix is proven insufficient.
+4. Validate the exact failure case
+- Reproduce the sequence: sign in as Dane, sign out, sign back in, and confirm the app settles once.
+- Verify both routes remain stable:
+  - `/dashboard` for non-exec/staff/admin flows
+  - `/dashboard/hive-exec` for executive flow
+- Confirm no repeated full-page refreshes, no bouncing between dashboard surfaces, and no regression in sign-out behavior.
+
+## Technical details
+- Files likely involved:
+  - `src/routes/login.tsx`
+  - `src/routes/dashboard.tsx`
+  - `src/hooks/use-auth.tsx`
+  - `src/hooks/use-portal-view.ts`
+  - `src/hooks/use-org.tsx`
+- Current likely trigger:
+  - `login.tsx` always sends an authenticated user to `/dashboard`.
+  - `use-portal-view.ts` persists `portal-view` across sessions.
+  - `dashboard.tsx` then reconciles the route back toward `/dashboard/hive-exec` when persisted state says `hive_exec`.
+  - Because sign-out does not reset that routing preference, the next login can replay the same race and loop again.
+- Scope: routing/bootstrap only. No backend permissions, role policies, or executive-access rules will be changed.

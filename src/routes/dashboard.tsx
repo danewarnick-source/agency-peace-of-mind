@@ -176,25 +176,29 @@ function DashboardLayout() {
   // Keep view and content strictly aligned: leaving HIVE View must also leave
   // /dashboard/hive-exec, and entering HIVE View jumps to the platform landing.
   useEffect(() => {
-    // Don't reconcile view↔route until we know the user's executive status
-    // AND the persisted portal view has hydrated from localStorage. Otherwise
-    // the default `staff` view briefly bounces the user off
-    // /dashboard/hive-exec on login before hydration restores `hive_exec`,
-    // causing a refresh/reload loop.
-    if (execLoading || !viewHydrated) return;
+    // Don't reconcile view↔route until ALL bootstrap signals are ready:
+    //   - executive status resolved (so allowedViews includes hive_exec)
+    //   - portal view hydrated from localStorage
+    //   - org/role loaded (drives allowedViews for admin)
+    // Without this, the brief window after login (queryClient.clear)
+    // shows isExecutive=false / role=employee while pathname is still
+    // /dashboard/hive-exec, and the kick-back at line E would bounce the
+    // user off, only for the forward push to send them back once the
+    // queries settle — the reload/refresh loop the user reported.
+    if (execLoading || !viewHydrated || orgLoading) return;
     if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) {
-      navigate({ to: "/dashboard/hive-exec" });
+      navigate({ to: "/dashboard/hive-exec", replace: true });
     } else if (!isHiveExecView && !isStatePreview && pathname.startsWith("/dashboard/hive-exec")) {
-      navigate({ to: "/dashboard" });
+      navigate({ to: "/dashboard", replace: true });
     }
-  }, [execLoading, viewHydrated, isHiveExecView, isStatePreview, pathname, navigate]);
+  }, [execLoading, viewHydrated, orgLoading, isHiveExecView, isStatePreview, pathname, navigate]);
 
   const currentPreviewState = isStatePreview
     ? states.find((s) => s.code === stateCode) ?? null
     : null;
   const isComingSoonPreview = isStatePreview && currentPreviewState?.status === "coming_soon";
 
-  if (loading || !session || execLoading || !viewHydrated) {
+  if (loading || !session || execLoading || !viewHydrated || orgLoading) {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
   }
 

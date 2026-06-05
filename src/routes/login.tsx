@@ -9,6 +9,7 @@ import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { signInWithUsername } from "@/lib/login.functions";
+import { checkHiveExecutive } from "@/lib/hive-exec.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -77,11 +78,32 @@ function LoginPage() {
   const { session, loading } = useAuth();
   const [busy, setBusy] = useState(false);
   const signIn = useServerFn(signInWithUsername);
+  const execCheck = useServerFn(checkHiveExecutive);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  // Resolve the correct landing route ONCE per authenticated session, then
+  // navigate with `replace` so the dashboard shell isn't forced to reconcile
+  // /dashboard ↔ /dashboard/hive-exec after auth state settles.
   useEffect(() => {
-    if (!loading && session) navigate({ to: "/dashboard" });
-  }, [loading, session, navigate]);
+    if (loading || !session) return;
+    let cancelled = false;
+    (async () => {
+      let target = "/dashboard";
+      try {
+        const r = await execCheck();
+        if (r?.isExecutive) {
+          // Persist exec view so the dashboard shell doesn't re-route us.
+          try {
+            window.localStorage.setItem("portal-view", "hive_exec");
+            window.dispatchEvent(new Event("portal-view-change"));
+          } catch { /* ignore */ }
+          target = "/dashboard/hive-exec";
+        }
+      } catch { /* fall back to /dashboard */ }
+      if (!cancelled) navigate({ to: target, replace: true });
+    })();
+    return () => { cancelled = true; };
+  }, [loading, session, navigate, execCheck]);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

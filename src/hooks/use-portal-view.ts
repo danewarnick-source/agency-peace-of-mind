@@ -30,11 +30,13 @@ export function usePortalView() {
   const [view, setView] = useState<PortalView>("staff");
   const [stateCode, setStateCodeState] = useState<string | null>(null);
   const [subView, setSubViewState] = useState<StatePreviewSubView>("admin");
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setView(readView());
     setStateCodeState(readStateCode());
     setSubViewState(readSub());
+    setHydrated(true);
     const handler = () => {
       setView(readView());
       setStateCodeState(readStateCode());
@@ -67,5 +69,5 @@ export function usePortalView() {
     setSubViewState(s);
   }, []);
 
-  return { view, setView: update, stateCode, setStateCode, subView, setSubView };
+  return { view, setView: update, stateCode, setStateCode, subView, setSubView, hydrated };
 }

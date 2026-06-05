@@ -1791,7 +1791,7 @@ function Check({ step, onPass }: { step: CheckStep; onPass: () => void }) {
       {chosen && chosen.correct && (
         <>
           <div style={{ fontSize: 12.5, color: "#0f6e56", background: "#e1f5ee", border: "1px solid #9fe1cb", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>{chosen.fb}</div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}><button style={btn("pri")} onClick={onPass}>Continue \u2192</button></div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}><button style={btn("pri")} onClick={onPass}>Continue</button></div>
         </>
       )}
     </div>

@@ -15,7 +15,6 @@ import {
   ESIGN_CONSENT_STATEMENT,
   TRAINING_ENGINE_VERSION,
   type AttestPayload,
-  type Topic as EngineTopic,
 } from "@/components/training/hive-training-engine";
 
 export const Route = createFileRoute("/dashboard/courses/topic/$topicId")({

@@ -117,7 +117,7 @@ export function TrainingContentAdmin() {
 
       <Section
         title="Policies & Procedures"
-        description='Fills the staff topic "P · The agency\'s policies & procedures".'
+        description={"Fills the staff topic \u201CP \u00B7 The agency\u2019s policies & procedures\u201D."}
         icon={<FileText className="h-4 w-4" />}
         orgId={orgId}
         kind="policies"

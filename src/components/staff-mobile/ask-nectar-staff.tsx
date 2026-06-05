@@ -126,6 +126,42 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
 
   const composerMount = container;
 
+  const composerForm = (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        send(input);
+      }}
+      className="flex items-end gap-2"
+    >
+      <textarea
+        ref={taRef}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            send(input);
+          }
+        }}
+        placeholder="Ask NECTAR anything about your training…"
+        rows={1}
+        className="min-h-[44px] max-h-32 flex-1 resize-none rounded-full border border-input bg-background px-4 py-2.5 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f4a93a]/40"
+        disabled={mutation.isPending}
+      />
+      <NectarButton
+        type="submit"
+        variant="amber"
+        loading={mutation.isPending}
+        icon={<Send className="h-4 w-4" />}
+        disabled={!input.trim() || mutation.isPending}
+        className="h-11 min-w-[44px] rounded-full"
+      >
+        <span className="sr-only">Send</span>
+      </NectarButton>
+    </form>
+  );
+
   const composer = (
     <div
       className="absolute inset-x-0 z-30 border-t border-border bg-background/98 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/92"
@@ -134,41 +170,10 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
         paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
       }}
     >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          send(input);
-        }}
-        className="flex items-end gap-2"
-      >
-        <textarea
-          ref={taRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send(input);
-            }
-          }}
-          placeholder="Message NECTAR…"
-          rows={1}
-          className="min-h-[44px] max-h-32 flex-1 resize-none rounded-full border border-input bg-background px-4 py-2.5 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f4a93a]/40"
-          disabled={mutation.isPending}
-        />
-        <NectarButton
-          type="submit"
-          variant="amber"
-          loading={mutation.isPending}
-          icon={<Send className="h-4 w-4" />}
-          disabled={!input.trim() || mutation.isPending}
-          className="h-11 min-w-[44px] rounded-full"
-        >
-          <span className="sr-only">Send</span>
-        </NectarButton>
-      </form>
+      {composerForm}
     </div>
   );
+
 
   return (
     <>

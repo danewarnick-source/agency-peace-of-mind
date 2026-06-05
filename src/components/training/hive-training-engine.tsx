@@ -1895,7 +1895,7 @@ export function TrainingModule({
               <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Jordan Rivera" style={{ width: "100%", boxSizing: "border-box", font: "inherit", fontSize: 13.5, padding: "10px 12px", border: "1px solid #cdd2e0", borderRadius: 10 }} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
-              <button style={btn("out")} onClick={back}>\u2190 Back</button>
+              <button style={btn("out")} onClick={back}>Back</button>
               <button style={btn(agree && name.trim().length > 1 && !submitting ? "pri" : "dis")} disabled={!(agree && name.trim().length > 1) || submitting} onClick={submitAttestAndContinue}>{submitting ? "Saving…" : "Complete topic \u2713"}</button>
             </div>
           </>

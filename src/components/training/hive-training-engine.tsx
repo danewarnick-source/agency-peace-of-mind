@@ -1896,7 +1896,7 @@ export function TrainingModule({
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
               <button style={btn("out")} onClick={back}>\u2190 Back</button>
-              <button style={btn(agree && name.trim().length > 1 ? "pri" : "dis")} disabled={!(agree && name.trim().length > 1)} onClick={next}>Complete topic \u2713</button>
+              <button style={btn(agree && name.trim().length > 1 && !submitting ? "pri" : "dis")} disabled={!(agree && name.trim().length > 1) || submitting} onClick={submitAttestAndContinue}>{submitting ? "Saving…" : "Complete topic \u2713"}</button>
             </div>
           </>
         )}

@@ -6,7 +6,14 @@
 // every topic then automatically gets the same lessons / dropdowns /
 // knowledge-checks / attestation flow.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  useTrainingSpeech,
+  getSessionAutoRead,
+  setSessionAutoRead,
+  buildLessonSpeech,
+  buildCheckSpeech,
+} from "./use-training-speech";
 
 /* ───────────────────────── Types ───────────────────────── */
 type Callout = { v: "info" | "crit"; t: string; b: string };

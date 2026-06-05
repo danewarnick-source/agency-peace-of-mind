@@ -9,6 +9,7 @@ import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { signInWithUsername } from "@/lib/login.functions";
+import { checkHiveExecutive } from "@/lib/hive-exec.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({

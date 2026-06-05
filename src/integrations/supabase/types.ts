@@ -5955,6 +5955,48 @@ export type Database = {
         }
         Relationships: []
       }
+      training_completions: {
+        Row: {
+          attestation_statement: string
+          completed_at: string
+          dspd_letter: string | null
+          id: string
+          is_current: boolean
+          ref_id: string
+          topic_code: string | null
+          topic_kind: Database["public"]["Enums"]["training_topic_kind"]
+          topic_title: string
+          typed_signature: string
+          user_id: string
+        }
+        Insert: {
+          attestation_statement: string
+          completed_at?: string
+          dspd_letter?: string | null
+          id?: string
+          is_current?: boolean
+          ref_id: string
+          topic_code?: string | null
+          topic_kind: Database["public"]["Enums"]["training_topic_kind"]
+          topic_title: string
+          typed_signature: string
+          user_id: string
+        }
+        Update: {
+          attestation_statement?: string
+          completed_at?: string
+          dspd_letter?: string | null
+          id?: string
+          is_current?: boolean
+          ref_id?: string
+          topic_code?: string | null
+          topic_kind?: Database["public"]["Enums"]["training_topic_kind"]
+          topic_title?: string
+          typed_signature?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       training_modules: {
         Row: {
           created_at: string
@@ -5981,6 +6023,50 @@ export type Database = {
           title?: string
         }
         Relationships: []
+      }
+      training_person_modules: {
+        Row: {
+          attestation_statement: string
+          client_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          mindsmith_url: string | null
+          organization_id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          attestation_statement?: string
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          mindsmith_url?: string | null
+          organization_id: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          attestation_statement?: string
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          mindsmith_url?: string | null
+          organization_id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_person_modules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       training_programs: {
         Row: {
@@ -6030,6 +6116,75 @@ export type Database = {
           organization_id?: string | null
           slug?: string
           validity_months?: number | null
+        }
+        Relationships: []
+      }
+      training_topic_progress: {
+        Row: {
+          id: string
+          position: number
+          ref_id: string
+          status: Database["public"]["Enums"]["training_progress_status"]
+          topic_kind: Database["public"]["Enums"]["training_topic_kind"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          position?: number
+          ref_id: string
+          status?: Database["public"]["Enums"]["training_progress_status"]
+          topic_kind: Database["public"]["Enums"]["training_topic_kind"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          position?: number
+          ref_id?: string
+          status?: Database["public"]["Enums"]["training_progress_status"]
+          topic_kind?: Database["public"]["Enums"]["training_topic_kind"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      training_topics: {
+        Row: {
+          attestation_statement: string
+          category: string
+          code: string
+          created_at: string
+          description: string | null
+          dspd_letter: string | null
+          id: string
+          mindsmith_url: string | null
+          sort_order: number
+          title: string
+        }
+        Insert: {
+          attestation_statement?: string
+          category: string
+          code: string
+          created_at?: string
+          description?: string | null
+          dspd_letter?: string | null
+          id?: string
+          mindsmith_url?: string | null
+          sort_order?: number
+          title: string
+        }
+        Update: {
+          attestation_statement?: string
+          category?: string
+          code?: string
+          created_at?: string
+          description?: string | null
+          dspd_letter?: string | null
+          id?: string
+          mindsmith_url?: string | null
+          sort_order?: number
+          title?: string
         }
         Relationships: []
       }
@@ -6480,6 +6635,8 @@ export type Database = {
         | "abi_specialty"
         | "annual"
         | "custom"
+      training_progress_status: "not_started" | "in_progress" | "completed"
+      training_topic_kind: "core" | "person"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6641,6 +6798,8 @@ export const Constants = {
         "annual",
         "custom",
       ],
+      training_progress_status: ["not_started", "in_progress", "completed"],
+      training_topic_kind: ["core", "person"],
     },
   },
 } as const

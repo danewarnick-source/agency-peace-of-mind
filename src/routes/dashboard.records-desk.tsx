@@ -5,10 +5,11 @@ import { CommandCenter } from "./dashboard.command-center";
 import { ComplianceDeskWrapped } from "./dashboard.compliance-desk";
 import { HostHomeControl } from "./dashboard.host-home-control";
 import { AuditZone } from "@/components/audit-zone/audit-zone";
+import { TrainingRecordsAdmin } from "@/components/audit-zone/training-records-admin";
 
 const recordsDeskSearch = z.object({
   tab: z
-    .enum(["command-center", "evv-timesheets", "host-home", "audit-zone"])
+    .enum(["command-center", "evv-timesheets", "host-home", "audit-zone", "training-records"])
     .optional(),
   /** Inner Command Center tab (forwarded from deep-links). */
   cc: z.enum(["urgent", "pending", "approved", "analytics", "nectar"]).optional(),
@@ -42,6 +43,7 @@ function RecordsDesk() {
           <TabsTrigger value="command-center">Command Center</TabsTrigger>
           <TabsTrigger value="evv-timesheets">EVV &amp; Timesheets</TabsTrigger>
           <TabsTrigger value="host-home">Host Home</TabsTrigger>
+          <TabsTrigger value="training-records">Training Records</TabsTrigger>
           <TabsTrigger value="audit-zone">Audit Zone</TabsTrigger>
         </TabsList>
         <TabsContent value="command-center" className="mt-4">
@@ -52,6 +54,9 @@ function RecordsDesk() {
         </TabsContent>
         <TabsContent value="host-home" className="mt-4">
           <HostHomeControl />
+        </TabsContent>
+        <TabsContent value="training-records" className="mt-4">
+          <TrainingRecordsAdmin />
         </TabsContent>
         <TabsContent value="audit-zone" className="mt-4">
           <AuditZone />

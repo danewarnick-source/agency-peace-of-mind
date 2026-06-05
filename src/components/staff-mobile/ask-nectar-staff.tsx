@@ -292,6 +292,11 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
             </div>
           )}
         </div>
+        {!composerMount && (
+          <div className="shrink-0 border-t border-border bg-background/98 px-3 py-2">
+            {composerForm}
+          </div>
+        )}
       </div>
       {composerMount ? createPortal(composer, composerMount) : null}
     </>

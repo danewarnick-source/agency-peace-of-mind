@@ -1950,6 +1950,39 @@ export function TrainingModule({
       </div>
       <div style={{ height: 5, background: "#eef0f5" }}><div style={{ height: "100%", width: pct + "%", background: GOLD, transition: "width .35s" }} /></div>
 
+      {ttsSupported && (
+        <div style={{ background: "#f7f8fb", borderBottom: "1px solid #e4e7ef", padding: "8px 17px", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 11.5, color: "#5b6172" }}>Auto read-aloud</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoRead}
+            onClick={() => setAutoRead(!autoRead)}
+            style={{
+              width: 38, height: 22, borderRadius: 999, border: "1px solid #cdd2e0",
+              background: autoRead ? TEAL : "#fff", position: "relative", cursor: "pointer", padding: 0,
+            }}
+          >
+            <span style={{
+              position: "absolute", top: 2, left: autoRead ? 18 : 2,
+              width: 16, height: 16, borderRadius: "50%", background: "#fff",
+              boxShadow: "0 1px 2px rgba(0,0,0,.2)", transition: "left .15s",
+            }} />
+          </button>
+        </div>
+      )}
+
+      {ttsSupported && showOptIn && !autoRead && step.type === "intro" && (
+        <div style={{ background: "#eaf3fc", borderBottom: "1px solid #b9d6f2", color: "#1c4e80", fontSize: 12.5, padding: "10px 17px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span>Would you like this training read aloud?</span>
+          <span style={{ display: "flex", gap: 8 }}>
+            <button style={{ ...btn("pri"), padding: "6px 12px", fontSize: 12 }} onClick={() => { setAutoRead(true); setShowOptIn(false); }}>Yes, read aloud</button>
+            <button style={{ ...btn("out"), padding: "6px 12px", fontSize: 12 }} onClick={() => setShowOptIn(false)}>No thanks</button>
+            <button aria-label="Dismiss" onClick={() => setShowOptIn(false)} style={{ background: "transparent", border: 0, color: "#1c4e80", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px" }}>{"\u00D7"}</button>
+          </span>
+        </div>
+      )}
+
       {readOnly && (
         <div style={{ background: "#e1f5ee", borderBottom: "1px solid #9fe1cb", color: "#0f6e56", fontSize: 12.5, padding: "10px 17px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <span>

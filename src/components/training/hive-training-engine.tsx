@@ -1865,7 +1865,7 @@ export function TrainingModule({
                 <div style={{ fontSize: 13, lineHeight: 1.5, marginTop: 5, color: step.callout.v === "crit" ? "#7a2222" : "#1c4e80" }} dangerouslySetInnerHTML={{ __html: step.callout.b }} />
               </div>
             )}
-            {step.facts?.map((f, n) => (
+            {step.facts?.map((f: Fact, n: number) => (
               <div key={n} style={{ display: "flex", gap: 11, fontSize: 13.5, lineHeight: 1.5, margin: "0 0 11px" }}>
                 <span style={{ color: TEAL, flex: "0 0 auto", marginTop: 1 }}>{"\u25C6"}</span>
                 <div><b style={{ color: INK }}>{f.t}</b> {f.b}</div>

@@ -96,11 +96,21 @@ function TopicPlayer() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Find rich content from the bundled engine registry (by DSPD letter or topic code)
+  // Find rich content from the bundled engine registry (by DSPD letter, or
+  // by slug→letter fallback for topics whose dspd_letter isn't populated).
+  const SLUG_TO_LETTER: Record<string, string> = {
+    call_911: "A", call_medical: "B", call_mental_health: "C", incident_reporting: "D",
+    seizure_disorders: "E", whereabouts_unknown: "F", choking_rescue: "G", choking_prevention: "H",
+    positive_behavior_supports: "I", legal_rights_ada: "J", ane_reporting: "K", hipaa_confidentiality: "L",
+    idrc_abi_orientation: "M", communicable_disease: "N", person_specific: "O", agency_policies: "P",
+    dspd_philosophy: "Q", dhhs_medicaid_101: "R", oig_fraud_reporting: "S", hcbs_settings_rule: "T",
+    crisis_deescalation: "U", trauma_informed: "V", suicide_prevention: "W",
+  };
   const engineTopic = useMemo(() => {
     if (!topic) return null;
-    const key = (topic.dspd_letter || topic.code || "").toUpperCase();
-    return TRAINING_TOPICS.find((t) => t.code.toUpperCase() === key && t.status === "ready" && t.steps?.length) || null;
+    const letter = (topic.dspd_letter || SLUG_TO_LETTER[topic.code ?? ""] || "").toUpperCase();
+    if (!letter) return null;
+    return TRAINING_TOPICS.find((t) => t.code.toUpperCase() === letter && t.status === "ready" && t.steps?.length) || null;
   }, [topic]);
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading topic…</p>;

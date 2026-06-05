@@ -300,6 +300,7 @@ function StaffRecordTable({
   completions: Completion[];
   statusFilter: "all" | "completed" | "in_progress" | "not_started";
 }) {
+  const [openRecord, setOpenRecord] = useState<Completion | null>(null);
   const progressMap = useMemo(() => {
     const m = new Map<string, Progress["status"]>();
     progress.forEach((p) => m.set(`${p.topic_kind}:${p.ref_id}`, p.status));
@@ -312,7 +313,6 @@ function StaffRecordTable({
     return m;
   }, [completions]);
 
-  // DSPD a–n ordered first using dspd_letter; then person modules under (o); then extras
   const dspdTopics = DSPD_ORDER.map((letter) => topics.find((t) => t.dspd_letter === letter)).filter(
     (t): t is Topic => !!t,
   );
@@ -381,6 +381,13 @@ function StaffRecordTable({
         </td>
         <td className="py-2 pr-3 text-xs font-medium">
           {completion?.typed_signature ?? "—"}
+        </td>
+        <td className="py-2 pr-3 text-right">
+          {completion && (
+            <Button size="sm" variant="outline" onClick={() => setOpenRecord(completion)}>
+              <FileSignature className="mr-1 h-3.5 w-3.5" /> View record
+            </Button>
+          )}
         </td>
       </tr>
     );

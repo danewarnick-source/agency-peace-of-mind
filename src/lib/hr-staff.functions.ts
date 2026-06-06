@@ -1104,6 +1104,22 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
       for (const [k, v] of cellsMap) {
         cells[k] = { ...v, applicable: applicableByReq.get(k) ?? true };
       }
+      // For non-applicable requirements with no completion row, inject a
+      // placeholder cell so the matrix can render N/A consistently.
+      for (const req of requirements) {
+        const isApp = applicableByReq.get(req.requirement_id) ?? true;
+        if (!isApp && !cells[req.requirement_id]) {
+          cells[req.requirement_id] = {
+            status: "not_started",
+            completed_date: null,
+            expires_at: null,
+            evidence_document_id: null,
+            training_completion_id: null,
+            auto_checked_at: null,
+            applicable: false,
+          };
+        }
+      }
       // Inject cumulative-progress into every cumulative requirement's cell.
       for (const cfg of cumulativeConfigByReqId.values()) {
         const k = contribKey(sid, cfg.requirement_id);

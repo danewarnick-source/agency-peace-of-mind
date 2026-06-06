@@ -83,13 +83,20 @@ function HrAdminPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">HR Admin</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Org-wide HR oversight. NECTAR surfaces what's missing or expiring across
-          the staff you can see — completion still requires a one-click human
-          confirm on each item.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">HR Admin</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Org-wide HR oversight. NECTAR surfaces what's missing or expiring across
+            the staff you can see — completion still requires a one-click human
+            confirm on each item.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/dashboard/hr-admin/settings">
+            <SettingsIcon className="mr-1 h-3.5 w-3.5" /> HR Settings →
+          </Link>
+        </Button>
       </div>
 
       {/* NECTAR gaps / renewals bar */}

@@ -559,6 +559,8 @@ function EmployeesPage() {
                   workerType: (String(fd.get("worker_type") || "w2") as WorkerType),
                   hourlyRate: String(fd.get("hourly_rate") || "").trim(),
                   dailyRate: String(fd.get("daily_rate") || "").trim(),
+                  startDate: String(fd.get("start_date") || "").trim(),
+                  endDate: String(fd.get("end_date") || "").trim(),
                 });
                 setEditDirty(false);
               }}
@@ -598,7 +600,18 @@ function EmployeesPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="start_date">Start date</Label>
+                  <Input id="start_date" name="start_date" type="date" defaultValue={editingMember.startDate || ""} />
+                  <p className="text-[10px] text-muted-foreground">Drives Continuing Education eligibility & year window.</p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="end_date">End date (optional)</Label>
+                  <Input id="end_date" name="end_date" type="date" defaultValue={editingMember.endDate || ""} />
+                  <p className="text-[10px] text-muted-foreground">Blank for active employees. Pauses new CE; history retained.</p>
+                </div>
               </div>
+
 
               <div className="rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

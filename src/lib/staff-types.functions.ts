@@ -88,7 +88,19 @@ Rules:
   declared in staff_types.
 - Prefer "all" when in doubt; set ambiguous=true.
 - Cite the section that establishes scope when possible.
+- IMPORTANT: Keep every "source_basis" CONCISE — under 400 characters.
+  Cite the SOW/contract article or section number plus a brief one-sentence
+  reason. Do NOT paste long excerpts or quote multiple paragraphs.
 `;
+
+// Schema cap with headroom (was 500). If a single field still exceeds it,
+// truncate that field rather than rejecting the whole proposal.
+const MAX_BASIS = 1500;
+const truncateBasis = (s: string | null | undefined): string | null => {
+  if (s == null) return null;
+  const str = String(s);
+  return str.length > MAX_BASIS ? str.slice(0, MAX_BASIS - 1) + "…" : str;
+};
 
 const StaffTypeItem = z.object({
   key: z
@@ -97,13 +109,13 @@ const StaffTypeItem = z.object({
     .max(60)
     .regex(/^[a-z0-9_]+$/),
   label: z.string().min(1).max(120),
-  description: z.string().max(500).optional().nullable(),
-  source_basis: z.string().max(500).optional().nullable(),
+  description: z.string().optional().nullable().transform(truncateBasis),
+  source_basis: z.string().optional().nullable().transform(truncateBasis),
 });
 const MappingItem = z.object({
   requirement_key: z.string().min(1).max(120),
   applies_to: z.union([z.literal("all"), z.array(z.string().min(1).max(60)).max(20)]),
-  source_basis: z.string().max(500).optional().nullable(),
+  source_basis: z.string().optional().nullable().transform(truncateBasis),
   ambiguous: z.boolean().optional().default(false),
 });
 const AiResponse = z.object({

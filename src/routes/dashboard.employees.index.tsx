@@ -176,13 +176,18 @@ function EmployeesPage() {
   const manualMutation = useMutation({
     mutationFn: async (input: {
       firstName: string; lastName: string; username: string; email: string;
-      role: Role; department: string; hireDate: string; trackIds: string[]; password: string;
+      role: Role; department: string; startDate: string; endDate: string; trackIds: string[]; password: string;
     }) => {
+      if (input.startDate && input.endDate && input.endDate < input.startDate) {
+        throw new Error("End date must be on or after Start date.");
+      }
       return await createManual({ data: {
         organizationId: org!.organization_id,
         firstName: input.firstName, lastName: input.lastName, username: input.username,
         email: input.email, temporaryPassword: input.password, role: input.role,
-        department: input.department, hireDate: input.hireDate, trackIds: input.trackIds,
+        department: input.department, hireDate: input.startDate,
+        startDate: input.startDate, endDate: input.endDate,
+        trackIds: input.trackIds,
       } });
     },
     onSuccess: (res, vars) => {

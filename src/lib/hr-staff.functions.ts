@@ -856,9 +856,17 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
       });
     }
 
-    const profMap = new Map(
-      (profs ?? []).map((p: { id: string; full_name: string | null; team_id: string | null }) => [p.id, p]),
-    );
+    const mProfMap = new Map<
+      string,
+      { id: string; full_name: string | null; team_id: string | null }
+    >();
+    for (const p of (profs ?? []) as Array<{
+      id: string;
+      full_name: string | null;
+      team_id: string | null;
+    }>) {
+      mProfMap.set(p.id, p);
+    }
 
     const staff: HrMatrixStaff[] = staffIds.map((sid) => {
       const p = profMap.get(sid);

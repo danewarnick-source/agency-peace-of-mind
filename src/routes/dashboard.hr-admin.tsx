@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RequirePermission } from "@/components/rbac-guard";
+import { HrComplianceMatrix } from "@/components/hr/hr-compliance-matrix";
 
 export const Route = createFileRoute("/dashboard/hr-admin")({
   head: () => ({ meta: [{ title: "HR Admin — HIVE" }] }),
@@ -304,6 +305,8 @@ function HrAdminPage() {
           )}
         </CardContent>
       </Card>
+      {orgId && <HrComplianceMatrix organizationId={orgId} />}
+
 
       <p className="text-[11px] text-muted-foreground">
         Scope respects the HR PII gate at the aggregate level. Admins see every

@@ -79,11 +79,14 @@ export interface ChecklistRow {
   evidence_type: string | null;
   renewal_frequency: string | null;
   checklist_layer: string | null;
+  is_renewable: boolean;
+  renewal_interval_months: number | null;
+  renewal_source: string | null;
   completion: {
     id: string | null;
     status: string;
     completed_date: string | null;
-    expires_at: string | null;
+    expires_at: string | null; // effective: stored OR computed
     evidence_document_id: string | null;
     notes: string | null;
     completed_by: string | null;
@@ -128,6 +131,20 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
     return (base ?? []).map((r: Record<string, unknown>) => {
       const c = compMap.get(r.id as string);
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      const isRenewable = meta.is_renewable === true;
+      const intervalMonths =
+        typeof meta.renewal_interval_months === "number"
+          ? (meta.renewal_interval_months as number)
+          : null;
+      const completedDate = (c?.completed_date as string) ?? null;
+      let effExpiry = (c?.expires_at as string) ?? null;
+      if (!effExpiry && isRenewable && intervalMonths && completedDate) {
+        const d = new Date(completedDate);
+        if (!Number.isNaN(d.getTime())) {
+          d.setUTCMonth(d.getUTCMonth() + intervalMonths);
+          effExpiry = d.toISOString().slice(0, 10);
+        }
+      }
       return {
         requirement_id: r.id as string,
         title: (r.title as string) ?? (r.short_label as string) ?? "Untitled",
@@ -136,11 +153,14 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         evidence_type: (r.evidence_type as string) ?? null,
         renewal_frequency: (r.renewal_frequency as string) ?? null,
         checklist_layer: (meta.checklist_layer as string) ?? null,
+        is_renewable: isRenewable,
+        renewal_interval_months: intervalMonths,
+        renewal_source: (meta.renewal_source as string) ?? null,
         completion: {
           id: (c?.id as string) ?? null,
           status: (c?.status as string) ?? "not_started",
-          completed_date: (c?.completed_date as string) ?? null,
-          expires_at: (c?.expires_at as string) ?? null,
+          completed_date: completedDate,
+          expires_at: effExpiry,
           evidence_document_id: (c?.evidence_document_id as string) ?? null,
           notes: (c?.notes as string) ?? null,
           completed_by: (c?.completed_by as string) ?? null,
@@ -523,15 +543,27 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
       { _org: data.organization_id },
     );
     if (baseErr) throw new Error(baseErr.message);
-    const baseItems: Array<{ id: string; title: string }> = (base ?? []).map(
-      (r: Record<string, unknown>) => ({
+    const baseItems: Array<{
+      id: string;
+      title: string;
+      is_renewable: boolean;
+      interval_months: number | null;
+    }> = (base ?? []).map((r: Record<string, unknown>) => {
+      const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      return {
         id: r.id as string,
         title:
           (r.title as string) ?? (r.short_label as string) ?? "Untitled",
-      }),
-    );
+        is_renewable: meta.is_renewable === true,
+        interval_months:
+          typeof meta.renewal_interval_months === "number"
+            ? (meta.renewal_interval_months as number)
+            : null,
+      };
+    });
     const totalRequired = baseItems.length;
     const baseIds = new Set(baseItems.map((b) => b.id));
+    const baseById = new Map(baseItems.map((b) => [b.id, b]));
     const titleById = new Map(baseItems.map((b) => [b.id, b.title]));
 
     // 3. Names / team / hire_date (non-PII) for the gated staff set.
@@ -563,10 +595,12 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
       for (const t of teams ?? []) teamMap.set(t.id, t.team_name);
     }
 
-    // 4. Completions for those staff only.
+    // 4. Completions for those staff only. Effective expiry = stored
+    //    expires_at OR (completed_date + renewal_interval_months) when the
+    //    item is renewable. Same computation as the matrix and card view.
     const { data: comps } = await sb
       .from("staff_checklist_completion")
-      .select("staff_id, requirement_id, status, expires_at")
+      .select("staff_id, requirement_id, status, completed_date, expires_at")
       .eq("organization_id", data.organization_id)
       .in("staff_id", staffIds);
     const compByStaff = new Map<
@@ -575,10 +609,24 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
     >();
     for (const c of comps ?? []) {
       if (!baseIds.has(c.requirement_id)) continue;
+      const b = baseById.get(c.requirement_id);
+      let effExpiry: string | null = c.expires_at ?? null;
+      if (
+        !effExpiry &&
+        b?.is_renewable &&
+        b.interval_months &&
+        c.completed_date
+      ) {
+        const d = new Date(c.completed_date);
+        if (!Number.isNaN(d.getTime())) {
+          d.setUTCMonth(d.getUTCMonth() + b.interval_months);
+          effExpiry = d.toISOString().slice(0, 10);
+        }
+      }
       if (!compByStaff.has(c.staff_id)) compByStaff.set(c.staff_id, new Map());
       compByStaff
         .get(c.staff_id)!
-        .set(c.requirement_id, { status: c.status, expires_at: c.expires_at });
+        .set(c.requirement_id, { status: c.status, expires_at: effExpiry });
     }
 
     const todayMs = Date.now();
@@ -649,4 +697,216 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
     };
 
     return { summary, rows };
+  });
+
+// --- HR Compliance Matrix (org-wide grid) ---------------------------------
+//
+// Cross-staff "spreadsheet" view backing the HR Admin matrix. Reads the SAME
+// data as the staff HR card view (base checklist + completions + computed
+// expiry from completed_date + metadata.renewal_interval_months). The PII
+// gate is applied at the AGGREGATE level via list_staff_pii; the matrix
+// only includes staff the caller is permitted to see (admin → all;
+// manager → own team; staff → self).
+
+export interface HrMatrixRequirement {
+  requirement_id: string;
+  title: string;
+  category: string | null;
+  source_citation: string | null;
+  checklist_layer: string | null;
+  is_renewable: boolean;
+  renewal_interval_months: number | null;
+  renewal_source: string | null;
+}
+
+export interface HrMatrixCell {
+  status: string; // not_started | in_progress | complete | expired | waived
+  completed_date: string | null;
+  expires_at: string | null; // effective: stored expires_at OR computed
+  evidence_document_id: string | null;
+  training_completion_id: string | null;
+  auto_checked_at: string | null;
+}
+
+export interface HrMatrixStaff {
+  staff_id: string;
+  full_name: string;
+  team_id: string | null;
+  team_name: string | null;
+  manager_id: string | null;
+  manager_name: string | null;
+  cells: Record<string, HrMatrixCell>;
+}
+
+export interface HrMatrix {
+  requirements: HrMatrixRequirement[];
+  staff: HrMatrixStaff[];
+}
+
+function addMonthsIso(dateStr: string, months: number): string | null {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+export const getHrComplianceMatrix = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ organization_id: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<HrMatrix> => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    const { data: piiRows, error: piiErr } = await sb.rpc("list_staff_pii", {
+      _org: data.organization_id,
+    });
+    if (piiErr) throw new Error(piiErr.message);
+    const staffIds: string[] = (piiRows ?? []).map(
+      (r: { staff_id: string }) => r.staff_id,
+    );
+    if (staffIds.length === 0) {
+      return { requirements: [], staff: [] };
+    }
+
+    const [{ data: base, error: baseErr }, { data: profs }, { data: comps }] =
+      await Promise.all([
+        sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
+        sb
+          .from("profiles")
+          .select("id, full_name, team_id")
+          .in("id", staffIds),
+        sb
+          .from("staff_checklist_completion")
+          .select(
+            "staff_id, requirement_id, status, completed_date, expires_at, evidence_document_id, training_completion_id, auto_checked_at",
+          )
+          .eq("organization_id", data.organization_id)
+          .in("staff_id", staffIds),
+      ]);
+    if (baseErr) throw new Error(baseErr.message);
+
+    const requirements: HrMatrixRequirement[] = (base ?? []).map(
+      (r: Record<string, unknown>) => {
+        const meta = (r.metadata ?? {}) as Record<string, unknown>;
+        return {
+          requirement_id: r.id as string,
+          title:
+            (r.title as string) ?? (r.short_label as string) ?? "Untitled",
+          category: (r.category as string) ?? null,
+          source_citation: (r.source_citation as string) ?? null,
+          checklist_layer: (meta.checklist_layer as string) ?? null,
+          is_renewable: meta.is_renewable === true,
+          renewal_interval_months:
+            typeof meta.renewal_interval_months === "number"
+              ? (meta.renewal_interval_months as number)
+              : null,
+          renewal_source: (meta.renewal_source as string) ?? null,
+        };
+      },
+    );
+    const reqById = new Map(requirements.map((r) => [r.requirement_id, r]));
+
+    // Teams + managers
+    const teamIds = Array.from(
+      new Set(
+        (profs ?? [])
+          .map((p: { team_id: string | null }) => p.team_id)
+          .filter((x: string | null): x is string => !!x),
+      ),
+    );
+    const teamMap = new Map<
+      string,
+      { name: string; manager_id: string | null }
+    >();
+    if (teamIds.length > 0) {
+      const { data: teams } = await sb
+        .from("teams")
+        .select("id, team_name, manager_id")
+        .in("id", teamIds);
+      for (const t of teams ?? [])
+        teamMap.set(t.id, { name: t.team_name, manager_id: t.manager_id });
+    }
+    const managerIds = Array.from(
+      new Set(
+        Array.from(teamMap.values())
+          .map((t) => t.manager_id)
+          .filter((x): x is string => !!x),
+      ),
+    );
+    const managerNames = new Map<string, string>();
+    if (managerIds.length > 0) {
+      const { data: mgrs } = await sb
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", managerIds);
+      for (const m of mgrs ?? [])
+        managerNames.set(m.id, m.full_name ?? "—");
+    }
+
+    // Group completions per staff
+    const compByStaff = new Map<
+      string,
+      Map<string, HrMatrixCell>
+    >();
+    for (const c of comps ?? []) {
+      const req = reqById.get(c.requirement_id);
+      if (!req) continue;
+      let effExpiry: string | null = c.expires_at ?? null;
+      if (
+        !effExpiry &&
+        req.is_renewable &&
+        req.renewal_interval_months &&
+        c.completed_date
+      ) {
+        effExpiry = addMonthsIso(c.completed_date, req.renewal_interval_months);
+      }
+      if (!compByStaff.has(c.staff_id))
+        compByStaff.set(c.staff_id, new Map());
+      compByStaff.get(c.staff_id)!.set(c.requirement_id, {
+        status: c.status,
+        completed_date: c.completed_date ?? null,
+        expires_at: effExpiry,
+        evidence_document_id: c.evidence_document_id ?? null,
+        training_completion_id: c.training_completion_id ?? null,
+        auto_checked_at: c.auto_checked_at ?? null,
+      });
+    }
+
+    const mProfMap = new Map<
+      string,
+      { id: string; full_name: string | null; team_id: string | null }
+    >();
+    for (const p of (profs ?? []) as Array<{
+      id: string;
+      full_name: string | null;
+      team_id: string | null;
+    }>) {
+      mProfMap.set(p.id, p);
+    }
+
+    const staff: HrMatrixStaff[] = staffIds.map((sid) => {
+      const p = mProfMap.get(sid);
+      const team = p?.team_id ? teamMap.get(p.team_id) : undefined;
+      const cellsMap = compByStaff.get(sid) ?? new Map<string, HrMatrixCell>();
+      const cells: Record<string, HrMatrixCell> = {};
+      for (const [k, v] of cellsMap) cells[k] = v;
+      return {
+        staff_id: sid,
+        full_name: p?.full_name ?? "—",
+        team_id: p?.team_id ?? null,
+        team_name: team?.name ?? null,
+        manager_id: team?.manager_id ?? null,
+        manager_name: team?.manager_id
+          ? (managerNames.get(team.manager_id) ?? null)
+          : null,
+        cells,
+      };
+    });
+
+    staff.sort((a, b) => a.full_name.localeCompare(b.full_name));
+    return { requirements, staff };
   });

@@ -799,10 +799,15 @@ function UnifiedSearchResults({
         </div>
       )}
 
-      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
+      <div className="mb-2 flex justify-end">
+        <ExpandControls exp={exp} ids={allIds} />
+      </div>
+
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle">
         <Table>
           <TableHeader>
                   <TableRow className="[&>td]:border-b-0">
+              <TableHead className="w-8" />
               <TableHead>Score</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Status</TableHead>
@@ -820,14 +825,14 @@ function UnifiedSearchResults({
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={`sk-${i}`}>
-                  <TableCell colSpan={11} className="py-3">
+                  <TableCell colSpan={12} className="py-3">
                     <div className="h-12 w-full animate-pulse rounded-md bg-muted/60" />
                   </TableCell>
                 </TableRow>
               ))
             ) : ranked.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={12} className="py-10 text-center text-sm text-muted-foreground">
                   No conceptually similar shifts. If you just added shifts, click <span className="font-semibold">Index embeddings</span> above so NECTAR can read them.
                 </TableCell>
               </TableRow>
@@ -835,9 +840,16 @@ function UnifiedSearchResults({
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
               const isPending = r.status === "Pending";
+              const open = exp.isExpanded(r.id);
               return (
                 <Fragment key={r.id}>
-                  <TableRow>
+                  <TableRow
+                    onClick={() => exp.toggle(r.id)}
+                    role="button"
+                    aria-expanded={open}
+                    className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
+                  >
+                    <ChevronCell open={open} />
                     <TableCell>
                       <Badge variant="outline" className="font-mono text-[11px]">
                         {(similarity * 100).toFixed(0)}%
@@ -852,6 +864,7 @@ function UnifiedSearchResults({
                     <TableCell className="whitespace-nowrap font-medium">
                       {r.staff?.full_name ?? r.staff?.email ?? "—"}
                       <EditedByAdminBadge row={r} />
+                      <FlagDot row={r} />
                     </TableCell>
                     <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                     <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
@@ -859,18 +872,18 @@ function UnifiedSearchResults({
                       {fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}
                     </TableCell>
                     <TableCell className="whitespace-nowrap font-mono">{fmtDuration(inIso, outIso)}</TableCell>
-                    <TableCell>
+                    <TableCell onClick={stopRowToggle}>
                       <Button variant="outline" size="sm" onClick={() => onMap(r)}>
                         <MapPin /> View
                       </Button>
                     </TableCell>
                     <TableCell
-                      onClick={() => r.outside_geofence_reason && onReason(r)}
+                      onClick={(e) => { e.stopPropagation(); if (r.outside_geofence_reason) onReason(r); }}
                       className={r.outside_geofence_reason ? "cursor-pointer" : ""}
                     >
                       <GeofenceBadge row={r} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={stopRowToggle}>
                       <div className="flex justify-end gap-1.5">
                         {isPending && (
                           <Button
@@ -888,7 +901,7 @@ function UnifiedSearchResults({
                       </div>
                     </TableCell>
                   </TableRow>
-                  <InlineNotesRow row={r} colSpan={11} />
+                  {open && <InlineNotesRow row={r} colSpan={12} />}
                 </Fragment>
               );
             })}

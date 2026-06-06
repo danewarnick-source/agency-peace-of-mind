@@ -87,6 +87,8 @@ export interface ChecklistRow {
     evidence_document_id: string | null;
     notes: string | null;
     completed_by: string | null;
+    training_completion_id: string | null;
+    auto_checked_at: string | null;
   };
 }
 

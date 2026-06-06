@@ -341,11 +341,14 @@ export const updateMyAssignmentStatus = createServerFn({ method: "POST" })
         "This task requires admin confirmation to mark complete",
       );
     }
-    const patch: Record<string, unknown> = { status: data.status };
-    if (data.status === "completed") {
-      patch.completed_at = new Date().toISOString();
-      patch.completion_source = "self";
-    }
+    const patch =
+      data.status === "completed"
+        ? {
+            status: data.status,
+            completed_at: new Date().toISOString(),
+            completion_source: "self",
+          }
+        : { status: data.status };
     const { error } = await supabase
       .from("staff_other_assignments")
       .update(patch)

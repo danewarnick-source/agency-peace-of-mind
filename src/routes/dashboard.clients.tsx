@@ -37,6 +37,7 @@ import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselec
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { ClientIntakeChecklistCard } from "@/components/clients/client-intake-checklist-card";
+import { ClientLoanMarker } from "@/components/loans/client-loan-marker";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
@@ -685,6 +686,7 @@ function ProfileTab({
               <div>
                 <h3 className="text-lg font-semibold">{client.first_name} {client.last_name}</h3>
                 <p className="text-xs text-muted-foreground">Click photo to update. JPEG or PNG, max 5MB.</p>
+                <ClientLoanMarker clientId={client.id} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

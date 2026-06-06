@@ -143,8 +143,10 @@ function Overview() {
             subtitle="Your assigned clients, today's shift, and anything that needs your attention."
           />
           <TodayShiftBanner />
+          <OtherAssignmentsReminder />
           <StaffClientGrid />
           <ComplianceInbox />
+
         </div>
       )}
     </div>

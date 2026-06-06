@@ -755,6 +755,9 @@ function UnifiedSearchResults({
     return out;
   }, [matches, rowMap]);
 
+  const exp = useRowExpansion();
+  const allIds = useMemo(() => ranked.map((r) => r.row.id), [ranked]);
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

@@ -705,12 +705,29 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
 
     const rows: HrRollupRow[] = staffIds.map((sid) => {
       const p = profMap.get(sid);
+      const staffTypeKeys = p?.staff_type_keys ?? [];
       const cmap = compByStaff.get(sid) ?? new Map();
+      // Filter to applicable-only per staffer (single source of truth).
+      const applicableBinary = binaryItems.filter((b) =>
+        isRequirementApplicable({
+          applies_to: b.applies_to,
+          applies_to_confirmed_at: b.applies_to_confirmed_at,
+          staff_type_keys: staffTypeKeys,
+        }),
+      );
+      const applicableCumulative = cumulativeItems.filter((b) =>
+        isRequirementApplicable({
+          applies_to: b.applies_to,
+          applies_to_confirmed_at: b.applies_to_confirmed_at,
+          staff_type_keys: staffTypeKeys,
+        }),
+      );
+      const totalRequired = applicableBinary.length + applicableCumulative.length;
       let binaryComplete = 0;
       let expired = 0;
       let nextRenewal: HrRollupRow["next_renewal"] = null;
       let nextRenewalTs = Infinity;
-      for (const b of binaryItems) {
+      for (const b of applicableBinary) {
         const c = cmap.get(b.id);
         if (c?.status === "complete") binaryComplete++;
         if (c?.status === "expired") expired++;
@@ -731,14 +748,14 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
       let cumComplete = 0;
       let cumGaps = 0;
       const cumForStaff = cumProgress[sid] ?? {};
-      for (const ci of cumulativeItems) {
+      for (const ci of applicableCumulative) {
         const prog = cumForStaff[ci.id];
         if (!prog) continue;
         if (prog.status === "complete") cumComplete++;
         else if (prog.enforced && prog.status === "behind") cumGaps++;
       }
       const complete = binaryComplete + cumComplete;
-      const binaryGaps = Math.max(0, binaryItems.length - binaryComplete);
+      const binaryGaps = Math.max(0, applicableBinary.length - binaryComplete);
       const openGaps = binaryGaps + cumGaps;
       const hire = p?.hire_date ?? null;
       const hireMs = hire ? new Date(hire).getTime() : null;

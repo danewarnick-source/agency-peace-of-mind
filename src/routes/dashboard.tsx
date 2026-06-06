@@ -49,6 +49,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/hr-admin", label: "HR Admin", icon: ShieldCheck, perm: "manage_users" },
   { to: "/dashboard/client-loans", label: "Client Loans", icon: HandCoins, perm: "manage_organization" },
+  { to: "/dashboard/hrc", label: "Human Rights Committee", icon: Scale, perm: "manage_users" },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
   { to: "/dashboard/billing", label: "Billing", icon: Receipt, perm: "view_billing" },

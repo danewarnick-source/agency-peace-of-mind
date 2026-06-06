@@ -788,6 +788,8 @@ export interface HrMatrixRequirement {
   renewal_source: string | null;
   requirement_type: "binary" | "cumulative_hours";
   cumulative_config: CumulativeRequirementConfig | null;
+  applies_to_staff_types: string[] | "all";
+  applies_to_confirmed_at: string | null;
 }
 
 export interface HrMatrixCell {
@@ -798,6 +800,7 @@ export interface HrMatrixCell {
   training_completion_id: string | null;
   auto_checked_at: string | null;
   cumulative_progress?: AnnualHoursProgress | null;
+  applicable: boolean;
 }
 
 export interface HrMatrixStaff {
@@ -807,6 +810,7 @@ export interface HrMatrixStaff {
   team_name: string | null;
   manager_id: string | null;
   manager_name: string | null;
+  staff_type_keys: string[];
   cells: Record<string, HrMatrixCell>;
 }
 

@@ -325,6 +325,21 @@ function CellView({
   in60Ms: number;
   onEvidence: (docId: string) => void;
 }) {
+  // N/A — confirmed not applicable to this staffer's type(s).
+  if (cell && cell.applicable === false) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded border border-dashed border-border bg-muted/30 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            N/A
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          Not applicable to this staffer's type
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
   // Cumulative-hours requirements render as a progress meter regardless of
   // the binary status (status will be 'not_started' since no checklist row).
   if (req.requirement_type === "cumulative_hours" && cell?.cumulative_progress) {

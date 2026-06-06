@@ -19,6 +19,8 @@ export type CeStepLesson = {
   title: string;
   body: string;
   facts?: [string, string][];
+  /** Source document(s)/clause(s) this lesson is built on (e.g. "Provider P&P §3.2"). */
+  citation?: string;
 };
 export type CeStepCheck = {
   type: "check";

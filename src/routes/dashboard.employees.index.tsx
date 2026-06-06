@@ -427,7 +427,9 @@ function EmployeesPage() {
               email: String(fd.get("email") || "").trim(),
               role: String(fd.get("role") || "employee") as Role,
               department: String(fd.get("department") || "").trim(),
-              hireDate: String(fd.get("hire_date") || ""),
+              startDate: String(fd.get("start_date") || ""),
+              endDate: String(fd.get("end_date") || ""),
+
               trackIds,
               password: String(fd.get("password") || tempPassword),
             });
@@ -463,7 +465,11 @@ function EmployeesPage() {
               </div>
               <div className="grid gap-2"><Label htmlFor="department">Department / team</Label><Input id="department" name="department" /></div>
             </div>
-            <div className="grid gap-2"><Label htmlFor="hire_date">Hire date</Label><Input id="hire_date" name="hire_date" type="date" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2"><Label htmlFor="start_date">Start date</Label><Input id="start_date" name="start_date" type="date" /></div>
+              <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
+            </div>
+
             {!!tracks?.length && (
               <div className="grid gap-2">
                 <Label>Assigned training tracks</Label>

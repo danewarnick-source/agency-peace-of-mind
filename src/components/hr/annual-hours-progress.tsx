@@ -77,7 +77,7 @@ export function AnnualHoursCell({
       <div className={`text-[10px] font-medium leading-none ${textTone}`}>
         {progress.hours_to_date}/{progress.target_hours}
       </div>
-      <div className="h-1.5 w-full max-w-[56px] overflow-hidden rounded-full bg-muted">
+      <div className="h-1.5 w-full max-w-[96px] overflow-hidden rounded-full bg-muted">
         <div
           className={`h-full ${color}`}
           style={{ width: `${pct}%` }}

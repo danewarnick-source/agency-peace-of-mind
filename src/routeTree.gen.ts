@@ -106,6 +106,7 @@ import { Route as DashboardBillingImportsRouteImport } from './routes/dashboard.
 import { Route as DashboardBillingForm520RouteImport } from './routes/dashboard.billing.form520'
 import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard.billing.$clientId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
+import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
 import { Route as DashboardHiveExecStatesStateCodeRouteImport } from './routes/dashboard.hive-exec.states.$stateCode'
 import { Route as DashboardCoursesTopicTopicIdRouteImport } from './routes/dashboard.courses.topic.$topicId'
 import { Route as DashboardCoursesPersonModuleAssignmentIdRouteImport } from './routes/dashboard.courses.person-module.$assignmentId'
@@ -620,6 +621,11 @@ const DashboardAdminEmarAuditRoute = DashboardAdminEmarAuditRouteImport.update({
   path: '/admin/emar-audit',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardAdminCeHoursRoute = DashboardAdminCeHoursRouteImport.update({
+  id: '/admin/ce-hours',
+  path: '/admin/ce-hours',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardHiveExecStatesStateCodeRoute =
   DashboardHiveExecStatesStateCodeRouteImport.update({
     id: '/$stateCode',
@@ -717,6 +723,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
@@ -818,6 +825,7 @@ export interface FileRoutesByTo {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
@@ -924,6 +932,7 @@ export interface FileRoutesById {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
@@ -1031,6 +1040,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
+    | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/form520'
@@ -1132,6 +1142,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard'
+    | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/form520'
@@ -1237,6 +1248,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/verify/$code'
     | '/dashboard/'
+    | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/form520'
@@ -1985,6 +1997,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminEmarAuditRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/admin/ce-hours': {
+      id: '/dashboard/admin/ce-hours'
+      path: '/admin/ce-hours'
+      fullPath: '/dashboard/admin/ce-hours'
+      preLoaderRoute: typeof DashboardAdminCeHoursRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/hive-exec/states/$stateCode': {
       id: '/dashboard/hive-exec/states/$stateCode'
       path: '/$stateCode'
@@ -2230,6 +2249,7 @@ interface DashboardRouteChildren {
   DashboardTimeclockRoute: typeof DashboardTimeclockRoute
   DashboardTracksRoute: typeof DashboardTracksRouteWithChildren
   DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardAdminCeHoursRoute: typeof DashboardAdminCeHoursRoute
   DashboardAdminEmarAuditRoute: typeof DashboardAdminEmarAuditRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesCeRoute: typeof DashboardCoursesCeRoute
@@ -2291,6 +2311,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardTimeclockRoute: DashboardTimeclockRoute,
   DashboardTracksRoute: DashboardTracksRouteWithChildren,
   DashboardIndexRoute: DashboardIndexRoute,
+  DashboardAdminCeHoursRoute: DashboardAdminCeHoursRoute,
   DashboardAdminEmarAuditRoute: DashboardAdminEmarAuditRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesCeRoute: DashboardCoursesCeRoute,

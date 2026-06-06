@@ -12,6 +12,7 @@ import { TodayShiftBanner } from "@/components/today-shift-banner";
 import { CompanyOverview } from "@/components/company-overview";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { OtherAssignmentsReminder } from "@/components/training/other-assignments-reminder";
+import { CeReminderCard } from "@/components/ce/ce-reminder-card";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 
@@ -143,6 +144,7 @@ function Overview() {
             subtitle="Your assigned clients, today's shift, and anything that needs your attention."
           />
           <TodayShiftBanner />
+          <CeReminderCard />
           <OtherAssignmentsReminder />
           <StaffClientGrid />
           <ComplianceInbox />

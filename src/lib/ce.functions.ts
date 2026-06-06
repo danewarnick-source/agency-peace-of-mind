@@ -563,9 +563,18 @@ export const completeCeModule = createServerFn({ method: "POST" })
     const reflectionText = (data.reflections[String(reflectIndex)] ?? "").trim();
     if (reflectionText.length < 150) throw new Error("Reflection must be at least 150 characters.");
 
-    const profileQ = await supabase.from("profiles").select("hire_date").eq("id", userId).maybeSingle();
-    const hireDate = (profileQ.data as { hire_date: string | null } | null)?.hire_date;
-    if (!hireDate) throw new Error("Your hire date is not set. Ask HR to update your profile.");
+    const profileQ = await supabase
+      .from("profiles")
+      .select("hire_date, start_date, end_date")
+      .eq("id", userId)
+      .maybeSingle();
+    const profileRow =
+      (profileQ.data as { hire_date: string | null; start_date: string | null; end_date: string | null } | null) ?? null;
+    if (profileRow?.end_date) {
+      throw new Error("Your employment end date is set — no new CE entries can be added.");
+    }
+    const hireDate = profileRow?.start_date ?? profileRow?.hire_date ?? null;
+    if (!hireDate) throw new Error("Your start date is not set. Ask HR to update your profile.");
     const yearStart = ceYearStart(hireDate);
 
     const contentHash = createHash("sha256").update(JSON.stringify(mod.steps)).digest("hex");

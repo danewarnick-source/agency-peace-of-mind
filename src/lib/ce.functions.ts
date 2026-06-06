@@ -648,8 +648,8 @@ export const getOrgCeRoster = createServerFn({ method: "GET" })
     const supabase = getSupabase(context);
     const userId = (context as { userId: string }).userId;
     const { orgId, isAdmin } = await getCallerOrg(supabase, userId);
-    if (!orgId) throw new Error("No active organization.");
-    if (!isAdmin) throw new Error("Admins or managers only.");
+    if (!orgId) return { organizationId: null, goalHours: 12, rows: [], behindCount: 0 };
+    if (!isAdmin) return { organizationId: orgId, goalHours: 12, rows: [], behindCount: 0 };
 
     const setQ = await supabase
       .from("ce_settings")

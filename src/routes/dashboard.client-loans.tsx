@@ -150,7 +150,7 @@ function LoanArea({ organizationId, lenderName }: { organizationId: string; lend
                   </TableRow>
                 ))}
                 {!(loans.data ?? []).length && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground">No loans yet.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground">No agreements on file yet.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

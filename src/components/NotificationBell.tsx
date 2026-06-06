@@ -213,43 +213,48 @@ export function NotificationBell() {
           </div>
 
           <div className="max-h-[420px] overflow-y-auto">
-            {notifications.length === 0 ? (
+            {merged.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground">
                 <Bell className="h-8 w-8 opacity-20" />
                 <p>No notifications</p>
               </div>
             ) : (
               <ul className="divide-y divide-border">
-                {notifications.map((n) => (
+                {merged.map((n) => {
+                  const synthetic = n.id.startsWith("__");
+                  return (
                   <li key={n.id} className={`group ${!n.read_at ? "bg-muted/30" : ""}`}>
                     <div className={`${urgencyRing(n.urgency)} relative`}>
                       <button type="button" onClick={() => handleClick(n)}
                         className="w-full px-4 py-3 text-left transition hover:bg-accent/50">
                         <div className="flex items-start gap-2.5">
-                          {urgencyIcon(n.urgency)}
+                          {synthetic ? <GraduationCap className="h-4 w-4 shrink-0 text-amber-500" /> : urgencyIcon(n.urgency)}
                           <div className="min-w-0 flex-1">
                             <p className={`text-xs font-semibold leading-snug ${!n.read_at ? "text-foreground" : "text-muted-foreground"}`}>
                               {n.title}
                             </p>
                             <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground line-clamp-2">{n.body}</p>
-                            <p className="mt-1 text-[10px] text-muted-foreground/70">{timeAgo(n.created_at)}</p>
+                            {!synthetic && <p className="mt-1 text-[10px] text-muted-foreground/70">{timeAgo(n.created_at)}</p>}
                           </div>
                           {!n.read_at && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />}
                         </div>
                       </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); dismissMut.mutate(n.id); }}
-                        className="absolute right-2 top-2 rounded p-0.5 text-muted-foreground/50 opacity-0 transition hover:bg-accent hover:text-foreground group-hover:opacity-100"
-                        aria-label="Dismiss">
-                        <X className="h-3 w-3" />
-                      </button>
+                      {!synthetic && (
+                        <button type="button" onClick={(e) => { e.stopPropagation(); dismissMut.mutate(n.id); }}
+                          className="absolute right-2 top-2 rounded p-0.5 text-muted-foreground/50 opacity-0 transition hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                          aria-label="Dismiss">
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>
 
-          {notifications.length > 0 && (
+          {merged.length > 0 && (
             <div className="border-t border-border px-4 py-2.5">
               <Button variant="ghost" size="sm"
                 className="h-7 w-full text-xs text-muted-foreground hover:text-foreground"

@@ -25,7 +25,7 @@ import {
 import { RequirePermission } from "@/components/rbac-guard";
 import { HrComplianceMatrix } from "@/components/hr/hr-compliance-matrix";
 import { OtherAssignmentsRollup } from "@/components/training/other-assignments-rollup";
-import { StaffTypesProposal } from "@/components/hr/staff-types-proposal";
+import { Settings as SettingsIcon } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/hr-admin")({
   head: () => ({ meta: [{ title: "HR Admin — HIVE" }] }),

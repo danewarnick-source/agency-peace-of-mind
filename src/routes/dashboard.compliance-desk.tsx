@@ -222,6 +222,73 @@ function nectarReason(row: Row): string {
   return "No documentation concerns detected in this shift.";
 }
 
+/** Per-table expand/collapse state for condensed shift rows. */
+function useRowExpansion() {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const isExpanded = (id: string) => expanded.has(id);
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const expandAll = (ids: string[]) => setExpanded(new Set(ids));
+  const collapseAll = () => setExpanded(new Set());
+  return { expanded, isExpanded, toggle, expandAll, collapseAll };
+}
+
+function ExpandControls({
+  exp, ids,
+}: { exp: ReturnType<typeof useRowExpansion>; ids: string[] }) {
+  const disabled = ids.length === 0;
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        type="button" size="sm" variant="ghost"
+        disabled={disabled}
+        onClick={() => exp.expandAll(ids)}
+        className="h-8 gap-1 text-xs"
+      >
+        <ChevronsUpDown className="h-3.5 w-3.5" /> Expand all
+      </Button>
+      <Button
+        type="button" size="sm" variant="ghost"
+        disabled={disabled || exp.expanded.size === 0}
+        onClick={() => exp.collapseAll()}
+        className="h-8 gap-1 text-xs"
+      >
+        <ChevronsDownUp className="h-3.5 w-3.5" /> Collapse all
+      </Button>
+    </div>
+  );
+}
+
+function ChevronCell({ open }: { open: boolean }) {
+  return (
+    <TableCell className="w-8 py-1.5 pr-0 align-middle">
+      <ChevronRight
+        className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}
+        aria-hidden
+      />
+    </TableCell>
+  );
+}
+
+function FlagDot({ row }: { row: Pick<Row, "ai_compliance_status"> }) {
+  if (row.ai_compliance_status !== "Exception") return null;
+  return (
+    <AlertTriangle
+      className="ml-1.5 inline h-3.5 w-3.5 text-destructive align-text-bottom"
+      aria-label="NECTAR flag"
+    >
+      <title>NECTAR flag</title>
+    </AlertTriangle>
+  );
+}
+
+const stopRowToggle = (e: MouseEvent) => e.stopPropagation();
+
 /** Inline shift narrative + goals strip — visually connected to the shift row above. */
 function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
   const note = (row.shift_note_text ?? "").trim();

@@ -158,6 +158,7 @@ function validateSteps(steps: unknown): CeStep[] {
         title: s.title,
         body: s.body,
         kicker: typeof s.kicker === "string" ? s.kicker : undefined,
+        citation: typeof s.citation === "string" ? s.citation : undefined,
         facts: Array.isArray(s.facts)
           ? (s.facts as unknown[])
               .map((f) => (Array.isArray(f) && f.length >= 2 ? ([String(f[0]), String(f[1])] as [string, string]) : null))

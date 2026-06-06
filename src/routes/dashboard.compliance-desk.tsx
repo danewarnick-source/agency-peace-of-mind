@@ -1221,13 +1221,19 @@ function ArchiveTable({
   const heading = variant === "evv" ? "State EVV Archive (Geofence-Locked Codes)" : "Internal / Non-EVV Archive";
   const exportLabel = variant === "evv" ? "Export Utah DHHS EVV CSV" : "Export Payroll CSV";
 
+  const exp = useRowExpansion();
+  const allIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{heading}</h2>
-        <Button onClick={onExport}>
-          <Download /> {exportLabel}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExpandControls exp={exp} ids={allIds} />
+          <Button onClick={onExport}>
+            <Download /> {exportLabel}
+          </Button>
+        </div>
       </div>
 
       <div className="mb-3 grid gap-2 md:grid-cols-4">
@@ -1243,10 +1249,11 @@ function ArchiveTable({
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
       </div>
 
-      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               <TableHead>Date</TableHead>
               <TableHead>Caregiver</TableHead>
               <TableHead>Client</TableHead>
@@ -1261,26 +1268,34 @@ function ArchiveTable({
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
             ) : filtered.map((r) => {
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
+              const open = exp.isExpanded(r.id);
               return (
                 <Fragment key={r.id}>
-                <TableRow className="[&>td]:border-b-0">
+                <TableRow
+                  onClick={() => exp.toggle(r.id)}
+                  role="button"
+                  aria-expanded={open}
+                  className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
+                >
+                  <ChevronCell open={open} />
                   <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
                   <TableCell className="whitespace-nowrap font-medium">
                     {r.staff?.full_name ?? r.staff?.email ?? "—"}
                     <EditedByAdminBadge row={r} />
+                    <FlagDot row={r} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                   <TableCell className="whitespace-nowrap font-mono">{r.utah_medicaid_member_id}</TableCell>
                   <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
                   <TableCell className="whitespace-nowrap font-mono">{fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}</TableCell>
                   <TableCell className="whitespace-nowrap font-mono">{fmtDuration(inIso, outIso)}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={stopRowToggle}>
                     <Button variant="outline" size="sm" onClick={() => onMap(r)}>
                       <MapPin /> View
                     </Button>
@@ -1288,13 +1303,13 @@ function ArchiveTable({
                   <TableCell>
                     <GeofenceBadge row={r} />
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={stopRowToggle}>
                     <Button size="sm" variant="secondary" onClick={() => onEdit(r)}>
                       <Pencil /> Edit
                     </Button>
                   </TableCell>
                 </TableRow>
-                <InlineNotesRow row={r} colSpan={10} />
+                {open && <InlineNotesRow row={r} colSpan={11} />}
                 </Fragment>
               );
             })}

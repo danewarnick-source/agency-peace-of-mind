@@ -19,6 +19,8 @@ export type CeStepLesson = {
   title: string;
   body: string;
   facts?: [string, string][];
+  /** Source document(s)/clause(s) this lesson is built on (e.g. "Provider P&P §3.2"). */
+  citation?: string;
 };
 export type CeStepCheck = {
   type: "check";
@@ -156,6 +158,7 @@ function validateSteps(steps: unknown): CeStep[] {
         title: s.title,
         body: s.body,
         kicker: typeof s.kicker === "string" ? s.kicker : undefined,
+        citation: typeof s.citation === "string" ? s.citation : undefined,
         facts: Array.isArray(s.facts)
           ? (s.facts as unknown[])
               .map((f) => (Array.isArray(f) && f.length >= 2 ? ([String(f[0]), String(f[1])] as [string, string]) : null))
@@ -178,36 +181,64 @@ function validateSteps(steps: unknown): CeStep[] {
   const lessons = out.filter((s) => s.type === "lesson").length;
   const checks = out.filter((s) => s.type === "check").length;
   const reflects = out.filter((s) => s.type === "reflect").length;
-  if (lessons < 5) throw new Error(`Module floor not met: needs ≥5 lessons (got ${lessons}).`);
-  if (checks < 5) throw new Error(`Module floor not met: needs ≥5 scenario checks (got ${checks}).`);
+  // Soft floor — if sources are thin, the AI may emit fewer than 5 pairs
+  // (admin is flagged separately). Always require some teaching + a reflection.
+  if (lessons < 3) throw new Error(`Module floor not met: needs ≥3 lessons (got ${lessons}).`);
+  if (checks < 3) throw new Error(`Module floor not met: needs ≥3 scenario checks (got ${checks}).`);
   if (reflects !== 1) throw new Error("Module must end with exactly one reflection.");
   return out;
 }
 
 // ──────────────── Nectar AI call ───────────────────────────────────────────
 
-async function callNectarForCe(prompt: string): Promise<CeStep[]> {
+async function callNectarForCe(prompt: string): Promise<{ steps: CeStep[]; materialShort: boolean }> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
 
-  const system = `You are NECTAR, a coaching engine for experienced DSPD direct-support staff (year 2+).
-Build ONE monthly Continuing Education review of at least 60 minutes of genuine material, framed as coaching: what happened in this staff member's prior month, why it matters, and how to do better. Write at an EXPERIENCED-staff level — finer judgment calls, not the basics already covered in initial training.
+  const system = `You are NECTAR, a coaching engine that builds a monthly Continuing Education review for an experienced DSPD direct-support staff member.
 
-Output STRICT JSON, no markdown, matching:
-{"steps":[
-  {"type":"nectar","body":"<plain-language intro: what you found in their month and what this session covers>"},
-  {"type":"lesson","kicker":"...","title":"...","body":"...","facts":[["bold lead","detail"], ...]},
-  {"type":"check","kicker":"...","stem":"...","options":[{"label":"A","text":"...","correct":false,"feedback":"..."}, ...]},
-  ... more lesson/check pairs ...,
-  {"type":"reflect","kicker":"Reflection","prompt":"<final reflection prompt, free text required, ≥150 chars>"}
-]}
+ABSOLUTE GROUND RULE — source-grounded teaching only.
+You may build this review ONLY from:
+  (a) the AUTHORITATIVE SOURCES the provider has uploaded (State SOW, contracts, DSPD/DHS requirements, the provider's own policies & procedures, person-specific care plans, and any approved curriculum the provider uploaded), AND
+  (b) the staff member's factual event records for the prior month (incidents, medication events, caseload).
 
-REQUIREMENTS:
-- For EACH real event found, include a coaching lesson + at least one judgment-call scenario (check).
-- If real events are sparse, top up with deeper-than-basics refreshers of high-risk core skills (CPR, choking, seizures, de-escalation, med safety, abuse/neglect reporting). Review-level pro pointers, not introductory content.
-- FLOOR: at least 5 lessons + 5 checks (each lesson followed by a check), plus exactly 1 reflect at the end, totalling ≥60 minutes engagement.
-- Every check has 3–4 options, exactly one correct, every option gets per-option feedback.
-- Plain language. No markdown formatting inside body strings.`;
+You are the TEACHER of that material. You SHOULD expound on it:
+  - Explain a source clause in plain language; summarize and reorganize dense policy into a clear lesson.
+  - Give the rationale / the "why" behind a requirement where it aids understanding.
+  - Illustrate with clearly-hypothetical examples that show how a sourced rule applies in practice (e.g. a sample strong-vs-weak shift note teaching the agency's own documentation standard).
+  - Relate the source to the staff member's real events ("your June 3 incident connects to this policy because…").
+  - Ask reflective/application questions and scenarios built on the sourced material.
+
+You MUST NOT:
+  - Introduce a new substantive fact, requirement, number, threshold, or procedure step that no source supports — most importantly clinical/safety specifics (a seizure threshold, a medication rule, a CPR detail, a choking response sequence).
+  - Override, contradict, or "improve on" a source using outside knowledge.
+  - Fill a gap in the source with invented specifics. If the source is silent on a needed clinical point, explain what the source DOES say, then route the staff member to the nurse / the person's care plan / their supervisor — do NOT supply the missing fact.
+  - Present your own explanation, example, or illustration as if it were the authority or a new requirement.
+  - Pad the hour with generic CPR / choking / seizure / first-aid content that is not in any provided source.
+
+CITATIONS.
+  - Every "lesson" step MUST set "citation" to the source document title and (where possible) clause/section it is built on (e.g. "Provider P&P §3.2 – Medication Administration"). If the lesson is a coaching reflection on a real event, "citation" may be the event reference (e.g. "Incident #2026-0034 + Provider P&P §5.1").
+  - Explanation, examples, and application exercises do not each need a per-sentence citation, but they must not introduce new substantive facts.
+  - Keep a clear voice distinction: when quoting/summarizing a source, say so ("The agency's policy says…"); when explaining or illustrating, say so ("In plain language…", "For example…").
+
+INSUFFICIENT MATERIAL.
+  - Fill what you responsibly can from the provided sources and events.
+  - If there genuinely isn't enough sourced material to fill ~60 minutes, set "material_short": true and produce a shorter but fully-sourced review. Do NOT pad.
+  - When material is short, include one lesson titled "What's missing" that lists, in plain language, the topics that would normally be covered but were not in the uploaded sources, so the admin knows what to upload.
+
+OUTPUT — STRICT JSON, no markdown, matching this shape:
+{
+  "material_short": false,
+  "steps": [
+    {"type":"nectar","body":"<plain-language intro: what sources and events this review was built from, and what it covers>"},
+    {"type":"lesson","kicker":"...","title":"...","body":"...","citation":"Source title §clause","facts":[["bold lead","detail"]]},
+    {"type":"check","kicker":"...","stem":"...","options":[{"label":"A","text":"...","correct":false,"feedback":"..."}, ...]},
+    ... more lesson/check pairs, each lesson grounded in a cited source ...,
+    {"type":"reflect","kicker":"Reflection","prompt":"<final reflection prompt grounded in the sourced material, free text required, ≥150 chars>"}
+  ]
+}
+
+FLOOR: at least 3 lesson+check pairs and exactly 1 reflect. Aim for ~60 minutes when sources support it. Every check has 3–4 options, exactly one correct, every option gets per-option feedback. Plain language. No markdown inside body strings.`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -230,22 +261,67 @@ REQUIREMENTS:
   if (!res.ok) throw new Error(`Nectar generation failed (${res.status}).`);
   const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
   const raw = json.choices?.[0]?.message?.content ?? "{}";
-  let parsed: { steps?: unknown };
+  let parsed: { steps?: unknown; material_short?: unknown };
   try { parsed = JSON.parse(raw); } catch { throw new Error("Nectar returned non-JSON."); }
-  return validateSteps(parsed.steps);
+  return {
+    steps: validateSteps(parsed.steps),
+    materialShort: Boolean(parsed.material_short),
+  };
 }
 
-// Gather a compact event summary scoped to this staff member, prior ~30 days.
-async function gatherStaffEvents(
+// Gather authoritative sources + the staff member's factual records.
+// CE reviews are built only from these inputs — never from outside knowledge.
+async function gatherCeContext(
   supabase: ReturnType<typeof getSupabase>,
   orgId: string,
   staffId: string,
-): Promise<{ prompt: string; summary: string }> {
+): Promise<{ prompt: string; summary: string; sourceTitles: string[]; sourceCount: number }> {
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - 35);
   const sinceIso = since.toISOString();
 
-  // Incidents reported by this staff member.
+  // ---- (a) Authoritative sources for the org (current versions only) ----
+  const srcQ = await supabase
+    .from("nectar_documents")
+    .select("id, title, authoritative_kind, raw_text, fiscal_year, effective_start, effective_end")
+    .eq("organization_id", orgId)
+    .eq("is_authoritative_source", true)
+    .eq("is_current", true)
+    .order("created_at", { ascending: false })
+    .limit(40);
+  const allSources = (srcQ.data as {
+    id: string; title: string; authoritative_kind: string | null;
+    raw_text: string | null; fiscal_year: string | null;
+    effective_start: string | null; effective_end: string | null;
+  }[] | null) ?? [];
+
+  // ---- Staff's caseload → pull care-plan / person-specific docs for those clients ----
+  const caseQ = await supabase
+    .from("staff_assignments")
+    .select("client_id, clients:client_id(first_name, last_name)")
+    .eq("organization_id", orgId)
+    .eq("staff_id", staffId)
+    .limit(20);
+  const caseload = (caseQ.data as {
+    client_id: string;
+    clients: { first_name: string | null; last_name: string | null } | null;
+  }[] | null) ?? [];
+  const clientIds = caseload.map((c) => c.client_id);
+
+  let clientDocs: { id: string; title: string; raw_text: string | null; client_id: string | null }[] = [];
+  if (clientIds.length > 0) {
+    const cdQ = await supabase
+      .from("nectar_documents")
+      .select("id, title, raw_text, client_id")
+      .eq("organization_id", orgId)
+      .eq("is_current", true)
+      .eq("owner_kind", "client")
+      .in("client_id", clientIds)
+      .limit(40);
+    clientDocs = (cdQ.data as { id: string; title: string; raw_text: string | null; client_id: string | null }[] | null) ?? [];
+  }
+
+  // ---- (b) Staff's factual event records (prior ~30 days) ----
   const inc = await supabase
     .from("incident_reports")
     .select("report_number, incident_date, incident_types, narrative_during, immediate_actions")
@@ -255,7 +331,6 @@ async function gatherStaffEvents(
     .order("incident_date", { ascending: false })
     .limit(15);
 
-  // Med errors / near-misses on their shifts.
   const meds = await supabase
     .from("emar_logs")
     .select("scheduled_for, status, exception_reason, is_medication_error, error_description, is_prn, prn_reason")
@@ -266,7 +341,6 @@ async function gatherStaffEvents(
     .order("scheduled_for", { ascending: false })
     .limit(20);
 
-  // Recently added caseload.
   const cases = await supabase
     .from("staff_assignments")
     .select("created_at, client_id, clients:client_id(first_name)")
@@ -280,13 +354,35 @@ async function gatherStaffEvents(
   const medRows = (meds.data as { scheduled_for: string; status: string; exception_reason: string | null; is_medication_error: boolean; error_description: string | null; is_prn: boolean; prn_reason: string | null }[] | null) ?? [];
   const newClients = (cases.data as { created_at: string; client_id: string; clients: { first_name: string } | null }[] | null) ?? [];
 
+  // ---- Build the source pack for the prompt (capped per source to fit context) ----
+  const PER_SOURCE_CHARS = 4000;
+  const sourcePack = allSources.map((s) => ({
+    title: s.title,
+    kind: s.authoritative_kind,
+    fiscal_year: s.fiscal_year,
+    effective: s.effective_start ? `${s.effective_start} → ${s.effective_end ?? "present"}` : null,
+    text: (s.raw_text ?? "").slice(0, PER_SOURCE_CHARS),
+  }));
+  const clientPack = clientDocs.map((d) => {
+    const c = caseload.find((cc) => cc.client_id === d.client_id)?.clients;
+    const person = [c?.first_name, c?.last_name].filter(Boolean).join(" ") || "(person)";
+    return { person, title: d.title, text: (d.raw_text ?? "").slice(0, PER_SOURCE_CHARS) };
+  });
+
+  const sourceTitles = [
+    ...sourcePack.map((s) => s.title),
+    ...clientPack.map((c) => `${c.title} — ${c.person}`),
+  ];
+
   const summary = [
+    `Authoritative sources: ${sourcePack.length}`,
+    `Person-specific docs: ${clientPack.length}`,
     `Incidents filed: ${incidents.length}`,
     `Med exceptions/errors: ${medRows.length}`,
-    `New caseload assignments: ${newClients.length}`,
+    `New caseload: ${newClients.length}`,
   ].join(" · ");
 
-  const payload = {
+  const events = {
     incidents: incidents.map((i) => ({
       ref: i.report_number,
       date: i.incident_date,
@@ -303,14 +399,22 @@ async function gatherStaffEvents(
     new_caseload: newClients.map((c) => ({ first_name: c.clients?.first_name ?? "(person)", added: c.created_at })),
   };
 
-  const prompt = `Build the staff member's monthly CE review from their REAL prior-30-day activity below.
-Coach on every event. Top up with deeper-than-basics refreshers if fewer than 5 events.
-Hit the ≥60-minute / ≥5 lesson+check pair floor. End with one reflection prompt.
+  const prompt = `Build this staff member's monthly CE review STRICTLY from the AUTHORITATIVE SOURCES and EVENT RECORDS below.
+You may explain, illustrate, and apply this material — but you must NOT introduce new substantive facts, clinical specifics, thresholds, or procedure steps that are not in the provided sources. If a needed clinical specific is absent, route to the nurse / care plan / supervisor instead of supplying it.
 
-ACTIVITY JSON:
-${JSON.stringify(payload).slice(0, 12000)}`;
+Cite the source (title + clause/section when possible) on every lesson.
+If sources are too thin to responsibly fill ~60 minutes, set material_short=true and produce a shorter but fully-sourced review with a "What's missing" lesson.
 
-  return { prompt, summary };
+=== AUTHORITATIVE SOURCES (provider-uploaded) ===
+${JSON.stringify(sourcePack).slice(0, 40000)}
+
+=== PERSON-SPECIFIC DOCUMENTS (for this staff member's caseload) ===
+${JSON.stringify(clientPack).slice(0, 20000)}
+
+=== STAFF MEMBER'S FACTUAL EVENT RECORDS (prior ~30 days) ===
+${JSON.stringify(events).slice(0, 12000)}`;
+
+  return { prompt, summary, sourceTitles, sourceCount: sourcePack.length + clientPack.length };
 }
 
 // ──────────────── Server functions ─────────────────────────────────────────
@@ -441,9 +545,16 @@ export const ensureCurrentCeModule = createServerFn({ method: "POST" })
     let steps: CeStep[];
     let summary: string;
     try {
-      const gathered = await gatherStaffEvents(supabase, orgId, userId);
-      summary = gathered.summary;
-      steps = await callNectarForCe(gathered.prompt);
+      const gathered = await gatherCeContext(supabase, orgId, userId);
+      const result = await callNectarForCe(gathered.prompt);
+      steps = result.steps;
+      const sourceList = gathered.sourceTitles.length > 0
+        ? `Sources: ${gathered.sourceTitles.slice(0, 8).join("; ")}${gathered.sourceTitles.length > 8 ? `, +${gathered.sourceTitles.length - 8} more` : ""}`
+        : "Sources: (none uploaded yet)";
+      const shortFlag = (result.materialShort || gathered.sourceCount === 0)
+        ? " ⚠ Insufficient authoritative source material — admin should upload more sources so future CE reviews are richer."
+        : "";
+      summary = `Built from the agency's Authoritative Sources + this staff member's prior-30-day records. ${gathered.summary}. ${sourceList}.${shortFlag}`;
     } catch (err) {
       await supabase.from("ce_modules").update({ status: "failed", source_summary: (err as Error).message }).eq("id", modId);
       throw err;

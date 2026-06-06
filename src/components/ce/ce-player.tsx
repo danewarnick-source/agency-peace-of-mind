@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CheckCircle2, Circle, Pause, Play, Save, Lock, AlertCircle } from "lucide-react";
+import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 
 interface Props {
   module: CeModule;
@@ -19,7 +20,7 @@ interface Props {
   onCompleted: () => void;
 }
 
-const ATTESTATION = `I attest that I personally completed this Continuing Education review, understood the material, and will apply it in my work supporting people with disabilities. I understand this attestation is a legally meaningful electronic signature under the federal ESIGN Act and Utah's Uniform Electronic Transactions Act, and that this record is retained for DSPD audit purposes.`;
+const ATTESTATION = `I attest that I personally completed the agency's Continuing Education review for this period, drawn from the agency's Authoritative Sources (state requirements, the provider's policies & procedures, and applicable person-specific care plans) and from my own factual event records. I understood the material and will apply it in my work supporting people with disabilities. I understand this attestation is a legally meaningful electronic signature under the federal ESIGN Act and applicable state Uniform Electronic Transactions Act, and that this record is retained for audit purposes. The platform organizes what the agency uploads but does not independently verify accuracy or guarantee compliance.`;
 
 const IDLE_LIMIT_MS = 90_000;
 const TICK_MS = 1_000;
@@ -260,6 +261,7 @@ function StepView({
       <Card className="space-y-3 p-5">
         {step.kicker && <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{step.kicker}</div>}
         <h2 className="text-lg font-semibold tracking-tight">{step.title}</h2>
+        <SourceCitationChip citation={step.citation ?? null} />
         <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{step.body}</p>
         {step.facts && step.facts.length > 0 && (
           <ul className="space-y-2 rounded-xl bg-muted/40 p-3 text-sm">

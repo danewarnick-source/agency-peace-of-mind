@@ -174,18 +174,9 @@ export function HrComplianceMatrix({
                   {reqs.map((r) => (
                     <th
                       key={r.requirement_id}
-                      className="border-b border-border px-1 pt-2 pb-1 text-left font-medium min-w-[44px]"
-                      title={`${r.title}${r.source_citation ? `\n${r.source_citation}` : ""}`}
+                      className="border-b border-border px-2 py-2 text-center font-medium min-w-[72px]"
                     >
-                      <span
-                        className="inline-block whitespace-nowrap text-[11px] leading-tight"
-                        style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
-                      >
-                        {r.title}
-                        {r.is_renewable && r.renewal_interval_months && (
-                          <span className="text-muted-foreground">·{r.renewal_interval_months}mo</span>
-                        )}
-                      </span>
+                      <HeaderLabel req={r} />
                     </th>
                   ))}
                 </tr>

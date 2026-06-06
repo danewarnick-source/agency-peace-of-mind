@@ -64,6 +64,17 @@ function MyTrainings() {
 
   const personTotal = personModules?.length ?? 0;
 
+  const fetchOther = useServerFn(getMyOtherAssignmentsSummary);
+  const { data: otherSummary } = useQuery({
+    enabled: !!user,
+    queryKey: ["my-other-assignments-summary"],
+    queryFn: () => fetchOther(),
+  });
+  const otherOpen = otherSummary?.open_count ?? 0;
+  const otherSafety = otherSummary?.safety_critical_open_count ?? 0;
+  const otherTotal = otherSummary?.total ?? 0;
+  const otherDone = otherSummary?.completed ?? 0;
+
   return (
     <div className="space-y-4 pb-2">
       <StaffPageHeader

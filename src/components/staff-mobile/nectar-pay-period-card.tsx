@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
-  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays, Briefcase,
+  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays, Briefcase, ShieldAlert, BookOpen,
 } from "lucide-react";
 import {
   useNectarPayPeriod, useLivePayPeriod,
@@ -9,6 +11,7 @@ import {
 import { useCountUp } from "@/hooks/use-count-up";
 import { HexWatermark } from "@/components/brand/hex-watermark";
 import { NectarBadge, NectarSurface } from "@/components/nectar/nectar-brand";
+import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
 
 const fmtHours = (n: number) => `${n.toFixed(1)} hrs`;
 const fmtDays = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;

@@ -378,3 +378,198 @@ export const listStaffTypeProposal = createServerFn({ method: "POST" })
       proposed_at: proposed_at as string | null,
     };
   });
+
+// --- Edit + confirm (admin/manager only) -----------------------------------
+
+const staffTypeUpsert = z.object({
+  organization_id: z.string().uuid(),
+  id: z.string().uuid().nullable().optional(),
+  key: z
+    .string()
+    .min(1)
+    .max(60)
+    .regex(/^[a-z0-9_]+$/),
+  label: z.string().min(1).max(120),
+  description: z.string().max(2000).nullable().optional(),
+});
+
+export const upsertStaffType = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => staffTypeUpsert.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id, "manager");
+    if (data.id) {
+      const { error } = await supabase
+        .from("staff_types")
+        .update({
+          key: data.key,
+          label: data.label,
+          description: data.description ?? null,
+        })
+        .eq("id", data.id)
+        .eq("organization_id", data.organization_id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("staff_types").upsert(
+        {
+          organization_id: data.organization_id,
+          key: data.key,
+          label: data.label,
+          description: data.description ?? null,
+          proposed_by: "admin",
+          proposed_at: new Date().toISOString(),
+        },
+        { onConflict: "organization_id,key" },
+      );
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
+export const deleteStaffType = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({ organization_id: z.string().uuid(), id: z.string().uuid() })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id, "manager");
+    const { error } = await supabase
+      .from("staff_types")
+      .delete()
+      .eq("id", data.id)
+      .eq("organization_id", data.organization_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const requirementApplicabilityUpdate = z.object({
+  organization_id: z.string().uuid(),
+  requirement_id: z.string().uuid(),
+  applies_to: z.union([
+    z.literal("all"),
+    z.array(z.string().min(1).max(60)).max(20),
+  ]),
+});
+
+export const updateRequirementApplicability = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => requirementApplicabilityUpdate.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id, "manager");
+    const { data: r, error: rErr } = await supabase
+      .from("nectar_requirements")
+      .select("id, metadata")
+      .eq("id", data.requirement_id)
+      .eq("organization_id", data.organization_id)
+      .maybeSingle();
+    if (rErr) throw new Error(rErr.message);
+    if (!r) throw new Error("Requirement not found");
+    const prev = (r.metadata ?? {}) as Record<string, unknown>;
+    const now = new Date().toISOString();
+    const nextMeta = {
+      ...prev,
+      applies_to_staff_types: data.applies_to,
+      applies_to_confirmed_at: now,
+      applies_to_confirmed_by: userId,
+      applies_to_ambiguous: false,
+    };
+    const { error } = await supabase
+      .from("nectar_requirements")
+      .update({ metadata: nextMeta })
+      .eq("id", data.requirement_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const confirmAllApplicability = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ organization_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id, "manager");
+    const now = new Date().toISOString();
+    await supabase
+      .from("staff_types")
+      .update({ confirmed_at: now, confirmed_by: userId })
+      .eq("organization_id", data.organization_id)
+      .is("confirmed_at", null);
+    const { data: reqs } = await supabase
+      .from("nectar_requirements")
+      .select("id, metadata")
+      .eq("organization_id", data.organization_id)
+      .eq("approval_state", "provider_confirmed")
+      .filter("metadata->>scope", "eq", "hr_staff_checklist");
+    for (const r of reqs ?? []) {
+      const prev = (r.metadata ?? {}) as Record<string, unknown>;
+      if (prev.applies_to_confirmed_at) continue;
+      await supabase
+        .from("nectar_requirements")
+        .update({
+          metadata: {
+            ...prev,
+            applies_to_confirmed_at: now,
+            applies_to_confirmed_by: userId,
+          },
+        })
+        .eq("id", r.id);
+    }
+    return { ok: true };
+  });
+
+// --- Per-staff assignment --------------------------------------------------
+
+export const setStaffTypeKeys = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        organization_id: z.string().uuid(),
+        staff_id: z.string().uuid(),
+        staff_type_keys: z.array(z.string().min(1).max(60)).max(20),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id, "manager");
+    if (userId === data.staff_id) {
+      throw new Error("Forbidden: staff may not edit own type");
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from("profiles")
+      .update({ staff_type_keys: data.staff_type_keys })
+      .eq("id", data.staff_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const getStaffTypeAssignment = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        organization_id: z.string().uuid(),
+        staff_id: z.string().uuid(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }): Promise<{ staff_type_keys: string[] }> => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: row } = await (supabase as any)
+      .from("profiles")
+      .select("staff_type_keys")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    return { staff_type_keys: (row?.staff_type_keys as string[] | null) ?? [] };
+  });
+

@@ -523,15 +523,27 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
       { _org: data.organization_id },
     );
     if (baseErr) throw new Error(baseErr.message);
-    const baseItems: Array<{ id: string; title: string }> = (base ?? []).map(
-      (r: Record<string, unknown>) => ({
+    const baseItems: Array<{
+      id: string;
+      title: string;
+      is_renewable: boolean;
+      interval_months: number | null;
+    }> = (base ?? []).map((r: Record<string, unknown>) => {
+      const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      return {
         id: r.id as string,
         title:
           (r.title as string) ?? (r.short_label as string) ?? "Untitled",
-      }),
-    );
+        is_renewable: meta.is_renewable === true,
+        interval_months:
+          typeof meta.renewal_interval_months === "number"
+            ? (meta.renewal_interval_months as number)
+            : null,
+      };
+    });
     const totalRequired = baseItems.length;
     const baseIds = new Set(baseItems.map((b) => b.id));
+    const baseById = new Map(baseItems.map((b) => [b.id, b]));
     const titleById = new Map(baseItems.map((b) => [b.id, b.title]));
 
     // 3. Names / team / hire_date (non-PII) for the gated staff set.
@@ -563,10 +575,12 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
       for (const t of teams ?? []) teamMap.set(t.id, t.team_name);
     }
 
-    // 4. Completions for those staff only.
+    // 4. Completions for those staff only. Effective expiry = stored
+    //    expires_at OR (completed_date + renewal_interval_months) when the
+    //    item is renewable. Same computation as the matrix and card view.
     const { data: comps } = await sb
       .from("staff_checklist_completion")
-      .select("staff_id, requirement_id, status, expires_at")
+      .select("staff_id, requirement_id, status, completed_date, expires_at")
       .eq("organization_id", data.organization_id)
       .in("staff_id", staffIds);
     const compByStaff = new Map<
@@ -575,10 +589,24 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
     >();
     for (const c of comps ?? []) {
       if (!baseIds.has(c.requirement_id)) continue;
+      const b = baseById.get(c.requirement_id);
+      let effExpiry: string | null = c.expires_at ?? null;
+      if (
+        !effExpiry &&
+        b?.is_renewable &&
+        b.interval_months &&
+        c.completed_date
+      ) {
+        const d = new Date(c.completed_date);
+        if (!Number.isNaN(d.getTime())) {
+          d.setUTCMonth(d.getUTCMonth() + b.interval_months);
+          effExpiry = d.toISOString().slice(0, 10);
+        }
+      }
       if (!compByStaff.has(c.staff_id)) compByStaff.set(c.staff_id, new Map());
       compByStaff
         .get(c.staff_id)!
-        .set(c.requirement_id, { status: c.status, expires_at: c.expires_at });
+        .set(c.requirement_id, { status: c.status, expires_at: effExpiry });
     }
 
     const todayMs = Date.now();

@@ -15,6 +15,7 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import {
   parseCumulativeConfig,
   computeAnnualHoursProgress,
+  loadOrgAnnualHoursProgress,
   type AnnualHoursProgress,
   type CumulativeRequirementConfig,
   type TrainingContribution,

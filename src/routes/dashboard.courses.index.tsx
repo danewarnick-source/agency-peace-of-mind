@@ -144,6 +144,44 @@ function MyTrainings() {
             </span>
           </div>
         </Link>
+
+        <Link
+          to="/dashboard/courses/other"
+          className={`group relative overflow-hidden rounded-2xl border bg-card p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)] ${
+            otherSafety > 0 ? "border-destructive/40" : "border-border"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+              otherSafety > 0 ? "bg-destructive/15 text-destructive" : "bg-sky-500/15 text-sky-600"
+            }`}>
+              <BookOpen className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-semibold tracking-tight">Other Trainings</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Assigned to you by your admin or NECTAR.</p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+          </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+            <span className="font-medium">
+              <span className="text-foreground">{otherDone}</span> of {otherTotal} complete
+            </span>
+            {otherSafety > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 font-semibold uppercase tracking-wider text-destructive">
+                <AlertTriangle className="h-3 w-3" /> {otherSafety} safety-critical
+              </span>
+            ) : otherOpen > 0 ? (
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold uppercase tracking-wider text-amber-700">
+                {otherOpen} open
+              </span>
+            ) : (
+              <span className="rounded-full bg-muted px-2 py-0.5 font-semibold uppercase tracking-wider">
+                {otherTotal === 0 ? "none assigned" : "all done"}
+              </span>
+            )}
+          </div>
+        </Link>
       </div>
     </div>
   );

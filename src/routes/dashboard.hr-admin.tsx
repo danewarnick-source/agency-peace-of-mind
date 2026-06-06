@@ -307,6 +307,10 @@ function HrAdminPage() {
       </Card>
       {orgId && <HrComplianceMatrix organizationId={orgId} />}
 
+      {orgId && <OtherAssignmentsRollup organizationId={orgId} />}
+
+
+
 
       <p className="text-[11px] text-muted-foreground">
         Scope respects the HR PII gate at the aggregate level. Admins see every

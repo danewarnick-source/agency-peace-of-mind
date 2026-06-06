@@ -125,7 +125,16 @@ function DashboardLayout() {
   }, [session?.user?.id, navigate]);
 
   const role: Role = org?.role ?? "employee";
-  const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
+  const isCommitteeMember = role === "committee_member";
+  const isAdminCapable = !isCommitteeMember && (can("manage_users") || role === "admin" || role === "manager" || role === "super_admin");
+
+  // Fail-closed gate: a committee_member can ONLY access /dashboard/hrc.
+  // Redirect away from anything else immediately.
+  useEffect(() => {
+    if (!loading && session && isCommitteeMember && !pathname.startsWith("/dashboard/hrc")) {
+      navigate({ to: "/dashboard/hrc", replace: true });
+    }
+  }, [loading, session, isCommitteeMember, pathname, navigate]);
   // PV type is hoisted to module scope.
   const allowedViews: PV[] = ["staff"];
   if (isAdminCapable) { allowedViews.push("admin", "staff_mobile"); }

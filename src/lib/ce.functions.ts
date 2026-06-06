@@ -322,8 +322,18 @@ export const getMyCeStatus = createServerFn({ method: "GET" })
     const userId = (context as { userId: string }).userId;
     const { orgId, isAdmin } = await getCallerOrg(supabase, userId);
 
-    const profileQ = await supabase.from("profiles").select("hire_date").eq("id", userId).maybeSingle();
-    const hireDate = (profileQ.data as { hire_date: string | null } | null)?.hire_date ?? null;
+    // start_date is the single source of truth for CE eligibility.
+    // Fall back to legacy hire_date until every profile is migrated.
+    // end_date set → employment ended → no new CE.
+    const profileQ = await supabase
+      .from("profiles")
+      .select("hire_date, start_date, end_date")
+      .eq("id", userId)
+      .maybeSingle();
+    const profileRow =
+      (profileQ.data as { hire_date: string | null; start_date: string | null; end_date: string | null } | null) ?? null;
+    const hireDate = profileRow?.start_date ?? profileRow?.hire_date ?? null;
+    const endDate = profileRow?.end_date ?? null;
 
     let demoModeEnabled = false;
     let minActiveMinutes = 60;
@@ -339,7 +349,8 @@ export const getMyCeStatus = createServerFn({ method: "GET" })
     }
 
     const today = todayUtc();
-    const applies = hireDate ? ceApplies(hireDate, today) : false;
+    const employmentEnded = !!endDate;
+    const applies = hireDate && !employmentEnded ? ceApplies(hireDate, today) : false;
     const yearStart = hireDate && applies ? ceYearStart(hireDate, today) : null;
     const yearEnd = yearStart ? ceYearEnd(yearStart) : null;
     const period = periodOf(today);

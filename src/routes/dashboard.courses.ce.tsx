@@ -63,16 +63,29 @@ function ContinuingEducation() {
   }
 
   if (!status.ceApplies) {
+    const anniversary = status.hireDate
+      ? (() => {
+          const d = new Date(status.hireDate + "T00:00:00Z");
+          d.setUTCFullYear(d.getUTCFullYear() + 1);
+          return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+        })()
+      : null;
     return (
       <div className="space-y-4 pb-2">
         <BackLink />
         <StaffPageHeader eyebrow="Year 2+" eyebrowIcon={GraduationCap} title="Continuing Education" subtitle="Annual 12-hour refresher for experienced staff." />
-        <Card className="p-5 text-sm">
-          Continuing Education begins after your first year of employment. Focus on the 30-Day Core Training and your person-specific modules for now.
+        <Card className="p-5 text-sm space-y-2">
+          <p>Continuing Education begins after your first year of employment. Focus on the 30-Day Core Training and your person-specific modules for now.</p>
+          {anniversary && (
+            <p className="text-muted-foreground">
+              Your CE year begins on <span className="font-medium text-foreground">{anniversary}</span> (your first-year anniversary).
+            </p>
+          )}
         </Card>
       </div>
     );
   }
+
 
   const mod = status.currentModule;
   const progressPct = Math.min(100, (status.hoursThisYear / status.goalHours) * 100);

@@ -1631,6 +1631,9 @@ function ReconcileTable({
     toast.success(`Exported ${rows.length} reconciliation record${rows.length === 1 ? "" : "s"}.`);
   };
 
+  const exp = useRowExpansion();
+  const allIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -1643,6 +1646,7 @@ function ReconcileTable({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ExpandControls exp={exp} ids={allIds} />
           <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -1658,10 +1662,11 @@ function ReconcileTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               <TableHead>Date</TableHead>
               <TableHead>Caregiver</TableHead>
               <TableHead>Client</TableHead>
@@ -1675,21 +1680,31 @@ function ReconcileTable({
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No shifts match this filter — geofence reconciliation is clean.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No shifts match this filter — geofence reconciliation is clean.</TableCell></TableRow>
             ) : filtered.map((r) => {
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
+              const open = exp.isExpanded(r.id);
               return (
                 <Fragment key={r.id}>
-                <TableRow className="[&>td]:border-b-0">
+                <TableRow
+                  onClick={() => exp.toggle(r.id)}
+                  role="button"
+                  aria-expanded={open}
+                  className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
+                >
+                  <ChevronCell open={open} />
                   <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
-                  <TableCell className="whitespace-nowrap font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap font-medium">
+                    {r.staff?.full_name ?? r.staff?.email ?? "—"}
+                    <FlagDot row={r} />
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                   <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
                   <TableCell className="whitespace-nowrap font-mono">{fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={stopRowToggle}>
                     <Button variant="outline" size="sm" onClick={() => onMap(r)}>
                       <MapPin /> View
                     </Button>
@@ -1698,13 +1713,13 @@ function ReconcileTable({
                   <TableCell className="max-w-xs truncate text-xs text-muted-foreground" title={r.outside_geofence_reason ?? ""}>
                     {r.outside_geofence_reason ?? "—"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={stopRowToggle}>
                     <Button size="sm" onClick={() => onReview(r)}>
                       Review
                     </Button>
                   </TableCell>
                 </TableRow>
-                <InlineNotesRow row={r} colSpan={9} />
+                {open && <InlineNotesRow row={r} colSpan={10} />}
                 </Fragment>
               );
             })}

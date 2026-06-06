@@ -131,6 +131,20 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
     return (base ?? []).map((r: Record<string, unknown>) => {
       const c = compMap.get(r.id as string);
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      const isRenewable = meta.is_renewable === true;
+      const intervalMonths =
+        typeof meta.renewal_interval_months === "number"
+          ? (meta.renewal_interval_months as number)
+          : null;
+      const completedDate = (c?.completed_date as string) ?? null;
+      let effExpiry = (c?.expires_at as string) ?? null;
+      if (!effExpiry && isRenewable && intervalMonths && completedDate) {
+        const d = new Date(completedDate);
+        if (!Number.isNaN(d.getTime())) {
+          d.setUTCMonth(d.getUTCMonth() + intervalMonths);
+          effExpiry = d.toISOString().slice(0, 10);
+        }
+      }
       return {
         requirement_id: r.id as string,
         title: (r.title as string) ?? (r.short_label as string) ?? "Untitled",
@@ -139,11 +153,14 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         evidence_type: (r.evidence_type as string) ?? null,
         renewal_frequency: (r.renewal_frequency as string) ?? null,
         checklist_layer: (meta.checklist_layer as string) ?? null,
+        is_renewable: isRenewable,
+        renewal_interval_months: intervalMonths,
+        renewal_source: (meta.renewal_source as string) ?? null,
         completion: {
           id: (c?.id as string) ?? null,
           status: (c?.status as string) ?? "not_started",
-          completed_date: (c?.completed_date as string) ?? null,
-          expires_at: (c?.expires_at as string) ?? null,
+          completed_date: completedDate,
+          expires_at: effExpiry,
           evidence_document_id: (c?.evidence_document_id as string) ?? null,
           notes: (c?.notes as string) ?? null,
           completed_by: (c?.completed_by as string) ?? null,

@@ -172,14 +172,19 @@ export function HrComplianceMatrix({
                   <th className="sticky left-0 z-20 bg-background border-b border-r border-border px-3 py-2 text-left font-medium min-w-[180px]">
                     Staff
                   </th>
-                  {reqs.map((r) => (
-                    <th
-                      key={r.requirement_id}
-                      className="border-b border-border px-2 py-2 text-center font-medium min-w-[72px]"
-                    >
-                      <HeaderLabel req={r} />
-                    </th>
-                  ))}
+                  {reqs.map((r) => {
+                    const isCum = r.requirement_type === "cumulative_hours";
+                    return (
+                      <th
+                        key={r.requirement_id}
+                        className={`border-b border-border px-2 py-2 text-center font-medium ${
+                          isCum ? "min-w-[110px]" : "min-w-[72px]"
+                        }`}
+                      >
+                        <HeaderLabel req={r} />
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>

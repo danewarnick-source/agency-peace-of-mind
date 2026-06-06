@@ -463,6 +463,64 @@ function computeBandSummary(
   return { expired, dueSoon, total };
 }
 
+function deriveShortLabel(title: string): string {
+  let t = title.replace(/^\s*Training\s*:\s*/i, "").trim();
+  t = t.replace(/\s*\(.*?\)\s*/g, " ").trim();
+  t = t.split(/\s+[–—\-·:/]\s+/)[0].trim();
+  t = t
+    .replace(/Professional/gi, "Prof.")
+    .replace(/Communicable/gi, "Comm.")
+    .replace(/Disease[s]?/gi, "Disease")
+    .replace(/Prevention/gi, "Prev.")
+    .replace(/Response/gi, "Resp.")
+    .replace(/Management/gi, "Mgmt")
+    .replace(/Discrimination/gi, "Disc.")
+    .replace(/Certification/gi, "Cert");
+  t = t.replace(/\s+/g, " ").trim();
+  const words = t.split(" ");
+  let out = words[0] ?? t;
+  for (let i = 1; i < words.length && out.length + 1 + words[i].length <= 14; i++) {
+    out += " " + words[i];
+  }
+  if (out.length > 16) out = out.slice(0, 15) + "…";
+  return out;
+}
+
+function HeaderLabel({ req }: { req: HrMatrix["requirements"][number] }) {
+  const short =
+    (req as { short_label?: string }).short_label?.trim() ||
+    deriveShortLabel(req.title);
+  const [open, setOpen] = useState(false);
+  return (
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          className="inline-flex flex-col items-center gap-0.5 rounded px-1 py-0.5 text-[11px] font-medium leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <span className="whitespace-nowrap">{short}</span>
+          {req.is_renewable && req.renewal_interval_months && (
+            <span className="text-[9px] font-normal text-muted-foreground">
+              {req.renewal_interval_months}mo
+            </span>
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-xs">
+        <div className="space-y-0.5 text-xs">
+          <div className="font-medium">{req.title}</div>
+          {req.source_citation && (
+            <div className="text-[11px] opacity-80">{req.source_citation}</div>
+          )}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1">

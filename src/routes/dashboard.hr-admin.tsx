@@ -314,7 +314,7 @@ function HrAdminPage() {
           )}
         </CardContent>
       </Card>
-      {orgId && <StaffTypesProposal organizationId={orgId} />}
+      
 
       {orgId && <HrComplianceMatrix organizationId={orgId} />}
 

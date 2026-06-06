@@ -501,7 +501,7 @@ function TrainingHistoryCard({ staffId }: { staffId: string }) {
     },
   });
 
-  const rows = q.data ?? [];
+  const rows = (q.data ?? []) as Array<Record<string, any>>;
   const exportCsv = () => {
     const cols = [
       "completed_at",

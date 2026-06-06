@@ -21,6 +21,11 @@ import {
   type TrainingContribution,
   type HoursEntry,
 } from "@/lib/hr-training-hours.functions";
+import {
+  isRequirementApplicable,
+  parseAppliesTo,
+} from "@/lib/staff-applicability";
+
 
 const orgStaff = z.object({
   organization_id: z.string().uuid(),

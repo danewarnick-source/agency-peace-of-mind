@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
-import { Bell, AlertTriangle, Clock, CheckCircle2, X } from "lucide-react";
+import { Bell, AlertTriangle, Clock, CheckCircle2, X, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getOrgCeRoster } from "@/lib/ce.functions";
 
 type Urgency = "normal" | "urgent" | "critical";
 type NotificationType =

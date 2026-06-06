@@ -47,13 +47,14 @@ function PermissionsPage() {
 
   const resetDefaults = () => {
     const fresh: Record<Role, Record<Permission, boolean>> = {} as never;
-    (["super_admin", ...EDITABLE_ROLES] as Role[]).forEach((r) => {
+    EDITABLE_ROLES.forEach((r) => {
       fresh[r] = Object.fromEntries(
         ALL_PERMISSIONS.map((p) => [p, DEFAULT_MATRIX[r].includes(p)]),
       ) as Record<Permission, boolean>;
     });
     setDraft(fresh);
   };
+
 
   const save = async () => {
     if (!org || !draft) return;
@@ -91,7 +92,7 @@ function PermissionsPage() {
             <h2 className="text-base font-semibold">Role permissions</h2>
             <p className="text-sm text-muted-foreground">
               Customize what each role can do in {org?.organization_name ?? "your organization"}.
-              Super Admin always has full access.
+
             </p>
           </div>
         </div>

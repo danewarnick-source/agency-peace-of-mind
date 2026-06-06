@@ -336,8 +336,11 @@ function EmployeesPage() {
               <th className="p-4 text-left">Role</th>
               <th className="p-4 text-left">Position</th>
               <th className="p-4 text-left">Status</th>
+              <th className="p-4 text-left">Start date</th>
+              <th className="p-4 text-left">End date</th>
               <th className="p-4 text-left">Joined</th>
               <th className="p-4" />
+
             </tr>
           </thead>
           <tbody>
@@ -353,7 +356,10 @@ function EmployeesPage() {
                   <td className="p-4"><span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span></td>
                   <td className="p-4">{position ? <Badge variant="outline" className="font-normal">{position}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</td>
                   <td className="p-4 text-xs">{m.active ? <span className="text-emerald-600">Active</span> : <span className="text-muted-foreground">Deactivated</span>}</td>
+                  <td className="p-4 text-xs text-muted-foreground">{m.profile?.start_date ?? m.profile?.hire_date ?? "—"}</td>
+                  <td className="p-4 text-xs text-muted-foreground">{m.profile?.end_date ?? "—"}</td>
                   <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
+
                   <td className="p-4 text-right whitespace-nowrap">
                     <Button variant="ghost" size="sm" onClick={() => setEditingMember({
                       membershipId: m.id,
@@ -427,7 +433,9 @@ function EmployeesPage() {
               email: String(fd.get("email") || "").trim(),
               role: String(fd.get("role") || "employee") as Role,
               department: String(fd.get("department") || "").trim(),
-              hireDate: String(fd.get("hire_date") || ""),
+              startDate: String(fd.get("start_date") || ""),
+              endDate: String(fd.get("end_date") || ""),
+
               trackIds,
               password: String(fd.get("password") || tempPassword),
             });
@@ -463,7 +471,11 @@ function EmployeesPage() {
               </div>
               <div className="grid gap-2"><Label htmlFor="department">Department / team</Label><Input id="department" name="department" /></div>
             </div>
-            <div className="grid gap-2"><Label htmlFor="hire_date">Hire date</Label><Input id="hire_date" name="hire_date" type="date" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2"><Label htmlFor="start_date">Start date</Label><Input id="start_date" name="start_date" type="date" /></div>
+              <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
+            </div>
+
             {!!tracks?.length && (
               <div className="grid gap-2">
                 <Label>Assigned training tracks</Label>

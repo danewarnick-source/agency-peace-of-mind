@@ -168,15 +168,11 @@ function RolesPage() {
                   </TableCell>
                   <TableCell>
                     <Select
-                      value={role}
+                      value={role === "super_admin" ? "admin" : role}
                       disabled={disabled}
                       onValueChange={(val) => {
                         const next = val as Role;
                         if (next === role) return;
-                        if (next === "super_admin" && !isSuperAdmin) {
-                          toast.error("Only Super Admins can grant Super Admin");
-                          return;
-                        }
                         if (confirm(`Change ${m.profile?.full_name ?? "this user"}'s role to ${ROLE_LABEL[next]}?`)) {
                           updateRole.mutate({ memberId: m.id, role: next });
                         }
@@ -186,10 +182,10 @@ function RolesPage() {
                       <SelectContent>
                         <SelectItem value="employee">Employee</SelectItem>
                         <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="admin">Company Admin</SelectItem>
-                        {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
+                        <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
+
                   </TableCell>
                 </TableRow>
               );
@@ -201,12 +197,12 @@ function RolesPage() {
       <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-[var(--shadow-card)]">
         <h3 className="mb-2 text-sm font-semibold text-foreground">Role guide</h3>
         <ul className="space-y-1">
-          <li><strong className="text-foreground">Super Admin</strong> — Full platform access across all organizations.</li>
-          <li><strong className="text-foreground">Company Admin</strong> — Manages employees, courses, billing, and roles in this organization.</li>
+          <li><strong className="text-foreground">Admin</strong> — Manages employees, courses, billing, and roles in this organization.</li>
           <li><strong className="text-foreground">Manager</strong> — Assigns training and views team reports.</li>
           <li><strong className="text-foreground">Employee</strong> — Completes assigned courses and earns certifications.</li>
         </ul>
       </div>
+
     </div>
   );
 }

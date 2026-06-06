@@ -623,10 +623,12 @@ export function TrainingRecordsAdmin() {
                 <tr className="border-b border-border">
                   <th className="w-8 py-2 text-left print:hidden"></th>
                   <th className="py-2 text-left">Staff</th>
+                  <th className="py-2 text-left">Start date</th>
                   <th className="py-2 text-left">Status</th>
                   <th className="py-2 text-left">Hours this year</th>
                   <th className="py-2 text-left">Progress</th>
                   <th className="py-2 text-left">Year ends</th>
+
                 </tr>
               </thead>
               <tbody>
@@ -653,6 +655,8 @@ export function TrainingRecordsAdmin() {
                           />
                         </td>
                         <td className="py-2 font-medium">{r.fullName}</td>
+                        <td className="py-2 whitespace-nowrap text-xs text-muted-foreground">{r.hireDate ?? "—"}</td>
+
                         <td className="py-2">
                           {r.status === "complete" && (
                             <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
@@ -706,7 +710,8 @@ export function TrainingRecordsAdmin() {
                 {(!ceRoster || ceRoster.rows.length === 0) && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
+
                       className="py-6 text-center text-xs text-muted-foreground"
                     >
                       No CE roster data yet.

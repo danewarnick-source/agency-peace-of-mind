@@ -243,6 +243,7 @@ function StaffProfilePage() {
         </TabsContent>
 
         <TabsContent value="hr" className="mt-4 space-y-4">
+          <StaffTypeEditor organizationId={orgId} staffId={staffId} />
           <StaffHrChecklistCard organizationId={orgId} staffId={staffId} />
           <OtherAssignmentsAdminSection organizationId={orgId} staffId={staffId} />
         </TabsContent>

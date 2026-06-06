@@ -336,8 +336,11 @@ function EmployeesPage() {
               <th className="p-4 text-left">Role</th>
               <th className="p-4 text-left">Position</th>
               <th className="p-4 text-left">Status</th>
+              <th className="p-4 text-left">Start date</th>
+              <th className="p-4 text-left">End date</th>
               <th className="p-4 text-left">Joined</th>
               <th className="p-4" />
+
             </tr>
           </thead>
           <tbody>
@@ -353,7 +356,10 @@ function EmployeesPage() {
                   <td className="p-4"><span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span></td>
                   <td className="p-4">{position ? <Badge variant="outline" className="font-normal">{position}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</td>
                   <td className="p-4 text-xs">{m.active ? <span className="text-emerald-600">Active</span> : <span className="text-muted-foreground">Deactivated</span>}</td>
+                  <td className="p-4 text-xs text-muted-foreground">{m.profile?.start_date ?? m.profile?.hire_date ?? "—"}</td>
+                  <td className="p-4 text-xs text-muted-foreground">{m.profile?.end_date ?? "—"}</td>
                   <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
+
                   <td className="p-4 text-right whitespace-nowrap">
                     <Button variant="ghost" size="sm" onClick={() => setEditingMember({
                       membershipId: m.id,

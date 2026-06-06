@@ -379,6 +379,13 @@ export function StaffHrChecklistCard({
                         {row.completion.expires_at && ` · expires ${row.completion.expires_at}`}
                       </div>
                     )}
+                    {row.completion.training_completion_id && (
+                      <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                        <GraduationCap className="h-3 w-3" /> Auto-checked from signed training
+                        {row.completion.auto_checked_at &&
+                          ` · ${new Date(row.completion.auto_checked_at).toLocaleDateString()}`}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -386,6 +393,12 @@ export function StaffHrChecklistCard({
           )}
         </CardContent>
       </Card>
+
+      <TrainingHistoryCard
+        organizationId={organizationId}
+        staffId={staffId}
+        staffLabel={pii.full_name ?? pii.email ?? staffId}
+      />
 
       <Card>
         <CardHeader>

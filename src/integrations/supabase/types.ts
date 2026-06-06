@@ -7443,6 +7443,7 @@ export type Database = {
           similarity: number
         }[]
       }
+      is_admin_anywhere: { Args: { _user: string }; Returns: boolean }
       is_company_executive: {
         Args: { _org: string; _user: string }
         Returns: boolean

@@ -204,7 +204,41 @@ export function NectarPayPeriodCard() {
             Needs your attention
           </p>
           <ul className="mt-2 flex flex-col gap-1.5">
+            {otherOpen > 0 && (
+              <li>
+                <Link
+                  to="/dashboard/courses/other"
+                  className={`flex min-h-[44px] items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white transition active:scale-[0.99] ${
+                    otherSafety > 0
+                      ? "bg-red-500/25 hover:bg-red-500/35 ring-1 ring-red-400/60"
+                      : "bg-white/[0.06] hover:bg-white/[0.12]"
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    {otherSafety > 0 ? (
+                      <ShieldAlert className="h-4 w-4 text-red-200" />
+                    ) : (
+                      <BookOpen className="h-4 w-4 text-[#f4a93a]" />
+                    )}
+                    {otherSafety > 0
+                      ? "Safety-critical training due"
+                      : "Assigned trainings outstanding"}
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 font-mono text-xs font-bold tabular-nums ${
+                      otherSafety > 0
+                        ? "bg-red-400 text-red-950"
+                        : "bg-[image:var(--gradient-amber)] text-[#412402]"
+                    }`}>
+                      {otherSafety > 0 ? otherSafety : otherOpen}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-white/80" />
+                  </span>
+                </Link>
+              </li>
+            )}
             <li>
+
               <Link
                 to="/dashboard/daily-logs"
                 className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg bg-white/[0.06] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/[0.12] active:scale-[0.99]"

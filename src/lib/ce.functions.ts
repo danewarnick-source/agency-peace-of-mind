@@ -685,14 +685,22 @@ export const getOrgCeRoster = createServerFn({ method: "GET" })
     // Pull active staff in this org via organization_members + profiles join.
     const membersQ = await supabase
       .from("organization_members")
-      .select("user_id, role, profiles:user_id(id, first_name, last_name, email, hire_date)")
+      .select("user_id, role, profiles:user_id(id, first_name, last_name, email, hire_date, start_date, end_date)")
       .eq("organization_id", orgId)
       .eq("active", true);
 
     type MemRow = {
       user_id: string;
       role: string;
-      profiles: { id: string; first_name: string | null; last_name: string | null; email: string | null; hire_date: string | null } | null;
+      profiles: {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        email: string | null;
+        hire_date: string | null;
+        start_date: string | null;
+        end_date: string | null;
+      } | null;
     };
     const members = ((membersQ.data as MemRow[] | null) ?? []).filter((m) => m.profiles);
 
@@ -707,8 +715,9 @@ export const getOrgCeRoster = createServerFn({ method: "GET" })
     const rows: CeRosterRow[] = members.map((m) => {
       const p = m.profiles!;
       const fullName = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || (p.email ?? "Staff");
-      const hire = p.hire_date;
-      const applies = hire ? ceApplies(hire, today) : false;
+      const hire = p.start_date ?? p.hire_date;
+      const employmentEnded = !!p.end_date;
+      const applies = hire && !employmentEnded ? ceApplies(hire, today) : false;
       const yearStart = hire && applies ? ceYearStart(hire, today) : null;
       const yearEnd = yearStart ? ceYearEnd(yearStart) : null;
       const yearStartIso = yearStart ? fmtDate(yearStart) : null;

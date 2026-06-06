@@ -89,7 +89,6 @@ type OtherAssignment = {
   status: string;
   due_date: string | null;
   completed_at: string | null;
-  signature_name: string | null;
 };
 
 type TrainingType = "core" | "person" | "ce" | "other";

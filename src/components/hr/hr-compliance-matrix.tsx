@@ -476,7 +476,8 @@ function computeBandSummary(
   for (const s of staff) {
     for (const r of renewable) {
       const c = s.cells[r.requirement_id];
-      if (!c || (c.status !== "complete" && c.status !== "expired")) continue;
+      if (!c || c.applicable === false) continue;
+      if (c.status !== "complete" && c.status !== "expired") continue;
       total++;
       const ts = c.expires_at ? new Date(c.expires_at).getTime() : null;
       if (c.status === "expired" || (ts !== null && ts < todayMs)) {

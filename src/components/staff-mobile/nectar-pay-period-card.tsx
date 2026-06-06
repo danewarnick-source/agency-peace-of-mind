@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
-  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays, Briefcase,
+  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays, Briefcase, ShieldAlert, BookOpen,
 } from "lucide-react";
 import {
   useNectarPayPeriod, useLivePayPeriod,
@@ -9,6 +11,7 @@ import {
 import { useCountUp } from "@/hooks/use-count-up";
 import { HexWatermark } from "@/components/brand/hex-watermark";
 import { NectarBadge, NectarSurface } from "@/components/nectar/nectar-brand";
+import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
 
 const fmtHours = (n: number) => `${n.toFixed(1)} hrs`;
 const fmtDays = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
@@ -24,6 +27,14 @@ export function NectarPayPeriodCard() {
   const { data } = useNectarPayPeriod();
   const live = useLivePayPeriod();
   const [open, setOpen] = useState(false);
+  const fetchOther = useServerFn(getMyOtherAssignmentsSummary);
+  const { data: otherSummary } = useQuery({
+    queryKey: ["my-other-assignments-summary"],
+    queryFn: () => fetchOther(),
+  });
+  const otherOpen = otherSummary?.open_count ?? 0;
+  const otherSafety = otherSummary?.safety_critical_open_count ?? 0;
+
 
   const label = data?.label ?? "Current period";
 
@@ -193,7 +204,41 @@ export function NectarPayPeriodCard() {
             Needs your attention
           </p>
           <ul className="mt-2 flex flex-col gap-1.5">
+            {otherOpen > 0 && (
+              <li>
+                <Link
+                  to="/dashboard/courses/other"
+                  className={`flex min-h-[44px] items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white transition active:scale-[0.99] ${
+                    otherSafety > 0
+                      ? "bg-red-500/25 hover:bg-red-500/35 ring-1 ring-red-400/60"
+                      : "bg-white/[0.06] hover:bg-white/[0.12]"
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    {otherSafety > 0 ? (
+                      <ShieldAlert className="h-4 w-4 text-red-200" />
+                    ) : (
+                      <BookOpen className="h-4 w-4 text-[#f4a93a]" />
+                    )}
+                    {otherSafety > 0
+                      ? "Safety-critical training due"
+                      : "Assigned trainings outstanding"}
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 font-mono text-xs font-bold tabular-nums ${
+                      otherSafety > 0
+                        ? "bg-red-400 text-red-950"
+                        : "bg-[image:var(--gradient-amber)] text-[#412402]"
+                    }`}>
+                      {otherSafety > 0 ? otherSafety : otherOpen}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-white/80" />
+                  </span>
+                </Link>
+              </li>
+            )}
             <li>
+
               <Link
                 to="/dashboard/daily-logs"
                 className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg bg-white/[0.06] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/[0.12] active:scale-[0.99]"

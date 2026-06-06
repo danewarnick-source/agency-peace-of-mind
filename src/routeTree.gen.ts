@@ -93,6 +93,7 @@ import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.
 import { Route as DashboardFinancialRevenueRouteImport } from './routes/dashboard.financial.revenue'
 import { Route as DashboardEmployeesStaffIdRouteImport } from './routes/dashboard.employees.$staffId'
 import { Route as DashboardCoursesPersonRouteImport } from './routes/dashboard.courses.person'
+import { Route as DashboardCoursesOtherRouteImport } from './routes/dashboard.courses.other'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCoreRouteImport } from './routes/dashboard.courses.core'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
@@ -546,6 +547,11 @@ const DashboardCoursesPersonRoute = DashboardCoursesPersonRouteImport.update({
   path: '/courses/person',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardCoursesOtherRoute = DashboardCoursesOtherRouteImport.update({
+  id: '/courses/other',
+  path: '/courses/other',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardCoursesMindsmithRoute =
   DashboardCoursesMindsmithRouteImport.update({
     id: '/courses/mindsmith',
@@ -692,6 +698,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
   '/dashboard/courses/person': typeof DashboardCoursesPersonRoute
   '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
@@ -788,6 +795,7 @@ export interface FileRoutesByTo {
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
   '/dashboard/courses/person': typeof DashboardCoursesPersonRoute
   '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
@@ -889,6 +897,7 @@ export interface FileRoutesById {
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
+  '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
   '/dashboard/courses/person': typeof DashboardCoursesPersonRoute
   '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
@@ -991,6 +1000,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/core'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/courses/other'
     | '/dashboard/courses/person'
     | '/dashboard/employees/$staffId'
     | '/dashboard/financial/revenue'
@@ -1087,6 +1097,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/core'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/courses/other'
     | '/dashboard/courses/person'
     | '/dashboard/employees/$staffId'
     | '/dashboard/financial/revenue'
@@ -1187,6 +1198,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/core'
     | '/dashboard/courses/mindsmith'
+    | '/dashboard/courses/other'
     | '/dashboard/courses/person'
     | '/dashboard/employees/$staffId'
     | '/dashboard/financial/revenue'
@@ -1833,6 +1845,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesPersonRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/courses/other': {
+      id: '/dashboard/courses/other'
+      path: '/courses/other'
+      fullPath: '/dashboard/courses/other'
+      preLoaderRoute: typeof DashboardCoursesOtherRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/courses/mindsmith': {
       id: '/dashboard/courses/mindsmith'
       path: '/courses/mindsmith'
@@ -2125,6 +2144,7 @@ interface DashboardRouteChildren {
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesCoreRoute: typeof DashboardCoursesCoreRoute
   DashboardCoursesMindsmithRoute: typeof DashboardCoursesMindsmithRoute
+  DashboardCoursesOtherRoute: typeof DashboardCoursesOtherRoute
   DashboardCoursesPersonRoute: typeof DashboardCoursesPersonRoute
   DashboardEmployeesStaffIdRoute: typeof DashboardEmployeesStaffIdRoute
   DashboardHhsHubClientIdRoute: typeof DashboardHhsHubClientIdRoute
@@ -2182,6 +2202,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesCoreRoute: DashboardCoursesCoreRoute,
   DashboardCoursesMindsmithRoute: DashboardCoursesMindsmithRoute,
+  DashboardCoursesOtherRoute: DashboardCoursesOtherRoute,
   DashboardCoursesPersonRoute: DashboardCoursesPersonRoute,
   DashboardEmployeesStaffIdRoute: DashboardEmployeesStaffIdRoute,
   DashboardHhsHubClientIdRoute: DashboardHhsHubClientIdRoute,

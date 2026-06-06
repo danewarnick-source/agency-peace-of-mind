@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { RequirePermission } from "@/components/rbac-guard";
 import { HrComplianceMatrix } from "@/components/hr/hr-compliance-matrix";
+import { OtherAssignmentsRollup } from "@/components/training/other-assignments-rollup";
 
 export const Route = createFileRoute("/dashboard/hr-admin")({
   head: () => ({ meta: [{ title: "HR Admin — HIVE" }] }),
@@ -306,6 +307,10 @@ function HrAdminPage() {
         </CardContent>
       </Card>
       {orgId && <HrComplianceMatrix organizationId={orgId} />}
+
+      {orgId && <OtherAssignmentsRollup organizationId={orgId} />}
+
+
 
 
       <p className="text-[11px] text-muted-foreground">

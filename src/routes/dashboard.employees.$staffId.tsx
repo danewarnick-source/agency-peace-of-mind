@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
+import { OtherAssignmentsAdminSection } from "@/components/training/other-assignments-section";
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (
@@ -240,8 +241,9 @@ function StaffProfilePage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="hr" className="mt-4">
+        <TabsContent value="hr" className="mt-4 space-y-4">
           <StaffHrChecklistCard organizationId={orgId} staffId={staffId} />
+          <OtherAssignmentsAdminSection organizationId={orgId} staffId={staffId} />
         </TabsContent>
       </Tabs>
     </div>

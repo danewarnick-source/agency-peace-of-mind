@@ -745,8 +745,10 @@ export const getStaffCeLedger = createServerFn({ method: "POST" })
     const supabase = getSupabase(context);
     const userId = (context as { userId: string }).userId;
     const { orgId, isAdmin } = await getCallerOrg(supabase, userId);
-    if (!orgId) throw new Error("No active organization.");
-    if (!isAdmin) throw new Error("Admins or managers only.");
+    // Fail closed gracefully — return an empty list rather than throwing
+    // into the React error boundary on the Records Desk.
+    if (!orgId) return [];
+    if (!isAdmin) return [];
     const q = await supabase
       .from("ce_ledger")
       .select("id, ce_year_start, title, hours, active_minutes, type, source, completed_at, signature_name")
@@ -755,3 +757,4 @@ export const getStaffCeLedger = createServerFn({ method: "POST" })
       .order("completed_at", { ascending: false });
     return ((q.data as CeLedgerEntry[] | null) ?? []).map((r) => ({ ...r, hours: Number(r.hours) }));
   });
+

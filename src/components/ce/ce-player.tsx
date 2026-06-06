@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CheckCircle2, Circle, Pause, Play, Save, Lock, AlertCircle } from "lucide-react";
+import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 
 interface Props {
   module: CeModule;

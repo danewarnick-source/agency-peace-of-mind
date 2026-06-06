@@ -107,7 +107,11 @@ export interface ChecklistRow {
     training_completion_id: string | null;
     auto_checked_at: string | null;
   };
+  applicable: boolean;
+  applies_to_staff_types: string[] | "all";
+  applies_to_confirmed_at: string | null;
 }
+
 
 export const getStaffChecklist = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

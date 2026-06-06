@@ -43,7 +43,7 @@ async function fetchMemberships(userId: string): Promise<CurrentMembership[]> {
     .eq("user_id", userId)
     .eq("active", true);
   if (error || !data?.length) return [];
-  const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3 };
+  const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3, committee_member: 4 };
   return [...data]
     .sort((a, b) => rank[a.role as Role] - rank[b.role as Role])
     .map((m) => ({

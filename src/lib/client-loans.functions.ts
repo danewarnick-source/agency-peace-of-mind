@@ -10,33 +10,26 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
-export const LOAN_ATTESTATION_VERSION = "draft-2026-06-06";
+export const LOAN_ATTESTATION_VERSION = "draft-2026-06-06-recordkeeping";
 
 export const LOAN_ATTESTATION_TEXT = `DRAFT — pending legal review.
 
 By enabling the Client Loan feature, I (the undersigned administrator)
-acknowledge and attest on behalf of my organization that:
+achnowledge on behalf of my organization that:
 
-1. Lending money or making advances to a person served (a client) is legally
-   sensitive and is permitted only in certain states and only under specific
-   conditions imposed by state regulators, Medicaid, and DSPD or equivalent
-   oversight bodies.
+1. This is a recordkeeping tool for a financial arrangement the company and
+the client's support team have INDEPENDENTLY decided to enter into.
 
-2. My organization has independently verified — with our own legal counsel
-   and the relevant state regulators — that engaging in this kind of lending
-   is permissible in the state(s) we operate in, and that any specific loan
-   we create using this tool will comply with all applicable rules,
-   including conflict-of-interest, fiduciary, and waiver-program
-   requirements.
+2. HIVE does not provide legal advice and does not determine whether the
+arrangement is permissible. The provider is responsible for verifying
+permissibility under their state, DSPD, Medicaid, and rep-payee obligations.
 
-3. My organization accepts full responsibility and liability for any use
-   of this feature, including any loan agreement generated, edited,
-   downloaded, signed, or executed.
+3. The provider confirms the arrangement was entered into voluntarily by the
+parties and acknowledges HIVE's role is limited to documentation and tracking.
 
-4. The HIVE platform does not provide legal advice. Any informational
-   material surfaced by NECTAR or the platform is for review only and is
-   not a legal conclusion. The platform and its operators are not liable
-   for use of this feature outside of authorized requirements.
+4. Any informational material surfaced by NECTAR or the platform is for
+review only and is not a legal conclusion. The platform and its operators
+are not liable for use of this feature.
 
 I confirm I have authority to make this attestation for my organization.`;
 

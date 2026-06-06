@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RequirePermission } from "@/components/rbac-guard";
+import { HrComplianceMatrix } from "@/components/hr/hr-compliance-matrix";
 
 export const Route = createFileRoute("/dashboard/hr-admin")({
   head: () => ({ meta: [{ title: "HR Admin — HIVE" }] }),

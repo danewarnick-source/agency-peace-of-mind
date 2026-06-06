@@ -5081,6 +5081,7 @@ export type Database = {
           department: string | null
           email: string | null
           employee_id: string | null
+          end_date: string | null
           evv_consent_timestamp: string | null
           evv_gps_consent_status: string
           first_name: string | null
@@ -5095,6 +5096,7 @@ export type Database = {
           position: string | null
           ssn_last4: string | null
           staff_type_keys: string[]
+          start_date: string | null
           system_role: string
           team_id: string | null
           tenant_id: string | null
@@ -5110,6 +5112,7 @@ export type Database = {
           department?: string | null
           email?: string | null
           employee_id?: string | null
+          end_date?: string | null
           evv_consent_timestamp?: string | null
           evv_gps_consent_status?: string
           first_name?: string | null
@@ -5124,6 +5127,7 @@ export type Database = {
           position?: string | null
           ssn_last4?: string | null
           staff_type_keys?: string[]
+          start_date?: string | null
           system_role?: string
           team_id?: string | null
           tenant_id?: string | null
@@ -5139,6 +5143,7 @@ export type Database = {
           department?: string | null
           email?: string | null
           employee_id?: string | null
+          end_date?: string | null
           evv_consent_timestamp?: string | null
           evv_gps_consent_status?: string
           first_name?: string | null
@@ -5153,6 +5158,7 @@ export type Database = {
           position?: string | null
           ssn_last4?: string | null
           staff_type_keys?: string[]
+          start_date?: string | null
           system_role?: string
           team_id?: string | null
           tenant_id?: string | null

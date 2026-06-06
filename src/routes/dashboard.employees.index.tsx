@@ -58,6 +58,8 @@ type EditableMember = {
   workerType: WorkerType;
   hourlyRate: string;
   dailyRate: string;
+  startDate: string;
+  endDate: string;
 };
 
 function EmployeesPage() {
@@ -99,7 +101,7 @@ function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, employee_id, position, account_status, worker_type" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, account_status, worker_type" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
@@ -174,13 +176,18 @@ function EmployeesPage() {
   const manualMutation = useMutation({
     mutationFn: async (input: {
       firstName: string; lastName: string; username: string; email: string;
-      role: Role; department: string; hireDate: string; trackIds: string[]; password: string;
+      role: Role; department: string; startDate: string; endDate: string; trackIds: string[]; password: string;
     }) => {
+      if (input.startDate && input.endDate && input.endDate < input.startDate) {
+        throw new Error("End date must be on or after Start date.");
+      }
       return await createManual({ data: {
         organizationId: org!.organization_id,
         firstName: input.firstName, lastName: input.lastName, username: input.username,
         email: input.email, temporaryPassword: input.password, role: input.role,
-        department: input.department, hireDate: input.hireDate, trackIds: input.trackIds,
+        department: input.department, hireDate: input.startDate,
+        startDate: input.startDate, endDate: input.endDate,
+        trackIds: input.trackIds,
       } });
     },
     onSuccess: (res, vars) => {
@@ -219,7 +226,9 @@ function EmployeesPage() {
 
   const editMemberMutation = useMutation({
     mutationFn: async (input: EditableMember) => {
-      // Non-PII profile fields go through the regular client.
+      if (input.startDate && input.endDate && input.endDate < input.startDate) {
+        throw new Error("End date must be on or after Start date.");
+      }
       const { error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -229,6 +238,9 @@ function EmployeesPage() {
           employee_id: input.employeeId || null,
           position: input.position || null,
           worker_type: input.workerType,
+          start_date: input.startDate || null,
+          end_date: input.endDate || null,
+          hire_date: input.startDate || null,
         } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;
@@ -355,6 +367,8 @@ function EmployeesPage() {
                       workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
                       hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
                       dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
+                      startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
+                      endDate: (m.profile?.end_date ?? "") as string,
                     })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
                       <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload
@@ -555,6 +569,8 @@ function EmployeesPage() {
                   workerType: (String(fd.get("worker_type") || "w2") as WorkerType),
                   hourlyRate: String(fd.get("hourly_rate") || "").trim(),
                   dailyRate: String(fd.get("daily_rate") || "").trim(),
+                  startDate: String(fd.get("start_date") || "").trim(),
+                  endDate: String(fd.get("end_date") || "").trim(),
                 });
                 setEditDirty(false);
               }}
@@ -594,7 +610,18 @@ function EmployeesPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="start_date">Start date</Label>
+                  <Input id="start_date" name="start_date" type="date" defaultValue={editingMember.startDate || ""} />
+                  <p className="text-[10px] text-muted-foreground">Drives Continuing Education eligibility & year window.</p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="end_date">End date (optional)</Label>
+                  <Input id="end_date" name="end_date" type="date" defaultValue={editingMember.endDate || ""} />
+                  <p className="text-[10px] text-muted-foreground">Blank for active employees. Pauses new CE; history retained.</p>
+                </div>
               </div>
+
 
               <div className="rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

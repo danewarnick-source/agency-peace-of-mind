@@ -15,6 +15,8 @@ const CreateEmployeeInput = z.object({
   role: RoleEnum,
   department: z.string().trim().max(120).optional().or(z.literal("")),
   hireDate: z.string().optional().or(z.literal("")),
+  startDate: z.string().optional().or(z.literal("")),
+  endDate: z.string().optional().or(z.literal("")),
   trackIds: z.array(z.string().uuid()).max(50).default([]),
 });
 
@@ -65,6 +67,13 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
     const newUserId = created.user.id;
 
     try {
+      // start_date is the single source of truth for CE; mirror to hire_date
+      // for legacy reads. Falls back to legacy hireDate if no startDate given.
+      const startDate = data.startDate || data.hireDate || null;
+      const endDate = data.endDate || null;
+      if (startDate && endDate && endDate < startDate) {
+        throw new Error("End date must be on or after Start date.");
+      }
       // Upsert profile (handle_new_user trigger may have created a stub)
       const { error: profErr } = await supabaseAdmin.from("profiles").upsert({
         id: newUserId,
@@ -74,7 +83,9 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
         last_name: data.lastName,
         username: data.username,
         department: data.department || null,
-        hire_date: data.hireDate || null,
+        hire_date: startDate,
+        start_date: startDate,
+        end_date: endDate,
         must_change_password: true,
         is_active: true,
       }, { onConflict: "id" });

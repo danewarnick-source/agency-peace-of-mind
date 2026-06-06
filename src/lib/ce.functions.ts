@@ -111,6 +111,10 @@ function ceApplies(hireIso: string, today = todayUtc()): boolean {
 
 interface MembershipRow { organization_id: string; role: string }
 
+// Shared helper: super_admin is deprecated (collapsed into admin) but still
+// accepted defensively so any lingering legacy row keeps access.
+const ADMIN_LIKE_ROLES = new Set(["admin", "manager", "owner", "super_admin"]);
+
 async function getCallerOrg(
   supabase: ReturnType<typeof getSupabase>,
   userId: string,
@@ -126,7 +130,7 @@ async function getCallerOrg(
   if (!row) return { orgId: null, isAdmin: false };
   return {
     orgId: row.organization_id,
-    isAdmin: row.role === "admin" || row.role === "manager" || row.role === "owner",
+    isAdmin: ADMIN_LIKE_ROLES.has(row.role),
   };
 }
 
@@ -318,8 +322,18 @@ export const getMyCeStatus = createServerFn({ method: "GET" })
     const userId = (context as { userId: string }).userId;
     const { orgId, isAdmin } = await getCallerOrg(supabase, userId);
 
-    const profileQ = await supabase.from("profiles").select("hire_date").eq("id", userId).maybeSingle();
-    const hireDate = (profileQ.data as { hire_date: string | null } | null)?.hire_date ?? null;
+    // start_date is the single source of truth for CE eligibility.
+    // Fall back to legacy hire_date until every profile is migrated.
+    // end_date set → employment ended → no new CE.
+    const profileQ = await supabase
+      .from("profiles")
+      .select("hire_date, start_date, end_date")
+      .eq("id", userId)
+      .maybeSingle();
+    const profileRow =
+      (profileQ.data as { hire_date: string | null; start_date: string | null; end_date: string | null } | null) ?? null;
+    const hireDate = profileRow?.start_date ?? profileRow?.hire_date ?? null;
+    const endDate = profileRow?.end_date ?? null;
 
     let demoModeEnabled = false;
     let minActiveMinutes = 60;
@@ -335,7 +349,8 @@ export const getMyCeStatus = createServerFn({ method: "GET" })
     }
 
     const today = todayUtc();
-    const applies = hireDate ? ceApplies(hireDate, today) : false;
+    const employmentEnded = !!endDate;
+    const applies = hireDate && !employmentEnded ? ceApplies(hireDate, today) : false;
     const yearStart = hireDate && applies ? ceYearStart(hireDate, today) : null;
     const yearEnd = yearStart ? ceYearEnd(yearStart) : null;
     const period = periodOf(today);
@@ -548,9 +563,18 @@ export const completeCeModule = createServerFn({ method: "POST" })
     const reflectionText = (data.reflections[String(reflectIndex)] ?? "").trim();
     if (reflectionText.length < 150) throw new Error("Reflection must be at least 150 characters.");
 
-    const profileQ = await supabase.from("profiles").select("hire_date").eq("id", userId).maybeSingle();
-    const hireDate = (profileQ.data as { hire_date: string | null } | null)?.hire_date;
-    if (!hireDate) throw new Error("Your hire date is not set. Ask HR to update your profile.");
+    const profileQ = await supabase
+      .from("profiles")
+      .select("hire_date, start_date, end_date")
+      .eq("id", userId)
+      .maybeSingle();
+    const profileRow =
+      (profileQ.data as { hire_date: string | null; start_date: string | null; end_date: string | null } | null) ?? null;
+    if (profileRow?.end_date) {
+      throw new Error("Your employment end date is set — no new CE entries can be added.");
+    }
+    const hireDate = profileRow?.start_date ?? profileRow?.hire_date ?? null;
+    if (!hireDate) throw new Error("Your start date is not set. Ask HR to update your profile.");
     const yearStart = ceYearStart(hireDate);
 
     const contentHash = createHash("sha256").update(JSON.stringify(mod.steps)).digest("hex");
@@ -661,14 +685,22 @@ export const getOrgCeRoster = createServerFn({ method: "GET" })
     // Pull active staff in this org via organization_members + profiles join.
     const membersQ = await supabase
       .from("organization_members")
-      .select("user_id, role, profiles:user_id(id, first_name, last_name, email, hire_date)")
+      .select("user_id, role, profiles:user_id(id, first_name, last_name, email, hire_date, start_date, end_date)")
       .eq("organization_id", orgId)
       .eq("active", true);
 
     type MemRow = {
       user_id: string;
       role: string;
-      profiles: { id: string; first_name: string | null; last_name: string | null; email: string | null; hire_date: string | null } | null;
+      profiles: {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        email: string | null;
+        hire_date: string | null;
+        start_date: string | null;
+        end_date: string | null;
+      } | null;
     };
     const members = ((membersQ.data as MemRow[] | null) ?? []).filter((m) => m.profiles);
 
@@ -683,8 +715,9 @@ export const getOrgCeRoster = createServerFn({ method: "GET" })
     const rows: CeRosterRow[] = members.map((m) => {
       const p = m.profiles!;
       const fullName = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || (p.email ?? "Staff");
-      const hire = p.hire_date;
-      const applies = hire ? ceApplies(hire, today) : false;
+      const hire = p.start_date ?? p.hire_date;
+      const employmentEnded = !!p.end_date;
+      const applies = hire && !employmentEnded ? ceApplies(hire, today) : false;
       const yearStart = hire && applies ? ceYearStart(hire, today) : null;
       const yearEnd = yearStart ? ceYearEnd(yearStart) : null;
       const yearStartIso = yearStart ? fmtDate(yearStart) : null;
@@ -741,8 +774,10 @@ export const getStaffCeLedger = createServerFn({ method: "POST" })
     const supabase = getSupabase(context);
     const userId = (context as { userId: string }).userId;
     const { orgId, isAdmin } = await getCallerOrg(supabase, userId);
-    if (!orgId) throw new Error("No active organization.");
-    if (!isAdmin) throw new Error("Admins or managers only.");
+    // Fail closed gracefully — return an empty list rather than throwing
+    // into the React error boundary on the Records Desk.
+    if (!orgId) return [];
+    if (!isAdmin) return [];
     const q = await supabase
       .from("ce_ledger")
       .select("id, ce_year_start, title, hours, active_minutes, type, source, completed_at, signature_name")
@@ -751,3 +786,4 @@ export const getStaffCeLedger = createServerFn({ method: "POST" })
       .order("completed_at", { ascending: false });
     return ((q.data as CeLedgerEntry[] | null) ?? []).map((r) => ({ ...r, hours: Number(r.hours) }));
   });
+

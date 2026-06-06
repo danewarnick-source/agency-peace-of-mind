@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -49,6 +49,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/employees", label: "Employees", icon: Users },
   { to: "/dashboard/hr-admin", label: "HR Admin", icon: ShieldCheck, perm: "manage_users" },
   { to: "/dashboard/client-loans", label: "Client Loans", icon: HandCoins, perm: "manage_organization" },
+  { to: "/dashboard/hrc", label: "Human Rights Committee", icon: Scale, perm: "manage_users" },
   { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
   { to: "/dashboard/billing", label: "Billing", icon: Receipt, perm: "view_billing" },
@@ -124,7 +125,16 @@ function DashboardLayout() {
   }, [session?.user?.id, navigate]);
 
   const role: Role = org?.role ?? "employee";
-  const isAdminCapable = can("manage_users") || role === "admin" || role === "manager" || role === "super_admin";
+  const isCommitteeMember = role === "committee_member";
+  const isAdminCapable = !isCommitteeMember && (can("manage_users") || role === "admin" || role === "manager" || role === "super_admin");
+
+  // Fail-closed gate: a committee_member can ONLY access /dashboard/hrc.
+  // Redirect away from anything else immediately.
+  useEffect(() => {
+    if (!loading && session && isCommitteeMember && !pathname.startsWith("/dashboard/hrc")) {
+      navigate({ to: "/dashboard/hrc", replace: true });
+    }
+  }, [loading, session, isCommitteeMember, pathname, navigate]);
   // PV type is hoisted to module scope.
   const allowedViews: PV[] = ["staff"];
   if (isAdminCapable) { allowedViews.push("admin", "staff_mobile"); }
@@ -150,7 +160,11 @@ function DashboardLayout() {
     { to: "/dashboard/hive-exec/company-migration", label: "Company Migration", icon: ArrowRightLeft },
     { to: "/dashboard/hive-exec/nectar", label: "NECTAR", icon: Hexagon },
   ];
+  const COMMITTEE_NAV: NavItem[] = [
+    { to: "/dashboard/hrc", label: "Human Rights Committee", icon: Scale, exact: true },
+  ];
   const baseNav: NavItem[] =
+    isCommitteeMember            ? COMMITTEE_NAV :
     effectiveView === "hive_exec" ? execNav :
     effectiveView === "admin"     ? ADMIN_NAV : STAFF_NAV;
   const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");

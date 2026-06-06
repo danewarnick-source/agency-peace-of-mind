@@ -28,6 +28,7 @@ const ROLE_BADGE: Record<Role, string> = {
   admin: "bg-primary/15 text-primary",
   manager: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   employee: "bg-secondary text-secondary-foreground",
+  committee_member: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 };
 
 function RolesPage() {

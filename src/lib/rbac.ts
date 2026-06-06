@@ -1,10 +1,11 @@
-export type Role = "super_admin" | "admin" | "manager" | "employee";
+export type Role = "super_admin" | "admin" | "manager" | "employee" | "committee_member";
 
 export const ROLE_LABEL: Record<Role, string> = {
   super_admin: "Super Admin",
   admin: "Company Admin",
   manager: "Manager",
   employee: "Employee",
+  committee_member: "Committee Member",
 };
 
 export const ROLE_HOME: Record<Role, string> = {
@@ -12,6 +13,7 @@ export const ROLE_HOME: Record<Role, string> = {
   admin: "/admin",
   manager: "/manager",
   employee: "/employee",
+  committee_member: "/dashboard/hrc",
 };
 
 /** Canonical list of permission keys. Add to this list to expose a new toggle. */
@@ -81,6 +83,7 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
     "upload_external_certs", "view_analytics", "view_own_training", "view_certifications",
   ],
   employee: ["view_own_training", "view_certifications", "upload_external_certs"],
+  committee_member: [],
 };
 
 export function defaultCan(role: Role | undefined | null, perm: Permission): boolean {

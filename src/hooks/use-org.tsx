@@ -43,7 +43,7 @@ async function fetchMemberships(userId: string): Promise<CurrentMembership[]> {
     .eq("user_id", userId)
     .eq("active", true);
   if (error || !data?.length) return [];
-  const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3 };
+  const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3, committee_member: 4 };
   return [...data]
     .sort((a, b) => rank[a.role as Role] - rank[b.role as Role])
     .map((m) => ({
@@ -78,7 +78,7 @@ export function useMyMemberships() {
  */
 function pickDefaultMembership(memberships: CurrentMembership[]): CurrentMembership | null {
   if (!memberships.length) return null;
-  const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3 };
+  const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3, committee_member: 4 };
   const sorted = [...memberships].sort((a, b) => {
     if (a.is_demo !== b.is_demo) return a.is_demo ? 1 : -1; // non-demo first
     const r = rank[a.role] - rank[b.role];

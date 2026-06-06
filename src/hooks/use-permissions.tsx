@@ -7,7 +7,7 @@ export type PermissionMap = Record<Role, Record<Permission, boolean>>;
 
 function buildDefault(): PermissionMap {
   const out = {} as PermissionMap;
-  (["super_admin", "admin", "manager", "employee"] as Role[]).forEach((r) => {
+  (["super_admin", "admin", "manager", "employee", "committee_member"] as Role[]).forEach((r) => {
     out[r] = {} as Record<Permission, boolean>;
     ALL_PERMISSIONS.forEach((p) => {
       out[r][p] = DEFAULT_MATRIX[r].includes(p);

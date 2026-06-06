@@ -21,6 +21,11 @@ import {
   type TrainingContribution,
   type HoursEntry,
 } from "@/lib/hr-training-hours.functions";
+import {
+  isRequirementApplicable,
+  parseAppliesTo,
+} from "@/lib/staff-applicability";
+
 
 const orgStaff = z.object({
   organization_id: z.string().uuid(),
@@ -102,7 +107,11 @@ export interface ChecklistRow {
     training_completion_id: string | null;
     auto_checked_at: string | null;
   };
+  applicable: boolean;
+  applies_to_staff_types: string[] | "all";
+  applies_to_confirmed_at: string | null;
 }
+
 
 export const getStaffChecklist = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -122,17 +131,28 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
     });
     if (!canView) throw new Error("Forbidden: cannot view staff HR record");
 
-    const [{ data: base, error: baseErr }, { data: comp, error: compErr }] =
-      await Promise.all([
-        sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
-        sb
-          .from("staff_checklist_completion")
-          .select("*")
-          .eq("organization_id", data.organization_id)
-          .eq("staff_id", data.staff_id),
-      ]);
+    const [
+      { data: base, error: baseErr },
+      { data: comp, error: compErr },
+      { data: prof },
+    ] = await Promise.all([
+      sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
+      sb
+        .from("staff_checklist_completion")
+        .select("*")
+        .eq("organization_id", data.organization_id)
+        .eq("staff_id", data.staff_id),
+      sb
+        .from("profiles")
+        .select("staff_type_keys")
+        .eq("id", data.staff_id)
+        .maybeSingle(),
+    ]);
     if (baseErr) throw new Error(baseErr.message);
     if (compErr) throw new Error(compErr.message);
+
+    const staffTypeKeys: string[] =
+      (prof?.staff_type_keys as string[] | null) ?? [];
 
     const compMap = new Map<string, Record<string, unknown>>();
     for (const c of comp ?? []) compMap.set(c.requirement_id as string, c);
@@ -154,6 +174,12 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
           effExpiry = d.toISOString().slice(0, 10);
         }
       }
+      const { applies_to, applies_to_confirmed_at } = parseAppliesTo(meta);
+      const applicable = isRequirementApplicable({
+        applies_to,
+        applies_to_confirmed_at,
+        staff_type_keys: staffTypeKeys,
+      });
       return {
         requirement_id: r.id as string,
         title: (r.title as string) ?? (r.short_label as string) ?? "Untitled",
@@ -176,9 +202,14 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
           training_completion_id: (c?.training_completion_id as string) ?? null,
           auto_checked_at: (c?.auto_checked_at as string) ?? null,
         },
+        applicable,
+        applies_to_staff_types:
+          applies_to === null || applies_to === undefined ? "all" : applies_to,
+        applies_to_confirmed_at,
       };
     });
   });
+
 
 // --- Mutations -------------------------------------------------------------
 

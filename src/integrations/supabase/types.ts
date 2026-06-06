@@ -4562,6 +4562,7 @@ export type Database = {
           must_change_password: boolean
           position: string | null
           ssn_last4: string | null
+          staff_type_keys: string[]
           system_role: string
           team_id: string | null
           tenant_id: string | null
@@ -4590,6 +4591,7 @@ export type Database = {
           must_change_password?: boolean
           position?: string | null
           ssn_last4?: string | null
+          staff_type_keys?: string[]
           system_role?: string
           team_id?: string | null
           tenant_id?: string | null
@@ -4618,6 +4620,7 @@ export type Database = {
           must_change_password?: boolean
           position?: string | null
           ssn_last4?: string | null
+          staff_type_keys?: string[]
           system_role?: string
           team_id?: string | null
           tenant_id?: string | null

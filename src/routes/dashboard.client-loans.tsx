@@ -96,7 +96,7 @@ function LoanArea({ organizationId, lenderName }: { organizationId: string; lend
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle className="text-base">Create a loan for a client</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Record a loan agreement for a client</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Select value={newClientId} onValueChange={setNewClientId}>
             <SelectTrigger className="w-72"><SelectValue placeholder="Select client…" /></SelectTrigger>

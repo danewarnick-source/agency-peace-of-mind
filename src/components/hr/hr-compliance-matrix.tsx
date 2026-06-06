@@ -32,6 +32,7 @@ import {
   type HrMatrixCell,
   type HrMatrixStaff,
 } from "@/lib/hr-staff.functions";
+import { AnnualHoursCell } from "@/components/hr/annual-hours-progress";
 import { toast } from "sonner";
 
 type GroupMode = "manager" | "house" | "flat";

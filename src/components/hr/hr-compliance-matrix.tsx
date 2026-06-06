@@ -174,22 +174,18 @@ export function HrComplianceMatrix({
                   {reqs.map((r) => (
                     <th
                       key={r.requirement_id}
-                      className="border-b border-border px-2 py-2 text-left align-bottom font-medium"
+                      className="border-b border-border px-1 pt-2 pb-1 text-left font-medium min-w-[44px]"
                       title={`${r.title}${r.source_citation ? `\n${r.source_citation}` : ""}`}
                     >
-                      <div className="flex h-28 w-[44px] items-end">
-                        <span
-                          className="block origin-bottom-left -rotate-[55deg] whitespace-nowrap text-[11px] leading-tight max-w-[160px] truncate"
-                          style={{ transformOrigin: "left bottom" }}
-                        >
-                          {r.title}
-                          {r.is_renewable && r.renewal_interval_months && (
-                            <span className="ml-1 text-muted-foreground">
-                              · {r.renewal_interval_months}mo
-                            </span>
-                          )}
-                        </span>
-                      </div>
+                      <span
+                        className="inline-block whitespace-nowrap text-[11px] leading-tight"
+                        style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+                      >
+                        {r.title}
+                        {r.is_renewable && r.renewal_interval_months && (
+                          <span className="text-muted-foreground">·{r.renewal_interval_months}mo</span>
+                        )}
+                      </span>
                     </th>
                   ))}
                 </tr>

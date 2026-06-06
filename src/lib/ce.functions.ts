@@ -545,9 +545,16 @@ export const ensureCurrentCeModule = createServerFn({ method: "POST" })
     let steps: CeStep[];
     let summary: string;
     try {
-      const gathered = await gatherStaffEvents(supabase, orgId, userId);
-      summary = gathered.summary;
-      steps = await callNectarForCe(gathered.prompt);
+      const gathered = await gatherCeContext(supabase, orgId, userId);
+      const result = await callNectarForCe(gathered.prompt);
+      steps = result.steps;
+      const sourceList = gathered.sourceTitles.length > 0
+        ? `Sources: ${gathered.sourceTitles.slice(0, 8).join("; ")}${gathered.sourceTitles.length > 8 ? `, +${gathered.sourceTitles.length - 8} more` : ""}`
+        : "Sources: (none uploaded yet)";
+      const shortFlag = (result.materialShort || gathered.sourceCount === 0)
+        ? " ⚠ Insufficient authoritative source material — admin should upload more sources so future CE reviews are richer."
+        : "";
+      summary = `Built from the agency's Authoritative Sources + this staff member's prior-30-day records. ${gathered.summary}. ${sourceList}.${shortFlag}`;
     } catch (err) {
       await supabase.from("ce_modules").update({ status: "failed", source_summary: (err as Error).message }).eq("id", modId);
       throw err;

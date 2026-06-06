@@ -275,125 +275,229 @@ export function StaffHrChecklistCard({
               No live base items yet. Confirm the HR base checklist in HIVE Exec / Approvals.
             </p>
           ) : (
-            <div className="space-y-2">
-              {(checklistQ.data ?? []).map((row) => {
-                const completionDoc = (docsQ.data ?? []).find(
-                  (d) => d.id === row.completion.evidence_document_id,
-                );
-                return (
-                  <div
-                    key={row.requirement_id}
-                    className="rounded-lg border border-border/60 p-3 text-sm"
-                  >
-                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0">
-                        <div className="font-medium">{row.title}</div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
-                          {row.category && <Badge variant="outline">{row.category}</Badge>}
-                          {row.checklist_layer && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              {row.checklist_layer}
-                            </Badge>
-                          )}
-                          {row.renewal_frequency && (
-                            <span>renews: {row.renewal_frequency}</span>
-                          )}
-                          {row.source_citation && <span>· {row.source_citation}</span>}
+            (() => {
+              const rows = checklistQ.data ?? [];
+              const byCat = new Map<string, typeof rows>();
+              for (const r of rows) {
+                const k = r.category ?? "Other";
+                if (!byCat.has(k)) byCat.set(k, [] as typeof rows);
+                byCat.get(k)!.push(r);
+              }
+              const todayMs = Date.now();
+              const in60Ms = todayMs + 60 * 86400_000;
+              return (
+                <div className="space-y-2">
+                  {Array.from(byCat.entries()).map(([cat, items]) => {
+                    const complete = items.filter(
+                      (i) => i.completion.status === "complete",
+                    ).length;
+                    return (
+                      <details
+                        key={cat}
+                        className="group rounded-lg border border-border/60"
+                      >
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-medium hover:bg-muted/40">
+                          <span className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground transition-transform group-open:rotate-90">
+                              ▶
+                            </span>
+                            {cat}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {complete} of {items.length} ✓
+                          </span>
+                        </summary>
+                        <div className="space-y-2 border-t border-border/60 p-3">
+                          {items.map((row) => {
+                            const completionDoc = (docsQ.data ?? []).find(
+                              (d) => d.id === row.completion.evidence_document_id,
+                            );
+                            const status = row.completion.status;
+                            const expMs = row.completion.expires_at
+                              ? new Date(row.completion.expires_at).getTime()
+                              : null;
+                            const isExpired =
+                              status === "expired" ||
+                              (expMs !== null && expMs < todayMs);
+                            const isSoon =
+                              expMs !== null &&
+                              expMs >= todayMs &&
+                              expMs <= in60Ms;
+                            const dot =
+                              status === "complete" && !isExpired
+                                ? "bg-emerald-500"
+                                : status === "in_progress" || isSoon
+                                  ? "bg-amber-500"
+                                  : isExpired
+                                    ? "bg-rose-500"
+                                    : "bg-muted";
+                            return (
+                              <div
+                                key={row.requirement_id}
+                                className="rounded-md border border-border/40 p-3 text-sm"
+                              >
+                                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                  <div className="flex min-w-0 items-start gap-2">
+                                    <span
+                                      className={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`}
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="font-medium">{row.title}</div>
+                                      <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                                        {row.checklist_layer && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-[10px]"
+                                          >
+                                            {row.checklist_layer}
+                                          </Badge>
+                                        )}
+                                        {row.is_renewable &&
+                                          row.renewal_interval_months && (
+                                            <span>
+                                              renews every {row.renewal_interval_months}{" "}
+                                              mo
+                                              {row.renewal_source && (
+                                                <span className="text-[10px]">
+                                                  {" "}
+                                                  ({row.renewal_source})
+                                                </span>
+                                              )}
+                                            </span>
+                                          )}
+                                        {row.source_citation && (
+                                          <span>· {row.source_citation}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {isSelf ? (
+                                      <Badge>{status}</Badge>
+                                    ) : (
+                                      <Select
+                                        value={status}
+                                        onValueChange={(v) =>
+                                          setStatus.mutate({
+                                            requirement_id: row.requirement_id,
+                                            status: v as typeof STATUSES[number],
+                                          })
+                                        }
+                                      >
+                                        <SelectTrigger className="h-8 w-[140px] text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {STATUSES.map((s) => (
+                                            <SelectItem
+                                              key={s}
+                                              value={s}
+                                              className="text-xs"
+                                            >
+                                              {s}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                    {completionDoc ? (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => viewDoc(completionDoc.id)}
+                                      >
+                                        <Eye className="mr-1 h-3.5 w-3.5" /> Evidence
+                                      </Button>
+                                    ) : isSelf ? null : (
+                                      <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted">
+                                        <Upload className="h-3.5 w-3.5" /> Evidence
+                                        <input
+                                          type="file"
+                                          className="hidden"
+                                          onChange={async (e) => {
+                                            const f = e.target.files?.[0];
+                                            if (!f) return;
+                                            const docId = await uploadEvidence(
+                                              f,
+                                              row.requirement_id,
+                                              row.category ?? "checklist_evidence",
+                                            );
+                                            if (docId) {
+                                              await upsertFn({
+                                                data: {
+                                                  organization_id: organizationId,
+                                                  staff_id: staffId,
+                                                  requirement_id: row.requirement_id,
+                                                  status: "in_progress",
+                                                  evidence_document_id: docId,
+                                                },
+                                              });
+                                              toast.message(
+                                                "Evidence attached — confirm to mark complete",
+                                              );
+                                              invalidate();
+                                            }
+                                            e.target.value = "";
+                                          }}
+                                        />
+                                      </label>
+                                    )}
+                                  </div>
+                                </div>
+                                {row.completion.completed_date && (
+                                  <div
+                                    className={
+                                      "mt-1 text-[11px] " +
+                                      (isExpired
+                                        ? "text-rose-600"
+                                        : isSoon
+                                          ? "text-amber-700"
+                                          : "text-muted-foreground")
+                                    }
+                                  >
+                                    Completed {row.completion.completed_date}
+                                    {row.is_renewable && row.completion.expires_at && (
+                                      <>
+                                        {" · expires "}
+                                        {row.completion.expires_at}
+                                        {isExpired
+                                          ? " (overdue)"
+                                          : isSoon
+                                            ? " (due soon)"
+                                            : ""}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                                {row.completion.training_completion_id && (
+                                  <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                                    <GraduationCap className="h-3 w-3" /> Signed by
+                                    staff (training)
+                                    {row.completion.auto_checked_at &&
+                                      ` · ${new Date(row.completion.auto_checked_at).toLocaleDateString()}`}
+                                  </div>
+                                )}
+                                {!row.completion.training_completion_id &&
+                                  row.completion.evidence_document_id && (
+                                    <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                      <Upload className="h-3 w-3" /> Uploaded by
+                                      admin
+                                    </div>
+                                  )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isSelf ? (
-                          <Badge>{row.completion.status}</Badge>
-                        ) : (
-                          <Select
-                            value={row.completion.status}
-                            onValueChange={(v) =>
-                              setStatus.mutate({
-                                requirement_id: row.requirement_id,
-                                status: v as typeof STATUSES[number],
-                              })
-                            }
-                          >
-                            <SelectTrigger className="h-8 w-[140px] text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {STATUSES.map((s) => (
-                                <SelectItem key={s} value={s} className="text-xs">
-                                  {s}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                        {completionDoc ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => viewDoc(completionDoc.id)}
-                          >
-                            <Eye className="mr-1 h-3.5 w-3.5" /> Evidence
-                          </Button>
-                        ) : isSelf ? null : (
-                          <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted">
-                            <Upload className="h-3.5 w-3.5" /> Evidence
-                            <input
-                              type="file"
-                              className="hidden"
-                              onChange={async (e) => {
-                                const f = e.target.files?.[0];
-                                if (!f) return;
-                                const docId = await uploadEvidence(
-                                  f,
-                                  row.requirement_id,
-                                  row.category ?? "checklist_evidence",
-                                );
-                                if (docId) {
-                                  // PREFILL ONLY — never auto-mark complete.
-                                  // Attach the evidence + move to in_progress;
-                                  // a human must click "complete" in the
-                                  // status dropdown to attest completion.
-                                  await upsertFn({
-                                    data: {
-                                      organization_id: organizationId,
-                                      staff_id: staffId,
-                                      requirement_id: row.requirement_id,
-                                      status: "in_progress",
-                                      evidence_document_id: docId,
-                                    },
-                                  });
-                                  toast.message(
-                                    "Evidence attached — confirm to mark complete",
-                                  );
-                                  invalidate();
-                                }
-                                e.target.value = "";
-                              }}
-                            />
-                          </label>
-                        )}
-                      </div>
-                    </div>
-                    {row.completion.completed_date && (
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        Completed {row.completion.completed_date}
-                        {row.completion.expires_at && ` · expires ${row.completion.expires_at}`}
-                      </div>
-                    )}
-                    {row.completion.training_completion_id && (
-                      <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                        <GraduationCap className="h-3 w-3" /> Auto-checked from signed training
-                        {row.completion.auto_checked_at &&
-                          ` · ${new Date(row.completion.auto_checked_at).toLocaleDateString()}`}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      </details>
+                    );
+                  })}
+                </div>
+              );
+            })()
           )}
         </CardContent>
       </Card>
+
 
       <TrainingHistoryCard staffId={staffId} />
 

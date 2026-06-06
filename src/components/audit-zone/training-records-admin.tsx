@@ -231,7 +231,7 @@ export function TrainingRecordsAdmin() {
     queryFn: async (): Promise<OtherAssignment[]> => {
       const { data } = await supabase
         .from("staff_other_assignments")
-        .select("id, staff_id, title, status, due_date, completed_at, signature_name")
+        .select("id, staff_id, title, status, due_date, completed_at")
         .in("staff_id", memberIds);
       return (data ?? []) as OtherAssignment[];
     },
@@ -370,7 +370,7 @@ export function TrainingRecordsAdmin() {
             o.completed_at ? new Date(o.completed_at).toISOString() : "",
             "",
             "",
-            o.signature_name ?? "",
+            "",
             "",
           ]);
         }
@@ -764,9 +764,7 @@ export function TrainingRecordsAdmin() {
                             ? new Date(o.completed_at).toLocaleDateString()
                             : "—"}
                         </td>
-                        <td className="py-2 text-xs">
-                          {o.signature_name ?? "—"}
-                        </td>
+                        <td className="py-2 text-xs">—</td>
                       </tr>
                     );
                   })}

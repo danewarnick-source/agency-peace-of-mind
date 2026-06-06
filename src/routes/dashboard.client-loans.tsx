@@ -120,7 +120,7 @@ function LoanArea({ organizationId, lenderName }: { organizationId: string; lend
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Existing loans</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Agreements on file</CardTitle></CardHeader>
         <CardContent>
           {loans.isLoading ? (
             <div className="text-sm text-muted-foreground">Loading…</div>

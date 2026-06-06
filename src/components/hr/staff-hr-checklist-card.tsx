@@ -289,7 +289,8 @@ export function StaffHrChecklistCard({
               return (
                 <div className="space-y-2">
                   {Array.from(byCat.entries()).map(([cat, items]) => {
-                    const complete = items.filter(
+                    const applicableItems = items.filter((i) => i.applicable !== false);
+                    const complete = applicableItems.filter(
                       (i) => i.completion.status === "complete",
                     ).length;
                     return (
@@ -305,7 +306,12 @@ export function StaffHrChecklistCard({
                             {cat}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {complete} of {items.length} ✓
+                            {complete} of {applicableItems.length} ✓
+                            {items.length > applicableItems.length && (
+                              <span className="ml-1 italic">
+                                · {items.length - applicableItems.length} N/A
+                              </span>
+                            )}
                           </span>
                         </summary>
                         <div className="space-y-2 border-t border-border/60 p-3">
@@ -324,14 +330,39 @@ export function StaffHrChecklistCard({
                               expMs !== null &&
                               expMs >= todayMs &&
                               expMs <= in60Ms;
-                            const dot =
-                              status === "complete" && !isExpired
+                            const isNA = row.applicable === false;
+                            const dot = isNA
+                              ? "bg-muted-foreground/40"
+                              : status === "complete" && !isExpired
                                 ? "bg-emerald-500"
                                 : status === "in_progress" || isSoon
                                   ? "bg-amber-500"
                                   : isExpired
                                     ? "bg-rose-500"
                                     : "bg-muted";
+                            if (isNA) {
+                              return (
+                                <div
+                                  key={row.requirement_id}
+                                  className="rounded-md border border-dashed border-border/40 bg-muted/20 p-3 text-sm"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className={`mt-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-medium text-muted-foreground line-through decoration-muted-foreground/40">
+                                        {row.title}
+                                      </div>
+                                      <div className="mt-0.5 text-[11px] italic text-muted-foreground">
+                                        N/A — not applicable to this staffer's type
+                                      </div>
+                                    </div>
+                                    <Badge variant="outline" className="text-[10px] uppercase">
+                                      N/A
+                                    </Badge>
+                                  </div>
+                                </div>
+                              );
+                            }
                             return (
                               <div
                                 key={row.requirement_id}

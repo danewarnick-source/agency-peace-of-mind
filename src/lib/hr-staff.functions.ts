@@ -589,8 +589,11 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
       is_renewable: boolean;
       interval_months: number | null;
       is_cumulative: boolean;
+      applies_to: string[] | "all";
+      applies_to_confirmed_at: string | null;
     }> = (base ?? []).map((r: Record<string, unknown>) => {
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      const { applies_to, applies_to_confirmed_at } = parseAppliesTo(meta);
       return {
         id: r.id as string,
         title:
@@ -601,26 +604,37 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
             ? (meta.renewal_interval_months as number)
             : null,
         is_cumulative: meta.requirement_type === "cumulative_hours",
+        applies_to:
+          applies_to === null || applies_to === undefined ? "all" : applies_to,
+        applies_to_confirmed_at,
       };
     });
     const binaryItems = baseItems.filter((b) => !b.is_cumulative);
     const cumulativeItems = baseItems.filter((b) => b.is_cumulative);
-    const totalRequired = baseItems.length;
     const baseIds = new Set(baseItems.map((b) => b.id));
     const baseById = new Map(baseItems.map((b) => [b.id, b]));
     const titleById = new Map(baseItems.map((b) => [b.id, b.title]));
 
-    // 3. Names / team / hire_date (non-PII) for the gated staff set.
+    // 3. Names / team / hire_date / staff_type_keys (non-PII) for the gated staff set.
     const { data: profs } = await sb
       .from("profiles")
-      .select("id, full_name, team_id, hire_date")
+      .select("id, full_name, team_id, hire_date, staff_type_keys")
       .in("id", staffIds);
-    const profMap = new Map<string, { full_name: string | null; team_id: string | null; hire_date: string | null }>();
+    const profMap = new Map<
+      string,
+      {
+        full_name: string | null;
+        team_id: string | null;
+        hire_date: string | null;
+        staff_type_keys: string[];
+      }
+    >();
     for (const p of profs ?? []) {
       profMap.set(p.id, {
         full_name: p.full_name,
         team_id: p.team_id,
         hire_date: p.hire_date,
+        staff_type_keys: (p.staff_type_keys as string[] | null) ?? [],
       });
     }
     const teamIds = Array.from(
@@ -691,12 +705,29 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
 
     const rows: HrRollupRow[] = staffIds.map((sid) => {
       const p = profMap.get(sid);
+      const staffTypeKeys = p?.staff_type_keys ?? [];
       const cmap = compByStaff.get(sid) ?? new Map();
+      // Filter to applicable-only per staffer (single source of truth).
+      const applicableBinary = binaryItems.filter((b) =>
+        isRequirementApplicable({
+          applies_to: b.applies_to,
+          applies_to_confirmed_at: b.applies_to_confirmed_at,
+          staff_type_keys: staffTypeKeys,
+        }),
+      );
+      const applicableCumulative = cumulativeItems.filter((b) =>
+        isRequirementApplicable({
+          applies_to: b.applies_to,
+          applies_to_confirmed_at: b.applies_to_confirmed_at,
+          staff_type_keys: staffTypeKeys,
+        }),
+      );
+      const totalRequired = applicableBinary.length + applicableCumulative.length;
       let binaryComplete = 0;
       let expired = 0;
       let nextRenewal: HrRollupRow["next_renewal"] = null;
       let nextRenewalTs = Infinity;
-      for (const b of binaryItems) {
+      for (const b of applicableBinary) {
         const c = cmap.get(b.id);
         if (c?.status === "complete") binaryComplete++;
         if (c?.status === "expired") expired++;
@@ -717,14 +748,14 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
       let cumComplete = 0;
       let cumGaps = 0;
       const cumForStaff = cumProgress[sid] ?? {};
-      for (const ci of cumulativeItems) {
+      for (const ci of applicableCumulative) {
         const prog = cumForStaff[ci.id];
         if (!prog) continue;
         if (prog.status === "complete") cumComplete++;
         else if (prog.enforced && prog.status === "behind") cumGaps++;
       }
       const complete = binaryComplete + cumComplete;
-      const binaryGaps = Math.max(0, binaryItems.length - binaryComplete);
+      const binaryGaps = Math.max(0, applicableBinary.length - binaryComplete);
       const openGaps = binaryGaps + cumGaps;
       const hire = p?.hire_date ?? null;
       const hireMs = hire ? new Date(hire).getTime() : null;
@@ -788,6 +819,8 @@ export interface HrMatrixRequirement {
   renewal_source: string | null;
   requirement_type: "binary" | "cumulative_hours";
   cumulative_config: CumulativeRequirementConfig | null;
+  applies_to_staff_types: string[] | "all";
+  applies_to_confirmed_at: string | null;
 }
 
 export interface HrMatrixCell {
@@ -798,6 +831,7 @@ export interface HrMatrixCell {
   training_completion_id: string | null;
   auto_checked_at: string | null;
   cumulative_progress?: AnnualHoursProgress | null;
+  applicable: boolean;
 }
 
 export interface HrMatrixStaff {
@@ -807,6 +841,7 @@ export interface HrMatrixStaff {
   team_name: string | null;
   manager_id: string | null;
   manager_name: string | null;
+  staff_type_keys: string[];
   cells: Record<string, HrMatrixCell>;
 }
 
@@ -849,7 +884,7 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
         sb
           .from("profiles")
-          .select("id, full_name, team_id, hire_date")
+          .select("id, full_name, team_id, hire_date, staff_type_keys")
           .in("id", staffIds),
         sb
           .from("staff_checklist_completion")
@@ -887,6 +922,7 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         cumulativeConfigByReqId.set(cumCfg.requirement_id, cumCfg);
         cumulativeReqKeyToId.set(cumCfg.requirement_key, cumCfg.requirement_id);
       }
+      const { applies_to, applies_to_confirmed_at } = parseAppliesTo(meta);
       return {
         requirement_id: r.id as string,
         title:
@@ -902,6 +938,9 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         renewal_source: (meta.renewal_source as string) ?? null,
         requirement_type: cumCfg ? "cumulative_hours" : "binary",
         cumulative_config: cumCfg,
+        applies_to_staff_types:
+          applies_to === null || applies_to === undefined ? "all" : applies_to,
+        applies_to_confirmed_at,
       };
     });
     const reqById = new Map(requirements.map((r) => [r.requirement_id, r]));
@@ -1019,18 +1058,26 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         evidence_document_id: c.evidence_document_id ?? null,
         training_completion_id: c.training_completion_id ?? null,
         auto_checked_at: c.auto_checked_at ?? null,
+        applicable: true,
       });
     }
 
     const mProfMap = new Map<
       string,
-      { id: string; full_name: string | null; team_id: string | null; hire_date: string | null }
+      {
+        id: string;
+        full_name: string | null;
+        team_id: string | null;
+        hire_date: string | null;
+        staff_type_keys: string[] | null;
+      }
     >();
     for (const p of (profs ?? []) as Array<{
       id: string;
       full_name: string | null;
       team_id: string | null;
       hire_date: string | null;
+      staff_type_keys: string[] | null;
     }>) {
       mProfMap.set(p.id, p);
     }
@@ -1039,9 +1086,40 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
     const staff: HrMatrixStaff[] = staffIds.map((sid) => {
       const p = mProfMap.get(sid);
       const team = p?.team_id ? teamMap.get(p.team_id) : undefined;
+      const staffTypeKeys: string[] = p?.staff_type_keys ?? [];
       const cellsMap = compByStaff.get(sid) ?? new Map<string, HrMatrixCell>();
       const cells: Record<string, HrMatrixCell> = {};
-      for (const [k, v] of cellsMap) cells[k] = v;
+      // Pre-compute applicable per requirement using shared helper.
+      const applicableByReq = new Map<string, boolean>();
+      for (const req of requirements) {
+        applicableByReq.set(
+          req.requirement_id,
+          isRequirementApplicable({
+            applies_to: req.applies_to_staff_types,
+            applies_to_confirmed_at: req.applies_to_confirmed_at,
+            staff_type_keys: staffTypeKeys,
+          }),
+        );
+      }
+      for (const [k, v] of cellsMap) {
+        cells[k] = { ...v, applicable: applicableByReq.get(k) ?? true };
+      }
+      // For non-applicable requirements with no completion row, inject a
+      // placeholder cell so the matrix can render N/A consistently.
+      for (const req of requirements) {
+        const isApp = applicableByReq.get(req.requirement_id) ?? true;
+        if (!isApp && !cells[req.requirement_id]) {
+          cells[req.requirement_id] = {
+            status: "not_started",
+            completed_date: null,
+            expires_at: null,
+            evidence_document_id: null,
+            training_completion_id: null,
+            auto_checked_at: null,
+            applicable: false,
+          };
+        }
+      }
       // Inject cumulative-progress into every cumulative requirement's cell.
       for (const cfg of cumulativeConfigByReqId.values()) {
         const k = contribKey(sid, cfg.requirement_id);
@@ -1060,8 +1138,10 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
             evidence_document_id: null,
             training_completion_id: null,
             auto_checked_at: null,
+            applicable: applicableByReq.get(cfg.requirement_id) ?? true,
           }),
           cumulative_progress: progress,
+          applicable: applicableByReq.get(cfg.requirement_id) ?? true,
         };
       }
       return {
@@ -1073,6 +1153,7 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         manager_name: team?.manager_id
           ? (managerNames.get(team.manager_id) ?? null)
           : null,
+        staff_type_keys: staffTypeKeys,
         cells,
       };
     });

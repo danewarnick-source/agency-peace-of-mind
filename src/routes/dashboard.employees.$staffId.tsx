@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
 import { OtherAssignmentsAdminSection } from "@/components/training/other-assignments-section";
+import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (

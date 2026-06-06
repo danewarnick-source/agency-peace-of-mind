@@ -78,6 +78,7 @@ import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard
 import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashboard.settings.team-access'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
+import { Route as DashboardHrAdminSettingsRouteImport } from './routes/dashboard.hr-admin.settings'
 import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
 import { Route as DashboardHiveExecStatesRouteImport } from './routes/dashboard.hive-exec.states'
 import { Route as DashboardHiveExecPlansRouteImport } from './routes/dashboard.hive-exec.plans'
@@ -464,6 +465,12 @@ const DashboardProgramsProgramIdRoute =
     path: '/$programId',
     getParentRoute: () => DashboardProgramsRoute,
   } as any)
+const DashboardHrAdminSettingsRoute =
+  DashboardHrAdminSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => DashboardHrAdminRoute,
+  } as any)
 const DashboardHiveExecTicketsRoute =
   DashboardHiveExecTicketsRouteImport.update({
     id: '/tickets',
@@ -668,7 +675,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
-  '/dashboard/hr-admin': typeof DashboardHrAdminRoute
+  '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -714,6 +721,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
@@ -765,7 +773,7 @@ export interface FileRoutesByTo {
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
-  '/dashboard/hr-admin': typeof DashboardHrAdminRoute
+  '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -811,6 +819,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
@@ -867,7 +876,7 @@ export interface FileRoutesById {
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
-  '/dashboard/hr-admin': typeof DashboardHrAdminRoute
+  '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -913,6 +922,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
@@ -1016,6 +1026,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/hr-admin/settings'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
@@ -1113,6 +1124,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/hr-admin/settings'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
@@ -1214,6 +1226,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/hr-admin/settings'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
@@ -1740,6 +1753,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardProgramsProgramIdRouteImport
       parentRoute: typeof DashboardProgramsRoute
     }
+    '/dashboard/hr-admin/settings': {
+      id: '/dashboard/hr-admin/settings'
+      path: '/settings'
+      fullPath: '/dashboard/hr-admin/settings'
+      preLoaderRoute: typeof DashboardHrAdminSettingsRouteImport
+      parentRoute: typeof DashboardHrAdminRoute
+    }
     '/dashboard/hive-exec/tickets': {
       id: '/dashboard/hive-exec/tickets'
       path: '/tickets'
@@ -2049,6 +2069,17 @@ const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
 const DashboardHiveExecRouteWithChildren =
   DashboardHiveExecRoute._addFileChildren(DashboardHiveExecRouteChildren)
 
+interface DashboardHrAdminRouteChildren {
+  DashboardHrAdminSettingsRoute: typeof DashboardHrAdminSettingsRoute
+}
+
+const DashboardHrAdminRouteChildren: DashboardHrAdminRouteChildren = {
+  DashboardHrAdminSettingsRoute: DashboardHrAdminSettingsRoute,
+}
+
+const DashboardHrAdminRouteWithChildren =
+  DashboardHrAdminRoute._addFileChildren(DashboardHrAdminRouteChildren)
+
 interface DashboardProgramsRouteChildren {
   DashboardProgramsProgramIdRoute: typeof DashboardProgramsProgramIdRoute
 }
@@ -2119,7 +2150,7 @@ interface DashboardRouteChildren {
   DashboardHelpRoute: typeof DashboardHelpRoute
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
-  DashboardHrAdminRoute: typeof DashboardHrAdminRoute
+  DashboardHrAdminRoute: typeof DashboardHrAdminRouteWithChildren
   DashboardInternalAuditRoute: typeof DashboardInternalAuditRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardNectarDocsRoute: typeof DashboardNectarDocsRoute
@@ -2177,7 +2208,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardHelpRoute: DashboardHelpRoute,
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,
-  DashboardHrAdminRoute: DashboardHrAdminRoute,
+  DashboardHrAdminRoute: DashboardHrAdminRouteWithChildren,
   DashboardInternalAuditRoute: DashboardInternalAuditRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardNectarDocsRoute: DashboardNectarDocsRoute,

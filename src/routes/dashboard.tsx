@@ -160,7 +160,11 @@ function DashboardLayout() {
     { to: "/dashboard/hive-exec/company-migration", label: "Company Migration", icon: ArrowRightLeft },
     { to: "/dashboard/hive-exec/nectar", label: "NECTAR", icon: Hexagon },
   ];
+  const COMMITTEE_NAV: NavItem[] = [
+    { to: "/dashboard/hrc", label: "Human Rights Committee", icon: Scale, exact: true },
+  ];
   const baseNav: NavItem[] =
+    isCommitteeMember            ? COMMITTEE_NAV :
     effectiveView === "hive_exec" ? execNav :
     effectiveView === "admin"     ? ADMIN_NAV : STAFF_NAV;
   const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");

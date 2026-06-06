@@ -5444,6 +5444,88 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_training_hours_entries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          hours: number
+          id: string
+          note: string | null
+          organization_id: string
+          requirement_id: string | null
+          staff_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entry_date: string
+          hours: number
+          id?: string
+          note?: string | null
+          organization_id: string
+          requirement_id?: string | null
+          staff_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          hours?: number
+          id?: string
+          note?: string | null
+          organization_id?: string
+          requirement_id?: string | null
+          staff_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_training_hours_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_training_hours_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_training_hours_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_training_hours_entries_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_training_hours_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_training_hours_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       state_derived_requirements: {
         Row: {
           category: string | null
@@ -6305,6 +6387,7 @@ export type Database = {
           category: string
           code: string
           created_at: string
+          default_hours: number | null
           description: string | null
           dspd_letter: string | null
           id: string
@@ -6317,6 +6400,7 @@ export type Database = {
           category: string
           code: string
           created_at?: string
+          default_hours?: number | null
           description?: string | null
           dspd_letter?: string | null
           id?: string
@@ -6329,6 +6413,7 @@ export type Database = {
           category?: string
           code?: string
           created_at?: string
+          default_hours?: number | null
           description?: string | null
           dspd_letter?: string | null
           id?: string

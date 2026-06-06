@@ -12,6 +12,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import {
+  parseCumulativeConfig,
+  computeAnnualHoursProgress,
+  type AnnualHoursProgress,
+  type CumulativeRequirementConfig,
+  type TrainingContribution,
+  type HoursEntry,
+} from "@/lib/hr-training-hours.functions";
 
 const orgStaff = z.object({
   organization_id: z.string().uuid(),

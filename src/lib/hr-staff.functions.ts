@@ -725,6 +725,8 @@ export interface HrMatrixRequirement {
   is_renewable: boolean;
   renewal_interval_months: number | null;
   renewal_source: string | null;
+  requirement_type: "binary" | "cumulative_hours";
+  cumulative_config: CumulativeRequirementConfig | null;
 }
 
 export interface HrMatrixCell {
@@ -734,6 +736,7 @@ export interface HrMatrixCell {
   evidence_document_id: string | null;
   training_completion_id: string | null;
   auto_checked_at: string | null;
+  cumulative_progress?: AnnualHoursProgress | null;
 }
 
 export interface HrMatrixStaff {

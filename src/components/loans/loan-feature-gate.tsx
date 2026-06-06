@@ -73,7 +73,7 @@ export function LoanFeatureGate({
     <Card className="border-amber-300/60 bg-amber-50/30 dark:bg-amber-950/10">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <Lock className="h-5 w-5 text-amber-600" /> Restricted Feature — Client Loan
+          <Lock className="h-5 w-5 text-amber-600" /> Restricted Feature — Client Loan Ledger
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -92,7 +92,7 @@ export function LoanFeatureGate({
 
         <div className="rounded-md border border-border bg-background/80 p-3">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-            <ShieldAlert className="h-4 w-4 text-amber-600" /> Attestation &amp; Release
+            <ShieldAlert className="h-4 w-4 text-amber-600" /> Recordkeeping attestation
           </div>
           <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-3 text-xs leading-relaxed">
 {LOAN_ATTESTATION_TEXT}
@@ -117,7 +117,7 @@ export function LoanFeatureGate({
             disabled={!accepted || attestMut.isPending}
             onClick={() => attestMut.mutate()}
           >
-            {attestMut.isPending ? "Recording…" : "Attest &amp; enable feature"}
+            {attestMut.isPending ? "Recording…" : "Attest & enable feature"}
           </Button>
         </div>
         <p className="text-[10px] italic text-muted-foreground">

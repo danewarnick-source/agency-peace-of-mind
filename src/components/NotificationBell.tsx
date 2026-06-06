@@ -132,12 +132,46 @@ export function NotificationBell() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", org?.organization_id] }),
   });
 
-  const unread = notifications.filter((n) => !n.read_at);
+  // CE roster signal — surfaces "N staff behind on CE" as a synthetic top entry.
+  const fetchRoster = useServerFn(getOrgCeRoster);
+  const { data: ceRoster } = useQuery({
+    enabled: !!user?.id && !!org?.organization_id,
+    queryKey: ["ce-roster-signal", org?.organization_id],
+    queryFn: () => fetchRoster(),
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    retry: false,
+  });
+  const ceBehind = ceRoster?.behindCount ?? 0;
+  const ceSynthetic = useMemo<AppNotification | null>(() => {
+    if (ceBehind <= 0) return null;
+    return {
+      id: "__ce_behind__",
+      organization_id: org?.organization_id ?? "",
+      type: "incident_deadline_warning",
+      urgency: "urgent",
+      title: `${ceBehind} staff behind on Continuing Education`,
+      body: "DSPD requires 12 CE hours per staff per year (Year 2+). Open CE Hours to see who's behind.",
+      link_to: "/dashboard/admin/ce-hours",
+      related_id: null,
+      related_type: null,
+      read_at: null,
+      dismissed_at: null,
+      created_at: new Date().toISOString(),
+    };
+  }, [ceBehind, org?.organization_id]);
+
+  const merged = useMemo(
+    () => (ceSynthetic ? [ceSynthetic, ...notifications] : notifications),
+    [ceSynthetic, notifications],
+  );
+
+  const unread = merged.filter((n) => !n.read_at);
   const critical = unread.filter((n) => n.urgency === "critical");
   const unreadCount = unread.length;
 
   function handleClick(n: AppNotification) {
-    if (!n.read_at) markReadMut.mutate(n.id);
+    if (n.id !== "__ce_synthetic__" && n.id !== "__ce_behind__" && !n.read_at) markReadMut.mutate(n.id);
     if (n.link_to) { setOpen(false); navigate({ to: n.link_to as never }); }
   }
 

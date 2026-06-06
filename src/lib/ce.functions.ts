@@ -181,8 +181,10 @@ function validateSteps(steps: unknown): CeStep[] {
   const lessons = out.filter((s) => s.type === "lesson").length;
   const checks = out.filter((s) => s.type === "check").length;
   const reflects = out.filter((s) => s.type === "reflect").length;
-  if (lessons < 5) throw new Error(`Module floor not met: needs ≥5 lessons (got ${lessons}).`);
-  if (checks < 5) throw new Error(`Module floor not met: needs ≥5 scenario checks (got ${checks}).`);
+  // Soft floor — if sources are thin, the AI may emit fewer than 5 pairs
+  // (admin is flagged separately). Always require some teaching + a reflection.
+  if (lessons < 3) throw new Error(`Module floor not met: needs ≥3 lessons (got ${lessons}).`);
+  if (checks < 3) throw new Error(`Module floor not met: needs ≥3 scenario checks (got ${checks}).`);
   if (reflects !== 1) throw new Error("Module must end with exactly one reflection.");
   return out;
 }

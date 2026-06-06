@@ -15,6 +15,8 @@ const CreateEmployeeInput = z.object({
   role: RoleEnum,
   department: z.string().trim().max(120).optional().or(z.literal("")),
   hireDate: z.string().optional().or(z.literal("")),
+  startDate: z.string().optional().or(z.literal("")),
+  endDate: z.string().optional().or(z.literal("")),
   trackIds: z.array(z.string().uuid()).max(50).default([]),
 });
 

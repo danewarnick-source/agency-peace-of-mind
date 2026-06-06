@@ -1185,6 +1185,159 @@ export type Database = {
           },
         ]
       }
+      client_loan_entries: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          id: string
+          kind: string
+          loan_id: string
+          note: string | null
+          organization_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          kind: string
+          loan_id: string
+          note?: string | null
+          organization_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          kind?: string
+          loan_id?: string
+          note?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_loan_entries_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "client_loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_loan_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_loans: {
+        Row: {
+          advance_amount: number | null
+          advance_cadence: string | null
+          agreement_date: string
+          borrower_name: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          direct_payment_amount: number | null
+          direct_payment_cadence: string | null
+          direct_payment_description: string | null
+          direct_payment_due_day: string | null
+          direct_payment_start_date: string | null
+          id: string
+          interest_notes: string | null
+          interest_rate: number
+          lender_name: string
+          maturity_date: string | null
+          notes: string | null
+          organization_id: string
+          purpose: string | null
+          repayment_conditions: Json
+          repayment_method: string | null
+          signature_parties: Json
+          status: string
+          updated_at: string
+          voluntary_ack: boolean
+        }
+        Insert: {
+          advance_amount?: number | null
+          advance_cadence?: string | null
+          agreement_date?: string
+          borrower_name: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          direct_payment_amount?: number | null
+          direct_payment_cadence?: string | null
+          direct_payment_description?: string | null
+          direct_payment_due_day?: string | null
+          direct_payment_start_date?: string | null
+          id?: string
+          interest_notes?: string | null
+          interest_rate?: number
+          lender_name: string
+          maturity_date?: string | null
+          notes?: string | null
+          organization_id: string
+          purpose?: string | null
+          repayment_conditions?: Json
+          repayment_method?: string | null
+          signature_parties?: Json
+          status?: string
+          updated_at?: string
+          voluntary_ack?: boolean
+        }
+        Update: {
+          advance_amount?: number | null
+          advance_cadence?: string | null
+          agreement_date?: string
+          borrower_name?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          direct_payment_amount?: number | null
+          direct_payment_cadence?: string | null
+          direct_payment_description?: string | null
+          direct_payment_due_day?: string | null
+          direct_payment_start_date?: string | null
+          id?: string
+          interest_notes?: string | null
+          interest_rate?: number
+          lender_name?: string
+          maturity_date?: string | null
+          notes?: string | null
+          organization_id?: string
+          purpose?: string | null
+          repayment_conditions?: Json
+          repayment_method?: string | null
+          signature_parties?: Json
+          status?: string
+          updated_at?: string
+          voluntary_ack?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_loans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_loans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_medications: {
         Row: {
           adverse_effects: string | null
@@ -4159,6 +4312,89 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      org_loan_attestations: {
+        Row: {
+          attestation_text: string
+          attestation_version: string
+          attested_at: string
+          attested_by: string
+          created_at: string
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          attestation_text: string
+          attestation_version: string
+          attested_at?: string
+          attested_by: string
+          created_at?: string
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          attestation_text?: string
+          attestation_version?: string
+          attested_at?: string
+          attested_by?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_loan_attestations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_loan_settings: {
+        Row: {
+          active_attestation_id: string | null
+          created_at: string
+          enabled: boolean
+          enabled_at: string | null
+          enabled_by: string | null
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          active_attestation_id?: string | null
+          created_at?: string
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          active_attestation_id?: string | null
+          created_at?: string
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_loan_settings_active_attestation_id_fkey"
+            columns: ["active_attestation_id"]
+            isOneToOne: false
+            referencedRelation: "org_loan_attestations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_loan_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       org_subscriptions: {
         Row: {

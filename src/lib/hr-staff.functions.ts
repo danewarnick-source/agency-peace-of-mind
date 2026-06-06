@@ -12,6 +12,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import {
+  parseCumulativeConfig,
+  computeAnnualHoursProgress,
+  type AnnualHoursProgress,
+  type CumulativeRequirementConfig,
+  type TrainingContribution,
+  type HoursEntry,
+} from "@/lib/hr-training-hours.functions";
 
 const orgStaff = z.object({
   organization_id: z.string().uuid(),
@@ -717,6 +725,8 @@ export interface HrMatrixRequirement {
   is_renewable: boolean;
   renewal_interval_months: number | null;
   renewal_source: string | null;
+  requirement_type: "binary" | "cumulative_hours";
+  cumulative_config: CumulativeRequirementConfig | null;
 }
 
 export interface HrMatrixCell {
@@ -726,6 +736,7 @@ export interface HrMatrixCell {
   evidence_document_id: string | null;
   training_completion_id: string | null;
   auto_checked_at: string | null;
+  cumulative_progress?: AnnualHoursProgress | null;
 }
 
 export interface HrMatrixStaff {
@@ -772,12 +783,12 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
       return { requirements: [], staff: [] };
     }
 
-    const [{ data: base, error: baseErr }, { data: profs }, { data: comps }] =
+    const [{ data: base, error: baseErr }, { data: profs }, { data: comps }, { data: hoursEntries }, { data: completions }, { data: mappings }, { data: topics }] =
       await Promise.all([
         sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
         sb
           .from("profiles")
-          .select("id, full_name, team_id")
+          .select("id, full_name, team_id, hire_date")
           .in("id", staffIds),
         sb
           .from("staff_checklist_completion")
@@ -786,28 +797,52 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
           )
           .eq("organization_id", data.organization_id)
           .in("staff_id", staffIds),
+        sb
+          .from("staff_training_hours_entries")
+          .select("staff_id, requirement_id, entry_date, hours")
+          .eq("organization_id", data.organization_id)
+          .in("staff_id", staffIds),
+        sb
+          .from("training_completions")
+          .select("id, user_id, ref_id, topic_kind, topic_title, completed_at, is_current")
+          .in("user_id", staffIds)
+          .eq("topic_kind", "core")
+          .eq("is_current", true),
+        sb
+          .from("training_checklist_mappings")
+          .select("training_topic_id, requirement_key, is_active")
+          .eq("is_active", true),
+        sb.from("training_topics").select("id, title, default_hours"),
       ]);
     if (baseErr) throw new Error(baseErr.message);
 
-    const requirements: HrMatrixRequirement[] = (base ?? []).map(
-      (r: Record<string, unknown>) => {
-        const meta = (r.metadata ?? {}) as Record<string, unknown>;
-        return {
-          requirement_id: r.id as string,
-          title:
-            (r.title as string) ?? (r.short_label as string) ?? "Untitled",
-          category: (r.category as string) ?? null,
-          source_citation: (r.source_citation as string) ?? null,
-          checklist_layer: (meta.checklist_layer as string) ?? null,
-          is_renewable: meta.is_renewable === true,
-          renewal_interval_months:
-            typeof meta.renewal_interval_months === "number"
-              ? (meta.renewal_interval_months as number)
-              : null,
-          renewal_source: (meta.renewal_source as string) ?? null,
-        };
-      },
-    );
+    const baseRows = (base ?? []) as Array<Record<string, unknown>>;
+    const cumulativeConfigByReqId = new Map<string, CumulativeRequirementConfig>();
+    const cumulativeReqKeyToId = new Map<string, string>();
+    const requirements: HrMatrixRequirement[] = baseRows.map((r) => {
+      const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      const cumCfg = parseCumulativeConfig(r);
+      if (cumCfg) {
+        cumulativeConfigByReqId.set(cumCfg.requirement_id, cumCfg);
+        cumulativeReqKeyToId.set(cumCfg.requirement_key, cumCfg.requirement_id);
+      }
+      return {
+        requirement_id: r.id as string,
+        title:
+          (r.title as string) ?? (r.short_label as string) ?? "Untitled",
+        category: (r.category as string) ?? null,
+        source_citation: (r.source_citation as string) ?? null,
+        checklist_layer: (meta.checklist_layer as string) ?? null,
+        is_renewable: meta.is_renewable === true,
+        renewal_interval_months:
+          typeof meta.renewal_interval_months === "number"
+            ? (meta.renewal_interval_months as number)
+            : null,
+        renewal_source: (meta.renewal_source as string) ?? null,
+        requirement_type: cumCfg ? "cumulative_hours" : "binary",
+        cumulative_config: cumCfg,
+      };
+    });
     const reqById = new Map(requirements.map((r) => [r.requirement_id, r]));
 
     // Teams + managers
@@ -847,6 +882,56 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         managerNames.set(m.id, m.full_name ?? "—");
     }
 
+    // Build training-hour contributions per staff × cumulative-requirement.
+    const topicById = new Map<string, { title: string; default_hours: number | null }>();
+    for (const t of topics ?? [])
+      topicById.set(t.id, { title: t.title, default_hours: t.default_hours });
+    const topicToReqId = new Map<string, string>();
+    for (const m of mappings ?? []) {
+      const rid = cumulativeReqKeyToId.get(m.requirement_key);
+      if (rid) topicToReqId.set(m.training_topic_id, rid);
+    }
+    const contribKey = (s: string, r: string) => `${s}::${r}`;
+    const contribMap = new Map<string, TrainingContribution[]>();
+    for (const tc of completions ?? []) {
+      const reqId = topicToReqId.get(tc.ref_id);
+      if (!reqId) continue;
+      const topic = topicById.get(tc.ref_id);
+      const rawHours =
+        topic?.default_hours != null ? Number(topic.default_hours) : null;
+      const hours = rawHours && rawHours > 0 ? rawHours : 1.0;
+      const k = contribKey(tc.user_id, reqId);
+      if (!contribMap.has(k)) contribMap.set(k, []);
+      contribMap.get(k)!.push({
+        training_completion_id: tc.id,
+        topic_id: tc.ref_id,
+        topic_title: tc.topic_title ?? topic?.title ?? "Training",
+        completed_at: tc.completed_at,
+        hours,
+        hours_source: rawHours ? "topic_default" : "fallback_one_hour",
+      });
+    }
+    const entryMap = new Map<string, HoursEntry[]>();
+    const singleCumReqId =
+      cumulativeConfigByReqId.size === 1
+        ? Array.from(cumulativeConfigByReqId.keys())[0]
+        : null;
+    for (const e of hoursEntries ?? []) {
+      const reqId = e.requirement_id ?? singleCumReqId;
+      if (!reqId) continue;
+      const k = contribKey(e.staff_id, reqId);
+      if (!entryMap.has(k)) entryMap.set(k, []);
+      entryMap.get(k)!.push({
+        id: "_",
+        entry_date: e.entry_date,
+        hours: Number(e.hours),
+        note: null,
+        created_by: null,
+        created_by_name: null,
+        created_at: "",
+      });
+    }
+
     // Group completions per staff
     const compByStaff = new Map<
       string,
@@ -878,22 +963,46 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
 
     const mProfMap = new Map<
       string,
-      { id: string; full_name: string | null; team_id: string | null }
+      { id: string; full_name: string | null; team_id: string | null; hire_date: string | null }
     >();
     for (const p of (profs ?? []) as Array<{
       id: string;
       full_name: string | null;
       team_id: string | null;
+      hire_date: string | null;
     }>) {
       mProfMap.set(p.id, p);
     }
 
+    const now = new Date();
     const staff: HrMatrixStaff[] = staffIds.map((sid) => {
       const p = mProfMap.get(sid);
       const team = p?.team_id ? teamMap.get(p.team_id) : undefined;
       const cellsMap = compByStaff.get(sid) ?? new Map<string, HrMatrixCell>();
       const cells: Record<string, HrMatrixCell> = {};
       for (const [k, v] of cellsMap) cells[k] = v;
+      // Inject cumulative-progress into every cumulative requirement's cell.
+      for (const cfg of cumulativeConfigByReqId.values()) {
+        const k = contribKey(sid, cfg.requirement_id);
+        const progress = computeAnnualHoursProgress({
+          config: cfg,
+          hire_date: p?.hire_date ?? null,
+          training_contributions: contribMap.get(k) ?? [],
+          entries: entryMap.get(k) ?? [],
+          now,
+        });
+        cells[cfg.requirement_id] = {
+          ...(cells[cfg.requirement_id] ?? {
+            status: "not_started",
+            completed_date: null,
+            expires_at: null,
+            evidence_document_id: null,
+            training_completion_id: null,
+            auto_checked_at: null,
+          }),
+          cumulative_progress: progress,
+        };
+      }
       return {
         staff_id: sid,
         full_name: p?.full_name ?? "—",

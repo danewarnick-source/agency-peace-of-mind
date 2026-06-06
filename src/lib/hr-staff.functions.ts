@@ -15,6 +15,7 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import {
   parseCumulativeConfig,
   computeAnnualHoursProgress,
+  loadOrgAnnualHoursProgress,
   type AnnualHoursProgress,
   type CumulativeRequirementConfig,
   type TrainingContribution,
@@ -556,6 +557,7 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
       title: string;
       is_renewable: boolean;
       interval_months: number | null;
+      is_cumulative: boolean;
     }> = (base ?? []).map((r: Record<string, unknown>) => {
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
       return {
@@ -567,8 +569,11 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
           typeof meta.renewal_interval_months === "number"
             ? (meta.renewal_interval_months as number)
             : null,
+        is_cumulative: meta.requirement_type === "cumulative_hours",
       };
     });
+    const binaryItems = baseItems.filter((b) => !b.is_cumulative);
+    const cumulativeItems = baseItems.filter((b) => b.is_cumulative);
     const totalRequired = baseItems.length;
     const baseIds = new Set(baseItems.map((b) => b.id));
     const baseById = new Map(baseItems.map((b) => [b.id, b]));
@@ -641,16 +646,28 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
     const in30Ms = todayMs + 30 * 86400_000;
     const newHireCutoffMs = todayMs - 60 * 86400_000;
 
+    // Cumulative-hours: load shared computation so the rollup's gap math uses
+    // the SAME status the matrix cell and staff HR tab show.
+    let cumProgress: Record<string, Record<string, AnnualHoursProgress>> = {};
+    if (cumulativeItems.length > 0) {
+      const loaded = await loadOrgAnnualHoursProgress(
+        sb,
+        data.organization_id,
+        staffIds,
+      );
+      cumProgress = loaded.progress;
+    }
+
     const rows: HrRollupRow[] = staffIds.map((sid) => {
       const p = profMap.get(sid);
       const cmap = compByStaff.get(sid) ?? new Map();
-      let complete = 0;
+      let binaryComplete = 0;
       let expired = 0;
       let nextRenewal: HrRollupRow["next_renewal"] = null;
       let nextRenewalTs = Infinity;
-      for (const b of baseItems) {
+      for (const b of binaryItems) {
         const c = cmap.get(b.id);
-        if (c?.status === "complete") complete++;
+        if (c?.status === "complete") binaryComplete++;
         if (c?.status === "expired") expired++;
         if (c?.expires_at) {
           const ts = new Date(c.expires_at).getTime();
@@ -664,7 +681,20 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
           }
         }
       }
-      const openGaps = Math.max(0, totalRequired - complete);
+      // Cumulative: gap ONLY when enforced AND behind. Pre-tenure/on_target =
+      // not a gap. Complete counts toward complete_count.
+      let cumComplete = 0;
+      let cumGaps = 0;
+      const cumForStaff = cumProgress[sid] ?? {};
+      for (const ci of cumulativeItems) {
+        const prog = cumForStaff[ci.id];
+        if (!prog) continue;
+        if (prog.status === "complete") cumComplete++;
+        else if (prog.enforced && prog.status === "behind") cumGaps++;
+      }
+      const complete = binaryComplete + cumComplete;
+      const binaryGaps = Math.max(0, binaryItems.length - binaryComplete);
+      const openGaps = binaryGaps + cumGaps;
       const hire = p?.hire_date ?? null;
       const hireMs = hire ? new Date(hire).getTime() : null;
       const isNewHire =

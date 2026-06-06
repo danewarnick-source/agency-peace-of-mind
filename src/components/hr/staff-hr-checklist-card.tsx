@@ -26,6 +26,7 @@ import {
   getHrDocumentUrl,
   deleteHrDocument,
 } from "@/lib/hr-staff.functions";
+import { AnnualHoursSection } from "@/components/hr/annual-hours-progress";
 import { useAuth } from "@/hooks/use-auth";
 
 const STATUSES = ["not_started", "in_progress", "complete", "expired", "waived"] as const;
@@ -499,7 +500,14 @@ export function StaffHrChecklistCard({
       </Card>
 
 
+      <AnnualHoursSection
+        organizationId={organizationId}
+        staffId={staffId}
+        canEdit={!isSelf}
+      />
+
       <TrainingHistoryCard staffId={staffId} />
+
 
       <Card>
         <CardHeader>

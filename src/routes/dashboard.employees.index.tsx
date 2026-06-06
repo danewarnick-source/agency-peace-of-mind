@@ -58,6 +58,8 @@ type EditableMember = {
   workerType: WorkerType;
   hourlyRate: string;
   dailyRate: string;
+  startDate: string;
+  endDate: string;
 };
 
 function EmployeesPage() {

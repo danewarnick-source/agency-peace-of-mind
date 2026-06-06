@@ -320,6 +320,11 @@ function CellView({
   in60Ms: number;
   onEvidence: (docId: string) => void;
 }) {
+  // Cumulative-hours requirements render as a progress meter regardless of
+  // the binary status (status will be 'not_started' since no checklist row).
+  if (req.requirement_type === "cumulative_hours" && cell?.cumulative_progress) {
+    return <AnnualHoursCell progress={cell.cumulative_progress} />;
+  }
   if (!cell || cell.status === "not_started") {
     return (
       <span className="inline-block h-6 w-6 rounded border border-dashed border-border" />

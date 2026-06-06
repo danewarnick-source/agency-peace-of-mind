@@ -74,7 +74,7 @@ export function generateLoanPdf(d: LoanPdfData): jsPDF {
   // Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text("LOAN AGREEMENT", pageW / 2, y, { align: "center" });
+  doc.text("LOAN AGREEMENT (on file — copy for records)", pageW / 2, y, { align: "center" });
   y += 26;
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9);
@@ -82,7 +82,7 @@ export function generateLoanPdf(d: LoanPdfData): jsPDF {
   y += 20;
 
   writeP(
-    `This Loan Agreement (the "Agreement") is entered into on ${fmtDate(d.agreement_date)} between ${d.lender_name} ("Lender") and ${d.borrower_name} ("Borrower").`,
+    `This document is a copy of the Loan Agreement kept on file. It was entered into on ${fmtDate(d.agreement_date)} between ${d.lender_name} ("Lender") and ${d.borrower_name} ("Borrower"), reflecting an arrangement the company and the client's support team independently decided to enter into.`,
   );
 
   heading(1, "Purpose");

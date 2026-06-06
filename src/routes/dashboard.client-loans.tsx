@@ -38,9 +38,9 @@ function ClientLoansPage() {
   return (
     <div className="space-y-4 p-4 md:p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Client Loans</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Client Loan Ledger</h1>
         <p className="text-sm text-muted-foreground">
-          Admin-only. Manage provider-to-client loan agreements. Not visible to staff.
+          Admin-only recordkeeping. Document and track client loan agreements kept on file. Not visible to staff.
         </p>
       </header>
       <LoanFeatureGate organizationId={org.organization_id}>

@@ -11,6 +11,7 @@ import { StaffClientGrid } from "@/components/staff-client-grid";
 import { TodayShiftBanner } from "@/components/today-shift-banner";
 import { CompanyOverview } from "@/components/company-overview";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
+import { OtherAssignmentsReminder } from "@/components/training/other-assignments-reminder";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 

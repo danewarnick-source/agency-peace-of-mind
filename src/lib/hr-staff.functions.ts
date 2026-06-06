@@ -869,7 +869,7 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
     }
 
     const staff: HrMatrixStaff[] = staffIds.map((sid) => {
-      const p = profMap.get(sid);
+      const p = mProfMap.get(sid);
       const team = p?.team_id ? teamMap.get(p.team_id) : undefined;
       const cellsMap = compByStaff.get(sid) ?? new Map<string, HrMatrixCell>();
       const cells: Record<string, HrMatrixCell> = {};

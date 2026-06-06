@@ -1027,18 +1027,26 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         evidence_document_id: c.evidence_document_id ?? null,
         training_completion_id: c.training_completion_id ?? null,
         auto_checked_at: c.auto_checked_at ?? null,
+        applicable: true,
       });
     }
 
     const mProfMap = new Map<
       string,
-      { id: string; full_name: string | null; team_id: string | null; hire_date: string | null }
+      {
+        id: string;
+        full_name: string | null;
+        team_id: string | null;
+        hire_date: string | null;
+        staff_type_keys: string[] | null;
+      }
     >();
     for (const p of (profs ?? []) as Array<{
       id: string;
       full_name: string | null;
       team_id: string | null;
       hire_date: string | null;
+      staff_type_keys: string[] | null;
     }>) {
       mProfMap.set(p.id, p);
     }
@@ -1047,9 +1055,24 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
     const staff: HrMatrixStaff[] = staffIds.map((sid) => {
       const p = mProfMap.get(sid);
       const team = p?.team_id ? teamMap.get(p.team_id) : undefined;
+      const staffTypeKeys: string[] = p?.staff_type_keys ?? [];
       const cellsMap = compByStaff.get(sid) ?? new Map<string, HrMatrixCell>();
       const cells: Record<string, HrMatrixCell> = {};
-      for (const [k, v] of cellsMap) cells[k] = v;
+      // Pre-compute applicable per requirement using shared helper.
+      const applicableByReq = new Map<string, boolean>();
+      for (const req of requirements) {
+        applicableByReq.set(
+          req.requirement_id,
+          isRequirementApplicable({
+            applies_to: req.applies_to_staff_types,
+            applies_to_confirmed_at: req.applies_to_confirmed_at,
+            staff_type_keys: staffTypeKeys,
+          }),
+        );
+      }
+      for (const [k, v] of cellsMap) {
+        cells[k] = { ...v, applicable: applicableByReq.get(k) ?? true };
+      }
       // Inject cumulative-progress into every cumulative requirement's cell.
       for (const cfg of cumulativeConfigByReqId.values()) {
         const k = contribKey(sid, cfg.requirement_id);
@@ -1068,8 +1091,10 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
             evidence_document_id: null,
             training_completion_id: null,
             auto_checked_at: null,
+            applicable: applicableByReq.get(cfg.requirement_id) ?? true,
           }),
           cumulative_progress: progress,
+          applicable: applicableByReq.get(cfg.requirement_id) ?? true,
         };
       }
       return {
@@ -1081,6 +1106,7 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         manager_name: team?.manager_id
           ? (managerNames.get(team.manager_id) ?? null)
           : null,
+        staff_type_keys: staffTypeKeys,
         cells,
       };
     });

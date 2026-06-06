@@ -22,7 +22,7 @@ import { LoanEditor } from "@/components/loans/loan-editor";
 import { listOrgLoans } from "@/lib/client-loans.functions";
 
 export const Route = createFileRoute("/dashboard/client-loans")({
-  head: () => ({ meta: [{ title: "Client Loans — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Client Loan Ledger — HIVE" }] }),
   component: () => (
     <RequireRole roles={["admin", "super_admin"]}>
       <ClientLoansPage />
@@ -38,9 +38,9 @@ function ClientLoansPage() {
   return (
     <div className="space-y-4 p-4 md:p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Client Loans</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Client Loan Ledger</h1>
         <p className="text-sm text-muted-foreground">
-          Admin-only. Manage provider-to-client loan agreements. Not visible to staff.
+          Admin-only recordkeeping. Document and track client loan agreements kept on file. Not visible to staff.
         </p>
       </header>
       <LoanFeatureGate organizationId={org.organization_id}>
@@ -96,7 +96,7 @@ function LoanArea({ organizationId, lenderName }: { organizationId: string; lend
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle className="text-base">Create a loan for a client</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Record a loan agreement for a client</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Select value={newClientId} onValueChange={setNewClientId}>
             <SelectTrigger className="w-72"><SelectValue placeholder="Select client…" /></SelectTrigger>
@@ -120,7 +120,7 @@ function LoanArea({ organizationId, lenderName }: { organizationId: string; lend
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Existing loans</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Agreements on file</CardTitle></CardHeader>
         <CardContent>
           {loans.isLoading ? (
             <div className="text-sm text-muted-foreground">Loading…</div>
@@ -150,7 +150,7 @@ function LoanArea({ organizationId, lenderName }: { organizationId: string; lend
                   </TableRow>
                 ))}
                 {!(loans.data ?? []).length && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground">No loans yet.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground">No agreements on file yet.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

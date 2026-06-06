@@ -205,19 +205,19 @@ export function LoanEditor({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-xl font-semibold">{loanId ? "Edit Loan" : "New Loan"}</h2>
-          <p className="text-xs text-muted-foreground">DRAFT — pending legal review</p>
+          <h2 className="text-xl font-semibold">{loanId ? "Edit Loan Agreement (on file)" : "New Loan Agreement (on file)"}</h2>
+          <p className="text-xs text-muted-foreground">DRAFT — pending legal review · Record of an agreement entered into by the company and the client's support team</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={onClose}>Back</Button>
           <Button variant="outline" onClick={handleDownload}>
-            <FileDown className="mr-2 h-4 w-4" /> Download PDF
+            <FileDown className="mr-2 h-4 w-4" /> Download copy for records (PDF)
           </Button>
           <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
             <Save className="mr-2 h-4 w-4" /> {saveMut.isPending ? "Saving…" : "Save"}
           </Button>
           {loanId && (
-            <Button variant="destructive" onClick={() => { if (confirm("Delete loan?")) delMut.mutate(); }}>
+            <Button variant="destructive" onClick={() => { if (confirm("Delete this agreement and ledger?")) delMut.mutate(); }}>
               <Trash2 className="mr-2 h-4 w-4" /> Delete
             </Button>
           )}
@@ -394,8 +394,8 @@ export function LoanEditor({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-base">
-              <span>Running balance &amp; ledger</span>
-              <span className="rounded bg-muted px-2 py-0.5 text-sm font-mono">${balance.toFixed(2)}</span>
+              <span>Loan Ledger</span>
+              <span className="rounded bg-muted px-2 py-0.5 text-sm font-mono">Running balance: ${balance.toFixed(2)}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -441,7 +441,7 @@ export function LoanEditor({
                   </TableRow>
                 ))}
                 {!(q.data?.entries ?? []).length && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground">No entries yet.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground">No entries yet. Use the form above to record advances and repayments.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

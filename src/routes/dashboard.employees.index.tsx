@@ -357,6 +357,8 @@ function EmployeesPage() {
                       workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
                       hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
                       dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
+                      startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
+                      endDate: (m.profile?.end_date ?? "") as string,
                     })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
                       <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload

@@ -5444,6 +5444,95 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_other_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          assignment_type: Database["public"]["Enums"]["other_assignment_type"]
+          completed_at: string | null
+          completion_provenance: Json | null
+          completion_source: string | null
+          confirmed: boolean
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          is_safety_critical: boolean
+          notes: string | null
+          organization_id: string
+          proposal_rationale: string | null
+          proposed_by: Database["public"]["Enums"]["other_assignment_proposer"]
+          proposed_by_user: string | null
+          requires_admin_confirmation: boolean
+          staff_id: string
+          status: Database["public"]["Enums"]["other_assignment_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          assignment_type?: Database["public"]["Enums"]["other_assignment_type"]
+          completed_at?: string | null
+          completion_provenance?: Json | null
+          completion_source?: string | null
+          confirmed?: boolean
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_safety_critical?: boolean
+          notes?: string | null
+          organization_id: string
+          proposal_rationale?: string | null
+          proposed_by?: Database["public"]["Enums"]["other_assignment_proposer"]
+          proposed_by_user?: string | null
+          requires_admin_confirmation?: boolean
+          staff_id: string
+          status?: Database["public"]["Enums"]["other_assignment_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          assignment_type?: Database["public"]["Enums"]["other_assignment_type"]
+          completed_at?: string | null
+          completion_provenance?: Json | null
+          completion_source?: string | null
+          confirmed?: boolean
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_safety_critical?: boolean
+          notes?: string | null
+          organization_id?: string
+          proposal_rationale?: string | null
+          proposed_by?: Database["public"]["Enums"]["other_assignment_proposer"]
+          proposed_by_user?: string | null
+          requires_admin_confirmation?: boolean
+          staff_id?: string
+          status?: Database["public"]["Enums"]["other_assignment_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_other_assignments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_training_hours_entries: {
         Row: {
           created_at: string
@@ -6853,6 +6942,9 @@ export type Database = {
       hive_ticket_source: "auto" | "manual"
       hive_ticket_status: "new" | "in_progress" | "resolved"
       invitation_status: "pending" | "accepted" | "revoked"
+      other_assignment_proposer: "admin" | "manager" | "nectar"
+      other_assignment_status: "not_started" | "in_progress" | "completed"
+      other_assignment_type: "training" | "task" | "requirement"
       provider_training_kind: "policies" | "person"
       provider_training_status: "draft" | "published"
       report_cadence: "weekly" | "monthly"
@@ -7016,6 +7108,9 @@ export const Constants = {
       hive_ticket_source: ["auto", "manual"],
       hive_ticket_status: ["new", "in_progress", "resolved"],
       invitation_status: ["pending", "accepted", "revoked"],
+      other_assignment_proposer: ["admin", "manager", "nectar"],
+      other_assignment_status: ["not_started", "in_progress", "completed"],
+      other_assignment_type: ["training", "task", "requirement"],
       provider_training_kind: ["policies", "person"],
       provider_training_status: ["draft", "published"],
       report_cadence: ["weekly", "monthly"],

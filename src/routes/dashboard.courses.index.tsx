@@ -82,7 +82,7 @@ function MyTrainings() {
     queryKey: ["ce-status"],
     queryFn: () => fetchCe(),
   });
-  const showCe = !!ce?.ceApplies;
+  const ceApplies = !!ce?.ceApplies;
 
   return (
     <div className="space-y-4 pb-2">

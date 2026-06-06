@@ -111,6 +111,10 @@ function ceApplies(hireIso: string, today = todayUtc()): boolean {
 
 interface MembershipRow { organization_id: string; role: string }
 
+// Shared helper: super_admin is deprecated (collapsed into admin) but still
+// accepted defensively so any lingering legacy row keeps access.
+const ADMIN_LIKE_ROLES = new Set(["admin", "manager", "owner", "super_admin"]);
+
 async function getCallerOrg(
   supabase: ReturnType<typeof getSupabase>,
   userId: string,
@@ -126,7 +130,7 @@ async function getCallerOrg(
   if (!row) return { orgId: null, isAdmin: false };
   return {
     orgId: row.organization_id,
-    isAdmin: row.role === "admin" || row.role === "manager" || row.role === "owner",
+    isAdmin: ADMIN_LIKE_ROLES.has(row.role),
   };
 }
 

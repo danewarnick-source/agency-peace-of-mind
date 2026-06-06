@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X, Search, Database, Inbox, FolderArchive, Briefcase, MessageSquare, Target, CheckCircle2, ShieldCheck, ShieldAlert, Bot, Calendar, User as UserIcon, Users, Zap, Dna, Filter, AlertCircle, Flag } from "lucide-react";
+import { Check, Pencil, MapPin, Clock, Loader2, Download, AlertTriangle, Sparkles, X, Search, Database, Inbox, FolderArchive, Briefcase, MessageSquare, Target, CheckCircle2, ShieldCheck, ShieldAlert, Bot, Calendar, User as UserIcon, Users, Zap, Dna, Filter, AlertCircle, Flag, ChevronRight, ChevronsUpDown, ChevronsDownUp } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth as useAuthHook } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -221,6 +221,70 @@ function nectarReason(row: Row): string {
   }
   return "No documentation concerns detected in this shift.";
 }
+
+/** Per-table expand/collapse state for condensed shift rows. */
+function useRowExpansion() {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const isExpanded = (id: string) => expanded.has(id);
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const expandAll = (ids: string[]) => setExpanded(new Set(ids));
+  const collapseAll = () => setExpanded(new Set());
+  return { expanded, isExpanded, toggle, expandAll, collapseAll };
+}
+
+function ExpandControls({
+  exp, ids,
+}: { exp: ReturnType<typeof useRowExpansion>; ids: string[] }) {
+  const disabled = ids.length === 0;
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        type="button" size="sm" variant="ghost"
+        disabled={disabled}
+        onClick={() => exp.expandAll(ids)}
+        className="h-8 gap-1 text-xs"
+      >
+        <ChevronsUpDown className="h-3.5 w-3.5" /> Expand all
+      </Button>
+      <Button
+        type="button" size="sm" variant="ghost"
+        disabled={disabled || exp.expanded.size === 0}
+        onClick={() => exp.collapseAll()}
+        className="h-8 gap-1 text-xs"
+      >
+        <ChevronsDownUp className="h-3.5 w-3.5" /> Collapse all
+      </Button>
+    </div>
+  );
+}
+
+function ChevronCell({ open }: { open: boolean }) {
+  return (
+    <TableCell className="w-8 py-1.5 pr-0 align-middle">
+      <ChevronRight
+        className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}
+        aria-hidden
+      />
+    </TableCell>
+  );
+}
+
+function FlagDot({ row }: { row: Pick<Row, "ai_compliance_status"> }) {
+  if (row.ai_compliance_status !== "Exception") return null;
+  return (
+    <span title="NECTAR flag" aria-label="NECTAR flag" className="ml-1.5 inline-flex align-middle">
+      <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+    </span>
+  );
+}
+
+const stopRowToggle = (e: MouseEvent) => e.stopPropagation();
 
 /** Inline shift narrative + goals strip — visually connected to the shift row above. */
 function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
@@ -691,6 +755,9 @@ function UnifiedSearchResults({
     return out;
   }, [matches, rowMap]);
 
+  const exp = useRowExpansion();
+  const allIds = useMemo(() => ranked.map((r) => r.row.id), [ranked]);
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -732,10 +799,15 @@ function UnifiedSearchResults({
         </div>
       )}
 
-      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
+      <div className="mb-2 flex justify-end">
+        <ExpandControls exp={exp} ids={allIds} />
+      </div>
+
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle">
         <Table>
           <TableHeader>
                   <TableRow className="[&>td]:border-b-0">
+              <TableHead className="w-8" />
               <TableHead>Score</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Status</TableHead>
@@ -753,14 +825,14 @@ function UnifiedSearchResults({
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={`sk-${i}`}>
-                  <TableCell colSpan={11} className="py-3">
+                  <TableCell colSpan={12} className="py-3">
                     <div className="h-12 w-full animate-pulse rounded-md bg-muted/60" />
                   </TableCell>
                 </TableRow>
               ))
             ) : ranked.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={12} className="py-10 text-center text-sm text-muted-foreground">
                   No conceptually similar shifts. If you just added shifts, click <span className="font-semibold">Index embeddings</span> above so NECTAR can read them.
                 </TableCell>
               </TableRow>
@@ -768,9 +840,16 @@ function UnifiedSearchResults({
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
               const isPending = r.status === "Pending";
+              const open = exp.isExpanded(r.id);
               return (
                 <Fragment key={r.id}>
-                  <TableRow>
+                  <TableRow
+                    onClick={() => exp.toggle(r.id)}
+                    role="button"
+                    aria-expanded={open}
+                    className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
+                  >
+                    <ChevronCell open={open} />
                     <TableCell>
                       <Badge variant="outline" className="font-mono text-[11px]">
                         {(similarity * 100).toFixed(0)}%
@@ -785,6 +864,7 @@ function UnifiedSearchResults({
                     <TableCell className="whitespace-nowrap font-medium">
                       {r.staff?.full_name ?? r.staff?.email ?? "—"}
                       <EditedByAdminBadge row={r} />
+                      <FlagDot row={r} />
                     </TableCell>
                     <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                     <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
@@ -792,18 +872,18 @@ function UnifiedSearchResults({
                       {fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}
                     </TableCell>
                     <TableCell className="whitespace-nowrap font-mono">{fmtDuration(inIso, outIso)}</TableCell>
-                    <TableCell>
+                    <TableCell onClick={stopRowToggle}>
                       <Button variant="outline" size="sm" onClick={() => onMap(r)}>
                         <MapPin /> View
                       </Button>
                     </TableCell>
                     <TableCell
-                      onClick={() => r.outside_geofence_reason && onReason(r)}
+                      onClick={(e) => { e.stopPropagation(); if (r.outside_geofence_reason) onReason(r); }}
                       className={r.outside_geofence_reason ? "cursor-pointer" : ""}
                     >
                       <GeofenceBadge row={r} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={stopRowToggle}>
                       <div className="flex justify-end gap-1.5">
                         {isPending && (
                           <Button
@@ -821,7 +901,7 @@ function UnifiedSearchResults({
                       </div>
                     </TableCell>
                   </TableRow>
-                  <InlineNotesRow row={r} colSpan={11} />
+                  {open && <InlineNotesRow row={r} colSpan={12} />}
                 </Fragment>
               );
             })}
@@ -842,16 +922,22 @@ function PendingTable({
   onApprove: (id: string) => void; approving: boolean;
   onReason: (r: Row) => void;
 }) {
+  const exp = useRowExpansion();
+  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Pending EVV Shifts</h2>
-        <Badge variant="outline" className="font-mono text-[10px]">{rows.length} pending</Badge>
+        <div className="flex items-center gap-2">
+          <ExpandControls exp={exp} ids={allIds} />
+          <Badge variant="outline" className="font-mono text-[10px]">{rows.length} pending</Badge>
+        </div>
       </div>
-      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle">
         <Table>
           <TableHeader>
               <TableRow>
+              <TableHead className="w-8" />
               <TableHead>Caregiver</TableHead>
               <TableHead>Client</TableHead>
               <TableHead>Origin</TableHead>
@@ -865,19 +951,28 @@ function PendingTable({
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : rows.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts.</TableCell></TableRow>
-            ) : rows.map((r) => (
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No pending shifts.</TableCell></TableRow>
+            ) : rows.map((r) => {
+              const open = exp.isExpanded(r.id);
+              return (
               <Fragment key={r.id}>
-              <TableRow className="[&>td]:border-b-0">
+              <TableRow
+                onClick={() => exp.toggle(r.id)}
+                role="button"
+                aria-expanded={open}
+                className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
+              >
+                <ChevronCell open={open} />
                 <TableCell className="whitespace-nowrap font-medium">
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
                   <EditedByAdminBadge row={r} />
+                  <FlagDot row={r} />
                 </TableCell>
                 <TableCell>
                   <div className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</div>
-                  <div className="text-xs text-muted-foreground">{r.clients?.physical_address ?? "—"}</div>
+                  <div className="text-xs text-muted-foreground truncate max-w-[220px]">{r.clients?.physical_address ?? "—"}</div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={r.shift_entry_type === "Client_Profile_Pass" ? "default" : "secondary"}>
@@ -887,15 +982,15 @@ function PendingTable({
                 <TableCell className="whitespace-nowrap font-mono">{r.utah_medicaid_member_id}</TableCell>
                 <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
                 <TableCell className="whitespace-nowrap font-mono"><Clock className="mr-1 inline h-3.5 w-3.5" />{fmtDuration(effectiveIn(r), effectiveOut(r))}</TableCell>
-                <TableCell>
+                <TableCell onClick={stopRowToggle}>
                   <Button variant="outline" size="sm" onClick={() => onMap(r)}>
                     <MapPin /> View
                   </Button>
                 </TableCell>
-                <TableCell onClick={() => r.outside_geofence_reason && onReason(r)} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
+                <TableCell onClick={(e) => { e.stopPropagation(); if (r.outside_geofence_reason) onReason(r); }} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
                   <GeofenceBadge row={r} />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right" onClick={stopRowToggle}>
                   <div className="flex justify-end gap-1.5">
                     <Button
                       size="icon"
@@ -911,9 +1006,10 @@ function PendingTable({
                   </div>
                 </TableCell>
               </TableRow>
-              <InlineNotesRow row={r} colSpan={9} />
+              {open && <InlineNotesRow row={r} colSpan={10} />}
               </Fragment>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -1125,13 +1221,19 @@ function ArchiveTable({
   const heading = variant === "evv" ? "State EVV Archive (Geofence-Locked Codes)" : "Internal / Non-EVV Archive";
   const exportLabel = variant === "evv" ? "Export Utah DHHS EVV CSV" : "Export Payroll CSV";
 
+  const exp = useRowExpansion();
+  const allIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{heading}</h2>
-        <Button onClick={onExport}>
-          <Download /> {exportLabel}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExpandControls exp={exp} ids={allIds} />
+          <Button onClick={onExport}>
+            <Download /> {exportLabel}
+          </Button>
+        </div>
       </div>
 
       <div className="mb-3 grid gap-2 md:grid-cols-4">
@@ -1147,10 +1249,11 @@ function ArchiveTable({
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
       </div>
 
-      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               <TableHead>Date</TableHead>
               <TableHead>Caregiver</TableHead>
               <TableHead>Client</TableHead>
@@ -1165,26 +1268,34 @@ function ArchiveTable({
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
             ) : filtered.map((r) => {
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
+              const open = exp.isExpanded(r.id);
               return (
                 <Fragment key={r.id}>
-                <TableRow className="[&>td]:border-b-0">
+                <TableRow
+                  onClick={() => exp.toggle(r.id)}
+                  role="button"
+                  aria-expanded={open}
+                  className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
+                >
+                  <ChevronCell open={open} />
                   <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
                   <TableCell className="whitespace-nowrap font-medium">
                     {r.staff?.full_name ?? r.staff?.email ?? "—"}
                     <EditedByAdminBadge row={r} />
+                    <FlagDot row={r} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                   <TableCell className="whitespace-nowrap font-mono">{r.utah_medicaid_member_id}</TableCell>
                   <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
                   <TableCell className="whitespace-nowrap font-mono">{fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}</TableCell>
                   <TableCell className="whitespace-nowrap font-mono">{fmtDuration(inIso, outIso)}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={stopRowToggle}>
                     <Button variant="outline" size="sm" onClick={() => onMap(r)}>
                       <MapPin /> View
                     </Button>
@@ -1192,13 +1303,13 @@ function ArchiveTable({
                   <TableCell>
                     <GeofenceBadge row={r} />
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={stopRowToggle}>
                     <Button size="sm" variant="secondary" onClick={() => onEdit(r)}>
                       <Pencil /> Edit
                     </Button>
                   </TableCell>
                 </TableRow>
-                <InlineNotesRow row={r} colSpan={10} />
+                {open && <InlineNotesRow row={r} colSpan={11} />}
                 </Fragment>
               );
             })}
@@ -1520,6 +1631,9 @@ function ReconcileTable({
     toast.success(`Exported ${rows.length} reconciliation record${rows.length === 1 ? "" : "s"}.`);
   };
 
+  const exp = useRowExpansion();
+  const allIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -1532,6 +1646,7 @@ function ReconcileTable({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ExpandControls exp={exp} ids={allIds} />
           <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -1547,10 +1662,11 @@ function ReconcileTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               <TableHead>Date</TableHead>
               <TableHead>Caregiver</TableHead>
               <TableHead>Client</TableHead>
@@ -1564,21 +1680,31 @@ function ReconcileTable({
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No shifts match this filter — geofence reconciliation is clean.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No shifts match this filter — geofence reconciliation is clean.</TableCell></TableRow>
             ) : filtered.map((r) => {
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
+              const open = exp.isExpanded(r.id);
               return (
                 <Fragment key={r.id}>
-                <TableRow className="[&>td]:border-b-0">
+                <TableRow
+                  onClick={() => exp.toggle(r.id)}
+                  role="button"
+                  aria-expanded={open}
+                  className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
+                >
+                  <ChevronCell open={open} />
                   <TableCell className="whitespace-nowrap font-mono">{fmtDateMDY(inIso)}</TableCell>
-                  <TableCell className="whitespace-nowrap font-medium">{r.staff?.full_name ?? r.staff?.email ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap font-medium">
+                    {r.staff?.full_name ?? r.staff?.email ?? "—"}
+                    <FlagDot row={r} />
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</TableCell>
                   <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
                   <TableCell className="whitespace-nowrap font-mono">{fmtTimeAmPm(inIso)} → {outIso ? fmtTimeAmPm(outIso) : "—"}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={stopRowToggle}>
                     <Button variant="outline" size="sm" onClick={() => onMap(r)}>
                       <MapPin /> View
                     </Button>
@@ -1587,13 +1713,13 @@ function ReconcileTable({
                   <TableCell className="max-w-xs truncate text-xs text-muted-foreground" title={r.outside_geofence_reason ?? ""}>
                     {r.outside_geofence_reason ?? "—"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={stopRowToggle}>
                     <Button size="sm" onClick={() => onReview(r)}>
                       Review
                     </Button>
                   </TableCell>
                 </TableRow>
-                <InlineNotesRow row={r} colSpan={9} />
+                {open && <InlineNotesRow row={r} colSpan={10} />}
                 </Fragment>
               );
             })}

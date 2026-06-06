@@ -7220,7 +7220,12 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "manager" | "employee" | "super_admin"
+      app_role:
+        | "admin"
+        | "manager"
+        | "employee"
+        | "super_admin"
+        | "committee_member"
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
       hive_ticket_category:
@@ -7385,7 +7390,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "employee", "super_admin"],
+      app_role: [
+        "admin",
+        "manager",
+        "employee",
+        "super_admin",
+        "committee_member",
+      ],
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
       hive_ticket_category: [

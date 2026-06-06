@@ -278,12 +278,9 @@ function ChevronCell({ open }: { open: boolean }) {
 function FlagDot({ row }: { row: Pick<Row, "ai_compliance_status"> }) {
   if (row.ai_compliance_status !== "Exception") return null;
   return (
-    <AlertTriangle
-      className="ml-1.5 inline h-3.5 w-3.5 text-destructive align-text-bottom"
-      aria-label="NECTAR flag"
-    >
-      <title>NECTAR flag</title>
-    </AlertTriangle>
+    <span title="NECTAR flag" aria-label="NECTAR flag" className="ml-1.5 inline-flex align-middle">
+      <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+    </span>
   );
 }
 

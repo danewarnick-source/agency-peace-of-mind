@@ -79,11 +79,14 @@ export interface ChecklistRow {
   evidence_type: string | null;
   renewal_frequency: string | null;
   checklist_layer: string | null;
+  is_renewable: boolean;
+  renewal_interval_months: number | null;
+  renewal_source: string | null;
   completion: {
     id: string | null;
     status: string;
     completed_date: string | null;
-    expires_at: string | null;
+    expires_at: string | null; // effective: stored OR computed
     evidence_document_id: string | null;
     notes: string | null;
     completed_by: string | null;

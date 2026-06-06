@@ -589,8 +589,11 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
       is_renewable: boolean;
       interval_months: number | null;
       is_cumulative: boolean;
+      applies_to: string[] | "all";
+      applies_to_confirmed_at: string | null;
     }> = (base ?? []).map((r: Record<string, unknown>) => {
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      const { applies_to, applies_to_confirmed_at } = parseAppliesTo(meta);
       return {
         id: r.id as string,
         title:
@@ -601,11 +604,13 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
             ? (meta.renewal_interval_months as number)
             : null,
         is_cumulative: meta.requirement_type === "cumulative_hours",
+        applies_to:
+          applies_to === null || applies_to === undefined ? "all" : applies_to,
+        applies_to_confirmed_at,
       };
     });
     const binaryItems = baseItems.filter((b) => !b.is_cumulative);
     const cumulativeItems = baseItems.filter((b) => b.is_cumulative);
-    const totalRequired = baseItems.length;
     const baseIds = new Set(baseItems.map((b) => b.id));
     const baseById = new Map(baseItems.map((b) => [b.id, b]));
     const titleById = new Map(baseItems.map((b) => [b.id, b.title]));

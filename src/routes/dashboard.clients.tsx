@@ -685,6 +685,7 @@ function ProfileTab({
               <div>
                 <h3 className="text-lg font-semibold">{client.first_name} {client.last_name}</h3>
                 <p className="text-xs text-muted-foreground">Click photo to update. JPEG or PNG, max 5MB.</p>
+                <ClientLoanMarker clientId={client.id} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

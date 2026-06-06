@@ -853,7 +853,7 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
         sb
           .from("profiles")
-          .select("id, full_name, team_id, hire_date")
+          .select("id, full_name, team_id, hire_date, staff_type_keys")
           .in("id", staffIds),
         sb
           .from("staff_checklist_completion")

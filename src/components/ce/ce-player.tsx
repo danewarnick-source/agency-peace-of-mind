@@ -260,6 +260,7 @@ function StepView({
       <Card className="space-y-3 p-5">
         {step.kicker && <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{step.kicker}</div>}
         <h2 className="text-lg font-semibold tracking-tight">{step.title}</h2>
+        <SourceCitationChip citation={step.citation ?? null} />
         <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{step.body}</p>
         {step.facts && step.facts.length > 0 && (
           <ul className="space-y-2 rounded-xl bg-muted/40 p-3 text-sm">

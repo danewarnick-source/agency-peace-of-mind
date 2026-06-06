@@ -218,6 +218,142 @@ export function parseCumulativeConfig(
   };
 }
 
+// --- Shared loader ---------------------------------------------------------
+
+/**
+ * Load configs + computed progress for cumulative-hours requirements across
+ * a given staff set. Used by both `getOrgAnnualHoursProgress` and the HR
+ * Admin rollup so the matrix, the staff HR tab, and the rollup all see the
+ * SAME status / hours / window per staff × requirement.
+ *
+ * Caller is responsible for any PII/membership gating before passing
+ * staffIds.
+ */
+export async function loadOrgAnnualHoursProgress(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  organizationId: string,
+  staffIds: string[],
+  now: Date = new Date(),
+): Promise<{
+  configs: CumulativeRequirementConfig[];
+  progress: Record<string, Record<string, AnnualHoursProgress>>;
+}> {
+  if (staffIds.length === 0) return { configs: [], progress: {} };
+  const { data: base, error: baseErr } = await sb.rpc(
+    "get_hr_staff_checklist_base",
+    { _org: organizationId },
+  );
+  if (baseErr) throw new Error(baseErr.message);
+  const configs: CumulativeRequirementConfig[] = [];
+  for (const r of base ?? []) {
+    const cfg = parseCumulativeConfig(r);
+    if (cfg) configs.push(cfg);
+  }
+  if (configs.length === 0) return { configs, progress: {} };
+
+  const [{ data: profs }, { data: entries }, { data: completions }, { data: mappings }, { data: topics }] =
+    await Promise.all([
+      sb.from("profiles").select("id, hire_date").in("id", staffIds),
+      sb
+        .from("staff_training_hours_entries")
+        .select(
+          "id, staff_id, requirement_id, entry_date, hours, note, created_by, created_at",
+        )
+        .eq("organization_id", organizationId)
+        .in("staff_id", staffIds),
+      sb
+        .from("training_completions")
+        .select(
+          "id, user_id, ref_id, topic_kind, topic_title, completed_at, is_current",
+        )
+        .in("user_id", staffIds)
+        .eq("topic_kind", "core")
+        .eq("is_current", true),
+      sb
+        .from("training_checklist_mappings")
+        .select("training_topic_id, requirement_key, is_active")
+        .eq("is_active", true),
+      sb.from("training_topics").select("id, title, default_hours"),
+    ]);
+
+  const hireByStaff = new Map<string, string | null>();
+  for (const p of profs ?? []) hireByStaff.set(p.id, p.hire_date ?? null);
+
+  const topicById = new Map<
+    string,
+    { title: string; default_hours: number | null }
+  >();
+  for (const t of topics ?? [])
+    topicById.set(t.id, { title: t.title, default_hours: t.default_hours });
+
+  const reqKeyToCfg = new Map<string, CumulativeRequirementConfig>();
+  for (const c of configs) reqKeyToCfg.set(c.requirement_key, c);
+  const topicToReqId = new Map<string, string>();
+  for (const m of mappings ?? []) {
+    const cfg = reqKeyToCfg.get(m.requirement_key);
+    if (cfg) topicToReqId.set(m.training_topic_id, cfg.requirement_id);
+  }
+
+  const contribByStaffReq = new Map<string, TrainingContribution[]>();
+  const key = (s: string, r: string) => `${s}::${r}`;
+  for (const tc of completions ?? []) {
+    const reqId = topicToReqId.get(tc.ref_id);
+    if (!reqId) continue;
+    const topic = topicById.get(tc.ref_id);
+    const rawHours =
+      topic?.default_hours != null ? Number(topic.default_hours) : null;
+    const hours = rawHours && rawHours > 0 ? rawHours : FALLBACK_TOPIC_HOURS;
+    const k = key(tc.user_id, reqId);
+    if (!contribByStaffReq.has(k)) contribByStaffReq.set(k, []);
+    contribByStaffReq.get(k)!.push({
+      training_completion_id: tc.id,
+      topic_id: tc.ref_id,
+      topic_title: tc.topic_title ?? topic?.title ?? "Training",
+      completed_at: tc.completed_at,
+      hours,
+      hours_source: rawHours ? "topic_default" : "fallback_one_hour",
+    });
+  }
+
+  const entriesByStaffReq = new Map<string, HoursEntry[]>();
+  for (const e of entries ?? []) {
+    const reqId =
+      e.requirement_id ??
+      (configs.length === 1 ? configs[0].requirement_id : null);
+    if (!reqId) continue;
+    const k = key(e.staff_id, reqId);
+    if (!entriesByStaffReq.has(k)) entriesByStaffReq.set(k, []);
+    entriesByStaffReq.get(k)!.push({
+      id: e.id,
+      entry_date: e.entry_date,
+      hours: Number(e.hours),
+      note: e.note,
+      created_by: e.created_by,
+      created_by_name: null,
+      created_at: e.created_at,
+    });
+  }
+
+  const progress: Record<string, Record<string, AnnualHoursProgress>> = {};
+  for (const sid of staffIds) {
+    progress[sid] = {};
+    const hire = hireByStaff.get(sid) ?? null;
+    for (const cfg of configs) {
+      const k = key(sid, cfg.requirement_id);
+      progress[sid][cfg.requirement_id] = computeAnnualHoursProgress({
+        config: cfg,
+        hire_date: hire,
+        training_contributions: contribByStaffReq.get(k) ?? [],
+        entries: entriesByStaffReq.get(k) ?? [],
+        now,
+      });
+    }
+  }
+
+  return { configs, progress };
+}
+
 // --- Server fns ------------------------------------------------------------
 
 /** Bulk fetcher: returns progress for all cumulative requirements × all staff
@@ -247,122 +383,10 @@ export const getOrgAnnualHoursProgress = createServerFn({ method: "GET" })
       const staffIds: string[] = (piiRows ?? []).map(
         (r: { staff_id: string }) => r.staff_id,
       );
-      if (staffIds.length === 0) return { configs: [], progress: {} };
-
-      const { data: base, error: baseErr } = await sb.rpc(
-        "get_hr_staff_checklist_base",
-        { _org: data.organization_id },
-      );
-      if (baseErr) throw new Error(baseErr.message);
-      const configs: CumulativeRequirementConfig[] = [];
-      for (const r of base ?? []) {
-        const cfg = parseCumulativeConfig(r);
-        if (cfg) configs.push(cfg);
-      }
-      if (configs.length === 0) return { configs, progress: {} };
-
-      const [{ data: profs }, { data: entries }, { data: completions }, { data: mappings }, { data: topics }] =
-        await Promise.all([
-          sb
-            .from("profiles")
-            .select("id, hire_date")
-            .in("id", staffIds),
-          sb
-            .from("staff_training_hours_entries")
-            .select("id, staff_id, requirement_id, entry_date, hours, note, created_by, created_at")
-            .eq("organization_id", data.organization_id)
-            .in("staff_id", staffIds),
-          sb
-            .from("training_completions")
-            .select("id, user_id, ref_id, topic_kind, topic_title, completed_at, is_current")
-            .in("user_id", staffIds)
-            .eq("topic_kind", "core")
-            .eq("is_current", true),
-          sb
-            .from("training_checklist_mappings")
-            .select("training_topic_id, requirement_key, is_active")
-            .eq("is_active", true),
-          sb.from("training_topics").select("id, title, default_hours"),
-        ]);
-
-      const hireByStaff = new Map<string, string | null>();
-      for (const p of profs ?? []) hireByStaff.set(p.id, p.hire_date ?? null);
-
-      const topicById = new Map<string, { title: string; default_hours: number | null }>();
-      for (const t of topics ?? [])
-        topicById.set(t.id, { title: t.title, default_hours: t.default_hours });
-
-      // Map training topic → cumulative requirement (via mapping.requirement_key).
-      const reqKeyToCfg = new Map<string, CumulativeRequirementConfig>();
-      for (const c of configs) reqKeyToCfg.set(c.requirement_key, c);
-      const topicToReqId = new Map<string, string>();
-      for (const m of mappings ?? []) {
-        const cfg = reqKeyToCfg.get(m.requirement_key);
-        if (cfg) topicToReqId.set(m.training_topic_id, cfg.requirement_id);
-      }
-
-      // Group contributions by staff × requirement.
-      const contribByStaffReq = new Map<string, TrainingContribution[]>();
-      const key = (s: string, r: string) => `${s}::${r}`;
-      for (const tc of completions ?? []) {
-        const reqId = topicToReqId.get(tc.ref_id);
-        if (!reqId) continue;
-        const topic = topicById.get(tc.ref_id);
-        const rawHours =
-          topic?.default_hours != null ? Number(topic.default_hours) : null;
-        const hours = rawHours && rawHours > 0 ? rawHours : FALLBACK_TOPIC_HOURS;
-        const k = key(tc.user_id, reqId);
-        if (!contribByStaffReq.has(k)) contribByStaffReq.set(k, []);
-        contribByStaffReq.get(k)!.push({
-          training_completion_id: tc.id,
-          topic_id: tc.ref_id,
-          topic_title: tc.topic_title ?? topic?.title ?? "Training",
-          completed_at: tc.completed_at,
-          hours,
-          hours_source: rawHours ? "topic_default" : "fallback_one_hour",
-        });
-      }
-
-      // Group entries by staff × requirement (entries with NULL requirement_id apply to all cumulative reqs only if there's exactly one — otherwise we attach to the single config).
-      const entriesByStaffReq = new Map<string, HoursEntry[]>();
-      for (const e of entries ?? []) {
-        const reqId =
-          e.requirement_id ??
-          (configs.length === 1 ? configs[0].requirement_id : null);
-        if (!reqId) continue;
-        const k = key(e.staff_id, reqId);
-        if (!entriesByStaffReq.has(k)) entriesByStaffReq.set(k, []);
-        entriesByStaffReq.get(k)!.push({
-          id: e.id,
-          entry_date: e.entry_date,
-          hours: Number(e.hours),
-          note: e.note,
-          created_by: e.created_by,
-          created_by_name: null,
-          created_at: e.created_at,
-        });
-      }
-
-      const progress: Record<string, Record<string, AnnualHoursProgress>> = {};
-      const now = new Date();
-      for (const sid of staffIds) {
-        progress[sid] = {};
-        const hire = hireByStaff.get(sid) ?? null;
-        for (const cfg of configs) {
-          const k = key(sid, cfg.requirement_id);
-          progress[sid][cfg.requirement_id] = computeAnnualHoursProgress({
-            config: cfg,
-            hire_date: hire,
-            training_contributions: contribByStaffReq.get(k) ?? [],
-            entries: entriesByStaffReq.get(k) ?? [],
-            now,
-          });
-        }
-      }
-
-      return { configs, progress };
+      return loadOrgAnnualHoursProgress(sb, data.organization_id, staffIds);
     },
   );
+
 
 /** Per-staff detail: full progress + entries + training contributions. */
 export const getStaffAnnualHoursDetail = createServerFn({ method: "GET" })

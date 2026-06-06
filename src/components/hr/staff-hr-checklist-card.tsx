@@ -394,11 +394,7 @@ export function StaffHrChecklistCard({
         </CardContent>
       </Card>
 
-      <TrainingHistoryCard
-        organizationId={organizationId}
-        staffId={staffId}
-        staffLabel={pii.full_name ?? pii.email ?? staffId}
-      />
+      <TrainingHistoryCard staffId={staffId} />
 
       <Card>
         <CardHeader>

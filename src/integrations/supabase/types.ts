@@ -5615,6 +5615,59 @@ export type Database = {
           },
         ]
       }
+      staff_types: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          label: string
+          organization_id: string
+          proposed_at: string
+          proposed_by: string
+          source_basis: string | null
+          updated_at: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          label: string
+          organization_id: string
+          proposed_at?: string
+          proposed_by?: string
+          source_basis?: string | null
+          updated_at?: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          label?: string
+          organization_id?: string
+          proposed_at?: string
+          proposed_by?: string
+          source_basis?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_types_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       state_derived_requirements: {
         Row: {
           category: string | null

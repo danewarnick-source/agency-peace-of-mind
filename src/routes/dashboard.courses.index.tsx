@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { GraduationCap, ShieldCheck, Users, ChevronRight, Sparkles } from "lucide-react";
+import { GraduationCap, ShieldCheck, Users, ChevronRight, Sparkles, BookOpen, AlertTriangle } from "lucide-react";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
+import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
 
 export const Route = createFileRoute("/dashboard/courses/")({ component: MyTrainings });
 

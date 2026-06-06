@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2, Upload, FileText, Eye, Trash2, ShieldAlert } from "lucide-react";
+import { Loader2, Upload, FileText, Eye, Trash2, ShieldAlert, GraduationCap, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -379,6 +380,13 @@ export function StaffHrChecklistCard({
                         {row.completion.expires_at && ` · expires ${row.completion.expires_at}`}
                       </div>
                     )}
+                    {row.completion.training_completion_id && (
+                      <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                        <GraduationCap className="h-3 w-3" /> Auto-checked from signed training
+                        {row.completion.auto_checked_at &&
+                          ` · ${new Date(row.completion.auto_checked_at).toLocaleDateString()}`}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -386,6 +394,8 @@ export function StaffHrChecklistCard({
           )}
         </CardContent>
       </Card>
+
+      <TrainingHistoryCard staffId={staffId} />
 
       <Card>
         <CardHeader>
@@ -463,5 +473,138 @@ function Field({ label, value }: { label: string; value: string }) {
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="font-mono">{value}</div>
     </div>
+  );
+}
+
+/**
+ * Per-staff training-completion ledger. Surfaces every signed training record
+ * for this staffer with the typed-name signature, attestation, content hash,
+ * IP, time zone, and UA captured at sign time. Exports to CSV for auditors.
+ *
+ * RLS allows the staff member to read their own completions and org
+ * managers/admins to read theirs — so this card is safe to render in both
+ * self and admin views.
+ */
+function TrainingHistoryCard({ staffId }: { staffId: string }) {
+  const q = useQuery({
+    queryKey: ["staff-training-history", staffId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("training_completions")
+        .select(
+          "id, topic_kind, topic_code, topic_title, dspd_letter, attestation_statement, typed_signature, signer_full_name, signer_email, consent_statement, consent_accepted, content_version, content_hash, ip_address, user_agent, time_zone, completed_at, is_current",
+        )
+        .eq("user_id", staffId)
+        .order("completed_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
+
+  const rows = (q.data ?? []) as Array<Record<string, any>>;
+  const exportCsv = () => {
+    const cols = [
+      "completed_at",
+      "topic_kind",
+      "topic_code",
+      "dspd_letter",
+      "topic_title",
+      "signer_full_name",
+      "signer_email",
+      "typed_signature",
+      "consent_accepted",
+      "consent_statement",
+      "attestation_statement",
+      "content_version",
+      "content_hash",
+      "ip_address",
+      "time_zone",
+      "user_agent",
+      "is_current",
+    ];
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [
+      cols.join(","),
+      ...rows.map((r) => cols.map((c) => esc((r as Record<string, unknown>)[c])).join(",")),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `training-history-${staffId}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
+        <CardTitle className="text-base inline-flex items-center gap-2">
+          <GraduationCap className="h-4 w-4" /> Training History
+          <Badge variant="secondary" className="ml-1 text-[10px]">
+            {rows.length} signed
+          </Badge>
+        </CardTitle>
+        <Button size="sm" variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
+          <Download className="mr-1 h-3.5 w-3.5" /> Export CSV
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {q.isLoading ? (
+          <p className="text-sm text-muted-foreground">
+            <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading…
+          </p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No signed training records yet. Completing a topic with electronic signature will add a
+            row here.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {rows.map((r) => (
+              <li
+                key={r.id}
+                className={`rounded-lg border p-3 text-sm ${
+                  r.is_current ? "border-border/60" : "border-dashed border-muted-foreground/30 opacity-70"
+                }`}
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="font-medium">
+                    {r.topic_title}
+                    {r.dspd_letter && (
+                      <span className="ml-1 text-[11px] text-muted-foreground">
+                        · §1.8(4)({r.dspd_letter.toLowerCase()})
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {new Date(r.completed_at).toLocaleString()}
+                  </div>
+                </div>
+                <div className="mt-1 text-[11px] text-muted-foreground">
+                  Signed by{" "}
+                  <span className="font-medium text-foreground">
+                    {r.signer_full_name || r.typed_signature}
+                  </span>{" "}
+                  ({r.typed_signature})
+                  {r.consent_accepted ? " · ESIGN/UETA consent on file" : " · no consent recorded"}
+                  {!r.is_current && " · superseded by later signing"}
+                </div>
+                {r.content_hash && (
+                  <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+                    hash: {r.content_hash}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }

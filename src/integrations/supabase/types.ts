@@ -5296,6 +5296,7 @@ export type Database = {
       }
       staff_checklist_completion: {
         Row: {
+          auto_checked_at: string | null
           completed_by: string | null
           completed_date: string | null
           created_at: string
@@ -5307,9 +5308,11 @@ export type Database = {
           requirement_id: string
           staff_id: string
           status: string
+          training_completion_id: string | null
           updated_at: string
         }
         Insert: {
+          auto_checked_at?: string | null
           completed_by?: string | null
           completed_date?: string | null
           created_at?: string
@@ -5321,9 +5324,11 @@ export type Database = {
           requirement_id: string
           staff_id: string
           status?: string
+          training_completion_id?: string | null
           updated_at?: string
         }
         Update: {
+          auto_checked_at?: string | null
           completed_by?: string | null
           completed_date?: string | null
           created_at?: string
@@ -5335,6 +5340,7 @@ export type Database = {
           requirement_id?: string
           staff_id?: string
           status?: string
+          training_completion_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5385,6 +5391,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_checklist_completion_training_completion_id_fkey"
+            columns: ["training_completion_id"]
+            isOneToOne: false
+            referencedRelation: "training_completions"
             referencedColumns: ["id"]
           },
         ]
@@ -6026,6 +6039,44 @@ export type Database = {
           track_id?: string
         }
         Relationships: []
+      }
+      training_checklist_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          requirement_key: string
+          training_topic_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          requirement_key: string
+          training_topic_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          requirement_key?: string
+          training_topic_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_checklist_mappings_training_topic_id_fkey"
+            columns: ["training_topic_id"]
+            isOneToOne: false
+            referencedRelation: "training_topics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       training_completions: {
         Row: {

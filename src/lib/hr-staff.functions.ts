@@ -87,6 +87,8 @@ export interface ChecklistRow {
     evidence_document_id: string | null;
     notes: string | null;
     completed_by: string | null;
+    training_completion_id: string | null;
+    auto_checked_at: string | null;
   };
 }
 
@@ -142,6 +144,8 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
           evidence_document_id: (c?.evidence_document_id as string) ?? null,
           notes: (c?.notes as string) ?? null,
           completed_by: (c?.completed_by as string) ?? null,
+          training_completion_id: (c?.training_completion_id as string) ?? null,
+          auto_checked_at: (c?.auto_checked_at as string) ?? null,
         },
       };
     });

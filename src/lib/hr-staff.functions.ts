@@ -891,6 +891,7 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         cumulativeConfigByReqId.set(cumCfg.requirement_id, cumCfg);
         cumulativeReqKeyToId.set(cumCfg.requirement_key, cumCfg.requirement_id);
       }
+      const { applies_to, applies_to_confirmed_at } = parseAppliesTo(meta);
       return {
         requirement_id: r.id as string,
         title:
@@ -906,6 +907,9 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         renewal_source: (meta.renewal_source as string) ?? null,
         requirement_type: cumCfg ? "cumulative_hours" : "binary",
         cumulative_config: cumCfg,
+        applies_to_staff_types:
+          applies_to === null || applies_to === undefined ? "all" : applies_to,
+        applies_to_confirmed_at,
       };
     });
     const reqById = new Map(requirements.map((r) => [r.requirement_id, r]));

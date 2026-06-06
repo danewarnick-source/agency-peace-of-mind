@@ -27,6 +27,14 @@ export function NectarPayPeriodCard() {
   const { data } = useNectarPayPeriod();
   const live = useLivePayPeriod();
   const [open, setOpen] = useState(false);
+  const fetchOther = useServerFn(getMyOtherAssignmentsSummary);
+  const { data: otherSummary } = useQuery({
+    queryKey: ["my-other-assignments-summary"],
+    queryFn: () => fetchOther(),
+  });
+  const otherOpen = otherSummary?.open_count ?? 0;
+  const otherSafety = otherSummary?.safety_critical_open_count ?? 0;
+
 
   const label = data?.label ?? "Current period";
 

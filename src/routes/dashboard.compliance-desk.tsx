@@ -922,16 +922,22 @@ function PendingTable({
   onApprove: (id: string) => void; approving: boolean;
   onReason: (r: Row) => void;
 }) {
+  const exp = useRowExpansion();
+  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Pending EVV Shifts</h2>
-        <Badge variant="outline" className="font-mono text-[10px]">{rows.length} pending</Badge>
+        <div className="flex items-center gap-2">
+          <ExpandControls exp={exp} ids={allIds} />
+          <Badge variant="outline" className="font-mono text-[10px]">{rows.length} pending</Badge>
+        </div>
       </div>
-      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle [&_tbody_tr]:h-[52px]">
+      <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle">
         <Table>
           <TableHeader>
               <TableRow>
+              <TableHead className="w-8" />
               <TableHead>Caregiver</TableHead>
               <TableHead>Client</TableHead>
               <TableHead>Origin</TableHead>
@@ -945,19 +951,28 @@ function PendingTable({
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : rows.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">No pending shifts.</TableCell></TableRow>
-            ) : rows.map((r) => (
+              <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No pending shifts.</TableCell></TableRow>
+            ) : rows.map((r) => {
+              const open = exp.isExpanded(r.id);
+              return (
               <Fragment key={r.id}>
-              <TableRow className="[&>td]:border-b-0">
+              <TableRow
+                onClick={() => exp.toggle(r.id)}
+                role="button"
+                aria-expanded={open}
+                className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
+              >
+                <ChevronCell open={open} />
                 <TableCell className="whitespace-nowrap font-medium">
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
                   <EditedByAdminBadge row={r} />
+                  <FlagDot row={r} />
                 </TableCell>
                 <TableCell>
                   <div className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</div>
-                  <div className="text-xs text-muted-foreground">{r.clients?.physical_address ?? "—"}</div>
+                  <div className="text-xs text-muted-foreground truncate max-w-[220px]">{r.clients?.physical_address ?? "—"}</div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={r.shift_entry_type === "Client_Profile_Pass" ? "default" : "secondary"}>
@@ -967,15 +982,15 @@ function PendingTable({
                 <TableCell className="whitespace-nowrap font-mono">{r.utah_medicaid_member_id}</TableCell>
                 <TableCell className="whitespace-nowrap"><Badge variant="outline" className="font-mono">{r.service_type_code}</Badge></TableCell>
                 <TableCell className="whitespace-nowrap font-mono"><Clock className="mr-1 inline h-3.5 w-3.5" />{fmtDuration(effectiveIn(r), effectiveOut(r))}</TableCell>
-                <TableCell>
+                <TableCell onClick={stopRowToggle}>
                   <Button variant="outline" size="sm" onClick={() => onMap(r)}>
                     <MapPin /> View
                   </Button>
                 </TableCell>
-                <TableCell onClick={() => r.outside_geofence_reason && onReason(r)} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
+                <TableCell onClick={(e) => { e.stopPropagation(); if (r.outside_geofence_reason) onReason(r); }} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
                   <GeofenceBadge row={r} />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right" onClick={stopRowToggle}>
                   <div className="flex justify-end gap-1.5">
                     <Button
                       size="icon"
@@ -991,9 +1006,10 @@ function PendingTable({
                   </div>
                 </TableCell>
               </TableRow>
-              <InlineNotesRow row={r} colSpan={9} />
+              {open && <InlineNotesRow row={r} colSpan={10} />}
               </Fragment>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>

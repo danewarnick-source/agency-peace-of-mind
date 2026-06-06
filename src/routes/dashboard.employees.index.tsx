@@ -221,7 +221,9 @@ function EmployeesPage() {
 
   const editMemberMutation = useMutation({
     mutationFn: async (input: EditableMember) => {
-      // Non-PII profile fields go through the regular client.
+      if (input.startDate && input.endDate && input.endDate < input.startDate) {
+        throw new Error("End date must be on or after Start date.");
+      }
       const { error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -231,6 +233,9 @@ function EmployeesPage() {
           employee_id: input.employeeId || null,
           position: input.position || null,
           worker_type: input.workerType,
+          start_date: input.startDate || null,
+          end_date: input.endDate || null,
+          hire_date: input.startDate || null,
         } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;

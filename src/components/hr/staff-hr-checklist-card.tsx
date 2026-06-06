@@ -499,7 +499,14 @@ export function StaffHrChecklistCard({
       </Card>
 
 
+      <AnnualHoursSection
+        organizationId={organizationId}
+        staffId={staffId}
+        canEdit={!isSelf}
+      />
+
       <TrainingHistoryCard staffId={staffId} />
+
 
       <Card>
         <CardHeader>

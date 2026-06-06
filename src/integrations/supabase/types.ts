@@ -675,6 +675,169 @@ export type Database = {
         }
         Relationships: []
       }
+      ce_ledger: {
+        Row: {
+          active_minutes: number
+          attestation_text: string
+          ce_year_start: string
+          completed_at: string
+          content_hash: string
+          created_at: string
+          hours: number
+          id: string
+          module_id: string | null
+          organization_id: string
+          signature_name: string
+          source: string | null
+          staff_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          active_minutes: number
+          attestation_text: string
+          ce_year_start: string
+          completed_at?: string
+          content_hash: string
+          created_at?: string
+          hours: number
+          id?: string
+          module_id?: string | null
+          organization_id: string
+          signature_name: string
+          source?: string | null
+          staff_id: string
+          title: string
+          type: string
+        }
+        Update: {
+          active_minutes?: number
+          attestation_text?: string
+          ce_year_start?: string
+          completed_at?: string
+          content_hash?: string
+          created_at?: string
+          hours?: number
+          id?: string
+          module_id?: string | null
+          organization_id?: string
+          signature_name?: string
+          source?: string | null
+          staff_id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ce_ledger_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "ce_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ce_ledger_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ce_modules: {
+        Row: {
+          active_seconds: number
+          completed_at: string | null
+          created_at: string
+          current_step: number
+          generated_at: string | null
+          id: string
+          organization_id: string
+          period: string
+          reflections: Json
+          source_summary: string | null
+          staff_id: string
+          status: string
+          steps: Json
+          updated_at: string
+        }
+        Insert: {
+          active_seconds?: number
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          generated_at?: string | null
+          id?: string
+          organization_id: string
+          period: string
+          reflections?: Json
+          source_summary?: string | null
+          staff_id: string
+          status?: string
+          steps?: Json
+          updated_at?: string
+        }
+        Update: {
+          active_seconds?: number
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          generated_at?: string | null
+          id?: string
+          organization_id?: string
+          period?: string
+          reflections?: Json
+          source_summary?: string | null
+          staff_id?: string
+          status?: string
+          steps?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ce_modules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ce_settings: {
+        Row: {
+          annual_goal_hours: number
+          created_at: string
+          demo_mode: boolean
+          min_active_minutes: number
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          annual_goal_hours?: number
+          created_at?: string
+          demo_mode?: boolean
+          min_active_minutes?: number
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          annual_goal_hours?: number
+          created_at?: string
+          demo_mode?: boolean
+          min_active_minutes?: number
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ce_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       celebration_acknowledgements: {
         Row: {
           acknowledged_at: string

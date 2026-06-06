@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { GraduationCap, ShieldCheck, Users, ChevronRight, Sparkles, BookOpen, AlertTriangle } from "lucide-react";
+import { GraduationCap, ShieldCheck, Users, ChevronRight, Sparkles, BookOpen, AlertTriangle, Calendar } from "lucide-react";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
+import { getMyCeStatus } from "@/lib/ce.functions";
 
 export const Route = createFileRoute("/dashboard/courses/")({ component: MyTrainings });
 
@@ -74,6 +75,14 @@ function MyTrainings() {
   const otherSafety = otherSummary?.safety_critical_open_count ?? 0;
   const otherTotal = otherSummary?.total ?? 0;
   const otherDone = otherSummary?.completed ?? 0;
+
+  const fetchCe = useServerFn(getMyCeStatus);
+  const { data: ce } = useQuery({
+    enabled: !!user,
+    queryKey: ["ce-status"],
+    queryFn: () => fetchCe(),
+  });
+  const showCe = !!ce?.ceApplies;
 
   return (
     <div className="space-y-4 pb-2">
@@ -182,6 +191,32 @@ function MyTrainings() {
             )}
           </div>
         </Link>
+
+        {showCe && (
+          <Link
+            to="/dashboard/courses/ce"
+            className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)]"
+          >
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-500/15 text-teal-600">
+                <Calendar className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-semibold tracking-tight">Continuing Education</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Year 2+ · one ~1-hour Nectar review per month.</p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+            </div>
+            <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+              <span className="font-medium">
+                <span className="text-foreground">{(ce?.hoursThisYear ?? 0).toFixed(1)}</span> of {ce?.goalHours ?? 12} hrs this CE year
+              </span>
+              <span className="rounded-full bg-teal-500/10 px-2 py-0.5 font-semibold uppercase tracking-wider text-teal-700">
+                {ce?.daysLeftInYear ?? 0} days left
+              </span>
+            </div>
+          </Link>
+        )}
       </div>
     </div>
   );

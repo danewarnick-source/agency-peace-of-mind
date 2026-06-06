@@ -99,6 +99,7 @@ import { Route as DashboardCoursesPersonRouteImport } from './routes/dashboard.c
 import { Route as DashboardCoursesOtherRouteImport } from './routes/dashboard.courses.other'
 import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboard.courses.mindsmith'
 import { Route as DashboardCoursesCoreRouteImport } from './routes/dashboard.courses.core'
+import { Route as DashboardCoursesCeRouteImport } from './routes/dashboard.courses.ce'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
 import { Route as DashboardBillingNectarRouteImport } from './routes/dashboard.billing.nectar'
 import { Route as DashboardBillingImportsRouteImport } from './routes/dashboard.billing.imports'
@@ -582,6 +583,11 @@ const DashboardCoursesCoreRoute = DashboardCoursesCoreRouteImport.update({
   path: '/courses/core',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardCoursesCeRoute = DashboardCoursesCeRouteImport.update({
+  id: '/courses/ce',
+  path: '/courses/ce',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardCoursesCourseIdRoute =
   DashboardCoursesCourseIdRouteImport.update({
     id: '/courses/$courseId',
@@ -717,6 +723,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
+  '/dashboard/courses/ce': typeof DashboardCoursesCeRoute
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
@@ -817,6 +824,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
+  '/dashboard/courses/ce': typeof DashboardCoursesCeRoute
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
@@ -922,6 +930,7 @@ export interface FileRoutesById {
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
+  '/dashboard/courses/ce': typeof DashboardCoursesCeRoute
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
   '/dashboard/courses/mindsmith': typeof DashboardCoursesMindsmithRoute
   '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
@@ -1028,6 +1037,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/imports'
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
+    | '/dashboard/courses/ce'
     | '/dashboard/courses/core'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/courses/other'
@@ -1128,6 +1138,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/imports'
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
+    | '/dashboard/courses/ce'
     | '/dashboard/courses/core'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/courses/other'
@@ -1232,6 +1243,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/imports'
     | '/dashboard/billing/nectar'
     | '/dashboard/courses/$courseId'
+    | '/dashboard/courses/ce'
     | '/dashboard/courses/core'
     | '/dashboard/courses/mindsmith'
     | '/dashboard/courses/other'
@@ -1924,6 +1936,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCoreRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/courses/ce': {
+      id: '/dashboard/courses/ce'
+      path: '/courses/ce'
+      fullPath: '/dashboard/courses/ce'
+      preLoaderRoute: typeof DashboardCoursesCeRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/courses/$courseId': {
       id: '/dashboard/courses/$courseId'
       path: '/courses/$courseId'
@@ -2213,6 +2232,7 @@ interface DashboardRouteChildren {
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardAdminEmarAuditRoute: typeof DashboardAdminEmarAuditRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
+  DashboardCoursesCeRoute: typeof DashboardCoursesCeRoute
   DashboardCoursesCoreRoute: typeof DashboardCoursesCoreRoute
   DashboardCoursesMindsmithRoute: typeof DashboardCoursesMindsmithRoute
   DashboardCoursesOtherRoute: typeof DashboardCoursesOtherRoute
@@ -2273,6 +2293,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardAdminEmarAuditRoute: DashboardAdminEmarAuditRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
+  DashboardCoursesCeRoute: DashboardCoursesCeRoute,
   DashboardCoursesCoreRoute: DashboardCoursesCoreRoute,
   DashboardCoursesMindsmithRoute: DashboardCoursesMindsmithRoute,
   DashboardCoursesOtherRoute: DashboardCoursesOtherRoute,
@@ -2316,13 +2337,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

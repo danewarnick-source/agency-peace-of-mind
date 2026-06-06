@@ -291,10 +291,22 @@ export const updateStaffPii = createServerFn({ method: "POST" })
       _viewer: userId,
     });
     if (!canView) throw new Error("Forbidden");
-    // Self may read own PII but not edit it (mirrors checklist policy).
+    // Self may read own PII; only Admin/Manager may edit (including their own,
+    // so a solo owner-operator isn't locked out).
     if (userId === data.staff_id) {
-      throw new Error("Forbidden: staff may not edit own PII");
+      const { data: mem } = await sb
+        .from("organization_members")
+        .select("role")
+        .eq("organization_id", data.organization_id)
+        .eq("user_id", userId)
+        .eq("active", true)
+        .maybeSingle();
+      const role = (mem as { role?: string } | null)?.role;
+      if (role !== "admin" && role !== "manager") {
+        throw new Error("Forbidden: staff may not edit own PII");
+      }
     }
+
 
     const patch: Record<string, unknown> = {};
     if (data.ssn_last4 !== undefined) patch.ssn_last4 = data.ssn_last4;

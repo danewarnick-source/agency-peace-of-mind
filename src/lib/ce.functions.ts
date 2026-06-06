@@ -608,3 +608,146 @@ export const setCeDemoMode = createServerFn({ method: "POST" })
       .upsert({ organization_id: orgId, demo_mode: data.enabled }, { onConflict: "organization_id" });
     return { ok: true };
   });
+
+// ──────────────── Phase 2: Admin roster + reminder ─────────────────────────
+
+export interface CeRosterRow {
+  staffId: string;
+  fullName: string;
+  email: string | null;
+  hireDate: string | null;
+  ceApplies: boolean;
+  ceYearStart: string | null;
+  ceYearEnd: string | null;
+  hoursThisYear: number;
+  goalHours: number;
+  daysLeftInYear: number;
+  expectedHoursToDate: number;
+  monthsIntoYear: number;
+  status: "complete" | "on_track" | "behind" | "not_applicable";
+  lastCompletedAt: string | null;
+}
+
+export interface CeRoster {
+  organizationId: string | null;
+  goalHours: number;
+  rows: CeRosterRow[];
+  behindCount: number;
+}
+
+function rosterStatus(applies: boolean, hours: number, goal: number, expected: number): CeRosterRow["status"] {
+  if (!applies) return "not_applicable";
+  if (hours >= goal) return "complete";
+  if (hours + 0.001 < expected) return "behind";
+  return "on_track";
+}
+
+export const getOrgCeRoster = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<CeRoster> => {
+    const supabase = getSupabase(context);
+    const userId = (context as { userId: string }).userId;
+    const { orgId, isAdmin } = await getCallerOrg(supabase, userId);
+    if (!orgId) throw new Error("No active organization.");
+    if (!isAdmin) throw new Error("Admins or managers only.");
+
+    const setQ = await supabase
+      .from("ce_settings")
+      .select("annual_goal_hours")
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    const goalHours = Number((setQ.data as { annual_goal_hours: number } | null)?.annual_goal_hours ?? 12);
+
+    // Pull active staff in this org via organization_members + profiles join.
+    const membersQ = await supabase
+      .from("organization_members")
+      .select("user_id, role, profiles:user_id(id, first_name, last_name, email, hire_date)")
+      .eq("organization_id", orgId)
+      .eq("active", true);
+
+    type MemRow = {
+      user_id: string;
+      role: string;
+      profiles: { id: string; first_name: string | null; last_name: string | null; email: string | null; hire_date: string | null } | null;
+    };
+    const members = ((membersQ.data as MemRow[] | null) ?? []).filter((m) => m.profiles);
+
+    // Pull all ledger rows for this org in one shot, then bucket by staff.
+    const ledQ = await supabase
+      .from("ce_ledger")
+      .select("staff_id, ce_year_start, hours, completed_at")
+      .eq("organization_id", orgId);
+    const ledger = (ledQ.data as { staff_id: string; ce_year_start: string; hours: number; completed_at: string }[] | null) ?? [];
+
+    const today = todayUtc();
+    const rows: CeRosterRow[] = members.map((m) => {
+      const p = m.profiles!;
+      const fullName = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || (p.email ?? "Staff");
+      const hire = p.hire_date;
+      const applies = hire ? ceApplies(hire, today) : false;
+      const yearStart = hire && applies ? ceYearStart(hire, today) : null;
+      const yearEnd = yearStart ? ceYearEnd(yearStart) : null;
+      const yearStartIso = yearStart ? fmtDate(yearStart) : null;
+      const mine = ledger.filter((l) => l.staff_id === p.id && (!yearStartIso || l.ce_year_start === yearStartIso));
+      const hoursThisYear = mine.reduce((acc, l) => acc + Number(l.hours), 0);
+      const lastCompletedAt = mine
+        .map((l) => l.completed_at)
+        .sort()
+        .reverse()[0] ?? null;
+      const daysLeft = yearEnd ? Math.max(0, Math.round((yearEnd.getTime() - today.getTime()) / 86_400_000)) : 0;
+      const monthsIn = yearStart
+        ? Math.min(12, Math.max(0, Math.round((today.getTime() - yearStart.getTime()) / (86_400_000 * 30))))
+        : 0;
+      const expected = yearStart ? Math.min(goalHours, (goalHours * monthsIn) / 12) : 0;
+      return {
+        staffId: p.id,
+        fullName,
+        email: p.email,
+        hireDate: hire,
+        ceApplies: applies,
+        ceYearStart: yearStartIso,
+        ceYearEnd: yearEnd ? fmtDate(yearEnd) : null,
+        hoursThisYear,
+        goalHours,
+        daysLeftInYear: daysLeft,
+        expectedHoursToDate: Math.round(expected * 10) / 10,
+        monthsIntoYear: monthsIn,
+        status: rosterStatus(applies, hoursThisYear, goalHours, expected),
+        lastCompletedAt,
+      };
+    });
+
+    rows.sort((a, b) => {
+      const order = { behind: 0, on_track: 1, complete: 2, not_applicable: 3 } as const;
+      if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+      return a.fullName.localeCompare(b.fullName);
+    });
+
+    const behindCount = rows.filter((r) => r.status === "behind").length;
+    return { organizationId: orgId, goalHours, rows, behindCount };
+  });
+
+function vStaffDetail(input: unknown): { staffId: string } {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const staffId = String(i.staffId ?? "");
+  if (!staffId) throw new Error("staffId required");
+  return { staffId };
+}
+
+export const getStaffCeLedger = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(vStaffDetail)
+  .handler(async ({ data, context }): Promise<CeLedgerEntry[]> => {
+    const supabase = getSupabase(context);
+    const userId = (context as { userId: string }).userId;
+    const { orgId, isAdmin } = await getCallerOrg(supabase, userId);
+    if (!orgId) throw new Error("No active organization.");
+    if (!isAdmin) throw new Error("Admins or managers only.");
+    const q = await supabase
+      .from("ce_ledger")
+      .select("id, ce_year_start, title, hours, active_minutes, type, source, completed_at, signature_name")
+      .eq("organization_id", orgId)
+      .eq("staff_id", data.staffId)
+      .order("completed_at", { ascending: false });
+    return ((q.data as CeLedgerEntry[] | null) ?? []).map((r) => ({ ...r, hours: Number(r.hours) }));
+  });

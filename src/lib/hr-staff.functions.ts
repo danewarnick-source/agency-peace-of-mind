@@ -615,17 +615,26 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
     const baseById = new Map(baseItems.map((b) => [b.id, b]));
     const titleById = new Map(baseItems.map((b) => [b.id, b.title]));
 
-    // 3. Names / team / hire_date (non-PII) for the gated staff set.
+    // 3. Names / team / hire_date / staff_type_keys (non-PII) for the gated staff set.
     const { data: profs } = await sb
       .from("profiles")
-      .select("id, full_name, team_id, hire_date")
+      .select("id, full_name, team_id, hire_date, staff_type_keys")
       .in("id", staffIds);
-    const profMap = new Map<string, { full_name: string | null; team_id: string | null; hire_date: string | null }>();
+    const profMap = new Map<
+      string,
+      {
+        full_name: string | null;
+        team_id: string | null;
+        hire_date: string | null;
+        staff_type_keys: string[];
+      }
+    >();
     for (const p of profs ?? []) {
       profMap.set(p.id, {
         full_name: p.full_name,
         team_id: p.team_id,
         hire_date: p.hire_date,
+        staff_type_keys: (p.staff_type_keys as string[] | null) ?? [],
       });
     }
     const teamIds = Array.from(

@@ -370,7 +370,46 @@ export const getAssignDirectory = createServerFn({ method: "GET" })
     const { data: staffTypes } = await supabase
       .from("staff_types").select("key, label")
       .eq("organization_id", m.organization_id);
-    return { members: members ?? [], profiles, staffTypes: staffTypes ?? [] };
+    const { data: clients } = await supabase
+      .from("clients").select("id, first_name, last_name")
+      .eq("organization_id", m.organization_id)
+      .order("last_name", { ascending: true });
+    return { members: members ?? [], profiles, staffTypes: staffTypes ?? [], clients: clients ?? [] };
+  });
+
+// ─── STAFF: forms assigned to me + this client (rule: form assigned to staff
+// AND assigned to client AND client on staff's caseload). Returns forms plus
+// my submissions for the current period.
+export const listClientForms = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    // Confirm client is on my caseload
+    const { data: sa } = await supabase
+      .from("staff_assignments").select("organization_id")
+      .eq("staff_id", userId).eq("client_id", data.clientId).limit(1).maybeSingle();
+    if (!sa) return { forms: [], submissions: [] };
+    // RLS already restricts forms to those assigned to me + published; filter
+    // additionally to those assigned to this client (or all_clients).
+    const { data: forms, error } = await supabase
+      .from("forms").select("*")
+      .eq("status", "published")
+      .eq("organization_id", sa.organization_id)
+      .or(`all_clients.eq.true,assigned_clients.cs.{${data.clientId}}`);
+    if (error) throw new Error(error.message);
+    const formIds = (forms ?? []).map((f: { id: string }) => f.id);
+    let subs: Array<{ id: string; form_id: string; period_key: string | null; submitted_at: string; client_id: string | null }> = [];
+    if (formIds.length) {
+      const { data: s } = await supabase
+        .from("form_submissions")
+        .select("id, form_id, period_key, submitted_at, client_id")
+        .eq("submitted_by", userId)
+        .eq("client_id", data.clientId)
+        .in("form_id", formIds);
+      subs = s ?? [];
+    }
+    return { forms: forms ?? [], submissions: subs };
   });
 
 // ─── NECTAR: draft a form from a description ──────────────────────────────

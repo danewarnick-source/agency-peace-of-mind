@@ -119,7 +119,14 @@ function FieldRow({
 
   return (
     <div className="grid gap-1">
-      <Label className="text-xs text-muted-foreground">{field.field_label}</Label>
+      <div className="flex items-center gap-1.5">
+        <Label className="text-xs text-muted-foreground">{field.field_label}</Label>
+        {field.source === "pcsp" && (
+          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-primary">
+            from PCSP
+          </span>
+        )}
+      </div>
       {field.data_type === "boolean" ? (
         <div className="flex items-center gap-2 pt-1">
           <Switch

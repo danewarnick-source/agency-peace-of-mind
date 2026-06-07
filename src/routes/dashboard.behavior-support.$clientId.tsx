@@ -10,6 +10,8 @@ import { FbaBspStrip } from "@/components/behavior-support/fba-bsp-strip";
 import { BehaviorsPanel } from "@/components/behavior-support/behaviors-panel";
 import { DataCharts } from "@/components/behavior-support/data-charts";
 import { NotesPanel } from "@/components/behavior-support/notes-panel";
+import { AuditFeed } from "@/components/behavior-support/audit-feed";
+import { SowDeadlinesPanel } from "@/components/behavior-support/sow-deadlines";
 
 export const Route = createFileRoute("/dashboard/behavior-support/$clientId")({
   head: () => ({ meta: [{ title: "Behavior Support — HIVE" }] }),

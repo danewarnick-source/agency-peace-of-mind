@@ -1,431 +1,79 @@
-import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listClientForms } from "@/lib/forms.functions";
+import { describeFrequency, type Frequency, type Schedule } from "@/lib/forms-utils";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Activity,
-  AlertOctagon,
-  Loader2,
-  Stethoscope,
-} from "lucide-react";
-import { toast } from "sonner";
+import { FileText, CalendarClock, CheckCircle2 } from "lucide-react";
 
-type FormType = "incident" | "medical" | "behavior" | "summary" | "inventory" | "drill" | "transfer";
+type FormRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  frequency: Frequency;
+  schedule: Schedule;
+  category: string;
+};
+type SubRow = { id: string; form_id: string; period_key: string | null; submitted_at: string };
 
-const CARDS: {
-  type: FormType;
-  title: string;
-  desc: string;
-  accent: string;
-}[] = [
-  {
-    type: "incident",
-    title: "🚨 Critical Incident Report",
-    desc: "INTERNAL intake for admin review — injury, behavior crisis, medication error, abuse, neglect.",
-    accent: "border-rose-200 hover:border-rose-400 bg-rose-50/40 dark:bg-rose-950/10",
-  },
-  {
-    type: "medical",
-    title: "🩺 Medical & Specialist Appointment Log",
-    desc: "Record an appointment visit, physician orders, and follow-up.",
-    accent: "border-blue-200 hover:border-blue-400 bg-blue-50/40 dark:bg-blue-950/10",
-  },
-  {
-    type: "behavior",
-    title: "🧠 Behavior / Seizure Data Sheet",
-    desc: "Antecedent, behavior, consequence + seizure type, duration, and recovery.",
-    accent: "border-violet-200 hover:border-violet-400 bg-violet-50/40 dark:bg-violet-950/10",
-  },
-  {
-    type: "summary",
-    title: "📈 Comprehensive Monthly Review Summary",
-    desc: "Monthly PCSP narrative and community outings.",
-    accent: "border-teal-200 hover:border-teal-400 bg-teal-50/40 dark:bg-teal-950/10",
-  },
-  {
-    type: "inventory",
-    title: "💎 $50+ Valuables Inventory",
-    desc: "Register or remove client high-value belongings.",
-    accent: "border-amber-200 hover:border-amber-400 bg-amber-50/40 dark:bg-amber-950/10",
-  },
-  {
-    type: "drill",
-    title: "🔥 Quarterly Evacuation Drill Record",
-    desc: "Log fire, earthquake, or severe weather drills.",
-    accent: "border-orange-200 hover:border-orange-400 bg-orange-50/40 dark:bg-orange-950/10",
-  },
-  {
-    type: "transfer",
-    title: "🔄 Cross-Agency Transfer Log",
-    desc: "Communication log to school, day program, or respite.",
-    accent: "border-slate-200 hover:border-slate-400 bg-slate-50/40 dark:bg-slate-950/10",
-  },
-];
+export function FormsHubTab({ clientId, clientName }: { clientId: string; clientName: string }) {
+  const fetchList = useServerFn(listClientForms);
+  const { data, isLoading } = useQuery({
+    queryKey: ["client-forms", clientId],
+    queryFn: () => fetchList({ data: { clientId } }),
+  });
 
-export function FormsHubTab({
-  clientId,
-  clientName,
-}: {
-  clientId: string;
-  clientName: string;
-}) {
-  const [active, setActive] = useState<FormType | null>(null);
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading forms…</p>;
+  const forms = (data?.forms ?? []) as FormRow[];
+  const subs = (data?.submissions ?? []) as SubRow[];
+  const submittedByForm = new Map<string, SubRow>();
+  for (const s of subs) {
+    const prev = submittedByForm.get(s.form_id);
+    if (!prev || new Date(s.submitted_at) > new Date(prev.submitted_at)) submittedByForm.set(s.form_id, s);
+  }
 
-  return (
-    <>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {CARDS.map((c) => {
-          return (
-            <button
-              key={c.type}
-              type="button"
-              onClick={() => setActive(c.type)}
-              className={`group flex min-h-[44px] flex-col rounded-2xl border-2 p-5 text-left shadow-sm transition hover:shadow-md ${c.accent}`}
-            >
-              <p className="font-semibold leading-tight">{c.title}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{c.desc}</p>
-            </button>
-          );
-        })}
-      </div>
-      <FormDialog
-        type={active}
-        clientId={clientId}
-        clientName={clientName}
-        onClose={() => setActive(null)}
-      />
-    </>
-  );
-}
-
-function FormDialog({
-  type,
-  clientId,
-  clientName,
-  onClose,
-}: {
-  type: FormType | null;
-  clientId: string;
-  clientName: string;
-  onClose: () => void;
-}) {
-  const { user } = useAuth();
-  const { data: org } = useCurrentOrg();
-  const qc = useQueryClient();
-  const [busy, setBusy] = useState(false);
-  const [title, setTitle] = useState("");
-  const [narrative, setNarrative] = useState("");
-  const [occurredAt, setOccurredAt] = useState(() =>
-    new Date().toISOString().slice(0, 16),
-  );
-  // type-specific
-  const [severity, setSeverity] = useState("low");
-  const [provider, setProvider] = useState("");
-  const [bp, setBp] = useState("");
-  const [pulse, setPulse] = useState("");
-  const [followUpDate, setFollowUpDate] = useState("");
-  const [ordersChanges, setOrdersChanges] = useState("");
-  const [behaviorKind, setBehaviorKind] = useState("behavior");
-  const [antecedent, setAntecedent] = useState("");
-  const [consequence, setConsequence] = useState("");
-  const [duration, setDuration] = useState("");
-  const [targetMonth, setTargetMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [communityOutings, setCommunityOutings] = useState("");
-  const [assetDescription, setAssetDescription] = useState("");
-  const [assetValue, setAssetValue] = useState("");
-  const [drillType, setDrillType] = useState("Fire");
-  const [evacuationDuration, setEvacuationDuration] = useState("");
-  const [receivingParty, setReceivingParty] = useState("");
-  const [partyType, setPartyType] = useState("School");
-
-  useEffect(() => {
-    if (!type) return;
-    setTitle("");
-    setNarrative("");
-    setSeverity("low");
-    setProvider(""); setBp(""); setPulse(""); setFollowUpDate(""); setOrdersChanges("");
-    setBehaviorKind("behavior"); setAntecedent(""); setConsequence(""); setDuration("");
-    setTargetMonth(new Date().toISOString().slice(0, 7));
-    setCommunityOutings(""); setAssetDescription(""); setAssetValue("");
-    setDrillType("Fire"); setEvacuationDuration("");
-    setReceivingParty(""); setPartyType("School");
-    setOccurredAt(new Date().toISOString().slice(0, 16));
-  }, [type]);
-
-  const headings: Record<FormType, string> = {
-    incident: "🚨 Critical Incident Report",
-    medical: "🩺 Medical & Specialist Appointment Log",
-    behavior: "🧠 Behavior / Seizure Data Sheet",
-    summary: "📈 Comprehensive Monthly Review Summary",
-    inventory: "💎 $50+ Valuables Inventory",
-    drill: "🔥 Quarterly Evacuation Drill Record",
-    transfer: "🔄 Cross-Agency Transfer Log",
-  };
-
-  async function submit() {
-    if (!user || !org || !type) return;
-    if (!title.trim() || !narrative.trim()) {
-      toast.error("Title and narrative are required.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const payload: Record<string, unknown> = {};
-      if (type === "incident") payload.severity = severity;
-      if (type === "medical") {
-        payload.provider = provider;
-        payload.bp = bp;
-        payload.pulse = pulse;
-        payload.follow_up_date = followUpDate || null;
-        payload.orders_changes = ordersChanges || null;
-      }
-      if (type === "behavior") {
-        payload.kind = behaviorKind;
-        payload.antecedent = antecedent;
-        payload.consequence = consequence;
-        payload.duration_minutes = parseFloat(duration) || 0;
-      }
-      if (type === "summary") {
-        payload.target_month = targetMonth;
-        payload.community_outings = communityOutings
-          ? communityOutings.split("\n").filter(Boolean)
-          : [];
-      }
-      if (type === "inventory") {
-        payload.asset_description = assetDescription;
-        payload.estimated_value = parseFloat(assetValue) || 0;
-      }
-      if (type === "drill") {
-        payload.simulation_type = drillType;
-        payload.evacuation_duration_seconds = parseInt(evacuationDuration) || 0;
-      }
-      if (type === "transfer") {
-        payload.receiving_party = receivingParty;
-        payload.party_type = partyType;
-      }
-      const { error } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("submitted_forms" as any)
-        .insert({
-          organization_id: org.organization_id,
-          user_id: user.id, // active caregiver auto-attached
-          client_id: clientId, // active individual auto-attached
-          form_type: type,
-          title: title.trim(),
-          narrative: narrative.trim(),
-          payload,
-          occurred_at: new Date(occurredAt).toISOString(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
-      if (error) throw error;
-      toast.success(`Submitted to ${clientName}'s record`);
-      qc.invalidateQueries({ queryKey: ["client-timeline"] });
-      onClose();
-    } catch (e) {
-      toast.error((e as Error).message || "Could not submit");
-    } finally {
-      setBusy(false);
-    }
+  if (forms.length === 0) {
+    return (
+      <Card className="p-6 text-center text-sm text-muted-foreground">
+        No forms are assigned for {clientName} yet.
+      </Card>
+    );
   }
 
   return (
-    <Dialog open={!!type} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{type ? headings[type] : ""}</DialogTitle>
-          <DialogDescription>{clientName}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="title">Title / summary</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={200}
-              required
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="when">When did this occur?</Label>
-            <Input
-              id="when"
-              type="datetime-local"
-              value={occurredAt}
-              onChange={(e) => setOccurredAt(e.target.value)}
-            />
-          </div>
-
-          {type === "incident" && (
-            <div className="grid gap-1.5">
-              <Label htmlFor="sev">Severity</Label>
-              <select
-                id="sev"
-                value={severity}
-                onChange={(e) => setSeverity(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="low">Non-critical · Low</option>
-                <option value="moderate">Non-critical · Moderate</option>
-                <option value="high">Critical · High</option>
-                <option value="critical">Critical · Reportable</option>
-              </select>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {forms.map((f) => {
+        const sub = submittedByForm.get(f.id);
+        const submittedThisPeriod = !!sub;
+        return (
+          <Card key={f.id} className="flex flex-col p-4">
+            <div className="flex items-start gap-2">
+              <FileText className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm leading-tight truncate">{f.name}</p>
+                {f.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{f.description}</p>}
+                <p className="mt-1.5 text-[11px] text-muted-foreground flex items-center gap-1">
+                  <CalendarClock className="h-3 w-3" /> {describeFrequency(f.frequency, f.schedule ?? {})}
+                </p>
+                {submittedThisPeriod && (
+                  <Badge variant="outline" className="mt-2 text-[10px] gap-1 border-emerald-300 text-emerald-700">
+                    <CheckCircle2 className="h-3 w-3" /> Submitted this period
+                  </Badge>
+                )}
+              </div>
             </div>
-          )}
-
-          {type === "medical" && (
-            <>
-              <div className="grid gap-1.5">
-                <Label htmlFor="prov">Provider / Clinic</Label>
-                <Input id="prov" value={provider} onChange={(e) => setProvider(e.target.value)} maxLength={120} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="bp">Blood Pressure</Label>
-                  <Input id="bp" value={bp} onChange={(e) => setBp(e.target.value)} placeholder="120/80" maxLength={20} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pulse">Pulse (bpm)</Label>
-                  <Input id="pulse" value={pulse} onChange={(e) => setPulse(e.target.value)} inputMode="numeric" maxLength={5} />
-                </div>
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="orders">Physician Orders / Care Plan Changes</Label>
-                <Textarea id="orders" rows={3} value={ordersChanges} onChange={(e) => setOrdersChanges(e.target.value)} placeholder="Note any new orders, medication changes, or care plan updates from this visit." />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="followup">Follow-Up Date</Label>
-                <Input id="followup" type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
-              </div>
-            </>
-          )}
-
-          {type === "behavior" && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="kind">Type</Label>
-                  <select id="kind" value={behaviorKind} onChange={(e) => setBehaviorKind(e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm">
-                    <option value="behavior">Behavioral Episode</option>
-                    <option value="seizure">Seizure</option>
-                  </select>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="dur">Duration (minutes)</Label>
-                  <Input id="dur" value={duration} onChange={(e) => setDuration(e.target.value)} inputMode="decimal" maxLength={6} />
-                </div>
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="ante">Antecedent — What happened before?</Label>
-                <Textarea id="ante" rows={2} value={antecedent} onChange={(e) => setAntecedent(e.target.value)} placeholder="Environment, triggers, preceding activity…" />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="consq">Consequence — What happened after / how was it resolved?</Label>
-                <Textarea id="consq" rows={2} value={consequence} onChange={(e) => setConsequence(e.target.value)} placeholder="Staff response, de-escalation steps, outcome…" />
-              </div>
-            </>
-          )}
-
-          {type === "summary" && (
-            <>
-              <div className="grid gap-1.5">
-                <Label htmlFor="month">Target Month</Label>
-                <Input id="month" type="month" value={targetMonth} onChange={(e) => setTargetMonth(e.target.value)} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="outings">Community Outings (one per line)</Label>
-                <Textarea id="outings" rows={3} value={communityOutings} onChange={(e) => setCommunityOutings(e.target.value)} placeholder={"Grocery store visit — May 3\nLibrary outing — May 10\nPark walk — May 15"} />
-              </div>
-            </>
-          )}
-
-          {type === "inventory" && (
-            <>
-              <div className="grid gap-1.5">
-                <Label htmlFor="asset">Asset Description</Label>
-                <Input id="asset" value={assetDescription} onChange={(e) => setAssetDescription(e.target.value)} placeholder="e.g., iPad Pro 12.9-inch, silver case" maxLength={200} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="val">Estimated Value (USD)</Label>
-                <Input id="val" type="number" step="0.01" min="50" value={assetValue} onChange={(e) => setAssetValue(e.target.value)} placeholder="0.00" />
-              </div>
-            </>
-          )}
-
-          {type === "drill" && (
-            <>
-              <div className="grid gap-1.5">
-                <Label htmlFor="drilltype">Drill Type</Label>
-                <select id="drilltype" value={drillType} onChange={(e) => setDrillType(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="Fire">Fire</option>
-                  <option value="Earthquake">Earthquake</option>
-                  <option value="Severe Weather">Severe Weather</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="evactime">Total Evacuation Duration (seconds)</Label>
-                <Input id="evactime" type="number" min="0" value={evacuationDuration} onChange={(e) => setEvacuationDuration(e.target.value)} placeholder="e.g., 90" />
-              </div>
-            </>
-          )}
-
-          {type === "transfer" && (
-            <>
-              <div className="grid gap-1.5">
-                <Label htmlFor="party">Receiving Party Name</Label>
-                <Input id="party" value={receivingParty} onChange={(e) => setReceivingParty(e.target.value)} placeholder="e.g., Valley Day Program" maxLength={150} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="partytype">Party Type</Label>
-                <select id="partytype" value={partyType} onChange={(e) => setPartyType(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="School">School</option>
-                  <option value="Day Program">Day Program</option>
-                  <option value="Respite">Respite</option>
-                  <option value="Medical Transport">Medical Transport</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </>
-          )}
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="narr">Narrative / details</Label>
-            <Textarea
-              id="narr"
-              value={narrative}
-              onChange={(e) => setNarrative(e.target.value)}
-              rows={5}
-              maxLength={5000}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={submit} disabled={busy}>
-            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Submit
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <div className="mt-3 flex justify-end">
+              <Button asChild size="sm" className="min-h-[44px]">
+                <Link to="/dashboard/forms/$formId/fill" params={{ formId: f.id }} search={{ clientId }}>
+                  Complete form
+                </Link>
+              </Button>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
   );
 }

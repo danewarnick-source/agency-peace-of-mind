@@ -618,8 +618,12 @@ export function PunchPad({
 
   const hasGoalSelected    = baselineChecked || Object.values(checkedGoals).some(Boolean);
   const narrativeOk        = wordCount >= 50;
+  const hasGoalSelected    = baselineChecked || Object.values(checkedGoals).some(Boolean);
+  const narrativeOk        = wordCount >= 50;
   const nectarConfirmOk    = !nectarUsed || draftConfirmed;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && !busy;
+  const behaviorError      = behaviorEnabled ? validateBehaviorAnswers(behaviorAnswers) : null;
+  const behaviorOk         = behaviorError === null;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && !busy;
 
 
   function openCompliance() {

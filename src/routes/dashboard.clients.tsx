@@ -29,7 +29,7 @@ import {
   Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2,
   User, FileText, Pill, Shield, Settings2, ChevronRight,
   Upload, Trash2, CheckCircle2, AlertTriangle, Search,
-  ArrowLeft, Users, Camera, Sparkles,
+  ArrowLeft, Users, Camera, Sparkles, Brain,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
@@ -45,6 +45,7 @@ import { MedicationsManager } from "@/components/medications-manager";
 import { MarCalendar } from "@/components/mar-calendar";
 import { ApprovedLocationsEditor } from "@/components/evv/approved-locations-editor";
 import { ClientPhoto } from "@/components/client-photo";
+import { BehaviorSupportConfigCard } from "@/components/behavior-support/bs-config-card";
 import {
   isClientFeatureEnabled,
   isFeatureTierDisabled,
@@ -496,6 +497,7 @@ function ClientWorkspace({
             { value: "staff",      label: "Staff Assignment",   icon: Users,     show: true        },
             { value: "medications",label: "Medications & MAR",  icon: Pill,      show: emarEnabled },
             { value: "documents",  label: "Documents",          icon: Shield,    show: true        },
+            { value: "behavior",   label: "Behavior Support",   icon: Brain,     show: true        },
             { value: "settings",   label: "Settings",           icon: Settings2, show: true        },
           ].filter((t) => t.show).map(({ value, label, icon: Icon }) => (
             <button
@@ -549,6 +551,14 @@ function ClientWorkspace({
 
         <TabsContent value="documents" className="mt-5">
           <DocumentsTab clientId={client.id} orgId={orgId} />
+        </TabsContent>
+
+        <TabsContent value="behavior" className="mt-5">
+          <BehaviorSupportConfigCard
+            clientId={client.id}
+            organizationId={orgId}
+            clientName={`${client.first_name} ${client.last_name}`.trim()}
+          />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-5">

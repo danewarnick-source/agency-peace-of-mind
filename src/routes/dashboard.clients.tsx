@@ -489,24 +489,20 @@ function ClientWorkspace({
         </div>
       </div>
 
-      {/* Tab navigation */}
+      {/* Tab navigation — 4 hubs: Profile · Care · Activity · Funds */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
         <TabsList className="h-10 w-full justify-start rounded-none border-b border-border bg-transparent p-0">
           {[
-            { value: "profile",    label: "Client Profile",     icon: User,      show: true        },
-            { value: "intake",     label: "Intake",             icon: Shield,    show: true        },
-            { value: "pcsp",       label: "PCSP & Directives",  icon: FileText,  show: true        },
-            { value: "staff",      label: "Staff Assignment",   icon: Users,     show: true        },
-            { value: "medications",label: "Medications & MAR",  icon: Pill,      show: emarEnabled },
-            { value: "documents",  label: "Documents",          icon: Shield,    show: true        },
-            { value: "behavior",   label: "Behavior Support",   icon: Brain,     show: true        },
-            { value: "settings",   label: "Settings",           icon: Settings2, show: true        },
-          ].filter((t) => t.show).map(({ value, label, icon: Icon }) => (
+            { value: "profile",  label: "Profile",  icon: User },
+            { value: "care",     label: "Care",     icon: Stethoscope },
+            { value: "activity", label: "Activity", icon: ActivityIcon },
+            { value: "funds",    label: "Funds",    icon: Wallet },
+          ].map(({ value, label, icon: Icon }) => (
             <button
               key={value}
               type="button"
               onClick={() => setActiveTab(value)}
-              className={`relative flex h-10 items-center gap-2 border-b-2 px-4 text-sm font-medium transition ${
+              className={`relative flex h-11 min-h-[44px] items-center gap-2 border-b-2 px-4 text-sm font-medium transition ${
                 activeTab === value
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -518,55 +514,603 @@ function ClientWorkspace({
           ))}
         </TabsList>
 
-        <TabsContent value="profile" className="mt-5">
+        {/* PROFILE — the "who": identity, contact, codes, PCSP goals, settings */}
+        <TabsContent value="profile" className="mt-5 space-y-6">
           <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
-        </TabsContent>
-
-        <TabsContent value="intake" className="mt-5">
-          <ClientIntakeChecklistCard
-            organizationId={orgId}
-            clientId={client.id}
-            clientName={`${client.first_name} ${client.last_name}`.trim()}
-          />
-        </TabsContent>
-
-        <TabsContent value="pcsp" className="mt-5">
           <PcspTab client={client} onSave={onSave} saving={saving} />
-        </TabsContent>
-
-        <TabsContent value="staff" className="mt-5">
-          <StaffAssignmentTab clientId={client.id} orgId={orgId} />
-        </TabsContent>
-
-        {emarEnabled && (
-          <TabsContent value="medications" className="mt-5 space-y-4">
-            <div>
-              <h3 className="text-base font-semibold">Medications & MAR Overview</h3>
-              <p className="text-xs text-muted-foreground">
-                Active prescriptions, administration schedules, and monthly MAR calendar.
-              </p>
-            </div>
-            <MedicationsManager clientId={client.id} organizationId={orgId} />
-            <MarCalendar clientId={client.id} />
-          </TabsContent>
-        )}
-
-        <TabsContent value="documents" className="mt-5">
-          <DocumentsTab clientId={client.id} orgId={orgId} />
-        </TabsContent>
-
-        <TabsContent value="behavior" className="mt-5">
-          <BehaviorSupportConfigCard
-            clientId={client.id}
-            organizationId={orgId}
-            clientName={`${client.first_name} ${client.last_name}`.trim()}
-          />
-        </TabsContent>
-
-        <TabsContent value="settings" className="mt-5">
           <SettingsTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
         </TabsContent>
+
+        {/* CARE — operational config as read-only surfaces with links out */}
+        <TabsContent value="care" className="mt-5 space-y-6">
+          <CareSectionShell
+            title="Placement"
+            description="Team & home assignment for this client. Manage caseload here, or open Teams & Homes for the full module."
+            linkTo="/dashboard/teams"
+            linkLabel="Open Teams & Homes"
+          >
+            <StaffAssignmentTab clientId={client.id} orgId={orgId} />
+          </CareSectionShell>
+
+          <CareSectionShell
+            title="Authorizations"
+            description="Per-client service-code summary (annual units, used, remaining). Full management lives in Billing."
+            linkTo="/dashboard/billing/$clientId"
+            linkParams={{ clientId: client.id }}
+            linkLabel="Open Billing"
+          >
+            <BillingCodesDetail
+              clientId={client.id}
+              clientName={`${client.first_name} ${client.last_name}`.trim()}
+              medicaidId={client.medicaid_id ?? null}
+            />
+          </CareSectionShell>
+
+          <CareSectionShell
+            title="Intake checklist"
+            description="State-specific intake requirements for this client."
+            linkTo="/dashboard/hub/clients"
+            linkLabel="Open Clients Hub"
+          >
+            <ClientIntakeChecklistCard
+              organizationId={orgId}
+              clientId={client.id}
+              clientName={`${client.first_name} ${client.last_name}`.trim()}
+            />
+          </CareSectionShell>
+
+          {emarEnabled && (
+            <CareSectionShell
+              title="Medications & MAR"
+              description="Active prescriptions, administration schedules, and monthly MAR calendar."
+              linkTo="/dashboard/workspace/$clientId"
+              linkParams={{ clientId: client.id }}
+              linkLabel="Open workspace"
+            >
+              <div className="space-y-4">
+                <MedicationsManager clientId={client.id} organizationId={orgId} />
+                <MarCalendar clientId={client.id} />
+              </div>
+            </CareSectionShell>
+          )}
+
+          <CareSectionShell
+            title="Behavior support plan"
+            description="Current BSP status from the Behavior Support module."
+            linkTo="/dashboard/behavior-support/$clientId"
+            linkParams={{ clientId: client.id }}
+            linkLabel="Open Behavior Support"
+          >
+            <BehaviorSupportConfigCard
+              clientId={client.id}
+              organizationId={orgId}
+              clientName={`${client.first_name} ${client.last_name}`.trim()}
+            />
+          </CareSectionShell>
+
+          <CareSectionShell
+            title="Documents"
+            description="Client-specific documents flow into Company Docs."
+            linkTo="/dashboard/hub/documentation"
+            linkLabel="Open Documentation Hub"
+          >
+            <DocumentsTab clientId={client.id} orgId={orgId} />
+          </CareSectionShell>
+
+          <RightsSafeguardsCard clientId={client.id} />
+        </TabsContent>
+
+        {/* ACTIVITY — read-only date-sorted feed of client-linked records */}
+        <TabsContent value="activity" className="mt-5">
+          <ClientActivityFeed organizationId={orgId} clientId={client.id} />
+        </TabsContent>
+
+        {/* FUNDS — this client's money: trust account + loan agreements */}
+        <TabsContent value="funds" className="mt-5">
+          <ClientFundsTab organizationId={orgId} clientId={client.id} />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// ─── Care section shell ───────────────────────────────────────────────────────
+function CareSectionShell({
+  title, description, linkTo, linkParams, linkLabel, children,
+}: {
+  title: string;
+  description: string;
+  linkTo: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  linkParams?: Record<string, any>;
+  linkLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card">
+      <header className="flex flex-col gap-2 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">{title}</h3>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        <Button asChild variant="outline" size="sm" className="gap-1.5 self-start md:self-auto">
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <Link to={linkTo as any} params={linkParams as any}>
+            {linkLabel} <ExternalLink className="h-3 w-3" />
+          </Link>
+        </Button>
+      </header>
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
+
+// ─── Rights & safeguards (link-out card) ──────────────────────────────────────
+function RightsSafeguardsCard({ clientId }: { clientId: string }) {
+  void clientId;
+  return (
+    <section className="rounded-lg border border-border bg-card">
+      <header className="flex flex-col gap-2 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">
+            Rights & safeguards
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Rights-restriction status and HRC review workflow live in the HRC module.
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm" className="gap-1.5 self-start md:self-auto">
+          <Link to="/dashboard/hrc">
+            Open HRC <ExternalLink className="h-3 w-3" />
+          </Link>
+        </Button>
+      </header>
+      <div className="px-4 py-6 text-sm text-muted-foreground">
+        <div className="flex items-start gap-2">
+          <Gavel className="mt-0.5 h-4 w-4 text-[#137182]" />
+          <p>
+            Open the HRC module to view this client's rights-restriction status and committee reviews.
+            Edits and approvals stay in the HRC workflow.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Activity feed (read-only) ────────────────────────────────────────────────
+type ClientActivityItem = {
+  id: string;
+  kind: "Form" | "MAR" | "Note" | "Incident" | "Shift";
+  title: string;
+  status: string;
+  date: string;
+};
+
+function ClientActivityFeed({ organizationId, clientId }: { organizationId: string; clientId: string }) {
+  const [filter, setFilter] = useState<"all" | ClientActivityItem["kind"]>("all");
+
+  const formsQ = useQuery({
+    enabled: !!organizationId && !!clientId,
+    queryKey: ["client-activity-forms", organizationId, clientId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("form_submissions")
+        .select("id, status, submitted_at, created_at, forms:form_id(name)")
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId)
+        .order("submitted_at", { ascending: false, nullsFirst: false })
+        .limit(100);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as any[];
+    },
+  });
+
+  const marQ = useQuery({
+    enabled: !!organizationId && !!clientId,
+    queryKey: ["client-activity-mar", organizationId, clientId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("emar_logs")
+        .select("id, status, created_at")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as any[];
+    },
+  });
+
+  const notesQ = useQuery({
+    enabled: !!organizationId && !!clientId,
+    queryKey: ["client-activity-notes", organizationId, clientId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("daily_logs")
+        .select("id, status, log_date, submitted_at, created_at")
+        .eq("client_id", clientId)
+        .order("log_date", { ascending: false, nullsFirst: false })
+        .limit(100);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as any[];
+    },
+  });
+
+  const incidentsQ = useQuery({
+    enabled: !!organizationId && !!clientId,
+    queryKey: ["client-activity-incidents", organizationId, clientId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("incident_reports")
+        .select("id, report_number, status, incident_date, filed_at")
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId)
+        .order("filed_at", { ascending: false, nullsFirst: false })
+        .limit(100);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as any[];
+    },
+  });
+
+  const shiftsQ = useQuery({
+    enabled: !!organizationId && !!clientId,
+    queryKey: ["client-activity-shifts", organizationId, clientId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("evv_timesheets")
+        .select("id, status, clock_in_timestamp, service_code")
+        .eq("client_id", clientId)
+        .order("clock_in_timestamp", { ascending: false, nullsFirst: false })
+        .limit(100);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as any[];
+    },
+  });
+
+  const items = useMemo<ClientActivityItem[]>(() => {
+    const out: ClientActivityItem[] = [];
+    for (const r of formsQ.data ?? []) {
+      out.push({
+        id: `form-${r.id}`,
+        kind: "Form",
+        title: String(r.forms?.name ?? "Form"),
+        status: String(r.status ?? "submitted"),
+        date: String(r.submitted_at ?? r.created_at ?? new Date().toISOString()),
+      });
+    }
+    for (const r of marQ.data ?? []) {
+      out.push({
+        id: `mar-${r.id}`,
+        kind: "MAR",
+        title: "Medication administration",
+        status: String(r.status ?? "logged"),
+        date: String(r.created_at ?? new Date().toISOString()),
+      });
+    }
+    for (const r of notesQ.data ?? []) {
+      out.push({
+        id: `note-${r.id}`,
+        kind: "Note",
+        title: "Progress note",
+        status: String(r.status ?? "logged"),
+        date: String(r.log_date ?? r.submitted_at ?? r.created_at ?? new Date().toISOString()),
+      });
+    }
+    for (const r of incidentsQ.data ?? []) {
+      out.push({
+        id: `inc-${r.id}`,
+        kind: "Incident",
+        title: String(r.report_number ?? "Incident"),
+        status: String(r.status ?? "filed"),
+        date: String(r.filed_at ?? r.incident_date ?? new Date().toISOString()),
+      });
+    }
+    for (const r of shiftsQ.data ?? []) {
+      out.push({
+        id: `shift-${r.id}`,
+        kind: "Shift",
+        title: String(r.service_code ?? "Shift"),
+        status: String(r.status ?? ""),
+        date: String(r.clock_in_timestamp ?? new Date().toISOString()),
+      });
+    }
+    out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    return out;
+  }, [formsQ.data, marQ.data, notesQ.data, incidentsQ.data, shiftsQ.data]);
+
+  const filtered = filter === "all" ? items : items.filter((i) => i.kind === filter);
+  const isLoading =
+    formsQ.isLoading || marQ.isLoading || notesQ.isLoading || incidentsQ.isLoading || shiftsQ.isLoading;
+
+  const chips: Array<{ k: "all" | ClientActivityItem["kind"]; label: string }> = [
+    { k: "all", label: "All" },
+    { k: "Form", label: "Forms" },
+    { k: "MAR", label: "MARs" },
+    { k: "Note", label: "Notes" },
+    { k: "Incident", label: "Incidents" },
+    { k: "Shift", label: "Shifts" },
+  ];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-col gap-2 space-y-0 md:flex-row md:items-center md:justify-between">
+        <CardTitle className="text-base">Client activity</CardTitle>
+        <span className="text-xs text-muted-foreground">Read-only · newest first</span>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {chips.map((c) => (
+            <button
+              key={c.k}
+              type="button"
+              onClick={() => setFilter(c.k)}
+              className={`min-h-[36px] rounded-full border px-3 py-1 text-xs font-medium transition ${
+                filter === c.k
+                  ? "border-[#137182] bg-[#137182] text-white"
+                  : "border-border bg-background text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading activity…</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No activity to show in this filter.</p>
+        ) : (
+          <ul className="divide-y">
+            {filtered.map((it) => (
+              <li key={it.id} className="flex flex-col gap-1 py-2 text-sm md:flex-row md:items-center md:justify-between md:gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <ActivityKindBadge kind={it.kind} />
+                  <span className="truncate font-medium">{it.title}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
+                  <Badge variant="outline" className="text-[10px] capitalize">{it.status}</Badge>
+                  <span>{new Date(it.date).toLocaleDateString()}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActivityKindBadge({ kind }: { kind: ClientActivityItem["kind"] }) {
+  const map: Record<ClientActivityItem["kind"], { Icon: typeof FileText; cls: string }> = {
+    Form:     { Icon: FileText,      cls: "bg-muted text-foreground/80" },
+    MAR:      { Icon: Pill,          cls: "bg-[#137182]/10 text-[#137182]" },
+    Note:     { Icon: ClipboardList, cls: "bg-[#0B1126]/10 text-[#0B1126]" },
+    Incident: { Icon: AlertTriangle, cls: "bg-rose-100 text-rose-700" },
+    Shift:    { Icon: Users,         cls: "bg-amber-100 text-amber-800" },
+  };
+  const { Icon, cls } = map[kind];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}>
+      <Icon className="h-3 w-3" /> {kind}
+    </span>
+  );
+}
+
+// ─── Funds tab ────────────────────────────────────────────────────────────────
+function ClientFundsTab({ organizationId, clientId }: { organizationId: string; clientId: string }) {
+  // Trust (PBA) account + recent transactions for this client only
+  const acctQ = useQuery({
+    enabled: !!organizationId && !!clientId,
+    queryKey: ["client-pba-account", organizationId, clientId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("pba_accounts")
+        .select("id, current_balance, medicaid_threshold, opened_on")
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId)
+        .maybeSingle();
+      return data as { id: string; current_balance: number; medicaid_threshold: number; opened_on: string } | null;
+    },
+  });
+
+  const txQ = useQuery({
+    enabled: !!acctQ.data?.id,
+    queryKey: ["client-pba-tx", acctQ.data?.id],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("pba_transactions")
+        .select("id, txn_type, amount, occurred_on, memo")
+        .eq("account_id", acctQ.data!.id)
+        .order("occurred_on", { ascending: false })
+        .limit(20);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as any[];
+    },
+  });
+
+  // Loans for this client (gated by org loan setting)
+  const loanStatusQ = useQuery({
+    enabled: !!organizationId,
+    queryKey: ["loan-feature-status", organizationId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("org_loan_settings")
+        .select("enabled")
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      return { enabled: !!data?.enabled };
+    },
+  });
+
+  const loansQ = useQuery({
+    enabled: !!organizationId && !!clientId && !!loanStatusQ.data?.enabled,
+    queryKey: ["client-loans", organizationId, clientId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("client_loans")
+        .select("id, purpose, advance_amount, agreement_date, status, maturity_date")
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId)
+        .order("agreement_date", { ascending: false });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as any[];
+    },
+  });
+
+  const fmt$ = (n: number | null | undefined) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(n ?? 0));
+
+  return (
+    <div className="space-y-6">
+      {/* Trust (PBA) */}
+      <Card>
+        <CardHeader className="flex flex-col gap-2 space-y-0 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Wallet className="h-4 w-4 text-[#137182]" /> Trust account (PBA)
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              This client's slice of the PBA Trust Ledger. Add transactions in the full ledger.
+            </p>
+          </div>
+          <Button asChild variant="outline" size="sm" className="gap-1.5 self-start md:self-auto">
+            <Link to="/dashboard/pba-ledger">
+              Open PBA Trust Ledger <ExternalLink className="h-3 w-3" />
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {acctQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : !acctQ.data ? (
+            <p className="text-sm text-muted-foreground">
+              No trust account on file for this client. Open the PBA Trust Ledger to create one.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Balance</p>
+                  <p className="mt-1 text-lg font-semibold text-[#0B1126]">{fmt$(acctQ.data.current_balance)}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Medicaid threshold</p>
+                  <p className="mt-1 text-lg font-semibold">{fmt$(acctQ.data.medicaid_threshold)}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Opened</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {acctQ.data.opened_on ? new Date(acctQ.data.opened_on).toLocaleDateString() : "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-md border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="text-xs">Date</TableHead>
+                      <TableHead className="text-xs">Type</TableHead>
+                      <TableHead className="text-right text-xs">Amount</TableHead>
+                      <TableHead className="text-xs">Memo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(txQ.data ?? []).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
+                          No transactions yet.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      (txQ.data ?? []).map((t) => (
+                        <TableRow key={t.id}>
+                          <TableCell className="text-xs">{new Date(t.occurred_on).toLocaleDateString()}</TableCell>
+                          <TableCell className="text-xs capitalize">{String(t.txn_type ?? "")}</TableCell>
+                          <TableCell className="text-right font-mono text-xs">{fmt$(t.amount)}</TableCell>
+                          <TableCell className="max-w-[280px] truncate text-xs text-muted-foreground">
+                            {t.memo ?? ""}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Loans — only if org feature is enabled */}
+      {loanStatusQ.data?.enabled && (
+        <Card>
+          <CardHeader className="flex flex-col gap-2 space-y-0 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <HandCoins className="h-4 w-4 text-amber-700" /> Loan agreements
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Agreements for this client from the Client Loan Ledger.
+              </p>
+            </div>
+            <Button asChild variant="outline" size="sm" className="gap-1.5 self-start md:self-auto">
+              <Link to="/dashboard/client-loans">
+                Open Client Loan Ledger <ExternalLink className="h-3 w-3" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {loansQ.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : (loansQ.data ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No loan agreements on file. Open the ledger to create one.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-md border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="text-xs">Agreement</TableHead>
+                      <TableHead className="text-xs">Purpose</TableHead>
+                      <TableHead className="text-right text-xs">Advance</TableHead>
+                      <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs">Maturity</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(loansQ.data ?? []).map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="text-xs">
+                          {l.agreement_date ? new Date(l.agreement_date).toLocaleDateString() : "—"}
+                        </TableCell>
+                        <TableCell className="max-w-[260px] truncate text-xs">{l.purpose ?? "—"}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{fmt$(l.advance_amount)}</TableCell>
+                        <TableCell className="text-xs">
+                          <Badge variant="outline" className="capitalize">{String(l.status ?? "")}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {l.maturity_date ? new Date(l.maturity_date).toLocaleDateString() : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

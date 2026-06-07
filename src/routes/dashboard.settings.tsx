@@ -10,6 +10,7 @@ import { Landmark, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 import { CelebrationSettings } from "@/components/celebrations/celebration-settings";
+import { ShiftBehaviorToggleCard } from "@/components/evv/shift-behavior-toggle-card";
 
 export const Route = createFileRoute("/dashboard/settings")({ component: SettingsPage });
 

@@ -194,9 +194,11 @@ export function StaffHrChecklistCard({
     );
   }
 
-  const pii = piiQ.data;
+  const showPii = view === "all" || view === "pii";
+  const showChecklist = view === "all" || view === "checklist";
   return (
     <div className="space-y-4">
+      {showPii && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">HR — Sensitive Information</CardTitle>

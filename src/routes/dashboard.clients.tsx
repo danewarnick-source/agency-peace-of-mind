@@ -1228,7 +1228,7 @@ function ProfileTab({
   const [radius, setRadius]             = useState(client.geofence_radius_feet ?? 1000);
   const [pinning, setPinning]           = useState(false);
   const [goals]                         = useState<string[]>(client.pcsp_goals ?? []);
-  const [specialDir]                    = useState(client.special_directions ?? "");
+  const [specialDir, setSpecialDir]     = useState(client.special_directions ?? "");
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const [photoUrl, setPhotoUrl] = useState(client.profile_photo_url ?? "");

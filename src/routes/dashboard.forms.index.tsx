@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, FileText, Sparkles, Archive, Send, Edit3 } from "lucide-react";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useEffectiveView } from "@/hooks/use-effective-view";
 import {
   listForms, listMyForms, archiveForm, saveForm,
   getMyFormNotifications, markFormNotificationsRead,
@@ -29,10 +29,8 @@ type AdminFormRow = {
 };
 
 function FormsIndex() {
-  const { data: org } = useCurrentOrg();
-  const role = org?.role ?? "employee";
-  const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
-  return isAdmin ? <AdminList /> : <StaffList />;
+  const { effective } = useEffectiveView();
+  return effective === "admin" ? <AdminList /> : <StaffList />;
 }
 
 // ─── ADMIN ─────────────────────────────────────────────────────────────────
@@ -173,7 +171,7 @@ function StaffList() {
                   </div>
                   <Badge variant={overdue ? "destructive" : "secondary"}>{overdue ? "Overdue" : "Due"} {formatDue(due)}</Badge>
                 </div>
-                <Button size="sm" className="mt-3 min-h-[40px]"><Send className="mr-1.5 h-3.5 w-3.5" /> Start</Button>
+                <Button size="sm" className="mt-3 min-h-[40px]"><Send className="mr-1.5 h-3.5 w-3.5" /> Complete form</Button>
               </Link>
             );
           })}
@@ -188,7 +186,7 @@ function StaffList() {
               className="block rounded-lg border border-border bg-card p-4 hover:bg-muted/40 min-h-[44px]">
               <p className="font-semibold truncate">{f.name}</p>
               <p className="text-xs text-muted-foreground">As needed</p>
-              <Button size="sm" className="mt-3 min-h-[40px]">Start</Button>
+              <Button size="sm" className="mt-3 min-h-[40px]"><Send className="mr-1.5 h-3.5 w-3.5" /> Complete form</Button>
             </Link>
           ))}
           {buckets.anytime.length === 0 && <Empty>No anytime forms assigned.</Empty>}

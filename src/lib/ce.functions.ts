@@ -198,7 +198,7 @@ function meetsFullHourFloor(steps: CeStep[]): boolean {
 
 // ──────────────── Nectar AI call ───────────────────────────────────────────
 
-async function callNectarForCe(prompt: string): Promise<{ steps: CeStep[]; materialShort: boolean }> {
+async function callNectarForCe(prompt: string): Promise<{ steps: CeStep[]; materialShort: boolean; topicsNeedingSources: string[]; adminNotes: string }> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
 

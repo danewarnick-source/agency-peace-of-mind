@@ -154,6 +154,15 @@ async function extractPdfText(base64: string): Promise<string> {
   return Array.isArray(text) ? text.join("\n") : text;
 }
 
+async function extractDocxText(base64: string): Promise<string> {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const mammoth = await import("mammoth");
+  const result = await mammoth.extractRawText({ arrayBuffer: bytes.buffer });
+  return result.value || "";
+}
+
 // ---------- AI extraction ----------
 
 const KNOWN_CODES = EVV_SERVICE_CODES.map((c) => c.code).join(", ");

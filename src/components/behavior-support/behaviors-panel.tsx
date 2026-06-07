@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, ShieldCheck, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, ShieldCheck, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 type BehaviorRow = {
@@ -20,6 +20,7 @@ type BehaviorRow = {
   expected_cadence: string;
   status: "draft" | "approved" | "published" | "archived";
   source: "nectar" | "manual";
+  last_logged_at: string | null;
 };
 
 type Role = "admin" | "behaviorist" | "staff";

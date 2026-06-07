@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, ShieldCheck, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, ShieldCheck, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 type BehaviorRow = {
@@ -20,6 +20,7 @@ type BehaviorRow = {
   expected_cadence: string;
   status: "draft" | "approved" | "published" | "archived";
   source: "nectar" | "manual";
+  last_logged_at: string | null;
 };
 
 type Role = "admin" | "behaviorist" | "staff";
@@ -30,6 +31,21 @@ const STATUS_STYLES: Record<BehaviorRow["status"], string> = {
   published: "bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 border-emerald-500/40",
   archived: "bg-muted text-muted-foreground line-through",
 };
+
+const CADENCE_MAX_GAP_HOURS: Record<string, number> = {
+  "Every shift": 24,
+  Daily: 36,
+  "Per occurrence": 24 * 14,
+  Weekly: 24 * 10,
+};
+
+function computeCoverageGap(b: BehaviorRow): boolean {
+  if (b.status !== "published") return false;
+  const max = CADENCE_MAX_GAP_HOURS[b.expected_cadence] ?? 24 * 14;
+  if (!b.last_logged_at) return true;
+  const ageHours = (Date.now() - new Date(b.last_logged_at).getTime()) / 3_600_000;
+  return ageHours > max;
+}
 
 export function BehaviorsPanel({
   clientId,
@@ -48,7 +64,7 @@ export function BehaviorsPanel({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bc_behaviors")
-        .select("id, name, operational_definition, data_method, bsp_citation, expected_cadence, status, source")
+        .select("id, name, operational_definition, data_method, bsp_citation, expected_cadence, status, source, last_logged_at")
         .eq("client_id", clientId)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -190,6 +206,8 @@ function BehaviorRowItem({
     onError: (e: any) => toast.error(e?.message ?? "Publish failed."),
   });
 
+  const gap = computeCoverageGap(behavior);
+
   return (
     <div className="rounded-lg border border-border">
       <button
@@ -204,6 +222,11 @@ function BehaviorRowItem({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {gap && behavior.status === "published" && (
+            <Badge variant="outline" className="gap-1 border-rose-500/50 bg-rose-500/10 text-[10px] uppercase text-rose-800 dark:text-rose-200">
+              <AlertTriangle className="h-3 w-3" /> coverage gap
+            </Badge>
+          )}
           <Badge variant="outline" className={`text-[10px] font-mono uppercase ${STATUS_STYLES[behavior.status]}`}>
             {behavior.status}
           </Badge>

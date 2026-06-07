@@ -188,11 +188,28 @@ function ContinuingEducation() {
             </>
           )}
 
-          {mod && mod.status !== "completed" && (mod.steps as unknown[]).length > 0 && (
-            <Button onClick={() => setPlayerOpen(true)} className="w-full sm:w-auto">
-              {mod.active_seconds > 0 ? "Continue review" : "Start review"}
-            </Button>
-          )}
+          {mod && mod.status !== "completed" && (mod.steps as unknown[]).length > 0 && (() => {
+            const stepCount = (mod.steps as unknown[]).length;
+            const flaggedShort = (mod.source_summary ?? "").includes("Authoritative sources couldn't produce");
+            const underFloor = stepCount < 30 && !flaggedShort;
+            if (underFloor) {
+              return (
+                <>
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    This month's review is only {stepCount} slides — below the 30-slide / ~60-minute floor. Regenerate to get the full deep-dive review (your progress on this draft will reset).
+                  </p>
+                  <Button onClick={() => ensureMut.mutate()} disabled={ensureMut.isPending} className="w-full sm:w-auto">
+                    {ensureMut.isPending ? "Rebuilding…" : "Regenerate to 30 slides"}
+                  </Button>
+                </>
+              );
+            }
+            return (
+              <Button onClick={() => setPlayerOpen(true)} className="w-full sm:w-auto">
+                {mod.active_seconds > 0 ? "Continue review" : "Start review"}
+              </Button>
+            );
+          })()}
 
           {mod?.status === "failed" && status.demoModeEnabled && (
             <Button variant="outline" onClick={() => ensureMut.mutate()} disabled={ensureMut.isPending} className="w-full sm:w-auto">

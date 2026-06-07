@@ -14,7 +14,7 @@ import {
 import { getForm, saveForm } from "@/lib/forms.functions";
 import {
   type FormField, type FieldType, type Frequency, type Schedule, type FormSettings,
-  defaultFieldFor, FORM_CATEGORIES, describeFrequency,
+  defaultFieldFor, FORM_CATEGORIES, describeFrequency, sanitizeConditions, isFieldVisible,
 } from "@/lib/forms-utils";
 import { FieldEditor, TYPE_GROUPS, TYPE_LABEL } from "@/components/forms/field-editor";
 import { FieldRenderer } from "@/components/forms/field-renderer";
@@ -69,17 +69,19 @@ function EditForm() {
   }, [data]);
 
   function addField(type: FieldType) {
-    setFields((arr) => [...arr, defaultFieldFor(type)]);
+    setFields((arr) => sanitizeConditions([...arr, defaultFieldFor(type)]));
   }
-  function updateField(idx: number, next: FormField) { setFields((arr) => arr.map((f, i) => i === idx ? next : f)); }
+  function updateField(idx: number, next: FormField) {
+    setFields((arr) => sanitizeConditions(arr.map((f, i) => i === idx ? next : f)));
+  }
   function move(idx: number, dir: -1 | 1) {
     setFields((arr) => {
       const next = [...arr]; const j = idx + dir;
       if (j < 0 || j >= next.length) return next;
-      [next[idx], next[j]] = [next[j], next[idx]]; return next;
+      [next[idx], next[j]] = [next[j], next[idx]]; return sanitizeConditions(next);
     });
   }
-  function removeField(idx: number) { setFields((arr) => arr.filter((_, i) => i !== idx)); }
+  function removeField(idx: number) { setFields((arr) => sanitizeConditions(arr.filter((_, i) => i !== idx))); }
 
   async function persist(): Promise<boolean> {
     if (!name.trim()) { toast.error("Form needs a name."); return false; }
@@ -164,13 +166,18 @@ function EditForm() {
           </div>
 
           <div className="space-y-2">
-            {fields.map((f, i) => (
-              <FieldEditor key={f.id} field={f}
-                onChange={(n) => updateField(i, n)}
-                onMoveUp={() => move(i, -1)}
-                onMoveDown={() => move(i, 1)}
-                onRemove={() => removeField(i)} />
-            ))}
+            {fields.map((f, i) => {
+              const eligible = fields.slice(0, i)
+                .map((cf, ci) => ({ field: cf, index: ci }))
+                .filter((c) => c.field.type !== "section");
+              return (
+                <FieldEditor key={f.id} field={f} index={i} eligibleControllers={eligible}
+                  onChange={(n) => updateField(i, n)}
+                  onMoveUp={() => move(i, -1)}
+                  onMoveDown={() => move(i, 1)}
+                  onRemove={() => removeField(i)} />
+              );
+            })}
             {fields.length === 0 && (
               <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                 Add a field from the palette above, or click <strong>Build with Nectar</strong>.
@@ -188,9 +195,7 @@ function EditForm() {
           <Card className="p-4 max-h-[60vh] overflow-y-auto space-y-3 bg-white">
             {fields.length === 0
               ? <p className="text-xs text-center text-muted-foreground">Preview will appear here.</p>
-              : fields.map((f) => (
-                  <FieldRenderer key={f.id} field={f} value={undefined} onChange={() => {}} disabled />
-                ))}
+              : <LivePreview fields={fields} />}
           </Card>
 
           <Card className="p-3 text-xs space-y-1.5">
@@ -217,6 +222,24 @@ function EditForm() {
         formId={formId} formMeta={{ name, description, frequency, schedule, fields }}
         onPublished={() => { qc.invalidateQueries({ queryKey: ["form-edit", formId] }); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }} />
     </div>
+  );
+}
+
+function LivePreview({ fields }: { fields: FormField[] }) {
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  return (
+    <>
+      {fields.map((f) => {
+        if (!isFieldVisible(f, answers, fields)) return null;
+        return (
+          <FieldRenderer
+            key={f.id} field={f}
+            value={answers[f.id]}
+            onChange={(v) => setAnswers((a) => ({ ...a, [f.id]: v }))}
+          />
+        );
+      })}
+    </>
   );
 }
 

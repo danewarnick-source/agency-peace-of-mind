@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { ChevronLeft, Send, Loader2 } from "lucide-react";
 import { getStaffForm, submitForm } from "@/lib/forms.functions";
 import { FieldRenderer } from "@/components/forms/field-renderer";
-import type { FormField } from "@/lib/forms-utils";
+import { type FormField, isFieldVisible } from "@/lib/forms-utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/forms/$formId/fill")({
@@ -32,13 +32,20 @@ function FillForm() {
   async function go() {
     for (const f of fields) {
       if (f.type === "section" || !f.required) continue;
+      if (!isFieldVisible(f, answers, fields)) continue; // hidden required fields don't block
       const v = answers[f.id];
       const empty = v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
       if (empty) { toast.error(`Please answer: ${f.label}`); return; }
     }
     setBusy(true);
     try {
-      await submit({ data: { formId, answers } });
+      // Strip answers for hidden fields so they aren't stored
+      const visible: Record<string, unknown> = {};
+      for (const f of fields) {
+        if (f.type === "section") continue;
+        if (isFieldVisible(f, answers, fields) && answers[f.id] !== undefined) visible[f.id] = answers[f.id];
+      }
+      await submit({ data: { formId, answers: visible } });
       qc.invalidateQueries({ queryKey: ["my-forms"] });
       toast.success("Submitted");
       navigate({ to: "/dashboard/forms" });
@@ -61,9 +68,10 @@ function FillForm() {
       </div>
 
       <Card className="p-4 md:p-6 space-y-5">
-        {fields.map((f) => (
-          <FieldRenderer key={f.id} field={f} value={answers[f.id]} onChange={(v) => setAns(f.id, v)} />
-        ))}
+        {fields.map((f) => {
+          if (!isFieldVisible(f, answers, fields)) return null;
+          return <FieldRenderer key={f.id} field={f} value={answers[f.id]} onChange={(v) => setAns(f.id, v)} />;
+        })}
         {fields.length === 0 && <p className="text-sm text-muted-foreground">This form has no fields yet.</p>}
       </Card>
 

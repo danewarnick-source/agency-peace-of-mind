@@ -29,6 +29,18 @@ export type FieldType =
   | "email"
   | "phone";
 
+export type ConditionOperator =
+  | "is" | "is_not"
+  | "lt" | "gt" | "eq"
+  | "includes" | "excludes"
+  | "answered" | "not_answered";
+
+export type FieldCondition = {
+  fieldId: string;
+  operator: ConditionOperator;
+  value?: string | number;
+} | null;
+
 export type FormField = {
   id: string;
   type: FieldType;
@@ -45,7 +57,66 @@ export type FormField = {
     step?: number;
     scale?: number; // rating max stars
   };
+  condition?: FieldCondition;
 };
+
+/** Returns true when the field has no condition or its condition is satisfied
+ *  by the current answers. Sections are always visible. */
+export function isFieldVisible(
+  field: FormField,
+  answers: Record<string, unknown>,
+  allFields: FormField[],
+): boolean {
+  const c = field.condition;
+  if (!c || !c.fieldId) return true;
+  const ctrl = allFields.find((x) => x.id === c.fieldId);
+  if (!ctrl) return true; // broken ref — show
+  // Controller itself must be visible for downstream rule to count
+  if (!isFieldVisible(ctrl, answers, allFields)) return false;
+  const v = answers[c.fieldId];
+  const isEmpty = v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+  switch (c.operator) {
+    case "answered": return !isEmpty;
+    case "not_answered": return isEmpty;
+    case "is": return String(v ?? "") === String(c.value ?? "");
+    case "is_not": return String(v ?? "") !== String(c.value ?? "");
+    case "lt": return typeof v === "number" && typeof c.value === "number" && v < c.value;
+    case "gt": return typeof v === "number" && typeof c.value === "number" && v > c.value;
+    case "eq": return Number(v) === Number(c.value);
+    case "includes": return Array.isArray(v) && v.includes(String(c.value));
+    case "excludes": return Array.isArray(v) && !v.includes(String(c.value));
+    default: return true;
+  }
+}
+
+/** Self-heal: clear any condition whose controller no longer exists OR is now
+ *  positioned at/after the dependent field (forward reference). */
+export function sanitizeConditions(fields: FormField[]): FormField[] {
+  return fields.map((f, idx) => {
+    if (!f.condition) return f;
+    const ctrlIdx = fields.findIndex((x) => x.id === f.condition!.fieldId);
+    if (ctrlIdx === -1 || ctrlIdx >= idx || fields[ctrlIdx].type === "section") {
+      return { ...f, condition: null };
+    }
+    return f;
+  });
+}
+
+/** Operators available for a controlling field type. */
+export function operatorsFor(type: FieldType): { value: ConditionOperator; label: string }[] {
+  switch (type) {
+    case "yes_no": return [{ value: "is", label: "is" }, { value: "is_not", label: "is not" }];
+    case "number":
+    case "rating": return [
+      { value: "lt", label: "is less than" },
+      { value: "gt", label: "is greater than" },
+      { value: "eq", label: "equals" },
+    ];
+    case "dropdown": return [{ value: "is", label: "is" }, { value: "is_not", label: "is not" }];
+    case "checkboxes": return [{ value: "includes", label: "includes" }, { value: "excludes", label: "does not include" }];
+    default: return [{ value: "answered", label: "is answered" }, { value: "not_answered", label: "is not answered" }];
+  }
+}
 
 export type FormSettings = {
   anonymous?: boolean;

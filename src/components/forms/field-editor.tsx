@@ -1,15 +1,19 @@
-import type { FormField, FieldType } from "@/lib/forms-utils";
+import type { FormField, FieldType, FieldCondition } from "@/lib/forms-utils";
+import { operatorsFor } from "@/lib/forms-utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowUp, Trash2, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowDown, ArrowUp, Trash2, Plus, GitBranch } from "lucide-react";
 
 export function FieldEditor({
-  field, onChange, onMoveUp, onMoveDown, onRemove,
+  field, index, eligibleControllers, onChange, onMoveUp, onMoveDown, onRemove,
 }: {
   field: FormField;
+  index: number;
+  eligibleControllers: { field: FormField; index: number }[];
   onChange: (next: FormField) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -18,17 +22,26 @@ export function FieldEditor({
   function patch(p: Partial<FormField>) { onChange({ ...field, ...p }); }
   function patchConfig(p: NonNullable<FormField["config"]>) { onChange({ ...field, config: { ...(field.config ?? {}), ...p } }); }
   const hasOptions = field.type === "dropdown" || field.type === "checkboxes";
+  const controller = field.condition ? eligibleControllers.find((c) => c.field.id === field.condition!.fieldId) : null;
 
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{TYPE_LABEL[field.type]}</div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{TYPE_LABEL[field.type]}</div>
+          {controller && (
+            <Badge variant="outline" className="text-[10px] gap-1 border-teal-300 text-teal-700">
+              <GitBranch className="h-3 w-3" /> Conditional → Q{controller.index + 1}
+            </Badge>
+          )}
+        </div>
         <div className="flex gap-1">
           <Button size="icon" variant="ghost" onClick={onMoveUp} className="h-8 w-8"><ArrowUp className="h-4 w-4" /></Button>
           <Button size="icon" variant="ghost" onClick={onMoveDown} className="h-8 w-8"><ArrowDown className="h-4 w-4" /></Button>
           <Button size="icon" variant="ghost" onClick={onRemove} className="h-8 w-8 text-rose-600"><Trash2 className="h-4 w-4" /></Button>
         </div>
       </div>
+
 
       <div className="grid gap-1.5">
         <Label className="text-xs">Question / heading</Label>
@@ -103,11 +116,98 @@ export function FieldEditor({
             <Checkbox checked={!!field.required} onCheckedChange={(c) => patch({ required: !!c })} />
             Required
           </label>
+
+          <ConditionEditor
+            condition={field.condition ?? null}
+            eligibleControllers={eligibleControllers}
+            onChange={(c) => patch({ condition: c })}
+          />
         </>
       )}
     </div>
   );
 }
+
+function ConditionEditor({
+  condition, eligibleControllers, onChange,
+}: {
+  condition: FieldCondition;
+  eligibleControllers: { field: FormField; index: number }[];
+  onChange: (c: FieldCondition) => void;
+}) {
+  const enabled = !!condition;
+  const ctrl = condition ? eligibleControllers.find((c) => c.field.id === condition.fieldId) : null;
+  const ops = ctrl ? operatorsFor(ctrl.field.type) : [];
+  const needsValue = condition && condition.operator !== "answered" && condition.operator !== "not_answered";
+
+  return (
+    <div className="rounded-md border border-dashed border-border bg-muted/30 p-2 space-y-2">
+      <label className="flex items-center gap-2 text-xs min-h-[36px]">
+        <Checkbox
+          checked={enabled}
+          disabled={eligibleControllers.length === 0}
+          onCheckedChange={(c) => {
+            if (!c) return onChange(null);
+            const first = eligibleControllers[0];
+            if (!first) return;
+            const op = operatorsFor(first.field.type)[0].value;
+            onChange({ fieldId: first.field.id, operator: op, value: "" });
+          }}
+        />
+        <GitBranch className="h-3.5 w-3.5" />
+        <span className="font-medium">Show this field only if…</span>
+        {eligibleControllers.length === 0 && <span className="text-muted-foreground">(add a question above first)</span>}
+      </label>
+      {enabled && condition && ctrl && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <select
+            className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+            value={condition.fieldId}
+            onChange={(e) => {
+              const f = eligibleControllers.find((c) => c.field.id === e.target.value);
+              if (!f) return;
+              onChange({ fieldId: f.field.id, operator: operatorsFor(f.field.type)[0].value, value: "" });
+            }}
+          >
+            {eligibleControllers.map((c) => (
+              <option key={c.field.id} value={c.field.id}>Q{c.index + 1}: {c.field.label.slice(0, 40)}</option>
+            ))}
+          </select>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+            value={condition.operator}
+            onChange={(e) => onChange({ ...condition, operator: e.target.value as typeof condition.operator })}
+          >
+            {ops.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          {needsValue && (
+            ctrl.field.type === "dropdown" || ctrl.field.type === "checkboxes" || ctrl.field.type === "yes_no" ? (
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+                value={String(condition.value ?? "")}
+                onChange={(e) => onChange({ ...condition, value: e.target.value })}
+              >
+                <option value="">Select…</option>
+                {(ctrl.field.type === "yes_no" ? ["Yes", "No"] : (ctrl.field.options ?? [])).map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                type={ctrl.field.type === "number" || ctrl.field.type === "rating" ? "number" : "text"}
+                value={String(condition.value ?? "")}
+                onChange={(e) => onChange({ ...condition, value: ctrl.field.type === "number" || ctrl.field.type === "rating" ? Number(e.target.value) : e.target.value })}
+                className="h-9 text-xs"
+                placeholder="Value"
+              />
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 export const TYPE_LABEL: Record<FieldType, string> = {
   section: "Section / instructions",

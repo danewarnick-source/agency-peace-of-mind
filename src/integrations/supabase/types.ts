@@ -2577,6 +2577,7 @@ export type Database = {
       form_submissions: {
         Row: {
           answers: Json
+          client_id: string | null
           created_at: string
           form_id: string
           id: string
@@ -2589,6 +2590,7 @@ export type Database = {
         }
         Insert: {
           answers?: Json
+          client_id?: string | null
           created_at?: string
           form_id: string
           id?: string
@@ -2601,6 +2603,7 @@ export type Database = {
         }
         Update: {
           answers?: Json
+          client_id?: string | null
           created_at?: string
           form_id?: string
           id?: string
@@ -2612,6 +2615,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "form_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "form_submissions_form_id_fkey"
             columns: ["form_id"]
@@ -2630,6 +2640,8 @@ export type Database = {
       }
       forms: {
         Row: {
+          all_clients: boolean
+          assigned_clients: string[]
           assigned_groups: string[]
           assigned_users: string[]
           category: string
@@ -2648,6 +2660,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          all_clients?: boolean
+          assigned_clients?: string[]
           assigned_groups?: string[]
           assigned_users?: string[]
           category?: string
@@ -2666,6 +2680,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          all_clients?: boolean
+          assigned_clients?: string[]
           assigned_groups?: string[]
           assigned_users?: string[]
           category?: string

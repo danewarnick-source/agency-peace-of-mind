@@ -83,6 +83,11 @@ import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard
 import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashboard.settings.team-access'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
+import { Route as DashboardHubKnowledgeRouteImport } from './routes/dashboard.hub.knowledge'
+import { Route as DashboardHubFinancesRouteImport } from './routes/dashboard.hub.finances'
+import { Route as DashboardHubEmployeesRouteImport } from './routes/dashboard.hub.employees'
+import { Route as DashboardHubDocumentationRouteImport } from './routes/dashboard.hub.documentation'
+import { Route as DashboardHubClientsRouteImport } from './routes/dashboard.hub.clients'
 import { Route as DashboardHrAdminSettingsRouteImport } from './routes/dashboard.hr-admin.settings'
 import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
 import { Route as DashboardHiveExecStatesRouteImport } from './routes/dashboard.hive-exec.states'
@@ -501,6 +506,32 @@ const DashboardProgramsProgramIdRoute =
     path: '/$programId',
     getParentRoute: () => DashboardProgramsRoute,
   } as any)
+const DashboardHubKnowledgeRoute = DashboardHubKnowledgeRouteImport.update({
+  id: '/hub/knowledge',
+  path: '/hub/knowledge',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardHubFinancesRoute = DashboardHubFinancesRouteImport.update({
+  id: '/hub/finances',
+  path: '/hub/finances',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardHubEmployeesRoute = DashboardHubEmployeesRouteImport.update({
+  id: '/hub/employees',
+  path: '/hub/employees',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardHubDocumentationRoute =
+  DashboardHubDocumentationRouteImport.update({
+    id: '/hub/documentation',
+    path: '/hub/documentation',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardHubClientsRoute = DashboardHubClientsRouteImport.update({
+  id: '/hub/clients',
+  path: '/hub/clients',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardHrAdminSettingsRoute =
   DashboardHrAdminSettingsRouteImport.update({
     id: '/settings',
@@ -799,6 +830,11 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
+  '/dashboard/hub/clients': typeof DashboardHubClientsRoute
+  '/dashboard/hub/documentation': typeof DashboardHubDocumentationRoute
+  '/dashboard/hub/employees': typeof DashboardHubEmployeesRoute
+  '/dashboard/hub/finances': typeof DashboardHubFinancesRoute
+  '/dashboard/hub/knowledge': typeof DashboardHubKnowledgeRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
@@ -907,6 +943,11 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
+  '/dashboard/hub/clients': typeof DashboardHubClientsRoute
+  '/dashboard/hub/documentation': typeof DashboardHubDocumentationRoute
+  '/dashboard/hub/employees': typeof DashboardHubEmployeesRoute
+  '/dashboard/hub/finances': typeof DashboardHubFinancesRoute
+  '/dashboard/hub/knowledge': typeof DashboardHubKnowledgeRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
@@ -1021,6 +1062,11 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
+  '/dashboard/hub/clients': typeof DashboardHubClientsRoute
+  '/dashboard/hub/documentation': typeof DashboardHubDocumentationRoute
+  '/dashboard/hub/employees': typeof DashboardHubEmployeesRoute
+  '/dashboard/hub/finances': typeof DashboardHubFinancesRoute
+  '/dashboard/hub/knowledge': typeof DashboardHubKnowledgeRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
@@ -1136,6 +1182,11 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/hr-admin/settings'
+    | '/dashboard/hub/clients'
+    | '/dashboard/hub/documentation'
+    | '/dashboard/hub/employees'
+    | '/dashboard/hub/finances'
+    | '/dashboard/hub/knowledge'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
@@ -1244,6 +1295,11 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/hr-admin/settings'
+    | '/dashboard/hub/clients'
+    | '/dashboard/hub/documentation'
+    | '/dashboard/hub/employees'
+    | '/dashboard/hub/finances'
+    | '/dashboard/hub/knowledge'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
@@ -1357,6 +1413,11 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
     | '/dashboard/hr-admin/settings'
+    | '/dashboard/hub/clients'
+    | '/dashboard/hub/documentation'
+    | '/dashboard/hub/employees'
+    | '/dashboard/hub/finances'
+    | '/dashboard/hub/knowledge'
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
@@ -1922,6 +1983,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardProgramsProgramIdRouteImport
       parentRoute: typeof DashboardProgramsRoute
     }
+    '/dashboard/hub/knowledge': {
+      id: '/dashboard/hub/knowledge'
+      path: '/hub/knowledge'
+      fullPath: '/dashboard/hub/knowledge'
+      preLoaderRoute: typeof DashboardHubKnowledgeRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/hub/finances': {
+      id: '/dashboard/hub/finances'
+      path: '/hub/finances'
+      fullPath: '/dashboard/hub/finances'
+      preLoaderRoute: typeof DashboardHubFinancesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/hub/employees': {
+      id: '/dashboard/hub/employees'
+      path: '/hub/employees'
+      fullPath: '/dashboard/hub/employees'
+      preLoaderRoute: typeof DashboardHubEmployeesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/hub/documentation': {
+      id: '/dashboard/hub/documentation'
+      path: '/hub/documentation'
+      fullPath: '/dashboard/hub/documentation'
+      preLoaderRoute: typeof DashboardHubDocumentationRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/hub/clients': {
+      id: '/dashboard/hub/clients'
+      path: '/hub/clients'
+      fullPath: '/dashboard/hub/clients'
+      preLoaderRoute: typeof DashboardHubClientsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/hr-admin/settings': {
       id: '/dashboard/hr-admin/settings'
       path: '/settings'
@@ -2415,6 +2511,11 @@ interface DashboardRouteChildren {
   DashboardCoursesPersonRoute: typeof DashboardCoursesPersonRoute
   DashboardEmployeesStaffIdRoute: typeof DashboardEmployeesStaffIdRoute
   DashboardHhsHubClientIdRoute: typeof DashboardHhsHubClientIdRoute
+  DashboardHubClientsRoute: typeof DashboardHubClientsRoute
+  DashboardHubDocumentationRoute: typeof DashboardHubDocumentationRoute
+  DashboardHubEmployeesRoute: typeof DashboardHubEmployeesRoute
+  DashboardHubFinancesRoute: typeof DashboardHubFinancesRoute
+  DashboardHubKnowledgeRoute: typeof DashboardHubKnowledgeRoute
   DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
   DashboardWorkspaceClientIdRoute: typeof DashboardWorkspaceClientIdRoute
   DashboardCoursesIndexRoute: typeof DashboardCoursesIndexRoute
@@ -2480,6 +2581,11 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCoursesPersonRoute: DashboardCoursesPersonRoute,
   DashboardEmployeesStaffIdRoute: DashboardEmployeesStaffIdRoute,
   DashboardHhsHubClientIdRoute: DashboardHhsHubClientIdRoute,
+  DashboardHubClientsRoute: DashboardHubClientsRoute,
+  DashboardHubDocumentationRoute: DashboardHubDocumentationRoute,
+  DashboardHubEmployeesRoute: DashboardHubEmployeesRoute,
+  DashboardHubFinancesRoute: DashboardHubFinancesRoute,
+  DashboardHubKnowledgeRoute: DashboardHubKnowledgeRoute,
   DashboardTrainingIdRoute: DashboardTrainingIdRoute,
   DashboardWorkspaceClientIdRoute: DashboardWorkspaceClientIdRoute,
   DashboardCoursesIndexRoute: DashboardCoursesIndexRoute,

@@ -2019,6 +2019,15 @@ export function PunchPad({
                   </div>
                 )}
 
+                {/* Post-shift Behavior Observations (provider-toggled) */}
+                {behaviorEnabled && (
+                  <BehaviorObservationsBlock
+                    value={behaviorAnswers}
+                    onChange={setBehaviorAnswers}
+                    onOpenIncident={() => navigate({ to: "/dashboard/command-center" })}
+                  />
+                )}
+
                 {/* NECTAR Completeness Check */}
                 <NectarInfusionLock
                   featureName="Pre-submit completeness check"

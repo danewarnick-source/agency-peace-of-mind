@@ -270,7 +270,15 @@ export function CePlayer({ module, minActiveMinutes, onClose, onCompleted }: Pro
               Back
             </Button>
             {currentStep < steps.length - 1 ? (
-              <Button onClick={() => setCurrentStep((s) => Math.min(steps.length - 1, s + 1))}>Next</Button>
+              <Button
+                onClick={() => setCurrentStep((s) => Math.min(steps.length - 1, s + 1))}
+                disabled={nextBlocked}
+                className="gap-1"
+                title={nextBlocked ? "Select the correct answer to continue" : undefined}
+              >
+                {nextBlocked ? <Lock className="h-4 w-4" /> : null}
+                Next
+              </Button>
             ) : showSig ? null : (
               <Button onClick={() => setShowSig(true)} disabled={!canComplete} className="gap-1">
                 {canComplete ? null : <Lock className="h-4 w-4" />}

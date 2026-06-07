@@ -1667,42 +1667,7 @@ function PcspTab({
           </CardContent>
         </Card>
 
-        {/* Special Directions */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Special Directions & Clinical Alerts
-              </CardTitle>
-              {specialDir.trim() && (
-                <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">
-                  Active
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              High-priority clinical notices displayed prominently to staff in the client workspace.
-              Include choking/swallowing alerts, transfer instructions, behavioral de-escalation notes.
-            </p>
-            <Textarea
-              value={specialDir}
-              onChange={(e) => setSpecialDir(e.target.value)}
-              rows={5}
-              placeholder="Example: CHOKING RISK — Client requires all medications crushed and mixed with applesauce. Must be seated upright at 90 degrees during all meals and medication passes. Contact supervisor immediately if any swallowing difficulty is observed."
-              className="text-sm"
-            />
-            {specialDir.trim() && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-2.5 dark:bg-amber-950/20">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <p className="text-xs text-amber-800 dark:text-amber-200">
-                  This alert will appear at the top of every client workspace tab visible to staff.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Special directions are edited on the Profile tab → Clinical alert card. */}
       </div>
 
       {/* Right */}

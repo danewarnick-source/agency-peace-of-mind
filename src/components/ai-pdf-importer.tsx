@@ -283,7 +283,7 @@ export function AiPdfImporter({
     } finally {
       setCommitting(false);
     }
-  }, [data, organizationId, fileObj, commitFn, qc, reset, onDone, sectionDecisions]);
+  }, [data, organizationId, fileObj, commitFn, qc, reset, onDone, sectionChecked]);
 
   const codeSet = useMemo(() => new Set(data?.authorized_codes ?? []), [data]);
 

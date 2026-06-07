@@ -527,6 +527,8 @@ function ClientWorkspace({
             linkTo="/dashboard/teams"
             linkLabel="Open Teams & Homes"
             icon={Users}
+            storageKey={`${client.id}:placement`}
+            summary="Team & home assignment"
           >
             <StaffAssignmentTab clientId={client.id} orgId={orgId} />
           </CareSectionShell>
@@ -538,6 +540,12 @@ function ClientWorkspace({
             linkParams={{ clientId: client.id }}
             linkLabel="Open Billing"
             icon={ClipboardList}
+            storageKey={`${client.id}:billing`}
+            summary={
+              (client.job_code ?? []).length
+                ? `${(client.job_code ?? []).length} code${(client.job_code ?? []).length === 1 ? "" : "s"} · ${(client.job_code ?? []).join(", ")}`
+                : "No codes"
+            }
           >
             <CareBillingCodesEditor client={client} onSave={onSave} saving={saving} />
             <div className="mt-4">
@@ -555,6 +563,8 @@ function ClientWorkspace({
             linkTo="/dashboard/hub/clients"
             linkLabel="Open Clients Hub"
             icon={Sparkles}
+            storageKey={`${client.id}:goals`}
+            summary={`${(client.pcsp_goals ?? []).length} goal${(client.pcsp_goals ?? []).length === 1 ? "" : "s"}`}
           >
             <PcspTab client={client} onSave={onSave} saving={saving} />
           </CareSectionShell>
@@ -565,6 +575,8 @@ function ClientWorkspace({
             linkTo="/dashboard/hub/clients"
             linkLabel="Open Clients Hub"
             icon={CheckCircle2}
+            storageKey={`${client.id}:intake`}
+            summary="State-specific intake"
           >
             <ClientIntakeChecklistCard
               organizationId={orgId}
@@ -581,6 +593,8 @@ function ClientWorkspace({
               linkParams={{ clientId: client.id }}
               linkLabel="Open workspace"
               icon={Pill}
+              storageKey={`${client.id}:meds`}
+              summary="Prescriptions & MAR"
             >
               <div className="space-y-4">
                 <MedicationsManager clientId={client.id} organizationId={orgId} />
@@ -596,6 +610,8 @@ function ClientWorkspace({
             linkParams={{ clientId: client.id }}
             linkLabel="Open Behavior Support"
             icon={Brain}
+            storageKey={`${client.id}:bsp`}
+            summary="BSP status"
           >
             <BehaviorSupportConfigCard
               clientId={client.id}
@@ -611,19 +627,37 @@ function ClientWorkspace({
             title="Feature configuration"
             description="Enable or disable specific platform features for this client."
             icon={Settings2}
+            storageKey={`${client.id}:features`}
+            summary="Per-client feature toggles"
           >
             <SettingsTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
           </CollapsibleCard>
         </TabsContent>
 
         {/* ACTIVITY — read-only date-sorted feed of client-linked records */}
-        <TabsContent value="activity" className="mt-5">
-          <ClientActivityFeed organizationId={orgId} clientId={client.id} />
+        <TabsContent value="activity" className="mt-5 space-y-6">
+          <CollapsibleCard
+            title="Activity feed"
+            description="Chronological list of forms, MAR entries, notes, incidents and shifts for this client."
+            icon={ActivityIcon}
+            storageKey={`${client.id}:activity`}
+            summary="Recent client activity"
+          >
+            <ClientActivityFeed organizationId={orgId} clientId={client.id} />
+          </CollapsibleCard>
         </TabsContent>
 
         {/* FUNDS — this client's money: trust account + loan agreements */}
-        <TabsContent value="funds" className="mt-5">
-          <ClientFundsTab organizationId={orgId} clientId={client.id} />
+        <TabsContent value="funds" className="mt-5 space-y-6">
+          <CollapsibleCard
+            title="Trust account & loans"
+            description="Personal funds, spending log, and active loan agreements for this client."
+            icon={Wallet}
+            storageKey={`${client.id}:funds`}
+            summary="Trust funds & loans"
+          >
+            <ClientFundsTab organizationId={orgId} clientId={client.id} />
+          </CollapsibleCard>
         </TabsContent>
       </Tabs>
     </div>

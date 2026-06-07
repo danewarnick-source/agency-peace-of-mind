@@ -68,9 +68,10 @@ function FillForm() {
       </div>
 
       <Card className="p-4 md:p-6 space-y-5">
-        {fields.map((f) => (
-          <FieldRenderer key={f.id} field={f} value={answers[f.id]} onChange={(v) => setAns(f.id, v)} />
-        ))}
+        {fields.map((f) => {
+          if (!isFieldVisible(f, answers, fields)) return null;
+          return <FieldRenderer key={f.id} field={f} value={answers[f.id]} onChange={(v) => setAns(f.id, v)} />;
+        })}
         {fields.length === 0 && <p className="text-sm text-muted-foreground">This form has no fields yet.</p>}
       </Card>
 

@@ -1052,6 +1052,10 @@ export function PunchPad({
       toast.error("Please review the NECTAR-drafted note and check the confirmation box before submitting.");
       return;
     }
+    if (behaviorEnabled && behaviorError) {
+      toast.error(`Behavior observations: ${behaviorError}`);
+      return;
+    }
 
     // NECTAR Completeness Check (Infusion only). Without infusion, basic field
     // validation above is sufficient — the cross-checks are the locked layer.

@@ -144,13 +144,34 @@ function DocSlot({
       });
       if (ins.error) throw ins.error;
 
-      // If BSP replaced, return all published/approved behaviors to draft for re-review
+      // BSP-specific: return live behaviors to draft, then run demo Nectar extraction
       if (docType === "BSP") {
         await supabase
           .from("bc_behaviors")
           .update({ status: "draft", approved_at: null, approved_by_user_id: null, published_at: null, published_by_user_id: null })
           .eq("client_id", clientId)
           .in("status", ["approved", "published"]);
+
+        // Nectar (demo mode): seeded extraction with BSP citations.
+        // Strictly descriptive — never auto-approved, never shown to staff.
+        const rows = DEMO_BSP_EXTRACTION.map((b) => ({
+          organization_id: organizationId,
+          client_id: clientId,
+          name: b.name,
+          operational_definition: b.operational_definition,
+          data_method: b.data_method,
+          expected_cadence: b.expected_cadence,
+          bsp_citation: b.bsp_citation,
+          status: "draft" as const,
+          source: "nectar" as const,
+          drafted_by_user_id: userId,
+        }));
+        const nectar = await supabase.from("bc_behaviors").insert(rows);
+        if (nectar.error) {
+          toast.error(`Nectar draft skipped: ${nectar.error.message}`);
+        } else {
+          toast.message(`Nectar drafted ${rows.length} target behaviors from BSP citations.`);
+        }
       }
 
       toast.success(`${docType} v${nextVersion} uploaded.`);

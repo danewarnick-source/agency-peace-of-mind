@@ -299,10 +299,19 @@ async function gatherCeContext(
   supabase: ReturnType<typeof getSupabase>,
   orgId: string,
   staffId: string,
-): Promise<{ prompt: string; summary: string; sourceTitles: string[]; sourceCount: number }> {
+): Promise<{ prompt: string; summary: string; sourceTitles: string[]; sourceCount: number; suggestedTopics: string[] }> {
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - 35);
   const sinceIso = since.toISOString();
+
+  // ---- Admin-suggested CE focus topics for this staff member ----
+  const profQ = await supabase
+    .from("profiles")
+    .select("ce_suggested_topics")
+    .eq("id", staffId)
+    .maybeSingle();
+  const suggestedTopics = ((profQ.data as { ce_suggested_topics: string[] | null } | null)?.ce_suggested_topics ?? [])
+    .map((t) => String(t)).filter(Boolean).slice(0, 25);
 
   // ---- (a) Authoritative sources for the org (current versions only) ----
   const srcQ = await supabase

@@ -61,6 +61,7 @@ type EditableMember = {
   dailyRate: string;
   startDate: string;
   endDate: string;
+  ceSuggestedTopics: string[];
 };
 
 function EmployeesPage() {

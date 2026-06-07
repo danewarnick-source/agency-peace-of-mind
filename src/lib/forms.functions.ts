@@ -240,6 +240,45 @@ export const submitForm = createServerFn({ method: "POST" })
       period_key: periodKey,
     }).select().maybeSingle();
     if (error) throw new Error(error.message);
+
+    // Fan-out at submission time per form settings (share_users, share_manager, share_emails).
+    try {
+      const shareUserIds = new Set<string>(Array.isArray(settings.share_users) ? settings.share_users : []);
+      if (settings.share_manager) {
+        const mine = await supabase
+          .from("organization_members").select("manager_id")
+          .eq("user_id", userId).eq("organization_id", form.organization_id)
+          .maybeSingle();
+        const mgr = mine.data?.manager_id;
+        if (mgr) shareUserIds.add(mgr);
+      }
+      // Best-effort lookup of admins for share_emails (in-app notify only).
+      if (Array.isArray(settings.share_emails) && settings.share_emails.length) {
+        const { data: p } = await supabase
+          .from("profiles").select("id, email").in("email", settings.share_emails);
+        for (const row of p ?? []) if (row.id) shareUserIds.add(row.id);
+      }
+      if (shareUserIds.size) {
+        const submitterName = (await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle()).data?.full_name ?? "A staff member";
+        const formName = (await supabase.from("forms").select("name").eq("id", form.id).maybeSingle()).data?.name ?? "a form";
+        const rows = Array.from(shareUserIds).map((uid) => ({
+          organization_id: form.organization_id,
+          recipient_role: "staff" as const,
+          recipient_user_id: uid,
+          type: "form_submitted",
+          urgency: "normal",
+          title: `New submission: ${formName}`,
+          body: `${submitterName} submitted "${formName}".`,
+          link_to: `/dashboard/forms/${form.id}/submissions`,
+          related_id: form.id,
+          related_type: "form",
+        }));
+        await supabase.from("notifications").insert(rows);
+      }
+    } catch {
+      // Fan-out is best-effort; never block the staff submission on it.
+    }
+
     return { submission: ins };
   });
 

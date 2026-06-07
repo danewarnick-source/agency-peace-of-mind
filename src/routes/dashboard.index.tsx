@@ -13,6 +13,7 @@ import { CompanyOverview } from "@/components/company-overview";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { OtherAssignmentsReminder } from "@/components/training/other-assignments-reminder";
 import { CeReminderCard } from "@/components/ce/ce-reminder-card";
+import { FormsReminderCard } from "@/components/forms/forms-reminder-card";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 
@@ -145,6 +146,7 @@ function Overview() {
           />
           <TodayShiftBanner />
           <CeReminderCard />
+          <FormsReminderCard />
           <OtherAssignmentsReminder />
           <StaffClientGrid />
           <ComplianceInbox />

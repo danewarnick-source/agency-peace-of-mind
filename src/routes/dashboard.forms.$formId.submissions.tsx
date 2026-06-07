@@ -14,6 +14,8 @@ export const Route = createFileRoute("/dashboard/forms/$formId/submissions")({
   component: SubmissionsView,
 });
 
+type SubRow = { id: string; submitted_by: string | null; submitted_at: string; period_key: string | null; answers: Record<string, unknown> };
+
 function SubmissionsView() {
   const { formId } = Route.useParams();
   const navigate = useNavigate();
@@ -34,7 +36,7 @@ function SubmissionsView() {
 
   const rows = useMemo(() => {
     const all = s?.submissions ?? [];
-    return all.filter((r) => {
+    return (all as SubRow[]).filter((r) => {
       if (from && new Date(r.submitted_at) < new Date(from)) return false;
       if (to && new Date(r.submitted_at) > new Date(to + "T23:59:59")) return false;
       if (q.trim()) {
@@ -105,7 +107,7 @@ function SubmissionsView() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {rows.map((r) => {
+            {rows.map((r: SubRow) => {
               const p = profilesById[r.submitted_by ?? ""];
               const ans = (r.answers ?? {}) as Record<string, unknown>;
               return (

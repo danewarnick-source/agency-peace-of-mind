@@ -23,6 +23,11 @@ export const Route = createFileRoute("/dashboard/forms/")({
   component: FormsIndex,
 });
 
+type AdminFormRow = {
+  id: string; name: string; status: string; frequency: Frequency; schedule: Schedule;
+  fields: unknown[]; assigned_groups: string[]; assigned_users: string[];
+};
+
 function FormsIndex() {
   const { data: org } = useCurrentOrg();
   const role = org?.role ?? "employee";
@@ -62,7 +67,7 @@ function AdminList() {
 
       {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {(data?.forms ?? []).map((f) => (
+          {((data?.forms ?? []) as AdminFormRow[]).map((f) => (
             <Card key={f.id} className="flex flex-col">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
@@ -118,7 +123,7 @@ function StaffList() {
 
   const [popup, setPopup] = useState<{ id: string; title: string; body: string } | null>(null);
   useEffect(() => {
-    const unread = (bell?.notifications ?? []).find((n) => !n.read_at && n.type === "form_assigned");
+    const unread = (bell?.notifications ?? []).find((n: { read_at: string | null; type: string }) => !n.read_at && n.type === "form_assigned");
     if (unread) setPopup({ id: unread.id, title: unread.title, body: unread.body });
   }, [bell]);
 

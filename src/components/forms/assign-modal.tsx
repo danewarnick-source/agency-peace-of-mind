@@ -46,7 +46,7 @@ export function AssignModal({
             <p className="text-sm font-semibold mb-1.5">By group / job code</p>
             <div className="flex flex-wrap gap-1.5">
               <Pill checked={g.includes("all_staff")} label="All staff" onClick={() => toggleG("all_staff")} />
-              {types.map((t) => (
+              {types.map((t: { key: string; label: string }) => (
                 <Pill key={t.key} checked={g.includes(t.key)} label={t.label} onClick={() => toggleG(t.key)} />
               ))}
               {types.length === 0 && <p className="text-xs text-muted-foreground">No staff types defined yet — assign individuals below.</p>}

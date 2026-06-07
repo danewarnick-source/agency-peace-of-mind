@@ -50,6 +50,7 @@ import { Route as DashboardHrAdminRouteImport } from './routes/dashboard.hr-admi
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
 import { Route as DashboardHiveExecRouteImport } from './routes/dashboard.hive-exec'
 import { Route as DashboardHelpRouteImport } from './routes/dashboard.help'
+import { Route as DashboardFormsRouteImport } from './routes/dashboard.forms'
 import { Route as DashboardFinancialRouteImport } from './routes/dashboard.financial'
 import { Route as DashboardExternalComplianceRouteImport } from './routes/dashboard.external-compliance'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
@@ -70,6 +71,7 @@ import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-n
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardHiveExecIndexRouteImport } from './routes/dashboard.hive-exec.index'
+import { Route as DashboardFormsIndexRouteImport } from './routes/dashboard.forms.index'
 import { Route as DashboardFinancialIndexRouteImport } from './routes/dashboard.financial.index'
 import { Route as DashboardEmployeesIndexRouteImport } from './routes/dashboard.employees.index'
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
@@ -108,6 +110,9 @@ import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
 import { Route as DashboardHiveExecStatesStateCodeRouteImport } from './routes/dashboard.hive-exec.states.$stateCode'
+import { Route as DashboardFormsFormIdSubmissionsRouteImport } from './routes/dashboard.forms.$formId.submissions'
+import { Route as DashboardFormsFormIdFillRouteImport } from './routes/dashboard.forms.$formId.fill'
+import { Route as DashboardFormsFormIdEditRouteImport } from './routes/dashboard.forms.$formId.edit'
 import { Route as DashboardCoursesTopicTopicIdRouteImport } from './routes/dashboard.courses.topic.$topicId'
 import { Route as DashboardCoursesPersonModuleAssignmentIdRouteImport } from './routes/dashboard.courses.person-module.$assignmentId'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
@@ -320,6 +325,11 @@ const DashboardHelpRoute = DashboardHelpRouteImport.update({
   path: '/help',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardFormsRoute = DashboardFormsRouteImport.update({
+  id: '/forms',
+  path: '/forms',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardFinancialRoute = DashboardFinancialRouteImport.update({
   id: '/financial',
   path: '/financial',
@@ -423,6 +433,11 @@ const DashboardHiveExecIndexRoute = DashboardHiveExecIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => DashboardHiveExecRoute,
+} as any)
+const DashboardFormsIndexRoute = DashboardFormsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardFormsRoute,
 } as any)
 const DashboardFinancialIndexRoute = DashboardFinancialIndexRouteImport.update({
   id: '/',
@@ -632,6 +647,24 @@ const DashboardHiveExecStatesStateCodeRoute =
     path: '/$stateCode',
     getParentRoute: () => DashboardHiveExecStatesRoute,
   } as any)
+const DashboardFormsFormIdSubmissionsRoute =
+  DashboardFormsFormIdSubmissionsRouteImport.update({
+    id: '/$formId/submissions',
+    path: '/$formId/submissions',
+    getParentRoute: () => DashboardFormsRoute,
+  } as any)
+const DashboardFormsFormIdFillRoute =
+  DashboardFormsFormIdFillRouteImport.update({
+    id: '/$formId/fill',
+    path: '/$formId/fill',
+    getParentRoute: () => DashboardFormsRoute,
+  } as any)
+const DashboardFormsFormIdEditRoute =
+  DashboardFormsFormIdEditRouteImport.update({
+    id: '/$formId/edit',
+    path: '/$formId/edit',
+    getParentRoute: () => DashboardFormsRoute,
+  } as any)
 const DashboardCoursesTopicTopicIdRoute =
   DashboardCoursesTopicTopicIdRouteImport.update({
     id: '/courses/topic/$topicId',
@@ -697,6 +730,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
+  '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -760,12 +794,16 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/employees/': typeof DashboardEmployeesIndexRoute
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
+  '/dashboard/forms/': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
+  '/dashboard/forms/$formId/edit': typeof DashboardFormsFormIdEditRoute
+  '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
+  '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
@@ -862,12 +900,16 @@ export interface FileRoutesByTo {
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
   '/dashboard/employees': typeof DashboardEmployeesIndexRoute
   '/dashboard/financial': typeof DashboardFinancialIndexRoute
+  '/dashboard/forms': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
+  '/dashboard/forms/$formId/edit': typeof DashboardFormsFormIdEditRoute
+  '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
+  '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
@@ -906,6 +948,7 @@ export interface FileRoutesById {
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
+  '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -969,12 +1012,16 @@ export interface FileRoutesById {
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
   '/dashboard/employees/': typeof DashboardEmployeesIndexRoute
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
+  '/dashboard/forms/': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
+  '/dashboard/forms/$formId/edit': typeof DashboardFormsFormIdEditRoute
+  '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
+  '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
@@ -1014,6 +1061,7 @@ export interface FileRouteTypes {
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/financial'
+    | '/dashboard/forms'
     | '/dashboard/help'
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
@@ -1077,12 +1125,16 @@ export interface FileRouteTypes {
     | '/dashboard/courses/'
     | '/dashboard/employees/'
     | '/dashboard/financial/'
+    | '/dashboard/forms/'
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
+    | '/dashboard/forms/$formId/edit'
+    | '/dashboard/forms/$formId/fill'
+    | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesByTo: FileRoutesByTo
@@ -1179,12 +1231,16 @@ export interface FileRouteTypes {
     | '/dashboard/courses'
     | '/dashboard/employees'
     | '/dashboard/financial'
+    | '/dashboard/forms'
     | '/dashboard/hive-exec'
     | '/dashboard/training'
     | '/api/public/hooks/nectar-schedules'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
+    | '/dashboard/forms/$formId/edit'
+    | '/dashboard/forms/$formId/fill'
+    | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   id:
@@ -1222,6 +1278,7 @@ export interface FileRouteTypes {
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/financial'
+    | '/dashboard/forms'
     | '/dashboard/help'
     | '/dashboard/hive-exec'
     | '/dashboard/host-home-control'
@@ -1285,12 +1342,16 @@ export interface FileRouteTypes {
     | '/dashboard/courses/'
     | '/dashboard/employees/'
     | '/dashboard/financial/'
+    | '/dashboard/forms/'
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
+    | '/dashboard/forms/$formId/edit'
+    | '/dashboard/forms/$formId/fill'
+    | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesById: FileRoutesById
@@ -1605,6 +1666,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHelpRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/forms': {
+      id: '/dashboard/forms'
+      path: '/forms'
+      fullPath: '/dashboard/forms'
+      preLoaderRoute: typeof DashboardFormsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/financial': {
       id: '/dashboard/financial'
       path: '/financial'
@@ -1744,6 +1812,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/hive-exec/'
       preLoaderRoute: typeof DashboardHiveExecIndexRouteImport
       parentRoute: typeof DashboardHiveExecRoute
+    }
+    '/dashboard/forms/': {
+      id: '/dashboard/forms/'
+      path: '/'
+      fullPath: '/dashboard/forms/'
+      preLoaderRoute: typeof DashboardFormsIndexRouteImport
+      parentRoute: typeof DashboardFormsRoute
     }
     '/dashboard/financial/': {
       id: '/dashboard/financial/'
@@ -2011,6 +2086,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHiveExecStatesStateCodeRouteImport
       parentRoute: typeof DashboardHiveExecStatesRoute
     }
+    '/dashboard/forms/$formId/submissions': {
+      id: '/dashboard/forms/$formId/submissions'
+      path: '/$formId/submissions'
+      fullPath: '/dashboard/forms/$formId/submissions'
+      preLoaderRoute: typeof DashboardFormsFormIdSubmissionsRouteImport
+      parentRoute: typeof DashboardFormsRoute
+    }
+    '/dashboard/forms/$formId/fill': {
+      id: '/dashboard/forms/$formId/fill'
+      path: '/$formId/fill'
+      fullPath: '/dashboard/forms/$formId/fill'
+      preLoaderRoute: typeof DashboardFormsFormIdFillRouteImport
+      parentRoute: typeof DashboardFormsRoute
+    }
+    '/dashboard/forms/$formId/edit': {
+      id: '/dashboard/forms/$formId/edit'
+      path: '/$formId/edit'
+      fullPath: '/dashboard/forms/$formId/edit'
+      preLoaderRoute: typeof DashboardFormsFormIdEditRouteImport
+      parentRoute: typeof DashboardFormsRoute
+    }
     '/dashboard/courses/topic/$topicId': {
       id: '/dashboard/courses/topic/$topicId'
       path: '/courses/topic/$topicId'
@@ -2080,6 +2176,24 @@ const DashboardFinancialRouteChildren: DashboardFinancialRouteChildren = {
 
 const DashboardFinancialRouteWithChildren =
   DashboardFinancialRoute._addFileChildren(DashboardFinancialRouteChildren)
+
+interface DashboardFormsRouteChildren {
+  DashboardFormsIndexRoute: typeof DashboardFormsIndexRoute
+  DashboardFormsFormIdEditRoute: typeof DashboardFormsFormIdEditRoute
+  DashboardFormsFormIdFillRoute: typeof DashboardFormsFormIdFillRoute
+  DashboardFormsFormIdSubmissionsRoute: typeof DashboardFormsFormIdSubmissionsRoute
+}
+
+const DashboardFormsRouteChildren: DashboardFormsRouteChildren = {
+  DashboardFormsIndexRoute: DashboardFormsIndexRoute,
+  DashboardFormsFormIdEditRoute: DashboardFormsFormIdEditRoute,
+  DashboardFormsFormIdFillRoute: DashboardFormsFormIdFillRoute,
+  DashboardFormsFormIdSubmissionsRoute: DashboardFormsFormIdSubmissionsRoute,
+}
+
+const DashboardFormsRouteWithChildren = DashboardFormsRoute._addFileChildren(
+  DashboardFormsRouteChildren,
+)
 
 interface DashboardHiveExecStatesStateCodeRouteChildren {
   DashboardHiveExecStatesStateCodeOnboardingRoute: typeof DashboardHiveExecStatesStateCodeOnboardingRoute
@@ -2224,6 +2338,7 @@ interface DashboardRouteChildren {
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardExternalComplianceRoute: typeof DashboardExternalComplianceRoute
   DashboardFinancialRoute: typeof DashboardFinancialRouteWithChildren
+  DashboardFormsRoute: typeof DashboardFormsRouteWithChildren
   DashboardHelpRoute: typeof DashboardHelpRoute
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
@@ -2286,6 +2401,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardExternalComplianceRoute: DashboardExternalComplianceRoute,
   DashboardFinancialRoute: DashboardFinancialRouteWithChildren,
+  DashboardFormsRoute: DashboardFormsRouteWithChildren,
   DashboardHelpRoute: DashboardHelpRoute,
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,

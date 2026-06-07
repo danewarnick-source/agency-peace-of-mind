@@ -23,6 +23,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
+import { SuggestedTopicsInput } from "@/components/ce/suggested-topics-input";
 
 function genPassword(len = 14) {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";

@@ -859,6 +859,82 @@ export function TrainingRecordsAdmin() {
   );
 }
 
+function StaffAuditRecordModal({
+  open,
+  onClose,
+  staffId,
+  staffLabel,
+  topics,
+  personModules,
+  progress,
+  completions,
+}: {
+  open: boolean;
+  onClose: () => void;
+  staffId: string;
+  staffLabel: string;
+  topics: Topic[];
+  personModules: PersonModule[];
+  progress: Progress[];
+  completions: Completion[];
+}) {
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "completed" | "in_progress" | "not_started"
+  >("all");
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
+          <DialogTitle className="text-lg">
+            Training Audit Record — {staffLabel}
+          </DialogTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            DSPD audit format · §1.8(4)(a–o) checklist
+          </p>
+        </DialogHeader>
+        
+        <div className="flex-1 overflow-y-auto px-6 pb-6">
+          <div className="flex flex-wrap items-end gap-3 mb-4 sticky top-0 bg-background z-10 pb-3 border-b">
+            <div className="w-44">
+              <label className="mb-1 block text-xs font-semibold text-muted-foreground">
+                Filter by status
+              </label>
+              <Select
+                value={statusFilter}
+                onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="in_progress">In progress</SelectItem>
+                  <SelectItem value="not_started">Not started</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <Printer className="mr-1.5 h-4 w-4" /> Print audit-ready PDF
+            </Button>
+          </div>
+          
+          <StaffRecordTable
+            staffId={staffId}
+            staffLabel={staffLabel}
+            topics={topics}
+            personModules={personModules}
+            progress={progress}
+            completions={completions}
+            statusFilter={statusFilter}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function StaffRecordTable({
   staffId,
   staffLabel,

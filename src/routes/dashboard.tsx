@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -39,6 +39,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
+  { to: "/dashboard/forms", label: "Forms", icon: FileText },
 ];
 
 const ADMIN_NAV: NavItem[] = [
@@ -56,6 +57,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/billing", label: "Billing", icon: Receipt, perm: "view_billing" },
   { to: "/dashboard/financial", label: "Financial", icon: TrendingUp, perm: "manage_billing" },
   { to: "/dashboard/audit", label: "Audit", icon: FolderArchive },
+  { to: "/dashboard/forms", label: "Forms", icon: FileText },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

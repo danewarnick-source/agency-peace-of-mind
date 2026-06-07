@@ -69,17 +69,19 @@ function EditForm() {
   }, [data]);
 
   function addField(type: FieldType) {
-    setFields((arr) => [...arr, defaultFieldFor(type)]);
+    setFields((arr) => sanitizeConditions([...arr, defaultFieldFor(type)]));
   }
-  function updateField(idx: number, next: FormField) { setFields((arr) => arr.map((f, i) => i === idx ? next : f)); }
+  function updateField(idx: number, next: FormField) {
+    setFields((arr) => sanitizeConditions(arr.map((f, i) => i === idx ? next : f)));
+  }
   function move(idx: number, dir: -1 | 1) {
     setFields((arr) => {
       const next = [...arr]; const j = idx + dir;
       if (j < 0 || j >= next.length) return next;
-      [next[idx], next[j]] = [next[j], next[idx]]; return next;
+      [next[idx], next[j]] = [next[j], next[idx]]; return sanitizeConditions(next);
     });
   }
-  function removeField(idx: number) { setFields((arr) => arr.filter((_, i) => i !== idx)); }
+  function removeField(idx: number) { setFields((arr) => sanitizeConditions(arr.filter((_, i) => i !== idx))); }
 
   async function persist(): Promise<boolean> {
     if (!name.trim()) { toast.error("Form needs a name."); return false; }

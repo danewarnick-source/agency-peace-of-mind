@@ -29,7 +29,7 @@ import {
   Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2,
   User, FileText, Pill, Shield, Settings2, ChevronRight,
   Upload, Trash2, CheckCircle2, AlertTriangle, Search,
-  ArrowLeft, Users, Camera, Sparkles, Brain,
+  ArrowLeft, Users, Camera, Sparkles, Brain, Info,
   Activity as ActivityIcon, HandCoins, Wallet, ClipboardList,
   ExternalLink, Stethoscope, Gavel,
 } from "lucide-react";

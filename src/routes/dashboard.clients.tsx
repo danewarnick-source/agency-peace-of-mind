@@ -514,36 +514,49 @@ function ClientWorkspace({
           ))}
         </TabsList>
 
-        {/* PROFILE — the "who": identity, contact, codes, PCSP goals, settings */}
+        {/* PROFILE — the "who": identity, contact, alerts, docs, custom attrs, danger zone */}
         <TabsContent value="profile" className="mt-5 space-y-6">
           <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
-          <PcspTab client={client} onSave={onSave} saving={saving} />
-          <SettingsTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
         </TabsContent>
 
-        {/* CARE — operational config as read-only surfaces with links out */}
+        {/* CARE — the "how": clinical/operational config */}
         <TabsContent value="care" className="mt-5 space-y-6">
           <CareSectionShell
             title="Placement"
-            description="Team & home assignment for this client. Manage caseload here, or open Teams & Homes for the full module."
+            description="Team & home assignment for this client."
             linkTo="/dashboard/teams"
             linkLabel="Open Teams & Homes"
+            icon={Users}
           >
             <StaffAssignmentTab clientId={client.id} orgId={orgId} />
           </CareSectionShell>
 
           <CareSectionShell
-            title="Authorizations"
-            description="Per-client service-code summary (annual units, used, remaining). Full management lives in Billing."
+            title="Authorized DSPD billing codes"
+            description="Per-client service codes. Selected codes appear in the caregiver's EVV clock-in dropdown."
             linkTo="/dashboard/billing/$clientId"
             linkParams={{ clientId: client.id }}
             linkLabel="Open Billing"
+            icon={ClipboardList}
           >
-            <BillingCodesDetail
-              clientId={client.id}
-              clientName={`${client.first_name} ${client.last_name}`.trim()}
-              medicaidId={client.medicaid_id ?? null}
-            />
+            <CareBillingCodesEditor client={client} onSave={onSave} saving={saving} />
+            <div className="mt-4">
+              <BillingCodesDetail
+                clientId={client.id}
+                clientName={`${client.first_name} ${client.last_name}`.trim()}
+                medicaidId={client.medicaid_id ?? null}
+              />
+            </div>
+          </CareSectionShell>
+
+          <CareSectionShell
+            title="Person-centered support plan goals"
+            description="PCSP goals appear as checkboxes during daily-note and eMAR documentation."
+            linkTo="/dashboard/hub/clients"
+            linkLabel="Open Clients Hub"
+            icon={Sparkles}
+          >
+            <PcspTab client={client} onSave={onSave} saving={saving} />
           </CareSectionShell>
 
           <CareSectionShell
@@ -551,6 +564,7 @@ function ClientWorkspace({
             description="State-specific intake requirements for this client."
             linkTo="/dashboard/hub/clients"
             linkLabel="Open Clients Hub"
+            icon={CheckCircle2}
           >
             <ClientIntakeChecklistCard
               organizationId={orgId}
@@ -566,6 +580,7 @@ function ClientWorkspace({
               linkTo="/dashboard/workspace/$clientId"
               linkParams={{ clientId: client.id }}
               linkLabel="Open workspace"
+              icon={Pill}
             >
               <div className="space-y-4">
                 <MedicationsManager clientId={client.id} organizationId={orgId} />
@@ -580,6 +595,7 @@ function ClientWorkspace({
             linkTo="/dashboard/behavior-support/$clientId"
             linkParams={{ clientId: client.id }}
             linkLabel="Open Behavior Support"
+            icon={Brain}
           >
             <BehaviorSupportConfigCard
               clientId={client.id}
@@ -588,16 +604,16 @@ function ClientWorkspace({
             />
           </CareSectionShell>
 
-          <CareSectionShell
-            title="Documents"
-            description="Client-specific documents flow into Company Docs."
-            linkTo="/dashboard/hub/documentation"
-            linkLabel="Open Documentation Hub"
-          >
-            <DocumentsTab clientId={client.id} orgId={orgId} />
-          </CareSectionShell>
-
           <RightsSafeguardsCard clientId={client.id} />
+
+          {/* Feature configuration — collapsed by default */}
+          <CollapsibleCard
+            title="Feature configuration"
+            description="Enable or disable specific platform features for this client."
+            icon={Settings2}
+          >
+            <SettingsTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
+          </CollapsibleCard>
         </TabsContent>
 
         {/* ACTIVITY — read-only date-sorted feed of client-linked records */}

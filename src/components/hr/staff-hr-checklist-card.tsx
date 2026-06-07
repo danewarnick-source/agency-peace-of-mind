@@ -619,6 +619,7 @@ export function StaffHrChecklistCard({
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

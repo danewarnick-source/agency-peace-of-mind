@@ -644,6 +644,7 @@ export function PunchPad({
     setDismissals({});
     setDismissingKey(null);
     setDismissReasonDraft("");
+    setBehaviorAnswers(emptyBehaviorAnswers);
     stopRecording();
     setShowCompliance(true);
   }

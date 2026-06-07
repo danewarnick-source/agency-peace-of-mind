@@ -161,7 +161,7 @@ export function AiPdfImporter({
   const handleFile = useCallback(
     async (file: File) => {
       if (!isAcceptedFile(file)) {
-        toast.error("PCSP import accepts PDF files only.");
+        toast.error("PCSP import accepts PDF or DOCX files only.");
         return;
       }
       if (file.size > 15 * 1024 * 1024) {
@@ -176,9 +176,15 @@ export function AiPdfImporter({
 
       try {
         const b64 = await fileToBase64(file);
-        const result = await extractFn({ data: { pdfBase64: b64 } });
+        const result = isDocx(file)
+          ? await extractDocxFn({ data: { docxBase64: b64 } })
+          : await extractFn({ data: { pdfBase64: b64 } });
         setData(result);
         setOriginal(structuredClone(result));
+        // Default-check every additional section.
+        const initialChecks: Record<number, boolean> = {};
+        (result.additional_sections ?? []).forEach((_, i) => { initialChecks[i] = true; });
+        setSectionChecked(initialChecks);
         toast.success("NECTAR extraction complete — review before saving.");
       } catch (e) {
         toast.error((e as Error).message);
@@ -189,7 +195,7 @@ export function AiPdfImporter({
         setExtracting(false);
       }
     },
-    [extractFn, reset],
+    [extractFn, extractDocxFn, reset],
   );
 
   const onDrop = useCallback(

@@ -1,15 +1,19 @@
-import type { FormField, FieldType } from "@/lib/forms-utils";
+import type { FormField, FieldType, FieldCondition } from "@/lib/forms-utils";
+import { operatorsFor } from "@/lib/forms-utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowUp, Trash2, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowDown, ArrowUp, Trash2, Plus, GitBranch } from "lucide-react";
 
 export function FieldEditor({
-  field, onChange, onMoveUp, onMoveDown, onRemove,
+  field, index, eligibleControllers, onChange, onMoveUp, onMoveDown, onRemove,
 }: {
   field: FormField;
+  index: number;
+  eligibleControllers: { field: FormField; index: number }[];
   onChange: (next: FormField) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -18,6 +22,7 @@ export function FieldEditor({
   function patch(p: Partial<FormField>) { onChange({ ...field, ...p }); }
   function patchConfig(p: NonNullable<FormField["config"]>) { onChange({ ...field, config: { ...(field.config ?? {}), ...p } }); }
   const hasOptions = field.type === "dropdown" || field.type === "checkboxes";
+  const controller = field.condition ? eligibleControllers.find((c) => c.field.id === field.condition!.fieldId) : null;
 
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-3">

@@ -286,6 +286,12 @@ export function PunchPad({
   const [outVarShorthand, setOutVarShorthand] = useState("");
   const [outVarDraftBusy, setOutVarDraftBusy] = useState(false);
 
+  // ── Post-shift Behavior Observations ───────────────────────────────────────
+  const { data: behaviorSetting } = useShiftBehaviorSetting();
+  const behaviorEnabled = behaviorSetting?.enabled ?? true;
+  const [behaviorAnswers, setBehaviorAnswers] = useState<BehaviorAnswers>(emptyBehaviorAnswers);
+
+
   // ── NECTAR Procedural Q&A (Infusion add-on) ────────────────────────────────
   const [askOpen, setAskOpen]         = useState(false);
   const [askQuestion, setAskQuestion] = useState("");

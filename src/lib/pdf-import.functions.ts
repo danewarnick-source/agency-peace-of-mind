@@ -213,131 +213,144 @@ Prompting levels (informational): prompting_levels (array of strings)
 
 Additional information: additional_sections — for diagnoses (with ICD-10), allergies, immunizations, risk assessment, daily schedule, communication dictionary, financial / rep-payee, support team roster, HRC review history, rights restrictions, and any other rich block that does not map above. Each item: {label, content}. Keep content concise but complete (up to ~2000 chars).`;
 
+async function runExtraction(docText: string, sourceLabel: string): Promise<ExtractedClient> {
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key) throw new Error("LOVABLE_API_KEY not configured");
+
+  if (!docText.trim()) {
+    throw new Error(`Could not read any text from this ${sourceLabel}.`);
+  }
+
+  const truncated = docText.slice(0, 60_000);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 55_000);
+  let res: Response;
+  try {
+    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `${USER_INSTRUCTIONS}\n\n--- DOCUMENT TEXT START ---\n${truncated}\n--- DOCUMENT TEXT END ---`,
+          },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if ((e as { name?: string })?.name === "AbortError") {
+      throw new Error("AI request timed out. Please try again — large documents may need a retry.");
+    }
+    throw e;
+  }
+  clearTimeout(timeoutId);
+
+  if (!res.ok) {
+    const t = await res.text();
+    if (res.status === 429) throw new Error("AI rate limit — try again shortly.");
+    if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Lovable AI.");
+    if (res.status === 504 || res.status === 524) throw new Error("AI request timed out. Please try again.");
+    throw new Error(`AI gateway error: ${res.status} ${t.slice(0, 200)}`);
+  }
+
+  const j = await res.json();
+  const raw = j.choices?.[0]?.message?.content;
+  if (!raw) throw new Error("AI returned no content");
+  const tryParse = (s: string): unknown => {
+    try { return JSON.parse(s); } catch { return undefined; }
+  };
+  const sanitize = (s: string): string => {
+    let t = s.trim()
+      .replace(/^\uFEFF/, "")
+      .replace(/```(?:json)?\s*/gi, "")
+      .replace(/```\s*$/g, "")
+      .trim();
+    const start = t.search(/[{[]/);
+    const open = start !== -1 ? t[start] : "";
+    const close = open === "[" ? "]" : "}";
+    const end = t.lastIndexOf(close);
+    if (start !== -1 && end !== -1 && end > start) t = t.slice(start, end + 1);
+    return t
+      .replace(/,\s*}/g, "}")
+      .replace(/,\s*]/g, "]")
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  };
+  let args: unknown = tryParse(raw) ?? tryParse(sanitize(raw));
+  if (args === undefined) {
+    let t = sanitize(raw);
+    const opens = (t.match(/[{[]/g) ?? []).length;
+    const closes = (t.match(/[}\]]/g) ?? []).length;
+    if (opens > closes) t = t + "}".repeat(opens - closes);
+    args = tryParse(t);
+  }
+  if (args === undefined || args === null || typeof args !== "object") {
+    args = {};
+  }
+
+  const safe = ExtractedSchema.safeParse(args);
+  const parsed: ExtractedClient = safe.success
+    ? safe.data
+    : ExtractedSchema.parse({});
+
+  const allow = new Set(EVV_SERVICE_CODES.map((c) => c.code));
+  parsed.authorized_codes = Array.from(
+    new Set(parsed.authorized_codes.map((c) => c.trim().toUpperCase()).filter((c) => allow.has(c))),
+  );
+  parsed.billing_codes = parsed.billing_codes
+    .map((r) => ({ ...r, service_code: (r.service_code || "").trim().toUpperCase() }))
+    .filter((r) => allow.has(r.service_code));
+  for (const b of parsed.billing_codes) {
+    if (!parsed.authorized_codes.includes(b.service_code)) {
+      parsed.authorized_codes.push(b.service_code);
+    }
+  }
+
+  parsed.medications = parsed.medications
+    .filter((m) => (m.medication_name || "").trim().length > 0)
+    .map((m) => ({ ...m, scheduled_times: Array.isArray(m.scheduled_times) ? m.scheduled_times : [] }));
+
+  parsed.additional_sections = parsed.additional_sections.filter(
+    (s) => (s.label || "").trim().length > 0 && (s.content || "").trim().length > 0,
+  );
+
+  parsed.pcsp_goals = Array.from(
+    new Set(parsed.pcsp_goals.map((g) => g.trim()).filter((g) => g.length > 2)),
+  ).slice(0, 25);
+  parsed.medicaid_id = (parsed.medicaid_id || "").replace(/\D+/g, "");
+
+  return parsed;
+}
+
 export const extractClientFromPdf = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => ExtractInput.parse(d))
   .handler(async ({ data }): Promise<ExtractedClient> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY not configured");
-
-    const pdfText = await extractPdfText(data.pdfBase64);
-    if (!pdfText.trim()) {
+    const text = await extractPdfText(data.pdfBase64);
+    if (!text.trim()) {
       throw new Error("Could not read any text from this PDF (it may be a scanned image).");
     }
-
-    const truncated = pdfText.slice(0, 60_000);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55_000);
-    let res: Response;
-    try {
-      res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            {
-              role: "user",
-              content: `${USER_INSTRUCTIONS}\n\n--- DOCUMENT TEXT START ---\n${truncated}\n--- DOCUMENT TEXT END ---`,
-            },
-          ],
-          response_format: { type: "json_object" },
-        }),
-      });
-    } catch (e) {
-      clearTimeout(timeoutId);
-      if ((e as { name?: string })?.name === "AbortError") {
-        throw new Error("AI request timed out. Please try again — large PCSPs may need a retry.");
-      }
-      throw e;
-    }
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      const t = await res.text();
-      if (res.status === 429) throw new Error("AI rate limit — try again shortly.");
-      if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Lovable AI.");
-      if (res.status === 504 || res.status === 524) throw new Error("AI request timed out. Please try again.");
-      throw new Error(`AI gateway error: ${res.status} ${t.slice(0, 200)}`);
-    }
-
-    const j = await res.json();
-    const raw = j.choices?.[0]?.message?.content;
-    if (!raw) throw new Error("AI returned no content");
-    const tryParse = (s: string): unknown => {
-      try { return JSON.parse(s); } catch { return undefined; }
-    };
-    const sanitize = (s: string): string => {
-      let t = s.trim()
-        .replace(/^\uFEFF/, "")
-        .replace(/```(?:json)?\s*/gi, "")
-        .replace(/```\s*$/g, "")
-        .trim();
-      const start = t.search(/[{[]/);
-      const open = start !== -1 ? t[start] : "";
-      const close = open === "[" ? "]" : "}";
-      const end = t.lastIndexOf(close);
-      if (start !== -1 && end !== -1 && end > start) t = t.slice(start, end + 1);
-      return t
-        .replace(/,\s*}/g, "}")
-        .replace(/,\s*]/g, "]")
-        // eslint-disable-next-line no-control-regex
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
-    };
-    let args: unknown = tryParse(raw) ?? tryParse(sanitize(raw));
-    if (args === undefined) {
-      // Last resort: close unbalanced braces/brackets caused by truncation.
-      let t = sanitize(raw);
-      const opens = (t.match(/[{[]/g) ?? []).length;
-      const closes = (t.match(/[}\]]/g) ?? []).length;
-      if (opens > closes) t = t + "}".repeat(opens - closes);
-      args = tryParse(t);
-    }
-    if (args === undefined || args === null || typeof args !== "object") {
-      // Don't blow up the import — fall back to an empty extraction.
-      args = {};
-    }
-
-    // Lenient parse — never hard-fail the whole import on a missing/null field.
-    const safe = ExtractedSchema.safeParse(args);
-    const parsed: ExtractedClient = safe.success
-      ? safe.data
-      : ExtractedSchema.parse({}); // schema has defaults everywhere
-
-    // Sanitize codes against allow-list
-    const allow = new Set(EVV_SERVICE_CODES.map((c) => c.code));
-    parsed.authorized_codes = Array.from(
-      new Set(parsed.authorized_codes.map((c) => c.trim().toUpperCase()).filter((c) => allow.has(c))),
-    );
-    parsed.billing_codes = parsed.billing_codes
-      .map((r) => ({ ...r, service_code: (r.service_code || "").trim().toUpperCase() }))
-      .filter((r) => allow.has(r.service_code));
-    for (const b of parsed.billing_codes) {
-      if (!parsed.authorized_codes.includes(b.service_code)) {
-        parsed.authorized_codes.push(b.service_code);
-      }
-    }
-
-    // Drop medications without a name; keep PRN/as-needed rows even with empty scheduled_times.
-    parsed.medications = parsed.medications
-      .filter((m) => (m.medication_name || "").trim().length > 0)
-      .map((m) => ({ ...m, scheduled_times: Array.isArray(m.scheduled_times) ? m.scheduled_times : [] }));
-
-    // Drop empty additional_sections rather than failing on them.
-    parsed.additional_sections = parsed.additional_sections.filter(
-      (s) => (s.label || "").trim().length > 0 && (s.content || "").trim().length > 0,
-    );
-
-    parsed.pcsp_goals = Array.from(
-      new Set(parsed.pcsp_goals.map((g) => g.trim()).filter((g) => g.length > 2)),
-    ).slice(0, 25);
-    parsed.medicaid_id = (parsed.medicaid_id || "").replace(/\D+/g, "");
-
-    return parsed;
+    return runExtraction(text, "PDF");
   });
+
+export const extractClientFromDocx = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => ExtractDocxInput.parse(d))
+  .handler(async ({ data }): Promise<ExtractedClient> => {
+    const text = await extractDocxText(data.docxBase64);
+    if (!text.trim()) {
+      throw new Error("Could not read any text from this DOCX file.");
+    }
+    return runExtraction(text, "DOCX");
+  });
+
 
 // ---------- Commit ----------
 

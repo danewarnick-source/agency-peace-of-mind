@@ -269,6 +269,15 @@ function ClientWorkspace() {
               clientName={`${client.first_name} ${client.last_name}`}
             />
           </TabsContent>
+
+          {showBehaviorTab && bsTab?.organizationId && (
+            <TabsContent value="behavior-data" className="mt-5">
+              <StaffBehaviorDataTab
+                clientId={client.id}
+                organizationId={bsTab.organizationId}
+              />
+            </TabsContent>
+          )}
         </Tabs>
 
       </div>

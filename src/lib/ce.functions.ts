@@ -594,7 +594,16 @@ export const ensureCurrentCeModule = createServerFn({ method: "POST" })
     let summary: string;
     try {
       const gathered = await gatherCeContext(supabase, orgId, userId);
-      const result = await callNectarForCe(gathered.prompt);
+      let result = await callNectarForCe(gathered.prompt);
+      // If the model under-produces without flagging material_short and we have
+      // sources to work with, retry once with an explicit reinforcement of the
+      // 30-slide floor and the deep-dive fallback.
+      if (!result.materialShort && gathered.sourceCount > 0 && !meetsFullHourFloor(result.steps)) {
+        const retryPrompt = `${gathered.prompt}
+
+REGENERATION NOTICE: Your previous draft returned only ${result.steps.length} steps. The minimum is 30 total steps (~60 minutes). The prior month is quiet (few/no events), so you MUST lean on the DEEP-DIVE FALLBACK: build an in-depth, source-grounded review of important recurring topics drawn entirely from the AUTHORITATIVE SOURCES above (deeper than the 30-day introductory training). Do NOT pad with un-sourced clinical or safety content. If — after a thorough pass over every source — you genuinely cannot reach 30 grounded steps, set "material_short": true and explain in admin_flags.notes which topic areas are missing.`;
+        result = await callNectarForCe(retryPrompt);
+      }
       steps = result.steps;
       const sourceList = gathered.sourceTitles.length > 0
         ? `Sources: ${gathered.sourceTitles.slice(0, 8).join("; ")}${gathered.sourceTitles.length > 8 ? `, +${gathered.sourceTitles.length - 8} more` : ""}`
@@ -623,7 +632,12 @@ export const ensureCurrentCeModule = createServerFn({ method: "POST" })
         steps,
         source_summary: summary,
         generated_at: new Date().toISOString(),
+        // Reset progress — slide content has changed, so any saved position,
+        // active-time, reflections, or quiz shuffle from the prior deck would
+        // be meaningless. Start fresh on slide 1 / 0 min.
         current_step: 0,
+        active_seconds: 0,
+        reflections: {},
       })
       .eq("id", modId)
       .select("*")

@@ -242,8 +242,8 @@ export function AiPdfImporter({
         .upload(path, fileObj, { upsert: true, contentType: fileObj.type || "application/pdf" });
       if (upErr) throw upErr;
 
-      // Build accepted additional sections (default to "create" if user didn't decide).
-      const accepted = data.additional_sections.filter((_, i) => sectionDecisions[i] !== "skip");
+      // Build accepted additional sections — only checked rows are persisted.
+      const accepted = data.additional_sections.filter((_, i) => sectionChecked[i] !== false);
 
       const res = await commitFn({
         data: {

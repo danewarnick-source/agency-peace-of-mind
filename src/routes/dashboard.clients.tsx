@@ -840,27 +840,17 @@ function CareBillingCodesEditor({
 }
 
 
-// ─── Rights & safeguards (link-out card) ──────────────────────────────────────
+// ─── Rights & safeguards (collapsible link-out card) ─────────────────────────
 function RightsSafeguardsCard({ clientId }: { clientId: string }) {
-  void clientId;
   return (
-    <section className="rounded-lg border border-border bg-card">
-      <header className="flex flex-col gap-2 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">
-            Rights & safeguards
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            Rights-restriction status and HRC review workflow live in the HRC module.
-          </p>
-        </div>
-        <Button asChild variant="outline" size="sm" className="gap-1.5 self-start md:self-auto">
-          <Link to="/dashboard/hrc">
-            Open HRC <ExternalLink className="h-3 w-3" />
-          </Link>
-        </Button>
-      </header>
-      <div className="px-4 py-6 text-sm text-muted-foreground">
+    <CollapsibleCard
+      title="Rights & safeguards"
+      description="Rights-restriction status and HRC review workflow live in the HRC module."
+      icon={Gavel}
+      storageKey={`${clientId}:rights`}
+      summary="Managed in HRC module"
+    >
+      <div className="space-y-3 text-sm text-muted-foreground">
         <div className="flex items-start gap-2">
           <Gavel className="mt-0.5 h-4 w-4 text-[#137182]" />
           <p>
@@ -868,8 +858,13 @@ function RightsSafeguardsCard({ clientId }: { clientId: string }) {
             Edits and approvals stay in the HRC workflow.
           </p>
         </div>
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Link to="/dashboard/hrc">
+            Open HRC <ExternalLink className="h-3 w-3" />
+          </Link>
+        </Button>
       </div>
-    </section>
+    </CollapsibleCard>
   );
 }
 

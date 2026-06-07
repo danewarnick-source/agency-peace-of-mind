@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { Link, useSearch, useRouterState } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 
 export type HubTab = {
   key: string;
@@ -21,7 +21,6 @@ type Props = {
  */
 export function HubShell({ title, subtitle, tabs, basePath }: Props) {
   const search = useSearch({ strict: false }) as { tab?: string };
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const activeKey = tabs.find((t) => t.key === search.tab)?.key ?? tabs[0].key;
   const active = tabs.find((t) => t.key === activeKey)!;
 
@@ -40,7 +39,7 @@ export function HubShell({ title, subtitle, tabs, basePath }: Props) {
               return (
                 <Link
                   key={t.key}
-                  to={pathname}
+                  to={basePath}
                   search={{ tab: t.key }}
                   replace
                   className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${

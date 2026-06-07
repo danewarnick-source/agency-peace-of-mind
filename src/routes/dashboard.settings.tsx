@@ -80,6 +80,8 @@ function SettingsPage() {
 
       <CelebrationSettings isAdmin={org?.role === "admin" || org?.role === "super_admin"} />
 
+      <ShiftBehaviorToggleCard isAdmin={org?.role === "admin" || org?.role === "super_admin"} />
+
 
       {(org?.role === "admin" || org?.role === "super_admin") && (
         <Link to="/dashboard/settings/team-access" className="group lg:col-span-2">

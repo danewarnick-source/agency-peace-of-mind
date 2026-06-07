@@ -1415,34 +1415,56 @@ function ProfileTab({
           </CardContent>
         </Card>
 
-        {/* Billing codes */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Authorized DSPD Billing Codes
-            </CardTitle>
+        {/* Clinical alert — the one colored callout on Profile */}
+        <Card className="border-amber-500/60 bg-amber-50/60 dark:bg-amber-950/20">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <CardTitle className="text-base font-medium text-amber-900 dark:text-amber-100">
+                Clinical alert
+              </CardTitle>
+              {specialDir.trim() && (
+                <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">
+                  Active
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            <DspdCodesMultiSelect value={jobCodes} onChange={setJobCodes} />
-            <p className="text-[11px] text-muted-foreground">
-              Selected codes appear in the caregiver's EVV clock-in service type dropdown.
-              Includes all 35 Utah DSPD codes including HHS.
+            <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
+              High-priority clinical notices displayed prominently to staff in the client workspace.
             </p>
+            <Textarea
+              value={specialDir}
+              onChange={(e) => setSpecialDir(e.target.value)}
+              rows={4}
+              placeholder="Example: CHOKING RISK — All meds crushed with applesauce; seated upright at 90°."
+              className="text-sm bg-white/70 dark:bg-amber-950/40"
+            />
           </CardContent>
         </Card>
+
+        {/* Client documents */}
+        <ClientDocumentsCard
+          clientId={client.id}
+          clientName={`${client.first_name} ${client.last_name}`.trim()}
+        />
       </div>
 
-      {/* Right column */}
+      {/* Right column — geofence + meta */}
       <div className="space-y-5">
-        {/* EVV Geofence */}
+        {/* EVV Geofence + approved locations */}
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-primary">
-              EVV Geofence Control
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base font-medium text-primary">
+                Service address & geofence
+              </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Label className="text-xs font-semibold">Maximum Clock-In Radius</Label>
+            <Label className="text-xs font-semibold">Maximum clock-in radius</Label>
             <Select value={String(radius)} onValueChange={(v) => setRadius(Number(v))}>
               <SelectTrigger className="h-10">
                 <SelectValue />
@@ -1455,7 +1477,7 @@ function ProfileTab({
             </Select>
             <p className="text-[11px] text-muted-foreground">
               Caregivers clocking in beyond this distance from the service address must submit a
-              variance justification before the clock-in completes.
+              variance justification.
             </p>
             <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
               <p className="text-[11px] font-semibold text-primary">Current: {radius.toLocaleString()} ft</p>
@@ -1471,47 +1493,60 @@ function ProfileTab({
           </CardContent>
         </Card>
 
-        {/* (Save promoted to sticky bottom bar — see end of ProfileTab) */}
-
-
-        {/* Custom attributes */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Custom Attributes
-            </CardTitle>
+        {/* Client record info (meta) */}
+        <Card className="border-border/60 bg-muted/20">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Client record info
+              </CardTitle>
+            </div>
           </CardHeader>
-          <CardContent>
-            <CustomAttributesSection
-              organizationId={client.id ? undefined : undefined}
-              entityKind="client"
-              entityId={client.id}
-            />
+          <CardContent className="space-y-2 text-xs text-muted-foreground">
+            <div className="flex justify-between">
+              <span>Record ID</span>
+              <span className="font-mono">{client.id.slice(0, 8)}…</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Status</span>
+              <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">Active</Badge>
+            </div>
+            <div className="flex justify-between">
+              <span>Service codes</span>
+              <span>{(client.job_code ?? []).join(", ") || "None"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>PCSP goals</span>
+              <span>{(client.pcsp_goals ?? []).length}</span>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Lifecycle */}
-        <LifecyclePanel
-          kind="client"
-          id={client.id}
-          fullName={`${client.first_name} ${client.last_name}`.trim()}
-          organizationId={orgId}
-        />
+        {/* Custom attributes — collapsed by default */}
+        <CollapsibleCard
+          title="Custom attributes"
+          description="Agency-specific fields, including any imported from a PCSP."
+          icon={Sparkles}
+        >
+          <CustomAttributesSection
+            organizationId={orgId}
+            entityKind="client"
+            entityId={client.id}
+          />
+        </CollapsibleCard>
       </div>
     </div>
 
-    {/* Billing Codes Detail — per-code ledger lives beneath the multi-select */}
-    <BillingCodesDetail
-      clientId={client.id}
-      clientName={`${client.first_name} ${client.last_name}`.trim()}
-      medicaidId={client.medicaid_id ?? null}
-    />
-
-    {/* Client-specific documents — flows into Company Docs */}
-    <ClientDocumentsCard
-      clientId={client.id}
-      clientName={`${client.first_name} ${client.last_name}`.trim()}
-    />
+    {/* Danger zone — quiet, at the very bottom */}
+    <div className="mt-6 border-t border-border/60 pt-4">
+      <LifecyclePanel
+        kind="client"
+        id={client.id}
+        fullName={`${client.first_name} ${client.last_name}`.trim()}
+        organizationId={orgId}
+      />
+    </div>
 
     {/* Sticky save bar — visible whenever there are unsaved profile edits,
         regardless of which field/column the user is editing. Reuses the

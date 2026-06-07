@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileDown, FileBarChart } from "lucide-react";
 import { toast } from "sonner";
 
 import { RequirePermission } from "@/components/rbac-guard";
+import { BehaviorSupportsReport } from "@/components/behavior-support/behavior-supports-report";
 
 export const Route = createFileRoute("/dashboard/reports")({
   component: () => (
@@ -17,6 +19,29 @@ export const Route = createFileRoute("/dashboard/reports")({
 });
 
 function ReportsPage() {
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <h2 className="text-base font-semibold">Audit-ready reports</h2>
+        <p className="text-sm text-muted-foreground">Export compliance evidence as CSV or PDF anytime.</p>
+      </div>
+      <Tabs defaultValue="standard">
+        <TabsList>
+          <TabsTrigger value="standard">Standard Reports</TabsTrigger>
+          <TabsTrigger value="behavior">Behavior Supports</TabsTrigger>
+        </TabsList>
+        <TabsContent value="standard" className="mt-4">
+          <StandardReports />
+        </TabsContent>
+        <TabsContent value="behavior" className="mt-4">
+          <BehaviorSupportsReport />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function StandardReports() {
   const { data: org } = useCurrentOrg();
 
   const { data: assigns } = useQuery({
@@ -58,29 +83,23 @@ function ReportsPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <h2 className="text-base font-semibold">Audit-ready reports</h2>
-        <p className="text-sm text-muted-foreground">Export compliance evidence as CSV anytime.</p>
-      </div>
-      <div className="grid gap-3">
-        {reports.map((r) => (
-          <div key={r.name} className="flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                <FileBarChart className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="font-medium">{r.name}</p>
-                <p className="text-xs text-muted-foreground">{r.desc}</p>
-              </div>
+    <div className="grid gap-3">
+      {reports.map((r) => (
+        <div key={r.name} className="flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+              <FileBarChart className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-medium">{r.name}</p>
+              <p className="text-xs text-muted-foreground">{r.desc}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => exportCsv(r.name.toLowerCase().replace(/\s+/g, "-"))}>
-              <FileDown className="mr-2 h-3.5 w-3.5" /> Download CSV
-            </Button>
           </div>
-        ))}
-      </div>
+          <Button variant="outline" size="sm" onClick={() => exportCsv(r.name.toLowerCase().replace(/\s+/g, "-"))}>
+            <FileDown className="mr-2 h-3.5 w-3.5" /> Download CSV
+          </Button>
+        </div>
+      ))}
     </div>
   );
 }

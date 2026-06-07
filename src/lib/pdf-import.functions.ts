@@ -254,11 +254,38 @@ export const extractClientFromPdf = createServerFn({ method: "POST" })
     const j = await res.json();
     const raw = j.choices?.[0]?.message?.content;
     if (!raw) throw new Error("AI returned no content");
-    let args: unknown;
-    try {
-      args = JSON.parse(raw);
-    } catch {
-      throw new Error("AI returned malformed JSON");
+    const tryParse = (s: string): unknown => {
+      try { return JSON.parse(s); } catch { return undefined; }
+    };
+    const sanitize = (s: string): string => {
+      let t = s.trim()
+        .replace(/^\uFEFF/, "")
+        .replace(/```(?:json)?\s*/gi, "")
+        .replace(/```\s*$/g, "")
+        .trim();
+      const start = t.search(/[{[]/);
+      const open = start !== -1 ? t[start] : "";
+      const close = open === "[" ? "]" : "}";
+      const end = t.lastIndexOf(close);
+      if (start !== -1 && end !== -1 && end > start) t = t.slice(start, end + 1);
+      return t
+        .replace(/,\s*}/g, "}")
+        .replace(/,\s*]/g, "]")
+        // eslint-disable-next-line no-control-regex
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+    };
+    let args: unknown = tryParse(raw) ?? tryParse(sanitize(raw));
+    if (args === undefined) {
+      // Last resort: close unbalanced braces/brackets caused by truncation.
+      let t = sanitize(raw);
+      const opens = (t.match(/[{[]/g) ?? []).length;
+      const closes = (t.match(/[}\]]/g) ?? []).length;
+      if (opens > closes) t = t + "}".repeat(opens - closes);
+      args = tryParse(t);
+    }
+    if (args === undefined || args === null || typeof args !== "object") {
+      // Don't blow up the import — fall back to an empty extraction.
+      args = {};
     }
 
     // Lenient parse — never hard-fail the whole import on a missing/null field.

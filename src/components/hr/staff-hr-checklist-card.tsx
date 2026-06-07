@@ -44,9 +44,18 @@ function maskSsn(last4: string | null) {
 export function StaffHrChecklistCard({
   organizationId,
   staffId,
+  view = "all",
+  filter = "all",
 }: {
   organizationId: string;
   staffId: string;
+  /** Section gate: render all sections (default), only PII, or only the
+   *  checklist + supporting docs/history. Pure presentational. */
+  view?: "all" | "pii" | "checklist";
+  /** Visibility filter for checklist rows — applies only inside the
+   *  Compliance Checklist section. "needs_action" = overdue + expiring +
+   *  to-do. "current" = items that are complete and not expiring. */
+  filter?: "all" | "needs_action" | "current";
 }) {
   const { user } = useAuth();
   const isSelf = user?.id === staffId;
@@ -186,8 +195,11 @@ export function StaffHrChecklistCard({
   }
 
   const pii = piiQ.data;
+  const showPii = view === "all" || view === "pii";
+  const showChecklist = view === "all" || view === "checklist";
   return (
     <div className="space-y-4">
+      {showPii && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">HR — Sensitive Information</CardTitle>
@@ -265,7 +277,10 @@ export function StaffHrChecklistCard({
           )}
         </CardContent>
       </Card>
+      )}
 
+      {showChecklist && (
+      <>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Compliance Checklist</CardTitle>
@@ -331,13 +346,53 @@ export function StaffHrChecklistCard({
                               expMs >= todayMs &&
                               expMs <= in60Ms;
                             const isNA = row.applicable === false;
+                            // Status kind drives both the visual dot and the
+                            // optional Requirements-tab filter chips.
+                            const statusKind: "na" | "current" | "expiring" | "overdue" | "todo" =
+                              isNA
+                                ? "na"
+                                : status === "complete" && !isExpired
+                                  ? "current"
+                                  : isExpired
+                                    ? "overdue"
+                                    : isSoon
+                                      ? "expiring"
+                                      : "todo";
+                            if (filter === "needs_action" && (statusKind === "current" || statusKind === "na")) {
+                              return null;
+                            }
+                            if (filter === "current" && statusKind !== "current") {
+                              return null;
+                            }
+                            const pillLabel =
+                              statusKind === "current"
+                                ? row.is_renewable
+                                  ? "Current"
+                                  : "Complete"
+                                : statusKind === "expiring"
+                                  ? "Expiring"
+                                  : statusKind === "overdue"
+                                    ? "Overdue"
+                                    : statusKind === "na"
+                                      ? "N/A"
+                                      : "To do";
+                            const pillTone =
+                              statusKind === "current"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : statusKind === "expiring"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : statusKind === "overdue"
+                                    ? "bg-rose-100 text-rose-800"
+                                    : statusKind === "na"
+                                      ? "bg-muted text-muted-foreground"
+                                      : "bg-muted text-foreground/70";
                             const dot = isNA
                               ? "bg-muted-foreground/40"
-                              : status === "complete" && !isExpired
+                              : statusKind === "current"
                                 ? "bg-emerald-500"
-                                : status === "in_progress" || isSoon
+                                : statusKind === "expiring" || status === "in_progress"
                                   ? "bg-amber-500"
-                                  : isExpired
+                                  : statusKind === "overdue"
                                     ? "bg-rose-500"
                                     : "bg-muted";
                             if (isNA) {
@@ -374,7 +429,12 @@ export function StaffHrChecklistCard({
                                       className={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`}
                                     />
                                     <div className="min-w-0">
-                                      <div className="font-medium">{row.title}</div>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-medium">{row.title}</span>
+                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pillTone}`}>
+                                          {pillLabel}
+                                        </span>
+                                      </div>
                                       <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
                                         {row.checklist_layer && (
                                           <Badge
@@ -606,6 +666,8 @@ export function StaffHrChecklistCard({
           )}
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

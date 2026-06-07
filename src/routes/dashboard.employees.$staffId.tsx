@@ -404,13 +404,16 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
     queryFn: async () => {
       const { data } = await supabase
         .from("evv_timesheets")
-        .select("id, status, clock_in_timestamp, clock_out_timestamp, units, service_code, client_id")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, status, clock_in_timestamp, clock_out_timestamp" as any)
         .eq("organization_id", organizationId)
         .eq("staff_id", staffId)
         .order("clock_in_timestamp", { ascending: false })
         .limit(100);
-      return data ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as Array<any>;
     },
+  });
   });
 
   const formsQ = useQuery({
@@ -425,7 +428,8 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
         .eq("submitted_by", staffId)
         .order("submitted_at", { ascending: false, nullsFirst: false })
         .limit(100);
-      return data ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as Array<any>;
     },
   });
 

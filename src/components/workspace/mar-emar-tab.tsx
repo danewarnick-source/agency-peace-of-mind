@@ -1166,20 +1166,32 @@ export function MarEmarTab({
 
   const passes = useMemo(() => {
     const rows: {
-      med: Medication; time: string; iso: string; block: Block; log: EmarLog | undefined;
+      med: Medication; time: string; iso: string; block: Block;
+      history: EmarLog[]; log: EmarLog | undefined; isLocked: boolean;
     }[] = [];
     meds.forEach((med) => {
       med.scheduled_times.forEach((t) => {
         const iso = isoForToday(t);
-        const log = todayLogs.find((l) =>
-          l.medication_id === med.id &&
-          Math.abs(new Date(l.scheduled_for).getTime() - new Date(iso).getTime()) < 60_000
-        );
-        rows.push({ med, time: t, iso, block: blockFor(t), log });
+        const history = todayLogs
+          .filter((l) =>
+            l.medication_id === med.id &&
+            Math.abs(new Date(l.scheduled_for).getTime() - new Date(iso).getTime()) < 60_000,
+          )
+          .sort((a, b) =>
+            (a.created_at ?? "").localeCompare(b.created_at ?? ""),
+          );
+        const latest = history[history.length - 1];
+        rows.push({
+          med, time: t, iso, block: blockFor(t),
+          history, log: latest, isLocked: latest?.status === "administered",
+        });
       });
       // PRN medications get a "log now" entry even without a scheduled time
       if (med.is_prn && med.scheduled_times.length === 0) {
-        rows.push({ med, time: "PRN", iso: new Date().toISOString(), block: "Morning", log: undefined });
+        rows.push({
+          med, time: "PRN", iso: new Date().toISOString(), block: "Morning",
+          history: [], log: undefined, isLocked: false,
+        });
       }
     });
     return rows;
@@ -1194,7 +1206,7 @@ export function MarEmarTab({
     return m;
   }, [passes]);
 
-  const pendingCount = passes.filter((p) => !p.log).length;
+  const pendingCount = passes.filter((p) => !p.isLocked).length;
   const errorCount = todayLogs.filter((l) => l.is_medication_error && !l.admin_reviewed).length;
 
   // ── Submit administration ────────────────────────────────────────────────────

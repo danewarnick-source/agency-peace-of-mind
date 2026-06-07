@@ -121,10 +121,8 @@ function downloadCsv(filename: string, csv: string) {
 
 export function TrainingRecordsAdmin() {
   const { data: org } = useCurrentOrg();
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "completed" | "in_progress" | "not_started"
-  >("all");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalUserId, setModalUserId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const [selectedTypes, setSelectedTypes] = useState<Set<TrainingType>>(
@@ -274,7 +272,7 @@ export function TrainingRecordsAdmin() {
     });
   }, [members, topics, progressAll, personModules]);
 
-  const selectedMember = members?.find((m) => m.id === selectedUserId);
+  
 
   const selectAllStaff = () => {
     setSelectedStaffIds(new Set(filteredMembers.map((m) => m.id)));

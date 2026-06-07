@@ -194,6 +194,7 @@ export function StaffHrChecklistCard({
     );
   }
 
+  const pii = piiQ.data;
   const showPii = view === "all" || view === "pii";
   const showChecklist = view === "all" || view === "checklist";
   return (

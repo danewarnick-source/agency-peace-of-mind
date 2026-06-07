@@ -323,7 +323,7 @@ export function AiPdfImporter({
             <>
               <Sparkles className="h-10 w-10 text-primary" />
               <div>
-                <p className="font-medium">Drop a PCSP PDF to fill the entire client profile</p>
+                <p className="font-medium">Drop a PCSP, roster, or assessment — PDF or DOCX</p>
                 <p className="text-xs text-muted-foreground">
                   NECTAR extracts every field present in the document and prompts you to create new sections
                   for anything that doesn't have a matching field. Nothing is ever invented.
@@ -331,13 +331,13 @@ export function AiPdfImporter({
               </div>
               <Label htmlFor="ai-pdf-file" className="cursor-pointer">
                 <span className="inline-flex h-11 min-w-[44px] items-center gap-2 rounded-md border border-primary/40 bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
-                  <Upload className="h-4 w-4" /> Browse PDF
+                  <Upload className="h-4 w-4" /> Browse file
                 </span>
                 <input
                   id="ai-pdf-file"
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,application/pdf"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];

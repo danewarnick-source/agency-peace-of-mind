@@ -49,7 +49,7 @@ export function BehaviorsPanel({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bc_behaviors")
-        .select("id, name, operational_definition, data_method, bsp_citation, expected_cadence, status, source")
+        .select("id, name, operational_definition, data_method, bsp_citation, expected_cadence, status, source, last_logged_at")
         .eq("client_id", clientId)
         .order("created_at", { ascending: true });
       if (error) throw error;

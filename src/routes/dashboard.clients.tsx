@@ -1400,7 +1400,7 @@ function ProfileTab({
           kind="client"
           id={client.id}
           fullName={`${client.first_name} ${client.last_name}`.trim()}
-          organizationId={undefined}
+          organizationId={client.organization_id}
         />
       </div>
     </div>

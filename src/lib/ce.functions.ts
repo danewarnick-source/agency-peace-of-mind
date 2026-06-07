@@ -549,7 +549,18 @@ export const ensureCurrentCeModule = createServerFn({ method: "POST" })
 
     const existQ = await supabase.from("ce_modules").select("*").eq("staff_id", userId).eq("period", period).maybeSingle();
     const existing = existQ.data as CeModule | null;
-    if (existing && existing.status !== "failed" && (existing.steps as unknown[]).length > 0) return existing;
+    const existingStepCount = existing ? (existing.steps as unknown[]).length : 0;
+    // If a previously-generated module is below the 30-slide floor and wasn't
+    // flagged material_short, regenerate it (and reset progress so the staff
+    // member doesn't land mid-way through a different deck).
+    const flaggedShort = (existing?.source_summary ?? "").includes("Authoritative sources couldn't produce");
+    const needsRegen =
+      !!existing &&
+      existing.status !== "completed" &&
+      existingStepCount > 0 &&
+      existingStepCount < 30 &&
+      !flaggedShort;
+    if (existing && existing.status !== "failed" && existingStepCount > 0 && !needsRegen) return existing;
 
     // Ensure org settings row exists; default demo_mode=false.
     await supabase.from("ce_settings").upsert(

@@ -244,6 +244,7 @@ function EmployeesPage() {
           start_date: input.startDate || null,
           end_date: input.endDate || null,
           hire_date: input.startDate || null,
+          ce_suggested_topics: input.ceSuggestedTopics ?? [],
         } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;

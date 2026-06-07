@@ -429,7 +429,12 @@ export function StaffHrChecklistCard({
                                       className={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`}
                                     />
                                     <div className="min-w-0">
-                                      <div className="font-medium">{row.title}</div>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-medium">{row.title}</span>
+                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pillTone}`}>
+                                          {pillLabel}
+                                        </span>
+                                      </div>
                                       <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
                                         {row.checklist_layer && (
                                           <Badge

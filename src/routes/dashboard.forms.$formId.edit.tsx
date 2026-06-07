@@ -67,6 +67,8 @@ function EditForm() {
     setSchedule(f.schedule ?? {});
     setGroups(f.assigned_groups ?? []);
     setUsers(f.assigned_users ?? []);
+    setAllClients(f.all_clients ?? true);
+    setClients(f.assigned_clients ?? []);
     setSettings(f.settings ?? {});
   }, [data]);
 

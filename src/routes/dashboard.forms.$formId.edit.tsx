@@ -46,6 +46,8 @@ function EditForm() {
   const [schedule, setSchedule] = useState<Schedule>({});
   const [groups, setGroups] = useState<string[]>([]);
   const [users, setUsers] = useState<string[]>([]);
+  const [allClients, setAllClients] = useState<boolean>(true);
+  const [clients, setClients] = useState<string[]>([]);
   const [settings, setSettings] = useState<FormSettings>({});
   const [isNectarDraft, setIsNectarDraft] = useState(false);
 

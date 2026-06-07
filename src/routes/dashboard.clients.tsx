@@ -1388,14 +1388,16 @@ function ProfileTab({
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-5">
 
-        {/* Identity */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Identity & Contact
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        {/* Identity & contact — expanded by default */}
+        <CollapsibleCard
+          title="Identity & contact"
+          description="Core facts: name, Medicaid ID, DOB, phone, service address."
+          icon={User}
+          defaultOpen
+          storageKey={`${client.id}:identity`}
+          summary={`${client.first_name} ${client.last_name}${client.medicaid_id ? ` · ${client.medicaid_id}` : ""}`}
+        >
+          <div className="space-y-4">
             <div className="flex items-center gap-4 mb-4">
               <div className="relative group">
                 <button
@@ -1485,18 +1487,18 @@ function ProfileTab({
                 Auto-geocoded via OpenStreetMap on save. Used as the EVV clock-in reference point.
               </p>
             </div>
-            {/* Per-section NECTAR import removed — use the NECTAR Bulk Import button (AI PDF mode) to auto-fill the whole profile. */}
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
 
-        {/* Emergency contact */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Emergency Contact
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
+        {/* Emergency contact — collapsed by default */}
+        <CollapsibleCard
+          title="Emergency contact"
+          description="Who to call if something goes wrong on shift."
+          icon={Contact2}
+          storageKey={`${client.id}:emergency`}
+          summary={ecName.trim() ? `${ecName.trim()}${ecPhone.trim() ? ` · ${ecPhone.trim()}` : ""}` : "Not set"}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="grid gap-1.5">
               <Label className="text-xs font-semibold">Contact Name</Label>
               <Input value={ecName} onChange={(e) => setEcName(e.target.value)}
@@ -1507,28 +1509,25 @@ function ProfileTab({
               <Input value={ecPhone} onChange={(e) => setEcPhone(e.target.value)}
                 placeholder="(801) 555-0100" maxLength={30} />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
 
-        {/* Clinical alert — the one colored callout on Profile */}
-        <Card className="border-amber-500/60 bg-amber-50/60 dark:bg-amber-950/20">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <CardTitle className="text-base font-medium text-amber-900 dark:text-amber-100">
-                Clinical alert
-              </CardTitle>
-              {specialDir.trim() && (
-                <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">
-                  Active
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
-              High-priority clinical notices displayed prominently to staff in the client workspace.
-            </p>
+        {/* Clinical alert — the one colored callout on Profile; expanded by default */}
+        <CollapsibleCard
+          title="Clinical alert"
+          description="High-priority clinical notices displayed prominently to staff in the client workspace."
+          icon={AlertTriangle}
+          tone="amber"
+          defaultOpen
+          storageKey={`${client.id}:alert`}
+          summary={specialDir.trim() ? "Active" : "None set"}
+        >
+          <div className="space-y-2">
+            {specialDir.trim() && (
+              <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">
+                Active
+              </Badge>
+            )}
             <Textarea
               value={specialDir}
               onChange={(e) => setSpecialDir(e.target.value)}
@@ -1536,29 +1535,19 @@ function ProfileTab({
               placeholder="Example: CHOKING RISK — All meds crushed with applesauce; seated upright at 90°."
               className="text-sm bg-white/70 dark:bg-amber-950/40"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
 
-        {/* Client documents */}
-        <ClientDocumentsCard
-          clientId={client.id}
-          clientName={`${client.first_name} ${client.last_name}`.trim()}
-        />
-      </div>
-
-      {/* Right column — geofence + meta */}
-      <div className="space-y-5">
-        {/* EVV Geofence + approved locations */}
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base font-medium text-primary">
-                Service address & geofence
-              </CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        {/* Service address & geofence + approved locations — collapsed by default */}
+        <CollapsibleCard
+          title="Service address & approved locations"
+          description="EVV clock-in radius and the list of approved alternate locations."
+          icon={MapPin}
+          tone="primary"
+          storageKey={`${client.id}:geofence`}
+          summary={`${radius.toLocaleString()} ft radius`}
+        >
+          <div className="space-y-3">
             <Label className="text-xs font-semibold">Maximum clock-in radius</Label>
             <Select value={String(radius)} onValueChange={(v) => setRadius(Number(v))}>
               <SelectTrigger className="h-10">
@@ -1574,20 +1563,36 @@ function ProfileTab({
               Caregivers clocking in beyond this distance from the service address must submit a
               variance justification.
             </p>
-            <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
               <p className="text-[11px] font-semibold text-primary">Current: {radius.toLocaleString()} ft</p>
             </div>
-
-            <div className="mt-4 border-t border-primary/20 pt-3">
+            <div className="mt-3 border-t border-primary/20 pt-3">
               <ApprovedLocationsEditor
                 clientId={client.id}
                 organizationId={orgId}
                 canEdit={true}
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
 
+        {/* Client documents — collapsed by default */}
+        <CollapsibleCard
+          title="Client documents"
+          description="Uploaded PDFs, scans, and other files attached to this client."
+          icon={FileText}
+          storageKey={`${client.id}:documents`}
+          summary="View & manage documents"
+        >
+          <ClientDocumentsCard
+            clientId={client.id}
+            clientName={`${client.first_name} ${client.last_name}`.trim()}
+          />
+        </CollapsibleCard>
+      </div>
+
+      {/* Right column — meta only */}
+      <div className="space-y-5">
         {/* Client record info (meta) */}
         <Card className="border-border/60 bg-muted/20">
           <CardHeader className="pb-2">
@@ -1617,21 +1622,23 @@ function ProfileTab({
             </div>
           </CardContent>
         </Card>
-
-        {/* Custom attributes — collapsed by default */}
-        <CollapsibleCard
-          title="Custom attributes"
-          description="Agency-specific fields, including any imported from a PCSP."
-          icon={Sparkles}
-        >
-          <CustomAttributesSection
-            organizationId={orgId}
-            entityKind="client"
-            entityId={client.id}
-          />
-        </CollapsibleCard>
       </div>
     </div>
+
+    {/* Custom attributes — full-width, first-class section, collapsed by default */}
+    <CollapsibleCard
+      title="Custom attributes"
+      description="Agency-specific fields, including any imported from a PCSP."
+      icon={Sparkles}
+      storageKey={`${client.id}:custom-attrs`}
+      summary="Agency-specific fields"
+    >
+      <CustomAttributesSection
+        organizationId={orgId}
+        entityKind="client"
+        entityId={client.id}
+      />
+    </CollapsibleCard>
 
     {/* Danger zone — quiet, at the very bottom */}
     <div className="mt-6 border-t border-border/60 pt-4">

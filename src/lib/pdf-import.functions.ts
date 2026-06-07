@@ -10,68 +10,102 @@ const ExtractInput = z.object({
   pdfBase64: z.string().min(100),
 });
 
+// Lenient helpers: never reject because a field came back null/missing.
+// Arrays coerce null/undefined/non-array → []. Strings coerce null/undefined → "".
+const lenientArray = <T extends z.ZodTypeAny>(item: T) =>
+  z.preprocess((v) => (Array.isArray(v) ? v : []), z.array(item).catch([]));
+const lenientString = () =>
+  z.preprocess(
+    (v) => (v == null ? "" : typeof v === "string" ? v : String(v)),
+    z.string().catch(""),
+  );
+const lenientOptionalString = () =>
+  z.preprocess(
+    (v) => (v == null || v === "" ? null : typeof v === "string" ? v : String(v)),
+    z.string().nullable().catch(null),
+  );
+const lenientOptionalNumber = () =>
+  z.preprocess(
+    (v) => {
+      if (v == null || v === "") return null;
+      if (typeof v === "number") return Number.isFinite(v) ? v : null;
+      if (typeof v === "string") {
+        const n = Number(v.replace(/[$,]/g, ""));
+        return Number.isFinite(n) ? n : null;
+      }
+      return null;
+    },
+    z.number().nullable().catch(null),
+  );
+const lenientOptionalBool = () =>
+  z.preprocess(
+    (v) => (typeof v === "boolean" ? v : v == null ? false : !!v),
+    z.boolean().catch(false),
+  );
+
 const BillingCodeRow = z.object({
-  service_code: z.string(),
-  rate_per_unit: z.number().nullable().optional(),
-  annual_units: z.number().nullable().optional(),
-  monthly_max_units: z.number().nullable().optional(),
-  service_start_date: z.string().nullable().optional(),
-  service_end_date: z.string().nullable().optional(),
+  service_code: lenientString(),
+  rate_per_unit: lenientOptionalNumber(),
+  annual_units: lenientOptionalNumber(),
+  monthly_max_units: lenientOptionalNumber(),
+  service_start_date: lenientOptionalString(),
+  service_end_date: lenientOptionalString(),
 });
 
 const MedicationRow = z.object({
-  medication_name: z.string(),
-  dosage: z.string().nullable().optional(),
-  route: z.string().nullable().optional(),
-  frequency: z.string().nullable().optional(),
-  scheduled_times: z.array(z.string()).default([]),
-  instructions: z.string().nullable().optional(),
-  prescriber: z.string().nullable().optional(),
-  is_prn: z.boolean().optional(),
-  prn_instructions: z.string().nullable().optional(),
+  medication_name: lenientString(),
+  dosage: lenientOptionalString(),
+  route: lenientOptionalString(),
+  frequency: lenientOptionalString(),
+  // PRN / as-needed meds legitimately have no scheduled clock times.
+  scheduled_times: lenientArray(z.string()),
+  instructions: lenientOptionalString(),
+  prescriber: lenientOptionalString(),
+  is_prn: lenientOptionalBool(),
+  prn_instructions: lenientOptionalString(),
 });
 
 const AdditionalSection = z.object({
-  label: z.string().min(1).max(120),
-  content: z.string().min(1).max(8000),
+  label: lenientString(),
+  content: lenientString(),
 });
 
 const ExtractedSchema = z.object({
   // Identity
-  first_name: z.string().default(""),
-  last_name: z.string().default(""),
-  preferred_name: z.string().nullable().optional(),
-  medicaid_id: z.string().default(""),
-  date_of_birth: z.string().default(""),
+  first_name: lenientString(),
+  last_name: lenientString(),
+  preferred_name: lenientOptionalString(),
+  medicaid_id: lenientString(),
+  date_of_birth: lenientString(),
   // Contact
-  phone_number: z.string().nullable().optional(),
-  physical_address: z.string().nullable().optional(),
+  phone_number: lenientOptionalString(),
+  physical_address: lenientOptionalString(),
   // Guardian / legal
-  guardian_name: z.string().nullable().optional(),
-  guardian_phone: z.string().nullable().optional(),
-  guardian_relationship: z.string().nullable().optional(),
-  guardian_legal_status: z.string().nullable().optional(),
+  guardian_name: lenientOptionalString(),
+  guardian_phone: lenientOptionalString(),
+  guardian_relationship: lenientOptionalString(),
+  guardian_legal_status: lenientOptionalString(),
   // Emergency contacts
-  emergency_contact_name: z.string().nullable().optional(),
-  emergency_contact_phone: z.string().nullable().optional(),
-  emergency_contact_secondary_name: z.string().nullable().optional(),
-  emergency_contact_secondary_phone: z.string().nullable().optional(),
+  emergency_contact_name: lenientOptionalString(),
+  emergency_contact_phone: lenientOptionalString(),
+  emergency_contact_secondary_name: lenientOptionalString(),
+  emergency_contact_secondary_phone: lenientOptionalString(),
   // Authorized services
-  authorized_codes: z.array(z.string()).default([]),
-  billing_codes: z.array(BillingCodeRow).default([]),
+  authorized_codes: lenientArray(z.string()),
+  billing_codes: lenientArray(BillingCodeRow),
   // Medications
-  medications: z.array(MedicationRow).default([]),
+  medications: lenientArray(MedicationRow),
   // Goals
-  pcsp_goals: z.array(z.string()).default([]),
-  // Clinical alerts (rolled into clients.special_directions as a single block)
-  special_directions: z.string().nullable().optional(),
+  pcsp_goals: lenientArray(z.string()),
+  // Clinical alerts
+  special_directions: lenientOptionalString(),
   // Behavior
-  bc_tier: z.string().nullable().optional(),
-  assigned_behaviorist: z.string().nullable().optional(),
-  // Prompting (informational)
-  prompting_levels: z.array(z.string()).default([]),
-  // Unmapped — present to admin as create-new-section prompts
-  additional_sections: z.array(AdditionalSection).default([]),
+  bc_tier: lenientOptionalString(),
+  assigned_behaviorist: lenientOptionalString(),
+  // Prompting
+  prompting_levels: lenientArray(z.string()),
+  // Unmapped
+  additional_sections: lenientArray(AdditionalSection),
 });
 export type ExtractedClient = z.infer<typeof ExtractedSchema>;
 
@@ -227,7 +261,11 @@ export const extractClientFromPdf = createServerFn({ method: "POST" })
       throw new Error("AI returned malformed JSON");
     }
 
-    const parsed = ExtractedSchema.parse(args);
+    // Lenient parse — never hard-fail the whole import on a missing/null field.
+    const safe = ExtractedSchema.safeParse(args);
+    const parsed: ExtractedClient = safe.success
+      ? safe.data
+      : ExtractedSchema.parse({}); // schema has defaults everywhere
 
     // Sanitize codes against allow-list
     const allow = new Set(EVV_SERVICE_CODES.map((c) => c.code));
@@ -235,19 +273,28 @@ export const extractClientFromPdf = createServerFn({ method: "POST" })
       new Set(parsed.authorized_codes.map((c) => c.trim().toUpperCase()).filter((c) => allow.has(c))),
     );
     parsed.billing_codes = parsed.billing_codes
-      .map((r) => ({ ...r, service_code: r.service_code.trim().toUpperCase() }))
+      .map((r) => ({ ...r, service_code: (r.service_code || "").trim().toUpperCase() }))
       .filter((r) => allow.has(r.service_code));
-    // Merge billing_codes' service codes into authorized_codes
     for (const b of parsed.billing_codes) {
       if (!parsed.authorized_codes.includes(b.service_code)) {
         parsed.authorized_codes.push(b.service_code);
       }
     }
 
+    // Drop medications without a name; keep PRN/as-needed rows even with empty scheduled_times.
+    parsed.medications = parsed.medications
+      .filter((m) => (m.medication_name || "").trim().length > 0)
+      .map((m) => ({ ...m, scheduled_times: Array.isArray(m.scheduled_times) ? m.scheduled_times : [] }));
+
+    // Drop empty additional_sections rather than failing on them.
+    parsed.additional_sections = parsed.additional_sections.filter(
+      (s) => (s.label || "").trim().length > 0 && (s.content || "").trim().length > 0,
+    );
+
     parsed.pcsp_goals = Array.from(
       new Set(parsed.pcsp_goals.map((g) => g.trim()).filter((g) => g.length > 2)),
     ).slice(0, 25);
-    parsed.medicaid_id = parsed.medicaid_id.replace(/\D+/g, "");
+    parsed.medicaid_id = (parsed.medicaid_id || "").replace(/\D+/g, "");
 
     return parsed;
   });

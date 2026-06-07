@@ -630,9 +630,30 @@ function ClientWorkspace({
   );
 }
 
-// ─── Care section shell ───────────────────────────────────────────────────────
+// ─── Session-scoped expand/collapse memory ───────────────────────────────────
+function useSessionToggle(key: string | undefined, defaultOpen: boolean) {
+  const [open, setOpen] = useState<boolean>(() => {
+    if (!key || typeof window === "undefined") return defaultOpen;
+    try {
+      const v = window.sessionStorage.getItem(`clients:section:${key}`);
+      return v == null ? defaultOpen : v === "1";
+    } catch {
+      return defaultOpen;
+    }
+  });
+  useEffect(() => {
+    if (!key || typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(`clients:section:${key}`, open ? "1" : "0");
+    } catch { /* ignore */ }
+  }, [key, open]);
+  return [open, setOpen] as const;
+}
+
+// ─── Care section shell (collapsible) ────────────────────────────────────────
 function CareSectionShell({
   title, description, linkTo, linkParams, linkLabel, children, icon: Icon,
+  summary, defaultOpen = false, storageKey,
 }: {
   title: string;
   description: string;
@@ -643,17 +664,36 @@ function CareSectionShell({
   children: React.ReactNode;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon?: any;
+  summary?: string;
+  defaultOpen?: boolean;
+  storageKey?: string;
 }) {
+  const [open, setOpen] = useSessionToggle(storageKey, defaultOpen);
   return (
     <section className="rounded-xl border border-border/60 bg-card p-1">
       <header className="flex flex-col gap-2 px-4 pt-4 pb-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-start gap-2.5">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex flex-1 items-start gap-2.5 text-left min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-md -mx-1 px-1"
+        >
+          <ChevronRight
+            className={`mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}
+          />
           {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />}
-          <div>
-            <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+              {!open && summary && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {summary}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">{description}</p>
           </div>
-        </div>
+        </button>
         <Button asChild variant="ghost" size="sm" className="gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground md:self-auto">
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           <Link to={linkTo as any} params={linkParams as any}>
@@ -661,14 +701,15 @@ function CareSectionShell({
           </Link>
         </Button>
       </header>
-      <div className="px-4 pb-4">{children}</div>
+      {open && <div className="px-4 pb-4">{children}</div>}
     </section>
   );
 }
 
-// ─── Collapsible card (for rarely-edited blocks) ──────────────────────────────
+// ─── Collapsible card (generic) ──────────────────────────────────────────────
 function CollapsibleCard({
   title, description, icon: Icon, children, defaultOpen = false,
+  summary, storageKey, tone = "default",
 }: {
   title: string;
   description?: string;
@@ -676,23 +717,48 @@ function CollapsibleCard({
   icon?: any;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  summary?: string;
+  storageKey?: string;
+  tone?: "default" | "amber" | "primary";
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useSessionToggle(storageKey, defaultOpen);
+  const toneClasses =
+    tone === "amber"
+      ? "border-amber-500/60 bg-amber-50/60 dark:bg-amber-950/20"
+      : tone === "primary"
+        ? "border-primary/20 bg-primary/5"
+        : "border-border/60 bg-card";
+  const iconColor =
+    tone === "amber" ? "text-amber-600"
+      : tone === "primary" ? "text-primary"
+        : "text-[#137182]";
+  const titleColor =
+    tone === "amber" ? "text-amber-900 dark:text-amber-100"
+      : tone === "primary" ? "text-primary"
+        : "text-[#0B1126]";
   return (
-    <section className="rounded-xl border border-border/60 bg-card">
+    <section className={`rounded-xl border ${toneClasses}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl"
       >
-        <div className="flex items-start gap-2.5">
-          {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />}
-          <div>
-            <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+          {Icon && <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${iconColor}`} />}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className={`text-base font-medium ${titleColor}`}>{title}</h3>
+              {!open && summary && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {summary}
+                </span>
+              )}
+            </div>
             {description && <p className="text-xs text-muted-foreground">{description}</p>}
           </div>
         </div>
-        <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+        <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
       {open && <div className="px-4 pb-4">{children}</div>}
     </section>

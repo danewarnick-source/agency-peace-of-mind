@@ -186,7 +186,7 @@ function StaffList() {
               className="block rounded-lg border border-border bg-card p-4 hover:bg-muted/40 min-h-[44px]">
               <p className="font-semibold truncate">{f.name}</p>
               <p className="text-xs text-muted-foreground">As needed</p>
-              <Button size="sm" className="mt-3 min-h-[40px]">Start</Button>
+              <Button size="sm" className="mt-3 min-h-[40px]"><Send className="mr-1.5 h-3.5 w-3.5" /> Complete form</Button>
             </Link>
           ))}
           {buckets.anytime.length === 0 && <Empty>No anytime forms assigned.</Empty>}

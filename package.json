@@ -56,6 +56,7 @@
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.575.0",
+    "mammoth": "^1.12.0",
     "nitro": "3.0.260429-beta",
     "papaparse": "^5.5.3",
     "react": "^19.2.0",

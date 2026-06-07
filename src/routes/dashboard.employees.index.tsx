@@ -364,22 +364,26 @@ function EmployeesPage() {
                   <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
 
                   <td className="p-4 text-right whitespace-nowrap">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingMember({
-                      membershipId: m.id,
-                      userId: m.user_id,
-                      fullName: m.profile?.full_name ?? "",
-                      email: m.profile?.email ?? "",
-                      employeeId: m.profile?.employee_id ?? "",
-                      role: m.role as Role,
-                      active: m.active,
-                      position,
-                      workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
-                      hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
-                      dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
-                      startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
-                      endDate: (m.profile?.end_date ?? "") as string,
-                      ceSuggestedTopics: ((m.profile as { ce_suggested_topics?: string[] | null } | undefined)?.ce_suggested_topics ?? []) as string[],
-                    })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      const topics = ((m.profile as { ce_suggested_topics?: string[] | null } | undefined)?.ce_suggested_topics ?? []) as string[];
+                      setEditTopics(topics);
+                      setEditingMember({
+                        membershipId: m.id,
+                        userId: m.user_id,
+                        fullName: m.profile?.full_name ?? "",
+                        email: m.profile?.email ?? "",
+                        employeeId: m.profile?.employee_id ?? "",
+                        role: m.role as Role,
+                        active: m.active,
+                        position,
+                        workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
+                        hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
+                        dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
+                        startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
+                        endDate: (m.profile?.end_date ?? "") as string,
+                        ceSuggestedTopics: topics,
+                      });
+                    }}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
                       <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload
                     </Button>

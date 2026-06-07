@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { ChevronLeft, Send, Loader2 } from "lucide-react";
 import { getStaffForm, submitForm } from "@/lib/forms.functions";
 import { FieldRenderer } from "@/components/forms/field-renderer";
-import type { FormField } from "@/lib/forms-utils";
+import { type FormField, isFieldVisible } from "@/lib/forms-utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/forms/$formId/fill")({

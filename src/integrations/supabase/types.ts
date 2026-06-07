@@ -6469,39 +6469,6 @@ export type Database = {
         }
         Relationships: []
       }
-      staff_certifications: {
-        Row: {
-          certification: string
-          created_at: string
-          expiration_date: string | null
-          id: string
-          issued_date: string | null
-          role: string | null
-          staff_name: string
-          status: string
-        }
-        Insert: {
-          certification: string
-          created_at?: string
-          expiration_date?: string | null
-          id?: string
-          issued_date?: string | null
-          role?: string | null
-          staff_name: string
-          status?: string
-        }
-        Update: {
-          certification?: string
-          created_at?: string
-          expiration_date?: string | null
-          id?: string
-          issued_date?: string | null
-          role?: string | null
-          staff_name?: string
-          status?: string
-        }
-        Relationships: []
-      }
       staff_checklist_completion: {
         Row: {
           auto_checked_at: string | null

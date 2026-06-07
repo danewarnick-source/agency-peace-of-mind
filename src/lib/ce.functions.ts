@@ -181,12 +181,19 @@ function validateSteps(steps: unknown): CeStep[] {
   const lessons = out.filter((s) => s.type === "lesson").length;
   const checks = out.filter((s) => s.type === "check").length;
   const reflects = out.filter((s) => s.type === "reflect").length;
-  // Soft floor — if sources are thin, the AI may emit fewer than 5 pairs
-  // (admin is flagged separately). Always require some teaching + a reflection.
+  const totalSlides = out.length;
+  // 30-slide / ~60-minute floor (≈2 minutes per slide). When sources are
+  // genuinely thin the AI sets material_short=true and the caller treats it
+  // as a hold-and-flag — we still require minimum teaching shape here.
   if (lessons < 3) throw new Error(`Module floor not met: needs ≥3 lessons (got ${lessons}).`);
   if (checks < 3) throw new Error(`Module floor not met: needs ≥3 scenario checks (got ${checks}).`);
   if (reflects !== 1) throw new Error("Module must end with exactly one reflection.");
   return out;
+}
+
+/** True when the generated module reaches the 30-slide / ~60-minute floor. */
+function meetsFullHourFloor(steps: CeStep[]): boolean {
+  return steps.length >= 30;
 }
 
 // ──────────────── Nectar AI call ───────────────────────────────────────────

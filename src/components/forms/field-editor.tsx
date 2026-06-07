@@ -116,11 +116,98 @@ export function FieldEditor({
             <Checkbox checked={!!field.required} onCheckedChange={(c) => patch({ required: !!c })} />
             Required
           </label>
+
+          <ConditionEditor
+            condition={field.condition ?? null}
+            eligibleControllers={eligibleControllers}
+            onChange={(c) => patch({ condition: c })}
+          />
         </>
       )}
     </div>
   );
 }
+
+function ConditionEditor({
+  condition, eligibleControllers, onChange,
+}: {
+  condition: FieldCondition;
+  eligibleControllers: { field: FormField; index: number }[];
+  onChange: (c: FieldCondition) => void;
+}) {
+  const enabled = !!condition;
+  const ctrl = condition ? eligibleControllers.find((c) => c.field.id === condition.fieldId) : null;
+  const ops = ctrl ? operatorsFor(ctrl.field.type) : [];
+  const needsValue = condition && condition.operator !== "answered" && condition.operator !== "not_answered";
+
+  return (
+    <div className="rounded-md border border-dashed border-border bg-muted/30 p-2 space-y-2">
+      <label className="flex items-center gap-2 text-xs min-h-[36px]">
+        <Checkbox
+          checked={enabled}
+          disabled={eligibleControllers.length === 0}
+          onCheckedChange={(c) => {
+            if (!c) return onChange(null);
+            const first = eligibleControllers[0];
+            if (!first) return;
+            const op = operatorsFor(first.field.type)[0].value;
+            onChange({ fieldId: first.field.id, operator: op, value: "" });
+          }}
+        />
+        <GitBranch className="h-3.5 w-3.5" />
+        <span className="font-medium">Show this field only if…</span>
+        {eligibleControllers.length === 0 && <span className="text-muted-foreground">(add a question above first)</span>}
+      </label>
+      {enabled && condition && ctrl && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <select
+            className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+            value={condition.fieldId}
+            onChange={(e) => {
+              const f = eligibleControllers.find((c) => c.field.id === e.target.value);
+              if (!f) return;
+              onChange({ fieldId: f.field.id, operator: operatorsFor(f.field.type)[0].value, value: "" });
+            }}
+          >
+            {eligibleControllers.map((c) => (
+              <option key={c.field.id} value={c.field.id}>Q{c.index + 1}: {c.field.label.slice(0, 40)}</option>
+            ))}
+          </select>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+            value={condition.operator}
+            onChange={(e) => onChange({ ...condition, operator: e.target.value as typeof condition.operator })}
+          >
+            {ops.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          {needsValue && (
+            ctrl.field.type === "dropdown" || ctrl.field.type === "checkboxes" || ctrl.field.type === "yes_no" ? (
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+                value={String(condition.value ?? "")}
+                onChange={(e) => onChange({ ...condition, value: e.target.value })}
+              >
+                <option value="">Select…</option>
+                {(ctrl.field.type === "yes_no" ? ["Yes", "No"] : (ctrl.field.options ?? [])).map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                type={ctrl.field.type === "number" || ctrl.field.type === "rating" ? "number" : "text"}
+                value={String(condition.value ?? "")}
+                onChange={(e) => onChange({ ...condition, value: ctrl.field.type === "number" || ctrl.field.type === "rating" ? Number(e.target.value) : e.target.value })}
+                className="h-9 text-xs"
+                placeholder="Value"
+              />
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 export const TYPE_LABEL: Record<FieldType, string> = {
   section: "Section / instructions",

@@ -178,28 +178,42 @@ export const extractClientFromPdf = createServerFn({ method: "POST" })
       throw new Error("Could not read any text from this PDF (it may be a scanned image).");
     }
 
-    const truncated = pdfText.slice(0, 120_000);
+    const truncated = pdfText.slice(0, 60_000);
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `${USER_INSTRUCTIONS}\n\n--- DOCUMENT TEXT START ---\n${truncated}\n--- DOCUMENT TEXT END ---`,
-          },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55_000);
+    let res: Response;
+    try {
+      res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: `${USER_INSTRUCTIONS}\n\n--- DOCUMENT TEXT START ---\n${truncated}\n--- DOCUMENT TEXT END ---`,
+            },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
+    } catch (e) {
+      clearTimeout(timeoutId);
+      if ((e as { name?: string })?.name === "AbortError") {
+        throw new Error("AI request timed out. Please try again — large PCSPs may need a retry.");
+      }
+      throw e;
+    }
+    clearTimeout(timeoutId);
 
     if (!res.ok) {
       const t = await res.text();
       if (res.status === 429) throw new Error("AI rate limit — try again shortly.");
       if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Lovable AI.");
+      if (res.status === 504 || res.status === 524) throw new Error("AI request timed out. Please try again.");
       throw new Error(`AI gateway error: ${res.status} ${t.slice(0, 200)}`);
     }
 

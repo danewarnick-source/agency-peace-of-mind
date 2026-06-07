@@ -420,20 +420,26 @@ export function AiPdfImporter({
         </Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr,1.4fr]">
-        {/* Left: file preview */}
-        <div className="rounded-lg border border-primary/20 bg-muted/30">
-          <div className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
-            <FileText className="h-3.5 w-3.5" /> {fileObj?.name || "PCSP"}
-          </div>
-          <iframe
-            title="PCSP preview"
-            src={pdfUrl}
-            className="h-[70vh] w-full rounded-b-lg bg-background"
-          />
-        </div>
+      {/* Compact file reference (no inline embed/iframe). */}
+      <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+        <span className="flex min-w-0 items-center gap-2 truncate text-muted-foreground">
+          <FileText className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate font-medium text-foreground">{fileObj?.name || "Source document"}</span>
+        </span>
+        {pdfUrl ? (
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-2.5 text-xs hover:bg-muted"
+          >
+            Open
+          </a>
+        ) : null}
+      </div>
 
-        {/* Right: editable extracted data */}
+      <div className="grid gap-4">
+        {/* Editable extracted data */}
         <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
           <section className="space-y-2">
             <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">

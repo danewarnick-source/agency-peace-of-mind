@@ -574,7 +574,10 @@ export function TrainingRecordsAdmin() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setSelectedUserId(o.id)}
+                          onClick={() => {
+                            setModalUserId(o.id);
+                            setModalOpen(true);
+                          }}
                         >
                           Open record
                         </Button>

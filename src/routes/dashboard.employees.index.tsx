@@ -694,6 +694,11 @@ function EmployeesPage() {
                   </div>
                 </div>
               </div>
+
+              <SuggestedTopicsInput
+                value={editTopics}
+                onChange={(next) => { setEditTopics(next); if (!editDirty) setEditDirty(true); }}
+              />
               <CustomAttributesSection
                 organizationId={org?.organization_id}
                 entityKind="employee"

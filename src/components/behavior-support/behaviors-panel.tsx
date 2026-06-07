@@ -32,6 +32,21 @@ const STATUS_STYLES: Record<BehaviorRow["status"], string> = {
   archived: "bg-muted text-muted-foreground line-through",
 };
 
+const CADENCE_MAX_GAP_HOURS: Record<string, number> = {
+  "Every shift": 24,
+  Daily: 36,
+  "Per occurrence": 24 * 14,
+  Weekly: 24 * 10,
+};
+
+function computeCoverageGap(b: BehaviorRow): boolean {
+  if (b.status !== "published") return false;
+  const max = CADENCE_MAX_GAP_HOURS[b.expected_cadence] ?? 24 * 14;
+  if (!b.last_logged_at) return true;
+  const ageHours = (Date.now() - new Date(b.last_logged_at).getTime()) / 3_600_000;
+  return ageHours > max;
+}
+
 export function BehaviorsPanel({
   clientId,
   organizationId,

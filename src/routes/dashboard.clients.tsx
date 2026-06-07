@@ -30,6 +30,8 @@ import {
   User, FileText, Pill, Shield, Settings2, ChevronRight,
   Upload, Trash2, CheckCircle2, AlertTriangle, Search,
   ArrowLeft, Users, Camera, Sparkles, Brain,
+  Activity as ActivityIcon, HandCoins, Wallet, ClipboardList,
+  ExternalLink, Stethoscope, Gavel,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";

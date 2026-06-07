@@ -587,6 +587,7 @@ function EmployeesPage() {
                   dailyRate: String(fd.get("daily_rate") || "").trim(),
                   startDate: String(fd.get("start_date") || "").trim(),
                   endDate: String(fd.get("end_date") || "").trim(),
+                  ceSuggestedTopics: editTopics,
                 });
                 setEditDirty(false);
               }}

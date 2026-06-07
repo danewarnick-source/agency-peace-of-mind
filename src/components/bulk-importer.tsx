@@ -286,29 +286,11 @@ export function BulkImporter({
           >Client Roster</button>
         </div>
 
-        {kind === "client" && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border p-1 w-fit">
-            <button
-              type="button"
-              onClick={() => setMode("sheet")}
-              className={`inline-flex h-9 min-w-[44px] items-center gap-1.5 px-3 text-xs rounded-md transition ${mode === "sheet" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5" /> CSV / Excel
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("pdf")}
-              className={`inline-flex h-9 min-w-[44px] items-center gap-1.5 px-3 text-xs rounded-md transition ${mode === "pdf" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >
-              <Sparkles className="h-3.5 w-3.5" /> AI PDF Import
-            </button>
-          </div>
-        )}
-
-        {kind === "client" && mode === "pdf" ? (
+        {aiFile && kind === "client" ? (
           <AiPdfImporter
             organizationId={organizationId}
-            onDone={() => setOpen(false)}
+            initialFile={aiFile}
+            onDone={() => { setOpen(false); reset(); }}
           />
         ) : (
           <>
@@ -322,17 +304,19 @@ export function BulkImporter({
             >
               <Upload className="h-10 w-10 text-muted-foreground" />
               <div>
-                <p className="font-medium">Drop CSV / Excel here</p>
-                <p className="text-xs text-muted-foreground">.csv, .xlsx, .xls supported · NECTAR auto-builds custom fields</p>
+                <p className="font-medium">Drop a PCSP, roster, or assessment — PDF, DOCX, CSV, or XLSX</p>
+                <p className="text-xs text-muted-foreground">
+                  PDFs and DOCX route to NECTAR AI extraction · CSV/XLSX route to bulk roster mapping with auto-generated custom fields
+                </p>
               </div>
               <Label htmlFor="bulk-file" className="cursor-pointer">
                 <span className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
-                  <FileSpreadsheet className="h-4 w-4" /> Browse files
+                  <FileText className="h-4 w-4" /> Browse files
                 </span>
                 <input
                   id="bulk-file"
                   type="file"
-                  accept=".csv,.xlsx,.xls,.pdf"
+                  accept=".csv,.xlsx,.xls,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }}
                 />

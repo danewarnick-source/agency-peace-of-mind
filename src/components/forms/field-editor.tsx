@@ -27,13 +27,21 @@ export function FieldEditor({
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{TYPE_LABEL[field.type]}</div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{TYPE_LABEL[field.type]}</div>
+          {controller && (
+            <Badge variant="outline" className="text-[10px] gap-1 border-teal-300 text-teal-700">
+              <GitBranch className="h-3 w-3" /> Conditional → Q{controller.index + 1}
+            </Badge>
+          )}
+        </div>
         <div className="flex gap-1">
           <Button size="icon" variant="ghost" onClick={onMoveUp} className="h-8 w-8"><ArrowUp className="h-4 w-4" /></Button>
           <Button size="icon" variant="ghost" onClick={onMoveDown} className="h-8 w-8"><ArrowDown className="h-4 w-4" /></Button>
           <Button size="icon" variant="ghost" onClick={onRemove} className="h-8 w-8 text-rose-600"><Trash2 className="h-4 w-4" /></Button>
         </div>
       </div>
+
 
       <div className="grid gap-1.5">
         <Label className="text-xs">Question / heading</Label>

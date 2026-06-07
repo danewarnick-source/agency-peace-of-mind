@@ -276,7 +276,9 @@ export function StaffHrChecklistCard({
           )}
         </CardContent>
       </Card>
+      )}
 
+      {showChecklist && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Compliance Checklist</CardTitle>

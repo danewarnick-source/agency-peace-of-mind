@@ -14,7 +14,7 @@ import {
 import { getForm, saveForm } from "@/lib/forms.functions";
 import {
   type FormField, type FieldType, type Frequency, type Schedule, type FormSettings,
-  defaultFieldFor, FORM_CATEGORIES, describeFrequency,
+  defaultFieldFor, FORM_CATEGORIES, describeFrequency, sanitizeConditions, isFieldVisible,
 } from "@/lib/forms-utils";
 import { FieldEditor, TYPE_GROUPS, TYPE_LABEL } from "@/components/forms/field-editor";
 import { FieldRenderer } from "@/components/forms/field-renderer";

@@ -83,7 +83,7 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <BudgetUploadButton clientId={clientId} />
+            {/* Per-section budget upload removed — use NECTAR Bulk Import (AI PDF mode) to populate authorized billing codes from a PCSP. */}
             <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs">
               <Link to="/dashboard/billing/$clientId" params={{ clientId }}>
                 <ExternalLink className="h-3.5 w-3.5" /> Full billing editor

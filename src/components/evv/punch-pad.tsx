@@ -26,6 +26,13 @@ import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
 import { draftShiftNote, draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
+import {
+  BehaviorObservationsBlock,
+  emptyBehaviorAnswers,
+  validateBehaviorAnswers,
+  type BehaviorAnswers,
+} from "@/components/evv/behavior-observations-block";
+import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────

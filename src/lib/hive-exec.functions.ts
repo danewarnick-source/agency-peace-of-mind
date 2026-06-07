@@ -108,14 +108,23 @@ async function audit(
 export const checkHiveExecutive = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ isExecutive: boolean }> => {
-    const { supabase, userId } = context;
-    const { data } = await supabase
-      .from("hive_executives")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("active", true)
-      .maybeSingle();
-    return { isExecutive: !!data };
+    try {
+      const { supabase, userId } = context;
+      const { data, error } = await supabase
+        .from("hive_executives")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("active", true)
+        .maybeSingle();
+      if (error) {
+        console.error("checkHiveExecutive query error:", error);
+        return { isExecutive: false };
+      }
+      return { isExecutive: !!data };
+    } catch (err) {
+      console.error("checkHiveExecutive unhandled error:", err);
+      return { isExecutive: false };
+    }
   });
 
 // ───── KPIs ────────────────────────────────────────────────────────────────

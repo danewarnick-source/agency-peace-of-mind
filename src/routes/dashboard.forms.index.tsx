@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, FileText, Sparkles, Archive, Send, Edit3 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useEffectiveView } from "@/hooks/use-effective-view";
 import {
   listForms, listMyForms, archiveForm, saveForm,
   getMyFormNotifications, markFormNotificationsRead,

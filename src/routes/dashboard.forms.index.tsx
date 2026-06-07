@@ -1,0 +1,232 @@
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Plus, FileText, Sparkles, Archive, Send, Edit3 } from "lucide-react";
+import { useCurrentOrg } from "@/hooks/use-org";
+import {
+  listForms, listMyForms, archiveForm, saveForm,
+  getMyFormNotifications, markFormNotificationsRead,
+} from "@/lib/forms.functions";
+import {
+  periodKeyFor, dueDateFor, formatDue, describeFrequency, isOverdue,
+  type Frequency, type Schedule, type FormSettings,
+} from "@/lib/forms-utils";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/dashboard/forms/")({
+  head: () => ({ meta: [{ title: "Forms — HIVE" }] }),
+  component: FormsIndex,
+});
+
+function FormsIndex() {
+  const { data: org } = useCurrentOrg();
+  const role = org?.role ?? "employee";
+  const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
+  return isAdmin ? <AdminList /> : <StaffList />;
+}
+
+// ─── ADMIN ─────────────────────────────────────────────────────────────────
+function AdminList() {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const fetchList = useServerFn(listForms);
+  const save = useServerFn(saveForm);
+  const archive = useServerFn(archiveForm);
+  const { data, isLoading } = useQuery({ queryKey: ["forms-admin"], queryFn: () => fetchList() });
+
+  async function createBlank() {
+    const out = await save({ data: {
+      name: "Untitled form", category: "general", fields: [], frequency: "as_needed",
+      schedule: {}, assigned_groups: [], assigned_users: [], settings: {},
+    } });
+    qc.invalidateQueries({ queryKey: ["forms-admin"] });
+    navigate({ to: "/dashboard/forms/$formId/edit", params: { formId: out.form.id } });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Forms</h1>
+          <p className="text-sm text-muted-foreground">Build custom intake forms for your staff. Submissions land in Records → Forms.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={createBlank}><Plus className="mr-1.5 h-4 w-4" /> New form</Button>
+        </div>
+      </div>
+
+      {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {(data?.forms ?? []).map((f) => (
+            <Card key={f.id} className="flex flex-col">
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-base">{f.name}</CardTitle>
+                  <Badge variant={f.status === "published" ? "default" : f.status === "draft" ? "secondary" : "outline"}>{f.status}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 space-y-2 text-xs text-muted-foreground">
+                <p>{(f.fields ?? []).length} fields · {describeFrequency(f.frequency, f.schedule ?? {})}</p>
+                <p>{f.assigned_groups?.length || 0} groups · {f.assigned_users?.length || 0} individuals</p>
+                <div className="pt-2 flex flex-wrap gap-1.5">
+                  <Link to="/dashboard/forms/$formId/edit" params={{ formId: f.id }}>
+                    <Button size="sm" variant="outline" className="min-h-[36px]"><Edit3 className="mr-1 h-3.5 w-3.5" /> Edit</Button>
+                  </Link>
+                  <Link to="/dashboard/forms/$formId/submissions" params={{ formId: f.id }}>
+                    <Button size="sm" variant="outline" className="min-h-[36px]"><FileText className="mr-1 h-3.5 w-3.5" /> Submissions</Button>
+                  </Link>
+                  {f.status !== "archived" && (
+                    <Button size="sm" variant="ghost" className="min-h-[36px] text-rose-600"
+                      onClick={async () => { await archive({ data: { formId: f.id } }); toast.success("Archived"); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }}>
+                      <Archive className="mr-1 h-3.5 w-3.5" /> Archive
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {(data?.forms ?? []).length === 0 && (
+            <div className="col-span-full rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+              <Sparkles className="mx-auto mb-2 h-5 w-5 text-amber-500" />
+              No forms yet. Click <strong>New form</strong> to build one — or use <strong>Build with Nectar</strong> inside the editor.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── STAFF ─────────────────────────────────────────────────────────────────
+type FormRow = {
+  id: string; name: string; frequency: Frequency; schedule: Schedule;
+  settings: FormSettings; fields: unknown[]; description?: string | null;
+};
+
+function StaffList() {
+  const fetchMine = useServerFn(listMyForms);
+  const fetchBell = useServerFn(getMyFormNotifications);
+  const markRead = useServerFn(markFormNotificationsRead);
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ["my-forms"], queryFn: () => fetchMine() });
+  const { data: bell } = useQuery({ queryKey: ["my-form-notifs"], queryFn: () => fetchBell() });
+
+  const [popup, setPopup] = useState<{ id: string; title: string; body: string } | null>(null);
+  useEffect(() => {
+    const unread = (bell?.notifications ?? []).find((n) => !n.read_at && n.type === "form_assigned");
+    if (unread) setPopup({ id: unread.id, title: unread.title, body: unread.body });
+  }, [bell]);
+
+  const forms = (data?.forms ?? []) as FormRow[];
+  const subs = data?.submissions ?? [];
+
+  const buckets = useMemo(() => {
+    const due: FormRow[] = [];
+    const anytime: FormRow[] = [];
+    const submitted: { form: FormRow; submittedAt: string }[] = [];
+    const now = new Date();
+    for (const f of forms) {
+      const periodKey = periodKeyFor(f.frequency);
+      const mySub = subs.find((s) => s.form_id === f.id && s.period_key === periodKey);
+      if (mySub) submitted.push({ form: f, submittedAt: mySub.submitted_at });
+      else if (f.frequency === "as_needed") anytime.push(f);
+      else due.push(f);
+    }
+    return { due, anytime, submitted, now };
+  }, [forms, subs]);
+
+  async function dismissPopup() {
+    if (popup) await markRead({ data: { ids: [popup.id] } });
+    setPopup(null);
+    qc.invalidateQueries({ queryKey: ["my-form-notifs"] });
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Forms</h1>
+        <p className="text-sm text-muted-foreground">Forms your agency has assigned to you.</p>
+      </div>
+
+      <Section title="Needs attention" subtitle="Submit before the due date for the current period.">
+        <div className="grid gap-2 md:grid-cols-2">
+          {buckets.due.map((f) => {
+            const due = dueDateFor(f.frequency, f.schedule);
+            const overdue = isOverdue(due);
+            return (
+              <Link key={f.id} to="/dashboard/forms/$formId/fill" params={{ formId: f.id }}
+                className="block rounded-lg border border-border bg-card p-4 hover:bg-muted/40 min-h-[44px]">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{f.name}</p>
+                    <p className="text-xs text-muted-foreground">{describeFrequency(f.frequency, f.schedule)}</p>
+                  </div>
+                  <Badge variant={overdue ? "destructive" : "secondary"}>{overdue ? "Overdue" : "Due"} {formatDue(due)}</Badge>
+                </div>
+                <Button size="sm" className="mt-3 min-h-[40px]"><Send className="mr-1.5 h-3.5 w-3.5" /> Start</Button>
+              </Link>
+            );
+          })}
+          {buckets.due.length === 0 && <Empty>All caught up.</Empty>}
+        </div>
+      </Section>
+
+      <Section title="Start anytime" subtitle="Forms you can submit whenever you like.">
+        <div className="grid gap-2 md:grid-cols-2">
+          {buckets.anytime.map((f) => (
+            <Link key={f.id} to="/dashboard/forms/$formId/fill" params={{ formId: f.id }}
+              className="block rounded-lg border border-border bg-card p-4 hover:bg-muted/40 min-h-[44px]">
+              <p className="font-semibold truncate">{f.name}</p>
+              <p className="text-xs text-muted-foreground">As needed</p>
+              <Button size="sm" className="mt-3 min-h-[40px]">Start</Button>
+            </Link>
+          ))}
+          {buckets.anytime.length === 0 && <Empty>No anytime forms assigned.</Empty>}
+        </div>
+      </Section>
+
+      <Section title="Submitted (this period)">
+        <div className="space-y-1.5">
+          {buckets.submitted.map(({ form, submittedAt }) => (
+            <div key={form.id} className="flex flex-col md:flex-row md:items-center justify-between rounded-md border border-border bg-card px-3 py-2 gap-1">
+              <p className="text-sm font-medium truncate">{form.name}</p>
+              <p className="text-xs text-muted-foreground">Submitted {new Date(submittedAt).toLocaleString()}</p>
+            </div>
+          ))}
+          {buckets.submitted.length === 0 && <Empty>No submissions yet this period.</Empty>}
+        </div>
+      </Section>
+
+      <Dialog open={!!popup} onOpenChange={(o) => !o && dismissPopup()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>{popup?.title}</DialogTitle></DialogHeader>
+          <p className="text-sm whitespace-pre-line">{popup?.body}</p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={dismissPopup}>Got it</Button>
+            <Button onClick={dismissPopup}>View Forms</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <div>
+        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">{children}</p>;
+}

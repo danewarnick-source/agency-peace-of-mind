@@ -5,24 +5,20 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Loader2, Sparkles, Upload, X, FileText, CheckCircle2, Trash2, Plus, AlertTriangle } from "lucide-react";
+  Loader2,
+  Sparkles,
+  Upload,
+  X,
+  FileText,
+  CheckCircle2,
+  Trash2,
+  Plus,
+  AlertTriangle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   extractClientFromPdf,
   commitClientFromPdf,
@@ -30,69 +26,92 @@ import {
 } from "@/lib/pdf-import.functions";
 import { EVV_SERVICE_CODES, evvServiceLabel } from "@/lib/evv-codes";
 
-type RouteTarget =
-  | "first_name"
-  | "last_name"
-  | "medicaid_id"
-  | "date_of_birth"
-  | "pcsp_goal"
-  | "discard";
-
-const ROUTE_OPTIONS: { value: RouteTarget; label: string }[] = [
-  { value: "first_name", label: "First Name" },
-  { value: "last_name", label: "Last Name" },
-  { value: "medicaid_id", label: "Individual Medicaid ID" },
-  { value: "date_of_birth", label: "Date of Birth (YYYY-MM-DD)" },
-  { value: "pcsp_goal", label: "Append as PCSP Goal" },
-  { value: "discard", label: "Discard / Ignore" },
-];
-
-type UnresolvedItem = { id: string; text: string; reason: string };
-
-const ACCEPT_EXT = [".pdf", ".docx", ".png"];
-const ACCEPT_MIME = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "image/png",
-];
+const ACCEPT_EXT = [".pdf"];
+const ACCEPT_MIME = ["application/pdf"];
 
 function isAcceptedFile(file: File): boolean {
   const name = file.name.toLowerCase();
-  return (
-    ACCEPT_EXT.some((ext) => name.endsWith(ext)) ||
-    ACCEPT_MIME.includes(file.type)
-  );
+  return ACCEPT_EXT.some((ext) => name.endsWith(ext)) || ACCEPT_MIME.includes(file.type);
 }
 
-function detectAmbiguities(d: ExtractedClient): UnresolvedItem[] {
-  const out: UnresolvedItem[] = [];
-  if (d.date_of_birth && !/^\d{4}-\d{2}-\d{2}$/.test(d.date_of_birth.trim())) {
-    out.push({
-      id: `dob-${Date.now()}`,
-      text: d.date_of_birth.trim(),
-      reason: "Ambiguous date format detected by the Nectar engine.",
-    });
-  }
-  if (d.medicaid_id && (d.medicaid_id.length < 8 || d.medicaid_id.length > 12)) {
-    out.push({
-      id: `med-${Date.now()}`,
-      text: d.medicaid_id,
-      reason: "Medicaid ID length is outside the expected 8–12 digit range.",
-    });
-  }
-  return out;
+function emptyData(): ExtractedClient {
+  return {
+    first_name: "",
+    last_name: "",
+    preferred_name: null,
+    medicaid_id: "",
+    date_of_birth: "",
+    phone_number: null,
+    physical_address: null,
+    guardian_name: null,
+    guardian_phone: null,
+    guardian_relationship: null,
+    guardian_legal_status: null,
+    emergency_contact_name: null,
+    emergency_contact_phone: null,
+    emergency_contact_secondary_name: null,
+    emergency_contact_secondary_phone: null,
+    authorized_codes: [],
+    billing_codes: [],
+    medications: [],
+    pcsp_goals: [],
+    special_directions: null,
+    bc_tier: null,
+    assigned_behaviorist: null,
+    prompting_levels: [],
+    additional_sections: [],
+  };
 }
 
 async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
   const bytes = new Uint8Array(buf);
   let bin = "";
-  // Convert in chunks to avoid call-stack overflow on large PDFs
   const CHUNK = 0x8000;
   for (let i = 0; i < bytes.length; i += CHUNK) {
     bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }
   return btoa(bin);
+}
+
+function FromPcspBadge() {
+  return (
+    <Badge variant="secondary" className="ml-2 h-4 px-1.5 text-[9px] font-medium uppercase tracking-wider">
+      <Sparkles className="mr-0.5 h-2.5 w-2.5" /> from PCSP
+    </Badge>
+  );
+}
+
+function FieldRow({
+  label,
+  value,
+  filled,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  filled: boolean;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <div className="grid gap-1">
+      <Label className="flex items-center text-[11px] text-muted-foreground">
+        {label}
+        {filled ? <FromPcspBadge /> : null}
+      </Label>
+      <Input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-9"
+      />
+    </div>
+  );
 }
 
 export function AiPdfImporter({
@@ -108,28 +127,27 @@ export function AiPdfImporter({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string>("");
+  const [fileObj, setFileObj] = useState<File | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [data, setData] = useState<ExtractedClient | null>(null);
-  const [unresolved, setUnresolved] = useState<UnresolvedItem[]>([]);
-  const [routeChoice, setRouteChoice] = useState<RouteTarget>("pcsp_goal");
-
-  const activeUnresolved = unresolved[0] ?? null;
+  const [original, setOriginal] = useState<ExtractedClient | null>(null);
+  const [sectionDecisions, setSectionDecisions] = useState<Record<number, "create" | "skip">>({});
 
   const reset = useCallback(() => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     setPdfUrl(null);
-    setFileName("");
+    setFileObj(null);
     setData(null);
-    setUnresolved([]);
+    setOriginal(null);
+    setSectionDecisions({});
   }, [pdfUrl]);
 
   const handleFile = useCallback(
     async (file: File) => {
       if (!isAcceptedFile(file)) {
-        toast.error("Nectar accepts .pdf, .docx, or .png files.");
+        toast.error("PCSP import accepts PDF files only.");
         return;
       }
       if (file.size > 15 * 1024 * 1024) {
@@ -139,43 +157,20 @@ export function AiPdfImporter({
       reset();
       const url = URL.createObjectURL(file);
       setPdfUrl(url);
-      setFileName(file.name);
+      setFileObj(file);
       setExtracting(true);
 
-      const isPdf =
-        file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-
       try {
-        if (isPdf) {
-          const b64 = await fileToBase64(file);
-          const result = await extractFn({ data: { pdfBase64: b64 } });
-          setData(result);
-          const flags = detectAmbiguities(result);
-          if (flags.length) setUnresolved(flags);
-          toast.success(
-            flags.length
-              ? `Nectar parsed the document — ${flags.length} item${flags.length === 1 ? "" : "s"} need routing.`
-              : "Nectar extraction complete — review before saving.",
-          );
-        } else {
-          // .docx / .png: Nectar simulation — no automatic field extraction yet.
-          // Admin reviews + fills the form manually; warn so the flow is explicit.
-          setData({
-            first_name: "",
-            last_name: "",
-            medicaid_id: "",
-            date_of_birth: "",
-            authorized_codes: [],
-            pcsp_goals: [],
-            prompting_levels: [],
-          });
-          toast.message("Nectar simulation engaged for non-PDF asset — please verify each field manually.");
-        }
+        const b64 = await fileToBase64(file);
+        const result = await extractFn({ data: { pdfBase64: b64 } });
+        setData(result);
+        setOriginal(structuredClone(result));
+        toast.success("NECTAR extraction complete — review before saving.");
       } catch (e) {
         toast.error((e as Error).message);
         URL.revokeObjectURL(url);
         setPdfUrl(null);
-        setFileName("");
+        setFileObj(null);
       } finally {
         setExtracting(false);
       }
@@ -193,41 +188,43 @@ export function AiPdfImporter({
     [handleFile],
   );
 
-  const resolveCurrent = useCallback(() => {
-    if (!activeUnresolved) return;
-    const text = activeUnresolved.text;
-    setData((cur) => {
-      if (!cur) return cur;
-      switch (routeChoice) {
-        case "first_name":
-          return { ...cur, first_name: text };
-        case "last_name":
-          return { ...cur, last_name: text };
-        case "medicaid_id":
-          return { ...cur, medicaid_id: text.replace(/\D+/g, "") };
-        case "date_of_birth":
-          return { ...cur, date_of_birth: text };
-        case "pcsp_goal":
-          return { ...cur, pcsp_goals: [...cur.pcsp_goals, text] };
-        case "discard":
-        default:
-          return cur;
-      }
-    });
-    setUnresolved((q) => q.slice(1));
-    setRouteChoice("pcsp_goal");
-    toast.success("Nectar ingestion path confirmed.");
-  }, [activeUnresolved, routeChoice]);
-
+  const wasFilled = useCallback(
+    (key: keyof ExtractedClient): boolean => {
+      const v = original?.[key];
+      if (v == null) return false;
+      if (typeof v === "string") return v.trim().length > 0;
+      if (Array.isArray(v)) return v.length > 0;
+      return true;
+    },
+    [original],
+  );
 
   const finalize = useCallback(async () => {
-    if (!data || !organizationId) return;
+    if (!data || !organizationId || !fileObj) return;
     if (!data.first_name.trim() || !data.last_name.trim()) {
       toast.error("First and last name are required.");
       return;
     }
     setCommitting(true);
     try {
+      // Upload the PCSP to storage with a stable path so re-uploads overwrite the same object.
+      // The DB-side dedupe in commitClientFromPdf will then update the single client_documents row.
+      const ext = fileObj.name.split(".").pop()?.toLowerCase() ?? "pdf";
+      // We don't yet know the client id (may be created here) — use a content-stable
+      // path that's still org/client scoped after we resolve the client id below.
+      // To keep it simple, upload to a per-org tmp path; commit() rewrites the
+      // client_documents row regardless of storage path. We use upsert:true so the
+      // same admin re-uploading the same filename overwrites instead of duplicating.
+      const safeName = fileObj.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${organizationId}/pcsp-import/${data.medicaid_id || `${data.first_name}_${data.last_name}`}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from("client-documents")
+        .upload(path, fileObj, { upsert: true, contentType: fileObj.type || "application/pdf" });
+      if (upErr) throw upErr;
+
+      // Build accepted additional sections (default to "create" if user didn't decide).
+      const accepted = data.additional_sections.filter((_, i) => sectionDecisions[i] !== "skip");
+
       const res = await commitFn({
         data: {
           organizationId,
@@ -235,12 +232,29 @@ export function AiPdfImporter({
             first_name: data.first_name.trim(),
             last_name: data.last_name.trim(),
             medicaid_id: data.medicaid_id.trim(),
+            date_of_birth: data.date_of_birth?.trim() || null,
+            phone_number: data.phone_number?.trim() || null,
+            physical_address: data.physical_address?.trim() || null,
+            emergency_contact_name: data.emergency_contact_name?.trim() || null,
+            emergency_contact_phone: data.emergency_contact_phone?.trim() || null,
+            special_directions: data.special_directions?.trim() || null,
             pcsp_goals: data.pcsp_goals.map((g) => g.trim()).filter(Boolean),
             authorized_codes: data.authorized_codes,
+            billing_codes: data.billing_codes,
+            medications: data.medications.filter((m) => m.medication_name.trim()),
+          },
+          additionalSections: accepted,
+          pcspDocument: {
+            storagePath: path,
+            fileName: fileObj.name,
+            fileSizeBytes: fileObj.size,
           },
         },
       });
-      toast.success(res.created ? "Client created from PCSP." : "Client profile updated from PCSP.");
+      const n = res.fieldCount ?? 0;
+      toast.success(
+        `${res.created ? "Client created" : "Client profile updated"} — NECTAR filled ${n} field${n === 1 ? "" : "s"} from the PCSP.`,
+      );
       qc.invalidateQueries();
       reset();
       onDone();
@@ -249,7 +263,7 @@ export function AiPdfImporter({
     } finally {
       setCommitting(false);
     }
-  }, [data, organizationId, commitFn, qc, reset, onDone]);
+  }, [data, organizationId, fileObj, commitFn, qc, reset, onDone, sectionDecisions]);
 
   const codeSet = useMemo(() => new Set(data?.authorized_codes ?? []), [data]);
 
@@ -277,10 +291,11 @@ export function AiPdfImporter({
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
               <div>
                 <p className="font-medium tracking-tight">
-                  Nectar Intelligence Engine: Filtering and Mapping Core Assets...
+                  NECTAR is reading every field in the PCSP…
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Parsing identity tokens, billing configurations, and clinical elements.
+                  Identity, contact, guardian, billing codes, medications, goals, clinical alerts, and anything else
+                  in the document.
                 </p>
               </div>
             </>
@@ -288,20 +303,21 @@ export function AiPdfImporter({
             <>
               <Sparkles className="h-10 w-10 text-primary" />
               <div>
-                <p className="font-medium">Drop a client asset for Nectar Import</p>
+                <p className="font-medium">Drop a PCSP PDF to fill the entire client profile</p>
                 <p className="text-xs text-muted-foreground">
-                  Accepts PDF, DOCX, and PNG. Nectar splits content into the correct profile fields and flags anything ambiguous.
+                  NECTAR extracts every field present in the document and prompts you to create new sections
+                  for anything that doesn't have a matching field. Nothing is ever invented.
                 </p>
               </div>
               <Label htmlFor="ai-pdf-file" className="cursor-pointer">
                 <span className="inline-flex h-11 min-w-[44px] items-center gap-2 rounded-md border border-primary/40 bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
-                  <Upload className="h-4 w-4" /> Browse File
+                  <Upload className="h-4 w-4" /> Browse PDF
                 </span>
                 <input
                   id="ai-pdf-file"
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.docx,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png"
+                  accept=".pdf,application/pdf"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -313,13 +329,11 @@ export function AiPdfImporter({
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Files up to 15 MB. Scanned image-only PDFs are not yet supported.
+          PDF files up to 15 MB. Re-uploading the same client's PCSP updates the existing record — it does not duplicate.
         </p>
       </div>
     );
   }
-
-
 
   // --- Review state -------------------------------------------------
   const setField = <K extends keyof ExtractedClient>(k: K, v: ExtractedClient[K]) =>
@@ -343,97 +357,177 @@ export function AiPdfImporter({
       cur ? { ...cur, pcsp_goals: cur.pcsp_goals.map((g, i) => (i === idx ? val : g)) } : cur,
     );
   const removeGoal = (idx: number) =>
-    setData((cur) => (cur ? { ...cur, pcsp_goals: cur.pcsp_goals.filter((_, i) => i !== idx) } : cur));
+    setData((cur) =>
+      cur ? { ...cur, pcsp_goals: cur.pcsp_goals.filter((_, i) => i !== idx) } : cur,
+    );
   const addGoal = () =>
     setData((cur) => (cur ? { ...cur, pcsp_goals: [...cur.pcsp_goals, ""] } : cur));
 
+  const filledCount =
+    (original
+      ? (
+          [
+            "first_name",
+            "last_name",
+            "medicaid_id",
+            "date_of_birth",
+            "phone_number",
+            "physical_address",
+            "guardian_name",
+            "guardian_phone",
+            "emergency_contact_name",
+            "emergency_contact_phone",
+            "special_directions",
+            "bc_tier",
+            "assigned_behaviorist",
+            "authorized_codes",
+            "billing_codes",
+            "medications",
+            "pcsp_goals",
+          ] as (keyof ExtractedClient)[]
+        ).filter((k) => wasFilled(k)).length
+      : 0) + (original?.additional_sections.length ?? 0);
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-medium">
           <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-          Review &amp; Verify
+          NECTAR extracted {filledCount} field{filledCount === 1 ? "" : "s"} from the PCSP — review and confirm
         </div>
         <Button variant="ghost" size="sm" onClick={reset} className="h-9">
           <X className="h-4 w-4" /> Discard
         </Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-[1fr,1.4fr]">
         {/* Left: file preview */}
         <div className="rounded-lg border border-primary/20 bg-muted/30">
           <div className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
-            <FileText className="h-3.5 w-3.5" /> {fileName || "Uploaded file"}
+            <FileText className="h-3.5 w-3.5" /> {fileObj?.name || "PCSP"}
           </div>
-          {fileName.toLowerCase().endsWith(".png") ? (
-            <img
-              src={pdfUrl}
-              alt={fileName}
-              className="h-[60vh] w-full rounded-b-lg bg-background object-contain"
-            />
-          ) : fileName.toLowerCase().endsWith(".docx") ? (
-            <div className="flex h-[60vh] w-full items-center justify-center rounded-b-lg bg-background p-6 text-center text-sm text-muted-foreground">
-              DOCX preview is not embedded. Nectar will route content based on your manual confirmations.
-            </div>
-          ) : (
-            <iframe
-              title="Asset preview"
-              src={pdfUrl}
-              className="h-[60vh] w-full rounded-b-lg bg-background"
-            />
-          )}
+          <iframe
+            title="PCSP preview"
+            src={pdfUrl}
+            className="h-[70vh] w-full rounded-b-lg bg-background"
+          />
         </div>
 
-
-        {/* Right: editable form */}
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label className="text-xs">First name *</Label>
-              <Input
+        {/* Right: editable extracted data */}
+        <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
+          <section className="space-y-2">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Identity
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <FieldRow
+                label="First name *"
                 value={data.first_name}
-                onChange={(e) => setField("first_name", e.target.value)}
-                className="h-11"
+                filled={wasFilled("first_name")}
+                onChange={(v) => setField("first_name", v)}
               />
-            </div>
-            <div className="grid gap-1.5">
-              <Label className="text-xs">Last name *</Label>
-              <Input
+              <FieldRow
+                label="Last name *"
                 value={data.last_name}
-                onChange={(e) => setField("last_name", e.target.value)}
-                className="h-11"
+                filled={wasFilled("last_name")}
+                onChange={(v) => setField("last_name", v)}
               />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label className="text-xs">Medicaid ID</Label>
-              <Input
+              <FieldRow
+                label="Medicaid ID"
                 value={data.medicaid_id}
-                onChange={(e) => setField("medicaid_id", e.target.value.replace(/\D+/g, ""))}
-                inputMode="numeric"
-                className="h-11 font-mono"
+                filled={wasFilled("medicaid_id")}
+                onChange={(v) => setField("medicaid_id", v.replace(/\D+/g, ""))}
                 placeholder="0000000000"
               />
-            </div>
-            <div className="grid gap-1.5">
-              <Label className="text-xs">Date of birth</Label>
-              <Input
+              <FieldRow
+                label="Date of birth"
                 value={data.date_of_birth}
-                onChange={(e) => setField("date_of_birth", e.target.value)}
+                filled={wasFilled("date_of_birth")}
+                onChange={(v) => setField("date_of_birth", v)}
                 placeholder="YYYY-MM-DD"
-                className="h-11"
               />
             </div>
-          </div>
+          </section>
 
-          <div className="grid gap-1.5">
-            <Label className="text-xs">
-              Authorized service codes{" "}
-              <span className="text-muted-foreground">({data.authorized_codes.length} checked)</span>
-            </Label>
-            <div className="max-h-40 overflow-y-auto rounded-md border p-2">
+          <section className="space-y-2">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Contact
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <FieldRow
+                label="Phone"
+                value={data.phone_number ?? ""}
+                filled={wasFilled("phone_number")}
+                onChange={(v) => setField("phone_number", v)}
+              />
+              <FieldRow
+                label="Service address"
+                value={data.physical_address ?? ""}
+                filled={wasFilled("physical_address")}
+                onChange={(v) => setField("physical_address", v)}
+              />
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Guardian / legal
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <FieldRow
+                label="Guardian name"
+                value={data.guardian_name ?? ""}
+                filled={wasFilled("guardian_name")}
+                onChange={(v) => setField("guardian_name", v)}
+              />
+              <FieldRow
+                label="Guardian phone"
+                value={data.guardian_phone ?? ""}
+                filled={wasFilled("guardian_phone")}
+                onChange={(v) => setField("guardian_phone", v)}
+              />
+              <FieldRow
+                label="Relationship"
+                value={data.guardian_relationship ?? ""}
+                filled={wasFilled("guardian_relationship")}
+                onChange={(v) => setField("guardian_relationship", v)}
+              />
+              <FieldRow
+                label="Legal status"
+                value={data.guardian_legal_status ?? ""}
+                filled={wasFilled("guardian_legal_status")}
+                onChange={(v) => setField("guardian_legal_status", v)}
+              />
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Emergency contact
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <FieldRow
+                label="Primary name"
+                value={data.emergency_contact_name ?? ""}
+                filled={wasFilled("emergency_contact_name")}
+                onChange={(v) => setField("emergency_contact_name", v)}
+              />
+              <FieldRow
+                label="Primary phone"
+                value={data.emergency_contact_phone ?? ""}
+                filled={wasFilled("emergency_contact_phone")}
+                onChange={(v) => setField("emergency_contact_phone", v)}
+              />
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Authorized service codes
+              {wasFilled("authorized_codes") ? <FromPcspBadge /> : null}{" "}
+              <span className="text-muted-foreground">({data.authorized_codes.length} selected)</span>
+            </h4>
+            <div className="max-h-32 overflow-y-auto rounded-md border p-2">
               <div className="flex flex-wrap gap-1.5">
                 {EVV_SERVICE_CODES.map((c) => {
                   const on = codeSet.has(c.code);
@@ -456,19 +550,90 @@ export function AiPdfImporter({
                 })}
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="grid gap-1.5">
+          {data.billing_codes.length > 0 && (
+            <section className="space-y-2">
+              <h4 className="flex items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Billing codes detail
+                <FromPcspBadge />
+              </h4>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="px-2 py-1 text-left font-medium">Code</th>
+                      <th className="px-2 py-1 text-left font-medium">Rate / unit</th>
+                      <th className="px-2 py-1 text-left font-medium">Annual units</th>
+                      <th className="px-2 py-1 text-left font-medium">Start</th>
+                      <th className="px-2 py-1 text-left font-medium">End</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.billing_codes.map((r, i) => (
+                      <tr key={`${r.service_code}-${i}`} className="border-t">
+                        <td className="px-2 py-1 font-mono">{r.service_code}</td>
+                        <td className="px-2 py-1">{r.rate_per_unit ?? "—"}</td>
+                        <td className="px-2 py-1">{r.annual_units ?? "—"}</td>
+                        <td className="px-2 py-1">{r.service_start_date ?? "—"}</td>
+                        <td className="px-2 py-1">{r.service_end_date ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {data.medications.length > 0 && (
+            <section className="space-y-2">
+              <h4 className="flex items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Medications
+                <FromPcspBadge />
+                <span className="ml-2 text-muted-foreground">({data.medications.length})</span>
+              </h4>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="px-2 py-1 text-left font-medium">Name</th>
+                      <th className="px-2 py-1 text-left font-medium">Dose</th>
+                      <th className="px-2 py-1 text-left font-medium">Route</th>
+                      <th className="px-2 py-1 text-left font-medium">Frequency</th>
+                      <th className="px-2 py-1 text-left font-medium">Prescriber</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.medications.map((m, i) => (
+                      <tr key={`${m.medication_name}-${i}`} className="border-t">
+                        <td className="px-2 py-1 font-medium">{m.medication_name}</td>
+                        <td className="px-2 py-1">{m.dosage ?? "—"}</td>
+                        <td className="px-2 py-1">{m.route ?? "—"}</td>
+                        <td className="px-2 py-1">{m.frequency ?? "—"}</td>
+                        <td className="px-2 py-1">{m.prescriber ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          <section className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">PCSP goals ({data.pcsp_goals.length})</Label>
-              <Button type="button" variant="ghost" size="sm" onClick={addGoal} className="h-8">
+              <h4 className="flex items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                PCSP goals
+                {wasFilled("pcsp_goals") ? <FromPcspBadge /> : null}
+                <span className="ml-2 text-muted-foreground">({data.pcsp_goals.length})</span>
+              </h4>
+              <Button type="button" variant="ghost" size="sm" onClick={addGoal} className="h-7">
                 <Plus className="h-3.5 w-3.5" /> Add
               </Button>
             </div>
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+            <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
               {data.pcsp_goals.length === 0 ? (
                 <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-                  No goals extracted. Click Add to enter one manually.
+                  No goals extracted.
                 </p>
               ) : (
                 data.pcsp_goals.map((g, i) => (
@@ -477,14 +642,14 @@ export function AiPdfImporter({
                       value={g}
                       rows={2}
                       onChange={(e) => updateGoal(i, e.target.value)}
-                      className="text-sm"
+                      className="text-xs"
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
                       onClick={() => removeGoal(i)}
-                      className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
+                      className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
                       aria-label="Remove goal"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -493,19 +658,93 @@ export function AiPdfImporter({
                 ))
               )}
             </div>
-          </div>
+          </section>
 
-          {data.prompting_levels.length > 0 && (
-            <div className="grid gap-1.5">
-              <Label className="text-xs">Prompting levels (informational)</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {data.prompting_levels.map((p) => (
-                  <Badge key={p} variant="secondary" className="text-[11px]">
-                    {p}
-                  </Badge>
-                ))}
+          {(data.special_directions || wasFilled("special_directions")) && (
+            <section className="space-y-2">
+              <h4 className="flex items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Special directions & clinical alerts
+                {wasFilled("special_directions") ? <FromPcspBadge /> : null}
+              </h4>
+              <Textarea
+                rows={4}
+                value={data.special_directions ?? ""}
+                onChange={(e) => setField("special_directions", e.target.value)}
+                className="text-xs"
+              />
+            </section>
+          )}
+
+          {(data.bc_tier || data.assigned_behaviorist) && (
+            <section className="space-y-2">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Behavior support
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <FieldRow
+                  label="BC tier"
+                  value={data.bc_tier ?? ""}
+                  filled={wasFilled("bc_tier")}
+                  onChange={(v) => setField("bc_tier", v)}
+                />
+                <FieldRow
+                  label="Assigned behaviorist"
+                  value={data.assigned_behaviorist ?? ""}
+                  filled={wasFilled("assigned_behaviorist")}
+                  onChange={(v) => setField("assigned_behaviorist", v)}
+                />
               </div>
-            </div>
+            </section>
+          )}
+
+          {data.additional_sections.length > 0 && (
+            <section className="space-y-2">
+              <div className="rounded-md border border-amber-400/40 bg-amber-50/40 p-3 dark:bg-amber-950/20">
+                <h4 className="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-100">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Additional information found in this PCSP
+                </h4>
+                <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-200">
+                  These blocks don't match any existing profile section. Create a new section for each to keep
+                  them on the client's profile, or skip.
+                </p>
+              </div>
+              <div className="space-y-2">
+                {data.additional_sections.map((s, i) => {
+                  const decision = sectionDecisions[i] ?? "create";
+                  return (
+                    <div key={i} className="rounded-md border p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm font-medium">{s.label}</div>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={decision === "create" ? "default" : "outline"}
+                            onClick={() => setSectionDecisions((d) => ({ ...d, [i]: "create" }))}
+                            className="h-8 text-xs"
+                          >
+                            Create section
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={decision === "skip" ? "default" : "outline"}
+                            onClick={() => setSectionDecisions((d) => ({ ...d, [i]: "skip" }))}
+                            className="h-8 text-xs"
+                          >
+                            Skip
+                          </Button>
+                        </div>
+                      </div>
+                      <pre className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] text-muted-foreground">
+                        {s.content}
+                      </pre>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           )}
         </div>
       </div>
@@ -514,76 +753,15 @@ export function AiPdfImporter({
         <Button variant="ghost" onClick={reset} disabled={committing} className="h-11">
           Cancel
         </Button>
-        <Button onClick={finalize} disabled={committing || unresolved.length > 0} className="h-11">
+        <Button onClick={finalize} disabled={committing} className="h-11">
           {committing ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <CheckCircle2 className="mr-2 h-4 w-4" />
           )}
-          Finalize &amp; Save to Profile
+          Confirm &amp; save to profile
         </Button>
       </div>
-
-      {unresolved.length > 0 && (
-        <div className="rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
-          {unresolved.length} item{unresolved.length === 1 ? "" : "s"} require Nectar mapping resolution before saving.
-        </div>
-      )}
-
-      <Dialog
-        open={activeUnresolved !== null}
-        onOpenChange={(open) => {
-          if (!open) setUnresolved((q) => q.slice(1));
-        }}
-      >
-        <DialogContent className="border-amber-400/60 sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-              Nectar Mapping Resolution Required
-            </DialogTitle>
-            <DialogDescription>
-              {activeUnresolved?.reason ?? ""}
-            </DialogDescription>
-          </DialogHeader>
-
-          {activeUnresolved && (
-            <div className="space-y-4">
-              <div className="rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-                Reviewing Text: &ldquo;{activeUnresolved.text}&rdquo;
-              </div>
-
-              <div className="grid gap-1.5">
-                <Label className="text-xs">
-                  Where should this piece of information be routed within the Client Profile?
-                </Label>
-                <Select
-                  value={routeChoice}
-                  onValueChange={(v) => setRouteChoice(v as RouteTarget)}
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROUTE_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button onClick={resolveCurrent} className="h-11">
-              Confirm Ingestion Path
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

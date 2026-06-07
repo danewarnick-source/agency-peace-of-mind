@@ -261,7 +261,11 @@ export const extractClientFromPdf = createServerFn({ method: "POST" })
       throw new Error("AI returned malformed JSON");
     }
 
-    const parsed = ExtractedSchema.parse(args);
+    // Lenient parse — never hard-fail the whole import on a missing/null field.
+    const safe = ExtractedSchema.safeParse(args);
+    const parsed: ExtractedClient = safe.success
+      ? safe.data
+      : ExtractedSchema.parse({}); // schema has defaults everywhere
 
     // Sanitize codes against allow-list
     const allow = new Set(EVV_SERVICE_CODES.map((c) => c.code));
@@ -269,19 +273,28 @@ export const extractClientFromPdf = createServerFn({ method: "POST" })
       new Set(parsed.authorized_codes.map((c) => c.trim().toUpperCase()).filter((c) => allow.has(c))),
     );
     parsed.billing_codes = parsed.billing_codes
-      .map((r) => ({ ...r, service_code: r.service_code.trim().toUpperCase() }))
+      .map((r) => ({ ...r, service_code: (r.service_code || "").trim().toUpperCase() }))
       .filter((r) => allow.has(r.service_code));
-    // Merge billing_codes' service codes into authorized_codes
     for (const b of parsed.billing_codes) {
       if (!parsed.authorized_codes.includes(b.service_code)) {
         parsed.authorized_codes.push(b.service_code);
       }
     }
 
+    // Drop medications without a name; keep PRN/as-needed rows even with empty scheduled_times.
+    parsed.medications = parsed.medications
+      .filter((m) => (m.medication_name || "").trim().length > 0)
+      .map((m) => ({ ...m, scheduled_times: Array.isArray(m.scheduled_times) ? m.scheduled_times : [] }));
+
+    // Drop empty additional_sections rather than failing on them.
+    parsed.additional_sections = parsed.additional_sections.filter(
+      (s) => (s.label || "").trim().length > 0 && (s.content || "").trim().length > 0,
+    );
+
     parsed.pcsp_goals = Array.from(
       new Set(parsed.pcsp_goals.map((g) => g.trim()).filter((g) => g.length > 2)),
     ).slice(0, 25);
-    parsed.medicaid_id = parsed.medicaid_id.replace(/\D+/g, "");
+    parsed.medicaid_id = (parsed.medicaid_id || "").replace(/\D+/g, "");
 
     return parsed;
   });

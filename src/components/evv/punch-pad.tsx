@@ -995,6 +995,38 @@ export function PunchPad({
       }
     }
 
+    // Persist post-shift Behavior Observations when the provider has the feature on.
+    if (behaviorEnabled && org?.organization_id) {
+      const b = behaviorAnswers;
+      const obs = {
+        organization_id: org.organization_id,
+        shift_id: active.id,
+        client_id: active.client_id,
+        staff_id: user.id,
+        observed_at: clockOut,
+        behaviors_observed: b.behaviorsObserved === true,
+        target_behaviors: b.behaviorsObserved ? b.targetBehaviors : [],
+        behavior_counts: b.behaviorsObserved ? b.counts : {},
+        objective_description: b.behaviorsObserved ? b.objectiveDescription.trim() || null : null,
+        antecedent_context:    b.behaviorsObserved ? b.antecedentContext.trim() || null : null,
+        intervention_response: b.behaviorsObserved ? b.interventionResponse.trim() || null : null,
+        reportable_incident:   b.behaviorsObserved ? b.reportableIncident : false,
+        positives:             b.positives.trim() || null,
+        trend_vs_recent:       b.trendVsRecent || null,
+      };
+      const { error: behErr } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from("shift_behavior_observations" as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .upsert(obs as any, { onConflict: "shift_id" });
+      if (behErr) {
+        // Non-blocking: shift is already saved. Surface a soft toast.
+        toast.error(`Behavior observations not saved: ${behErr.message}`);
+      }
+    }
+
+
+
 
     const duration = fmtElapsed(
       new Date(clockOut).getTime() - new Date(active.clock_in_timestamp).getTime(),

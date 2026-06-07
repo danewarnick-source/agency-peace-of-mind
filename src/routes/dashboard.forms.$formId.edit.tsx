@@ -93,7 +93,10 @@ function EditForm() {
     try {
       await save({ data: {
         id: formId, name: name.trim(), description, category,
-        fields, frequency, schedule, assigned_groups: groups, assigned_users: users, settings,
+        fields, frequency, schedule,
+        assigned_groups: groups, assigned_users: users,
+        all_clients: allClients, assigned_clients: clients,
+        settings,
       } });
       qc.invalidateQueries({ queryKey: ["form-edit", formId] });
       qc.invalidateQueries({ queryKey: ["forms-admin"] });

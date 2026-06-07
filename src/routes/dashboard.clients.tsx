@@ -1295,16 +1295,7 @@ function ProfileTab({
                 Auto-geocoded via OpenStreetMap on save. Used as the EVV clock-in reference point.
               </p>
             </div>
-            <div className="border-t border-border pt-3">
-              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs"
-                onClick={() => toast.info("NECTAR import: drop a client intake form, referral PDF, or demographics sheet and NECTAR will auto-populate the profile fields.")}>
-                <Sparkles className="h-3.5 w-3.5" />
-                NECTAR Import — Auto-fill from Document
-              </Button>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Upload a referral, intake form, or assessment to auto-populate profile fields.
-              </p>
-            </div>
+            {/* Per-section NECTAR import removed — use the NECTAR Bulk Import button (AI PDF mode) to auto-fill the whole profile. */}
           </CardContent>
         </Card>
 

@@ -64,6 +64,7 @@ import { Route as DashboardClientBillingCodesRouteImport } from './routes/dashbo
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBilling520RouteImport } from './routes/dashboard.billing-520'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
+import { Route as DashboardBehavioristRouteImport } from './routes/dashboard.behaviorist'
 import { Route as DashboardAuthoritativeSourcesRouteImport } from './routes/dashboard.authoritative-sources'
 import { Route as DashboardAuditRouteImport } from './routes/dashboard.audit'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
@@ -107,6 +108,7 @@ import { Route as DashboardBillingNectarRouteImport } from './routes/dashboard.b
 import { Route as DashboardBillingImportsRouteImport } from './routes/dashboard.billing.imports'
 import { Route as DashboardBillingForm520RouteImport } from './routes/dashboard.billing.form520'
 import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard.billing.$clientId'
+import { Route as DashboardBehaviorSupportClientIdRouteImport } from './routes/dashboard.behavior-support.$clientId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
 import { Route as DashboardHiveExecStatesStateCodeRouteImport } from './routes/dashboard.hive-exec.states.$stateCode'
@@ -398,6 +400,11 @@ const DashboardBillingRoute = DashboardBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardBehavioristRoute = DashboardBehavioristRouteImport.update({
+  id: '/behaviorist',
+  path: '/behaviorist',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardAuthoritativeSourcesRoute =
   DashboardAuthoritativeSourcesRouteImport.update({
     id: '/authoritative-sources',
@@ -631,6 +638,12 @@ const DashboardBillingClientIdRoute =
     path: '/$clientId',
     getParentRoute: () => DashboardBillingRoute,
   } as any)
+const DashboardBehaviorSupportClientIdRoute =
+  DashboardBehaviorSupportClientIdRouteImport.update({
+    id: '/behavior-support/$clientId',
+    path: '/behavior-support/$clientId',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardAdminEmarAuditRoute = DashboardAdminEmarAuditRouteImport.update({
   id: '/admin/emar-audit',
   path: '/admin/emar-audit',
@@ -717,6 +730,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
   '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
+  '/dashboard/behaviorist': typeof DashboardBehavioristRoute
   '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
@@ -759,6 +773,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
+  '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
@@ -827,6 +842,7 @@ export interface FileRoutesByTo {
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
   '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
+  '/dashboard/behaviorist': typeof DashboardBehavioristRoute
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
@@ -865,6 +881,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
+  '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
@@ -935,6 +952,7 @@ export interface FileRoutesById {
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
   '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
+  '/dashboard/behaviorist': typeof DashboardBehavioristRoute
   '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
@@ -977,6 +995,7 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
+  '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
@@ -1048,6 +1067,7 @@ export interface FileRouteTypes {
     | '/dashboard/assignments'
     | '/dashboard/audit'
     | '/dashboard/authoritative-sources'
+    | '/dashboard/behaviorist'
     | '/dashboard/billing'
     | '/dashboard/billing-520'
     | '/dashboard/certifications'
@@ -1090,6 +1110,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
+    | '/dashboard/behavior-support/$clientId'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/form520'
     | '/dashboard/billing/imports'
@@ -1158,6 +1179,7 @@ export interface FileRouteTypes {
     | '/dashboard/assignments'
     | '/dashboard/audit'
     | '/dashboard/authoritative-sources'
+    | '/dashboard/behaviorist'
     | '/dashboard/billing-520'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
@@ -1196,6 +1218,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
+    | '/dashboard/behavior-support/$clientId'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/form520'
     | '/dashboard/billing/imports'
@@ -1265,6 +1288,7 @@ export interface FileRouteTypes {
     | '/dashboard/assignments'
     | '/dashboard/audit'
     | '/dashboard/authoritative-sources'
+    | '/dashboard/behaviorist'
     | '/dashboard/billing'
     | '/dashboard/billing-520'
     | '/dashboard/certifications'
@@ -1307,6 +1331,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
+    | '/dashboard/behavior-support/$clientId'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/form520'
     | '/dashboard/billing/imports'
@@ -1764,6 +1789,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBillingRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/behaviorist': {
+      id: '/dashboard/behaviorist'
+      path: '/behaviorist'
+      fullPath: '/dashboard/behaviorist'
+      preLoaderRoute: typeof DashboardBehavioristRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/authoritative-sources': {
       id: '/dashboard/authoritative-sources'
       path: '/authoritative-sources'
@@ -2065,6 +2097,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBillingClientIdRouteImport
       parentRoute: typeof DashboardBillingRoute
     }
+    '/dashboard/behavior-support/$clientId': {
+      id: '/dashboard/behavior-support/$clientId'
+      path: '/behavior-support/$clientId'
+      fullPath: '/dashboard/behavior-support/$clientId'
+      preLoaderRoute: typeof DashboardBehaviorSupportClientIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/admin/emar-audit': {
       id: '/dashboard/admin/emar-audit'
       path: '/admin/emar-audit'
@@ -2325,6 +2364,7 @@ interface DashboardRouteChildren {
   DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
   DashboardAuditRoute: typeof DashboardAuditRoute
   DashboardAuthoritativeSourcesRoute: typeof DashboardAuthoritativeSourcesRoute
+  DashboardBehavioristRoute: typeof DashboardBehavioristRoute
   DashboardBillingRoute: typeof DashboardBillingRouteWithChildren
   DashboardBilling520Route: typeof DashboardBilling520Route
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
@@ -2366,6 +2406,7 @@ interface DashboardRouteChildren {
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardAdminCeHoursRoute: typeof DashboardAdminCeHoursRoute
   DashboardAdminEmarAuditRoute: typeof DashboardAdminEmarAuditRoute
+  DashboardBehaviorSupportClientIdRoute: typeof DashboardBehaviorSupportClientIdRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesCeRoute: typeof DashboardCoursesCeRoute
   DashboardCoursesCoreRoute: typeof DashboardCoursesCoreRoute
@@ -2388,6 +2429,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAssignmentsRoute: DashboardAssignmentsRoute,
   DashboardAuditRoute: DashboardAuditRoute,
   DashboardAuthoritativeSourcesRoute: DashboardAuthoritativeSourcesRoute,
+  DashboardBehavioristRoute: DashboardBehavioristRoute,
   DashboardBillingRoute: DashboardBillingRouteWithChildren,
   DashboardBilling520Route: DashboardBilling520Route,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
@@ -2429,6 +2471,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardAdminCeHoursRoute: DashboardAdminCeHoursRoute,
   DashboardAdminEmarAuditRoute: DashboardAdminEmarAuditRoute,
+  DashboardBehaviorSupportClientIdRoute: DashboardBehaviorSupportClientIdRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesCeRoute: DashboardCoursesCeRoute,
   DashboardCoursesCoreRoute: DashboardCoursesCoreRoute,

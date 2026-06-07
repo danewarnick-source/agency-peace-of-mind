@@ -21,17 +21,27 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   extractClientFromPdf,
+  extractClientFromDocx,
   commitClientFromPdf,
   type ExtractedClient,
 } from "@/lib/pdf-import.functions";
 import { EVV_SERVICE_CODES, evvServiceLabel } from "@/lib/evv-codes";
+import { Checkbox } from "@/components/ui/checkbox";
 
-const ACCEPT_EXT = [".pdf"];
-const ACCEPT_MIME = ["application/pdf"];
+const ACCEPT_EXT = [".pdf", ".docx"];
+const ACCEPT_MIME = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 
 function isAcceptedFile(file: File): boolean {
   const name = file.name.toLowerCase();
   return ACCEPT_EXT.some((ext) => name.endsWith(ext)) || ACCEPT_MIME.includes(file.type);
+}
+
+function isDocx(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".docx") ||
+    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 }
 
 function emptyData(): ExtractedClient {

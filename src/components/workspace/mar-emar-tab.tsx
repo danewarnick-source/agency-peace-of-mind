@@ -1059,8 +1059,28 @@ export function MarEmarTab({
 }) {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
+  const { data: activeShift } = useActiveShift();
   const qc = useQueryClient();
   const orgId = org?.organization_id;
+
+  // ── Realtime: any INSERT to emar_logs for this client refetches every
+  //    open dashboard so the MAR stays in sync across all staff/job codes.
+  useEffect(() => {
+    if (!clientId || !orgId) return;
+    const channel = supabase
+      .channel(`emar_logs:client:${clientId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "emar_logs", filter: `client_id=eq.${clientId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["mar-logs-today", clientId, orgId] });
+          qc.invalidateQueries({ queryKey: ["mar-logs-month", clientId, orgId] });
+          qc.invalidateQueries({ queryKey: ["mar-logs-cal", clientId] });
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [clientId, orgId, qc]);
 
   const [activePass, setActivePass] = useState<{
     med: Medication;

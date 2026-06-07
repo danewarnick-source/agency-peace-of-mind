@@ -210,7 +210,8 @@ function EditForm() {
             <ul className="space-y-1 text-muted-foreground">
               <li>• Records → Forms (always)</li>
               <li>• {FORM_CATEGORIES.find((c) => c.value === category)?.label}</li>
-              <li>• Audience: <Badge variant="outline" className="text-[10px]">{(groups.length || users.length) ? `${groups.length} groups · ${users.length} staff` : "Not assigned"}</Badge></li>
+              <li>• Staff: <Badge variant="outline" className="text-[10px]">{(groups.length || users.length) ? `${groups.length} groups · ${users.length} staff` : "Not assigned"}</Badge></li>
+              <li>• Clients: <Badge variant="outline" className="text-[10px]">{allClients ? "All clients" : `${clients.length} client${clients.length === 1 ? "" : "s"}`}</Badge></li>
               <li>• <CalendarClock className="inline h-3 w-3" /> {describeFrequency(frequency, schedule)}</li>
             </ul>
           </Card>

@@ -171,7 +171,7 @@ function StaffList() {
                   </div>
                   <Badge variant={overdue ? "destructive" : "secondary"}>{overdue ? "Overdue" : "Due"} {formatDue(due)}</Badge>
                 </div>
-                <Button size="sm" className="mt-3 min-h-[40px]"><Send className="mr-1.5 h-3.5 w-3.5" /> Start</Button>
+                <Button size="sm" className="mt-3 min-h-[40px]"><Send className="mr-1.5 h-3.5 w-3.5" /> Complete form</Button>
               </Link>
             );
           })}

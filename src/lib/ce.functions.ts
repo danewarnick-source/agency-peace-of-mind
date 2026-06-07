@@ -181,26 +181,39 @@ function validateSteps(steps: unknown): CeStep[] {
   const lessons = out.filter((s) => s.type === "lesson").length;
   const checks = out.filter((s) => s.type === "check").length;
   const reflects = out.filter((s) => s.type === "reflect").length;
-  // Soft floor — if sources are thin, the AI may emit fewer than 5 pairs
-  // (admin is flagged separately). Always require some teaching + a reflection.
+  const totalSlides = out.length;
+  // 30-slide / ~60-minute floor (≈2 minutes per slide). When sources are
+  // genuinely thin the AI sets material_short=true and the caller treats it
+  // as a hold-and-flag — we still require minimum teaching shape here.
   if (lessons < 3) throw new Error(`Module floor not met: needs ≥3 lessons (got ${lessons}).`);
   if (checks < 3) throw new Error(`Module floor not met: needs ≥3 scenario checks (got ${checks}).`);
   if (reflects !== 1) throw new Error("Module must end with exactly one reflection.");
   return out;
 }
 
+/** True when the generated module reaches the 30-slide / ~60-minute floor. */
+function meetsFullHourFloor(steps: CeStep[]): boolean {
+  return steps.length >= 30;
+}
+
 // ──────────────── Nectar AI call ───────────────────────────────────────────
 
-async function callNectarForCe(prompt: string): Promise<{ steps: CeStep[]; materialShort: boolean }> {
+async function callNectarForCe(prompt: string): Promise<{ steps: CeStep[]; materialShort: boolean; topicsNeedingSources: string[]; adminNotes: string }> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
 
   const system = `You are NECTAR, a coaching engine that builds a monthly Continuing Education review for an experienced DSPD direct-support staff member.
 
-ABSOLUTE GROUND RULE — source-grounded teaching only.
+ABSOLUTE GROUND RULE — verify-then-build, source-grounded teaching only.
 You may build this review ONLY from:
   (a) the AUTHORITATIVE SOURCES the provider has uploaded (State SOW, contracts, DSPD/DHS requirements, the provider's own policies & procedures, person-specific care plans, and any approved curriculum the provider uploaded), AND
   (b) the staff member's factual event records for the prior month (incidents, medication events, caseload).
+
+GENERATION PRIORITY (build in this order):
+  1. ADMIN-SUGGESTED FOCUS TOPICS for this staff member (if any are provided). Treat each as WHAT TO FOCUS ON — never as authoritative content. For each topic, find the supporting passages in the authoritative sources and build grounded, cited teaching on it. If a suggested topic is not covered by any uploaded source, do NOT write it freehand: omit it from the staff-facing content and add it to "admin_flags.topics_needing_sources".
+  2. THE STAFF MEMBER'S PRIOR MONTH — incidents, shift/med events, caseload changes — compared against the sources (verified coaching, every substantive claim tied to a source).
+  3. DEEP-DIVE FALLBACK — an in-depth, source-grounded review of important recurring topics (deeper than the introductory 30-day Core Training), prioritizing required annual topics not yet covered this CE year — used to reach the 30-slide / ~60-minute floor.
+  4. LAST RESORT — if the sources genuinely cannot produce 30 grounded slides, set "material_short": true and produce a shorter but fully-sourced review.
 
 You are the TEACHER of that material. You SHOULD expound on it:
   - Explain a source clause in plain language; summarize and reorganize dense policy into a clear lesson.
@@ -214,31 +227,36 @@ You MUST NOT:
   - Override, contradict, or "improve on" a source using outside knowledge.
   - Fill a gap in the source with invented specifics. If the source is silent on a needed clinical point, explain what the source DOES say, then route the staff member to the nurse / the person's care plan / their supervisor — do NOT supply the missing fact.
   - Present your own explanation, example, or illustration as if it were the authority or a new requirement.
-  - Pad the hour with generic CPR / choking / seizure / first-aid content that is not in any provided source.
+  - Pad to reach 30 slides with generic CPR / choking / seizure / first-aid content that is not in any provided source. If you cannot reach 30 grounded slides, set material_short=true and STOP.
+  - Show staff an "UNVERIFIED" badge or any unverified section — anything you cannot verify against a source is dropped from the staff view and surfaced to the admin via "admin_flags".
 
 CITATIONS.
   - Every "lesson" step MUST set "citation" to the source document title and (where possible) clause/section it is built on (e.g. "Provider P&P §3.2 – Medication Administration"). If the lesson is a coaching reflection on a real event, "citation" may be the event reference (e.g. "Incident #2026-0034 + Provider P&P §5.1").
   - Explanation, examples, and application exercises do not each need a per-sentence citation, but they must not introduce new substantive facts.
   - Keep a clear voice distinction: when quoting/summarizing a source, say so ("The agency's policy says…"); when explaining or illustrating, say so ("In plain language…", "For example…").
 
-INSUFFICIENT MATERIAL.
-  - Fill what you responsibly can from the provided sources and events.
-  - If there genuinely isn't enough sourced material to fill ~60 minutes, set "material_short": true and produce a shorter but fully-sourced review. Do NOT pad.
-  - When material is short, include one lesson titled "What's missing" that lists, in plain language, the topics that would normally be covered but were not in the uploaded sources, so the admin knows what to upload.
+LENGTH FLOOR.
+  - Aim for AT LEAST 30 total steps (≈ 2 minutes per slide ≈ 60 minutes of material). Lessons + checks together should comfortably reach 30 when sources support it. The final reflect step counts toward the total.
+  - Fill the 30 with grounded material only, per the priority list above.
+  - If genuinely impossible from the uploaded sources, set "material_short": true and include one lesson titled "What's missing" listing the topics that would normally be covered.
 
 OUTPUT — STRICT JSON, no markdown, matching this shape:
 {
   "material_short": false,
+  "admin_flags": {
+    "topics_needing_sources": ["<suggested topic the uploaded sources don't cover>", "..."],
+    "notes": "<short admin-facing note about gaps, if any>"
+  },
   "steps": [
     {"type":"nectar","body":"<plain-language intro: what sources and events this review was built from, and what it covers>"},
     {"type":"lesson","kicker":"...","title":"...","body":"...","citation":"Source title §clause","facts":[["bold lead","detail"]]},
     {"type":"check","kicker":"...","stem":"...","options":[{"label":"A","text":"...","correct":false,"feedback":"..."}, ...]},
-    ... more lesson/check pairs, each lesson grounded in a cited source ...,
+    ... more lesson/check pairs, each lesson grounded in a cited source, until ≥30 total steps ...,
     {"type":"reflect","kicker":"Reflection","prompt":"<final reflection prompt grounded in the sourced material, free text required, ≥150 chars>"}
   ]
 }
 
-FLOOR: at least 3 lesson+check pairs and exactly 1 reflect. Aim for ~60 minutes when sources support it. Every check has 3–4 options, exactly one correct, every option gets per-option feedback. Plain language. No markdown inside body strings.`;
+FLOOR: at least 3 lesson+check pairs and exactly 1 reflect. Target ≥30 total steps. Every check has 3–4 options, exactly one correct, every option gets per-option feedback. Plain language. No markdown inside body strings.`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -261,11 +279,17 @@ FLOOR: at least 3 lesson+check pairs and exactly 1 reflect. Aim for ~60 minutes 
   if (!res.ok) throw new Error(`Nectar generation failed (${res.status}).`);
   const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
   const raw = json.choices?.[0]?.message?.content ?? "{}";
-  let parsed: { steps?: unknown; material_short?: unknown };
+  let parsed: { steps?: unknown; material_short?: unknown; admin_flags?: { topics_needing_sources?: unknown; notes?: unknown } };
   try { parsed = JSON.parse(raw); } catch { throw new Error("Nectar returned non-JSON."); }
+  const flags = (parsed.admin_flags ?? {}) as { topics_needing_sources?: unknown; notes?: unknown };
+  const topicsNeedingSources = Array.isArray(flags.topics_needing_sources)
+    ? (flags.topics_needing_sources as unknown[]).map((t) => String(t)).filter(Boolean).slice(0, 25)
+    : [];
   return {
     steps: validateSteps(parsed.steps),
     materialShort: Boolean(parsed.material_short),
+    topicsNeedingSources,
+    adminNotes: typeof flags.notes === "string" ? flags.notes.slice(0, 800) : "",
   };
 }
 
@@ -275,10 +299,19 @@ async function gatherCeContext(
   supabase: ReturnType<typeof getSupabase>,
   orgId: string,
   staffId: string,
-): Promise<{ prompt: string; summary: string; sourceTitles: string[]; sourceCount: number }> {
+): Promise<{ prompt: string; summary: string; sourceTitles: string[]; sourceCount: number; suggestedTopics: string[] }> {
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - 35);
   const sinceIso = since.toISOString();
+
+  // ---- Admin-suggested CE focus topics for this staff member ----
+  const profQ = await supabase
+    .from("profiles")
+    .select("ce_suggested_topics")
+    .eq("id", staffId)
+    .maybeSingle();
+  const suggestedTopics = ((profQ.data as { ce_suggested_topics: string[] | null } | null)?.ce_suggested_topics ?? [])
+    .map((t) => String(t)).filter(Boolean).slice(0, 25);
 
   // ---- (a) Authoritative sources for the org (current versions only) ----
   const srcQ = await supabase
@@ -403,7 +436,11 @@ async function gatherCeContext(
 You may explain, illustrate, and apply this material — but you must NOT introduce new substantive facts, clinical specifics, thresholds, or procedure steps that are not in the provided sources. If a needed clinical specific is absent, route to the nurse / care plan / supervisor instead of supplying it.
 
 Cite the source (title + clause/section when possible) on every lesson.
-If sources are too thin to responsibly fill ~60 minutes, set material_short=true and produce a shorter but fully-sourced review with a "What's missing" lesson.
+Target ≥30 total steps (~60 minutes at ~2 min/slide). If the uploaded sources cannot responsibly produce 30 grounded steps, set material_short=true and produce a shorter but fully-sourced review with a "What's missing" lesson — never pad.
+
+=== ADMIN-SUGGESTED FOCUS TOPICS (prioritize; treat as focus areas, NOT as authoritative content) ===
+${JSON.stringify(suggestedTopics)}
+For each focus topic: search ALL authoritative sources below for supporting passages and build cited teaching on what is covered. For any topic the sources do not cover, OMIT it from the staff-facing review and add it to admin_flags.topics_needing_sources verbatim — do not write freehand on it.
 
 === AUTHORITATIVE SOURCES (provider-uploaded) ===
 ${JSON.stringify(sourcePack).slice(0, 40000)}
@@ -414,7 +451,7 @@ ${JSON.stringify(clientPack).slice(0, 20000)}
 === STAFF MEMBER'S FACTUAL EVENT RECORDS (prior ~30 days) ===
 ${JSON.stringify(events).slice(0, 12000)}`;
 
-  return { prompt, summary, sourceTitles, sourceCount: sourcePack.length + clientPack.length };
+  return { prompt, summary, sourceTitles, sourceCount: sourcePack.length + clientPack.length, suggestedTopics };
 }
 
 // ──────────────── Server functions ─────────────────────────────────────────
@@ -551,10 +588,18 @@ export const ensureCurrentCeModule = createServerFn({ method: "POST" })
       const sourceList = gathered.sourceTitles.length > 0
         ? `Sources: ${gathered.sourceTitles.slice(0, 8).join("; ")}${gathered.sourceTitles.length > 8 ? `, +${gathered.sourceTitles.length - 8} more` : ""}`
         : "Sources: (none uploaded yet)";
-      const shortFlag = (result.materialShort || gathered.sourceCount === 0)
-        ? " ⚠ Insufficient authoritative source material — admin should upload more sources so future CE reviews are richer."
+      const belowFloor = !meetsFullHourFloor(steps);
+      const shortFlag = (result.materialShort || gathered.sourceCount === 0 || belowFloor)
+        ? ` ⚠ Authoritative sources couldn't produce the full 30-slide / ~60-minute review (got ${steps.length} steps). Admin should upload more sources so future CE reviews are richer.`
         : "";
-      summary = `Built from the agency's Authoritative Sources + this staff member's prior-30-day records. ${gathered.summary}. ${sourceList}.${shortFlag}`;
+      const topicsFlag = result.topicsNeedingSources.length > 0
+        ? ` ⚠ Suggested CE topics not covered by uploaded sources — upload material on: ${result.topicsNeedingSources.join("; ")}.`
+        : "";
+      const focusList = gathered.suggestedTopics.length > 0
+        ? ` Admin focus topics: ${gathered.suggestedTopics.join("; ")}.`
+        : "";
+      const notes = result.adminNotes ? ` Admin notes: ${result.adminNotes}` : "";
+      summary = `Built from the agency's Authoritative Sources + this staff member's prior-30-day records. ${gathered.summary}. ${sourceList}.${focusList}${shortFlag}${topicsFlag}${notes}`;
     } catch (err) {
       await supabase.from("ce_modules").update({ status: "failed", source_summary: (err as Error).message }).eq("id", modId);
       throw err;

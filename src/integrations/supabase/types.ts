@@ -5075,6 +5075,7 @@ export type Database = {
         Row: {
           account_status: string
           agency_name: string | null
+          ce_suggested_topics: string[]
           created_at: string
           daily_rate: number | null
           date_of_birth: string | null
@@ -5106,6 +5107,7 @@ export type Database = {
         Insert: {
           account_status?: string
           agency_name?: string | null
+          ce_suggested_topics?: string[]
           created_at?: string
           daily_rate?: number | null
           date_of_birth?: string | null
@@ -5137,6 +5139,7 @@ export type Database = {
         Update: {
           account_status?: string
           agency_name?: string | null
+          ce_suggested_topics?: string[]
           created_at?: string
           daily_rate?: number | null
           date_of_birth?: string | null

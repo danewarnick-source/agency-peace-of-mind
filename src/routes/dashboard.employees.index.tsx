@@ -23,6 +23,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
+import { SuggestedTopicsInput } from "@/components/ce/suggested-topics-input";
 
 function genPassword(len = 14) {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -60,6 +61,7 @@ type EditableMember = {
   dailyRate: string;
   startDate: string;
   endDate: string;
+  ceSuggestedTopics: string[];
 };
 
 function EmployeesPage() {
@@ -73,6 +75,7 @@ function EmployeesPage() {
   const [tempPassword, setTempPassword] = useState(() => genPassword());
   const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
   const [editingMember, setEditingMember] = useState<EditableMember | null>(null);
+  const [editTopics, setEditTopics] = useState<string[]>([]);
   const [editDirty, setEditDirty] = useState(false);
   const [caseloadFor, setCaseloadFor] = useState<{ id: string; name: string; role: string } | null>(null);
 
@@ -101,7 +104,7 @@ function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, account_status, worker_type" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, account_status, worker_type, ce_suggested_topics" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
@@ -241,6 +244,7 @@ function EmployeesPage() {
           start_date: input.startDate || null,
           end_date: input.endDate || null,
           hire_date: input.startDate || null,
+          ce_suggested_topics: input.ceSuggestedTopics ?? [],
         } as any)
         .eq("id", input.userId);
       if (pErr) throw pErr;
@@ -361,21 +365,26 @@ function EmployeesPage() {
                   <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
 
                   <td className="p-4 text-right whitespace-nowrap">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingMember({
-                      membershipId: m.id,
-                      userId: m.user_id,
-                      fullName: m.profile?.full_name ?? "",
-                      email: m.profile?.email ?? "",
-                      employeeId: m.profile?.employee_id ?? "",
-                      role: m.role as Role,
-                      active: m.active,
-                      position,
-                      workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
-                      hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
-                      dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
-                      startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
-                      endDate: (m.profile?.end_date ?? "") as string,
-                    })}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      const topics = ((m.profile as { ce_suggested_topics?: string[] | null } | undefined)?.ce_suggested_topics ?? []) as string[];
+                      setEditTopics(topics);
+                      setEditingMember({
+                        membershipId: m.id,
+                        userId: m.user_id,
+                        fullName: m.profile?.full_name ?? "",
+                        email: m.profile?.email ?? "",
+                        employeeId: m.profile?.employee_id ?? "",
+                        role: m.role as Role,
+                        active: m.active,
+                        position,
+                        workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
+                        hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
+                        dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
+                        startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
+                        endDate: (m.profile?.end_date ?? "") as string,
+                        ceSuggestedTopics: topics,
+                      });
+                    }}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
                     <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
                       <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload
                     </Button>
@@ -583,6 +592,7 @@ function EmployeesPage() {
                   dailyRate: String(fd.get("daily_rate") || "").trim(),
                   startDate: String(fd.get("start_date") || "").trim(),
                   endDate: String(fd.get("end_date") || "").trim(),
+                  ceSuggestedTopics: editTopics,
                 });
                 setEditDirty(false);
               }}
@@ -685,6 +695,11 @@ function EmployeesPage() {
                   </div>
                 </div>
               </div>
+
+              <SuggestedTopicsInput
+                value={editTopics}
+                onChange={(next) => { setEditTopics(next); if (!editDirty) setEditDirty(true); }}
+              />
               <CustomAttributesSection
                 organizationId={org?.organization_id}
                 entityKind="employee"

@@ -739,20 +739,6 @@ function CareBillingCodesEditor({
   );
 }
 
-// ─── Rights & safeguards (link-out card) ──────────────────────────────────────
-function RightsSafeguardsCard({ clientId }: { clientId: string }) {
-  void clientId;
-        <Button asChild variant="outline" size="sm" className="gap-1.5 self-start md:self-auto">
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          <Link to={linkTo as any} params={linkParams as any}>
-            {linkLabel} <ExternalLink className="h-3 w-3" />
-          </Link>
-        </Button>
-      </header>
-      <div className="p-4">{children}</div>
-    </section>
-  );
-}
 
 // ─── Rights & safeguards (link-out card) ──────────────────────────────────────
 function RightsSafeguardsCard({ clientId }: { clientId: string }) {

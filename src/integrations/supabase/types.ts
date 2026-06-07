@@ -524,6 +524,370 @@ export type Database = {
           },
         ]
       }
+      bc_behaviors: {
+        Row: {
+          approved_at: string | null
+          approved_by_user_id: string | null
+          bsp_citation: string
+          client_id: string
+          created_at: string
+          data_method: string
+          drafted_by_user_id: string | null
+          expected_cadence: string
+          id: string
+          last_logged_at: string | null
+          name: string
+          operational_definition: string
+          organization_id: string
+          published_at: string | null
+          published_by_user_id: string | null
+          source: Database["public"]["Enums"]["bc_behavior_source"]
+          status: Database["public"]["Enums"]["bc_behavior_status"]
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by_user_id?: string | null
+          bsp_citation?: string
+          client_id: string
+          created_at?: string
+          data_method?: string
+          drafted_by_user_id?: string | null
+          expected_cadence?: string
+          id?: string
+          last_logged_at?: string | null
+          name: string
+          operational_definition?: string
+          organization_id: string
+          published_at?: string | null
+          published_by_user_id?: string | null
+          source?: Database["public"]["Enums"]["bc_behavior_source"]
+          status?: Database["public"]["Enums"]["bc_behavior_status"]
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by_user_id?: string | null
+          bsp_citation?: string
+          client_id?: string
+          created_at?: string
+          data_method?: string
+          drafted_by_user_id?: string | null
+          expected_cadence?: string
+          id?: string
+          last_logged_at?: string | null
+          name?: string
+          operational_definition?: string
+          organization_id?: string
+          published_at?: string | null
+          published_by_user_id?: string | null
+          source?: Database["public"]["Enums"]["bc_behavior_source"]
+          status?: Database["public"]["Enums"]["bc_behavior_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bc_behaviors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bc_behaviors_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bc_data_entries: {
+        Row: {
+          abc_antecedent: string
+          abc_behavior: string
+          abc_consequence: string
+          behavior_id: string
+          client_id: string
+          count: number | null
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          intensity: number | null
+          note: string
+          occurred_at: string
+          organization_id: string
+          staff_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          abc_antecedent?: string
+          abc_behavior?: string
+          abc_consequence?: string
+          behavior_id: string
+          client_id: string
+          count?: number | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          intensity?: number | null
+          note?: string
+          occurred_at?: string
+          organization_id: string
+          staff_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          abc_antecedent?: string
+          abc_behavior?: string
+          abc_consequence?: string
+          behavior_id?: string
+          client_id?: string
+          count?: number | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          intensity?: number | null
+          note?: string
+          occurred_at?: string
+          organization_id?: string
+          staff_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bc_data_entries_behavior_id_fkey"
+            columns: ["behavior_id"]
+            isOneToOne: false
+            referencedRelation: "bc_behaviors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bc_data_entries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bc_data_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bc_documents: {
+        Row: {
+          client_id: string
+          created_at: string
+          doc_type: Database["public"]["Enums"]["bc_doc_type"]
+          id: string
+          is_current: boolean
+          organization_id: string
+          storage_path: string
+          updated_at: string
+          uploaded_at: string
+          uploaded_by_user_id: string
+          version: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          doc_type: Database["public"]["Enums"]["bc_doc_type"]
+          id?: string
+          is_current?: boolean
+          organization_id: string
+          storage_path: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by_user_id: string
+          version?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          doc_type?: Database["public"]["Enums"]["bc_doc_type"]
+          id?: string
+          is_current?: boolean
+          organization_id?: string
+          storage_path?: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by_user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bc_documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bc_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bc_flags: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by_user_id: string | null
+          client_id: string
+          created_at: string
+          detail: string
+          flag_type: Database["public"]["Enums"]["bc_flag_type"]
+          id: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by_user_id?: string | null
+          client_id: string
+          created_at?: string
+          detail?: string
+          flag_type: Database["public"]["Enums"]["bc_flag_type"]
+          id?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by_user_id?: string | null
+          client_id?: string
+          created_at?: string
+          detail?: string
+          flag_type?: Database["public"]["Enums"]["bc_flag_type"]
+          id?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bc_flags_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bc_flags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bc_review_notes: {
+        Row: {
+          author_user_id: string
+          body: string
+          client_id: string
+          created_at: string
+          id: string
+          note_type: Database["public"]["Enums"]["bc_review_note_type"]
+          organization_id: string
+          period_end: string | null
+          period_start: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_user_id: string
+          body?: string
+          client_id: string
+          created_at?: string
+          id?: string
+          note_type?: Database["public"]["Enums"]["bc_review_note_type"]
+          organization_id: string
+          period_end?: string | null
+          period_start?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string
+          body?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          note_type?: Database["public"]["Enums"]["bc_review_note_type"]
+          organization_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bc_review_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bc_review_notes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      behavior_support_clients: {
+        Row: {
+          assigned_behaviorist_user_id: string | null
+          bc_code: Database["public"]["Enums"]["bc_code"]
+          client_id: string
+          created_at: string
+          features_enabled: boolean
+          id: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_behaviorist_user_id?: string | null
+          bc_code: Database["public"]["Enums"]["bc_code"]
+          client_id: string
+          created_at?: string
+          features_enabled?: boolean
+          id?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_behaviorist_user_id?: string | null
+          bc_code?: Database["public"]["Enums"]["bc_code"]
+          client_id?: string
+          created_at?: string
+          features_enabled?: boolean
+          id?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavior_support_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "behavior_support_clients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_submission_audit_log: {
         Row: {
           action: string
@@ -5287,6 +5651,7 @@ export type Database = {
         Row: {
           account_status: string
           agency_name: string | null
+          bc_role: Database["public"]["Enums"]["bc_code"] | null
           ce_suggested_topics: string[]
           created_at: string
           daily_rate: number | null
@@ -5319,6 +5684,7 @@ export type Database = {
         Insert: {
           account_status?: string
           agency_name?: string | null
+          bc_role?: Database["public"]["Enums"]["bc_code"] | null
           ce_suggested_topics?: string[]
           created_at?: string
           daily_rate?: number | null
@@ -5351,6 +5717,7 @@ export type Database = {
         Update: {
           account_status?: string
           agency_name?: string | null
+          bc_role?: Database["public"]["Enums"]["bc_code"] | null
           ce_suggested_topics?: string[]
           created_at?: string
           daily_rate?: number | null
@@ -7831,6 +8198,12 @@ export type Database = {
         | "super_admin"
         | "committee_member"
       assignment_status: "not_started" | "in_progress" | "completed" | "overdue"
+      bc_behavior_source: "nectar" | "manual"
+      bc_behavior_status: "draft" | "approved" | "published" | "archived"
+      bc_code: "BC1" | "BC2" | "BC3"
+      bc_doc_type: "FBA" | "BSP"
+      bc_flag_type: "credential_mismatch" | "deadline_overdue" | "coverage_gap"
+      bc_review_note_type: "monthly_review" | "note"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
       hive_ticket_category:
         | "structural_gap"
@@ -8002,6 +8375,12 @@ export const Constants = {
         "committee_member",
       ],
       assignment_status: ["not_started", "in_progress", "completed", "overdue"],
+      bc_behavior_source: ["nectar", "manual"],
+      bc_behavior_status: ["draft", "approved", "published", "archived"],
+      bc_code: ["BC1", "BC2", "BC3"],
+      bc_doc_type: ["FBA", "BSP"],
+      bc_flag_type: ["credential_mismatch", "deadline_overdue", "coverage_gap"],
+      bc_review_note_type: ["monthly_review", "note"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
       hive_ticket_category: [
         "structural_gap",

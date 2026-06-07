@@ -527,6 +527,8 @@ function ClientWorkspace({
             linkTo="/dashboard/teams"
             linkLabel="Open Teams & Homes"
             icon={Users}
+            storageKey={`${client.id}:placement`}
+            summary="Team & home assignment"
           >
             <StaffAssignmentTab clientId={client.id} orgId={orgId} />
           </CareSectionShell>
@@ -538,6 +540,12 @@ function ClientWorkspace({
             linkParams={{ clientId: client.id }}
             linkLabel="Open Billing"
             icon={ClipboardList}
+            storageKey={`${client.id}:billing`}
+            summary={
+              (client.job_code ?? []).length
+                ? `${(client.job_code ?? []).length} code${(client.job_code ?? []).length === 1 ? "" : "s"} · ${(client.job_code ?? []).join(", ")}`
+                : "No codes"
+            }
           >
             <CareBillingCodesEditor client={client} onSave={onSave} saving={saving} />
             <div className="mt-4">
@@ -555,6 +563,8 @@ function ClientWorkspace({
             linkTo="/dashboard/hub/clients"
             linkLabel="Open Clients Hub"
             icon={Sparkles}
+            storageKey={`${client.id}:goals`}
+            summary={`${(client.pcsp_goals ?? []).length} goal${(client.pcsp_goals ?? []).length === 1 ? "" : "s"}`}
           >
             <PcspTab client={client} onSave={onSave} saving={saving} />
           </CareSectionShell>
@@ -565,6 +575,8 @@ function ClientWorkspace({
             linkTo="/dashboard/hub/clients"
             linkLabel="Open Clients Hub"
             icon={CheckCircle2}
+            storageKey={`${client.id}:intake`}
+            summary="State-specific intake"
           >
             <ClientIntakeChecklistCard
               organizationId={orgId}
@@ -581,6 +593,8 @@ function ClientWorkspace({
               linkParams={{ clientId: client.id }}
               linkLabel="Open workspace"
               icon={Pill}
+              storageKey={`${client.id}:meds`}
+              summary="Prescriptions & MAR"
             >
               <div className="space-y-4">
                 <MedicationsManager clientId={client.id} organizationId={orgId} />
@@ -596,6 +610,8 @@ function ClientWorkspace({
             linkParams={{ clientId: client.id }}
             linkLabel="Open Behavior Support"
             icon={Brain}
+            storageKey={`${client.id}:bsp`}
+            summary="BSP status"
           >
             <BehaviorSupportConfigCard
               clientId={client.id}
@@ -611,28 +627,67 @@ function ClientWorkspace({
             title="Feature configuration"
             description="Enable or disable specific platform features for this client."
             icon={Settings2}
+            storageKey={`${client.id}:features`}
+            summary="Per-client feature toggles"
           >
             <SettingsTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
           </CollapsibleCard>
         </TabsContent>
 
         {/* ACTIVITY — read-only date-sorted feed of client-linked records */}
-        <TabsContent value="activity" className="mt-5">
-          <ClientActivityFeed organizationId={orgId} clientId={client.id} />
+        <TabsContent value="activity" className="mt-5 space-y-6">
+          <CollapsibleCard
+            title="Activity feed"
+            description="Chronological list of forms, MAR entries, notes, incidents and shifts for this client."
+            icon={ActivityIcon}
+            storageKey={`${client.id}:activity`}
+            summary="Recent client activity"
+          >
+            <ClientActivityFeed organizationId={orgId} clientId={client.id} />
+          </CollapsibleCard>
         </TabsContent>
 
         {/* FUNDS — this client's money: trust account + loan agreements */}
-        <TabsContent value="funds" className="mt-5">
-          <ClientFundsTab organizationId={orgId} clientId={client.id} />
+        <TabsContent value="funds" className="mt-5 space-y-6">
+          <CollapsibleCard
+            title="Trust account & loans"
+            description="Personal funds, spending log, and active loan agreements for this client."
+            icon={Wallet}
+            storageKey={`${client.id}:funds`}
+            summary="Trust funds & loans"
+          >
+            <ClientFundsTab organizationId={orgId} clientId={client.id} />
+          </CollapsibleCard>
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-// ─── Care section shell ───────────────────────────────────────────────────────
+// ─── Session-scoped expand/collapse memory ───────────────────────────────────
+function useSessionToggle(key: string | undefined, defaultOpen: boolean) {
+  const [open, setOpen] = useState<boolean>(() => {
+    if (!key || typeof window === "undefined") return defaultOpen;
+    try {
+      const v = window.sessionStorage.getItem(`clients:section:${key}`);
+      return v == null ? defaultOpen : v === "1";
+    } catch {
+      return defaultOpen;
+    }
+  });
+  useEffect(() => {
+    if (!key || typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(`clients:section:${key}`, open ? "1" : "0");
+    } catch { /* ignore */ }
+  }, [key, open]);
+  return [open, setOpen] as const;
+}
+
+// ─── Care section shell (collapsible) ────────────────────────────────────────
 function CareSectionShell({
   title, description, linkTo, linkParams, linkLabel, children, icon: Icon,
+  summary, defaultOpen = false, storageKey,
 }: {
   title: string;
   description: string;
@@ -643,17 +698,36 @@ function CareSectionShell({
   children: React.ReactNode;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon?: any;
+  summary?: string;
+  defaultOpen?: boolean;
+  storageKey?: string;
 }) {
+  const [open, setOpen] = useSessionToggle(storageKey, defaultOpen);
   return (
     <section className="rounded-xl border border-border/60 bg-card p-1">
       <header className="flex flex-col gap-2 px-4 pt-4 pb-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-start gap-2.5">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex flex-1 items-start gap-2.5 text-left min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-md -mx-1 px-1"
+        >
+          <ChevronRight
+            className={`mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}
+          />
           {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />}
-          <div>
-            <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+              {!open && summary && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {summary}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">{description}</p>
           </div>
-        </div>
+        </button>
         <Button asChild variant="ghost" size="sm" className="gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground md:self-auto">
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           <Link to={linkTo as any} params={linkParams as any}>
@@ -661,14 +735,15 @@ function CareSectionShell({
           </Link>
         </Button>
       </header>
-      <div className="px-4 pb-4">{children}</div>
+      {open && <div className="px-4 pb-4">{children}</div>}
     </section>
   );
 }
 
-// ─── Collapsible card (for rarely-edited blocks) ──────────────────────────────
+// ─── Collapsible card (generic) ──────────────────────────────────────────────
 function CollapsibleCard({
   title, description, icon: Icon, children, defaultOpen = false,
+  summary, storageKey, tone = "default",
 }: {
   title: string;
   description?: string;
@@ -676,23 +751,48 @@ function CollapsibleCard({
   icon?: any;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  summary?: string;
+  storageKey?: string;
+  tone?: "default" | "amber" | "primary";
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useSessionToggle(storageKey, defaultOpen);
+  const toneClasses =
+    tone === "amber"
+      ? "border-amber-500/60 bg-amber-50/60 dark:bg-amber-950/20"
+      : tone === "primary"
+        ? "border-primary/20 bg-primary/5"
+        : "border-border/60 bg-card";
+  const iconColor =
+    tone === "amber" ? "text-amber-600"
+      : tone === "primary" ? "text-primary"
+        : "text-[#137182]";
+  const titleColor =
+    tone === "amber" ? "text-amber-900 dark:text-amber-100"
+      : tone === "primary" ? "text-primary"
+        : "text-[#0B1126]";
   return (
-    <section className="rounded-xl border border-border/60 bg-card">
+    <section className={`rounded-xl border ${toneClasses}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl"
       >
-        <div className="flex items-start gap-2.5">
-          {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />}
-          <div>
-            <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+          {Icon && <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${iconColor}`} />}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className={`text-base font-medium ${titleColor}`}>{title}</h3>
+              {!open && summary && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {summary}
+                </span>
+              )}
+            </div>
             {description && <p className="text-xs text-muted-foreground">{description}</p>}
           </div>
         </div>
-        <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+        <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
       {open && <div className="px-4 pb-4">{children}</div>}
     </section>
@@ -740,27 +840,17 @@ function CareBillingCodesEditor({
 }
 
 
-// ─── Rights & safeguards (link-out card) ──────────────────────────────────────
+// ─── Rights & safeguards (collapsible link-out card) ─────────────────────────
 function RightsSafeguardsCard({ clientId }: { clientId: string }) {
-  void clientId;
   return (
-    <section className="rounded-lg border border-border bg-card">
-      <header className="flex flex-col gap-2 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">
-            Rights & safeguards
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            Rights-restriction status and HRC review workflow live in the HRC module.
-          </p>
-        </div>
-        <Button asChild variant="outline" size="sm" className="gap-1.5 self-start md:self-auto">
-          <Link to="/dashboard/hrc">
-            Open HRC <ExternalLink className="h-3 w-3" />
-          </Link>
-        </Button>
-      </header>
-      <div className="px-4 py-6 text-sm text-muted-foreground">
+    <CollapsibleCard
+      title="Rights & safeguards"
+      description="Rights-restriction status and HRC review workflow live in the HRC module."
+      icon={Gavel}
+      storageKey={`${clientId}:rights`}
+      summary="Managed in HRC module"
+    >
+      <div className="space-y-3 text-sm text-muted-foreground">
         <div className="flex items-start gap-2">
           <Gavel className="mt-0.5 h-4 w-4 text-[#137182]" />
           <p>
@@ -768,8 +858,13 @@ function RightsSafeguardsCard({ clientId }: { clientId: string }) {
             Edits and approvals stay in the HRC workflow.
           </p>
         </div>
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Link to="/dashboard/hrc">
+            Open HRC <ExternalLink className="h-3 w-3" />
+          </Link>
+        </Button>
       </div>
-    </section>
+    </CollapsibleCard>
   );
 }
 
@@ -1293,14 +1388,16 @@ function ProfileTab({
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-5">
 
-        {/* Identity */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Identity & Contact
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        {/* Identity & contact — expanded by default */}
+        <CollapsibleCard
+          title="Identity & contact"
+          description="Core facts: name, Medicaid ID, DOB, phone, service address."
+          icon={User}
+          defaultOpen
+          storageKey={`${client.id}:identity`}
+          summary={`${client.first_name} ${client.last_name}${client.medicaid_id ? ` · ${client.medicaid_id}` : ""}`}
+        >
+          <div className="space-y-4">
             <div className="flex items-center gap-4 mb-4">
               <div className="relative group">
                 <button
@@ -1390,18 +1487,18 @@ function ProfileTab({
                 Auto-geocoded via OpenStreetMap on save. Used as the EVV clock-in reference point.
               </p>
             </div>
-            {/* Per-section NECTAR import removed — use the NECTAR Bulk Import button (AI PDF mode) to auto-fill the whole profile. */}
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
 
-        {/* Emergency contact */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Emergency Contact
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
+        {/* Emergency contact — collapsed by default */}
+        <CollapsibleCard
+          title="Emergency contact"
+          description="Who to call if something goes wrong on shift."
+          icon={Contact2}
+          storageKey={`${client.id}:emergency`}
+          summary={ecName.trim() ? `${ecName.trim()}${ecPhone.trim() ? ` · ${ecPhone.trim()}` : ""}` : "Not set"}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="grid gap-1.5">
               <Label className="text-xs font-semibold">Contact Name</Label>
               <Input value={ecName} onChange={(e) => setEcName(e.target.value)}
@@ -1412,28 +1509,25 @@ function ProfileTab({
               <Input value={ecPhone} onChange={(e) => setEcPhone(e.target.value)}
                 placeholder="(801) 555-0100" maxLength={30} />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
 
-        {/* Clinical alert — the one colored callout on Profile */}
-        <Card className="border-amber-500/60 bg-amber-50/60 dark:bg-amber-950/20">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <CardTitle className="text-base font-medium text-amber-900 dark:text-amber-100">
-                Clinical alert
-              </CardTitle>
-              {specialDir.trim() && (
-                <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">
-                  Active
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
-              High-priority clinical notices displayed prominently to staff in the client workspace.
-            </p>
+        {/* Clinical alert — the one colored callout on Profile; expanded by default */}
+        <CollapsibleCard
+          title="Clinical alert"
+          description="High-priority clinical notices displayed prominently to staff in the client workspace."
+          icon={AlertTriangle}
+          tone="amber"
+          defaultOpen
+          storageKey={`${client.id}:alert`}
+          summary={specialDir.trim() ? "Active" : "None set"}
+        >
+          <div className="space-y-2">
+            {specialDir.trim() && (
+              <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">
+                Active
+              </Badge>
+            )}
             <Textarea
               value={specialDir}
               onChange={(e) => setSpecialDir(e.target.value)}
@@ -1441,29 +1535,19 @@ function ProfileTab({
               placeholder="Example: CHOKING RISK — All meds crushed with applesauce; seated upright at 90°."
               className="text-sm bg-white/70 dark:bg-amber-950/40"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
 
-        {/* Client documents */}
-        <ClientDocumentsCard
-          clientId={client.id}
-          clientName={`${client.first_name} ${client.last_name}`.trim()}
-        />
-      </div>
-
-      {/* Right column — geofence + meta */}
-      <div className="space-y-5">
-        {/* EVV Geofence + approved locations */}
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base font-medium text-primary">
-                Service address & geofence
-              </CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        {/* Service address & geofence + approved locations — collapsed by default */}
+        <CollapsibleCard
+          title="Service address & approved locations"
+          description="EVV clock-in radius and the list of approved alternate locations."
+          icon={MapPin}
+          tone="primary"
+          storageKey={`${client.id}:geofence`}
+          summary={`${radius.toLocaleString()} ft radius`}
+        >
+          <div className="space-y-3">
             <Label className="text-xs font-semibold">Maximum clock-in radius</Label>
             <Select value={String(radius)} onValueChange={(v) => setRadius(Number(v))}>
               <SelectTrigger className="h-10">
@@ -1479,20 +1563,36 @@ function ProfileTab({
               Caregivers clocking in beyond this distance from the service address must submit a
               variance justification.
             </p>
-            <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
               <p className="text-[11px] font-semibold text-primary">Current: {radius.toLocaleString()} ft</p>
             </div>
-
-            <div className="mt-4 border-t border-primary/20 pt-3">
+            <div className="mt-3 border-t border-primary/20 pt-3">
               <ApprovedLocationsEditor
                 clientId={client.id}
                 organizationId={orgId}
                 canEdit={true}
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
 
+        {/* Client documents — collapsed by default */}
+        <CollapsibleCard
+          title="Client documents"
+          description="Uploaded PDFs, scans, and other files attached to this client."
+          icon={FileText}
+          storageKey={`${client.id}:documents`}
+          summary="View & manage documents"
+        >
+          <ClientDocumentsCard
+            clientId={client.id}
+            clientName={`${client.first_name} ${client.last_name}`.trim()}
+          />
+        </CollapsibleCard>
+      </div>
+
+      {/* Right column — meta only */}
+      <div className="space-y-5">
         {/* Client record info (meta) */}
         <Card className="border-border/60 bg-muted/20">
           <CardHeader className="pb-2">
@@ -1522,21 +1622,23 @@ function ProfileTab({
             </div>
           </CardContent>
         </Card>
-
-        {/* Custom attributes — collapsed by default */}
-        <CollapsibleCard
-          title="Custom attributes"
-          description="Agency-specific fields, including any imported from a PCSP."
-          icon={Sparkles}
-        >
-          <CustomAttributesSection
-            organizationId={orgId}
-            entityKind="client"
-            entityId={client.id}
-          />
-        </CollapsibleCard>
       </div>
     </div>
+
+    {/* Custom attributes — full-width, first-class section, collapsed by default */}
+    <CollapsibleCard
+      title="Custom attributes"
+      description="Agency-specific fields, including any imported from a PCSP."
+      icon={Sparkles}
+      storageKey={`${client.id}:custom-attrs`}
+      summary="Agency-specific fields"
+    >
+      <CustomAttributesSection
+        organizationId={orgId}
+        entityKind="client"
+        entityId={client.id}
+      />
+    </CollapsibleCard>
 
     {/* Danger zone — quiet, at the very bottom */}
     <div className="mt-6 border-t border-border/60 pt-4">

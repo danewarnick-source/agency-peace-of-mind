@@ -588,10 +588,18 @@ export const ensureCurrentCeModule = createServerFn({ method: "POST" })
       const sourceList = gathered.sourceTitles.length > 0
         ? `Sources: ${gathered.sourceTitles.slice(0, 8).join("; ")}${gathered.sourceTitles.length > 8 ? `, +${gathered.sourceTitles.length - 8} more` : ""}`
         : "Sources: (none uploaded yet)";
-      const shortFlag = (result.materialShort || gathered.sourceCount === 0)
-        ? " ⚠ Insufficient authoritative source material — admin should upload more sources so future CE reviews are richer."
+      const belowFloor = !meetsFullHourFloor(steps);
+      const shortFlag = (result.materialShort || gathered.sourceCount === 0 || belowFloor)
+        ? ` ⚠ Authoritative sources couldn't produce the full 30-slide / ~60-minute review (got ${steps.length} steps). Admin should upload more sources so future CE reviews are richer.`
         : "";
-      summary = `Built from the agency's Authoritative Sources + this staff member's prior-30-day records. ${gathered.summary}. ${sourceList}.${shortFlag}`;
+      const topicsFlag = result.topicsNeedingSources.length > 0
+        ? ` ⚠ Suggested CE topics not covered by uploaded sources — upload material on: ${result.topicsNeedingSources.join("; ")}.`
+        : "";
+      const focusList = gathered.suggestedTopics.length > 0
+        ? ` Admin focus topics: ${gathered.suggestedTopics.join("; ")}.`
+        : "";
+      const notes = result.adminNotes ? ` Admin notes: ${result.adminNotes}` : "";
+      summary = `Built from the agency's Authoritative Sources + this staff member's prior-30-day records. ${gathered.summary}. ${sourceList}.${focusList}${shortFlag}${topicsFlag}${notes}`;
     } catch (err) {
       await supabase.from("ce_modules").update({ status: "failed", source_summary: (err as Error).message }).eq("id", modId);
       throw err;

@@ -208,6 +208,15 @@ export function AiPdfImporter({
     [handleFile],
   );
 
+  // Auto-ingest a parent-provided file (e.g. routed in from the unified uploader).
+  useEffect(() => {
+    if (initialFile && !fileObj && !extracting) {
+      void handleFile(initialFile);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
+
+
   const wasFilled = useCallback(
     (key: keyof ExtractedClient): boolean => {
       const v = original?.[key];

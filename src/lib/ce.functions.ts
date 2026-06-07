@@ -279,11 +279,17 @@ FLOOR: at least 3 lesson+check pairs and exactly 1 reflect. Target ≥30 total s
   if (!res.ok) throw new Error(`Nectar generation failed (${res.status}).`);
   const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
   const raw = json.choices?.[0]?.message?.content ?? "{}";
-  let parsed: { steps?: unknown; material_short?: unknown };
+  let parsed: { steps?: unknown; material_short?: unknown; admin_flags?: { topics_needing_sources?: unknown; notes?: unknown } };
   try { parsed = JSON.parse(raw); } catch { throw new Error("Nectar returned non-JSON."); }
+  const flags = (parsed.admin_flags ?? {}) as { topics_needing_sources?: unknown; notes?: unknown };
+  const topicsNeedingSources = Array.isArray(flags.topics_needing_sources)
+    ? (flags.topics_needing_sources as unknown[]).map((t) => String(t)).filter(Boolean).slice(0, 25)
+    : [];
   return {
     steps: validateSteps(parsed.steps),
     materialShort: Boolean(parsed.material_short),
+    topicsNeedingSources,
+    adminNotes: typeof flags.notes === "string" ? flags.notes.slice(0, 800) : "",
   };
 }
 

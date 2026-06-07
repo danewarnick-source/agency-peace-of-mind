@@ -1228,6 +1228,11 @@ export function MarEmarTab({
     if (!orgId || !user || !activePass) return;
     const staffName = payload.staffObserverName || user.user_metadata?.full_name || user.email || "Staff";
 
+    // Stamp the precise active job/service code so every appended entry
+    // carries cross-departmental audit context (HHS, DSI, DSG, RHS, …).
+    const jobCode = activeShift?.service_type_code || "none";
+    const stampedNotes = `[code:${jobCode}]${payload.notes ? " " + payload.notes : ""}`;
+
     const { data: inserted, error } = await (supabase as any)
       .from("emar_logs")
       .insert({
@@ -1242,7 +1247,8 @@ export function MarEmarTab({
         exception_reason:      payload.exceptionReason
           ? `Route: ${payload.route} · ${payload.exceptionReason}`
           : null,
-        notes:                 payload.notes,
+        notes:                 stampedNotes,
+        recorded_in:           bucketRecordedIn(activeShift?.service_type_code),
         staff_id:              user.id,
         staff_name:            staffName,
         signature_attestation: payload.attested ? ATTESTATION_TEXT : null,

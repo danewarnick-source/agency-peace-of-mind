@@ -223,8 +223,9 @@ function EditForm() {
         setFields(d.fields); setIsNectarDraft(true);
       }} />
       <SettingsModal open={showSettings} onOpenChange={setShowSettings} value={settings} onChange={setSettings} />
-      <AssignModal open={showAssign} onOpenChange={setShowAssign} groups={groups} users={users}
-        onChange={(g, u) => { setGroups(g); setUsers(u); }} />
+      <AssignModal open={showAssign} onOpenChange={setShowAssign}
+        groups={groups} users={users} allClients={allClients} clients={clients}
+        onChange={(g, u, ac, c) => { setGroups(g); setUsers(u); setAllClients(ac); setClients(c); }} />
       <PublishModal open={showPublish} onOpenChange={setShowPublish}
         formId={formId} formMeta={{ name, description, frequency, schedule, fields }}
         onPublished={() => { qc.invalidateQueries({ queryKey: ["form-edit", formId] }); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }} />

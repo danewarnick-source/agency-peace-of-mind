@@ -127,11 +127,14 @@ function FieldRow({
 export function AiPdfImporter({
   organizationId,
   onDone,
+  initialFile,
 }: {
   organizationId: string | undefined;
   onDone: () => void;
+  initialFile?: File | null;
 }) {
   const extractFn = useServerFn(extractClientFromPdf);
+  const extractDocxFn = useServerFn(extractClientFromDocx);
   const commitFn = useServerFn(commitClientFromPdf);
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -143,7 +146,8 @@ export function AiPdfImporter({
   const [dragging, setDragging] = useState(false);
   const [data, setData] = useState<ExtractedClient | null>(null);
   const [original, setOriginal] = useState<ExtractedClient | null>(null);
-  const [sectionDecisions, setSectionDecisions] = useState<Record<number, "create" | "skip">>({});
+  // Default: every additional section is checked (will be created on save).
+  const [sectionChecked, setSectionChecked] = useState<Record<number, boolean>>({});
 
   const reset = useCallback(() => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
@@ -151,7 +155,7 @@ export function AiPdfImporter({
     setFileObj(null);
     setData(null);
     setOriginal(null);
-    setSectionDecisions({});
+    setSectionChecked({});
   }, [pdfUrl]);
 
   const handleFile = useCallback(

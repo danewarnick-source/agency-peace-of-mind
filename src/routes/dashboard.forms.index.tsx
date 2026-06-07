@@ -29,10 +29,8 @@ type AdminFormRow = {
 };
 
 function FormsIndex() {
-  const { data: org } = useCurrentOrg();
-  const role = org?.role ?? "employee";
-  const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
-  return isAdmin ? <AdminList /> : <StaffList />;
+  const { effective } = useEffectiveView();
+  return effective === "admin" ? <AdminList /> : <StaffList />;
 }
 
 // ─── ADMIN ─────────────────────────────────────────────────────────────────

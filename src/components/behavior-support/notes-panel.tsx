@@ -47,12 +47,13 @@ export function NotesPanel({
     mutationFn: async () => {
       if (!body.trim()) throw new Error("Note is empty.");
       const { data: u } = await supabase.auth.getUser();
+      if (!u.user?.id) throw new Error("Not signed in.");
       const { error } = await supabase.from("bc_review_notes").insert({
         organization_id: organizationId,
         client_id: clientId,
         note_type: type,
         body: body.trim(),
-        author_user_id: u.user?.id,
+        author_user_id: u.user.id,
       });
       if (error) throw error;
     },

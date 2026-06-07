@@ -346,13 +346,53 @@ export function StaffHrChecklistCard({
                               expMs >= todayMs &&
                               expMs <= in60Ms;
                             const isNA = row.applicable === false;
+                            // Status kind drives both the visual dot and the
+                            // optional Requirements-tab filter chips.
+                            const statusKind: "na" | "current" | "expiring" | "overdue" | "todo" =
+                              isNA
+                                ? "na"
+                                : status === "complete" && !isExpired
+                                  ? "current"
+                                  : isExpired
+                                    ? "overdue"
+                                    : isSoon
+                                      ? "expiring"
+                                      : "todo";
+                            if (filter === "needs_action" && (statusKind === "current" || statusKind === "na")) {
+                              return null;
+                            }
+                            if (filter === "current" && statusKind !== "current") {
+                              return null;
+                            }
+                            const pillLabel =
+                              statusKind === "current"
+                                ? row.is_renewable
+                                  ? "Current"
+                                  : "Complete"
+                                : statusKind === "expiring"
+                                  ? "Expiring"
+                                  : statusKind === "overdue"
+                                    ? "Overdue"
+                                    : statusKind === "na"
+                                      ? "N/A"
+                                      : "To do";
+                            const pillTone =
+                              statusKind === "current"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : statusKind === "expiring"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : statusKind === "overdue"
+                                    ? "bg-rose-100 text-rose-800"
+                                    : statusKind === "na"
+                                      ? "bg-muted text-muted-foreground"
+                                      : "bg-muted text-foreground/70";
                             const dot = isNA
                               ? "bg-muted-foreground/40"
-                              : status === "complete" && !isExpired
+                              : statusKind === "current"
                                 ? "bg-emerald-500"
-                                : status === "in_progress" || isSoon
+                                : statusKind === "expiring" || status === "in_progress"
                                   ? "bg-amber-500"
-                                  : isExpired
+                                  : statusKind === "overdue"
                                     ? "bg-rose-500"
                                     : "bg-muted";
                             if (isNA) {

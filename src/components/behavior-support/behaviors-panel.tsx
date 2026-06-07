@@ -191,6 +191,8 @@ function BehaviorRowItem({
     onError: (e: any) => toast.error(e?.message ?? "Publish failed."),
   });
 
+  const gap = computeCoverageGap(behavior);
+
   return (
     <div className="rounded-lg border border-border">
       <button
@@ -205,6 +207,11 @@ function BehaviorRowItem({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {gap && behavior.status === "published" && (
+            <Badge variant="outline" className="gap-1 border-rose-500/50 bg-rose-500/10 text-[10px] uppercase text-rose-800 dark:text-rose-200">
+              <AlertTriangle className="h-3 w-3" /> coverage gap
+            </Badge>
+          )}
           <Badge variant="outline" className={`text-[10px] font-mono uppercase ${STATUS_STYLES[behavior.status]}`}>
             {behavior.status}
           </Badge>

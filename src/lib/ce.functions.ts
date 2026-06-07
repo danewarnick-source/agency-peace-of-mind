@@ -436,7 +436,11 @@ async function gatherCeContext(
 You may explain, illustrate, and apply this material — but you must NOT introduce new substantive facts, clinical specifics, thresholds, or procedure steps that are not in the provided sources. If a needed clinical specific is absent, route to the nurse / care plan / supervisor instead of supplying it.
 
 Cite the source (title + clause/section when possible) on every lesson.
-If sources are too thin to responsibly fill ~60 minutes, set material_short=true and produce a shorter but fully-sourced review with a "What's missing" lesson.
+Target ≥30 total steps (~60 minutes at ~2 min/slide). If the uploaded sources cannot responsibly produce 30 grounded steps, set material_short=true and produce a shorter but fully-sourced review with a "What's missing" lesson — never pad.
+
+=== ADMIN-SUGGESTED FOCUS TOPICS (prioritize; treat as focus areas, NOT as authoritative content) ===
+${JSON.stringify(suggestedTopics)}
+For each focus topic: search ALL authoritative sources below for supporting passages and build cited teaching on what is covered. For any topic the sources do not cover, OMIT it from the staff-facing review and add it to admin_flags.topics_needing_sources verbatim — do not write freehand on it.
 
 === AUTHORITATIVE SOURCES (provider-uploaded) ===
 ${JSON.stringify(sourcePack).slice(0, 40000)}
@@ -447,7 +451,7 @@ ${JSON.stringify(clientPack).slice(0, 20000)}
 === STAFF MEMBER'S FACTUAL EVENT RECORDS (prior ~30 days) ===
 ${JSON.stringify(events).slice(0, 12000)}`;
 
-  return { prompt, summary, sourceTitles, sourceCount: sourcePack.length + clientPack.length };
+  return { prompt, summary, sourceTitles, sourceCount: sourcePack.length + clientPack.length, suggestedTopics };
 }
 
 // ──────────────── Server functions ─────────────────────────────────────────

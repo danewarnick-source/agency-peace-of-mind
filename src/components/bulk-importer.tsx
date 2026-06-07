@@ -149,13 +149,13 @@ export function BulkImporter({
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>(defaultKind);
-  const [mode, setMode] = useState<"sheet" | "pdf">("sheet");
   const [step, setStep] = useState<Step>("upload");
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [mapping, setMapping] = useState<Record<string, MappingEntry>>({});
   const [pasteText, setPasteText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [aiFile, setAiFile] = useState<File | null>(null);
   const importFn = useServerFn(bulkImportRoster);
   const qc = useQueryClient();
 
@@ -164,6 +164,7 @@ export function BulkImporter({
     setParsed(null);
     setMapping({});
     setPasteText("");
+    setAiFile(null);
   }, []);
 
   const ingest = useCallback((p: ParsedFile) => {
@@ -183,6 +184,15 @@ export function BulkImporter({
   }, [kind]);
 
   const handleFile = useCallback(async (file: File) => {
+    // Auto-route: PDF/DOCX go to server-side AI extraction (clients only).
+    if (isAiDoc(file)) {
+      if (kind !== "client") {
+        toast.error("PDF and DOCX import is available for client profiles. Switch to Client Roster or upload a CSV/Excel file.");
+        return;
+      }
+      setAiFile(file);
+      return;
+    }
     try {
       const p = await parseFile(file);
       if (!p.rows.length) throw new Error("No rows found in file");
@@ -190,7 +200,7 @@ export function BulkImporter({
     } catch (e) {
       toast.error((e as Error).message);
     }
-  }, [ingest]);
+  }, [ingest, kind]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

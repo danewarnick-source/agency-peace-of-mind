@@ -539,9 +539,6 @@ export const setStaffTypeKeys = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await requireOrgMembership(supabase, userId, data.organization_id, "manager");
-    if (userId === data.staff_id) {
-      throw new Error("Forbidden: staff may not edit own type");
-    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
       .from("profiles")

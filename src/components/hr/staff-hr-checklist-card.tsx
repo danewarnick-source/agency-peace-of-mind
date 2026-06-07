@@ -44,9 +44,18 @@ function maskSsn(last4: string | null) {
 export function StaffHrChecklistCard({
   organizationId,
   staffId,
+  view = "all",
+  filter = "all",
 }: {
   organizationId: string;
   staffId: string;
+  /** Section gate: render all sections (default), only PII, or only the
+   *  checklist + supporting docs/history. Pure presentational. */
+  view?: "all" | "pii" | "checklist";
+  /** Visibility filter for checklist rows — applies only inside the
+   *  Compliance Checklist section. "needs_action" = overdue + expiring +
+   *  to-do. "current" = items that are complete and not expiring. */
+  filter?: "all" | "needs_action" | "current";
 }) {
   const { user } = useAuth();
   const isSelf = user?.id === staffId;

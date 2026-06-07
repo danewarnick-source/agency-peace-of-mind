@@ -94,7 +94,15 @@ function BehaviorSupportClientPage() {
 
       <DataCharts clientId={clientId} />
 
+      <AuditFeed clientId={clientId} />
+
       <NotesPanel clientId={clientId} organizationId={organizationId} canWrite={isAdmin || isBehaviorist} />
+
+      <SowDeadlinesPanel
+        clientId={clientId}
+        organizationId={organizationId}
+        canWriteFlags={isAdmin || isBehaviorist}
+      />
     </div>
   );
 }

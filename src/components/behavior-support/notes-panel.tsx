@@ -65,12 +65,24 @@ export function NotesPanel({
     onError: (e: any) => toast.error(e?.message ?? "Failed."),
   });
 
+  const lastMonthly = notes.find((n) => n.note_type === "monthly_review");
+  const monthlyDue = (() => {
+    if (!lastMonthly) return true;
+    const ageDays = (Date.now() - new Date(lastMonthly.created_at).getTime()) / 86_400_000;
+    return ageDays > 30;
+  })();
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Notes &amp; monthly review</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {monthlyDue && (
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+            Monthly review due{lastMonthly ? ` — last on ${new Date(lastMonthly.created_at).toLocaleDateString()}` : " — none on file yet"}.
+          </div>
+        )}
         {canWrite && (
           <div className="space-y-2 rounded-md border border-border p-3">
             <Select value={type} onValueChange={(v: any) => setType(v)}>

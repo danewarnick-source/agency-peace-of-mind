@@ -225,14 +225,25 @@ export const submitForm = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     formId: z.string().uuid(),
+    clientId: z.string().uuid(),
     answers: z.record(z.any()),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     const m = await getMembership(supabase, userId);
     const { data: form, error: fe } = await supabase
-      .from("forms").select("id, organization_id, frequency, settings").eq("id", data.formId).maybeSingle();
+      .from("forms").select("id, organization_id, frequency, settings, all_clients, assigned_clients").eq("id", data.formId).maybeSingle();
     if (fe || !form) throw new Error("Form not found.");
+    // Verify the form is assigned to this client
+    if (!form.all_clients && !(form.assigned_clients ?? []).includes(data.clientId)) {
+      throw new Error("This form is not assigned to that individual.");
+    }
+    // Verify the staff has this client on their caseload (defense-in-depth; UI already filters)
+    const { data: sa } = await supabase
+      .from("staff_assignments").select("client_id")
+      .eq("organization_id", form.organization_id)
+      .eq("staff_id", userId).eq("client_id", data.clientId).limit(1).maybeSingle();
+    if (!sa) throw new Error("This individual is not on your caseload.");
     const periodKey = periodKeyFor(form.frequency as Frequency);
     const settings = (form.settings ?? {}) as FormSettings;
     const submittedBy = settings.anonymous ? null : userId;
@@ -240,10 +251,12 @@ export const submitForm = createServerFn({ method: "POST" })
       organization_id: form.organization_id,
       form_id: form.id,
       submitted_by: submittedBy,
+      client_id: data.clientId,
       answers: data.answers,
       period_key: periodKey,
     }).select().maybeSingle();
     if (error) throw new Error(error.message);
+    void m;
 
     // Fan-out at submission time per form settings (share_users, share_manager, share_emails).
     try {

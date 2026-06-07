@@ -78,7 +78,7 @@ const SEVERITY_BADGE: Record<Severity, { label: string; cls: string; Icon: typeo
   },
 };
 
-function InternalAuditPage() {
+export function InternalAuditPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
   const { hasAddon } = useEntitlements();

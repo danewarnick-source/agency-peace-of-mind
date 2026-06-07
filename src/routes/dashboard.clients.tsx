@@ -194,7 +194,7 @@ export const Route = createFileRoute("/dashboard/clients")({
 
 // ─── Clients Page ─────────────────────────────────────────────────────────────
 
-function ClientsPage() {
+export function ClientsPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");

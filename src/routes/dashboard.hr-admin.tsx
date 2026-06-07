@@ -38,7 +38,7 @@ export const Route = createFileRoute("/dashboard/hr-admin")({
 
 type Filter = "all" | "open_gaps" | "renewals" | "onboarding";
 
-function HrAdminPage() {
+export function HrAdminPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
   const fetchRollup = useServerFn(getHrAdminRollup);

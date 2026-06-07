@@ -103,7 +103,7 @@ const statusMeta: Record<Item["status"], { label: string; cls: string; icon: typ
   },
 };
 
-function AuditPage() {
+export function AuditPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
   const [openId, setOpenId] = useState<string | null>(null);

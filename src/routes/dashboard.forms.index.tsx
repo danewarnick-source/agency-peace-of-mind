@@ -28,7 +28,7 @@ type AdminFormRow = {
   fields: unknown[]; assigned_groups: string[]; assigned_users: string[];
 };
 
-function FormsIndex() {
+export function FormsIndex() {
   const { effective } = useEffectiveView();
   return effective === "admin" ? <AdminList /> : <StaffList />;
 }

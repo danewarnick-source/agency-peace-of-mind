@@ -30,7 +30,7 @@ export const Route = createFileRoute("/dashboard/client-loans")({
   ),
 });
 
-function ClientLoansPage() {
+export function ClientLoansPage() {
   const { data: org } = useCurrentOrg();
   if (!org?.organization_id) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;

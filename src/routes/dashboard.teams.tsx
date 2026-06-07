@@ -35,7 +35,7 @@ const UNASSIGNED = "__unassigned__";
 type DragKind = "staff" | "client";
 type DragPayload = { kind: DragKind; id: string; from: string | null };
 
-function TeamsPage() {
+export function TeamsPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const orgId = org?.organization_id;

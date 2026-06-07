@@ -64,7 +64,7 @@ type EditableMember = {
   ceSuggestedTopics: string[];
 };
 
-function EmployeesPage() {
+export function EmployeesPage() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();

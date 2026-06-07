@@ -42,31 +42,20 @@ const STAFF_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { to: "/dashboard", label: "Company Overview", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/records-desk", label: "Records Desk", icon: ClipboardCheck },
-  { to: "/dashboard/pba-ledger", label: "PBA Trust Ledger", icon: Wallet },
+  { to: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/hub/employees", label: "Employees", icon: Users },
+  { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/scheduling", label: "Scheduling", icon: CalendarDays },
-  { to: "/dashboard/employees", label: "Employees", icon: Users },
-  { to: "/dashboard/hr-admin", label: "HR Admin", icon: ShieldCheck, perm: "manage_users" },
-  { to: "/dashboard/client-loans", label: "Client Loan Ledger", icon: HandCoins, perm: "manage_organization" },
-  { to: "/dashboard/hrc", label: "Human Rights Committee", icon: Scale, perm: "manage_users" },
-  
-  { to: "/dashboard/clients", label: "Clients", icon: Contact2 },
-  { to: "/dashboard/teams", label: "Teams & Homes", icon: Building2 },
-  { to: "/dashboard/billing", label: "Billing", icon: Receipt, perm: "view_billing" },
-  { to: "/dashboard/financial", label: "Financial", icon: TrendingUp, perm: "manage_billing" },
-  { to: "/dashboard/audit", label: "Audit", icon: FolderArchive },
-  { to: "/dashboard/forms", label: "Forms", icon: FileText },
+  { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck },
+  { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing" },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
-  { to: "/dashboard/authoritative-sources", label: "Authoritative Sources", icon: ShieldCheck },
-  { to: "/dashboard/nectar-docs", label: "Company Docs", icon: Database },
-  { to: "/dashboard/external-compliance", label: "External Compliance", icon: ExternalLink },
-  { to: "/dashboard/internal-audit", label: "Internal Audit", icon: ClipboardCheck },
+  { to: "/dashboard/hub/knowledge", label: "Knowledge base", icon: Database },
 ];
+
 
 type PlatformStateLite = { code: string; name: string; status: "draft" | "active" | "coming_soon" };
 

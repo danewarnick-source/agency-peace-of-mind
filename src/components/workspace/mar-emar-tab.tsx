@@ -1128,10 +1128,12 @@ export function MarEmarTab({
         .select(`id, medication_id, scheduled_for, administered_at, status,
           exception_reason, notes, staff_name, signature_attestation,
           is_medication_error, is_controlled, pill_count_verified, pill_count_value,
-          is_prn, prn_reason, admin_reviewed, signature_data_url`)
+          is_prn, prn_reason, admin_reviewed, signature_data_url,
+          created_at, recorded_in`)
         .eq("client_id", clientId)
         .gte("scheduled_for", todayStart)
-        .lt("scheduled_for", tomorrowStart);
+        .lt("scheduled_for", tomorrowStart)
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []) as EmarLog[];
     },

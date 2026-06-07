@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Upload, Eye } from "lucide-react";
+import { DEMO_BSP_EXTRACTION } from "@/lib/bc-extract";
 import { toast } from "sonner";
 
 type DocType = "FBA" | "BSP";

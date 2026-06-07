@@ -31,12 +31,76 @@ export function CePlayer({ module, minActiveMinutes, onClose, onCompleted }: Pro
   const saveFn = useServerFn(saveCeProgress);
   const completeFn = useServerFn(completeCeModule);
 
-  const [steps] = useState<CeStep[]>(module.steps);
+  const rawSteps = module.steps;
+  const initialReflections = (module.reflections as Record<string, string>) ?? {};
+
+  // ── Knowledge-check arrangement (stable on resume; reshuffled on fresh open) ──
+  // Persisted into reflections["__order"] as JSON so the resume path reuses it.
+  type Arrangement = {
+    checkOrder: number[]; // permutation of indices into the original check-step list
+    optionOrders: Record<string, number[]>; // displayed-step-index -> permutation of original option indices
+  };
+  const shuffle = <T,>(arr: T[]): T[] => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const origCheckIndices = useMemo(
+    () => rawSteps.map((s, i) => (s.type === "check" ? i : -1)).filter((i) => i >= 0),
+    [rawSteps],
+  );
+  const [arrangement, arrangementWasNew] = useMemo<[Arrangement, boolean]>(() => {
+    const raw = initialReflections["__order"];
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as Arrangement;
+        const checksOk =
+          Array.isArray(parsed.checkOrder) &&
+          parsed.checkOrder.length === origCheckIndices.length &&
+          parsed.checkOrder.every((n) => Number.isInteger(n) && n >= 0 && n < origCheckIndices.length);
+        const optsOk = parsed.optionOrders && typeof parsed.optionOrders === "object";
+        if (checksOk && optsOk) return [parsed, false];
+      } catch {
+        /* fall through to fresh shuffle */
+      }
+    }
+    const checkOrder = shuffle(origCheckIndices.map((_, i) => i));
+    const optionOrders: Record<string, number[]> = {};
+    let checkCursor = 0;
+    rawSteps.forEach((s, displayIdx) => {
+      if (s.type !== "check") return;
+      const origCheckPos = checkOrder[checkCursor++];
+      const origStep = rawSteps[origCheckIndices[origCheckPos]] as CeStepCheck;
+      optionOrders[String(displayIdx)] = shuffle(origStep.options.map((_, i) => i));
+    });
+    return [{ checkOrder, optionOrders }, true];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Build displayed steps: non-checks stay in place; check slots are filled by
+  // checkOrder, and each check's options are reordered + relabeled A/B/C/D.
+  const steps = useMemo<CeStep[]>(() => {
+    let checkCursor = 0;
+    return rawSteps.map((s, displayIdx) => {
+      if (s.type !== "check") return s;
+      const origCheckPos = arrangement.checkOrder[checkCursor++];
+      const sourceCheck = rawSteps[origCheckIndices[origCheckPos]] as CeStepCheck;
+      const order = arrangement.optionOrders[String(displayIdx)] ?? sourceCheck.options.map((_, i) => i);
+      const reordered = order.map((origI, newI) => ({
+        ...sourceCheck.options[origI],
+        label: String.fromCharCode(65 + newI),
+      }));
+      return { ...sourceCheck, options: reordered } as CeStepCheck;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawSteps, arrangement]);
+
   const [currentStep, setCurrentStep] = useState<number>(module.current_step ?? 0);
   const [activeSeconds, setActiveSeconds] = useState<number>(module.active_seconds ?? 0);
-  const [reflections, setReflections] = useState<Record<string, string>>(
-    (module.reflections as Record<string, string>) ?? {},
-  );
+  const [reflections, setReflections] = useState<Record<string, string>>(initialReflections);
   const [viewed, setViewed] = useState<Set<number>>(new Set([module.current_step ?? 0]));
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [showSig, setShowSig] = useState(false);
@@ -51,6 +115,15 @@ export function CePlayer({ module, minActiveMinutes, onClose, onCompleted }: Pro
 
   // Mark step viewed when navigating.
   useEffect(() => { setViewed((v) => { const n = new Set(v); n.add(currentStep); return n; }); }, [currentStep]);
+
+  // Persist a freshly-generated arrangement so resume reuses the same order.
+  useEffect(() => {
+    if (!arrangementWasNew) return;
+    const merged = { ...reflections, __order: JSON.stringify(arrangement) };
+    setReflections(merged);
+    saveFn({ data: { moduleId: module.id, activeSeconds, currentStep, reflections: merged } }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Interaction listeners.
   useEffect(() => {
@@ -97,6 +170,15 @@ export function CePlayer({ module, minActiveMinutes, onClose, onCompleted }: Pro
   const reflectionOk = reflectText.length >= 150;
   const timeOk = activeSeconds >= minSec;
   const canComplete = allViewed && allChecksCorrect && reflectionOk && timeOk;
+
+  // Gate Next on a knowledge-check until the correct option is chosen.
+  const currentStepObj = steps[currentStep];
+  const currentIsCheck = currentStepObj?.type === "check";
+  const currentCheckCorrect =
+    currentIsCheck &&
+    typeof answers[currentStep] === "number" &&
+    !!(currentStepObj as CeStepCheck).options[answers[currentStep]]?.correct;
+  const nextBlocked = currentIsCheck && !currentCheckCorrect;
 
   const saveAndClose = async () => {
     await saveFn({ data: { moduleId: module.id, activeSeconds, currentStep, reflections } });

@@ -25,7 +25,7 @@ function ScaffoldNotice() {
   );
 }
 
-function HrcPage() {
+export function HrcPage() {
   const { data: org } = useCurrentOrg();
   const role = (org?.role ?? "employee") as Role;
   const canManage = role === "admin" || role === "manager" || role === "super_admin";

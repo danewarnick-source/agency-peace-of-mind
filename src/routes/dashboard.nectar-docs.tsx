@@ -101,7 +101,7 @@ type DocRow = {
   created_at: string;
 };
 
-function NectarDocsPage() {
+export function NectarDocsPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
 

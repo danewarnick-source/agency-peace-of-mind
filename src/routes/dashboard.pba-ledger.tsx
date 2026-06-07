@@ -38,7 +38,7 @@ type PbaAccount = {
 type ClientLite = { id: string; first_name: string; last_name: string };
 type AuditSample = { id: string; account_id: string; quarter: string; status: "pending" | "verified"; verified_at: string | null; verifier_notes: string | null; assigned_auditor: string | null };
 
-function PbaLedgerPage() {
+export function PbaLedgerPage() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();

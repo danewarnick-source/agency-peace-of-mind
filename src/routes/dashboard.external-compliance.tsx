@@ -55,7 +55,7 @@ function statusOf(item: Item): "outstanding" | "attested" | "renewal_due" {
   return "attested";
 }
 
-function ExternalCompliancePage() {
+export function ExternalCompliancePage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
   const qc = useQueryClient();

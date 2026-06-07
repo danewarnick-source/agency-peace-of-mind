@@ -174,7 +174,7 @@ function HowThisWorks() {
   );
 }
 
-function AuthoritativeSourcesPage() {
+export function AuthoritativeSourcesPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
   const qc = useQueryClient();

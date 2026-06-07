@@ -80,6 +80,7 @@ function FieldRow({
     id: string;
     field_label: string;
     data_type: "text" | "number" | "boolean" | "date";
+    source?: "manual" | "pcsp";
     value: {
       value_text?: string | null;
       value_number?: number | null;

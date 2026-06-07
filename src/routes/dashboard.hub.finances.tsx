@@ -1,10 +1,10 @@
-import { createFileRoute, Outlet, useRouterState, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Receipt, TrendingUp } from "lucide-react";
 
 /**
- * Finances hub. Both Billing and Financial own their own nested routes
- * (with their own internal layouts), so this hub renders a thin tab bar
- * that links to those existing routes and lets each route's own <Outlet/>
- * render below. We don't remount the page components themselves.
+ * Finances hub landing. Billing and Financial each own their own nested
+ * route trees with internal tab layouts, so this hub is intentionally a
+ * thin chooser — it does not re-mount or duplicate those pages.
  */
 export const Route = createFileRoute("/dashboard/hub/finances")({
   head: () => ({ meta: [{ title: "Finances — HIVE" }] }),
@@ -12,36 +12,34 @@ export const Route = createFileRoute("/dashboard/hub/finances")({
 });
 
 function FinancesHub() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const tabs = [
-    { to: "/dashboard/billing", label: "Billing", match: "/dashboard/billing" },
-    { to: "/dashboard/financial", label: "Financial", match: "/dashboard/financial" },
-  ] as const;
-  const active = tabs.find((t) => pathname.startsWith(t.match))?.to ?? tabs[0].to;
   return (
     <div className="flex min-h-full flex-col">
-      <div className="mb-4">
+      <div className="mb-6">
         <h2 className="text-xl font-semibold tracking-tight">Finances</h2>
+        <p className="text-sm text-muted-foreground">Billing and financial overview.</p>
       </div>
-      <div className="mb-4 border-b border-border">
-        <nav className="-mb-px flex flex-wrap gap-1" aria-label="Tabs">
-          {tabs.map((t) => {
-            const isActive = active === t.to;
-            return (
-              <Link
-                key={t.to}
-                to={t.to}
-                className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-                  isActive ? "border-[#137182] text-[#137182]" : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-                }`}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
-        </nav>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Link
+          to="/dashboard/billing"
+          className="group rounded-xl border border-border bg-card p-6 shadow-sm transition-colors hover:border-[#137182]"
+        >
+          <Receipt className="h-6 w-6 text-[#137182]" />
+          <div className="mt-3 text-base font-semibold">Billing</div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Authorizations, 520 generation, claims, and per-client budgets.
+          </p>
+        </Link>
+        <Link
+          to="/dashboard/financial"
+          className="group rounded-xl border border-border bg-card p-6 shadow-sm transition-colors hover:border-[#137182]"
+        >
+          <TrendingUp className="h-6 w-6 text-[#137182]" />
+          <div className="mt-3 text-base font-semibold">Financial</div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Revenue tracking and accounting overview.
+          </p>
+        </Link>
       </div>
-      <div className="min-w-0 flex-1"><Outlet /></div>
     </div>
   );
 }

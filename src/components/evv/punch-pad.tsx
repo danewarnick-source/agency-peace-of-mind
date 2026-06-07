@@ -26,6 +26,13 @@ import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
 import { draftShiftNote, draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
+import {
+  BehaviorObservationsBlock,
+  emptyBehaviorAnswers,
+  validateBehaviorAnswers,
+  type BehaviorAnswers,
+} from "@/components/evv/behavior-observations-block";
+import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -278,6 +285,12 @@ export function PunchPad({
   const [varDraftBusy, setVarDraftBusy]       = useState(false);
   const [outVarShorthand, setOutVarShorthand] = useState("");
   const [outVarDraftBusy, setOutVarDraftBusy] = useState(false);
+
+  // ── Post-shift Behavior Observations ───────────────────────────────────────
+  const { data: behaviorSetting } = useShiftBehaviorSetting();
+  const behaviorEnabled = behaviorSetting?.enabled ?? true;
+  const [behaviorAnswers, setBehaviorAnswers] = useState<BehaviorAnswers>(emptyBehaviorAnswers);
+
 
   // ── NECTAR Procedural Q&A (Infusion add-on) ────────────────────────────────
   const [askOpen, setAskOpen]         = useState(false);
@@ -606,7 +619,9 @@ export function PunchPad({
   const hasGoalSelected    = baselineChecked || Object.values(checkedGoals).some(Boolean);
   const narrativeOk        = wordCount >= 50;
   const nectarConfirmOk    = !nectarUsed || draftConfirmed;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && !busy;
+  const behaviorError      = behaviorEnabled ? validateBehaviorAnswers(behaviorAnswers) : null;
+  const behaviorOk         = behaviorError === null;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && !busy;
 
 
   function openCompliance() {
@@ -629,6 +644,7 @@ export function PunchPad({
     setDismissals({});
     setDismissingKey(null);
     setDismissReasonDraft("");
+    setBehaviorAnswers(emptyBehaviorAnswers);
     stopRecording();
     setShowCompliance(true);
   }
@@ -979,6 +995,38 @@ export function PunchPad({
       }
     }
 
+    // Persist post-shift Behavior Observations when the provider has the feature on.
+    if (behaviorEnabled && org?.organization_id) {
+      const b = behaviorAnswers;
+      const obs = {
+        organization_id: org.organization_id,
+        shift_id: active.id,
+        client_id: active.client_id,
+        staff_id: user.id,
+        observed_at: clockOut,
+        behaviors_observed: b.behaviorsObserved === true,
+        target_behaviors: b.behaviorsObserved ? b.targetBehaviors : [],
+        behavior_counts: b.behaviorsObserved ? b.counts : {},
+        objective_description: b.behaviorsObserved ? b.objectiveDescription.trim() || null : null,
+        antecedent_context:    b.behaviorsObserved ? b.antecedentContext.trim() || null : null,
+        intervention_response: b.behaviorsObserved ? b.interventionResponse.trim() || null : null,
+        reportable_incident:   b.behaviorsObserved ? b.reportableIncident : false,
+        positives:             b.positives.trim() || null,
+        trend_vs_recent:       b.trendVsRecent || null,
+      };
+      const { error: behErr } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from("shift_behavior_observations" as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .upsert(obs as any, { onConflict: "shift_id" });
+      if (behErr) {
+        // Non-blocking: shift is already saved. Surface a soft toast.
+        toast.error(`Behavior observations not saved: ${behErr.message}`);
+      }
+    }
+
+
+
 
     const duration = fmtElapsed(
       new Date(clockOut).getTime() - new Date(active.clock_in_timestamp).getTime(),
@@ -1002,6 +1050,10 @@ export function PunchPad({
     }
     if (nectarUsed && !draftConfirmed) {
       toast.error("Please review the NECTAR-drafted note and check the confirmation box before submitting.");
+      return;
+    }
+    if (behaviorEnabled && behaviorError) {
+      toast.error(`Behavior observations: ${behaviorError}`);
       return;
     }
 
@@ -1969,6 +2021,15 @@ export function PunchPad({
                       </p>
                     )}
                   </div>
+                )}
+
+                {/* Post-shift Behavior Observations (provider-toggled) */}
+                {behaviorEnabled && (
+                  <BehaviorObservationsBlock
+                    value={behaviorAnswers}
+                    onChange={setBehaviorAnswers}
+                    onOpenIncident={() => navigate({ to: "/dashboard/command-center" })}
+                  />
                 )}
 
                 {/* NECTAR Completeness Check */}

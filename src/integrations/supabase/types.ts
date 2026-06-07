@@ -4875,6 +4875,35 @@ export type Database = {
           },
         ]
       }
+      org_shift_behavior_settings: {
+        Row: {
+          enabled: boolean
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          enabled?: boolean
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_shift_behavior_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_subscriptions: {
         Row: {
           canceled_at: string | null
@@ -5889,6 +5918,88 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_behavior_observations: {
+        Row: {
+          antecedent_context: string | null
+          behavior_counts: Json
+          behaviors_observed: boolean
+          client_id: string
+          created_at: string
+          id: string
+          intervention_response: string | null
+          objective_description: string | null
+          observed_at: string
+          organization_id: string
+          positives: string | null
+          reportable_incident: boolean
+          shift_id: string
+          staff_id: string
+          target_behaviors: Json
+          trend_vs_recent: string | null
+          updated_at: string
+        }
+        Insert: {
+          antecedent_context?: string | null
+          behavior_counts?: Json
+          behaviors_observed: boolean
+          client_id: string
+          created_at?: string
+          id?: string
+          intervention_response?: string | null
+          objective_description?: string | null
+          observed_at?: string
+          organization_id: string
+          positives?: string | null
+          reportable_incident?: boolean
+          shift_id: string
+          staff_id: string
+          target_behaviors?: Json
+          trend_vs_recent?: string | null
+          updated_at?: string
+        }
+        Update: {
+          antecedent_context?: string | null
+          behavior_counts?: Json
+          behaviors_observed?: boolean
+          client_id?: string
+          created_at?: string
+          id?: string
+          intervention_response?: string | null
+          objective_description?: string | null
+          observed_at?: string
+          organization_id?: string
+          positives?: string | null
+          reportable_incident?: boolean
+          shift_id?: string
+          staff_id?: string
+          target_behaviors?: Json
+          trend_vs_recent?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_behavior_observations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_behavior_observations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_behavior_observations_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: true
+            referencedRelation: "evv_timesheets"
             referencedColumns: ["id"]
           },
         ]

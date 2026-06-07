@@ -305,11 +305,13 @@ export const commitClientFromPdf = createServerFn({ method: "POST" })
 
     let clientId: string;
     if (existingId) {
-      const { error } = await supabase.from("clients").update(clientPayload).eq("id", existingId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("clients").update(clientPayload).eq("id", existingId);
       if (error) throw new Error(error.message);
       clientId = existingId;
     } else {
-      const { data: ins, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: ins, error } = await (supabase as any)
         .from("clients")
         .insert(clientPayload)
         .select("id")

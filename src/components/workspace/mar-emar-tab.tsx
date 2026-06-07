@@ -1393,10 +1393,11 @@ export function MarEmarTab({
                 </div>
                 <ul className="divide-y divide-border">
                   {items.map((p) => {
-                    const done = !!p.log;
+                    const isLocked = p.isLocked;
+                    const hasHistory = p.history.length > 0;
                     const passed = p.log?.status === "administered";
                     const errored = p.log?.is_medication_error;
-                    const overdue = !done && new Date(p.iso).getTime() < Date.now() - 60 * 60 * 1000 && p.time !== "PRN";
+                    const overdue = !isLocked && new Date(p.iso).getTime() < Date.now() - 60 * 60 * 1000 && p.time !== "PRN";
 
                     return (
                       <li key={`${p.med.id}-${p.time}`}
@@ -1440,7 +1441,7 @@ export function MarEmarTab({
                               )}
                             </div>
                           )}
-                          {done && !passed && (
+                          {p.log && !passed && (
                             <Badge variant="secondary" className="mt-1.5 capitalize">
                               {p.log?.status}
                               {p.log?.exception_reason ? ` — ${p.log.exception_reason.replace(/^Route:[^·]+·\s*/, "")}` : ""}
@@ -1451,14 +1452,37 @@ export function MarEmarTab({
                               <AlertOctagon className="mr-1 h-3 w-3" /> Medication Error Filed
                             </Badge>
                           )}
-                          {overdue && !done && (
+                          {overdue && !p.log && (
                             <Badge className="mt-1.5 animate-pulse bg-amber-500 text-white">
                               Window Passed — Documentation Required
                             </Badge>
                           )}
+
+                          {/* Chronological immutable history — visible to every dashboard */}
+                          {hasHistory && (
+                            <ul className="mt-2 space-y-0.5 border-l border-border pl-2 text-[11px] text-muted-foreground">
+                              {p.history.map((h) => {
+                                const code = parseJobCode(h);
+                                const when = h.created_at ? fmtTime(h.created_at) : "";
+                                const cleanNotes = stripJobCodePrefix(h.notes);
+                                const isAdmin = h.status === "administered";
+                                return (
+                                  <li key={h.id} className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-mono">{when}</span>
+                                    <span className={`capitalize ${isAdmin ? "text-emerald-700 dark:text-emerald-300 font-medium" : ""}`}>
+                                      {h.status}{isAdmin ? " ✓" : ""}
+                                    </span>
+                                    <span>— {h.staff_name || "Staff"}</span>
+                                    <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono">{code}</Badge>
+                                    {cleanNotes && <span className="opacity-80">· {cleanNotes}</span>}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
                         </div>
 
-                        {!done && (
+                        {!isLocked && (
                           <Button
                             size="sm"
                             onClick={() => setActivePass({ med: p.med, time: p.time, iso: p.iso })}
@@ -1469,7 +1493,13 @@ export function MarEmarTab({
                             }`}
                           >
                             <Pill className="h-4 w-4" />
-                            {overdue ? "Document Now" : p.time === "PRN" ? "Log PRN" : "Record Pass"}
+                            {overdue
+                              ? "Document Now"
+                              : p.time === "PRN"
+                              ? "Log PRN"
+                              : hasHistory
+                              ? "Update Status"
+                              : "Record Pass"}
                           </Button>
                         )}
                       </li>

@@ -1533,16 +1533,7 @@ function PcspTab({
                 <p className="text-sm text-muted-foreground">No PCSP goals entered. Add goals above.</p>
               </div>
             )}
-            <div className="border-t border-border pt-3">
-              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs"
-                onClick={() => toast.info("NECTAR import: drop a PCSP document and NECTAR will extract and populate the goals list automatically.")}>
-                <Sparkles className="h-3.5 w-3.5" />
-                NECTAR Import — Extract Goals from PCSP Document
-              </Button>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Upload a state PCSP PDF to automatically extract and populate goals.
-              </p>
-            </div>
+            {/* Per-section PCSP goal extraction removed — use NECTAR Bulk Import (AI PDF mode) to auto-populate goals from a PCSP. */}
           </CardContent>
         </Card>
 
@@ -1952,16 +1943,7 @@ function DocumentsTab({ clientId, orgId }: { clientId: string; orgId: string }) 
             />
           </div>
 
-          <div className="border-t border-border pt-3 mt-3">
-            <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs"
-              onClick={() => toast.info("NECTAR will index this document for AI-powered compliance search and auto-population across the platform.")}>
-              <Sparkles className="h-3.5 w-3.5" />
-              NECTAR Analyze — Index for AI Search
-            </Button>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Documents indexed by NECTAR can be referenced during AI-assisted documentation.
-            </p>
-          </div>
+          {/* Per-document NECTAR Analyze removed — uploaded documents are still RAG-indexed on save; whole-profile population happens via NECTAR Bulk Import (AI PDF mode). */}
         </CardContent>
       </Card>
 

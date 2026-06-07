@@ -10,6 +10,10 @@ const ExtractInput = z.object({
   pdfBase64: z.string().min(100),
 });
 
+const ExtractDocxInput = z.object({
+  docxBase64: z.string().min(100),
+});
+
 // Lenient helpers: never reject because a field came back null/missing.
 // Arrays coerce null/undefined/non-array → []. Strings coerce null/undefined → "".
 const lenientArray = <T extends z.ZodTypeAny>(item: T) =>

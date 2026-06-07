@@ -85,6 +85,15 @@ function inferType(samples: string[]): DataType {
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[] };
 
+function isAiDoc(file: File): boolean {
+  const n = file.name.toLowerCase();
+  if (n.endsWith(".pdf") || n.endsWith(".docx")) return true;
+  return (
+    file.type === "application/pdf" ||
+    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  );
+}
+
 async function parseFile(file: File): Promise<ParsedFile> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".csv") || file.type === "text/csv") {
@@ -102,9 +111,6 @@ async function parseFile(file: File): Promise<ParsedFile> {
       return out;
     });
     return { headers, rows };
-  }
-  if (name.endsWith(".pdf")) {
-    throw new Error("PDF parsing isn't supported in-browser yet. Paste your data as CSV below, or export the PDF to Excel/CSV first.");
   }
   return parseCsvText(await file.text());
 }

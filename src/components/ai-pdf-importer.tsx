@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,17 +21,27 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   extractClientFromPdf,
+  extractClientFromDocx,
   commitClientFromPdf,
   type ExtractedClient,
 } from "@/lib/pdf-import.functions";
 import { EVV_SERVICE_CODES, evvServiceLabel } from "@/lib/evv-codes";
+import { Checkbox } from "@/components/ui/checkbox";
 
-const ACCEPT_EXT = [".pdf"];
-const ACCEPT_MIME = ["application/pdf"];
+const ACCEPT_EXT = [".pdf", ".docx"];
+const ACCEPT_MIME = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 
 function isAcceptedFile(file: File): boolean {
   const name = file.name.toLowerCase();
   return ACCEPT_EXT.some((ext) => name.endsWith(ext)) || ACCEPT_MIME.includes(file.type);
+}
+
+function isDocx(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".docx") ||
+    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 }
 
 function emptyData(): ExtractedClient {
@@ -117,11 +127,14 @@ function FieldRow({
 export function AiPdfImporter({
   organizationId,
   onDone,
+  initialFile,
 }: {
   organizationId: string | undefined;
   onDone: () => void;
+  initialFile?: File | null;
 }) {
   const extractFn = useServerFn(extractClientFromPdf);
+  const extractDocxFn = useServerFn(extractClientFromDocx);
   const commitFn = useServerFn(commitClientFromPdf);
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -133,7 +146,8 @@ export function AiPdfImporter({
   const [dragging, setDragging] = useState(false);
   const [data, setData] = useState<ExtractedClient | null>(null);
   const [original, setOriginal] = useState<ExtractedClient | null>(null);
-  const [sectionDecisions, setSectionDecisions] = useState<Record<number, "create" | "skip">>({});
+  // Default: every additional section is checked (will be created on save).
+  const [sectionChecked, setSectionChecked] = useState<Record<number, boolean>>({});
 
   const reset = useCallback(() => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
@@ -141,13 +155,13 @@ export function AiPdfImporter({
     setFileObj(null);
     setData(null);
     setOriginal(null);
-    setSectionDecisions({});
+    setSectionChecked({});
   }, [pdfUrl]);
 
   const handleFile = useCallback(
     async (file: File) => {
       if (!isAcceptedFile(file)) {
-        toast.error("PCSP import accepts PDF files only.");
+        toast.error("PCSP import accepts PDF or DOCX files only.");
         return;
       }
       if (file.size > 15 * 1024 * 1024) {
@@ -162,9 +176,15 @@ export function AiPdfImporter({
 
       try {
         const b64 = await fileToBase64(file);
-        const result = await extractFn({ data: { pdfBase64: b64 } });
+        const result = isDocx(file)
+          ? await extractDocxFn({ data: { docxBase64: b64 } })
+          : await extractFn({ data: { pdfBase64: b64 } });
         setData(result);
         setOriginal(structuredClone(result));
+        // Default-check every additional section.
+        const initialChecks: Record<number, boolean> = {};
+        (result.additional_sections ?? []).forEach((_, i) => { initialChecks[i] = true; });
+        setSectionChecked(initialChecks);
         toast.success("NECTAR extraction complete — review before saving.");
       } catch (e) {
         toast.error((e as Error).message);
@@ -175,7 +195,7 @@ export function AiPdfImporter({
         setExtracting(false);
       }
     },
-    [extractFn, reset],
+    [extractFn, extractDocxFn, reset],
   );
 
   const onDrop = useCallback(
@@ -187,6 +207,15 @@ export function AiPdfImporter({
     },
     [handleFile],
   );
+
+  // Auto-ingest a parent-provided file (e.g. routed in from the unified uploader).
+  useEffect(() => {
+    if (initialFile && !fileObj && !extracting) {
+      void handleFile(initialFile);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
+
 
   const wasFilled = useCallback(
     (key: keyof ExtractedClient): boolean => {
@@ -222,8 +251,8 @@ export function AiPdfImporter({
         .upload(path, fileObj, { upsert: true, contentType: fileObj.type || "application/pdf" });
       if (upErr) throw upErr;
 
-      // Build accepted additional sections (default to "create" if user didn't decide).
-      const accepted = data.additional_sections.filter((_, i) => sectionDecisions[i] !== "skip");
+      // Build accepted additional sections — only checked rows are persisted.
+      const accepted = data.additional_sections.filter((_, i) => sectionChecked[i] !== false);
 
       const res = await commitFn({
         data: {
@@ -263,7 +292,7 @@ export function AiPdfImporter({
     } finally {
       setCommitting(false);
     }
-  }, [data, organizationId, fileObj, commitFn, qc, reset, onDone, sectionDecisions]);
+  }, [data, organizationId, fileObj, commitFn, qc, reset, onDone, sectionChecked]);
 
   const codeSet = useMemo(() => new Set(data?.authorized_codes ?? []), [data]);
 
@@ -303,7 +332,7 @@ export function AiPdfImporter({
             <>
               <Sparkles className="h-10 w-10 text-primary" />
               <div>
-                <p className="font-medium">Drop a PCSP PDF to fill the entire client profile</p>
+                <p className="font-medium">Drop a PCSP, roster, or assessment — PDF or DOCX</p>
                 <p className="text-xs text-muted-foreground">
                   NECTAR extracts every field present in the document and prompts you to create new sections
                   for anything that doesn't have a matching field. Nothing is ever invented.
@@ -311,13 +340,13 @@ export function AiPdfImporter({
               </div>
               <Label htmlFor="ai-pdf-file" className="cursor-pointer">
                 <span className="inline-flex h-11 min-w-[44px] items-center gap-2 rounded-md border border-primary/40 bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
-                  <Upload className="h-4 w-4" /> Browse PDF
+                  <Upload className="h-4 w-4" /> Browse file
                 </span>
                 <input
                   id="ai-pdf-file"
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,application/pdf"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -400,20 +429,26 @@ export function AiPdfImporter({
         </Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr,1.4fr]">
-        {/* Left: file preview */}
-        <div className="rounded-lg border border-primary/20 bg-muted/30">
-          <div className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
-            <FileText className="h-3.5 w-3.5" /> {fileObj?.name || "PCSP"}
-          </div>
-          <iframe
-            title="PCSP preview"
-            src={pdfUrl}
-            className="h-[70vh] w-full rounded-b-lg bg-background"
-          />
-        </div>
+      {/* Compact file reference (no inline embed/iframe). */}
+      <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+        <span className="flex min-w-0 items-center gap-2 truncate text-muted-foreground">
+          <FileText className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate font-medium text-foreground">{fileObj?.name || "Source document"}</span>
+        </span>
+        {pdfUrl ? (
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-2.5 text-xs hover:bg-muted"
+          >
+            Open
+          </a>
+        ) : null}
+      </div>
 
-        {/* Right: editable extracted data */}
+      <div className="grid gap-4">
+        {/* Editable extracted data */}
         <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
           <section className="space-y-2">
             <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -697,55 +732,70 @@ export function AiPdfImporter({
             </section>
           )}
 
-          {data.additional_sections.length > 0 && (
-            <section className="space-y-2">
-              <div className="rounded-md border border-amber-400/40 bg-amber-50/40 p-3 dark:bg-amber-950/20">
-                <h4 className="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-100">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Additional information found in this PCSP
-                </h4>
-                <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-200">
-                  These blocks don't match any existing profile section. Create a new section for each to keep
-                  them on the client's profile, or skip.
-                </p>
-              </div>
-              <div className="space-y-2">
-                {data.additional_sections.map((s, i) => {
-                  const decision = sectionDecisions[i] ?? "create";
-                  return (
-                    <div key={i} className="rounded-md border p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-sm font-medium">{s.label}</div>
-                        <div className="flex gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={decision === "create" ? "default" : "outline"}
-                            onClick={() => setSectionDecisions((d) => ({ ...d, [i]: "create" }))}
-                            className="h-8 text-xs"
-                          >
-                            Create section
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={decision === "skip" ? "default" : "outline"}
-                            onClick={() => setSectionDecisions((d) => ({ ...d, [i]: "skip" }))}
-                            className="h-8 text-xs"
-                          >
-                            Skip
-                          </Button>
+          {data.additional_sections.length > 0 && (() => {
+            const total = data.additional_sections.length;
+            const checkedCount = data.additional_sections.reduce(
+              (n, _, i) => n + (sectionChecked[i] !== false ? 1 : 0),
+              0,
+            );
+            const allChecked = checkedCount === total;
+            return (
+              <section className="space-y-2">
+                <div className="rounded-md border border-amber-400/40 bg-amber-50/40 p-3 dark:bg-amber-950/20">
+                  <h4 className="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-100">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Additional information found in this document
+                  </h4>
+                  <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-200">
+                    Check each block you want NECTAR to save as a new section on this client's profile.
+                  </p>
+                </div>
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <span className="text-[11px] text-muted-foreground">
+                    {checkedCount} of {total} selected
+                  </span>
+                  <button
+                    type="button"
+                    className="text-[11px] font-medium text-primary hover:underline"
+                    onClick={() => {
+                      const next: Record<number, boolean> = {};
+                      data.additional_sections.forEach((_, i) => { next[i] = !allChecked; });
+                      setSectionChecked(next);
+                    }}
+                  >
+                    {allChecked ? "Deselect all" : "Select all"}
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {data.additional_sections.map((s, i) => {
+                    const checked = sectionChecked[i] !== false;
+                    return (
+                      <label
+                        key={i}
+                        className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition ${
+                          checked ? "border-primary/40 bg-primary/5" : "border-border bg-background opacity-70"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) =>
+                            setSectionChecked((d) => ({ ...d, [i]: v === true }))
+                          }
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium">{s.label}</div>
+                          <pre className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] text-muted-foreground">
+                            {s.content}
+                          </pre>
                         </div>
-                      </div>
-                      <pre className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] text-muted-foreground">
-                        {s.content}
-                      </pre>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })()}
         </div>
       </div>
 

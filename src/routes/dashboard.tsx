@@ -39,7 +39,6 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
-  { to: "/dashboard/forms", label: "Forms", icon: FileText },
 ];
 
 const ADMIN_NAV: NavItem[] = [

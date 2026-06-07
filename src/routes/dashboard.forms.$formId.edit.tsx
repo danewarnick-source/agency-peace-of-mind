@@ -46,6 +46,8 @@ function EditForm() {
   const [schedule, setSchedule] = useState<Schedule>({});
   const [groups, setGroups] = useState<string[]>([]);
   const [users, setUsers] = useState<string[]>([]);
+  const [allClients, setAllClients] = useState<boolean>(true);
+  const [clients, setClients] = useState<string[]>([]);
   const [settings, setSettings] = useState<FormSettings>({});
   const [isNectarDraft, setIsNectarDraft] = useState(false);
 
@@ -65,6 +67,8 @@ function EditForm() {
     setSchedule(f.schedule ?? {});
     setGroups(f.assigned_groups ?? []);
     setUsers(f.assigned_users ?? []);
+    setAllClients(f.all_clients ?? true);
+    setClients(f.assigned_clients ?? []);
     setSettings(f.settings ?? {});
   }, [data]);
 
@@ -89,7 +93,10 @@ function EditForm() {
     try {
       await save({ data: {
         id: formId, name: name.trim(), description, category,
-        fields, frequency, schedule, assigned_groups: groups, assigned_users: users, settings,
+        fields, frequency, schedule,
+        assigned_groups: groups, assigned_users: users,
+        all_clients: allClients, assigned_clients: clients,
+        settings,
       } });
       qc.invalidateQueries({ queryKey: ["form-edit", formId] });
       qc.invalidateQueries({ queryKey: ["forms-admin"] });
@@ -203,7 +210,8 @@ function EditForm() {
             <ul className="space-y-1 text-muted-foreground">
               <li>• Records → Forms (always)</li>
               <li>• {FORM_CATEGORIES.find((c) => c.value === category)?.label}</li>
-              <li>• Audience: <Badge variant="outline" className="text-[10px]">{(groups.length || users.length) ? `${groups.length} groups · ${users.length} staff` : "Not assigned"}</Badge></li>
+              <li>• Staff: <Badge variant="outline" className="text-[10px]">{(groups.length || users.length) ? `${groups.length} groups · ${users.length} staff` : "Not assigned"}</Badge></li>
+              <li>• Clients: <Badge variant="outline" className="text-[10px]">{allClients ? "All clients" : `${clients.length} client${clients.length === 1 ? "" : "s"}`}</Badge></li>
               <li>• <CalendarClock className="inline h-3 w-3" /> {describeFrequency(frequency, schedule)}</li>
             </ul>
           </Card>
@@ -216,8 +224,9 @@ function EditForm() {
         setFields(d.fields); setIsNectarDraft(true);
       }} />
       <SettingsModal open={showSettings} onOpenChange={setShowSettings} value={settings} onChange={setSettings} />
-      <AssignModal open={showAssign} onOpenChange={setShowAssign} groups={groups} users={users}
-        onChange={(g, u) => { setGroups(g); setUsers(u); }} />
+      <AssignModal open={showAssign} onOpenChange={setShowAssign}
+        groups={groups} users={users} allClients={allClients} clients={clients}
+        onChange={(g, u, ac, c) => { setGroups(g); setUsers(u); setAllClients(ac); setClients(c); }} />
       <PublishModal open={showPublish} onOpenChange={setShowPublish}
         formId={formId} formMeta={{ name, description, frequency, schedule, fields }}
         onPublished={() => { qc.invalidateQueries({ queryKey: ["form-edit", formId] }); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }} />

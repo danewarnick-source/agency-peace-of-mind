@@ -69,6 +69,8 @@ const formInput = z.object({
   schedule: z.record(z.any()).default({}),
   assigned_groups: z.array(z.string().min(1).max(80)).max(40).default([]),
   assigned_users: z.array(z.string().uuid()).max(500).default([]),
+  all_clients: z.boolean().default(true),
+  assigned_clients: z.array(z.string().uuid()).max(2000).default([]),
   settings: z.record(z.any()).default({}),
 });
 
@@ -89,6 +91,8 @@ export const saveForm = createServerFn({ method: "POST" })
       schedule: data.schedule,
       assigned_groups: data.assigned_groups,
       assigned_users: data.assigned_users,
+      all_clients: data.all_clients,
+      assigned_clients: data.all_clients ? [] : data.assigned_clients,
       settings: data.settings,
       created_by: userId,
     };
@@ -221,14 +225,25 @@ export const submitForm = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     formId: z.string().uuid(),
+    clientId: z.string().uuid(),
     answers: z.record(z.any()),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     const m = await getMembership(supabase, userId);
     const { data: form, error: fe } = await supabase
-      .from("forms").select("id, organization_id, frequency, settings").eq("id", data.formId).maybeSingle();
+      .from("forms").select("id, organization_id, frequency, settings, all_clients, assigned_clients").eq("id", data.formId).maybeSingle();
     if (fe || !form) throw new Error("Form not found.");
+    // Verify the form is assigned to this client
+    if (!form.all_clients && !(form.assigned_clients ?? []).includes(data.clientId)) {
+      throw new Error("This form is not assigned to that individual.");
+    }
+    // Verify the staff has this client on their caseload (defense-in-depth; UI already filters)
+    const { data: sa } = await supabase
+      .from("staff_assignments").select("client_id")
+      .eq("organization_id", form.organization_id)
+      .eq("staff_id", userId).eq("client_id", data.clientId).limit(1).maybeSingle();
+    if (!sa) throw new Error("This individual is not on your caseload.");
     const periodKey = periodKeyFor(form.frequency as Frequency);
     const settings = (form.settings ?? {}) as FormSettings;
     const submittedBy = settings.anonymous ? null : userId;
@@ -236,10 +251,12 @@ export const submitForm = createServerFn({ method: "POST" })
       organization_id: form.organization_id,
       form_id: form.id,
       submitted_by: submittedBy,
+      client_id: data.clientId,
       answers: data.answers,
       period_key: periodKey,
     }).select().maybeSingle();
     if (error) throw new Error(error.message);
+    void m;
 
     // Fan-out at submission time per form settings (share_users, share_manager, share_emails).
     try {
@@ -353,7 +370,46 @@ export const getAssignDirectory = createServerFn({ method: "GET" })
     const { data: staffTypes } = await supabase
       .from("staff_types").select("key, label")
       .eq("organization_id", m.organization_id);
-    return { members: members ?? [], profiles, staffTypes: staffTypes ?? [] };
+    const { data: clients } = await supabase
+      .from("clients").select("id, first_name, last_name")
+      .eq("organization_id", m.organization_id)
+      .order("last_name", { ascending: true });
+    return { members: members ?? [], profiles, staffTypes: staffTypes ?? [], clients: clients ?? [] };
+  });
+
+// ─── STAFF: forms assigned to me + this client (rule: form assigned to staff
+// AND assigned to client AND client on staff's caseload). Returns forms plus
+// my submissions for the current period.
+export const listClientForms = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    // Confirm client is on my caseload
+    const { data: sa } = await supabase
+      .from("staff_assignments").select("organization_id")
+      .eq("staff_id", userId).eq("client_id", data.clientId).limit(1).maybeSingle();
+    if (!sa) return { forms: [], submissions: [] };
+    // RLS already restricts forms to those assigned to me + published; filter
+    // additionally to those assigned to this client (or all_clients).
+    const { data: forms, error } = await supabase
+      .from("forms").select("*")
+      .eq("status", "published")
+      .eq("organization_id", sa.organization_id)
+      .or(`all_clients.eq.true,assigned_clients.cs.{${data.clientId}}`);
+    if (error) throw new Error(error.message);
+    const formIds = (forms ?? []).map((f: { id: string }) => f.id);
+    let subs: Array<{ id: string; form_id: string; period_key: string | null; submitted_at: string; client_id: string | null }> = [];
+    if (formIds.length) {
+      const { data: s } = await supabase
+        .from("form_submissions")
+        .select("id, form_id, period_key, submitted_at, client_id")
+        .eq("submitted_by", userId)
+        .eq("client_id", data.clientId)
+        .in("form_id", formIds);
+      subs = s ?? [];
+    }
+    return { forms: forms ?? [], submissions: subs };
   });
 
 // ─── NECTAR: draft a form from a description ──────────────────────────────

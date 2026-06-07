@@ -23,7 +23,11 @@ import {
   User,
   AlertTriangle,
   Info,
+  Brain,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { StaffBehaviorDataTab } from "@/components/behavior-support/staff-data-tab";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 
 import { toast } from "sonner";
@@ -102,6 +106,29 @@ function ClientWorkspace() {
 
   const codes = allowedHourly.length ? allowedHourly : clientCodes;
   const { enabled: emarEnabled } = useClientFeature(client, "emar");
+
+  // Behavior Support visibility: bc_code set, features_enabled true, ≥1 published behavior
+  const { data: bsTab } = useQuery({
+    queryKey: ["workspace-bs-tab", client.id],
+    queryFn: async () => {
+      const { data: bsc } = await supabase
+        .from("behavior_support_clients")
+        .select("organization_id, bc_code, features_enabled")
+        .eq("client_id", client.id)
+        .maybeSingle();
+      if (!bsc?.features_enabled || !bsc?.bc_code) return { show: false as const };
+      const { count } = await supabase
+        .from("bc_behaviors")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", client.id)
+        .eq("status", "published");
+      return {
+        show: (count ?? 0) > 0,
+        organizationId: bsc.organization_id,
+      };
+    },
+  });
+  const showBehaviorTab = !!bsTab?.show;
 
   return (
     <>
@@ -184,12 +211,13 @@ function ClientWorkspace() {
           className="w-full"
         >
           {/* Touch-friendly tab bar — amber active w/ 2px underline, navy inactive (tappable, never dimmed) */}
-          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 border-b border-border bg-transparent p-0 text-foreground">
+          <TabsList className={`grid h-auto w-full ${showBehaviorTab ? "grid-cols-5" : "grid-cols-4"} gap-1 border-b border-border bg-transparent p-0 text-foreground`}>
             {[
               { v: "about", label: "About", Icon: User, show: true },
               { v: "clock-in", label: "Clock In", Icon: Clock, show: true },
               { v: "emar", label: "MAR", Icon: Pill, show: emarEnabled },
               { v: "forms", label: "Forms", Icon: FileText, show: true },
+              { v: "behavior-data", label: "Behavior Data", Icon: Brain, show: showBehaviorTab },
             ].filter((t) => t.show).map(({ v, label, Icon }) => (
               <TabsTrigger
                 key={v}
@@ -241,6 +269,15 @@ function ClientWorkspace() {
               clientName={`${client.first_name} ${client.last_name}`}
             />
           </TabsContent>
+
+          {showBehaviorTab && bsTab?.organizationId && (
+            <TabsContent value="behavior-data" className="mt-5">
+              <StaffBehaviorDataTab
+                clientId={client.id}
+                organizationId={bsTab.organizationId}
+              />
+            </TabsContent>
+          )}
         </Tabs>
 
       </div>

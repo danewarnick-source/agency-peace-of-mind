@@ -2529,6 +2529,170 @@ export type Database = {
         }
         Relationships: []
       }
+      form_notifications: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          form_id: string
+          id: string
+          organization_id: string
+          title: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          form_id: string
+          id?: string
+          organization_id: string
+          title: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          form_id?: string
+          id?: string
+          organization_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_notifications_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_notifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_submissions: {
+        Row: {
+          answers: Json
+          created_at: string
+          form_id: string
+          id: string
+          organization_id: string
+          period_key: string | null
+          status: string
+          submitted_at: string
+          submitted_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          answers?: Json
+          created_at?: string
+          form_id: string
+          id?: string
+          organization_id: string
+          period_key?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json
+          created_at?: string
+          form_id?: string
+          id?: string
+          organization_id?: string
+          period_key?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_submissions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forms: {
+        Row: {
+          assigned_groups: string[]
+          assigned_users: string[]
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          fields: Json
+          frequency: string
+          id: string
+          name: string
+          organization_id: string
+          published_at: string | null
+          schedule: Json
+          settings: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_groups?: string[]
+          assigned_users?: string[]
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fields?: Json
+          frequency?: string
+          id?: string
+          name: string
+          organization_id: string
+          published_at?: string | null
+          schedule?: Json
+          settings?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_groups?: string[]
+          assigned_users?: string[]
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fields?: Json
+          frequency?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          published_at?: string | null
+          schedule?: Json
+          settings?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forms_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hhs_client_inventories: {
         Row: {
           added_on: string
@@ -4544,6 +4708,7 @@ export type Database = {
           organization_id: string
           read_at: string | null
           recipient_role: string
+          recipient_user_id: string | null
           related_id: string | null
           related_type: string | null
           title: string
@@ -4559,6 +4724,7 @@ export type Database = {
           organization_id: string
           read_at?: string | null
           recipient_role?: string
+          recipient_user_id?: string | null
           related_id?: string | null
           related_type?: string | null
           title: string
@@ -4574,6 +4740,7 @@ export type Database = {
           organization_id?: string
           read_at?: string | null
           recipient_role?: string
+          recipient_user_id?: string | null
           related_id?: string | null
           related_type?: string | null
           title?: string

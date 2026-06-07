@@ -72,7 +72,31 @@ type EmarLog = {
   is_prn: boolean;
   prn_reason: string | null;
   admin_reviewed: boolean;
+  created_at?: string;
+  recorded_in?: string | null;
 };
+
+// Parse the `[code:XXX]` prefix we stamp on notes to carry the precise
+// service/job code (DSG, RHS, RP3, etc.) without violating the existing
+// `recorded_in` CHECK constraint (dsi | hhs | general).
+function parseJobCode(log: Pick<EmarLog, "notes" | "recorded_in">): string {
+  const m = log.notes?.match(/^\[code:([A-Za-z0-9_-]+)\]/);
+  if (m && m[1] && m[1].toLowerCase() !== "none") return m[1].toUpperCase();
+  return (log.recorded_in || "general").toUpperCase();
+}
+
+function stripJobCodePrefix(notes: string | null): string | null {
+  if (!notes) return notes;
+  return notes.replace(/^\[code:[A-Za-z0-9_-]+\]\s*/, "") || null;
+}
+
+function bucketRecordedIn(code: string | null | undefined): "dsi" | "hhs" | "general" {
+  const c = (code || "").toUpperCase();
+  if (!c) return "general";
+  if (c.startsWith("HH") || c === "RHS") return "hhs";
+  if (c.startsWith("DS")) return "dsi";
+  return "general";
+}
 
 type Block = "Morning" | "Noon" | "Evening" | "Night";
 

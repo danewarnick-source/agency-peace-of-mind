@@ -225,6 +225,24 @@ function EditForm() {
   );
 }
 
+function LivePreview({ fields }: { fields: FormField[] }) {
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  return (
+    <>
+      {fields.map((f) => {
+        if (!isFieldVisible(f, answers, fields)) return null;
+        return (
+          <FieldRenderer
+            key={f.id} field={f}
+            value={answers[f.id]}
+            onChange={(v) => setAnswers((a) => ({ ...a, [f.id]: v }))}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 function FrequencyControl({
   frequency, schedule, setFrequency, setSchedule,
 }: {

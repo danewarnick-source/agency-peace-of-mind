@@ -69,6 +69,8 @@ const formInput = z.object({
   schedule: z.record(z.any()).default({}),
   assigned_groups: z.array(z.string().min(1).max(80)).max(40).default([]),
   assigned_users: z.array(z.string().uuid()).max(500).default([]),
+  all_clients: z.boolean().default(true),
+  assigned_clients: z.array(z.string().uuid()).max(2000).default([]),
   settings: z.record(z.any()).default({}),
 });
 
@@ -89,6 +91,8 @@ export const saveForm = createServerFn({ method: "POST" })
       schedule: data.schedule,
       assigned_groups: data.assigned_groups,
       assigned_users: data.assigned_users,
+      all_clients: data.all_clients,
+      assigned_clients: data.all_clients ? [] : data.assigned_clients,
       settings: data.settings,
       created_by: userId,
     };

@@ -414,7 +414,6 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
       return (data ?? []) as Array<any>;
     },
   });
-  });
 
   const formsQ = useQuery({
     enabled: !!organizationId,

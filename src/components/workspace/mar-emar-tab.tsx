@@ -1068,7 +1068,7 @@ export function MarEmarTab({
   useEffect(() => {
     if (!clientId || !orgId) return;
     const channel = supabase
-      .channel(`emar_logs:client:${clientId}`)
+      .channel(`emar_logs:client:${clientId}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "emar_logs", filter: `client_id=eq.${clientId}` },

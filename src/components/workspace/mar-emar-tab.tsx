@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -71,7 +72,31 @@ type EmarLog = {
   is_prn: boolean;
   prn_reason: string | null;
   admin_reviewed: boolean;
+  created_at?: string;
+  recorded_in?: string | null;
 };
+
+// Parse the `[code:XXX]` prefix we stamp on notes to carry the precise
+// service/job code (DSG, RHS, RP3, etc.) without violating the existing
+// `recorded_in` CHECK constraint (dsi | hhs | general).
+function parseJobCode(log: Pick<EmarLog, "notes" | "recorded_in">): string {
+  const m = log.notes?.match(/^\[code:([A-Za-z0-9_-]+)\]/);
+  if (m && m[1] && m[1].toLowerCase() !== "none") return m[1].toUpperCase();
+  return (log.recorded_in || "general").toUpperCase();
+}
+
+function stripJobCodePrefix(notes: string | null): string | null {
+  if (!notes) return notes;
+  return notes.replace(/^\[code:[A-Za-z0-9_-]+\]\s*/, "") || null;
+}
+
+function bucketRecordedIn(code: string | null | undefined): "dsi" | "hhs" | "general" {
+  const c = (code || "").toUpperCase();
+  if (!c) return "general";
+  if (c.startsWith("HH") || c === "RHS") return "hhs";
+  if (c.startsWith("DS")) return "dsi";
+  return "general";
+}
 
 type Block = "Morning" | "Noon" | "Evening" | "Night";
 
@@ -1034,8 +1059,28 @@ export function MarEmarTab({
 }) {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
+  const { data: activeShift } = useActiveShift();
   const qc = useQueryClient();
   const orgId = org?.organization_id;
+
+  // ── Realtime: any INSERT to emar_logs for this client refetches every
+  //    open dashboard so the MAR stays in sync across all staff/job codes.
+  useEffect(() => {
+    if (!clientId || !orgId) return;
+    const channel = supabase
+      .channel(`emar_logs:client:${clientId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "emar_logs", filter: `client_id=eq.${clientId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["mar-logs-today", clientId, orgId] });
+          qc.invalidateQueries({ queryKey: ["mar-logs-month", clientId, orgId] });
+          qc.invalidateQueries({ queryKey: ["mar-logs-cal", clientId] });
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [clientId, orgId, qc]);
 
   const [activePass, setActivePass] = useState<{
     med: Medication;
@@ -1083,10 +1128,12 @@ export function MarEmarTab({
         .select(`id, medication_id, scheduled_for, administered_at, status,
           exception_reason, notes, staff_name, signature_attestation,
           is_medication_error, is_controlled, pill_count_verified, pill_count_value,
-          is_prn, prn_reason, admin_reviewed, signature_data_url`)
+          is_prn, prn_reason, admin_reviewed, signature_data_url,
+          created_at, recorded_in`)
         .eq("client_id", clientId)
         .gte("scheduled_for", todayStart)
-        .lt("scheduled_for", tomorrowStart);
+        .lt("scheduled_for", tomorrowStart)
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []) as EmarLog[];
     },
@@ -1119,20 +1166,32 @@ export function MarEmarTab({
 
   const passes = useMemo(() => {
     const rows: {
-      med: Medication; time: string; iso: string; block: Block; log: EmarLog | undefined;
+      med: Medication; time: string; iso: string; block: Block;
+      history: EmarLog[]; log: EmarLog | undefined; isLocked: boolean;
     }[] = [];
     meds.forEach((med) => {
       med.scheduled_times.forEach((t) => {
         const iso = isoForToday(t);
-        const log = todayLogs.find((l) =>
-          l.medication_id === med.id &&
-          Math.abs(new Date(l.scheduled_for).getTime() - new Date(iso).getTime()) < 60_000
-        );
-        rows.push({ med, time: t, iso, block: blockFor(t), log });
+        const history = todayLogs
+          .filter((l) =>
+            l.medication_id === med.id &&
+            Math.abs(new Date(l.scheduled_for).getTime() - new Date(iso).getTime()) < 60_000,
+          )
+          .sort((a, b) =>
+            (a.created_at ?? "").localeCompare(b.created_at ?? ""),
+          );
+        const latest = history[history.length - 1];
+        rows.push({
+          med, time: t, iso, block: blockFor(t),
+          history, log: latest, isLocked: latest?.status === "administered",
+        });
       });
       // PRN medications get a "log now" entry even without a scheduled time
       if (med.is_prn && med.scheduled_times.length === 0) {
-        rows.push({ med, time: "PRN", iso: new Date().toISOString(), block: "Morning", log: undefined });
+        rows.push({
+          med, time: "PRN", iso: new Date().toISOString(), block: "Morning",
+          history: [], log: undefined, isLocked: false,
+        });
       }
     });
     return rows;
@@ -1147,7 +1206,7 @@ export function MarEmarTab({
     return m;
   }, [passes]);
 
-  const pendingCount = passes.filter((p) => !p.log).length;
+  const pendingCount = passes.filter((p) => !p.isLocked).length;
   const errorCount = todayLogs.filter((l) => l.is_medication_error && !l.admin_reviewed).length;
 
   // ── Submit administration ────────────────────────────────────────────────────
@@ -1169,6 +1228,11 @@ export function MarEmarTab({
     if (!orgId || !user || !activePass) return;
     const staffName = payload.staffObserverName || user.user_metadata?.full_name || user.email || "Staff";
 
+    // Stamp the precise active job/service code so every appended entry
+    // carries cross-departmental audit context (HHS, DSI, DSG, RHS, …).
+    const jobCode = activeShift?.service_type_code || "none";
+    const stampedNotes = `[code:${jobCode}]${payload.notes ? " " + payload.notes : ""}`;
+
     const { data: inserted, error } = await (supabase as any)
       .from("emar_logs")
       .insert({
@@ -1183,7 +1247,8 @@ export function MarEmarTab({
         exception_reason:      payload.exceptionReason
           ? `Route: ${payload.route} · ${payload.exceptionReason}`
           : null,
-        notes:                 payload.notes,
+        notes:                 stampedNotes,
+        recorded_in:           bucketRecordedIn(activeShift?.service_type_code),
         staff_id:              user.id,
         staff_name:            staffName,
         signature_attestation: payload.attested ? ATTESTATION_TEXT : null,
@@ -1328,10 +1393,11 @@ export function MarEmarTab({
                 </div>
                 <ul className="divide-y divide-border">
                   {items.map((p) => {
-                    const done = !!p.log;
+                    const isLocked = p.isLocked;
+                    const hasHistory = p.history.length > 0;
                     const passed = p.log?.status === "administered";
                     const errored = p.log?.is_medication_error;
-                    const overdue = !done && new Date(p.iso).getTime() < Date.now() - 60 * 60 * 1000 && p.time !== "PRN";
+                    const overdue = !isLocked && new Date(p.iso).getTime() < Date.now() - 60 * 60 * 1000 && p.time !== "PRN";
 
                     return (
                       <li key={`${p.med.id}-${p.time}`}
@@ -1375,7 +1441,7 @@ export function MarEmarTab({
                               )}
                             </div>
                           )}
-                          {done && !passed && (
+                          {p.log && !passed && (
                             <Badge variant="secondary" className="mt-1.5 capitalize">
                               {p.log?.status}
                               {p.log?.exception_reason ? ` — ${p.log.exception_reason.replace(/^Route:[^·]+·\s*/, "")}` : ""}
@@ -1386,14 +1452,37 @@ export function MarEmarTab({
                               <AlertOctagon className="mr-1 h-3 w-3" /> Medication Error Filed
                             </Badge>
                           )}
-                          {overdue && !done && (
+                          {overdue && !p.log && (
                             <Badge className="mt-1.5 animate-pulse bg-amber-500 text-white">
                               Window Passed — Documentation Required
                             </Badge>
                           )}
+
+                          {/* Chronological immutable history — visible to every dashboard */}
+                          {hasHistory && (
+                            <ul className="mt-2 space-y-0.5 border-l border-border pl-2 text-[11px] text-muted-foreground">
+                              {p.history.map((h) => {
+                                const code = parseJobCode(h);
+                                const when = h.created_at ? fmtTime(h.created_at) : "";
+                                const cleanNotes = stripJobCodePrefix(h.notes);
+                                const isAdmin = h.status === "administered";
+                                return (
+                                  <li key={h.id} className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-mono">{when}</span>
+                                    <span className={`capitalize ${isAdmin ? "text-emerald-700 dark:text-emerald-300 font-medium" : ""}`}>
+                                      {h.status}{isAdmin ? " ✓" : ""}
+                                    </span>
+                                    <span>— {h.staff_name || "Staff"}</span>
+                                    <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono">{code}</Badge>
+                                    {cleanNotes && <span className="opacity-80">· {cleanNotes}</span>}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
                         </div>
 
-                        {!done && (
+                        {!isLocked && (
                           <Button
                             size="sm"
                             onClick={() => setActivePass({ med: p.med, time: p.time, iso: p.iso })}
@@ -1404,7 +1493,13 @@ export function MarEmarTab({
                             }`}
                           >
                             <Pill className="h-4 w-4" />
-                            {overdue ? "Document Now" : p.time === "PRN" ? "Log PRN" : "Record Pass"}
+                            {overdue
+                              ? "Document Now"
+                              : p.time === "PRN"
+                              ? "Log PRN"
+                              : hasHistory
+                              ? "Update Status"
+                              : "Record Pass"}
                           </Button>
                         )}
                       </li>

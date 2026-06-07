@@ -632,7 +632,7 @@ function ClientWorkspace({
 
 // ─── Care section shell ───────────────────────────────────────────────────────
 function CareSectionShell({
-  title, description, linkTo, linkParams, linkLabel, children,
+  title, description, linkTo, linkParams, linkLabel, children, icon: Icon,
 }: {
   title: string;
   description: string;
@@ -641,14 +641,107 @@ function CareSectionShell({
   linkParams?: Record<string, any>;
   linkLabel: string;
   children: React.ReactNode;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon?: any;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card">
-      <header className="flex flex-col gap-2 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">{title}</h3>
-          <p className="text-xs text-muted-foreground">{description}</p>
+    <section className="rounded-xl border border-border/60 bg-card p-1">
+      <header className="flex flex-col gap-2 px-4 pt-4 pb-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-2.5">
+          {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />}
+          <div>
+            <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
         </div>
+        <Button asChild variant="ghost" size="sm" className="gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground md:self-auto">
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <Link to={linkTo as any} params={linkParams as any}>
+            {linkLabel} <ExternalLink className="h-3 w-3" />
+          </Link>
+        </Button>
+      </header>
+      <div className="px-4 pb-4">{children}</div>
+    </section>
+  );
+}
+
+// ─── Collapsible card (for rarely-edited blocks) ──────────────────────────────
+function CollapsibleCard({
+  title, description, icon: Icon, children, defaultOpen = false,
+}: {
+  title: string;
+  description?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon?: any;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="rounded-xl border border-border/60 bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+      >
+        <div className="flex items-start gap-2.5">
+          {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />}
+          <div>
+            <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+          </div>
+        </div>
+        <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </section>
+  );
+}
+
+// ─── Care billing codes editor (lifts the DSPD multi-select out of Profile) ──
+function CareBillingCodesEditor({
+  client, onSave, saving,
+}: { client: Client; onSave: (v: ClientFormValues) => void; saving: boolean }) {
+  const [codes, setCodes] = useState<string[]>(client.job_code ?? []);
+  const dirty = JSON.stringify(codes) !== JSON.stringify(client.job_code ?? []);
+  return (
+    <div className="space-y-3">
+      <DspdCodesMultiSelect value={codes} onChange={setCodes} />
+      <p className="text-[11px] text-muted-foreground">
+        Selected codes appear in the caregiver's EVV clock-in service-type dropdown.
+      </p>
+      {dirty && (
+        <Button
+          size="sm"
+          onClick={() => onSave({
+            first_name: client.first_name,
+            last_name: client.last_name,
+            phone_number: client.phone_number ?? "",
+            physical_address: client.physical_address ?? "",
+            pcsp_goals: client.pcsp_goals ?? [],
+            job_code: codes,
+            medicaid_id: client.medicaid_id ?? "",
+            geofence_radius_feet: client.geofence_radius_feet ?? 1000,
+            special_directions: client.special_directions ?? "",
+            date_of_birth: client.date_of_birth ?? "",
+            emergency_contact_name: client.emergency_contact_name ?? "",
+            emergency_contact_phone: client.emergency_contact_phone ?? "",
+            profile_photo_url: client.profile_photo_url ?? "",
+          })}
+          disabled={saving}
+        >
+          {saving && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+          Save codes
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ─── Rights & safeguards (link-out card) ──────────────────────────────────────
+function RightsSafeguardsCard({ clientId }: { clientId: string }) {
+  void clientId;
         <Button asChild variant="outline" size="sm" className="gap-1.5 self-start md:self-auto">
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           <Link to={linkTo as any} params={linkParams as any}>

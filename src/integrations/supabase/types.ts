@@ -2304,6 +2304,7 @@ export type Database = {
           field_label: string
           id: string
           organization_id: string
+          source: string
         }
         Insert: {
           created_at?: string
@@ -2314,6 +2315,7 @@ export type Database = {
           field_label: string
           id?: string
           organization_id: string
+          source?: string
         }
         Update: {
           created_at?: string
@@ -2324,6 +2326,7 @@ export type Database = {
           field_label?: string
           id?: string
           organization_id?: string
+          source?: string
         }
         Relationships: []
       }

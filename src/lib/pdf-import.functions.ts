@@ -569,12 +569,21 @@ export const commitClientFromPdf = createServerFn({ method: "POST" })
             field_key: fieldKey,
             field_label: s.label,
             data_type: "text",
+            source: "pcsp",
             created_by: userId,
           })
           .select("id")
           .single();
         if (defErr) continue;
         defId = insDef!.id as string;
+      } else {
+        // Re-import: ensure the existing definition is tagged as PCSP-sourced
+        // (no-op if it's already 'pcsp'); upsert below replaces the value.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from("custom_field_definitions")
+          .update({ source: "pcsp", field_label: s.label })
+          .eq("id", defId);
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

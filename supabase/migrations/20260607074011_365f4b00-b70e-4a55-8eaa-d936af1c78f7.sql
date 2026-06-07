@@ -1,0 +1,1 @@
+ALTER TABLE public.custom_field_definitions ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual';

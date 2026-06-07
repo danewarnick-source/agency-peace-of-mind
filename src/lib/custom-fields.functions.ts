@@ -39,7 +39,7 @@ export const getCustomFields = createServerFn({ method: "POST" })
 
     const { data: defs, error: defsErr } = await supabase
       .from("custom_field_definitions")
-      .select("id, field_key, field_label, data_type")
+      .select("id, field_key, field_label, data_type, source")
       .eq("organization_id", data.organizationId)
       .eq("entity_kind", data.entityKind)
       .order("created_at", { ascending: true });
@@ -59,6 +59,7 @@ export const getCustomFields = createServerFn({ method: "POST" })
       field_key: d.field_key,
       field_label: d.field_label,
       data_type: d.data_type as "text" | "number" | "boolean" | "date",
+      source: (d.source ?? "manual") as "manual" | "pcsp",
       value: valMap.get(d.id) ?? null,
     }));
   });

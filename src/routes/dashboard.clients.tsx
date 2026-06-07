@@ -29,7 +29,7 @@ import {
   Plus, X, UserPlus, Contact2, Pencil, MapPin, Loader2,
   User, FileText, Pill, Shield, Settings2, ChevronRight,
   Upload, Trash2, CheckCircle2, AlertTriangle, Search,
-  ArrowLeft, Users, Camera, Sparkles, Brain,
+  ArrowLeft, Users, Camera, Sparkles, Brain, Info,
   Activity as ActivityIcon, HandCoins, Wallet, ClipboardList,
   ExternalLink, Stethoscope, Gavel,
 } from "lucide-react";
@@ -514,36 +514,49 @@ function ClientWorkspace({
           ))}
         </TabsList>
 
-        {/* PROFILE — the "who": identity, contact, codes, PCSP goals, settings */}
+        {/* PROFILE — the "who": identity, contact, alerts, docs, custom attrs, danger zone */}
         <TabsContent value="profile" className="mt-5 space-y-6">
           <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
-          <PcspTab client={client} onSave={onSave} saving={saving} />
-          <SettingsTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
         </TabsContent>
 
-        {/* CARE — operational config as read-only surfaces with links out */}
+        {/* CARE — the "how": clinical/operational config */}
         <TabsContent value="care" className="mt-5 space-y-6">
           <CareSectionShell
             title="Placement"
-            description="Team & home assignment for this client. Manage caseload here, or open Teams & Homes for the full module."
+            description="Team & home assignment for this client."
             linkTo="/dashboard/teams"
             linkLabel="Open Teams & Homes"
+            icon={Users}
           >
             <StaffAssignmentTab clientId={client.id} orgId={orgId} />
           </CareSectionShell>
 
           <CareSectionShell
-            title="Authorizations"
-            description="Per-client service-code summary (annual units, used, remaining). Full management lives in Billing."
+            title="Authorized DSPD billing codes"
+            description="Per-client service codes. Selected codes appear in the caregiver's EVV clock-in dropdown."
             linkTo="/dashboard/billing/$clientId"
             linkParams={{ clientId: client.id }}
             linkLabel="Open Billing"
+            icon={ClipboardList}
           >
-            <BillingCodesDetail
-              clientId={client.id}
-              clientName={`${client.first_name} ${client.last_name}`.trim()}
-              medicaidId={client.medicaid_id ?? null}
-            />
+            <CareBillingCodesEditor client={client} onSave={onSave} saving={saving} />
+            <div className="mt-4">
+              <BillingCodesDetail
+                clientId={client.id}
+                clientName={`${client.first_name} ${client.last_name}`.trim()}
+                medicaidId={client.medicaid_id ?? null}
+              />
+            </div>
+          </CareSectionShell>
+
+          <CareSectionShell
+            title="Person-centered support plan goals"
+            description="PCSP goals appear as checkboxes during daily-note and eMAR documentation."
+            linkTo="/dashboard/hub/clients"
+            linkLabel="Open Clients Hub"
+            icon={Sparkles}
+          >
+            <PcspTab client={client} onSave={onSave} saving={saving} />
           </CareSectionShell>
 
           <CareSectionShell
@@ -551,6 +564,7 @@ function ClientWorkspace({
             description="State-specific intake requirements for this client."
             linkTo="/dashboard/hub/clients"
             linkLabel="Open Clients Hub"
+            icon={CheckCircle2}
           >
             <ClientIntakeChecklistCard
               organizationId={orgId}
@@ -566,6 +580,7 @@ function ClientWorkspace({
               linkTo="/dashboard/workspace/$clientId"
               linkParams={{ clientId: client.id }}
               linkLabel="Open workspace"
+              icon={Pill}
             >
               <div className="space-y-4">
                 <MedicationsManager clientId={client.id} organizationId={orgId} />
@@ -580,6 +595,7 @@ function ClientWorkspace({
             linkTo="/dashboard/behavior-support/$clientId"
             linkParams={{ clientId: client.id }}
             linkLabel="Open Behavior Support"
+            icon={Brain}
           >
             <BehaviorSupportConfigCard
               clientId={client.id}
@@ -588,16 +604,16 @@ function ClientWorkspace({
             />
           </CareSectionShell>
 
-          <CareSectionShell
-            title="Documents"
-            description="Client-specific documents flow into Company Docs."
-            linkTo="/dashboard/hub/documentation"
-            linkLabel="Open Documentation Hub"
-          >
-            <DocumentsTab clientId={client.id} orgId={orgId} />
-          </CareSectionShell>
-
           <RightsSafeguardsCard clientId={client.id} />
+
+          {/* Feature configuration — collapsed by default */}
+          <CollapsibleCard
+            title="Feature configuration"
+            description="Enable or disable specific platform features for this client."
+            icon={Settings2}
+          >
+            <SettingsTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
+          </CollapsibleCard>
         </TabsContent>
 
         {/* ACTIVITY — read-only date-sorted feed of client-linked records */}
@@ -616,7 +632,7 @@ function ClientWorkspace({
 
 // ─── Care section shell ───────────────────────────────────────────────────────
 function CareSectionShell({
-  title, description, linkTo, linkParams, linkLabel, children,
+  title, description, linkTo, linkParams, linkLabel, children, icon: Icon,
 }: {
   title: string;
   description: string;
@@ -625,25 +641,104 @@ function CareSectionShell({
   linkParams?: Record<string, any>;
   linkLabel: string;
   children: React.ReactNode;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon?: any;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card">
-      <header className="flex flex-col gap-2 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">{title}</h3>
-          <p className="text-xs text-muted-foreground">{description}</p>
+    <section className="rounded-xl border border-border/60 bg-card p-1">
+      <header className="flex flex-col gap-2 px-4 pt-4 pb-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-2.5">
+          {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />}
+          <div>
+            <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
         </div>
-        <Button asChild variant="outline" size="sm" className="gap-1.5 self-start md:self-auto">
+        <Button asChild variant="ghost" size="sm" className="gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground md:self-auto">
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           <Link to={linkTo as any} params={linkParams as any}>
             {linkLabel} <ExternalLink className="h-3 w-3" />
           </Link>
         </Button>
       </header>
-      <div className="p-4">{children}</div>
+      <div className="px-4 pb-4">{children}</div>
     </section>
   );
 }
+
+// ─── Collapsible card (for rarely-edited blocks) ──────────────────────────────
+function CollapsibleCard({
+  title, description, icon: Icon, children, defaultOpen = false,
+}: {
+  title: string;
+  description?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon?: any;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="rounded-xl border border-border/60 bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+      >
+        <div className="flex items-start gap-2.5">
+          {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />}
+          <div>
+            <h3 className="text-base font-medium text-[#0B1126]">{title}</h3>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+          </div>
+        </div>
+        <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </section>
+  );
+}
+
+// ─── Care billing codes editor (lifts the DSPD multi-select out of Profile) ──
+function CareBillingCodesEditor({
+  client, onSave, saving,
+}: { client: Client; onSave: (v: ClientFormValues) => void; saving: boolean }) {
+  const [codes, setCodes] = useState<string[]>(client.job_code ?? []);
+  const dirty = JSON.stringify(codes) !== JSON.stringify(client.job_code ?? []);
+  return (
+    <div className="space-y-3">
+      <DspdCodesMultiSelect value={codes} onChange={setCodes} />
+      <p className="text-[11px] text-muted-foreground">
+        Selected codes appear in the caregiver's EVV clock-in service-type dropdown.
+      </p>
+      {dirty && (
+        <Button
+          size="sm"
+          onClick={() => onSave({
+            first_name: client.first_name,
+            last_name: client.last_name,
+            phone_number: client.phone_number ?? "",
+            physical_address: client.physical_address ?? "",
+            pcsp_goals: client.pcsp_goals ?? [],
+            job_code: codes,
+            medicaid_id: client.medicaid_id ?? "",
+            geofence_radius_feet: client.geofence_radius_feet ?? 1000,
+            special_directions: client.special_directions ?? "",
+            date_of_birth: client.date_of_birth ?? "",
+            emergency_contact_name: client.emergency_contact_name ?? "",
+            emergency_contact_phone: client.emergency_contact_phone ?? "",
+            profile_photo_url: client.profile_photo_url ?? "",
+          })}
+          disabled={saving}
+        >
+          {saving && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+          Save codes
+        </Button>
+      )}
+    </div>
+  );
+}
+
 
 // ─── Rights & safeguards (link-out card) ──────────────────────────────────────
 function RightsSafeguardsCard({ clientId }: { clientId: string }) {
@@ -1133,7 +1228,7 @@ function ProfileTab({
   const [radius, setRadius]             = useState(client.geofence_radius_feet ?? 1000);
   const [pinning, setPinning]           = useState(false);
   const [goals]                         = useState<string[]>(client.pcsp_goals ?? []);
-  const [specialDir]                    = useState(client.special_directions ?? "");
+  const [specialDir, setSpecialDir]     = useState(client.special_directions ?? "");
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const [photoUrl, setPhotoUrl] = useState(client.profile_photo_url ?? "");
@@ -1320,34 +1415,56 @@ function ProfileTab({
           </CardContent>
         </Card>
 
-        {/* Billing codes */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Authorized DSPD Billing Codes
-            </CardTitle>
+        {/* Clinical alert — the one colored callout on Profile */}
+        <Card className="border-amber-500/60 bg-amber-50/60 dark:bg-amber-950/20">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <CardTitle className="text-base font-medium text-amber-900 dark:text-amber-100">
+                Clinical alert
+              </CardTitle>
+              {specialDir.trim() && (
+                <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">
+                  Active
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            <DspdCodesMultiSelect value={jobCodes} onChange={setJobCodes} />
-            <p className="text-[11px] text-muted-foreground">
-              Selected codes appear in the caregiver's EVV clock-in service type dropdown.
-              Includes all 35 Utah DSPD codes including HHS.
+            <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
+              High-priority clinical notices displayed prominently to staff in the client workspace.
             </p>
+            <Textarea
+              value={specialDir}
+              onChange={(e) => setSpecialDir(e.target.value)}
+              rows={4}
+              placeholder="Example: CHOKING RISK — All meds crushed with applesauce; seated upright at 90°."
+              className="text-sm bg-white/70 dark:bg-amber-950/40"
+            />
           </CardContent>
         </Card>
+
+        {/* Client documents */}
+        <ClientDocumentsCard
+          clientId={client.id}
+          clientName={`${client.first_name} ${client.last_name}`.trim()}
+        />
       </div>
 
-      {/* Right column */}
+      {/* Right column — geofence + meta */}
       <div className="space-y-5">
-        {/* EVV Geofence */}
+        {/* EVV Geofence + approved locations */}
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-primary">
-              EVV Geofence Control
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base font-medium text-primary">
+                Service address & geofence
+              </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Label className="text-xs font-semibold">Maximum Clock-In Radius</Label>
+            <Label className="text-xs font-semibold">Maximum clock-in radius</Label>
             <Select value={String(radius)} onValueChange={(v) => setRadius(Number(v))}>
               <SelectTrigger className="h-10">
                 <SelectValue />
@@ -1360,7 +1477,7 @@ function ProfileTab({
             </Select>
             <p className="text-[11px] text-muted-foreground">
               Caregivers clocking in beyond this distance from the service address must submit a
-              variance justification before the clock-in completes.
+              variance justification.
             </p>
             <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
               <p className="text-[11px] font-semibold text-primary">Current: {radius.toLocaleString()} ft</p>
@@ -1376,47 +1493,60 @@ function ProfileTab({
           </CardContent>
         </Card>
 
-        {/* (Save promoted to sticky bottom bar — see end of ProfileTab) */}
-
-
-        {/* Custom attributes */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Custom Attributes
-            </CardTitle>
+        {/* Client record info (meta) */}
+        <Card className="border-border/60 bg-muted/20">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Client record info
+              </CardTitle>
+            </div>
           </CardHeader>
-          <CardContent>
-            <CustomAttributesSection
-              organizationId={client.id ? undefined : undefined}
-              entityKind="client"
-              entityId={client.id}
-            />
+          <CardContent className="space-y-2 text-xs text-muted-foreground">
+            <div className="flex justify-between">
+              <span>Record ID</span>
+              <span className="font-mono">{client.id.slice(0, 8)}…</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Status</span>
+              <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">Active</Badge>
+            </div>
+            <div className="flex justify-between">
+              <span>Service codes</span>
+              <span>{(client.job_code ?? []).join(", ") || "None"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>PCSP goals</span>
+              <span>{(client.pcsp_goals ?? []).length}</span>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Lifecycle */}
-        <LifecyclePanel
-          kind="client"
-          id={client.id}
-          fullName={`${client.first_name} ${client.last_name}`.trim()}
-          organizationId={orgId}
-        />
+        {/* Custom attributes — collapsed by default */}
+        <CollapsibleCard
+          title="Custom attributes"
+          description="Agency-specific fields, including any imported from a PCSP."
+          icon={Sparkles}
+        >
+          <CustomAttributesSection
+            organizationId={orgId}
+            entityKind="client"
+            entityId={client.id}
+          />
+        </CollapsibleCard>
       </div>
     </div>
 
-    {/* Billing Codes Detail — per-code ledger lives beneath the multi-select */}
-    <BillingCodesDetail
-      clientId={client.id}
-      clientName={`${client.first_name} ${client.last_name}`.trim()}
-      medicaidId={client.medicaid_id ?? null}
-    />
-
-    {/* Client-specific documents — flows into Company Docs */}
-    <ClientDocumentsCard
-      clientId={client.id}
-      clientName={`${client.first_name} ${client.last_name}`.trim()}
-    />
+    {/* Danger zone — quiet, at the very bottom */}
+    <div className="mt-6 border-t border-border/60 pt-4">
+      <LifecyclePanel
+        kind="client"
+        id={client.id}
+        fullName={`${client.first_name} ${client.last_name}`.trim()}
+        organizationId={orgId}
+      />
+    </div>
 
     {/* Sticky save bar — visible whenever there are unsaved profile edits,
         regardless of which field/column the user is editing. Reuses the
@@ -1537,42 +1667,7 @@ function PcspTab({
           </CardContent>
         </Card>
 
-        {/* Special Directions */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Special Directions & Clinical Alerts
-              </CardTitle>
-              {specialDir.trim() && (
-                <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">
-                  Active
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              High-priority clinical notices displayed prominently to staff in the client workspace.
-              Include choking/swallowing alerts, transfer instructions, behavioral de-escalation notes.
-            </p>
-            <Textarea
-              value={specialDir}
-              onChange={(e) => setSpecialDir(e.target.value)}
-              rows={5}
-              placeholder="Example: CHOKING RISK — Client requires all medications crushed and mixed with applesauce. Must be seated upright at 90 degrees during all meals and medication passes. Contact supervisor immediately if any swallowing difficulty is observed."
-              className="text-sm"
-            />
-            {specialDir.trim() && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-2.5 dark:bg-amber-950/20">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <p className="text-xs text-amber-800 dark:text-amber-200">
-                  This alert will appear at the top of every client workspace tab visible to staff.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Special directions are edited on the Profile tab → Clinical alert card. */}
       </div>
 
       {/* Right */}

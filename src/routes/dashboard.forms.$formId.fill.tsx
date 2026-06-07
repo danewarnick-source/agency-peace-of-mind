@@ -32,13 +32,20 @@ function FillForm() {
   async function go() {
     for (const f of fields) {
       if (f.type === "section" || !f.required) continue;
+      if (!isFieldVisible(f, answers, fields)) continue; // hidden required fields don't block
       const v = answers[f.id];
       const empty = v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
       if (empty) { toast.error(`Please answer: ${f.label}`); return; }
     }
     setBusy(true);
     try {
-      await submit({ data: { formId, answers } });
+      // Strip answers for hidden fields so they aren't stored
+      const visible: Record<string, unknown> = {};
+      for (const f of fields) {
+        if (f.type === "section") continue;
+        if (isFieldVisible(f, answers, fields) && answers[f.id] !== undefined) visible[f.id] = answers[f.id];
+      }
+      await submit({ data: { formId, answers: visible } });
       qc.invalidateQueries({ queryKey: ["my-forms"] });
       toast.success("Submitted");
       navigate({ to: "/dashboard/forms" });

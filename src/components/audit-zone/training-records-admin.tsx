@@ -789,72 +789,24 @@ export function TrainingRecordsAdmin() {
         </div>
       )}
 
-      {/* Per-staff drill-down (unchanged DSPD audit format) */}
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[240px] flex-1">
-            <label className="mb-1 block text-xs font-semibold text-muted-foreground">
-              Staff member
-            </label>
-            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a staff member…" />
-              </SelectTrigger>
-              <SelectContent>
-                {members?.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-44">
-            <label className="mb-1 block text-xs font-semibold text-muted-foreground">
-              Filter by status
-            </label>
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="in_progress">In progress</SelectItem>
-                <SelectItem value="not_started">Not started</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            variant="outline"
-            disabled={!selectedUserId}
-            onClick={() => window.print()}
-          >
-            <Printer className="mr-1.5 h-4 w-4" /> Print audit-ready PDF
-          </Button>
-        </div>
-
-        {selectedUserId && (
-          <StaffRecordTable
-            staffId={selectedUserId}
-            staffLabel={selectedMember?.label ?? ""}
-            topics={topics ?? []}
-            personModules={(personModules ?? []).filter(
-              (pm) => pm.user_id === selectedUserId,
-            )}
-            progress={(progressAll ?? []).filter(
-              (p) => p.user_id === selectedUserId,
-            )}
-            completions={(completionsAll ?? []).filter(
-              (c) => c.user_id === selectedUserId,
-            )}
-            statusFilter={statusFilter}
-          />
-        )}
-      </div>
+      {modalUserId && (
+        <StaffAuditRecordModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          staffId={modalUserId}
+          staffLabel={members?.find((m) => m.id === modalUserId)?.label ?? ""}
+          topics={topics ?? []}
+          personModules={(personModules ?? []).filter(
+            (pm) => pm.user_id === modalUserId,
+          )}
+          progress={(progressAll ?? []).filter(
+            (p) => p.user_id === modalUserId,
+          )}
+          completions={(completionsAll ?? []).filter(
+            (c) => c.user_id === modalUserId,
+          )}
+        />
+      )}
     </div>
   );
 }

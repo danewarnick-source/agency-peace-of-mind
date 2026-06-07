@@ -23,7 +23,11 @@ import {
   User,
   AlertTriangle,
   Info,
+  Brain,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { StaffBehaviorDataTab } from "@/components/behavior-support/staff-data-tab";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 
 import { toast } from "sonner";

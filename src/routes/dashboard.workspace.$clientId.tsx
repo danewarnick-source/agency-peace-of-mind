@@ -107,6 +107,29 @@ function ClientWorkspace() {
   const codes = allowedHourly.length ? allowedHourly : clientCodes;
   const { enabled: emarEnabled } = useClientFeature(client, "emar");
 
+  // Behavior Support visibility: bc_code set, features_enabled true, ≥1 published behavior
+  const { data: bsTab } = useQuery({
+    queryKey: ["workspace-bs-tab", client.id],
+    queryFn: async () => {
+      const { data: bsc } = await supabase
+        .from("behavior_support_clients")
+        .select("organization_id, bc_code, features_enabled")
+        .eq("client_id", client.id)
+        .maybeSingle();
+      if (!bsc?.features_enabled || !bsc?.bc_code) return { show: false as const };
+      const { count } = await supabase
+        .from("bc_behaviors")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", client.id)
+        .eq("status", "published");
+      return {
+        show: (count ?? 0) > 0,
+        organizationId: bsc.organization_id,
+      };
+    },
+  });
+  const showBehaviorTab = !!bsTab?.show;
+
   return (
     <>
       <div className="mx-auto w-full max-w-4xl space-y-5 px-3 sm:px-0">

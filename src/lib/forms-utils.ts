@@ -150,6 +150,11 @@ export type FormSettings = {
   /** Last NECTAR proposal (for transparency). Stored so admins can see what
    *  was suggested even after they pick a different behavior. */
   routing_proposal?: { behavior: RoutingBehavior; rationale: string; at: string };
+  /** Scope for a staff_mandate form. `per_staff` (default, wired now): the
+   *  staffer completes once and it satisfies the mandate everywhere. The
+   *  `per_staff_per_client` scope is reserved for a later stage; it is shown
+   *  in the UI as a future option and currently behaves as `per_staff`. */
+  mandate_scope?: "per_staff" | "per_staff_per_client";
 };
 
 export type RoutingBehavior =

@@ -171,6 +171,68 @@ export const saveForm = createServerFn({ method: "POST" })
       }
     }
 
+    // ─── Sync staff-mandate checklist requirement (scope='hr_staff_checklist')
+    // When a form is set to routing_behavior='staff_mandate', mint a
+    // company-required nectar_requirements row in the staff-checklist scope
+    // so the auto-check trigger can flip staff_checklist_completion on submit.
+    // If the behavior is switched away, hard-delete that staff-scope row
+    // (which cascades any staff_checklist_completion rows tied to it).
+    if (savedForm?.id) {
+      const s = (savedForm.settings ?? {}) as Record<string, unknown>;
+      const behavior = typeof s.routing_behavior === "string" ? s.routing_behavior : "";
+      const isStaffMandate = behavior === "staff_mandate";
+      const mandateScope = s.mandate_scope === "per_staff_per_client"
+        ? "per_staff_per_client" : "per_staff";
+      const purpose = typeof s.usage_purpose === "string"
+        ? s.usage_purpose
+        : (typeof s.purpose === "string" ? s.purpose : "");
+      const reqKey = `company_required:form:${savedForm.id}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb2 = supabase as any;
+      const { data: existingStaff } = await sb2
+        .from("nectar_requirements")
+        .select("id, metadata")
+        .eq("organization_id", m.organization_id)
+        .eq("requirement_key", reqKey)
+        .contains("metadata", { scope: "hr_staff_checklist" })
+        .maybeSingle();
+
+      if (isStaffMandate) {
+        const metadata = {
+          scope: "hr_staff_checklist",
+          checklist_layer: "company_required",
+          source_form_id: savedForm.id,
+          mandate_scope: mandateScope,
+          purpose,
+          evidence_type: "form_submission",
+        };
+        if (existingStaff?.id) {
+          await sb2.from("nectar_requirements").update({
+            title: savedForm.name,
+            description: purpose || null,
+            metadata,
+            approval_state: "provider_confirmed",
+            review_status: "confirmed",
+          }).eq("id", existingStaff.id);
+        } else {
+          await sb2.from("nectar_requirements").insert({
+            organization_id: m.organization_id,
+            origin: "manual",
+            requirement_key: reqKey,
+            title: savedForm.name,
+            description: purpose || null,
+            category: "hr",
+            metadata,
+            approval_state: "provider_confirmed",
+            review_status: "confirmed",
+            verified: true,
+          });
+        }
+      } else if (existingStaff?.id) {
+        await sb2.from("nectar_requirements").delete().eq("id", existingStaff.id);
+      }
+    }
+
     return { form: savedForm ? { id: savedForm.id, name: savedForm.name } : null };
   });
 
@@ -542,6 +604,75 @@ export const submitIntakeForm = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { submission: ins };
   });
+
+// ─── STAFF/ADMIN: submit a STAFF MANDATE form ─────────────────────────────
+// Staff-mandate forms credit the TARGET staffer (not necessarily the
+// submitter). The trigger reads `answers.__target_staff_id` to decide whose
+// staff_checklist_completion row flips to 'complete'. Self-submit defaults
+// to submitted_by. Admins/managers may submit on-behalf for any staffer in
+// the same org. No client_id (the mandate is per-staff, not per-client at
+// this stage). The form must have routing_behavior='staff_mandate'.
+export const submitStaffMandateForm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    formId: z.string().uuid(),
+    answers: z.record(z.any()),
+    targetStaffId: z.string().uuid().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+
+    const { data: form, error: fe } = await supabase
+      .from("forms")
+      .select("id, organization_id, status, frequency, settings, assigned_groups, assigned_users")
+      .eq("id", data.formId)
+      .maybeSingle();
+    if (fe || !form) throw new Error("Form not found.");
+    if (form.organization_id !== m.organization_id) throw new Error("Forbidden.");
+    if (form.status !== "published") throw new Error("Form is not published.");
+    const settings = (form.settings ?? {}) as FormSettings;
+    if (settings.routing_behavior !== "staff_mandate") {
+      throw new Error("submitStaffMandateForm only accepts staff_mandate forms.");
+    }
+
+    // Resolve target staffer.
+    let targetStaffId = data.targetStaffId ?? userId;
+    if (targetStaffId !== userId) {
+      // On-behalf submission requires admin/manager/super_admin.
+      adminGuard(m.role);
+      // Verify target is a member of the same org.
+      const { data: tm } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", m.organization_id)
+        .eq("user_id", targetStaffId)
+        .eq("active", true)
+        .maybeSingle();
+      if (!tm) throw new Error("Target staffer is not in your organization.");
+    }
+
+    // Stash the resolved target on the submission so the trigger can read it.
+    const answers = { ...(data.answers ?? {}), __target_staff_id: targetStaffId };
+    const periodKey = periodKeyFor(form.frequency as Frequency);
+
+    // Use admin client: server-side has already enforced org + role + form
+    // behavior. RLS on form_submissions only permits "assigned staff" inserts,
+    // which would block legitimate admin on-behalf submissions.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: ins, error } = await supabaseAdmin.from("form_submissions").insert({
+      organization_id: form.organization_id,
+      form_id: form.id,
+      submitted_by: userId,
+      client_id: null,
+      answers,
+      period_key: periodKey,
+    }).select().maybeSingle();
+    if (error) throw new Error(error.message);
+    return { submission: ins };
+  });
+
+
 
 // ─── STAFF: bell — unread form notifications for me ────────────────────────
 export const getMyFormNotifications = createServerFn({ method: "GET" })

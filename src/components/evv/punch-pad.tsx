@@ -499,8 +499,36 @@ export function PunchPad({
   }[gpsStatusLabel.color];
 
   // ────────────────────────────────────────────────────────────────────────────
+  // Stage 5 — Per-shift tracking-form FRONT-GUARDS (read-only, fail-open).
+  // These run BEFORE the EVV write calls (writeShift / finalizeClockOut).
+  // They NEVER touch evv_timesheets, GPS, status, or timestamps.
+  // ────────────────────────────────────────────────────────────────────────────
+  async function fetchPendingTrackingForms(
+    input:
+      | { tier: "clockout"; shiftId: string; clientId: string; serviceCode: string }
+      | { tier: "clockin" },
+  ): Promise<PendingForm[]> {
+    // ~1.5s timeout. ANY error/timeout → return [] so the caller proceeds.
+    const PROMISE_TIMEOUT_MS = 1500;
+    try {
+      const result = await Promise.race<{ pending: PendingForm[] } | "TIMEOUT">([
+        getPendingTrackingForms({ data: input }),
+        new Promise<"TIMEOUT">((resolve) =>
+          setTimeout(() => resolve("TIMEOUT"), PROMISE_TIMEOUT_MS),
+        ),
+      ]);
+      if (result === "TIMEOUT") return [];
+      return result?.pending ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
   // WRITE SHIFT (clock-in DB write)
   // ────────────────────────────────────────────────────────────────────────────
+
+
 
   async function writeShift(args: {
     pos: { lat: number; lng: number; acc: number } | null;

@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from "react";
 import type { FormField, FieldType, FieldCondition } from "@/lib/forms-utils";
 import { operatorsFor } from "@/lib/forms-utils";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { ArrowDown, ArrowUp, Trash2, Plus, GitBranch } from "lucide-react";
 
 export function FieldEditor({
   field, index, eligibleControllers, onChange, onMoveUp, onMoveDown, onRemove,
+  dragHandle, containerRef, containerStyle, containerClassName, isDragging,
 }: {
   field: FormField;
   index: number;
@@ -18,6 +20,11 @@ export function FieldEditor({
   onMoveUp: () => void;
   onMoveDown: () => void;
   onRemove: () => void;
+  dragHandle?: ReactNode;
+  containerRef?: (el: HTMLElement | null) => void;
+  containerStyle?: CSSProperties;
+  containerClassName?: string;
+  isDragging?: boolean;
 }) {
   function patch(p: Partial<FormField>) { onChange({ ...field, ...p }); }
   function patchConfig(p: NonNullable<FormField["config"]>) { onChange({ ...field, config: { ...(field.config ?? {}), ...p } }); }
@@ -25,9 +32,14 @@ export function FieldEditor({
   const controller = field.condition ? eligibleControllers.find((c) => c.field.id === field.condition!.fieldId) : null;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+    <div
+      ref={containerRef}
+      style={containerStyle}
+      className={`rounded-lg border border-border bg-card p-3 space-y-3 ${isDragging ? "opacity-50 ring-2 ring-primary" : ""} ${containerClassName ?? ""}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
+          {dragHandle}
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{TYPE_LABEL[field.type]}</div>
           {controller && (
             <Badge variant="outline" className="text-[10px] gap-1 border-teal-300 text-teal-700">
@@ -35,6 +47,7 @@ export function FieldEditor({
             </Badge>
           )}
         </div>
+
         <div className="flex gap-1">
           <Button size="icon" variant="ghost" onClick={onMoveUp} className="h-8 w-8"><ArrowUp className="h-4 w-4" /></Button>
           <Button size="icon" variant="ghost" onClick={onMoveDown} className="h-8 w-8"><ArrowDown className="h-4 w-4" /></Button>

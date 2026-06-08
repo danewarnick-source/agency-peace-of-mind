@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { RequirePermission } from "@/components/rbac-guard";
@@ -9,9 +10,14 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Loader2, ChevronDown, ChevronRight, Save } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Users, Loader2, ChevronDown, ChevronRight, Save, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { isDailyServiceCode } from "@/lib/service-billing";
+import { getUnmetStaffMandates } from "@/lib/forms.functions";
 
 export const Route = createFileRoute("/dashboard/assignments")({
   head: () => ({ meta: [{ title: "Caseloads — HIVE" }] }),

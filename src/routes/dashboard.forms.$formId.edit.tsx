@@ -542,7 +542,7 @@ function RoutingBehaviorCard({
         <div>
           <p className="text-sm font-semibold">How will this form be used?</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            Describe the purpose in plain English. Nectar can propose a routing behavior — you always confirm or override it. <strong>Declaration only at this stage:</strong> nothing about how the form currently files, satisfies intake, or gates anything changes until each behavior's destination is wired in a later step.
+            Describe the purpose in plain English. Nectar can propose a routing behavior — you always confirm or override it. Behaviors marked with a note are not yet wired; they still file safely as normal submissions.
           </p>
         </div>
       </div>

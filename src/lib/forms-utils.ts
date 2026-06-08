@@ -142,18 +142,16 @@ export type FormSettings = {
    *  NECTAR routing-behavior proposal. Stored only — not yet read by any
    *  runtime destination. */
   usage_purpose?: string;
-  /** Declared usage behavior for this form. Stored only at this stage; no
-   *  destination/auto-check/gate is wired off this value yet (later stages
-   *  will wire each behavior). Existing intake routing (category='intake'
-   *  + required_for_intake) is unchanged regardless of this value. */
+  /** Declared usage behavior for this form. Each behavior has a wired
+   *  destination except per_shift_per_client_tracked (still pending). */
   routing_behavior?: RoutingBehavior;
   /** Last NECTAR proposal (for transparency). Stored so admins can see what
    *  was suggested even after they pick a different behavior. */
   routing_proposal?: { behavior: RoutingBehavior; rationale: string; at: string };
   /** Scope for a staff_mandate form. `per_staff` (default, wired now): the
    *  staffer completes once and it satisfies the mandate everywhere. The
-   *  `per_staff_per_client` scope is reserved for a later stage; it is shown
-   *  in the UI as a future option and currently behaves as `per_staff`. */
+   *  `per_staff_per_client` scope is not yet built; it is shown as a future
+   *  option and currently behaves as `per_staff`. */
   mandate_scope?: "per_staff" | "per_staff_per_client";
 };
 
@@ -192,28 +190,28 @@ export const ROUTING_BEHAVIORS: Array<{
     value: "client_intake_required",
     label: "Client intake — required",
     short: "Satisfies a client intake checklist item.",
-    implication: "Intake forms appear on the client intake checklist as a Company-required item. Configure under the Intake category (subcategory + required-for-intake). Auto-check on submit ships in a later step.",
+    implication: "Intake forms appear on the client intake checklist as a Company-required item. Configure under the Intake category (subcategory + required-for-intake). Submissions auto-check the corresponding checklist item.",
     wired: true,
   },
   {
     value: "one_time_attestation",
     label: "One-time staff attestation",
     short: "Each staff completes once; filed as a signed record.",
-    implication: "Will record a one-time attestation per staff and surface it as evidence on the staff checklist. Routing for this behavior is set up in a later step; for now the form still files normally.",
-    wired: false,
+    implication: "Records a one-time attestation per staff and surfaces it as evidence. When mapped to a requirement, submission satisfies that checklist item.",
+    wired: true,
   },
   {
     value: "staff_mandate",
     label: "Staff mandate before client work",
     short: "Every staff must complete before being scheduled with a client.",
-    implication: "Will block client-work actions until each staff has filed this form. Routing for this behavior is set up in a later step; for now the form still files normally and nothing is gated.",
-    wired: false,
+    implication: "Warns admins if a staffer is assigned to client work without completing this form. Choosing Proceed anyway records an override and notifies admins.",
+    wired: true,
   },
   {
     value: "per_shift_per_client_tracked",
     label: "Per-shift, per-client tracked data",
     short: "Recurring data tied to a client, viewed as a series.",
-    implication: "This kind of recurring per-client data is handled by the client tracking (behavior support) module. Routing into client tracking is set up in a later step; for now the form still files normally.",
+    implication: "Tracked data routing is not set up yet — this form currently just files normally as a general submission.",
     wired: false,
   },
 ];

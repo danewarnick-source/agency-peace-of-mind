@@ -656,7 +656,11 @@ export const submitStaffMandateForm = createServerFn({ method: "POST" })
     const answers = { ...(data.answers ?? {}), __target_staff_id: targetStaffId };
     const periodKey = periodKeyFor(form.frequency as Frequency);
 
-    const { data: ins, error } = await supabase.from("form_submissions").insert({
+    // Use admin client: server-side has already enforced org + role + form
+    // behavior. RLS on form_submissions only permits "assigned staff" inserts,
+    // which would block legitimate admin on-behalf submissions.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: ins, error } = await supabaseAdmin.from("form_submissions").insert({
       organization_id: form.organization_id,
       form_id: form.id,
       submitted_by: userId,

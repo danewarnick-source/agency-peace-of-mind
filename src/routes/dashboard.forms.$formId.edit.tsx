@@ -652,10 +652,10 @@ function RoutingBehaviorCard({
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="per_staff">Per staffer (once — applies everywhere)</option>
-              <option value="per_staff_per_client">Per staffer, per client (set up in a later step)</option>
+              <option value="per_staff_per_client">Per staffer, per client (per-client scope not set up yet — treated as per-staff for now)</option>
             </select>
             <p className="text-[11px] text-muted-foreground">
-              “Per staffer” fits things like an annual code of conduct. Per-client mandates are wired in a later stage; for now they behave as per-staffer.
+              “Per staffer” fits things like an annual code of conduct. Per-client scope is not set up yet — treated as per-staff for now.
             </p>
           </div>
           <div className="grid gap-1.5">

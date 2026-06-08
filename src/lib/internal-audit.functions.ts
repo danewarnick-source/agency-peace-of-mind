@@ -156,7 +156,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
           .eq("organization_id", orgId),
         supabase
           .from("nectar_requirements")
-          .select("id, title, source_citation, review_status, category")
+          .select("id, title, source_citation, review_status, category, metadata, approval_state")
           .eq("organization_id", orgId),
       ]);
 
@@ -204,12 +204,17 @@ export const runInternalAudit = createServerFn({ method: "POST" })
     );
 
     // Citation index for engine-backed findings.
-    const reqById = new Map(
-      ((reqsRes.data ?? []) as Array<{ id: string; title: string; source_citation: string | null }>).map((r) => [
-        r.id,
-        r,
-      ]),
-    );
+    type ReqRow = {
+      id: string;
+      title: string;
+      source_citation: string | null;
+      review_status: string | null;
+      category: string | null;
+      metadata: Record<string, unknown> | null;
+      approval_state: string | null;
+    };
+    const reqRows = (reqsRes.data ?? []) as ReqRow[];
+    const reqById = new Map(reqRows.map((r) => [r.id, r]));
 
     // ---------- 1. Staff certifications: expired / expiring 30d ----------
     if (include("staff_certifications")) {
@@ -510,6 +515,45 @@ export const runInternalAudit = createServerFn({ method: "POST" })
           subjectKind: "provider",
           fixHref: "/dashboard/authoritative-sources",
           fixLabel: "Review",
+          asOf: todayIso(),
+        });
+      }
+
+      // Provider-declared cadence re-check prompts.
+      // NECTAR refuses to invent a cadence: only flag when the PROVIDER set a
+      // frequency on a confirmed requirement AND it's due/overdue per their
+      // own last-checked date.
+      const { computeRequirementDueState, frequencyLabel } = await import(
+        "@/lib/requirement-tracking"
+      );
+      for (const r of reqRows) {
+        if (r.approval_state !== "provider_confirmed" && r.review_status !== "confirmed")
+          continue;
+        const s = computeRequirementDueState(r.metadata ?? {});
+        if (s.state !== "overdue" && s.state !== "due" && s.state !== "never_checked")
+          continue;
+        const freq = frequencyLabel(s.frequency);
+        const last = s.lastCheckedAt ? `last checked ${s.lastCheckedAt}` : "never checked";
+        findings.push({
+          id: `req-recheck-${r.id}`,
+          area: "requirements_engine",
+          severity: s.state === "overdue" ? "attention" : "minor",
+          title:
+            s.state === "overdue"
+              ? `Recurring requirement overdue for re-verification`
+              : s.state === "due"
+                ? `Recurring requirement due for re-verification today`
+                : `Recurring requirement has no last-checked date`,
+          detail:
+            s.state === "never_checked"
+              ? `"${r.title}" — you set cadence ${freq} but haven't recorded a last-checked date.`
+              : `"${r.title}" — you set cadence ${freq}; ${last}${
+                  s.daysOverdue && s.daysOverdue > 0 ? `, overdue by ${s.daysOverdue}d` : ""
+                }.`,
+          sourceCitation: r.source_citation ?? null,
+          subjectKind: "provider",
+          fixHref: "/dashboard/authoritative-sources",
+          fixLabel: "Update tracking",
           asOf: todayIso(),
         });
       }

@@ -83,6 +83,12 @@ import { ExternalLink as ExternalLinkIcon, Building } from "lucide-react";
 import { attestExternalCompletion, inferClassification } from "@/lib/external-compliance.functions";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  computeRequirementDueState,
+  frequencyLabel,
+  type RequirementTracking,
+} from "@/lib/requirement-tracking";
+import { RequirementTrackingEditor } from "@/components/nectar/requirement-tracking-editor";
+import {
   listProviderPendingConfirmations,
   providerConfirmRequirement,
   providerRejectRequirement,
@@ -1693,6 +1699,7 @@ function RequirementRow({
   const [removeOpen, setRemoveOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [trackingOpen, setTrackingOpen] = useState(false);
   const [attestOpen, setAttestOpen] = useState(false);
 
   // Internal vs external classification (stored in metadata, falls back to heuristic)
@@ -1710,6 +1717,8 @@ function RequirementRow({
   const externalSystem =
     (md["external_system"] as string | null | undefined) ?? inferred?.externalSystem ?? null;
   const renewalDueAt = (md["renewal_due_at"] as string | null | undefined) ?? null;
+  const trackingMd = (md["tracking"] ?? {}) as Partial<RequirementTracking>;
+  const trackingState = computeRequirementDueState(md);
 
 
 
@@ -1825,7 +1834,45 @@ function RequirementRow({
               Renewal {new Date(renewalDueAt).toLocaleDateString()}
             </Badge>
           )}
-
+          {isConfirmed && (
+            <Badge
+              variant="outline"
+              className={
+                "text-[10px] cursor-pointer " +
+                (trackingState.state === "overdue"
+                  ? "border-red-500/50 text-red-700 dark:text-red-300"
+                  : trackingState.state === "due" || trackingState.state === "due_soon"
+                    ? "border-amber-500/50 text-amber-700 dark:text-amber-300"
+                    : trackingState.state === "never_checked"
+                      ? "border-slate-500/40 text-muted-foreground"
+                      : trackingState.frequency
+                        ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                        : "border-slate-500/30 text-muted-foreground")
+              }
+              onClick={() => setTrackingOpen(true)}
+              title={
+                trackingMd.tell_nectar_note
+                  ? `You said: ${trackingMd.tell_nectar_note}`
+                  : "Set how you track this requirement"
+              }
+            >
+              {trackingState.frequency
+                ? `${frequencyLabel(trackingState.frequency)}${
+                    trackingState.state === "overdue"
+                      ? ` · overdue ${trackingState.daysOverdue}d`
+                      : trackingState.state === "due"
+                        ? " · due today"
+                        : trackingState.state === "due_soon" && trackingState.daysOverdue !== null
+                          ? ` · due in ${-trackingState.daysOverdue}d`
+                          : trackingState.state === "never_checked"
+                            ? " · never checked"
+                            : trackingState.lastCheckedAt
+                              ? ` · last ${trackingState.lastCheckedAt}`
+                              : ""
+                  }`
+                : "Set tracking"}
+            </Badge>
+          )}
         </div>
         {req.description && (
           <p className="mt-1 text-xs text-muted-foreground">{req.description}</p>
@@ -2060,6 +2107,14 @@ function RequirementRow({
         requirementTitle={req.title}
         externalSystem={externalSystem}
         orgId={orgId}
+      />
+      <RequirementTrackingEditor
+        open={trackingOpen}
+        onOpenChange={setTrackingOpen}
+        requirementId={req.id}
+        requirementTitle={req.title}
+        orgId={orgId}
+        current={trackingMd}
       />
     </li>
   );
@@ -3335,8 +3390,34 @@ function AwaitingFinalConfirmationPanel({ orgId }: { orgId: string }) {
   });
 
   const confirm = useMutation({
-    mutationFn: (vars: { requirementId: string; note?: string }) =>
-      confirmFn({ data: { requirementId: vars.requirementId, note: vars.note ?? null } }),
+    mutationFn: (vars: {
+      requirementId: string;
+      note?: string;
+      frequency?: string | null;
+      tellNectarNote?: string | null;
+      lastCheckedAt?: string | null;
+    }) =>
+      confirmFn({
+        data: {
+          requirementId: vars.requirementId,
+          note: vars.note ?? null,
+          frequency: (vars.frequency ?? undefined) as
+            | "one_time"
+            | "per_employee"
+            | "per_shift"
+            | "per_code"
+            | "per_day"
+            | "per_week"
+            | "per_month"
+            | "per_quarter"
+            | "per_year"
+            | "per_billing_rate_unit"
+            | "ongoing"
+            | undefined,
+          tellNectarNote: vars.tellNectarNote ?? undefined,
+          lastCheckedAt: vars.lastCheckedAt ?? undefined,
+        },
+      }),
     onSuccess: () => {
       toast.success("Requirement confirmed — now active in your compliance set.");
       qc.invalidateQueries({ queryKey: ["provider-pending-confirmations", orgId] });
@@ -3391,7 +3472,15 @@ function AwaitingFinalConfirmationPanel({ orgId }: { orgId: string }) {
           <FinalConfirmRow
             key={r.id}
             row={r}
-            onConfirm={(note) => confirm.mutate({ requirementId: r.id, note })}
+            onConfirm={(payload) =>
+              confirm.mutate({
+                requirementId: r.id,
+                note: payload.note,
+                frequency: payload.frequency,
+                tellNectarNote: payload.tellNectarNote,
+                lastCheckedAt: payload.lastCheckedAt,
+              })
+            }
             onReject={(reason) => reject.mutate({ requirementId: r.id, reason })}
             busy={confirm.isPending || reject.isPending}
           />
@@ -3415,12 +3504,21 @@ function FinalConfirmRow({
     source_citation: string | null;
     applies_to: string | null;
   };
-  onConfirm: (note?: string) => void;
+  onConfirm: (payload: {
+    note?: string;
+    frequency?: string | null;
+    tellNectarNote?: string | null;
+    lastCheckedAt?: string | null;
+  }) => void;
   onReject: (reason: string) => void;
   busy: boolean;
 }) {
   const [mode, setMode] = useState<"idle" | "confirm" | "reject">("idle");
   const [note, setNote] = useState("");
+  const [frequency, setFrequency] = useState<string>("");
+  const [tellNectarNote, setTellNectarNote] = useState("");
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [lastCheckedAt, setLastCheckedAt] = useState<string>(todayIso);
 
   return (
     <li className="rounded-lg border border-border bg-background p-3">
@@ -3462,18 +3560,83 @@ function FinalConfirmRow({
       </div>
 
       {mode === "confirm" && (
-        <div className="mt-2 space-y-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2">
-          <Textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional note (logged in audit trail)"
-            rows={2}
-          />
+        <div className="mt-2 space-y-3 rounded-md border border-emerald-200 bg-emerald-50/60 p-3">
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-emerald-950">
+              How often does this requirement recur? <span className="text-muted-foreground font-normal">(you decide)</span>
+            </Label>
+            <Select value={frequency} onValueChange={setFrequency}>
+              <SelectTrigger className="h-8 bg-background">
+                <SelectValue placeholder="Choose a cadence (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="one_time">One-time</SelectItem>
+                <SelectItem value="per_employee">Per employee</SelectItem>
+                <SelectItem value="per_shift">Per shift</SelectItem>
+                <SelectItem value="per_code">Per billing code</SelectItem>
+                <SelectItem value="per_day">Daily</SelectItem>
+                <SelectItem value="per_week">Weekly</SelectItem>
+                <SelectItem value="per_month">Monthly</SelectItem>
+                <SelectItem value="per_quarter">Quarterly</SelectItem>
+                <SelectItem value="per_year">Yearly</SelectItem>
+                <SelectItem value="per_billing_rate_unit">Per billing-rate unit</SelectItem>
+                <SelectItem value="ongoing">Ongoing</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-emerald-950">
+              Tell NECTAR — how do <em>you</em> track this?
+            </Label>
+            <Textarea
+              value={tellNectarNote}
+              onChange={(e) => setTellNectarNote(e.target.value)}
+              placeholder='e.g. "1056s live on the Provider UPI/USTEPS — updated ongoing."'
+              rows={2}
+              className="bg-background"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Your words. NECTAR will surface this as a reminder — it won't invent a rule.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-emerald-950">Last verified</Label>
+            <Input
+              type="date"
+              value={lastCheckedAt}
+              onChange={(e) => setLastCheckedAt(e.target.value)}
+              className="h-8 bg-background"
+              max={todayIso}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-emerald-950">
+              Audit-trail note <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Optional note (logged in audit trail)"
+              rows={2}
+              className="bg-background"
+            />
+          </div>
+
           <div className="flex gap-2">
             <Button
               size="sm"
               className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
-              onClick={() => onConfirm(note.trim() || undefined)}
+              onClick={() =>
+                onConfirm({
+                  note: note.trim() || undefined,
+                  frequency: frequency || null,
+                  tellNectarNote: tellNectarNote.trim() || null,
+                  lastCheckedAt: lastCheckedAt || null,
+                })
+              }
               disabled={busy}
             >
               Make it active

@@ -222,10 +222,12 @@ export function ClientsPage() {
     },
   });
 
+  const navigate = useNavigate();
+
   const addMutation = useMutation({
-    mutationFn: async (input: ClientFormValues) => {
+    mutationFn: async (input: ClientFormValues & { intake_mode: "intake" | "profile-only" }) => {
       const coords = await resolveCoords(input.physical_address);
-      const { error } = await (supabase as any).from("clients").insert({
+      const { data, error } = await (supabase as any).from("clients").insert({
         organization_id:      org!.organization_id,
         first_name:           input.first_name,
         last_name:            input.last_name,
@@ -242,16 +244,22 @@ export function ClientsPage() {
         emergency_contact_phone: input.emergency_contact_phone || null,
         home_latitude:        coords.lat,
         home_longitude:       coords.lng,
-      });
+        intake_status:        input.intake_mode === "intake" ? "in_progress" : "pending",
+      }).select("id").single();
       if (error) throw error;
+      return { id: data!.id as string, mode: input.intake_mode };
     },
-    onSuccess: () => {
-      toast.success("Client added.");
+    onSuccess: ({ id, mode }) => {
+      toast.success(mode === "intake" ? "Client created — starting intake." : "Client added.");
       qc.invalidateQueries({ queryKey: ["clients"] });
       setAddOpen(false);
+      if (mode === "intake") {
+        navigate({ to: "/dashboard/clients/$clientId/intake", params: { clientId: id } });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   const editMutation = useMutation({
     mutationFn: async (input: ClientFormValues & { id: string }) => {

@@ -299,6 +299,64 @@ export const submitForm = createServerFn({ method: "POST" })
     return { submission: ins };
   });
 
+// ─── ADMIN/MANAGER: submit an INTAKE form (role-gated, no caseload check) ──
+// Separate path from staff submitForm. Strictly limited to category='intake'
+// forms so it can never be used to bypass the staff assignment rule for
+// ordinary forms. Does NOT modify submitForm.
+export const submitIntakeForm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    formId: z.string().uuid(),
+    clientId: z.string().uuid(),
+    answers: z.record(z.any()),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    // Role gate: admin/manager/super_admin only.
+    adminGuard(m.role);
+
+    const { data: form, error: fe } = await supabase
+      .from("forms")
+      .select("id, organization_id, category, frequency, settings, all_clients, assigned_clients")
+      .eq("id", data.formId)
+      .maybeSingle();
+    if (fe || !form) throw new Error("Form not found.");
+
+    // Org scope.
+    if (form.organization_id !== m.organization_id) {
+      throw new Error("Forbidden: form is not in your organization.");
+    }
+    // Category gate — intake only.
+    if (form.category !== "intake") {
+      throw new Error("submitIntakeForm only accepts intake-category forms.");
+    }
+    // Verify client belongs to the same org.
+    const { data: client, error: ce } = await supabase
+      .from("clients").select("id, organization_id")
+      .eq("id", data.clientId).maybeSingle();
+    if (ce || !client) throw new Error("Client not found.");
+    if (client.organization_id !== m.organization_id) {
+      throw new Error("Forbidden: client is not in your organization.");
+    }
+    // Form-to-client assignment (intake forms typically all_clients=true; honor explicit assignment if set).
+    if (!form.all_clients && !(form.assigned_clients ?? []).includes(data.clientId)) {
+      throw new Error("This intake form is not assigned to that individual.");
+    }
+
+    const periodKey = periodKeyFor(form.frequency as Frequency);
+    const { data: ins, error } = await supabase.from("form_submissions").insert({
+      organization_id: form.organization_id,
+      form_id: form.id,
+      submitted_by: userId,
+      client_id: data.clientId,
+      answers: data.answers,
+      period_key: periodKey,
+    }).select().maybeSingle();
+    if (error) throw new Error(error.message);
+    return { submission: ins };
+  });
+
 // ─── STAFF: bell — unread form notifications for me ────────────────────────
 export const getMyFormNotifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

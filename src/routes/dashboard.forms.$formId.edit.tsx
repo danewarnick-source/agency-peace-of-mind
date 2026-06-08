@@ -189,24 +189,15 @@ function EditForm() {
           </div>
 
           <div className="space-y-2">
-            {fields.map((f, i) => {
-              const eligible = fields.slice(0, i)
-                .map((cf, ci) => ({ field: cf, index: ci }))
-                .filter((c) => c.field.type !== "section");
-              return (
-                <FieldEditor key={f.id} field={f} index={i} eligibleControllers={eligible}
-                  onChange={(n) => updateField(i, n)}
-                  onMoveUp={() => move(i, -1)}
-                  onMoveDown={() => move(i, 1)}
-                  onRemove={() => removeField(i)} />
-              );
-            })}
-            {fields.length === 0 && (
+            {fields.length === 0 ? (
               <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                 Add a field from the palette above, or click <strong>Build with Nectar</strong>.
               </div>
+            ) : (
+              <SortableFields fields={fields} setFields={(next) => setFields(next)} />
             )}
           </div>
+
         </div>
 
         {/* Live preview + admin map */}

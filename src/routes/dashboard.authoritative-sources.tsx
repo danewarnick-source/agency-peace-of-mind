@@ -83,6 +83,12 @@ import { ExternalLink as ExternalLinkIcon, Building } from "lucide-react";
 import { attestExternalCompletion, inferClassification } from "@/lib/external-compliance.functions";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  computeRequirementDueState,
+  frequencyLabel,
+  type RequirementTracking,
+} from "@/lib/requirement-tracking";
+import { RequirementTrackingEditor } from "@/components/nectar/requirement-tracking-editor";
+import {
   listProviderPendingConfirmations,
   providerConfirmRequirement,
   providerRejectRequirement,

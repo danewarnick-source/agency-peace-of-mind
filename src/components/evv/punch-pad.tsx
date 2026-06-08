@@ -660,6 +660,41 @@ export function PunchPad({
     }
     setBusy(true);
     try {
+      // Stage 5 — same front-guard for variance clock-in path. Fail-open.
+      const pendingIn = await fetchPendingTrackingForms({ tier: "clockin" });
+      if (pendingIn.length) {
+        const pos = variance.pos;
+        const outside = reason;
+        setPendingFormsDialog({
+          mode: "clockin",
+          pending: pendingIn,
+          proceed: async () => {
+            setPendingFormsDialog(null);
+            setBusy(true);
+            try {
+              await writeShift({ pos, outsideReason: outside });
+              setVariance(null);
+              setVarianceReason("");
+            } finally { setBusy(false); }
+          },
+          recheck: async () => {
+            const again = await fetchPendingTrackingForms({ tier: "clockin" });
+            if (!again.length) {
+              setPendingFormsDialog(null);
+              setBusy(true);
+              try {
+                await writeShift({ pos, outsideReason: outside });
+                setVariance(null);
+                setVarianceReason("");
+              } finally { setBusy(false); }
+            } else {
+              setPendingFormsDialog((p) => p ? { ...p, pending: again } : p);
+            }
+          },
+        });
+        return;
+      }
+
       await writeShift({ pos: variance.pos, outsideReason: reason });
       setVariance(null);
       setVarianceReason("");

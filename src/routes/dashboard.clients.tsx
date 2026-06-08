@@ -39,6 +39,7 @@ import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselec
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { ClientIntakeChecklistCard } from "@/components/clients/client-intake-checklist-card";
+import { IntakeProgress } from "@/components/clients/intake-progress";
 import { ClientLoanMarker } from "@/components/loans/client-loan-marker";
 import { BulkImporter } from "@/components/bulk-importer";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
@@ -76,6 +77,7 @@ type Client = {
   // feature toggles stored as JSON
   feature_config: Record<string, boolean> | null;
   profile_photo_url: string | null;
+  intake_status: string | null;
 };
 
 type ClientFormValues = {
@@ -381,6 +383,7 @@ export function ClientsPage() {
                 <TableHead className="font-semibold">Phone</TableHead>
                 <TableHead className="font-semibold">Address</TableHead>
                 <TableHead className="font-semibold">PCSP Goals</TableHead>
+                <TableHead className="font-semibold w-[220px]">Intake</TableHead>
                 <TableHead className="text-right font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -427,6 +430,13 @@ export function ClientsPage() {
                         <Badge variant="outline" className="text-[10px]">+{c.pcsp_goals.length - 2}</Badge>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell className="w-[220px] align-middle" onClick={(e) => e.stopPropagation()}>
+                    <IntakeProgress
+                      organizationId={org?.organization_id}
+                      clientId={c.id}
+                      intakeStatus={c.intake_status}
+                    />
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <Button variant="ghost" size="sm" onClick={() => setActiveClient(c)}
@@ -485,8 +495,8 @@ function ClientWorkspace({
                 Medicaid ID: {client.medicaid_id}
               </p>
             )}
-          </div>
         </div>
+      </div>
         <div className="ml-auto flex gap-2">
           {(client.job_code ?? []).map((code) => (
             <Badge key={code} variant="outline" className="font-mono text-[10px]">{code}</Badge>
@@ -496,6 +506,20 @@ function ClientWorkspace({
           </Badge>
         </div>
       </div>
+
+      {client.intake_status !== "complete" && (
+        <div className="rounded-lg border border-border bg-card/40 p-3">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Intake progress
+          </div>
+          <IntakeProgress
+            organizationId={orgId}
+            clientId={client.id}
+            intakeStatus={client.intake_status}
+            size="md"
+          />
+        </div>
+      )}
 
       {/* Tab navigation — 4 hubs: Profile · Care · Activity · Funds */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">

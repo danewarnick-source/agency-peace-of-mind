@@ -766,6 +766,84 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
     return { unmet };
   });
 
+// ─── ADMIN: record a staff-mandate override (proceed-anyway) ───────────────
+// Called from the assignment checkpoint AFTER the staff_assignments write
+// succeeds. Inserts an admin-facing notification naming the staffer + unmet
+// form(s) + client(s). Best-effort; never throws to the caller in a way that
+// should roll back the assignment.
+//
+// Dedupe: skip insertion if an identical notification (same staff_id +
+// type + organization_id) was created in the last 5 minutes — this avoids
+// runaway noise when an admin re-saves the same caseload back-to-back.
+//
+// Path chosen: NOTIFICATIONS-ONLY. shift_completeness_flags.shift_id is
+// NOT NULL and there is no shift at assignment time; we deliberately do
+// NOT relax that schema or fabricate a fake shift.
+export const recordStaffMandateOverride = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    staffId: z.string().uuid(),
+    clientIds: z.array(z.string().uuid()).min(1).max(50),
+    unmetFormIds: z.array(z.string().uuid()).min(1).max(50),
+    unmetFormNames: z.array(z.string().min(1).max(300)).min(1).max(50),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+
+    // Dedupe window: 5 minutes per (staff, type, org).
+    const since = new Date(Date.now() - 5 * 60_000).toISOString();
+    const { data: recent } = await supabase
+      .from("notifications")
+      .select("id")
+      .eq("organization_id", m.organization_id)
+      .eq("type", "staff_mandate_missing")
+      .eq("related_id", data.staffId)
+      .gte("created_at", since)
+      .limit(1);
+    if (recent && recent.length > 0) {
+      return { wrote: false, reason: "deduped", notificationId: null as string | null };
+    }
+
+    // Resolve staffer + client display names (best-effort).
+    const [{ data: staffProfile }, { data: clientRows }] = await Promise.all([
+      supabase.from("profiles").select("id, first_name, last_name, email").eq("id", data.staffId).maybeSingle(),
+      supabase.from("clients").select("id, first_name, last_name").in("id", data.clientIds),
+    ]);
+    const staffName = staffProfile
+      ? [staffProfile.first_name, staffProfile.last_name].filter(Boolean).join(" ").trim() || staffProfile.email || "Staffer"
+      : "Staffer";
+    const clientNames = ((clientRows ?? []) as Array<{ first_name: string | null; last_name: string | null }>)
+      .map((c) => [c.first_name, c.last_name].filter(Boolean).join(" ").trim())
+      .filter(Boolean);
+    const clientLabel = clientNames.length ? clientNames.join(", ") : `${data.clientIds.length} client(s)`;
+    const formLabel = data.unmetFormNames.join("; ");
+
+    const title = `Mandate override: ${staffName}`;
+    const body =
+      `${staffName} was assigned to ${clientLabel} with incomplete required form(s): ${formLabel}. ` +
+      `Admin proceeded past the warning.`;
+
+    const { data: ins, error: insErr } = await supabase
+      .from("notifications")
+      .insert({
+        organization_id: m.organization_id,
+        recipient_role: "admin",
+        type: "staff_mandate_missing",
+        urgency: "warning",
+        title,
+        body,
+        link_to: `/dashboard/staff/${data.staffId}`,
+        related_id: data.staffId,
+        related_type: "staff_mandate_override",
+      })
+      .select("id")
+      .single();
+    if (insErr) throw new Error(insErr.message);
+    return { wrote: true, reason: "inserted", notificationId: ins?.id ?? null };
+  });
+
 
 
 

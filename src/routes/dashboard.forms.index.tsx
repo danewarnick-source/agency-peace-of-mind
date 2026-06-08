@@ -42,6 +42,7 @@ function AdminList() {
   const save = useServerFn(saveForm);
   const archive = useServerFn(archiveForm);
   const { data, isLoading } = useQuery({ queryKey: ["forms-admin"], queryFn: () => fetchList() });
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   async function createBlank() {
     const out = await save({ data: {

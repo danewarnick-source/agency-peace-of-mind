@@ -396,3 +396,240 @@ export const publishClientSpecificTraining = createServerFn({ method: "POST" })
     if (uErr) throw new Error(uErr.message);
     return { training: updated };
   });
+
+// ───────────────────────────────────────────────────────────────────────────
+// STAFF VIEWER + COMPLETION (Stage 2b)
+//
+// HARD ACCESS CHECK: underlying clients/client_medications/hrc_reviews RLS is
+// org-wide (not assignment-scoped). The server fn MUST verify that the
+// requesting user is either an admin/manager OR has an active staff_assignments
+// row covering this client (direct or via group-home address — same logic
+// as the existing clients_for_staff RPC). NEVER rely on table RLS for scope.
+// Content rendered to staff comes ENTIRELY from the published snapshot in
+// client_specific_trainings.content — we do NOT re-query hrc_reviews etc.
+// staff-side (staff have no read policy on hrc_reviews).
+// ───────────────────────────────────────────────────────────────────────────
+
+async function assertStaffMayViewClient(
+  supabase: AnySupabase,
+  orgId: string,
+  userId: string,
+  role: string,
+  clientId: string,
+): Promise<void> {
+  if (["admin", "manager", "super_admin"].includes(role)) return;
+  // Direct assignment first (cheap).
+  const { data: direct } = await supabase
+    .from("staff_assignments")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("staff_id", userId)
+    .eq("client_id", clientId)
+    .limit(1);
+  if (direct && direct.length) return;
+  // Group-home fallback via the SECURITY DEFINER RPC.
+  const { data: scoped, error: rpcErr } = await supabase
+    .rpc("clients_for_staff", { _org: orgId, _staff: userId });
+  if (rpcErr) throw new Error("Access check failed.");
+  const list = (scoped as Array<{ id: string }> | null) ?? [];
+  if (!list.some((c) => c.id === clientId)) {
+    throw new Error("Forbidden: you are not assigned to this client.");
+  }
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const buf = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function contentHashOf(training: { id: string; version: number; content: unknown; attestation_statement: string }): Promise<string> {
+  // Stable hash: training id + version + canonical JSON of content + attestation.
+  const canonical = JSON.stringify({
+    id: training.id,
+    version: training.version,
+    content: training.content,
+    attestation: training.attestation_statement,
+  });
+  return sha256Hex(canonical);
+}
+
+// Lazy upsert of the per-org "Client-Specific Training" system requirement.
+// staff_checklist_completion.requirement_id is NOT NULL → we need an anchor
+// row. Stage 4 (gate wiring) will key off (origin='system', requirement_key
+// = 'client_specific_training').
+async function ensureClientTrainingRequirementId(
+  supabase: AnySupabase,
+  orgId: string,
+): Promise<string> {
+  const { data: existing } = await supabase
+    .from("nectar_requirements")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("origin", "system")
+    .eq("requirement_key", "client_specific_training")
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) return existing.id as string;
+  const { data: inserted, error } = await supabase
+    .from("nectar_requirements")
+    .insert({
+      organization_id: orgId,
+      origin: "system",
+      requirement_key: "client_specific_training",
+      title: "Client-Specific Training",
+      description: "Per-client competency: staffer affirms they have reviewed the client's published training snapshot.",
+      category: "client_specific_training",
+      applies_to: "staff",
+      verified: true,
+      review_status: "approved",
+      approval_state: "approved",
+      metadata: { managed: "system" },
+    })
+    .select("id")
+    .maybeSingle();
+  if (error || !inserted) throw new Error(`Could not provision requirement anchor: ${error?.message ?? "unknown"}`);
+  return inserted.id as string;
+}
+
+// ── STAFF: get published training for an assigned client ───────────────────
+export const getStaffClientSpecificTraining = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    // HARD scope check — admin/manager bypass; staff must be assigned.
+    await assertStaffMayViewClient(supabase, m.organization_id, userId, m.role, data.clientId);
+
+    const { data: training, error } = await supabase
+      .from("client_specific_trainings")
+      .select("id, organization_id, client_id, title, content, attestation_statement, status, version, updated_at")
+      .eq("client_id", data.clientId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    // Staff only see PUBLISHED versions. Admin/manager get null too if not published yet — they can use admin path.
+    if (!training || training.status !== "published") {
+      return { training: null, completion: null, hash: null };
+    }
+    if (training.organization_id !== m.organization_id) throw new Error("Forbidden.");
+
+    const hash = await contentHashOf(training as { id: string; version: number; content: unknown; attestation_statement: string });
+
+    // Most recent current completion by this user for this training (pinned to a hash).
+    const { data: completion } = await supabase
+      .from("training_completions")
+      .select("id, completed_at, content_hash, typed_signature, is_current")
+      .eq("user_id", userId)
+      .eq("topic_kind", "person")
+      .eq("ref_id", training.id)
+      .eq("is_current", true)
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return {
+      training: {
+        id: training.id,
+        client_id: training.client_id,
+        title: training.title,
+        content: training.content,
+        attestation_statement: training.attestation_statement,
+        version: training.version,
+        updated_at: training.updated_at,
+      },
+      completion: completion ?? null,
+      hash,
+      // Echo whether the existing completion is pinned to the current hash.
+      pinnedToCurrent: completion?.content_hash === hash,
+    };
+  });
+
+// ── STAFF: complete the competency (typed-name attestation) ───────────────
+export const completeClientSpecificTraining = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    clientId: z.string().uuid(),
+    typedSignature: z.string().trim().min(3).max(120),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    // Re-verify assignment scope at write time.
+    await assertStaffMayViewClient(supabase, m.organization_id, userId, m.role, data.clientId);
+
+    const { data: training, error } = await supabase
+      .from("client_specific_trainings")
+      .select("id, organization_id, client_id, title, content, attestation_statement, status, version")
+      .eq("client_id", data.clientId)
+      .maybeSingle();
+    if (error || !training) throw new Error("Training not found.");
+    if (training.organization_id !== m.organization_id) throw new Error("Forbidden.");
+    if (training.status !== "published") throw new Error("This training is not published yet.");
+
+    const hash = await contentHashOf(training as { id: string; version: number; content: unknown; attestation_statement: string });
+
+    // 1) Signed completion (immutable; trigger marks prior versions not-current).
+    const { data: tc, error: tcErr } = await supabase
+      .from("training_completions")
+      .insert({
+        user_id: userId,
+        topic_kind: "person",
+        ref_id: training.id,
+        topic_code: "client_specific_training",
+        topic_title: training.title,
+        attestation_statement: training.attestation_statement,
+        typed_signature: data.typedSignature,
+        signer_full_name: data.typedSignature,
+        consent_statement: training.attestation_statement,
+        consent_accepted: true,
+        content_version: String(training.version),
+        content_hash: hash,
+      })
+      .select("id")
+      .maybeSingle();
+    if (tcErr || !tc) throw new Error(tcErr?.message ?? "Could not record completion.");
+
+    // 2) Per-(staff, client) requirement satisfaction row.
+    const requirementId = await ensureClientTrainingRequirementId(supabase, m.organization_id);
+    // Manual upsert against scc_unique_per_client (cannot use onConflict on a partial index).
+    const { data: existingScc } = await supabase
+      .from("staff_checklist_completion")
+      .select("id")
+      .eq("staff_id", userId)
+      .eq("requirement_id", requirementId)
+      .eq("client_id", data.clientId)
+      .limit(1)
+      .maybeSingle();
+    const completedDate = new Date().toISOString().slice(0, 10);
+    if (existingScc?.id) {
+      const { error: uErr } = await supabase
+        .from("staff_checklist_completion")
+        .update({
+          status: "complete",
+          completed_date: completedDate,
+          completed_by: userId,
+          training_completion_id: tc.id,
+          auto_checked_at: new Date().toISOString(),
+        })
+        .eq("id", existingScc.id);
+      if (uErr) throw new Error(uErr.message);
+    } else {
+      const { error: iErr } = await supabase
+        .from("staff_checklist_completion")
+        .insert({
+          organization_id: m.organization_id,
+          staff_id: userId,
+          requirement_id: requirementId,
+          client_id: data.clientId,
+          status: "complete",
+          completed_date: completedDate,
+          completed_by: userId,
+          training_completion_id: tc.id,
+          auto_checked_at: new Date().toISOString(),
+        });
+      if (iErr) throw new Error(iErr.message);
+    }
+
+    return { ok: true, completionId: tc.id, requirementId, contentHash: hash };
+  });

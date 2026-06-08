@@ -1728,6 +1728,46 @@ export function PunchPad({
             DIALOGS
         ════════════════════════════════════════════════════════════════════ */}
 
+        {/* Stage 5 — per-shift tracking-form front-guard dialog */}
+        <PendingTrackingFormsDialog
+          open={!!pendingFormsDialog}
+          mode={pendingFormsDialog?.mode ?? "clockout"}
+          pending={pendingFormsDialog?.pending ?? []}
+          busy={busy}
+          onClose={() => setPendingFormsDialog(null)}
+          onProceedAfterRecheck={
+            pendingFormsDialog ? () => pendingFormsDialog.recheck() : undefined
+          }
+          onSkipWithReason={
+            pendingFormsDialog?.mode === "clockout"
+              ? async (skipReason) => {
+                  // Sole write from the guard: shift_completeness_flags row(s).
+                  // evv_timesheets is NOT written here.
+                  if (org?.organization_id && user && active && pendingFormsDialog) {
+                    const rows = pendingFormsDialog.pending.map((p) => ({
+                      organization_id: org.organization_id,
+                      shift_id: active.id,
+                      client_id: active.client_id,
+                      staff_id: user.id,
+                      flag_type: "tracking_form_missing",
+                      severity: "soft",
+                      message: `Required tracking form "${p.formName}" skipped at clock-out.`,
+                      status: "dismissed_with_reason",
+                      dismissal_reason: skipReason,
+                    }));
+                    try {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      await supabase.from("shift_completeness_flags").insert(rows as any);
+                    } catch {
+                      // Best-effort; never trap caregiver because of flag insert.
+                    }
+                  }
+                  await pendingFormsDialog?.proceed();
+                }
+              : undefined
+          }
+        />
+
         {/* Clock-in variance — text only, no map */}
         <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); setVarShorthand(""); } }}>
           <DialogContent className="max-h-[85vh] overflow-y-auto">

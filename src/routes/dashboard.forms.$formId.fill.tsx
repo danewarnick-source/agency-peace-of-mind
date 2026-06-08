@@ -6,7 +6,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, Send, Loader2 } from "lucide-react";
-import { getStaffForm, submitForm } from "@/lib/forms.functions";
+import { getStaffForm, submitForm, submitIntakeForm } from "@/lib/forms.functions";
 import { FieldRenderer } from "@/components/forms/field-renderer";
 import { type FormField, isFieldVisible } from "@/lib/forms-utils";
 import { toast } from "sonner";

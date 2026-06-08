@@ -130,7 +130,14 @@ export type FormSettings = {
   notify_email?: boolean;
   submission_limit?: "unlimited" | "1_per_day" | "1_per_week" | "1_per_month" | "1_total";
   remind?: "off" | "3_days_before" | "weekly" | "daily";
-  subcategory?: "application" | "independence" | "consent" | "pnp_attestation";
+  subcategory?: "application" | "independence" | "consent" | "pnp_attestation" | "other";
+  /** Company-declared: this intake form is required to complete client intake.
+   *  When true, saveForm syncs a `company_required` row into nectar_requirements
+   *  (scope='hr_client_intake') so it appears on the client intake checklist. */
+  required_for_intake?: boolean;
+  /** Short company-authored description shown to staff in the runner and to
+   *  auditors on the intake checklist. NEVER presented as authoritative. */
+  purpose?: string;
 };
 
 export const FORM_CATEGORIES = [

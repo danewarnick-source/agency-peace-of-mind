@@ -497,6 +497,15 @@ function ClientWorkspace({
             )}
         </div>
       </div>
+        <div className="ml-auto flex gap-2">
+          {(client.job_code ?? []).map((code) => (
+            <Badge key={code} variant="outline" className="font-mono text-[10px]">{code}</Badge>
+          ))}
+          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+            Active
+          </Badge>
+        </div>
+      </div>
 
       {client.intake_status !== "complete" && (
         <div className="rounded-lg border border-border bg-card/40 p-3">
@@ -511,15 +520,6 @@ function ClientWorkspace({
           />
         </div>
       )}
-        <div className="ml-auto flex gap-2">
-          {(client.job_code ?? []).map((code) => (
-            <Badge key={code} variant="outline" className="font-mono text-[10px]">{code}</Badge>
-          ))}
-          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-            Active
-          </Badge>
-        </div>
-      </div>
 
       {/* Tab navigation — 4 hubs: Profile · Care · Activity · Funds */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">

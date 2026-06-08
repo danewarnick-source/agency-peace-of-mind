@@ -457,12 +457,14 @@ function contentHashOf(training: { id: string; version: number; content: unknown
 // Lazy upsert of the per-org "Client-Specific Training" system requirement.
 // staff_checklist_completion.requirement_id is NOT NULL → we need an anchor
 // row. Stage 4 (gate wiring) will key off (origin='system', requirement_key
-// = 'client_specific_training').
+// = 'client_specific_training'). Insert/select via service-role: staff don't
+// have nectar_requirements write privilege, and the row itself is non-PHI
+// system metadata.
 async function ensureClientTrainingRequirementId(
-  supabase: AnySupabase,
+  admin: AnySupabase,
   orgId: string,
 ): Promise<string> {
-  const { data: existing } = await supabase
+  const { data: existing } = await admin
     .from("nectar_requirements")
     .select("id")
     .eq("organization_id", orgId)
@@ -471,7 +473,7 @@ async function ensureClientTrainingRequirementId(
     .limit(1)
     .maybeSingle();
   if (existing?.id) return existing.id as string;
-  const { data: inserted, error } = await supabase
+  const { data: inserted, error } = await admin
     .from("nectar_requirements")
     .insert({
       organization_id: orgId,

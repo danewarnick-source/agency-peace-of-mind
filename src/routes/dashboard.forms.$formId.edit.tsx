@@ -63,6 +63,7 @@ function EditForm() {
   const [busy, setBusy] = useState(false);
   const [baseline, setBaseline] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     const f = data?.form;

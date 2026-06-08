@@ -230,6 +230,20 @@ export function PunchPad({
   }>(null);
   const [outVarianceReason, setOutVarianceReason] = useState("");
 
+  // ── Stage 5: per-shift tracking-form front-guard state ──────────────────────
+  // Pending dialog data + which proceed callback to invoke after the user
+  // either skips (clock-out) or clears them. The EVV calls live in those
+  // callbacks; the guard only PAUSES the punch, never modifies it.
+  const [pendingFormsDialog, setPendingFormsDialog] = useState<null | {
+    mode: "clockout" | "clockin";
+    pending: PendingForm[];
+    // Continues the original EVV call path.
+    proceed: () => void | Promise<void>;
+    // Re-runs the check; if cleared, proceed automatically.
+    recheck: () => Promise<void>;
+  }>(null);
+
+
   // ── Clock-in success state ──────────────────────────────────────────────────
   const [clockInSuccess, setClockInSuccess] = useState<null | {
     evvClean: boolean;

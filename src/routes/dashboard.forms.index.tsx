@@ -107,6 +107,15 @@ function AdminList() {
           )}
         </div>
       )}
+      {deleteTarget && (
+        <DeleteFormDialog
+          open={!!deleteTarget}
+          onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
+          formId={deleteTarget.id}
+          formName={deleteTarget.name}
+          onDeleted={() => { setDeleteTarget(null); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }}
+        />
+      )}
     </div>
   );
 }

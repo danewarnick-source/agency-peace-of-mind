@@ -226,8 +226,8 @@ export const ROUTING_BEHAVIORS: Array<{
     value: "per_shift_per_client_tracked",
     label: "Per-shift, per-client tracked data",
     short: "Recurring data tied to a client, viewed as a series.",
-    implication: "Tracked data routing is not set up yet — this form currently just files normally as a general submission.",
-    wired: false,
+    implication: "Collects data on shifts that match the chosen client and billing-code filters; submissions are filed as normal. Enforcement prompts at clock-out / next clock-in and the client Care-tab series view are set up in later steps — for now the form just files.",
+    wired: true,
   },
 ];
 

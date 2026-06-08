@@ -605,6 +605,71 @@ export const submitIntakeForm = createServerFn({ method: "POST" })
     return { submission: ins };
   });
 
+// ─── STAFF/ADMIN: submit a STAFF MANDATE form ─────────────────────────────
+// Staff-mandate forms credit the TARGET staffer (not necessarily the
+// submitter). The trigger reads `answers.__target_staff_id` to decide whose
+// staff_checklist_completion row flips to 'complete'. Self-submit defaults
+// to submitted_by. Admins/managers may submit on-behalf for any staffer in
+// the same org. No client_id (the mandate is per-staff, not per-client at
+// this stage). The form must have routing_behavior='staff_mandate'.
+export const submitStaffMandateForm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    formId: z.string().uuid(),
+    answers: z.record(z.any()),
+    targetStaffId: z.string().uuid().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+
+    const { data: form, error: fe } = await supabase
+      .from("forms")
+      .select("id, organization_id, status, frequency, settings, assigned_groups, assigned_users")
+      .eq("id", data.formId)
+      .maybeSingle();
+    if (fe || !form) throw new Error("Form not found.");
+    if (form.organization_id !== m.organization_id) throw new Error("Forbidden.");
+    if (form.status !== "published") throw new Error("Form is not published.");
+    const settings = (form.settings ?? {}) as FormSettings;
+    if (settings.routing_behavior !== "staff_mandate") {
+      throw new Error("submitStaffMandateForm only accepts staff_mandate forms.");
+    }
+
+    // Resolve target staffer.
+    let targetStaffId = data.targetStaffId ?? userId;
+    if (targetStaffId !== userId) {
+      // On-behalf submission requires admin/manager/super_admin.
+      adminGuard(m.role);
+      // Verify target is a member of the same org.
+      const { data: tm } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", m.organization_id)
+        .eq("user_id", targetStaffId)
+        .eq("active", true)
+        .maybeSingle();
+      if (!tm) throw new Error("Target staffer is not in your organization.");
+    }
+
+    // Stash the resolved target on the submission so the trigger can read it.
+    const answers = { ...(data.answers ?? {}), __target_staff_id: targetStaffId };
+    const periodKey = periodKeyFor(form.frequency as Frequency);
+
+    const { data: ins, error } = await supabase.from("form_submissions").insert({
+      organization_id: form.organization_id,
+      form_id: form.id,
+      submitted_by: userId,
+      client_id: null,
+      answers,
+      period_key: periodKey,
+    }).select().maybeSingle();
+    if (error) throw new Error(error.message);
+    return { submission: ins };
+  });
+
+
+
 // ─── STAFF: bell — unread form notifications for me ────────────────────────
 export const getMyFormNotifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

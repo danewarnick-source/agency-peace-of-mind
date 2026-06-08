@@ -1873,6 +1873,11 @@ function RequirementRow({
                 : "Set tracking"}
             </Badge>
           )}
+        </div>
+        {req.description && (
+          <p className="mt-1 text-xs text-muted-foreground">{req.description}</p>
+        )}
+        {isConfirmed && req.verified_at && (
           <p className="mt-1 text-[10px] text-muted-foreground">
             Confirmed {new Date(req.verified_at).toLocaleString()}
           </p>

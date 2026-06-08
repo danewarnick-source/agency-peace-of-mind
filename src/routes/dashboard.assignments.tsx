@@ -190,6 +190,37 @@ function AssignmentsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Stage-2 staff-mandate WARN-AND-NEVER-BLOCK at caseload save.
+  // We run detection only when the save would create at least one NEW
+  // (staff, client) assignment. Edits to existing assignments and deletions
+  // never warn. The detection is best-effort: on any error we proceed.
+  const fetchUnmet = useServerFn(getUnmetStaffMandates);
+  const [pendingWarning, setPendingWarning] = useState<{ names: string[] } | null>(null);
+
+  async function attemptSave() {
+    if (!org || !staffId) return;
+    const existingClientIds = new Set((assignments ?? []).map((a) => a.client_id));
+    const hasNewAssignment = Object.entries(draft).some(
+      ([cid, codes]) => codes.size > 0 && !existingClientIds.has(cid),
+    );
+    if (!hasNewAssignment) {
+      saveMut.mutate();
+      return;
+    }
+    try {
+      const res = await fetchUnmet({ data: { staffId } });
+      const names = (res?.unmet ?? []).map((u) => u.name);
+      if (names.length > 0) {
+        setPendingWarning({ names });
+        return;
+      }
+    } catch (err) {
+      // Best-effort: never block the save on detection failure.
+      console.warn("[assignments] unmet-mandate detection failed; proceeding without warning", err);
+    }
+    saveMut.mutate();
+  }
+
   function toggleCode(cid: string, code: string) {
     setDraft((prev) => {
       const next = { ...prev };

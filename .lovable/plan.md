@@ -58,3 +58,36 @@ No changes to: `forms-utils.ts`, save path, field types, conditional logic, `fie
 5. Drag the new field up/down — it reorders and remains grouped under its section.
 6. Save → reload → order and field config persist; staff filler renders identically.
 7. Top palette still appends to the end as before.
+
+---
+
+# DOCKET — Requirement frequency + "Tell NECTAR" note + last-checked
+Status: PARKED. Build AFTER per-shift Stage 5 and current verification pile.
+
+## Origin
+Some compliance requirements recur (e.g. 1056 form lives on Provider UPI/USTEPS, updated ongoing). Today `nectar_requirements` is essentially done/not-done. Need cadence + provider-described tracking method + last-verified date so audits can prompt re-checks.
+
+## Scope (light extension to nectar_requirements — NOT per-shift tracking forms)
+Each requirement carries:
+1. **Frequency** (provider-set dropdown): one-time, per employee, per shift, per code, per day, per week, per month, per quarter, per year, per billing-rate-unit, ongoing.
+2. **"Tell NECTAR" free-text note** — captured at CONFIRM time. Provider's own words on how they track it (e.g. "1056s on Provider UPI/USTEPS; updated ongoing"). Clearly labeled "Tell NECTAR" field.
+3. **Last-checked / last-verified date** — used with frequency to compute due/overdue on read.
+
+## Surfaces
+- **Confirm-time:** when provider confirms a requirement → set frequency + Tell NECTAR note + initial last-checked.
+- **Audit-time:** Internal Audit / Agency Command Center surface AND external-audit context show a prompt listing requirements due/overdue per frequency + last-checked ("12 recurring requirements due for re-verification: 1056 (ongoing, last checked Mar), ...").
+
+## NECTAR boundary (critical posture)
+- PROVIDER declares frequency + tracking method. NECTAR stores, surfaces, reminds. NECTAR does NOT autonomously assert cadence.
+- "Tell NECTAR" note is the provider's own description; NECTAR uses it to remind/contextualize — never to invent compliance rules.
+
+## Fit / reuse
+- `nectar_requirements.metadata` already has renewal / evidence_type concepts from intake checklist work. Promote frequency + last-checked + Tell NECTAR note into consistent first-class provider-editable attributes — likely metadata fields, NOT a new table (confirm in short diagnose).
+- Keep separate from per-shift tracking forms (`form_submissions`) and from `bc_*`. Recurring 1056 = compliance requirement attribute, not a tracking form.
+- Internal Audit QA tooling already exists (Agency Command Center / Internal Audit) — hook audit-time prompt INTO that surface, don't build parallel.
+
+## Keep it light
+Frequency dropdown + Tell NECTAR free-text + last-checked date + derived due/overdue computation surfaced at audit-time. NOT a scheduling/cron engine. Due/overdue derived on read.
+
+## When building — diagnose first
+Confirm where requirement-confirm/metadata lives, how intake renewal concept already works, and where Internal Audit surface is — extend, don't duplicate.

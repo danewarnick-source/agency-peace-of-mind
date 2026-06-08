@@ -392,11 +392,6 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
         .from("nectar_requirements")
         .update(baseUpdate)
         .eq("id", data.requirementId);
-    } else {
-      await context.supabase
-        .from("nectar_requirements")
-        .update(baseUpdate)
-        .eq("id", data.requirementId);
     }
 
     const actorLabel = await resolveActorLabel(context.userId);

@@ -48,7 +48,7 @@ function AdminList() {
       schedule: {}, assigned_groups: [], assigned_users: [], settings: {},
     } });
     qc.invalidateQueries({ queryKey: ["forms-admin"] });
-    navigate({ to: "/dashboard/forms/$formId/edit", params: { formId: out.form.id } });
+    if (out.form?.id) navigate({ to: "/dashboard/forms/$formId/edit", params: { formId: out.form.id } });
   }
 
   return (

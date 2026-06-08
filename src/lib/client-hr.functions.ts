@@ -28,6 +28,7 @@ export interface ClientIntakeRow {
   evidence_type: string | null;
   renewal: string | null;
   checklist_layer: string | null;
+  purpose: string | null;
   conditional: string | null;
   note: string | null;
   completion: {
@@ -92,6 +93,7 @@ export const getClientIntakeChecklist = createServerFn({ method: "GET" })
         evidence_type: (meta.evidence_type as string) ?? null,
         renewal: (meta.renewal as string) ?? null,
         checklist_layer: (meta.checklist_layer as string) ?? null,
+        purpose: (meta.purpose as string) ?? null,
         conditional: (meta.conditional as string) ?? null,
         note: (meta.note as string) ?? null,
         completion: {

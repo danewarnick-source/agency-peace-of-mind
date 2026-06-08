@@ -156,19 +156,48 @@ function EditForm() {
                 </select>
                 <p className="text-[11px] text-muted-foreground">Always lives in Records → Forms. Choosing a category adds it under that section too.</p>
                 {category === "intake" && (
-                  <div className="grid gap-1.5 mt-2">
-                    <Label className="text-xs">Intake subcategory (controls order in runner)</Label>
-                    <select
-                      value={settings.subcategory ?? ""}
-                      onChange={(e) => setSettings((s) => ({ ...s, subcategory: (e.target.value || undefined) as FormSettings["subcategory"] }))}
-                      className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="">— None —</option>
-                      <option value="application">Application / Intake Assessment</option>
-                      <option value="independence">Independence Levels Assessment</option>
-                      <option value="consent">Consents</option>
-                      <option value="pnp_attestation">Policies & Procedures Attestation</option>
-                    </select>
+                  <div className="grid gap-2 mt-2 rounded-md border border-border/60 bg-muted/30 p-3">
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Intake subcategory (controls order in runner)</Label>
+                      <select
+                        value={settings.subcategory ?? ""}
+                        onChange={(e) => setSettings((s) => ({ ...s, subcategory: (e.target.value || undefined) as FormSettings["subcategory"] }))}
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="">— None —</option>
+                        <option value="application">Application / Intake Assessment</option>
+                        <option value="independence">Independence Levels Assessment</option>
+                        <option value="consent">Consents</option>
+                        <option value="pnp_attestation">Policies & Procedures Attestation</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <label className="flex items-start gap-2 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4"
+                        checked={!!settings.required_for_intake}
+                        onChange={(e) => setSettings((s) => ({ ...s, required_for_intake: e.target.checked }))}
+                      />
+                      <span>
+                        <strong>Required for client intake</strong>
+                        <span className="block text-[11px] text-muted-foreground">
+                          Adds a <em>Company-required</em> item to the client intake checklist for this org.
+                          This is your company's own requirement — not auto-derived from regulations.
+                        </span>
+                      </span>
+                    </label>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Purpose / intent (what this form is for)</Label>
+                      <Textarea
+                        rows={2}
+                        maxLength={500}
+                        placeholder="e.g. Captures guardian consent for medication administration before admission."
+                        value={settings.purpose ?? ""}
+                        onChange={(e) => setSettings((s) => ({ ...s, purpose: e.target.value }))}
+                      />
+                      <p className="text-[11px] text-muted-foreground">Shown to staff in the intake runner and to auditors on the checklist.</p>
+                    </div>
                   </div>
                 )}
               </div>

@@ -33,6 +33,7 @@ const SUBCAT_ORDER: Record<string, number> = {
   independence: 1,
   consent: 2,
   pnp_attestation: 3,
+  other: 4,
 };
 
 type IntakeForm = {
@@ -191,6 +192,8 @@ function IntakeFormRow({
         ? "Draft"
         : "Not started";
   const subcat = (form.settings?.subcategory as string | undefined) ?? null;
+  const purpose = (form.settings?.purpose as string | undefined) ?? null;
+  const requiredForIntake = form.settings?.required_for_intake === true;
 
   return (
     <li className="rounded-lg border border-border/60 p-3 text-sm">
@@ -205,11 +208,21 @@ function IntakeFormRow({
                   {subcat}
                 </Badge>
               )}
+              {requiredForIntake && (
+                <Badge variant="outline" className="text-[10px] border-indigo-300 text-indigo-700">
+                  Company-required
+                </Badge>
+              )}
               <span>{label}</span>
               {form.description && (
                 <span className="truncate">· {form.description}</span>
               )}
             </div>
+            {purpose && (
+              <p className="mt-1 text-[11px] italic text-muted-foreground">
+                Purpose: {purpose}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex md:justify-end">

@@ -289,7 +289,15 @@ function ChecklistRowView({
           <div className="min-w-0">
             <div className="font-medium">{row.title}</div>
             <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
-              {row.checklist_layer && (
+              {row.checklist_layer === "company_required" ? (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-indigo-300 text-indigo-700"
+                  title="Added by your company as a required intake item. Not derived from an authoritative source."
+                >
+                  Company-required
+                </Badge>
+              ) : row.checklist_layer ? (
                 <Badge
                   variant="secondary"
                   className="text-[10px]"
@@ -301,7 +309,7 @@ function ChecklistRowView({
                 >
                   {row.checklist_layer}
                 </Badge>
-              )}
+              ) : null}
               {row.conditional && (
                 <Badge variant="outline" className="text-[10px]">
                   conditional · {row.conditional}
@@ -311,6 +319,11 @@ function ChecklistRowView({
               {row.renewal && <span>· renews: {row.renewal}</span>}
               {row.source_citation && <span>· {row.source_citation}</span>}
             </div>
+            {row.purpose && row.checklist_layer === "company_required" && (
+              <p className="mt-1 text-[11px] italic text-muted-foreground">
+                Purpose (company): {row.purpose}
+              </p>
+            )}
             {row.note && (
               <p className="mt-1 text-[11px] italic text-muted-foreground">
                 {row.note}

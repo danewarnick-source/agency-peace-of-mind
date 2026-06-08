@@ -17,7 +17,7 @@ import {
 import { Users, Loader2, ChevronDown, ChevronRight, Save, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { isDailyServiceCode } from "@/lib/service-billing";
-import { getUnmetStaffMandates } from "@/lib/forms.functions";
+import { getUnmetStaffMandates, recordStaffMandateOverride } from "@/lib/forms.functions";
 
 export const Route = createFileRoute("/dashboard/assignments")({
   head: () => ({ meta: [{ title: "Caseloads — HIVE" }] }),
@@ -195,23 +195,51 @@ function AssignmentsPage() {
   // (staff, client) assignment. Edits to existing assignments and deletions
   // never warn. The detection is best-effort: on any error we proceed.
   const fetchUnmet = useServerFn(getUnmetStaffMandates);
-  const [pendingWarning, setPendingWarning] = useState<{ names: string[] } | null>(null);
+  const recordOverride = useServerFn(recordStaffMandateOverride);
+  const [pendingWarning, setPendingWarning] = useState<
+    | { names: string[]; formIds: string[]; newClientIds: string[] }
+    | null
+  >(null);
+
+  // Best-effort flag/notify after a proceed-anyway save. Failures here MUST
+  // NOT roll back or block the assignment write — log only.
+  async function recordOverrideBestEffort(p: {
+    formIds: string[]; names: string[]; newClientIds: string[];
+  }) {
+    if (!staffId || !p.formIds.length || !p.newClientIds.length) return;
+    try {
+      await recordOverride({
+        data: {
+          staffId,
+          clientIds: p.newClientIds,
+          unmetFormIds: p.formIds,
+          unmetFormNames: p.names,
+        },
+      });
+    } catch (err) {
+      console.warn("[assignments] recordStaffMandateOverride failed (assignment was already saved)", err);
+    }
+  }
 
   async function attemptSave() {
     if (!org || !staffId) return;
     const existingClientIds = new Set((assignments ?? []).map((a) => a.client_id));
-    const hasNewAssignment = Object.entries(draft).some(
-      ([cid, codes]) => codes.size > 0 && !existingClientIds.has(cid),
-    );
-    if (!hasNewAssignment) {
+    const newClientIds = Object.entries(draft)
+      .filter(([cid, codes]) => codes.size > 0 && !existingClientIds.has(cid))
+      .map(([cid]) => cid);
+    if (newClientIds.length === 0) {
       saveMut.mutate();
       return;
     }
     try {
       const res = await fetchUnmet({ data: { staffId } });
-      const names = (res?.unmet ?? []).map((u) => u.name);
-      if (names.length > 0) {
-        setPendingWarning({ names });
+      const unmet = res?.unmet ?? [];
+      if (unmet.length > 0) {
+        setPendingWarning({
+          names: unmet.map((u) => u.name),
+          formIds: unmet.map((u) => u.form_id),
+          newClientIds,
+        });
         return;
       }
     } catch (err) {
@@ -337,7 +365,13 @@ function AssignmentsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setPendingWarning(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => { setPendingWarning(null); saveMut.mutate(); }}
+              onClick={() => {
+                const p = pendingWarning;
+                setPendingWarning(null);
+                saveMut.mutate(undefined, {
+                  onSuccess: () => { if (p) void recordOverrideBestEffort(p); },
+                });
+              }}
             >
               Proceed anyway
             </AlertDialogAction>

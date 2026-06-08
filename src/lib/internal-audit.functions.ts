@@ -156,7 +156,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
           .eq("organization_id", orgId),
         supabase
           .from("nectar_requirements")
-          .select("id, title, source_citation, review_status, category")
+          .select("id, title, source_citation, review_status, category, metadata, approval_state")
           .eq("organization_id", orgId),
       ]);
 

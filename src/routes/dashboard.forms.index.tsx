@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, FileText, Sparkles, Archive, Send, Edit3 } from "lucide-react";
+import { Plus, FileText, Sparkles, Archive, Send, Edit3, Trash2 } from "lucide-react";
 import { useEffectiveView } from "@/hooks/use-effective-view";
 import {
   listForms, listMyForms, archiveForm, saveForm,
@@ -16,6 +16,7 @@ import {
   periodKeyFor, dueDateFor, formatDue, describeFrequency, isOverdue,
   type Frequency, type Schedule, type FormSettings,
 } from "@/lib/forms-utils";
+import { DeleteFormDialog } from "@/components/forms/delete-form-dialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/forms/")({

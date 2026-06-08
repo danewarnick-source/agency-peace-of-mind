@@ -60,7 +60,11 @@ function FillForm() {
         if (f.type === "section") continue;
         if (isFieldVisible(f, answers, fields) && answers[f.id] !== undefined) visible[f.id] = answers[f.id];
       }
-      await submit({ data: { formId, clientId, answers: visible } });
+      // Intake-category forms go through the role-gated admin path; all
+      // other categories keep the unchanged staff submitForm (caseload-gated).
+      const isIntake = (data?.form?.category ?? null) === "intake";
+      const submitFn = isIntake ? submitIntake : submit;
+      await submitFn({ data: { formId, clientId, answers: visible } });
       qc.invalidateQueries({ queryKey: ["client-forms", clientId] });
       toast.success("Submitted to client's record");
       backToClient();

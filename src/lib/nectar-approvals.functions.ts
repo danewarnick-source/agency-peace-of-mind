@@ -350,23 +350,16 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
       );
     }
 
-    type J =
-      | string
-      | number
-      | boolean
-      | null
-      | { [k: string]: J | undefined }
-      | J[];
-    const md = (req.metadata as Record<string, J> | null) ?? {};
-    const prevTracking = ((md["tracking"] as Record<string, J> | undefined) ?? {}) as Record<
+    const md = (req.metadata as Record<string, Json> | null) ?? {};
+    const prevTracking = ((md["tracking"] as Record<string, Json> | undefined) ?? {}) as Record<
       string,
-      J
+      Json
     >;
     const hasTracking =
       data.frequency !== undefined ||
       data.tellNectarNote !== undefined ||
       data.lastCheckedAt !== undefined;
-    const nextTracking: Record<string, J> = { ...prevTracking };
+    const nextTracking: Record<string, Json> = { ...prevTracking };
     if (data.frequency !== undefined) nextTracking.frequency = data.frequency ?? null;
     if (data.tellNectarNote !== undefined)
       nextTracking.tell_nectar_note =
@@ -389,10 +382,15 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
     };
 
     if (hasTracking) {
-      const newMeta = { ...md, tracking: nextTracking } as unknown as J;
+      const newMeta = { ...md, tracking: nextTracking } as Json;
       await context.supabase
         .from("nectar_requirements")
         .update({ ...baseUpdate, metadata: newMeta })
+        .eq("id", data.requirementId);
+    } else {
+      await context.supabase
+        .from("nectar_requirements")
+        .update(baseUpdate)
         .eq("id", data.requirementId);
     } else {
       await context.supabase

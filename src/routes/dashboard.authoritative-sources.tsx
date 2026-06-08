@@ -3417,7 +3417,15 @@ function AwaitingFinalConfirmationPanel({ orgId }: { orgId: string }) {
           <FinalConfirmRow
             key={r.id}
             row={r}
-            onConfirm={(note) => confirm.mutate({ requirementId: r.id, note })}
+            onConfirm={(payload) =>
+              confirm.mutate({
+                requirementId: r.id,
+                note: payload.note,
+                frequency: payload.frequency,
+                tellNectarNote: payload.tellNectarNote,
+                lastCheckedAt: payload.lastCheckedAt,
+              })
+            }
             onReject={(reason) => reject.mutate({ requirementId: r.id, reason })}
             busy={confirm.isPending || reject.isPending}
           />

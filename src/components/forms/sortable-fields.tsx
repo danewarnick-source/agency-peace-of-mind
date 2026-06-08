@@ -168,6 +168,8 @@ export function SortableFields({
                     onMoveUp={() => move(indexOf(g.section!.id), -1)}
                     onMoveDown={() => move(indexOf(g.section!.id), 1)}
                     onRemove={() => remove(indexOf(g.section!.id))}
+                    justAdded={lastAddedId === g.section.id}
+                    onJustAddedConsumed={onLastAddedConsumed}
                   />
                 ) : (
                   <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Ungrouped (before first section)</p>

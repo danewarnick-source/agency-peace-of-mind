@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { RequirePermission } from "@/components/rbac-guard";
@@ -9,9 +10,14 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Loader2, ChevronDown, ChevronRight, Save } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Users, Loader2, ChevronDown, ChevronRight, Save, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { isDailyServiceCode } from "@/lib/service-billing";
+import { getUnmetStaffMandates } from "@/lib/forms.functions";
 
 export const Route = createFileRoute("/dashboard/assignments")({
   head: () => ({ meta: [{ title: "Caseloads — HIVE" }] }),
@@ -184,6 +190,37 @@ function AssignmentsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Stage-2 staff-mandate WARN-AND-NEVER-BLOCK at caseload save.
+  // We run detection only when the save would create at least one NEW
+  // (staff, client) assignment. Edits to existing assignments and deletions
+  // never warn. The detection is best-effort: on any error we proceed.
+  const fetchUnmet = useServerFn(getUnmetStaffMandates);
+  const [pendingWarning, setPendingWarning] = useState<{ names: string[] } | null>(null);
+
+  async function attemptSave() {
+    if (!org || !staffId) return;
+    const existingClientIds = new Set((assignments ?? []).map((a) => a.client_id));
+    const hasNewAssignment = Object.entries(draft).some(
+      ([cid, codes]) => codes.size > 0 && !existingClientIds.has(cid),
+    );
+    if (!hasNewAssignment) {
+      saveMut.mutate();
+      return;
+    }
+    try {
+      const res = await fetchUnmet({ data: { staffId } });
+      const names = (res?.unmet ?? []).map((u) => u.name);
+      if (names.length > 0) {
+        setPendingWarning({ names });
+        return;
+      }
+    } catch (err) {
+      // Best-effort: never block the save on detection failure.
+      console.warn("[assignments] unmet-mandate detection failed; proceeding without warning", err);
+    }
+    saveMut.mutate();
+  }
+
   function toggleCode(cid: string, code: string) {
     setDraft((prev) => {
       const next = { ...prev };
@@ -236,7 +273,7 @@ function AssignmentsPage() {
               {counts.clientsN} clients · {counts.servicesN} services selected
             </span>
             <Button
-              onClick={() => saveMut.mutate()}
+              onClick={() => { void attemptSave(); }}
               disabled={!staffId || saveMut.isPending}
               className="h-11 bg-[image:var(--gradient-amber)] text-[#412402] hover:brightness-95"
             >
@@ -271,6 +308,42 @@ function AssignmentsPage() {
           )}
         </Card>
       )}
+
+      <AlertDialog
+        open={!!pendingWarning}
+        onOpenChange={(o) => { if (!o) setPendingWarning(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Required forms not complete
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  This staffer has {pendingWarning?.names.length} incomplete required form
+                  {(pendingWarning?.names.length ?? 0) === 1 ? "" : "s"}:
+                </p>
+                <ul className="list-disc pl-5">
+                  {pendingWarning?.names.map((n) => (<li key={n}>{n}</li>))}
+                </ul>
+                <p className="text-muted-foreground">
+                  You can proceed; this will be recorded.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingWarning(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setPendingWarning(null); saveMut.mutate(); }}
+            >
+              Proceed anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

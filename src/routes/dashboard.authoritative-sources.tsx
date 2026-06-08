@@ -1834,12 +1834,45 @@ function RequirementRow({
               Renewal {new Date(renewalDueAt).toLocaleDateString()}
             </Badge>
           )}
-
-        </div>
-        {req.description && (
-          <p className="mt-1 text-xs text-muted-foreground">{req.description}</p>
-        )}
-        {isConfirmed && req.verified_at && (
+          {isConfirmed && (
+            <Badge
+              variant="outline"
+              className={
+                "text-[10px] cursor-pointer " +
+                (trackingState.state === "overdue"
+                  ? "border-red-500/50 text-red-700 dark:text-red-300"
+                  : trackingState.state === "due" || trackingState.state === "due_soon"
+                    ? "border-amber-500/50 text-amber-700 dark:text-amber-300"
+                    : trackingState.state === "never_checked"
+                      ? "border-slate-500/40 text-muted-foreground"
+                      : trackingState.frequency
+                        ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                        : "border-slate-500/30 text-muted-foreground")
+              }
+              onClick={() => setTrackingOpen(true)}
+              title={
+                trackingMd.tell_nectar_note
+                  ? `You said: ${trackingMd.tell_nectar_note}`
+                  : "Set how you track this requirement"
+              }
+            >
+              {trackingState.frequency
+                ? `${frequencyLabel(trackingState.frequency)}${
+                    trackingState.state === "overdue"
+                      ? ` · overdue ${trackingState.daysOverdue}d`
+                      : trackingState.state === "due"
+                        ? " · due today"
+                        : trackingState.state === "due_soon" && trackingState.daysOverdue !== null
+                          ? ` · due in ${-trackingState.daysOverdue}d`
+                          : trackingState.state === "never_checked"
+                            ? " · never checked"
+                            : trackingState.lastCheckedAt
+                              ? ` · last ${trackingState.lastCheckedAt}`
+                              : ""
+                  }`
+                : "Set tracking"}
+            </Badge>
+          )}
           <p className="mt-1 text-[10px] text-muted-foreground">
             Confirmed {new Date(req.verified_at).toLocaleString()}
           </p>

@@ -39,6 +39,7 @@ import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselec
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { ClientIntakeChecklistCard } from "@/components/clients/client-intake-checklist-card";
+import { PerShiftFormsCareSection } from "@/components/clients/per-shift-forms-care-section";
 import { IntakeProgress } from "@/components/clients/intake-progress";
 import { ClientLoanMarker } from "@/components/loans/client-loan-marker";
 import { BulkImporter } from "@/components/bulk-importer";
@@ -615,6 +616,18 @@ function ClientWorkspace({
               clientId={client.id}
               clientName={`${client.first_name} ${client.last_name}`.trim()}
             />
+          </CareSectionShell>
+
+          <CareSectionShell
+            title="Per-shift tracking forms"
+            description="Company-defined data collected on this client's shifts."
+            linkTo="/dashboard/forms"
+            linkLabel="Open Forms"
+            icon={ClipboardList}
+            storageKey={`${client.id}:per-shift-tracking`}
+            summary="Tracked data"
+          >
+            <PerShiftFormsCareSection clientId={client.id} orgId={orgId} />
           </CareSectionShell>
 
           {emarEnabled && (

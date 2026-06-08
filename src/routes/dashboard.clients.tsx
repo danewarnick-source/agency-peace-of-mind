@@ -431,6 +431,13 @@ export function ClientsPage() {
                       )}
                     </div>
                   </TableCell>
+                  <TableCell className="w-[220px] align-middle" onClick={(e) => e.stopPropagation()}>
+                    <IntakeProgress
+                      organizationId={org?.organization_id}
+                      clientId={c.id}
+                      intakeStatus={c.intake_status}
+                    />
+                  </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <Button variant="ghost" size="sm" onClick={() => setActiveClient(c)}
                       className="gap-1.5">

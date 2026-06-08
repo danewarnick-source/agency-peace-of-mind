@@ -174,7 +174,8 @@ function EditForm() {
             <p className="text-xs text-muted-foreground">{data?.form?.status ?? "draft"} · {describeFrequency(frequency, schedule)}</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <DirtyBadge isDirty={isDirty} />
           <Button variant="outline" onClick={() => setShowNectar(true)}><Sparkles className="mr-1.5 h-4 w-4 text-amber-500" /> Build with Nectar</Button>
           <Button variant="outline" onClick={() => setShowSettings(true)}><SettingsIcon className="mr-1.5 h-4 w-4" /> Settings</Button>
           <Button variant="outline" onClick={() => setShowAssign(true)}><Users className="mr-1.5 h-4 w-4" /> Assign</Button>

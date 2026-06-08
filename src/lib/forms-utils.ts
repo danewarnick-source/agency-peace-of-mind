@@ -219,14 +219,14 @@ export const ROUTING_BEHAVIORS: Array<{
     value: "staff_mandate",
     label: "Staff mandate before client work",
     short: "Every staff must complete before being scheduled with a client.",
-    implication: "Warns admins if a staffer is assigned to client work without completing this form. Choosing Proceed anyway records an override and notifies admins.",
+    implication: "Warns admins (and, if enforcement is set to Block, can require completion) before a staffer is assigned to client work.",
     wired: true,
   },
   {
     value: "per_shift_per_client_tracked",
     label: "Per-shift, per-client tracked data",
     short: "Recurring data tied to a client, viewed as a series.",
-    implication: "Collects data on shifts that match the chosen client and billing-code filters; submissions are filed as normal. Enforcement prompts at clock-out / next clock-in and the client Care-tab series view are set up in later steps — for now the form just files.",
+    implication: "Collects data on matching shifts (client × billing code); results show in the client's Care tab. Enforcement (optional / reminded / required before clock-out / required before next clock-in) applies per your setting.",
     wired: true,
   },
 ];

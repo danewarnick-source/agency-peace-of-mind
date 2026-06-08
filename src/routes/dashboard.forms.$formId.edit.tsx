@@ -328,7 +328,63 @@ function EditForm() {
       <PublishModal open={showPublish} onOpenChange={setShowPublish}
         formId={formId} formMeta={{ name, description, frequency, schedule, fields }}
         onPublished={() => { qc.invalidateQueries({ queryKey: ["form-edit", formId] }); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }} />
+
+      {/* spacer so sticky footer doesn't cover content */}
+      <div className="h-20" aria-hidden />
+
+      {/* Sticky Save bar */}
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-[0_-2px_10px_rgba(0,0,0,0.06)]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2">
+          <DirtyBadge isDirty={isDirty} verbose />
+          <div className="flex gap-2">
+            <Button onClick={persist} disabled={busy || !isDirty}>
+              <Save className="mr-1.5 h-4 w-4" /> {busy ? "Saving…" : isDirty ? "Save changes" : "Saved"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={(o) => { if (!o) { setConfirmOpen(false); blocker.reset?.(); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>You have unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Save your changes before leaving, or discard them. You can also stay on this page.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => { setConfirmOpen(false); blocker.reset?.(); }}>Stay</Button>
+            <Button variant="outline" onClick={() => { setConfirmOpen(false); blocker.proceed?.(); }}>
+              Leave without saving
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={async () => {
+                const ok = await persist();
+                if (ok) { setConfirmOpen(false); blocker.proceed?.(); }
+              }}
+            >
+              <Save className="mr-1.5 h-4 w-4" /> {busy ? "Saving…" : "Save and leave"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+function DirtyBadge({ isDirty, verbose }: { isDirty: boolean; verbose?: boolean }) {
+  if (isDirty) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 border border-amber-200">
+        <CircleDot className="h-3 w-3" /> {verbose ? "Unsaved changes" : "Unsaved"}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">
+      <Check className="h-3 w-3" /> {verbose ? "All changes saved" : "Saved"}
+    </span>
   );
 }
 

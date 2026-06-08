@@ -197,15 +197,29 @@ function AssignmentsPage() {
   // never warn. The detection is best-effort: on any error we proceed.
   const fetchUnmet = useServerFn(getUnmetStaffMandates);
   const recordOverride = useServerFn(recordStaffMandateOverride);
+
+  // Role of the current user in this org. Block-overrides are admin/owner
+  // only (super_admin/admin). Managers can still proceed past WARN mandates
+  // (their existing capability), but a hard BLOCK has no override for them.
+  const myRole = org?.role as string | undefined;
+  const canOverrideBlock = myRole === "admin" || myRole === "super_admin";
+
+  type UnmetItem = { name: string; form_id: string; enforcement: "warn" | "block" };
   const [pendingWarning, setPendingWarning] = useState<
-    | { names: string[]; formIds: string[]; newClientIds: string[] }
+    | { items: UnmetItem[]; newClientIds: string[] }
     | null
   >(null);
+  const [pendingBlock, setPendingBlock] = useState<
+    | { items: UnmetItem[]; newClientIds: string[] }
+    | null
+  >(null);
+  const [overrideReason, setOverrideReason] = useState("");
 
   // Best-effort flag/notify after a proceed-anyway save. Failures here MUST
   // NOT roll back or block the assignment write — log only.
   async function recordOverrideBestEffort(p: {
     formIds: string[]; names: string[]; newClientIds: string[];
+    overrideKind: "warn_proceed" | "block_override"; overrideReason?: string;
   }) {
     if (!staffId || !p.formIds.length || !p.newClientIds.length) return;
     try {
@@ -215,10 +229,12 @@ function AssignmentsPage() {
           clientIds: p.newClientIds,
           unmetFormIds: p.formIds,
           unmetFormNames: p.names,
+          overrideKind: p.overrideKind,
+          overrideReason: p.overrideReason,
         },
       });
     } catch (err) {
-      console.warn("[assignments] recordStaffMandateOverride failed (assignment was already saved)", err);
+      console.warn("[assignments] recordStaffMandateOverride failed", err);
     }
   }
 
@@ -234,13 +250,15 @@ function AssignmentsPage() {
     }
     try {
       const res = await fetchUnmet({ data: { staffId } });
-      const unmet = res?.unmet ?? [];
+      const unmet = (res?.unmet ?? []) as UnmetItem[];
       if (unmet.length > 0) {
-        setPendingWarning({
-          names: unmet.map((u) => u.name),
-          formIds: unmet.map((u) => u.form_id),
-          newClientIds,
-        });
+        const hasBlock = unmet.some((u) => u.enforcement === "block");
+        if (hasBlock) {
+          setOverrideReason("");
+          setPendingBlock({ items: unmet, newClientIds });
+        } else {
+          setPendingWarning({ items: unmet, newClientIds });
+        }
         return;
       }
     } catch (err) {

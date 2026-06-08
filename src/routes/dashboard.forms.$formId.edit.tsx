@@ -282,7 +282,10 @@ function EditForm() {
             fields={fields}
             settings={settings}
             setSettings={setSettings}
+            allClients={allClients}
+            clientsCount={clients.length}
           />
+
 
           <div className="flex flex-wrap gap-1.5 rounded-md border border-dashed border-border bg-muted/30 p-2">
             {TYPE_GROUPS.map((g) => (

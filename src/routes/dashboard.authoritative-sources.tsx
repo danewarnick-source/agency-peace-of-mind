@@ -3335,8 +3335,34 @@ function AwaitingFinalConfirmationPanel({ orgId }: { orgId: string }) {
   });
 
   const confirm = useMutation({
-    mutationFn: (vars: { requirementId: string; note?: string }) =>
-      confirmFn({ data: { requirementId: vars.requirementId, note: vars.note ?? null } }),
+    mutationFn: (vars: {
+      requirementId: string;
+      note?: string;
+      frequency?: string | null;
+      tellNectarNote?: string | null;
+      lastCheckedAt?: string | null;
+    }) =>
+      confirmFn({
+        data: {
+          requirementId: vars.requirementId,
+          note: vars.note ?? null,
+          frequency: (vars.frequency ?? undefined) as
+            | "one_time"
+            | "per_employee"
+            | "per_shift"
+            | "per_code"
+            | "per_day"
+            | "per_week"
+            | "per_month"
+            | "per_quarter"
+            | "per_year"
+            | "per_billing_rate_unit"
+            | "ongoing"
+            | undefined,
+          tellNectarNote: vars.tellNectarNote ?? undefined,
+          lastCheckedAt: vars.lastCheckedAt ?? undefined,
+        },
+      }),
     onSuccess: () => {
       toast.success("Requirement confirmed — now active in your compliance set.");
       qc.invalidateQueries({ queryKey: ["provider-pending-confirmations", orgId] });

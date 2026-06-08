@@ -96,16 +96,81 @@ export const saveForm = createServerFn({ method: "POST" })
       settings: data.settings,
       created_by: userId,
     };
+    let savedForm: { id: string; name: string; settings: Record<string, unknown> | null; category: string } | null = null;
     if (data.id) {
       const { data: updated, error } = await supabase
         .from("forms").update(payload).eq("id", data.id).select().maybeSingle();
       if (error) throw new Error(error.message);
-      return { form: updated };
+      savedForm = updated as typeof savedForm;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("forms").insert(payload).select().maybeSingle();
+      if (error) throw new Error(error.message);
+      savedForm = inserted as typeof savedForm;
     }
-    const { data: inserted, error } = await supabase
-      .from("forms").insert(payload).select().maybeSingle();
-    if (error) throw new Error(error.message);
-    return { form: inserted };
+
+    // Sync company-required intake checklist item.
+    // Companies may declare an intake form as required for client intake; that
+    // creates a `company_required` nectar_requirements row (scope='hr_client_intake')
+    // that surfaces on the client intake checklist next to SOW/practice items,
+    // but is clearly labeled as the company's own requirement (not authoritative).
+    // Toggling it off deactivates ONLY the company_required row keyed to this form.
+    if (savedForm?.id && savedForm.category === "intake") {
+      const s = (savedForm.settings ?? {}) as Record<string, unknown>;
+      const required = s.required_for_intake === true;
+      const purpose = typeof s.purpose === "string" ? s.purpose : "";
+      const subcategory = typeof s.subcategory === "string" ? s.subcategory : null;
+      const reqKey = `company_required:form:${savedForm.id}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+
+      const { data: existing } = await sb
+        .from("nectar_requirements")
+        .select("id")
+        .eq("organization_id", m.organization_id)
+        .eq("requirement_key", reqKey)
+        .maybeSingle();
+
+      if (required) {
+        const metadata = {
+          scope: "hr_client_intake",
+          checklist_layer: "company_required",
+          source_form_id: savedForm.id,
+          subcategory,
+          purpose,
+          evidence_type: "form_submission",
+        };
+        if (existing?.id) {
+          await sb.from("nectar_requirements").update({
+            title: savedForm.name,
+            description: purpose || null,
+            metadata,
+            approval_state: "provider_confirmed",
+            review_status: "confirmed",
+          }).eq("id", existing.id);
+        } else {
+          await sb.from("nectar_requirements").insert({
+            organization_id: m.organization_id,
+            origin: "manual",
+            requirement_key: reqKey,
+            title: savedForm.name,
+            description: purpose || null,
+            category: "intake",
+            metadata,
+            approval_state: "provider_confirmed",
+            review_status: "confirmed",
+            verified: true,
+          });
+        }
+      } else if (existing?.id) {
+        // Hard-delete the company_required row (it was added solely by the
+        // company toggling required=ON; turning it off removes it). Cascades
+        // any client_intake_completion rows tied to it.
+        await sb.from("nectar_requirements").delete().eq("id", existing.id);
+      }
+    }
+
+    return { form: savedForm };
   });
 
 // ─── ADMIN: archive a form ─────────────────────────────────────────────────

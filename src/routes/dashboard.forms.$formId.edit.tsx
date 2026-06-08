@@ -154,6 +154,22 @@ function EditForm() {
                   {FORM_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
                 <p className="text-[11px] text-muted-foreground">Always lives in Records → Forms. Choosing a category adds it under that section too.</p>
+                {category === "intake" && (
+                  <div className="grid gap-1.5 mt-2">
+                    <Label className="text-xs">Intake subcategory (controls order in runner)</Label>
+                    <select
+                      value={settings.subcategory ?? ""}
+                      onChange={(e) => setSettings((s) => ({ ...s, subcategory: e.target.value || undefined }))}
+                      className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="">— None —</option>
+                      <option value="application">Application / Intake Assessment</option>
+                      <option value="independence">Independence Levels Assessment</option>
+                      <option value="consent">Consents</option>
+                      <option value="pnp_attestation">Policies & Procedures Attestation</option>
+                    </select>
+                  </div>
+                )}
               </div>
               <FrequencyControl frequency={frequency} schedule={schedule} setFrequency={setFrequency} setSchedule={setSchedule} />
             </div>

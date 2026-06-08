@@ -56,13 +56,7 @@ export const updateRequirementTracking = createServerFn({ method: "POST" })
     });
     if (!isAdmin) throw new Error("Admin or Manager role required");
 
-    type Json =
-      | string
-      | number
-      | boolean
-      | null
-      | { [k: string]: Json | undefined }
-      | Json[];
+    // Json type imported from supabase types.
     const md = (req.metadata as Record<string, Json> | null) ?? {};
     const prev = ((md["tracking"] as Record<string, Json> | undefined) ?? {}) as Record<
       string,

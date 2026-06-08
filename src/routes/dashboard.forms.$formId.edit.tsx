@@ -140,6 +140,19 @@ function EditForm() {
 
   async function persist(): Promise<boolean> {
     if (!name.trim()) { toast.error("Form needs a name."); return false; }
+    // Per-shift tracked-data validation: "required_*" enforcement on a
+    // specific-codes target needs at least one code chosen, else the form
+    // would match nothing (or everything) ambiguously.
+    if (
+      settings.routing_behavior === "per_shift_per_client_tracked" &&
+      (settings.tracking_enforcement === "required_before_clockout" ||
+        settings.tracking_enforcement === "required_before_next_clockin") &&
+      (settings.tracking_code_mode ?? "all") === "specific" &&
+      (settings.tracking_billing_codes ?? []).length === 0
+    ) {
+      toast.error("Pick at least one billing code, or switch code targeting to All codes.");
+      return false;
+    }
     setBusy(true);
     try {
       await save({ data: {

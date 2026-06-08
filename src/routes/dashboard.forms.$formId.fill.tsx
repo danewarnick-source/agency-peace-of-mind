@@ -26,6 +26,7 @@ function FillForm() {
   const qc = useQueryClient();
   const fetchForm = useServerFn(getStaffForm);
   const submit = useServerFn(submitForm);
+  const submitIntake = useServerFn(submitIntakeForm);
 
   const { data, isLoading } = useQuery({ queryKey: ["staff-form", formId], queryFn: () => fetchForm({ data: { formId } }) });
   const fields = useMemo<FormField[]>(() => (Array.isArray(data?.form?.fields) ? data!.form!.fields as FormField[] : []), [data]);

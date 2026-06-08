@@ -110,6 +110,7 @@ import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboar
 import { Route as DashboardCoursesCoreRouteImport } from './routes/dashboard.courses.core'
 import { Route as DashboardCoursesCeRouteImport } from './routes/dashboard.courses.ce'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
+import { Route as DashboardClientTrainingClientIdRouteImport } from './routes/dashboard.client-training.$clientId'
 import { Route as DashboardClientIntakeClientIdRouteImport } from './routes/dashboard.client-intake.$clientId'
 import { Route as DashboardBillingNectarRouteImport } from './routes/dashboard.billing.nectar'
 import { Route as DashboardBillingImportsRouteImport } from './routes/dashboard.billing.imports'
@@ -656,6 +657,12 @@ const DashboardCoursesCourseIdRoute =
     path: '/courses/$courseId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardClientTrainingClientIdRoute =
+  DashboardClientTrainingClientIdRouteImport.update({
+    id: '/client-training/$clientId',
+    path: '/client-training/$clientId',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardClientIntakeClientIdRoute =
   DashboardClientIntakeClientIdRouteImport.update({
     id: '/client-intake/$clientId',
@@ -824,6 +831,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
+  '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/ce': typeof DashboardCoursesCeRoute
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
@@ -939,6 +947,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
+  '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/ce': typeof DashboardCoursesCeRoute
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
@@ -1060,6 +1069,7 @@ export interface FileRoutesById {
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
+  '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/ce': typeof DashboardCoursesCeRoute
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
@@ -1182,6 +1192,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/imports'
     | '/dashboard/billing/nectar'
     | '/dashboard/client-intake/$clientId'
+    | '/dashboard/client-training/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/ce'
     | '/dashboard/courses/core'
@@ -1297,6 +1308,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/imports'
     | '/dashboard/billing/nectar'
     | '/dashboard/client-intake/$clientId'
+    | '/dashboard/client-training/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/ce'
     | '/dashboard/courses/core'
@@ -1417,6 +1429,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/imports'
     | '/dashboard/billing/nectar'
     | '/dashboard/client-intake/$clientId'
+    | '/dashboard/client-training/$clientId'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/ce'
     | '/dashboard/courses/core'
@@ -2198,6 +2211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/client-training/$clientId': {
+      id: '/dashboard/client-training/$clientId'
+      path: '/client-training/$clientId'
+      fullPath: '/dashboard/client-training/$clientId'
+      preLoaderRoute: typeof DashboardClientTrainingClientIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/client-intake/$clientId': {
       id: '/dashboard/client-intake/$clientId'
       path: '/client-intake/$clientId'
@@ -2546,6 +2566,7 @@ interface DashboardRouteChildren {
   DashboardAdminEmarAuditRoute: typeof DashboardAdminEmarAuditRoute
   DashboardBehaviorSupportClientIdRoute: typeof DashboardBehaviorSupportClientIdRoute
   DashboardClientIntakeClientIdRoute: typeof DashboardClientIntakeClientIdRoute
+  DashboardClientTrainingClientIdRoute: typeof DashboardClientTrainingClientIdRoute
   DashboardCoursesCourseIdRoute: typeof DashboardCoursesCourseIdRouteWithChildren
   DashboardCoursesCeRoute: typeof DashboardCoursesCeRoute
   DashboardCoursesCoreRoute: typeof DashboardCoursesCoreRoute
@@ -2617,6 +2638,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAdminEmarAuditRoute: DashboardAdminEmarAuditRoute,
   DashboardBehaviorSupportClientIdRoute: DashboardBehaviorSupportClientIdRoute,
   DashboardClientIntakeClientIdRoute: DashboardClientIntakeClientIdRoute,
+  DashboardClientTrainingClientIdRoute: DashboardClientTrainingClientIdRoute,
   DashboardCoursesCourseIdRoute: DashboardCoursesCourseIdRouteWithChildren,
   DashboardCoursesCeRoute: DashboardCoursesCeRoute,
   DashboardCoursesCoreRoute: DashboardCoursesCoreRoute,

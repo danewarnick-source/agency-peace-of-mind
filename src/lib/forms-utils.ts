@@ -159,6 +159,15 @@ export type FormSettings = {
    *  while unmet; admins/owners may override with a typed reason which is
    *  stored on the notification record. */
   mandate_enforcement?: "warn" | "block";
+  /** Per-shift, per-client tracked-data routing (Stage 2 of 5).
+   *  Captures targeting + enforcement choices for forms with
+   *  routing_behavior='per_shift_per_client_tracked'. The choices are
+   *  stored so config persists; the actual front-of-punch prompts and
+   *  the Care-tab section are wired in later stages. Client targeting
+   *  REUSES the existing all_clients / assigned_clients audience. */
+  tracking_code_mode?: "all" | "specific";
+  tracking_billing_codes?: string[];
+  tracking_enforcement?: "optional" | "reminded" | "required_before_clockout" | "required_before_next_clockin";
 };
 
 export type RoutingBehavior =
@@ -217,8 +226,8 @@ export const ROUTING_BEHAVIORS: Array<{
     value: "per_shift_per_client_tracked",
     label: "Per-shift, per-client tracked data",
     short: "Recurring data tied to a client, viewed as a series.",
-    implication: "Tracked data routing is not set up yet — this form currently just files normally as a general submission.",
-    wired: false,
+    implication: "Collects data on shifts that match the chosen client and billing-code filters; submissions are filed as normal. Enforcement prompts at clock-out / next clock-in and the client Care-tab series view are set up in later steps — for now the form just files.",
+    wired: true,
   },
 ];
 

@@ -33,6 +33,7 @@ const SUBCAT_ORDER: Record<string, number> = {
   independence: 1,
   consent: 2,
   pnp_attestation: 3,
+  other: 4,
 };
 
 type IntakeForm = {

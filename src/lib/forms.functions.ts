@@ -188,6 +188,126 @@ export const archiveForm = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ─── ADMIN: count ties before hard-delete ──────────────────────────────────
+// Server-side recount so the destructive confirmation can show real numbers
+// and require type-to-confirm when ties exist.
+export const getFormDeleteImpact = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ formId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+
+    const { data: form, error: fe } = await supabase
+      .from("forms").select("id, name, category, organization_id")
+      .eq("id", data.formId).maybeSingle();
+    if (fe || !form) throw new Error("Form not found.");
+    if (form.organization_id !== m.organization_id) throw new Error("Forbidden.");
+
+    const { count: submissionCount } = await supabase
+      .from("form_submissions").select("id", { count: "exact", head: true })
+      .eq("form_id", form.id);
+
+    const { data: subClientRows } = await supabase
+      .from("form_submissions").select("client_id").eq("form_id", form.id)
+      .not("client_id", "is", null).limit(1);
+    const hasClientSubmissions = (subClientRows ?? []).length > 0;
+
+    const reqKey = `company_required:form:${form.id}`;
+    const { data: linkedReq } = await supabase
+      .from("nectar_requirements").select("id, title")
+      .eq("organization_id", m.organization_id)
+      .eq("requirement_key", reqKey).maybeSingle();
+
+    let intakeCompletionCount = 0;
+    if (linkedReq?.id) {
+      const { count: c } = await supabase
+        .from("client_intake_completion")
+        .select("id", { count: "exact", head: true })
+        .eq("requirement_id", linkedReq.id);
+      intakeCompletionCount = c ?? 0;
+    }
+
+    const { count: notifCount } = await supabase
+      .from("form_notifications").select("id", { count: "exact", head: true })
+      .eq("form_id", form.id);
+
+    return {
+      formId: form.id,
+      formName: form.name,
+      submissionCount: submissionCount ?? 0,
+      hasClientSubmissions,
+      hasLinkedChecklistItem: !!linkedReq?.id,
+      linkedChecklistItemTitle: linkedReq?.title ?? null,
+      intakeCompletionCount,
+      notificationCount: notifCount ?? 0,
+    };
+  });
+
+// ─── ADMIN: HARD DELETE a form (irreversible) ──────────────────────────────
+// Tiered: if any ties exist, caller MUST pass confirmName matching the form
+// name exactly. FK cascades clean form_submissions and form_notifications;
+// the linked company-required nectar_requirements row is deleted explicitly
+// (which cascades client_intake_completion). Role + org are enforced
+// server-side; tie counts are recounted server-side.
+export const deleteForm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    formId: z.string().uuid(),
+    confirmName: z.string().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+
+    const { data: form, error: fe } = await supabase
+      .from("forms").select("id, name, organization_id")
+      .eq("id", data.formId).maybeSingle();
+    if (fe || !form) throw new Error("Form not found.");
+    if (form.organization_id !== m.organization_id) throw new Error("Forbidden.");
+
+    const { count: submissionCount } = await supabase
+      .from("form_submissions").select("id", { count: "exact", head: true })
+      .eq("form_id", form.id);
+
+    const reqKey = `company_required:form:${form.id}`;
+    const { data: linkedReq } = await supabase
+      .from("nectar_requirements").select("id")
+      .eq("organization_id", m.organization_id)
+      .eq("requirement_key", reqKey).maybeSingle();
+
+    const hasTies = (submissionCount ?? 0) > 0 || !!linkedReq?.id;
+    if (hasTies) {
+      if (!data.confirmName || data.confirmName.trim() !== form.name.trim()) {
+        throw new Error("This form has attached records. Type the form name exactly to confirm permanent deletion.");
+      }
+    }
+
+    // Remove linked company-required checklist item first (cascades
+    // client_intake_completion via FK). Abort the whole delete on failure.
+    if (linkedReq?.id) {
+      const { error: delReqErr } = await supabase
+        .from("nectar_requirements").delete().eq("id", linkedReq.id);
+      if (delReqErr) throw new Error(`Failed to remove linked checklist item: ${delReqErr.message}`);
+    }
+
+    // Delete the form. FK cascade removes form_submissions and form_notifications.
+    const { error: delErr } = await supabase
+      .from("forms").delete().eq("id", form.id).eq("organization_id", m.organization_id);
+    if (delErr) throw new Error(delErr.message);
+
+    return {
+      ok: true,
+      deleted: {
+        formId: form.id,
+        submissionCount: submissionCount ?? 0,
+        removedChecklistItem: !!linkedReq?.id,
+      },
+    };
+  });
+
 // ─── ADMIN: publish a form, persist notification text, deliver to assignees
 export const publishForm = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

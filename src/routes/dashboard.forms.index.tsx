@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, FileText, Sparkles, Archive, Send, Edit3 } from "lucide-react";
+import { Plus, FileText, Sparkles, Archive, Send, Edit3, Trash2 } from "lucide-react";
 import { useEffectiveView } from "@/hooks/use-effective-view";
 import {
   listForms, listMyForms, archiveForm, saveForm,
@@ -16,6 +16,7 @@ import {
   periodKeyFor, dueDateFor, formatDue, describeFrequency, isOverdue,
   type Frequency, type Schedule, type FormSettings,
 } from "@/lib/forms-utils";
+import { DeleteFormDialog } from "@/components/forms/delete-form-dialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/forms/")({
@@ -41,6 +42,7 @@ function AdminList() {
   const save = useServerFn(saveForm);
   const archive = useServerFn(archiveForm);
   const { data, isLoading } = useQuery({ queryKey: ["forms-admin"], queryFn: () => fetchList() });
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   async function createBlank() {
     const out = await save({ data: {
@@ -89,6 +91,10 @@ function AdminList() {
                       <Archive className="mr-1 h-3.5 w-3.5" /> Archive
                     </Button>
                   )}
+                  <Button size="sm" variant="ghost" className="min-h-[36px] text-rose-700 hover:text-rose-800 hover:bg-rose-50"
+                    onClick={() => setDeleteTarget({ id: f.id, name: f.name })}>
+                    <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -100,6 +106,15 @@ function AdminList() {
             </div>
           )}
         </div>
+      )}
+      {deleteTarget && (
+        <DeleteFormDialog
+          open={!!deleteTarget}
+          onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
+          formId={deleteTarget.id}
+          formName={deleteTarget.name}
+          onDeleted={() => { setDeleteTarget(null); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }}
+        />
       )}
     </div>
   );

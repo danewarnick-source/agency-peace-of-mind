@@ -12,9 +12,10 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
 } from "@/components/ui/alert-dialog";
 import {
-  Save, Sparkles, Plus, ChevronLeft, Settings as SettingsIcon, Users, FolderTree, CalendarClock, Send, Check, CircleDot,
+  Save, Sparkles, Plus, ChevronLeft, Settings as SettingsIcon, Users, FolderTree, CalendarClock, Send, Check, CircleDot, Trash2,
 } from "lucide-react";
 import { getForm, saveForm } from "@/lib/forms.functions";
+import { DeleteFormDialog } from "@/components/forms/delete-form-dialog";
 import {
   type FormField, type FieldType, type Frequency, type Schedule, type FormSettings,
   defaultFieldFor, FORM_CATEGORIES, describeFrequency, sanitizeConditions, isFieldVisible,
@@ -62,6 +63,7 @@ function EditForm() {
   const [busy, setBusy] = useState(false);
   const [baseline, setBaseline] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     const f = data?.form;
@@ -179,6 +181,10 @@ function EditForm() {
           <Button variant="outline" onClick={() => setShowNectar(true)}><Sparkles className="mr-1.5 h-4 w-4 text-amber-500" /> Build with Nectar</Button>
           <Button variant="outline" onClick={() => setShowSettings(true)}><SettingsIcon className="mr-1.5 h-4 w-4" /> Settings</Button>
           <Button variant="outline" onClick={() => setShowAssign(true)}><Users className="mr-1.5 h-4 w-4" /> Assign</Button>
+          <Button variant="outline" className="text-rose-700 hover:text-rose-800 hover:bg-rose-50 border-rose-200"
+            onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+          </Button>
           <Button onClick={persist} disabled={busy}><Save className="mr-1.5 h-4 w-4" /> Save</Button>
           <Button variant="default" className="bg-[#137182] hover:bg-[#0e5a68]"
             onClick={async () => { const ok = await persist(); if (ok) setShowPublish(true); }}>
@@ -328,6 +334,19 @@ function EditForm() {
       <PublishModal open={showPublish} onOpenChange={setShowPublish}
         formId={formId} formMeta={{ name, description, frequency, schedule, fields }}
         onPublished={() => { qc.invalidateQueries({ queryKey: ["form-edit", formId] }); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }} />
+
+      <DeleteFormDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        formId={formId}
+        formName={name || data?.form?.name || ""}
+        onDeleted={() => {
+          setBaseline(currentSnapshot); // clear dirty so the unsaved guard doesn't block navigation
+          qc.invalidateQueries({ queryKey: ["forms-admin"] });
+          navigate({ to: "/dashboard/forms" });
+        }}
+      />
+
 
       {/* spacer so sticky footer doesn't cover content */}
       <div className="h-20" aria-hidden />

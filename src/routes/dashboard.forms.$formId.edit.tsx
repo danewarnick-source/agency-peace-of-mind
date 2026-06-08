@@ -14,11 +14,11 @@ import {
 import {
   Save, Sparkles, Plus, ChevronLeft, Settings as SettingsIcon, Users, FolderTree, CalendarClock, Send, Check, CircleDot, Trash2,
 } from "lucide-react";
-import { getForm, saveForm } from "@/lib/forms.functions";
+import { getForm, saveForm, nectarProposeRouting } from "@/lib/forms.functions";
 import { DeleteFormDialog } from "@/components/forms/delete-form-dialog";
 import {
-  type FormField, type FieldType, type Frequency, type Schedule, type FormSettings,
-  defaultFieldFor, FORM_CATEGORIES, describeFrequency, sanitizeConditions, isFieldVisible,
+  type FormField, type FieldType, type Frequency, type Schedule, type FormSettings, type RoutingBehavior,
+  defaultFieldFor, FORM_CATEGORIES, ROUTING_BEHAVIORS, describeFrequency, sanitizeConditions, isFieldVisible,
 } from "@/lib/forms-utils";
 import { FieldEditor, TYPE_GROUPS, TYPE_LABEL } from "@/components/forms/field-editor";
 import { SortableFields } from "@/components/forms/sortable-fields";

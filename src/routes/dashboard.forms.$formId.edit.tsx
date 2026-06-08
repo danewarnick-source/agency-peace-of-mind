@@ -1,7 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
-  Save, Sparkles, Plus, ChevronLeft, Settings as SettingsIcon, Users, FolderTree, CalendarClock, Send,
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
+} from "@/components/ui/alert-dialog";
+import {
+  Save, Sparkles, Plus, ChevronLeft, Settings as SettingsIcon, Users, FolderTree, CalendarClock, Send, Check, CircleDot,
 } from "lucide-react";
 import { getForm, saveForm } from "@/lib/forms.functions";
 import {
@@ -57,13 +60,16 @@ function EditForm() {
   const [showAssign, setShowAssign] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [baseline, setBaseline] = useState<string>("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     const f = data?.form;
     if (!f) return;
+    const flds = Array.isArray(f.fields) ? f.fields : [];
     setName(f.name ?? ""); setDescription(f.description ?? "");
     setCategory(f.category ?? "general");
-    setFields(Array.isArray(f.fields) ? f.fields : []);
+    setFields(flds);
     setFrequency(f.frequency ?? "as_needed");
     setSchedule(f.schedule ?? {});
     setGroups(f.assigned_groups ?? []);
@@ -71,7 +77,38 @@ function EditForm() {
     setAllClients(f.all_clients ?? true);
     setClients(f.assigned_clients ?? []);
     setSettings(f.settings ?? {});
+    setBaseline(JSON.stringify({
+      name: f.name ?? "", description: f.description ?? "", category: f.category ?? "general",
+      fields: flds, frequency: f.frequency ?? "as_needed", schedule: f.schedule ?? {},
+      groups: f.assigned_groups ?? [], users: f.assigned_users ?? [],
+      allClients: f.all_clients ?? true, clients: f.assigned_clients ?? [],
+      settings: f.settings ?? {},
+    }));
   }, [data]);
+
+  const currentSnapshot = useMemo(() => JSON.stringify({
+    name, description, category, fields, frequency, schedule,
+    groups, users, allClients, clients, settings,
+  }), [name, description, category, fields, frequency, schedule, groups, users, allClients, clients, settings]);
+  const isDirty = baseline !== "" && currentSnapshot !== baseline;
+
+  // Browser-level unsaved warning
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  // In-app navigation blocker
+  const blocker = useBlocker({
+    shouldBlockFn: () => isDirty,
+    withResolver: true,
+    enableBeforeUnload: false,
+  });
+  useEffect(() => {
+    if (blocker.status === "blocked") setConfirmOpen(true);
+  }, [blocker.status]);
 
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   function addField(type: FieldType) {
@@ -114,6 +151,10 @@ function EditForm() {
       qc.invalidateQueries({ queryKey: ["forms-admin"] });
       toast.success("Saved");
       setIsNectarDraft(false);
+      setBaseline(JSON.stringify({
+        name, description, category, fields, frequency, schedule,
+        groups, users, allClients, clients, settings,
+      }));
       return true;
     } catch (e) {
       toast.error((e as Error).message);
@@ -133,7 +174,8 @@ function EditForm() {
             <p className="text-xs text-muted-foreground">{data?.form?.status ?? "draft"} · {describeFrequency(frequency, schedule)}</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <DirtyBadge isDirty={isDirty} />
           <Button variant="outline" onClick={() => setShowNectar(true)}><Sparkles className="mr-1.5 h-4 w-4 text-amber-500" /> Build with Nectar</Button>
           <Button variant="outline" onClick={() => setShowSettings(true)}><SettingsIcon className="mr-1.5 h-4 w-4" /> Settings</Button>
           <Button variant="outline" onClick={() => setShowAssign(true)}><Users className="mr-1.5 h-4 w-4" /> Assign</Button>
@@ -286,7 +328,63 @@ function EditForm() {
       <PublishModal open={showPublish} onOpenChange={setShowPublish}
         formId={formId} formMeta={{ name, description, frequency, schedule, fields }}
         onPublished={() => { qc.invalidateQueries({ queryKey: ["form-edit", formId] }); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }} />
+
+      {/* spacer so sticky footer doesn't cover content */}
+      <div className="h-20" aria-hidden />
+
+      {/* Sticky Save bar */}
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-[0_-2px_10px_rgba(0,0,0,0.06)]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2">
+          <DirtyBadge isDirty={isDirty} verbose />
+          <div className="flex gap-2">
+            <Button onClick={persist} disabled={busy || !isDirty}>
+              <Save className="mr-1.5 h-4 w-4" /> {busy ? "Saving…" : isDirty ? "Save changes" : "Saved"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={(o) => { if (!o) { setConfirmOpen(false); blocker.reset?.(); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>You have unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Save your changes before leaving, or discard them. You can also stay on this page.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => { setConfirmOpen(false); blocker.reset?.(); }}>Stay</Button>
+            <Button variant="outline" onClick={() => { setConfirmOpen(false); blocker.proceed?.(); }}>
+              Leave without saving
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={async () => {
+                const ok = await persist();
+                if (ok) { setConfirmOpen(false); blocker.proceed?.(); }
+              }}
+            >
+              <Save className="mr-1.5 h-4 w-4" /> {busy ? "Saving…" : "Save and leave"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+function DirtyBadge({ isDirty, verbose }: { isDirty: boolean; verbose?: boolean }) {
+  if (isDirty) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 border border-amber-200">
+        <CircleDot className="h-3 w-3" /> {verbose ? "Unsaved changes" : "Unsaved"}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">
+      <Check className="h-3 w-3" /> {verbose ? "All changes saved" : "Saved"}
+    </span>
   );
 }
 

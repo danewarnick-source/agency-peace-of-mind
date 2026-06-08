@@ -209,6 +209,7 @@ export function SortableFields({
 
 function SortableItem({
   id, field, fieldIndex, allFields, onChange, onMoveUp, onMoveDown, onRemove,
+  justAdded, onJustAddedConsumed,
 }: {
   id: string;
   field: FormField;
@@ -218,9 +219,32 @@ function SortableItem({
   onMoveUp: () => void;
   onMoveDown: () => void;
   onRemove: () => void;
+  justAdded?: boolean;
+  onJustAddedConsumed?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition };
+  const nodeRef = useRef<HTMLElement | null>(null);
+  const [flash, setFlash] = useState(false);
+
+  useEffect(() => {
+    if (!justAdded) return;
+    const el = nodeRef.current;
+    if (el) {
+      const reduce = typeof window !== "undefined"
+        && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+      // First text input in the editor is the label / heading input.
+      const input = el.querySelector<HTMLInputElement>('input[type="text"], input:not([type])');
+      // Defer focus slightly so smooth-scroll doesn't fight focus jump.
+      window.setTimeout(() => input?.focus(), 50);
+    }
+    setFlash(true);
+    const t = window.setTimeout(() => setFlash(false), 1200);
+    onJustAddedConsumed?.();
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justAdded]);
 
   const eligible = allFields.slice(0, fieldIndex)
     .map((cf, ci) => ({ field: cf, index: ci }))
@@ -248,8 +272,9 @@ function SortableItem({
       onMoveDown={onMoveDown}
       onRemove={onRemove}
       dragHandle={handle}
-      containerRef={setNodeRef}
+      containerRef={(el) => { nodeRef.current = el; setNodeRef(el as HTMLElement | null); }}
       containerStyle={style}
+      containerClassName={flash ? "ring-2 ring-primary ring-offset-2 ring-offset-background animate-fade-in transition-shadow" : undefined}
       isDragging={isDragging}
     />
   );

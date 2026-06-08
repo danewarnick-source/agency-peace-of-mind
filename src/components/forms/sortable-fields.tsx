@@ -9,10 +9,12 @@ import {
   sortableKeyboardCoordinates, arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Plus } from "lucide-react";
 
 import { FieldEditor } from "./field-editor";
-import { sanitizeConditions, type FormField } from "@/lib/forms-utils";
+import { sanitizeConditions, type FormField, type FieldType } from "@/lib/forms-utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 /** A section "owns" the contiguous fields that follow it until the next section.
  *  Fields before the first section live in an implicit "head" group. */

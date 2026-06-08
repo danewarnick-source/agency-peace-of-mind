@@ -509,12 +509,14 @@ function FrequencyControl({
 }
 
 function RoutingBehaviorCard({
-  name, fields, settings, setSettings,
+  name, fields, settings, setSettings, allClients, clientsCount,
 }: {
   name: string;
   fields: FormField[];
   settings: FormSettings;
   setSettings: (updater: (s: FormSettings) => FormSettings) => void;
+  allClients: boolean;
+  clientsCount: number;
 }) {
   const propose = useServerFn(nectarProposeRouting);
   const [busy, setBusy] = useState(false);

@@ -617,6 +617,18 @@ function ClientWorkspace({
             />
           </CareSectionShell>
 
+          <CareSectionShell
+            title="Per-shift tracking forms"
+            description="Company-defined data collected on this client's shifts."
+            linkTo="/dashboard/forms"
+            linkLabel="Open Forms"
+            icon={ClipboardList}
+            storageKey={`${client.id}:per-shift-tracking`}
+            summary="Tracked data"
+          >
+            <PerShiftFormsCareSection clientId={client.id} orgId={orgId} />
+          </CareSectionShell>
+
           {emarEnabled && (
             <CareSectionShell
               title="Medications & MAR"

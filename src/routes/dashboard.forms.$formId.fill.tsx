@@ -6,7 +6,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, Send, Loader2 } from "lucide-react";
-import { getStaffForm, submitForm } from "@/lib/forms.functions";
+import { getStaffForm, submitForm, submitIntakeForm } from "@/lib/forms.functions";
 import { FieldRenderer } from "@/components/forms/field-renderer";
 import { type FormField, isFieldVisible } from "@/lib/forms-utils";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ function FillForm() {
   const qc = useQueryClient();
   const fetchForm = useServerFn(getStaffForm);
   const submit = useServerFn(submitForm);
+  const submitIntake = useServerFn(submitIntakeForm);
 
   const { data, isLoading } = useQuery({ queryKey: ["staff-form", formId], queryFn: () => fetchForm({ data: { formId } }) });
   const fields = useMemo<FormField[]>(() => (Array.isArray(data?.form?.fields) ? data!.form!.fields as FormField[] : []), [data]);
@@ -59,7 +60,11 @@ function FillForm() {
         if (f.type === "section") continue;
         if (isFieldVisible(f, answers, fields) && answers[f.id] !== undefined) visible[f.id] = answers[f.id];
       }
-      await submit({ data: { formId, clientId, answers: visible } });
+      // Intake-category forms go through the role-gated admin path; all
+      // other categories keep the unchanged staff submitForm (caseload-gated).
+      const isIntake = (data?.form?.category ?? null) === "intake";
+      const submitFn = isIntake ? submitIntake : submit;
+      await submitFn({ data: { formId, clientId, answers: visible } });
       qc.invalidateQueries({ queryKey: ["client-forms", clientId] });
       toast.success("Submitted to client's record");
       backToClient();

@@ -151,6 +151,10 @@ function EditForm() {
       qc.invalidateQueries({ queryKey: ["forms-admin"] });
       toast.success("Saved");
       setIsNectarDraft(false);
+      setBaseline(JSON.stringify({
+        name: name.trim(), description, category, fields, frequency, schedule,
+        groups, users, allClients, clients, settings,
+      }));
       return true;
     } catch (e) {
       toast.error((e as Error).message);

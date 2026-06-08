@@ -176,7 +176,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
 }
 
 // ── Sections rendering & edit controls ─────────────────────────────────────
-function SectionsView({
+export function SectionsView({
   content, editing, onChange,
 }: { content: CSTContent; editing: boolean; onChange: (next: CSTContent) => void }) {
   const sections = content.sections ?? [];

@@ -303,13 +303,36 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
       .object({
         requirementId: z.string().uuid(),
         note: z.string().max(2000).optional().nullable(),
+        // Optional provider-declared tracking at confirm-time.
+        frequency: z
+          .enum([
+            "one_time",
+            "per_employee",
+            "per_shift",
+            "per_code",
+            "per_day",
+            "per_week",
+            "per_month",
+            "per_quarter",
+            "per_year",
+            "per_billing_rate_unit",
+            "ongoing",
+          ])
+          .nullable()
+          .optional(),
+        tellNectarNote: z.string().max(2000).nullable().optional(),
+        lastCheckedAt: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable()
+          .optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { data: req, error: rErr } = await context.supabase
       .from("nectar_requirements")
-      .select("id, organization_id, approval_state")
+      .select("id, organization_id, approval_state, metadata")
       .eq("id", data.requirementId)
       .single();
     if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
@@ -326,15 +349,50 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
       );
     }
 
+    type J =
+      | string
+      | number
+      | boolean
+      | null
+      | { [k: string]: J | undefined }
+      | J[];
+    const md = (req.metadata as Record<string, J> | null) ?? {};
+    const prevTracking = ((md["tracking"] as Record<string, J> | undefined) ?? {}) as Record<
+      string,
+      J
+    >;
+    const hasTracking =
+      data.frequency !== undefined ||
+      data.tellNectarNote !== undefined ||
+      data.lastCheckedAt !== undefined;
+    const nextTracking: Record<string, J> = { ...prevTracking };
+    if (data.frequency !== undefined) nextTracking.frequency = data.frequency ?? null;
+    if (data.tellNectarNote !== undefined)
+      nextTracking.tell_nectar_note =
+        data.tellNectarNote && data.tellNectarNote.trim().length
+          ? data.tellNectarNote.trim()
+          : null;
+    if (data.lastCheckedAt !== undefined)
+      nextTracking.last_checked_at = data.lastCheckedAt ?? null;
+    if (hasTracking) {
+      nextTracking.updated_at = new Date().toISOString();
+      nextTracking.updated_by = context.userId;
+    }
+
+    const updatePayload: Record<string, J> = {
+      approval_state: "provider_confirmed" as ApprovalState,
+      review_status: "confirmed",
+      verified: true,
+      verified_by: context.userId,
+      verified_at: new Date().toISOString(),
+    };
+    if (hasTracking) {
+      updatePayload.metadata = { ...md, tracking: nextTracking };
+    }
+
     await context.supabase
       .from("nectar_requirements")
-      .update({
-        approval_state: "provider_confirmed" as ApprovalState,
-        review_status: "confirmed",
-        verified: true,
-        verified_by: context.userId,
-        verified_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", data.requirementId);
 
     const actorLabel = await resolveActorLabel(context.userId);

@@ -102,12 +102,12 @@ export const saveForm = createServerFn({ method: "POST" })
       const { data: updated, error } = await supabase
         .from("forms").update(payload).eq("id", data.id).select().maybeSingle();
       if (error) throw new Error(error.message);
-      savedForm = updated as typeof savedForm;
+      savedForm = (updated ?? null) as SavedForm | null;
     } else {
       const { data: inserted, error } = await supabase
         .from("forms").insert(payload).select().maybeSingle();
       if (error) throw new Error(error.message);
-      savedForm = inserted as typeof savedForm;
+      savedForm = (inserted ?? null) as SavedForm | null;
     }
 
     // Sync company-required intake checklist item.

@@ -62,7 +62,7 @@ export const updateRequirementTracking = createServerFn({ method: "POST" })
       | null
       | { [k: string]: Json | undefined }
       | Json[];
-    const md = ((req.metadata ?? {}) as Record<string, Json>) ?? {};
+    const md = (req.metadata as Record<string, Json> | null) ?? {};
     const prev = ((md["tracking"] as Record<string, Json> | undefined) ?? {}) as Record<
       string,
       Json

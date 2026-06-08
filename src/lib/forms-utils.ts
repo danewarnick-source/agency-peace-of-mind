@@ -138,7 +138,80 @@ export type FormSettings = {
   /** Short company-authored description shown to staff in the runner and to
    *  auditors on the intake checklist. NEVER presented as authoritative. */
   purpose?: string;
+  /** Admin-authored free-text describing how this form is used. Feeds the
+   *  NECTAR routing-behavior proposal. Stored only — not yet read by any
+   *  runtime destination. */
+  usage_purpose?: string;
+  /** Declared usage behavior for this form. Stored only at this stage; no
+   *  destination/auto-check/gate is wired off this value yet (later stages
+   *  will wire each behavior). Existing intake routing (category='intake'
+   *  + required_for_intake) is unchanged regardless of this value. */
+  routing_behavior?: RoutingBehavior;
+  /** Last NECTAR proposal (for transparency). Stored so admins can see what
+   *  was suggested even after they pick a different behavior. */
+  routing_proposal?: { behavior: RoutingBehavior; rationale: string; at: string };
 };
+
+export type RoutingBehavior =
+  | "general_submission"
+  | "notify_only"
+  | "client_intake_required"
+  | "one_time_attestation"
+  | "staff_mandate"
+  | "per_shift_per_client_tracked";
+
+export const ROUTING_BEHAVIORS: Array<{
+  value: RoutingBehavior;
+  label: string;
+  short: string;
+  /** Plain-language note shown once a behavior is chosen. */
+  implication: string;
+  /** Is the destination/auto-check/gate already wired today? */
+  wired: boolean;
+}> = [
+  {
+    value: "general_submission",
+    label: "General submission",
+    short: "Just filed in Records → Forms.",
+    implication: "Submissions are filed in Records → Forms. No notifications, no checklist, no gating.",
+    wired: true,
+  },
+  {
+    value: "notify_only",
+    label: "Notify on submit",
+    short: "Filed, and chosen people are notified when it's submitted.",
+    implication: "Filed in Records → Forms and people you choose under Settings → Sharing are notified on each submission.",
+    wired: true,
+  },
+  {
+    value: "client_intake_required",
+    label: "Client intake — required",
+    short: "Satisfies a client intake checklist item.",
+    implication: "Intake forms appear on the client intake checklist as a Company-required item. Configure under the Intake category (subcategory + required-for-intake). Auto-check on submit ships in a later step.",
+    wired: true,
+  },
+  {
+    value: "one_time_attestation",
+    label: "One-time staff attestation",
+    short: "Each staff completes once; filed as a signed record.",
+    implication: "Will record a one-time attestation per staff and surface it as evidence on the staff checklist. Routing for this behavior is set up in a later step; for now the form still files normally.",
+    wired: false,
+  },
+  {
+    value: "staff_mandate",
+    label: "Staff mandate before client work",
+    short: "Every staff must complete before being scheduled with a client.",
+    implication: "Will block client-work actions until each staff has filed this form. Routing for this behavior is set up in a later step; for now the form still files normally and nothing is gated.",
+    wired: false,
+  },
+  {
+    value: "per_shift_per_client_tracked",
+    label: "Per-shift, per-client tracked data",
+    short: "Recurring data tied to a client, viewed as a series.",
+    implication: "This kind of recurring per-client data is handled by the client tracking (behavior support) module. Routing into client tracking is set up in a later step; for now the form still files normally.",
+    wired: false,
+  },
+];
 
 export const FORM_CATEGORIES = [
   { value: "general", label: "General (Records → Forms only)" },

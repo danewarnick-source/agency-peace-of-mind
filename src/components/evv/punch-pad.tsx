@@ -616,6 +616,33 @@ export function PunchPad({
         }
       }
 
+      // Stage 5 — required_before_next_clockin front-guard. READ-ONLY,
+      // fail-open: on error/timeout the guard returns [] and we proceed.
+      // This is BEFORE writeShift; writeShift's payload is untouched.
+      const pendingIn = await fetchPendingTrackingForms({ tier: "clockin" });
+      if (pendingIn.length) {
+        setPendingFormsDialog({
+          mode: "clockin",
+          pending: pendingIn,
+          proceed: async () => {
+            setPendingFormsDialog(null);
+            setBusy(true);
+            try { await writeShift({ pos }); } finally { setBusy(false); }
+          },
+          recheck: async () => {
+            const again = await fetchPendingTrackingForms({ tier: "clockin" });
+            if (!again.length) {
+              setPendingFormsDialog(null);
+              setBusy(true);
+              try { await writeShift({ pos }); } finally { setBusy(false); }
+            } else {
+              setPendingFormsDialog((p) => p ? { ...p, pending: again } : p);
+            }
+          },
+        });
+        return;
+      }
+
       await writeShift({ pos });
     } catch (e) {
       toast.error((e as Error).message || "Could not start shift.");

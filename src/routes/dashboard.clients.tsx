@@ -76,6 +76,7 @@ type Client = {
   // feature toggles stored as JSON
   feature_config: Record<string, boolean> | null;
   profile_photo_url: string | null;
+  intake_status: string | null;
 };
 
 type ClientFormValues = {

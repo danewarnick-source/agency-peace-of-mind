@@ -241,26 +241,47 @@ export const upsertChecklistCompletion = createServerFn({ method: "POST" })
     if (userId === data.staff_id) {
       throw new Error("Forbidden: staff may not edit own completion");
     }
+    // Admin edits the GENERAL (per-staff, no-client) completion row. Two partial
+    // unique indexes now sit on this table: scc_unique_general WHERE client_id
+    // IS NULL, and scc_unique_per_client WHERE client_id IS NOT NULL. PostgREST
+    // .upsert(onConflict) can't name a partial-index predicate, so do a
+    // select-by-(org, staff, requirement, client_id IS NULL) then insert-or-
+    // update-by-id. Behavior is identical to the previous upsert.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const sb = supabase as any;
+    const { data: existing, error: selErr } = await sb
       .from("staff_checklist_completion")
-      .upsert(
-        {
-          organization_id: data.organization_id,
-          staff_id: data.staff_id,
-          requirement_id: data.requirement_id,
-          status: data.status,
-          completed_date: data.completed_date ?? null,
-          expires_at: data.expires_at ?? null,
-          evidence_document_id: data.evidence_document_id ?? null,
-          notes: data.notes ?? null,
-          completed_by: userId,
-        },
-        { onConflict: "staff_id,requirement_id" },
-      );
+      .select("id")
+      .eq("organization_id", data.organization_id)
+      .eq("staff_id", data.staff_id)
+      .eq("requirement_id", data.requirement_id)
+      .is("client_id", null)
+      .maybeSingle();
+    if (selErr) throw new Error(selErr.message);
+
+    const payload = {
+      organization_id: data.organization_id,
+      staff_id: data.staff_id,
+      requirement_id: data.requirement_id,
+      client_id: null as string | null,
+      status: data.status,
+      completed_date: data.completed_date ?? null,
+      expires_at: data.expires_at ?? null,
+      evidence_document_id: data.evidence_document_id ?? null,
+      notes: data.notes ?? null,
+      completed_by: userId,
+    };
+
+    const { error } = existing?.id
+      ? await sb
+          .from("staff_checklist_completion")
+          .update(payload)
+          .eq("id", existing.id)
+      : await sb.from("staff_checklist_completion").insert(payload);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 const piiUpdateSchema = z.object({
   organization_id: z.string().uuid(),

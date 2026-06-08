@@ -717,6 +717,13 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
     });
     if (!scoped.length) return { unmet: [] };
 
+    // Map form id → enforcement ('warn' default | 'block') from form settings.
+    const enforcementByForm = new Map<string, "warn" | "block">();
+    for (const f of scoped) {
+      const enf = (f.settings ?? {})["mandate_enforcement"];
+      enforcementByForm.set(f.id, enf === "block" ? "block" : "warn");
+    }
+
     // 3. Look up the matching hr_staff_checklist requirements (one per form).
     const reqKeys = scoped.map((f) => `company_required:form:${f.id}`);
     const { data: reqs } = await supabase
@@ -759,9 +766,14 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
         const req = reqByForm.get(f.id);
         if (!req) return null; // no mapped requirement → not gated by this check
         if (satisfied.has(req.id)) return null;
-        return { form_id: f.id, name: f.name, mandate_scope: req.mandate_scope };
+        return {
+          form_id: f.id,
+          name: f.name,
+          mandate_scope: req.mandate_scope,
+          enforcement: enforcementByForm.get(f.id) ?? "warn",
+        };
       })
-      .filter((x): x is { form_id: string; name: string; mandate_scope: string } => x !== null);
+      .filter((x): x is { form_id: string; name: string; mandate_scope: string; enforcement: "warn" | "block" } => x !== null);
 
     return { unmet };
   });

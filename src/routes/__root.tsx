@@ -112,6 +112,22 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Global safety net: failed dynamic imports / preloads that escape the
+  // router error boundary still surface here. Same one-time, loop-guarded
+  // reload — non-chunk errors are ignored and bubble up normally.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onError = (e: ErrorEvent) => { tryAutoReloadOnce(e.error ?? e.message); };
+    const onRejection = (e: PromiseRejectionEvent) => { tryAutoReloadOnce(e.reason); };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

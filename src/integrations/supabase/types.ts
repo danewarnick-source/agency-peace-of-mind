@@ -6794,6 +6794,7 @@ export type Database = {
       staff_checklist_completion: {
         Row: {
           auto_checked_at: string | null
+          client_id: string | null
           completed_by: string | null
           completed_date: string | null
           created_at: string
@@ -6810,6 +6811,7 @@ export type Database = {
         }
         Insert: {
           auto_checked_at?: string | null
+          client_id?: string | null
           completed_by?: string | null
           completed_date?: string | null
           created_at?: string
@@ -6826,6 +6828,7 @@ export type Database = {
         }
         Update: {
           auto_checked_at?: string | null
+          client_id?: string | null
           completed_by?: string | null
           completed_date?: string | null
           created_at?: string
@@ -6846,6 +6849,13 @@ export type Database = {
             columns: ["evidence_document_id"]
             isOneToOne: false
             referencedRelation: "hr_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_checklist_completion_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {

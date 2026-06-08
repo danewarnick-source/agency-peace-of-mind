@@ -249,7 +249,7 @@ function AssignmentsPage() {
       return;
     }
     try {
-      const res = await fetchUnmet({ data: { staffId } });
+      const res = await fetchUnmet({ data: { staffId, clientIds: newClientIds } });
       const unmet = (res?.unmet ?? []) as UnmetItem[];
       if (unmet.length > 0) {
         const hasBlock = unmet.some((u) => u.enforcement === "block");

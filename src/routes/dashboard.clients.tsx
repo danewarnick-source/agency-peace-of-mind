@@ -2383,7 +2383,8 @@ function SettingsTab({
 
 function AddClientDialog({
   pending, onSubmit,
-}: { pending: boolean; onSubmit: (v: ClientFormValues) => void }) {
+}: { pending: boolean; onSubmit: (v: ClientFormValues & { intake_mode: "intake" | "profile-only" }) => void }) {
+  const [mode, setMode] = useState<"intake" | "profile-only" | null>(null);
   const [first, setFirst]         = useState("");
   const [last, setLast]           = useState("");
   const [phone, setPhone]         = useState("");
@@ -2395,11 +2396,55 @@ function AddClientDialog({
 
   const canSubmit = first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim();
 
+  if (!mode) {
+    return (
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add New Client</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <p className="text-sm text-muted-foreground">
+            How do you want to proceed?
+          </p>
+          <button
+            type="button"
+            onClick={() => setMode("intake")}
+            className="w-full rounded-lg border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
+          >
+            <div className="font-semibold">Create profile &amp; begin intake now</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Create the client profile and immediately start the new-client intake procedure.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("profile-only")}
+            className="w-full rounded-lg border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
+          >
+            <div className="font-semibold">Create profile only (not ready for intake)</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Save the client profile now and complete the intake procedure later.
+            </p>
+          </button>
+        </div>
+      </DialogContent>
+    );
+  }
+
   return (
     <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
       <DialogHeader>
-        <DialogTitle>Add New Client</DialogTitle>
+        <DialogTitle>
+          {mode === "intake" ? "New Client — Begin Intake" : "New Client — Profile Only"}
+        </DialogTitle>
       </DialogHeader>
+      <button
+        type="button"
+        onClick={() => setMode(null)}
+        className="-mt-2 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-3 w-3" /> Back
+      </button>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1.5">
@@ -2465,13 +2510,15 @@ function AddClientDialog({
             special_directions: "", date_of_birth: "",
             emergency_contact_name: "", emergency_contact_phone: "",
             profile_photo_url: "",
+            intake_mode: mode,
           })}
           disabled={!canSubmit || pending}
         >
           {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save Client
+          {mode === "intake" ? "Create & Start Intake" : "Create Profile"}
         </Button>
       </DialogFooter>
     </DialogContent>
   );
 }
+

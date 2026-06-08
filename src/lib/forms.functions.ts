@@ -495,6 +495,35 @@ export const submitForm = createServerFn({ method: "POST" })
     const periodKey = periodKeyFor(form.frequency as Frequency);
     const settings = (form.settings ?? {}) as FormSettings;
     const submittedBy = settings.anonymous ? null : userId;
+
+    // Stage 4: best-effort active-shift linkage for per-shift tracking forms.
+    // READ-ONLY against evv_timesheets. Never blocks the submission.
+    let resolvedShiftId: string | null = null;
+    if (settings.routing_behavior === "per_shift_per_client_tracked") {
+      try {
+        const { data: activeShift } = await supabase
+          .from("evv_timesheets")
+          .select("id, client_id, service_type_code")
+          .eq("staff_id", userId)
+          .is("clock_out_timestamp", null)
+          .order("clock_in_timestamp", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (activeShift && activeShift.client_id === data.clientId) {
+          const codeMode = settings.tracking_code_mode ?? "all";
+          const codeOk =
+            codeMode === "all" ||
+            (Array.isArray(settings.tracking_billing_codes) &&
+              !!activeShift.service_type_code &&
+              settings.tracking_billing_codes.includes(activeShift.service_type_code));
+          if (codeOk) resolvedShiftId = activeShift.id as string;
+        }
+      } catch {
+        // Best-effort only — fall back to NULL shift_id.
+        resolvedShiftId = null;
+      }
+    }
+
     const { data: ins, error } = await supabase.from("form_submissions").insert({
       organization_id: form.organization_id,
       form_id: form.id,
@@ -502,8 +531,10 @@ export const submitForm = createServerFn({ method: "POST" })
       client_id: data.clientId,
       answers: data.answers,
       period_key: periodKey,
+      shift_id: resolvedShiftId,
     }).select().maybeSingle();
     if (error) throw new Error(error.message);
+
     void m;
 
     // Fan-out at submission time per form settings (share_users, share_manager, share_emails).

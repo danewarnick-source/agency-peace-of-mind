@@ -717,6 +717,13 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
     });
     if (!scoped.length) return { unmet: [] };
 
+    // Map form id → enforcement ('warn' default | 'block') from form settings.
+    const enforcementByForm = new Map<string, "warn" | "block">();
+    for (const f of scoped) {
+      const enf = (f.settings ?? {})["mandate_enforcement"];
+      enforcementByForm.set(f.id, enf === "block" ? "block" : "warn");
+    }
+
     // 3. Look up the matching hr_staff_checklist requirements (one per form).
     const reqKeys = scoped.map((f) => `company_required:form:${f.id}`);
     const { data: reqs } = await supabase
@@ -759,9 +766,14 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
         const req = reqByForm.get(f.id);
         if (!req) return null; // no mapped requirement → not gated by this check
         if (satisfied.has(req.id)) return null;
-        return { form_id: f.id, name: f.name, mandate_scope: req.mandate_scope };
+        return {
+          form_id: f.id,
+          name: f.name,
+          mandate_scope: req.mandate_scope,
+          enforcement: enforcementByForm.get(f.id) ?? "warn",
+        };
       })
-      .filter((x): x is { form_id: string; name: string; mandate_scope: string } => x !== null);
+      .filter((x): x is { form_id: string; name: string; mandate_scope: string; enforcement: "warn" | "block" } => x !== null);
 
     return { unmet };
   });
@@ -786,44 +798,73 @@ export const recordStaffMandateOverride = createServerFn({ method: "POST" })
     clientIds: z.array(z.string().uuid()).min(1).max(50),
     unmetFormIds: z.array(z.string().uuid()).min(1).max(50),
     unmetFormNames: z.array(z.string().min(1).max(300)).min(1).max(50),
+    // When set, this override was forced past a 'block' enforcement; the
+    // typed reason is REQUIRED and is stored verbatim in the notification
+    // body so admins can read it. Server enforces admin/super_admin role
+    // for block overrides (managers cannot override a hard block).
+    overrideKind: z.enum(["warn_proceed", "block_override"]).optional(),
+    overrideReason: z.string().trim().min(1).max(1000).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
 
-    // Dedupe window: 5 minutes per (staff, type, org).
-    const since = new Date(Date.now() - 5 * 60_000).toISOString();
-    const { data: recent } = await supabase
-      .from("notifications")
-      .select("id")
-      .eq("organization_id", m.organization_id)
-      .eq("type", "staff_mandate_missing")
-      .eq("related_id", data.staffId)
-      .gte("created_at", since)
-      .limit(1);
-    if (recent && recent.length > 0) {
-      return { wrote: false, reason: "deduped", notificationId: null as string | null };
+    const isBlockOverride = data.overrideKind === "block_override";
+    if (isBlockOverride) {
+      // Stricter gate: only admin/super_admin (not manager) may override
+      // a hard-block mandate, and a typed reason is required.
+      if (!["admin", "super_admin"].includes(m.role)) {
+        throw new Error("Only admins or owners may override a blocking staff mandate.");
+      }
+      if (!data.overrideReason || !data.overrideReason.trim()) {
+        throw new Error("A typed reason is required to override a blocking mandate.");
+      }
     }
 
-    // Resolve staffer + client display names (best-effort).
-    const [{ data: staffProfile }, { data: clientRows }] = await Promise.all([
+    // Dedupe window: 5 minutes per (staff, type, org). Block overrides are
+    // NOT deduped — every forced override must be recorded with its reason.
+    if (!isBlockOverride) {
+      const since = new Date(Date.now() - 5 * 60_000).toISOString();
+      const { data: recent } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("organization_id", m.organization_id)
+        .eq("type", "staff_mandate_missing")
+        .eq("related_id", data.staffId)
+        .gte("created_at", since)
+        .limit(1);
+      if (recent && recent.length > 0) {
+        return { wrote: false, reason: "deduped", notificationId: null as string | null };
+      }
+    }
+
+    // Resolve staffer + client + overriding-user display names (best-effort).
+    const [{ data: staffProfile }, { data: clientRows }, { data: actorProfile }] = await Promise.all([
       supabase.from("profiles").select("id, first_name, last_name, email").eq("id", data.staffId).maybeSingle(),
       supabase.from("clients").select("id, first_name, last_name").in("id", data.clientIds),
+      supabase.from("profiles").select("id, first_name, last_name, email").eq("id", userId).maybeSingle(),
     ]);
     const staffName = staffProfile
       ? [staffProfile.first_name, staffProfile.last_name].filter(Boolean).join(" ").trim() || staffProfile.email || "Staffer"
       : "Staffer";
+    const actorName = actorProfile
+      ? [actorProfile.first_name, actorProfile.last_name].filter(Boolean).join(" ").trim() || actorProfile.email || "Admin"
+      : "Admin";
     const clientNames = ((clientRows ?? []) as Array<{ first_name: string | null; last_name: string | null }>)
       .map((c) => [c.first_name, c.last_name].filter(Boolean).join(" ").trim())
       .filter(Boolean);
     const clientLabel = clientNames.length ? clientNames.join(", ") : `${data.clientIds.length} client(s)`;
     const formLabel = data.unmetFormNames.join("; ");
 
-    const title = `Mandate override: ${staffName}`;
-    const body =
-      `${staffName} was assigned to ${clientLabel} with incomplete required form(s): ${formLabel}. ` +
-      `Admin proceeded past the warning.`;
+    const title = isBlockOverride
+      ? `BLOCK override: ${staffName}`
+      : `Mandate override: ${staffName}`;
+    const body = isBlockOverride
+      ? `${actorName} overrode a BLOCKING required form to assign ${staffName} to ${clientLabel}. ` +
+        `Incomplete form(s): ${formLabel}. Reason: "${data.overrideReason}"`
+      : `${staffName} was assigned to ${clientLabel} with incomplete required form(s): ${formLabel}. ` +
+        `${actorName} proceeded past the warning.`;
 
     const { data: ins, error: insErr } = await supabase
       .from("notifications")
@@ -836,7 +877,7 @@ export const recordStaffMandateOverride = createServerFn({ method: "POST" })
         body,
         link_to: `/dashboard/staff/${data.staffId}`,
         related_id: data.staffId,
-        related_type: "staff_mandate_override",
+        related_type: isBlockOverride ? "staff_mandate_block_override" : "staff_mandate_override",
       })
       .select("id")
       .single();

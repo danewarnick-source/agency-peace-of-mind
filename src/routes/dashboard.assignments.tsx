@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Users, Loader2, ChevronDown, ChevronRight, Save, AlertTriangle } from "lucide-react";
+import { Users, Loader2, ChevronDown, ChevronRight, Save, AlertTriangle, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { getUnmetStaffMandates, recordStaffMandateOverride } from "@/lib/forms.functions";
@@ -196,15 +197,29 @@ function AssignmentsPage() {
   // never warn. The detection is best-effort: on any error we proceed.
   const fetchUnmet = useServerFn(getUnmetStaffMandates);
   const recordOverride = useServerFn(recordStaffMandateOverride);
+
+  // Role of the current user in this org. Block-overrides are admin/owner
+  // only (super_admin/admin). Managers can still proceed past WARN mandates
+  // (their existing capability), but a hard BLOCK has no override for them.
+  const myRole = org?.role as string | undefined;
+  const canOverrideBlock = myRole === "admin" || myRole === "super_admin";
+
+  type UnmetItem = { name: string; form_id: string; enforcement: "warn" | "block" };
   const [pendingWarning, setPendingWarning] = useState<
-    | { names: string[]; formIds: string[]; newClientIds: string[] }
+    | { items: UnmetItem[]; newClientIds: string[] }
     | null
   >(null);
+  const [pendingBlock, setPendingBlock] = useState<
+    | { items: UnmetItem[]; newClientIds: string[] }
+    | null
+  >(null);
+  const [overrideReason, setOverrideReason] = useState("");
 
   // Best-effort flag/notify after a proceed-anyway save. Failures here MUST
   // NOT roll back or block the assignment write — log only.
   async function recordOverrideBestEffort(p: {
     formIds: string[]; names: string[]; newClientIds: string[];
+    overrideKind: "warn_proceed" | "block_override"; overrideReason?: string;
   }) {
     if (!staffId || !p.formIds.length || !p.newClientIds.length) return;
     try {
@@ -214,10 +229,12 @@ function AssignmentsPage() {
           clientIds: p.newClientIds,
           unmetFormIds: p.formIds,
           unmetFormNames: p.names,
+          overrideKind: p.overrideKind,
+          overrideReason: p.overrideReason,
         },
       });
     } catch (err) {
-      console.warn("[assignments] recordStaffMandateOverride failed (assignment was already saved)", err);
+      console.warn("[assignments] recordStaffMandateOverride failed", err);
     }
   }
 
@@ -233,13 +250,15 @@ function AssignmentsPage() {
     }
     try {
       const res = await fetchUnmet({ data: { staffId } });
-      const unmet = res?.unmet ?? [];
+      const unmet = (res?.unmet ?? []) as UnmetItem[];
       if (unmet.length > 0) {
-        setPendingWarning({
-          names: unmet.map((u) => u.name),
-          formIds: unmet.map((u) => u.form_id),
-          newClientIds,
-        });
+        const hasBlock = unmet.some((u) => u.enforcement === "block");
+        if (hasBlock) {
+          setOverrideReason("");
+          setPendingBlock({ items: unmet, newClientIds });
+        } else {
+          setPendingWarning({ items: unmet, newClientIds });
+        }
         return;
       }
     } catch (err) {
@@ -337,6 +356,7 @@ function AssignmentsPage() {
         </Card>
       )}
 
+      {/* WARN dialog — existing non-blocking flow (default behavior). */}
       <AlertDialog
         open={!!pendingWarning}
         onOpenChange={(o) => { if (!o) setPendingWarning(null); }}
@@ -350,11 +370,11 @@ function AssignmentsPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
                 <p>
-                  This staffer has {pendingWarning?.names.length} incomplete required form
-                  {(pendingWarning?.names.length ?? 0) === 1 ? "" : "s"}:
+                  This staffer has {pendingWarning?.items.length} incomplete required form
+                  {(pendingWarning?.items.length ?? 0) === 1 ? "" : "s"}:
                 </p>
                 <ul className="list-disc pl-5">
-                  {pendingWarning?.names.map((n) => (<li key={n}>{n}</li>))}
+                  {pendingWarning?.items.map((u) => (<li key={u.form_id}>{u.name}</li>))}
                 </ul>
                 <p className="text-muted-foreground">
                   You can proceed; this will be recorded.
@@ -369,12 +389,107 @@ function AssignmentsPage() {
                 const p = pendingWarning;
                 setPendingWarning(null);
                 saveMut.mutate(undefined, {
-                  onSuccess: () => { if (p) void recordOverrideBestEffort(p); },
+                  onSuccess: () => {
+                    if (p) void recordOverrideBestEffort({
+                      formIds: p.items.map((i) => i.form_id),
+                      names: p.items.map((i) => i.name),
+                      newClientIds: p.newClientIds,
+                      overrideKind: "warn_proceed",
+                    });
+                  },
                 });
               }}
             >
               Proceed anyway
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* BLOCK dialog — hard stop. Admin/super_admin may override with a typed reason. */}
+      <AlertDialog
+        open={!!pendingBlock}
+        onOpenChange={(o) => { if (!o) { setPendingBlock(null); setOverrideReason(""); } }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-red-600" />
+              Assignment blocked — required form(s) incomplete
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  This staffer cannot be assigned until the following blocking
+                  required form{(pendingBlock?.items.length ?? 0) === 1 ? " is" : "s are"} complete:
+                </p>
+                <ul className="list-disc pl-5">
+                  {pendingBlock?.items.map((u) => (
+                    <li key={u.form_id}>
+                      {u.name}
+                      {u.enforcement === "block" ? (
+                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-800">Block</span>
+                      ) : (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-800">Warn</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {canOverrideBlock ? (
+                  <div className="pt-2">
+                    <Label className="text-xs font-semibold">
+                      Override reason (required)
+                    </Label>
+                    <Textarea
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      placeholder="Explain why this assignment must proceed before the mandate is met. This is stored and sent to admins."
+                      className="mt-1 min-h-[72px]"
+                      maxLength={1000}
+                    />
+                  </div>
+                ) : (
+                  <p className="rounded bg-amber-50 px-3 py-2 text-amber-900">
+                    You don't have permission to override a blocking mandate.
+                    Please ask an admin or owner, or have the staffer complete
+                    the form(s) above before assignment.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => { setPendingBlock(null); setOverrideReason(""); }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            {canOverrideBlock && (
+              <AlertDialogAction
+                disabled={!overrideReason.trim()}
+                onClick={() => {
+                  const p = pendingBlock;
+                  const reason = overrideReason.trim();
+                  if (!p || !reason) return;
+                  setPendingBlock(null);
+                  setOverrideReason("");
+                  saveMut.mutate(undefined, {
+                    onSuccess: () => {
+                      void recordOverrideBestEffort({
+                        formIds: p.items.map((i) => i.form_id),
+                        names: p.items.map((i) => i.name),
+                        newClientIds: p.newClientIds,
+                        overrideKind: "block_override",
+                        overrideReason: reason,
+                      });
+                    },
+                  });
+                }}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                Override and assign anyway
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

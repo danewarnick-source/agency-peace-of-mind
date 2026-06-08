@@ -2953,6 +2953,7 @@ export type Database = {
           id: string
           organization_id: string
           period_key: string | null
+          shift_id: string | null
           status: string
           submitted_at: string
           submitted_by: string | null
@@ -2966,6 +2967,7 @@ export type Database = {
           id?: string
           organization_id: string
           period_key?: string | null
+          shift_id?: string | null
           status?: string
           submitted_at?: string
           submitted_by?: string | null
@@ -2979,6 +2981,7 @@ export type Database = {
           id?: string
           organization_id?: string
           period_key?: string | null
+          shift_id?: string | null
           status?: string
           submitted_at?: string
           submitted_by?: string | null
@@ -3004,6 +3007,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "evv_timesheets"
             referencedColumns: ["id"]
           },
         ]

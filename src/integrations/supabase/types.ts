@@ -2899,6 +2899,70 @@ export type Database = {
         }
         Relationships: []
       }
+      extracted_fields: {
+        Row: {
+          confidence: number | null
+          id: string
+          import_job_id: string
+          org_id: string
+          provenance: string
+          source_document_id: string | null
+          source_snippet: string | null
+          status: string
+          target_field: string
+          target_table: string
+          value: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          id?: string
+          import_job_id: string
+          org_id: string
+          provenance?: string
+          source_document_id?: string | null
+          source_snippet?: string | null
+          status?: string
+          target_field: string
+          target_table: string
+          value?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          id?: string
+          import_job_id?: string
+          org_id?: string
+          provenance?: string
+          source_document_id?: string | null
+          source_snippet?: string | null
+          status?: string
+          target_field?: string
+          target_table?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extracted_fields_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extracted_fields_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extracted_fields_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "import_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_notifications: {
         Row: {
           body: string
@@ -4000,6 +4064,140 @@ export type Database = {
           {
             foreignKeyName: "hrc_reviews_organization_id_fkey"
             columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_audit: {
+        Row: {
+          action: string
+          actor: string | null
+          created_at: string
+          id: string
+          import_job_id: string
+          item: string
+          org_id: string
+          traces_to: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          created_at?: string
+          id?: string
+          import_job_id: string
+          item: string
+          org_id: string
+          traces_to?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          created_at?: string
+          id?: string
+          import_job_id?: string
+          item?: string
+          org_id?: string
+          traces_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_audit_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_audit_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_documents: {
+        Row: {
+          file_name: string
+          file_type: string | null
+          id: string
+          import_job_id: string
+          org_id: string
+          storage_path: string
+          uploaded_at: string
+        }
+        Insert: {
+          file_name: string
+          file_type?: string | null
+          id?: string
+          import_job_id: string
+          org_id: string
+          storage_path: string
+          uploaded_at?: string
+        }
+        Update: {
+          file_name?: string
+          file_type?: string | null
+          id?: string
+          import_job_id?: string
+          org_id?: string
+          storage_path?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_documents_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_jobs: {
+        Row: {
+          committed_at: string | null
+          committed_by: string | null
+          created_at: string
+          created_by: string
+          id: string
+          org_id: string
+          source_summary: string | null
+          status: string
+        }
+        Insert: {
+          committed_at?: string | null
+          committed_by?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          org_id: string
+          source_summary?: string | null
+          status?: string
+        }
+        Update: {
+          committed_at?: string | null
+          committed_by?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          org_id?: string
+          source_summary?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
@@ -6145,6 +6343,117 @@ export type Database = {
           },
         ]
       }
+      provisioning_plan: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          id: string
+          import_job_id: string
+          org_id: string
+          planned_action: string
+          reason: string | null
+          rule_id: string | null
+          state: string
+          target_module: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          id?: string
+          import_job_id: string
+          org_id: string
+          planned_action: string
+          reason?: string | null
+          rule_id?: string | null
+          state?: string
+          target_module: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          id?: string
+          import_job_id?: string
+          org_id?: string
+          planned_action?: string
+          reason?: string | null
+          rule_id?: string | null
+          state?: string
+          target_module?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provisioning_plan_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provisioning_plan_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provisioning_plan_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "provisioning_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provisioning_rules: {
+        Row: {
+          action_type: string
+          created_at: string
+          created_by: string
+          default_state: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          org_id: string
+          target_module: string
+          trigger_type: string
+          trigger_value: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          created_by?: string
+          default_state?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          org_id: string
+          target_module: string
+          trigger_type: string
+          trigger_value: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          created_by?: string
+          default_state?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          org_id?: string
+          target_module?: string
+          trigger_type?: string
+          trigger_value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provisioning_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       respite_stays: {
         Row: {
           created_at: string
@@ -7803,6 +8112,61 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      unfiled_items: {
+        Row: {
+          filed_at: string | null
+          filed_by: string | null
+          filed_to: string | null
+          id: string
+          import_job_id: string
+          org_id: string
+          source_document_id: string | null
+          text: string
+        }
+        Insert: {
+          filed_at?: string | null
+          filed_by?: string | null
+          filed_to?: string | null
+          id?: string
+          import_job_id: string
+          org_id: string
+          source_document_id?: string | null
+          text: string
+        }
+        Update: {
+          filed_at?: string | null
+          filed_by?: string | null
+          filed_to?: string | null
+          id?: string
+          import_job_id?: string
+          org_id?: string
+          source_document_id?: string | null
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unfiled_items_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unfiled_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unfiled_items_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "import_documents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_celebration_mute: {
         Row: {

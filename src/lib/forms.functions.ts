@@ -1152,9 +1152,128 @@ export const listClientTrackingForms = createServerFn({ method: "GET" })
     return { forms: eligible, submissions, submitterNames };
   });
 
+// ─── Stage 5: pending tracking forms for punch-pad guards (READ-ONLY) ─────
+// Tiers:
+//  - "clockout": list required_before_clockout tracking forms targeted to
+//    `clientId` + matching `serviceCode` that have NO submission for this
+//    exact shift_id. Caller passes the ACTIVE shift's id/client/code.
+//  - "clockin": list required_before_next_clockin tracking forms from the
+//    staffer's PRIOR closed shifts (any prior shift, code-matched per form)
+//    that have NO submission with shift_id=that_shift. Used before starting
+//    a NEW shift to surface unfinished prior-shift requirements.
+// Reads `evv_timesheets`, `forms`, `form_submissions` only. No writes.
+export const getPendingTrackingForms = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      tier: z.enum(["clockout", "clockin"]),
+      // clockout context (required for tier=clockout)
+      shiftId: z.string().uuid().optional(),
+      clientId: z.string().uuid().optional(),
+      serviceCode: z.string().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
 
+    // Pull this org's published tracking forms once.
+    const { data: forms, error } = await supabase
+      .from("forms")
+      .select("id, name, settings, all_clients, assigned_clients")
+      .eq("organization_id", m.organization_id)
+      .eq("status", "published");
+    if (error) throw new Error(error.message);
+
+    type FormRow = {
+      id: string;
+      name: string;
+      settings: FormSettings | null;
+      all_clients: boolean;
+      assigned_clients: string[] | null;
+    };
+    const tracking = (forms ?? []).filter(
+      (f: FormRow) => (f.settings ?? {}).routing_behavior === "per_shift_per_client_tracked",
+    ) as FormRow[];
+
+    function targetsClient(f: FormRow, clientId: string): boolean {
+      return f.all_clients || (f.assigned_clients ?? []).includes(clientId);
+    }
+    function codeMatches(f: FormRow, code: string | null | undefined): boolean {
+      const s = f.settings ?? {};
+      const mode = s.tracking_code_mode ?? "all";
+      if (mode === "all") return true;
+      const list = s.tracking_billing_codes ?? [];
+      return !!code && list.includes(code);
+    }
+
+    if (data.tier === "clockout") {
+      if (!data.shiftId || !data.clientId) return { pending: [] };
+      const required = tracking.filter(
+        (f) =>
+          (f.settings ?? {}).tracking_enforcement === "required_before_clockout" &&
+          targetsClient(f, data.clientId!) &&
+          codeMatches(f, data.serviceCode ?? null),
+      );
+      if (!required.length) return { pending: [] };
+      const { data: subs } = await supabase
+        .from("form_submissions")
+        .select("form_id, shift_id")
+        .eq("organization_id", m.organization_id)
+        .eq("shift_id", data.shiftId)
+        .in("form_id", required.map((f) => f.id));
+      const satisfied = new Set((subs ?? []).map((s: { form_id: string }) => s.form_id));
+      const pending = required
+        .filter((f) => !satisfied.has(f.id))
+        .map((f) => ({
+          formId: f.id,
+          formName: f.name,
+          clientId: data.clientId!,
+          shiftId: data.shiftId!,
+        }));
+      return { pending };
+    }
+
+    // tier === "clockin": scan recent prior closed shifts for this staffer.
+    const required = tracking.filter(
+      (f) => (f.settings ?? {}).tracking_enforcement === "required_before_next_clockin",
+    );
+    if (!required.length) return { pending: [] };
+
+    const { data: priorShifts } = await supabase
+      .from("evv_timesheets")
+      .select("id, client_id, service_type_code, clock_in_timestamp")
+      .eq("staff_id", userId)
+      .not("clock_out_timestamp", "is", null)
+      .order("clock_in_timestamp", { ascending: false })
+      .limit(20);
+    if (!priorShifts || priorShifts.length === 0) return { pending: [] };
+
+    const shiftIds = priorShifts.map((s: { id: string }) => s.id);
+    const { data: subs } = await supabase
+      .from("form_submissions")
+      .select("form_id, shift_id")
+      .eq("organization_id", m.organization_id)
+      .in("shift_id", shiftIds)
+      .in("form_id", required.map((f) => f.id));
+    const satisfiedKey = new Set(
+      (subs ?? []).map((s: { form_id: string; shift_id: string | null }) => `${s.form_id}::${s.shift_id}`),
+    );
+
+    const pending: Array<{ formId: string; formName: string; clientId: string; shiftId: string }> = [];
+    for (const shift of priorShifts as Array<{ id: string; client_id: string; service_type_code: string | null }>) {
+      for (const f of required) {
+        if (!targetsClient(f, shift.client_id)) continue;
+        if (!codeMatches(f, shift.service_type_code)) continue;
+        if (satisfiedKey.has(`${f.id}::${shift.id}`)) continue;
+        pending.push({ formId: f.id, formName: f.name, clientId: shift.client_id, shiftId: shift.id });
+      }
+    }
+    return { pending };
+  });
 
 // ─── NECTAR: draft a form from a description ──────────────────────────────
+
 export const nectarDraftForm = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({

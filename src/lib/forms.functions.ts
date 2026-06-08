@@ -831,7 +831,7 @@ export const recordStaffMandateOverride = createServerFn({ method: "POST" })
         organization_id: m.organization_id,
         recipient_role: "admin",
         type: "staff_mandate_missing",
-        urgency: "warning",
+        urgency: "urgent",
         title,
         body,
         link_to: `/dashboard/staff/${data.staffId}`,

@@ -26,6 +26,28 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+
+  // Chunk-load class only: try a one-time auto reload. If the loop guard
+  // blocks it (we already reloaded recently), fall through to a friendly
+  // manual-refresh card. All other errors render the normal UI below.
+  if (isChunkLoadError(error)) {
+    if (typeof window !== "undefined") tryAutoReloadOnce(error);
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="max-w-md text-center">
+          <h1 className="text-xl font-semibold">A new version is available</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Please refresh to load the latest version of the app.
+          </p>
+          <button
+            onClick={() => { clearChunkReloadGuard(); window.location.reload(); }}
+            className="mt-6 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >Refresh</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">

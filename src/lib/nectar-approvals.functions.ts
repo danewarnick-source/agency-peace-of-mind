@@ -388,15 +388,10 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
     };
 
     if (hasTracking) {
+      const newMeta = { ...md, tracking: nextTracking } as unknown as J;
       await context.supabase
         .from("nectar_requirements")
-        .update({
-          ...baseUpdate,
-          metadata: { ...md, tracking: nextTracking } as unknown as Record<
-            string,
-            unknown
-          >,
-        })
+        .update({ ...baseUpdate, metadata: newMeta })
         .eq("id", data.requirementId);
     } else {
       await context.supabase

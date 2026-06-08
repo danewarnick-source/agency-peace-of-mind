@@ -1348,6 +1348,46 @@ export function PunchPad({
     }
     setBusy(true);
     try {
+      // Stage 5 — fail-open clock-out guard for the variance path too.
+      if (active) {
+        const pendingOut = await fetchPendingTrackingForms({
+          tier: "clockout",
+          shiftId: active.id,
+          clientId: active.client_id,
+          serviceCode: active.service_type_code,
+        });
+        if (pendingOut.length) {
+          const pos = outVariance.pos;
+          const outside = reason;
+          const finalize = () => finalizeClockOut({ pos, outsideReason: outside });
+          setPendingFormsDialog({
+            mode: "clockout",
+            pending: pendingOut,
+            proceed: async () => {
+              setPendingFormsDialog(null);
+              setBusy(true);
+              try { await finalize(); } finally { setBusy(false); }
+            },
+            recheck: async () => {
+              const again = await fetchPendingTrackingForms({
+                tier: "clockout",
+                shiftId: active.id,
+                clientId: active.client_id,
+                serviceCode: active.service_type_code,
+              });
+              if (!again.length) {
+                setPendingFormsDialog(null);
+                setBusy(true);
+                try { await finalize(); } finally { setBusy(false); }
+              } else {
+                setPendingFormsDialog((p) => p ? { ...p, pending: again } : p);
+              }
+            },
+          });
+          return;
+        }
+      }
+
       await finalizeClockOut({ pos: outVariance.pos, outsideReason: reason });
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");

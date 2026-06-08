@@ -171,6 +171,68 @@ export const saveForm = createServerFn({ method: "POST" })
       }
     }
 
+    // ─── Sync staff-mandate checklist requirement (scope='hr_staff_checklist')
+    // When a form is set to routing_behavior='staff_mandate', mint a
+    // company-required nectar_requirements row in the staff-checklist scope
+    // so the auto-check trigger can flip staff_checklist_completion on submit.
+    // If the behavior is switched away, hard-delete that staff-scope row
+    // (which cascades any staff_checklist_completion rows tied to it).
+    if (savedForm?.id) {
+      const s = (savedForm.settings ?? {}) as Record<string, unknown>;
+      const behavior = typeof s.routing_behavior === "string" ? s.routing_behavior : "";
+      const isStaffMandate = behavior === "staff_mandate";
+      const mandateScope = s.mandate_scope === "per_staff_per_client"
+        ? "per_staff_per_client" : "per_staff";
+      const purpose = typeof s.usage_purpose === "string"
+        ? s.usage_purpose
+        : (typeof s.purpose === "string" ? s.purpose : "");
+      const reqKey = `company_required:form:${savedForm.id}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb2 = supabase as any;
+      const { data: existingStaff } = await sb2
+        .from("nectar_requirements")
+        .select("id, metadata")
+        .eq("organization_id", m.organization_id)
+        .eq("requirement_key", reqKey)
+        .contains("metadata", { scope: "hr_staff_checklist" })
+        .maybeSingle();
+
+      if (isStaffMandate) {
+        const metadata = {
+          scope: "hr_staff_checklist",
+          checklist_layer: "company_required",
+          source_form_id: savedForm.id,
+          mandate_scope: mandateScope,
+          purpose,
+          evidence_type: "form_submission",
+        };
+        if (existingStaff?.id) {
+          await sb2.from("nectar_requirements").update({
+            title: savedForm.name,
+            description: purpose || null,
+            metadata,
+            approval_state: "provider_confirmed",
+            review_status: "confirmed",
+          }).eq("id", existingStaff.id);
+        } else {
+          await sb2.from("nectar_requirements").insert({
+            organization_id: m.organization_id,
+            origin: "manual",
+            requirement_key: reqKey,
+            title: savedForm.name,
+            description: purpose || null,
+            category: "hr",
+            metadata,
+            approval_state: "provider_confirmed",
+            review_status: "confirmed",
+            verified: true,
+          });
+        }
+      } else if (existingStaff?.id) {
+        await sb2.from("nectar_requirements").delete().eq("id", existingStaff.id);
+      }
+    }
+
     return { form: savedForm ? { id: savedForm.id, name: savedForm.name } : null };
   });
 

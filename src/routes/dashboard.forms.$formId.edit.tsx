@@ -159,7 +159,7 @@ function EditForm() {
                     <Label className="text-xs">Intake subcategory (controls order in runner)</Label>
                     <select
                       value={settings.subcategory ?? ""}
-                      onChange={(e) => setSettings((s) => ({ ...s, subcategory: e.target.value || undefined }))}
+                      onChange={(e) => setSettings((s) => ({ ...s, subcategory: (e.target.value || undefined) as FormSettings["subcategory"] }))}
                       className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                     >
                       <option value="">— None —</option>

@@ -123,6 +123,7 @@ import { Route as DashboardFormsFormIdEditRouteImport } from './routes/dashboard
 import { Route as DashboardCoursesTopicTopicIdRouteImport } from './routes/dashboard.courses.topic.$topicId'
 import { Route as DashboardCoursesPersonModuleAssignmentIdRouteImport } from './routes/dashboard.courses.person-module.$assignmentId'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
+import { Route as DashboardClientsClientIdIntakeRouteImport } from './routes/dashboard.clients.$clientId.intake'
 import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
 import { Route as DashboardHiveExecStatesStateCodeOnboardingRouteImport } from './routes/dashboard.hive-exec.states.$stateCode.onboarding'
 
@@ -727,6 +728,12 @@ const DashboardCoursesCourseIdEditRoute =
     path: '/edit',
     getParentRoute: () => DashboardCoursesCourseIdRoute,
   } as any)
+const DashboardClientsClientIdIntakeRoute =
+  DashboardClientsClientIdIntakeRouteImport.update({
+    id: '/$clientId/intake',
+    path: '/$clientId/intake',
+    getParentRoute: () => DashboardClientsRoute,
+  } as any)
 const ApiPublicHooksNectarSchedulesRoute =
   ApiPublicHooksNectarSchedulesRouteImport.update({
     id: '/api/public/hooks/nectar-schedules',
@@ -767,7 +774,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
-  '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
@@ -849,6 +856,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
+  '/dashboard/clients/$clientId/intake': typeof DashboardClientsClientIdIntakeRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
@@ -883,7 +891,7 @@ export interface FileRoutesByTo {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
-  '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
@@ -962,6 +970,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
+  '/dashboard/clients/$clientId/intake': typeof DashboardClientsClientIdIntakeRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
@@ -999,7 +1008,7 @@ export interface FileRoutesById {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
-  '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
@@ -1081,6 +1090,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
+  '/dashboard/clients/$clientId/intake': typeof DashboardClientsClientIdIntakeRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
@@ -1201,6 +1211,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
+    | '/dashboard/clients/$clientId/intake'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
@@ -1314,6 +1325,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec'
     | '/dashboard/training'
     | '/api/public/hooks/nectar-schedules'
+    | '/dashboard/clients/$clientId/intake'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
@@ -1432,6 +1444,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
+    | '/dashboard/clients/$clientId/intake'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
@@ -2263,6 +2276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdEditRouteImport
       parentRoute: typeof DashboardCoursesCourseIdRoute
     }
+    '/dashboard/clients/$clientId/intake': {
+      id: '/dashboard/clients/$clientId/intake'
+      path: '/$clientId/intake'
+      fullPath: '/dashboard/clients/$clientId/intake'
+      preLoaderRoute: typeof DashboardClientsClientIdIntakeRouteImport
+      parentRoute: typeof DashboardClientsRoute
+    }
     '/api/public/hooks/nectar-schedules': {
       id: '/api/public/hooks/nectar-schedules'
       path: '/api/public/hooks/nectar-schedules'
@@ -2298,6 +2318,17 @@ const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
 
 const DashboardBillingRouteWithChildren =
   DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
+
+interface DashboardClientsRouteChildren {
+  DashboardClientsClientIdIntakeRoute: typeof DashboardClientsClientIdIntakeRoute
+}
+
+const DashboardClientsRouteChildren: DashboardClientsRouteChildren = {
+  DashboardClientsClientIdIntakeRoute: DashboardClientsClientIdIntakeRoute,
+}
+
+const DashboardClientsRouteWithChildren =
+  DashboardClientsRoute._addFileChildren(DashboardClientsRouteChildren)
 
 interface DashboardFinancialRouteChildren {
   DashboardFinancialRevenueRoute: typeof DashboardFinancialRevenueRoute
@@ -2466,7 +2497,7 @@ interface DashboardRouteChildren {
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientBillingCodesRoute: typeof DashboardClientBillingCodesRoute
   DashboardClientLoansRoute: typeof DashboardClientLoansRoute
-  DashboardClientsRoute: typeof DashboardClientsRoute
+  DashboardClientsRoute: typeof DashboardClientsRouteWithChildren
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
@@ -2536,7 +2567,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientBillingCodesRoute: DashboardClientBillingCodesRoute,
   DashboardClientLoansRoute: DashboardClientLoansRoute,
-  DashboardClientsRoute: DashboardClientsRoute,
+  DashboardClientsRoute: DashboardClientsRouteWithChildren,
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,

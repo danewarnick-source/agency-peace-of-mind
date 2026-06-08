@@ -495,8 +495,22 @@ function ClientWorkspace({
                 Medicaid ID: {client.medicaid_id}
               </p>
             )}
-          </div>
         </div>
+      </div>
+
+      {client.intake_status !== "complete" && (
+        <div className="rounded-lg border border-border bg-card/40 p-3">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Intake progress
+          </div>
+          <IntakeProgress
+            organizationId={orgId}
+            clientId={client.id}
+            intakeStatus={client.intake_status}
+            size="md"
+          />
+        </div>
+      )}
         <div className="ml-auto flex gap-2">
           {(client.job_code ?? []).map((code) => (
             <Badge key={code} variant="outline" className="font-mono text-[10px]">{code}</Badge>

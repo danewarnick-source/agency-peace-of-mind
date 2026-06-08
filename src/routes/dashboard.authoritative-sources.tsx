@@ -2108,6 +2108,14 @@ function RequirementRow({
         externalSystem={externalSystem}
         orgId={orgId}
       />
+      <RequirementTrackingEditor
+        open={trackingOpen}
+        onOpenChange={setTrackingOpen}
+        requirementId={req.id}
+        requirementTitle={req.title}
+        orgId={orgId}
+        current={trackingMd}
+      />
     </li>
   );
 }

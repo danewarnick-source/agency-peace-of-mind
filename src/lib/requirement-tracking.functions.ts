@@ -55,21 +55,32 @@ export const updateRequirementTracking = createServerFn({ method: "POST" })
     });
     if (!isAdmin) throw new Error("Admin or Manager role required");
 
-    const md = (req.metadata ?? {}) as Record<string, unknown>;
-    const prev = (md["tracking"] ?? {}) as Record<string, unknown>;
+    type Json =
+      | string
+      | number
+      | boolean
+      | null
+      | { [k: string]: Json | undefined }
+      | Json[];
+    const md = ((req.metadata ?? {}) as Record<string, Json>) ?? {};
+    const prev = ((md["tracking"] as Record<string, Json> | undefined) ?? {}) as Record<
+      string,
+      Json
+    >;
 
-    const next: Record<string, unknown> = { ...prev };
-    if (data.frequency !== undefined) next.frequency = data.frequency;
+    const next: Record<string, Json> = { ...prev };
+    if (data.frequency !== undefined) next.frequency = data.frequency ?? null;
     if (data.tellNectarNote !== undefined)
       next.tell_nectar_note =
         data.tellNectarNote && data.tellNectarNote.trim().length
           ? data.tellNectarNote.trim()
           : null;
-    if (data.lastCheckedAt !== undefined) next.last_checked_at = data.lastCheckedAt;
+    if (data.lastCheckedAt !== undefined)
+      next.last_checked_at = data.lastCheckedAt ?? null;
     next.updated_at = new Date().toISOString();
     next.updated_by = userId;
 
-    const newMeta = { ...md, tracking: next };
+    const newMeta: Record<string, Json> = { ...md, tracking: next };
 
     const { error: uErr } = await supabase
       .from("nectar_requirements")
@@ -77,5 +88,14 @@ export const updateRequirementTracking = createServerFn({ method: "POST" })
       .eq("id", data.requirementId);
     if (uErr) throw new Error(uErr.message);
 
-    return { ok: true, tracking: next };
+    return {
+      ok: true as const,
+      tracking: {
+        frequency: (next.frequency ?? null) as string | null,
+        tell_nectar_note: (next.tell_nectar_note ?? null) as string | null,
+        last_checked_at: (next.last_checked_at ?? null) as string | null,
+        updated_at: next.updated_at as string,
+        updated_by: next.updated_by as string,
+      },
+    };
   });

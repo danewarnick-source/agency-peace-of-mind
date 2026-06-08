@@ -181,6 +181,10 @@ function EditForm() {
           <Button variant="outline" onClick={() => setShowNectar(true)}><Sparkles className="mr-1.5 h-4 w-4 text-amber-500" /> Build with Nectar</Button>
           <Button variant="outline" onClick={() => setShowSettings(true)}><SettingsIcon className="mr-1.5 h-4 w-4" /> Settings</Button>
           <Button variant="outline" onClick={() => setShowAssign(true)}><Users className="mr-1.5 h-4 w-4" /> Assign</Button>
+          <Button variant="outline" className="text-rose-700 hover:text-rose-800 hover:bg-rose-50 border-rose-200"
+            onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+          </Button>
           <Button onClick={persist} disabled={busy}><Save className="mr-1.5 h-4 w-4" /> Save</Button>
           <Button variant="default" className="bg-[#137182] hover:bg-[#0e5a68]"
             onClick={async () => { const ok = await persist(); if (ok) setShowPublish(true); }}>

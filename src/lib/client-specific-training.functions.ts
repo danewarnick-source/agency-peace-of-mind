@@ -224,7 +224,7 @@ async function assembleVerbatim(
   try {
     const { data: docs } = await supabase
       .from("client_documents")
-      .select("filename, file_url")
+      .select("file_name, file_url")
       .eq("client_id", clientId)
       .limit(25);
     if (docs && docs.length) {
@@ -234,8 +234,8 @@ async function assembleVerbatim(
         items: [{
           kind: "link",
           label: "Files",
-          links: docs.map((d: { filename: string; file_url: string | null }) => ({
-            label: d.filename,
+          links: (docs as Array<{ file_name: string; file_url: string | null }>).map((d) => ({
+            label: d.file_name,
             href: d.file_url ?? null,
           })),
         }],

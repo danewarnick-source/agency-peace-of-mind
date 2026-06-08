@@ -379,21 +379,31 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
       nextTracking.updated_by = context.userId;
     }
 
-    const updatePayload: Record<string, J> = {
+    const baseUpdate = {
       approval_state: "provider_confirmed" as ApprovalState,
       review_status: "confirmed",
       verified: true,
       verified_by: context.userId,
       verified_at: new Date().toISOString(),
     };
-    if (hasTracking) {
-      updatePayload.metadata = { ...md, tracking: nextTracking };
-    }
 
-    await context.supabase
-      .from("nectar_requirements")
-      .update(updatePayload)
-      .eq("id", data.requirementId);
+    if (hasTracking) {
+      await context.supabase
+        .from("nectar_requirements")
+        .update({
+          ...baseUpdate,
+          metadata: { ...md, tracking: nextTracking } as unknown as Record<
+            string,
+            unknown
+          >,
+        })
+        .eq("id", data.requirementId);
+    } else {
+      await context.supabase
+        .from("nectar_requirements")
+        .update(baseUpdate)
+        .eq("id", data.requirementId);
+    }
 
     const actorLabel = await resolveActorLabel(context.userId);
     await logEvent({

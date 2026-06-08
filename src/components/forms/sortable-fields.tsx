@@ -191,6 +191,8 @@ export function SortableFields({
                         onMoveUp={() => move(idx, -1)}
                         onMoveDown={() => move(idx, 1)}
                         onRemove={() => remove(idx)}
+                        justAdded={lastAddedId === f.id}
+                        onJustAddedConsumed={onLastAddedConsumed}
                       />
                     );
                   })}

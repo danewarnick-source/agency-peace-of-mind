@@ -204,12 +204,17 @@ export const runInternalAudit = createServerFn({ method: "POST" })
     );
 
     // Citation index for engine-backed findings.
-    const reqById = new Map(
-      ((reqsRes.data ?? []) as Array<{ id: string; title: string; source_citation: string | null }>).map((r) => [
-        r.id,
-        r,
-      ]),
-    );
+    type ReqRow = {
+      id: string;
+      title: string;
+      source_citation: string | null;
+      review_status: string | null;
+      category: string | null;
+      metadata: Record<string, unknown> | null;
+      approval_state: string | null;
+    };
+    const reqRows = (reqsRes.data ?? []) as ReqRow[];
+    const reqById = new Map(reqRows.map((r) => [r.id, r]));
 
     // ---------- 1. Staff certifications: expired / expiring 30d ----------
     if (include("staff_certifications")) {

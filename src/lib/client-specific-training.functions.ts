@@ -130,21 +130,23 @@ async function assembleVerbatim(
   try {
     const { data: codes } = await supabase
       .from("client_billing_codes")
-      .select("service_code, modifier, description, is_active")
+      .select("service_code, unit_type, service_end_date")
       .eq("client_id", clientId);
     if (codes && codes.length) {
-      sections.push({
-        id: sid(),
-        title: "Authorized service codes",
-        items: [{
-          kind: "list",
-          label: "Codes",
-          values: codes
-            .filter((c: { is_active: boolean | null }) => c.is_active !== false)
-            .map((c: { service_code: string; modifier: string | null; description: string | null }) =>
-              [c.service_code, c.modifier].filter(Boolean).join(" ") + (c.description ? ` — ${c.description}` : "")),
-        }],
-      });
+      const today = new Date().toISOString().slice(0, 10);
+      const active = (codes as Array<{ service_code: string; unit_type: string | null; service_end_date: string | null }>)
+        .filter((c) => !c.service_end_date || c.service_end_date >= today);
+      if (active.length) {
+        sections.push({
+          id: sid(),
+          title: "Authorized service codes",
+          items: [{
+            kind: "list",
+            label: "Codes",
+            values: active.map((c) => c.service_code + (c.unit_type ? ` (${c.unit_type})` : "")),
+          }],
+        });
+      }
     }
   } catch { /* ignore */ }
 
@@ -152,16 +154,17 @@ async function assembleVerbatim(
   try {
     const { data: meds } = await supabase
       .from("client_medications")
-      .select("name, dose, frequency, is_prn, choking_risk, status")
+      .select("medication_name, dosage, frequency, is_prn, choking_risk, is_active")
       .eq("client_id", clientId);
     if (meds && meds.length) {
-      const active = meds.filter((m: { status: string | null }) => (m.status ?? "active") === "active");
+      const active = (meds as Array<{ medication_name: string; dosage: string | null; frequency: string | null; is_prn: boolean | null; choking_risk: boolean | null; is_active: boolean | null }>)
+        .filter((m) => m.is_active !== false);
       if (active.length) {
-        const items: CSTItem[] = active.map((m: { name: string; dose: string | null; frequency: string | null; is_prn: boolean | null; choking_risk: boolean | null }) => ({
+        const items: CSTItem[] = active.map((m) => ({
           kind: "kv" as const,
-          label: m.name,
+          label: m.medication_name,
           pairs: [
-            { label: "Dose", value: m.dose ?? "—" },
+            { label: "Dose", value: m.dosage ?? "—" },
             { label: "Frequency", value: m.frequency ?? "—" },
             { label: "PRN", value: m.is_prn ? "Yes" : "No" },
             { label: "Choking risk flagged", value: m.choking_risk ? "Yes" : "No" },
@@ -181,7 +184,7 @@ async function assembleVerbatim(
       .maybeSingle();
     const { data: behaviors } = await supabase
       .from("bc_behaviors")
-      .select("title, description, status")
+      .select("name, operational_definition, status")
       .eq("client_id", clientId)
       .eq("status", "published");
     const items: CSTItem[] = [];
@@ -190,14 +193,15 @@ async function assembleVerbatim(
       items.push({
         kind: "kv",
         label: "Published behaviors",
-        pairs: behaviors.map((b: { title: string; description: string | null }) => ({
-          label: b.title,
-          value: b.description ?? "",
+        pairs: (behaviors as Array<{ name: string; operational_definition: string | null }>).map((b) => ({
+          label: b.name,
+          value: b.operational_definition ?? "",
         })),
       });
     }
     if (items.length) sections.push({ id: sid(), title: "Behavior support — status & published behaviors", items });
   } catch { /* ignore */ }
+
 
   // 6. Rights & safeguards summary (restriction_summary + status only)
   try {

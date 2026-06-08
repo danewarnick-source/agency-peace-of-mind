@@ -1280,6 +1280,52 @@ export function PunchPad({
         }
       }
 
+      // Stage 5 — required_before_clockout front-guard. READ-ONLY against
+      // evv_timesheets; ALWAYS fail-open. Runs BEFORE finalizeClockOut;
+      // finalizeClockOut's update object is unchanged.
+      if (active) {
+        const pendingOut = await fetchPendingTrackingForms({
+          tier: "clockout",
+          shiftId: active.id,
+          clientId: active.client_id,
+          serviceCode: active.service_type_code,
+        });
+        if (pendingOut.length) {
+          const finalize = () =>
+            finalizeClockOut({
+              pos,
+              aiStatus: aiStatusForRow,
+              aiFeedback: aiFeedbackForRow,
+              aiIterationCount: iterationsToPersist,
+            });
+          setPendingFormsDialog({
+            mode: "clockout",
+            pending: pendingOut,
+            proceed: async () => {
+              setPendingFormsDialog(null);
+              setBusy(true);
+              try { await finalize(); } finally { setBusy(false); }
+            },
+            recheck: async () => {
+              const again = await fetchPendingTrackingForms({
+                tier: "clockout",
+                shiftId: active.id,
+                clientId: active.client_id,
+                serviceCode: active.service_type_code,
+              });
+              if (!again.length) {
+                setPendingFormsDialog(null);
+                setBusy(true);
+                try { await finalize(); } finally { setBusy(false); }
+              } else {
+                setPendingFormsDialog((p) => p ? { ...p, pending: again } : p);
+              }
+            },
+          });
+          return;
+        }
+      }
+
       await finalizeClockOut({
         pos,
         aiStatus: aiStatusForRow,

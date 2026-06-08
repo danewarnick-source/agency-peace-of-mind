@@ -91,6 +91,10 @@ function AdminList() {
                       <Archive className="mr-1 h-3.5 w-3.5" /> Archive
                     </Button>
                   )}
+                  <Button size="sm" variant="ghost" className="min-h-[36px] text-rose-700 hover:text-rose-800 hover:bg-rose-50"
+                    onClick={() => setDeleteTarget({ id: f.id, name: f.name })}>
+                    <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+                  </Button>
                 </div>
               </CardContent>
             </Card>

@@ -61,7 +61,7 @@ function EditForm() {
   const [showPublish, setShowPublish] = useState(false);
   const [busy, setBusy] = useState(false);
   const [baseline, setBaseline] = useState<string>("");
-  const [pendingNav, setPendingNav] = useState<null | { proceed: () => void; reset: () => void }>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     const f = data?.form;

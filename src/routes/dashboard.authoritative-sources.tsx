@@ -3449,12 +3449,21 @@ function FinalConfirmRow({
     source_citation: string | null;
     applies_to: string | null;
   };
-  onConfirm: (note?: string) => void;
+  onConfirm: (payload: {
+    note?: string;
+    frequency?: string | null;
+    tellNectarNote?: string | null;
+    lastCheckedAt?: string | null;
+  }) => void;
   onReject: (reason: string) => void;
   busy: boolean;
 }) {
   const [mode, setMode] = useState<"idle" | "confirm" | "reject">("idle");
   const [note, setNote] = useState("");
+  const [frequency, setFrequency] = useState<string>("");
+  const [tellNectarNote, setTellNectarNote] = useState("");
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [lastCheckedAt, setLastCheckedAt] = useState<string>(todayIso);
 
   return (
     <li className="rounded-lg border border-border bg-background p-3">
@@ -3496,18 +3505,83 @@ function FinalConfirmRow({
       </div>
 
       {mode === "confirm" && (
-        <div className="mt-2 space-y-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2">
-          <Textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional note (logged in audit trail)"
-            rows={2}
-          />
+        <div className="mt-2 space-y-3 rounded-md border border-emerald-200 bg-emerald-50/60 p-3">
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-emerald-950">
+              How often does this requirement recur? <span className="text-muted-foreground font-normal">(you decide)</span>
+            </Label>
+            <Select value={frequency} onValueChange={setFrequency}>
+              <SelectTrigger className="h-8 bg-background">
+                <SelectValue placeholder="Choose a cadence (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="one_time">One-time</SelectItem>
+                <SelectItem value="per_employee">Per employee</SelectItem>
+                <SelectItem value="per_shift">Per shift</SelectItem>
+                <SelectItem value="per_code">Per billing code</SelectItem>
+                <SelectItem value="per_day">Daily</SelectItem>
+                <SelectItem value="per_week">Weekly</SelectItem>
+                <SelectItem value="per_month">Monthly</SelectItem>
+                <SelectItem value="per_quarter">Quarterly</SelectItem>
+                <SelectItem value="per_year">Yearly</SelectItem>
+                <SelectItem value="per_billing_rate_unit">Per billing-rate unit</SelectItem>
+                <SelectItem value="ongoing">Ongoing</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-emerald-950">
+              Tell NECTAR — how do <em>you</em> track this?
+            </Label>
+            <Textarea
+              value={tellNectarNote}
+              onChange={(e) => setTellNectarNote(e.target.value)}
+              placeholder='e.g. "1056s live on the Provider UPI/USTEPS — updated ongoing."'
+              rows={2}
+              className="bg-background"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Your words. NECTAR will surface this as a reminder — it won't invent a rule.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-emerald-950">Last verified</Label>
+            <Input
+              type="date"
+              value={lastCheckedAt}
+              onChange={(e) => setLastCheckedAt(e.target.value)}
+              className="h-8 bg-background"
+              max={todayIso}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-emerald-950">
+              Audit-trail note <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Optional note (logged in audit trail)"
+              rows={2}
+              className="bg-background"
+            />
+          </div>
+
           <div className="flex gap-2">
             <Button
               size="sm"
               className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
-              onClick={() => onConfirm(note.trim() || undefined)}
+              onClick={() =>
+                onConfirm({
+                  note: note.trim() || undefined,
+                  frequency: frequency || null,
+                  tellNectarNote: tellNectarNote.trim() || null,
+                  lastCheckedAt: lastCheckedAt || null,
+                })
+              }
               disabled={busy}
             >
               Make it active

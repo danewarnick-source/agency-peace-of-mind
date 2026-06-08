@@ -33,6 +33,10 @@ import {
   type BehaviorAnswers,
 } from "@/components/evv/behavior-observations-block";
 import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
+import { getPendingTrackingForms } from "@/lib/forms.functions";
+import { PendingTrackingFormsDialog, type PendingForm } from "@/components/evv/pending-tracking-forms-dialog";
+
+
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -225,6 +229,20 @@ export function PunchPad({
     pos: { lat: number; lng: number; acc: number };
   }>(null);
   const [outVarianceReason, setOutVarianceReason] = useState("");
+
+  // ── Stage 5: per-shift tracking-form front-guard state ──────────────────────
+  // Pending dialog data + which proceed callback to invoke after the user
+  // either skips (clock-out) or clears them. The EVV calls live in those
+  // callbacks; the guard only PAUSES the punch, never modifies it.
+  const [pendingFormsDialog, setPendingFormsDialog] = useState<null | {
+    mode: "clockout" | "clockin";
+    pending: PendingForm[];
+    // Continues the original EVV call path.
+    proceed: () => void | Promise<void>;
+    // Re-runs the check; if cleared, proceed automatically.
+    recheck: () => Promise<void>;
+  }>(null);
+
 
   // ── Clock-in success state ──────────────────────────────────────────────────
   const [clockInSuccess, setClockInSuccess] = useState<null | {
@@ -481,8 +499,36 @@ export function PunchPad({
   }[gpsStatusLabel.color];
 
   // ────────────────────────────────────────────────────────────────────────────
+  // Stage 5 — Per-shift tracking-form FRONT-GUARDS (read-only, fail-open).
+  // These run BEFORE the EVV write calls (writeShift / finalizeClockOut).
+  // They NEVER touch evv_timesheets, GPS, status, or timestamps.
+  // ────────────────────────────────────────────────────────────────────────────
+  async function fetchPendingTrackingForms(
+    input:
+      | { tier: "clockout"; shiftId: string; clientId: string; serviceCode: string }
+      | { tier: "clockin" },
+  ): Promise<PendingForm[]> {
+    // ~1.5s timeout. ANY error/timeout → return [] so the caller proceeds.
+    const PROMISE_TIMEOUT_MS = 1500;
+    try {
+      const result = await Promise.race<{ pending: PendingForm[] } | "TIMEOUT">([
+        getPendingTrackingForms({ data: input }),
+        new Promise<"TIMEOUT">((resolve) =>
+          setTimeout(() => resolve("TIMEOUT"), PROMISE_TIMEOUT_MS),
+        ),
+      ]);
+      if (result === "TIMEOUT") return [];
+      return result?.pending ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
   // WRITE SHIFT (clock-in DB write)
   // ────────────────────────────────────────────────────────────────────────────
+
+
 
   async function writeShift(args: {
     pos: { lat: number; lng: number; acc: number } | null;
@@ -570,6 +616,33 @@ export function PunchPad({
         }
       }
 
+      // Stage 5 — required_before_next_clockin front-guard. READ-ONLY,
+      // fail-open: on error/timeout the guard returns [] and we proceed.
+      // This is BEFORE writeShift; writeShift's payload is untouched.
+      const pendingIn = await fetchPendingTrackingForms({ tier: "clockin" });
+      if (pendingIn.length) {
+        setPendingFormsDialog({
+          mode: "clockin",
+          pending: pendingIn,
+          proceed: async () => {
+            setPendingFormsDialog(null);
+            setBusy(true);
+            try { await writeShift({ pos }); } finally { setBusy(false); }
+          },
+          recheck: async () => {
+            const again = await fetchPendingTrackingForms({ tier: "clockin" });
+            if (!again.length) {
+              setPendingFormsDialog(null);
+              setBusy(true);
+              try { await writeShift({ pos }); } finally { setBusy(false); }
+            } else {
+              setPendingFormsDialog((p) => p ? { ...p, pending: again } : p);
+            }
+          },
+        });
+        return;
+      }
+
       await writeShift({ pos });
     } catch (e) {
       toast.error((e as Error).message || "Could not start shift.");
@@ -587,6 +660,41 @@ export function PunchPad({
     }
     setBusy(true);
     try {
+      // Stage 5 — same front-guard for variance clock-in path. Fail-open.
+      const pendingIn = await fetchPendingTrackingForms({ tier: "clockin" });
+      if (pendingIn.length) {
+        const pos = variance.pos;
+        const outside = reason;
+        setPendingFormsDialog({
+          mode: "clockin",
+          pending: pendingIn,
+          proceed: async () => {
+            setPendingFormsDialog(null);
+            setBusy(true);
+            try {
+              await writeShift({ pos, outsideReason: outside });
+              setVariance(null);
+              setVarianceReason("");
+            } finally { setBusy(false); }
+          },
+          recheck: async () => {
+            const again = await fetchPendingTrackingForms({ tier: "clockin" });
+            if (!again.length) {
+              setPendingFormsDialog(null);
+              setBusy(true);
+              try {
+                await writeShift({ pos, outsideReason: outside });
+                setVariance(null);
+                setVarianceReason("");
+              } finally { setBusy(false); }
+            } else {
+              setPendingFormsDialog((p) => p ? { ...p, pending: again } : p);
+            }
+          },
+        });
+        return;
+      }
+
       await writeShift({ pos: variance.pos, outsideReason: reason });
       setVariance(null);
       setVarianceReason("");
@@ -1172,6 +1280,52 @@ export function PunchPad({
         }
       }
 
+      // Stage 5 — required_before_clockout front-guard. READ-ONLY against
+      // evv_timesheets; ALWAYS fail-open. Runs BEFORE finalizeClockOut;
+      // finalizeClockOut's update object is unchanged.
+      if (active) {
+        const pendingOut = await fetchPendingTrackingForms({
+          tier: "clockout",
+          shiftId: active.id,
+          clientId: active.client_id,
+          serviceCode: active.service_type_code,
+        });
+        if (pendingOut.length) {
+          const finalize = () =>
+            finalizeClockOut({
+              pos,
+              aiStatus: aiStatusForRow,
+              aiFeedback: aiFeedbackForRow,
+              aiIterationCount: iterationsToPersist,
+            });
+          setPendingFormsDialog({
+            mode: "clockout",
+            pending: pendingOut,
+            proceed: async () => {
+              setPendingFormsDialog(null);
+              setBusy(true);
+              try { await finalize(); } finally { setBusy(false); }
+            },
+            recheck: async () => {
+              const again = await fetchPendingTrackingForms({
+                tier: "clockout",
+                shiftId: active.id,
+                clientId: active.client_id,
+                serviceCode: active.service_type_code,
+              });
+              if (!again.length) {
+                setPendingFormsDialog(null);
+                setBusy(true);
+                try { await finalize(); } finally { setBusy(false); }
+              } else {
+                setPendingFormsDialog((p) => p ? { ...p, pending: again } : p);
+              }
+            },
+          });
+          return;
+        }
+      }
+
       await finalizeClockOut({
         pos,
         aiStatus: aiStatusForRow,
@@ -1194,6 +1348,46 @@ export function PunchPad({
     }
     setBusy(true);
     try {
+      // Stage 5 — fail-open clock-out guard for the variance path too.
+      if (active) {
+        const pendingOut = await fetchPendingTrackingForms({
+          tier: "clockout",
+          shiftId: active.id,
+          clientId: active.client_id,
+          serviceCode: active.service_type_code,
+        });
+        if (pendingOut.length) {
+          const pos = outVariance.pos;
+          const outside = reason;
+          const finalize = () => finalizeClockOut({ pos, outsideReason: outside });
+          setPendingFormsDialog({
+            mode: "clockout",
+            pending: pendingOut,
+            proceed: async () => {
+              setPendingFormsDialog(null);
+              setBusy(true);
+              try { await finalize(); } finally { setBusy(false); }
+            },
+            recheck: async () => {
+              const again = await fetchPendingTrackingForms({
+                tier: "clockout",
+                shiftId: active.id,
+                clientId: active.client_id,
+                serviceCode: active.service_type_code,
+              });
+              if (!again.length) {
+                setPendingFormsDialog(null);
+                setBusy(true);
+                try { await finalize(); } finally { setBusy(false); }
+              } else {
+                setPendingFormsDialog((p) => p ? { ...p, pending: again } : p);
+              }
+            },
+          });
+          return;
+        }
+      }
+
       await finalizeClockOut({ pos: outVariance.pos, outsideReason: reason });
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");
@@ -1533,6 +1727,46 @@ export function PunchPad({
         {/* ════════════════════════════════════════════════════════════════════
             DIALOGS
         ════════════════════════════════════════════════════════════════════ */}
+
+        {/* Stage 5 — per-shift tracking-form front-guard dialog */}
+        <PendingTrackingFormsDialog
+          open={!!pendingFormsDialog}
+          mode={pendingFormsDialog?.mode ?? "clockout"}
+          pending={pendingFormsDialog?.pending ?? []}
+          busy={busy}
+          onClose={() => setPendingFormsDialog(null)}
+          onProceedAfterRecheck={
+            pendingFormsDialog ? () => pendingFormsDialog.recheck() : undefined
+          }
+          onSkipWithReason={
+            pendingFormsDialog?.mode === "clockout"
+              ? async (skipReason) => {
+                  // Sole write from the guard: shift_completeness_flags row(s).
+                  // evv_timesheets is NOT written here.
+                  if (org?.organization_id && user && active && pendingFormsDialog) {
+                    const rows = pendingFormsDialog.pending.map((p) => ({
+                      organization_id: org.organization_id,
+                      shift_id: active.id,
+                      client_id: active.client_id,
+                      staff_id: user.id,
+                      flag_type: "tracking_form_missing",
+                      severity: "soft",
+                      message: `Required tracking form "${p.formName}" skipped at clock-out.`,
+                      status: "dismissed_with_reason",
+                      dismissal_reason: skipReason,
+                    }));
+                    try {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      await supabase.from("shift_completeness_flags").insert(rows as any);
+                    } catch {
+                      // Best-effort; never trap caregiver because of flag insert.
+                    }
+                  }
+                  await pendingFormsDialog?.proceed();
+                }
+              : undefined
+          }
+        />
 
         {/* Clock-in variance — text only, no map */}
         <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); setVarShorthand(""); } }}>

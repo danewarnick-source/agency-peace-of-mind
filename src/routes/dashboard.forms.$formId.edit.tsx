@@ -152,7 +152,7 @@ function EditForm() {
       toast.success("Saved");
       setIsNectarDraft(false);
       setBaseline(JSON.stringify({
-        name: name.trim(), description, category, fields, frequency, schedule,
+        name, description, category, fields, frequency, schedule,
         groups, users, allClients, clients, settings,
       }));
       return true;

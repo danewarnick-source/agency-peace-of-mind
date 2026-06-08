@@ -383,6 +383,7 @@ export function ClientsPage() {
                 <TableHead className="font-semibold">Phone</TableHead>
                 <TableHead className="font-semibold">Address</TableHead>
                 <TableHead className="font-semibold">PCSP Goals</TableHead>
+                <TableHead className="font-semibold w-[220px]">Intake</TableHead>
                 <TableHead className="text-right font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>

@@ -412,6 +412,56 @@ export const listClientForms = createServerFn({ method: "GET" })
     return { forms: forms ?? [], submissions: subs };
   });
 
+// ─── ADMIN/MANAGER: intake-runner — published `intake` forms for this client,
+// plus any existing form_submissions tied to (form, client). Reuses the same
+// forms table / form_submissions store as the rest of the engine. Read-only;
+// does not create or advance submissions.
+export const listIntakeFormsForClient = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ clientId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+
+    const { data: forms, error } = await supabase
+      .from("forms")
+      .select("id, name, description, category, settings, all_clients, assigned_clients, updated_at, created_at")
+      .eq("organization_id", m.organization_id)
+      .eq("status", "published")
+      .eq("category", "intake")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const eligible = (forms ?? []).filter(
+      (f: { all_clients: boolean; assigned_clients: string[] | null }) =>
+        f.all_clients || (f.assigned_clients ?? []).includes(data.clientId),
+    );
+
+    const formIds = eligible.map((f: { id: string }) => f.id);
+    let submissions: Array<{
+      id: string;
+      form_id: string;
+      status: string;
+      submitted_at: string;
+      submitted_by: string | null;
+    }> = [];
+    if (formIds.length) {
+      const { data: subs, error: subErr } = await supabase
+        .from("form_submissions")
+        .select("id, form_id, status, submitted_at, submitted_by")
+        .eq("organization_id", m.organization_id)
+        .eq("client_id", data.clientId)
+        .in("form_id", formIds)
+        .order("submitted_at", { ascending: false });
+      if (subErr) throw new Error(subErr.message);
+      submissions = subs ?? [];
+    }
+    return { forms: eligible, submissions };
+  });
+
 // ─── NECTAR: draft a form from a description ──────────────────────────────
 export const nectarDraftForm = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -113,6 +113,21 @@ function SettingsPage() {
         </Link>
       )}
 
+      {org?.role === "admin" && (
+        <Link to="/dashboard/settings/automation-rules" className="group lg:col-span-2">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
+            <div className="flex items-start gap-4">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><Wand2 className="h-5 w-5" /></div>
+              <div>
+                <h2 className="text-base font-semibold">Automation Rules</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Control what NECTAR sets up automatically when it imports a document. Toggle, edit, or add rules — nothing is created without your review.</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </div>
+        </Link>
+      )}
+
     </div>
   );
 }

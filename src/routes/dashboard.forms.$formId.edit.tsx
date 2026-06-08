@@ -227,7 +227,7 @@ function EditForm() {
                 Add a field from the palette above, or click <strong>Build with Nectar</strong>.
               </div>
             ) : (
-              <SortableFields fields={fields} setFields={(next) => setFields(next)} />
+              <SortableFields fields={fields} setFields={(next) => setFields(next)} lastAddedId={lastAddedId} onLastAddedConsumed={() => setLastAddedId(null)} />
             )}
           </div>
 

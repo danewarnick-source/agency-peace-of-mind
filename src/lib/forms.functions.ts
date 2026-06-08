@@ -672,6 +672,102 @@ export const submitStaffMandateForm = createServerFn({ method: "POST" })
     return { submission: ins };
   });
 
+// ─── ADMIN: detect unmet staff_mandate forms for a staffer (read-only) ─────
+// Returns the list of published staff_mandate forms whose mapped
+// hr_staff_checklist requirement has NO satisfying staff_checklist_completion
+// row for `staffId` (status NOT IN complete/waived). Used by checkpoints
+// (assignment, future clock-in) to WARN — never to block. Caller is admin
+// scope; uses the user-scoped client (RLS applies to forms/requirements/SCC,
+// all of which admins can read).
+//
+// For per_staff mandates the clientId is ignored (the question is "is this
+// staffer's standing record complete?"). For mandates configured to specific
+// clients via all_clients=false / assigned_clients, we exclude forms not
+// assigned to clientId when it is provided. per_staff_per_client scope is
+// reserved for a later stage; treated as per_staff here.
+export const getUnmetStaffMandates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    staffId: z.string().uuid(),
+    clientId: z.string().uuid().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+
+    // 1. All published staff_mandate forms in this org.
+    const { data: forms, error: fe } = await supabase
+      .from("forms")
+      .select("id, name, settings, all_clients, assigned_clients")
+      .eq("organization_id", m.organization_id)
+      .eq("status", "published");
+    if (fe) throw new Error(fe.message);
+    const mandateForms = ((forms ?? []) as Array<{
+      id: string; name: string; settings: Record<string, unknown> | null;
+      all_clients: boolean; assigned_clients: string[] | null;
+    }>).filter((f) => (f.settings ?? {})["routing_behavior"] === "staff_mandate");
+    if (!mandateForms.length) return { unmet: [] };
+
+    // 2. If clientId provided, drop forms not assigned to that client.
+    const scoped = mandateForms.filter((f) => {
+      if (!data.clientId) return true;
+      if (f.all_clients) return true;
+      return (f.assigned_clients ?? []).includes(data.clientId);
+    });
+    if (!scoped.length) return { unmet: [] };
+
+    // 3. Look up the matching hr_staff_checklist requirements (one per form).
+    const reqKeys = scoped.map((f) => `company_required:form:${f.id}`);
+    const { data: reqs } = await supabase
+      .from("nectar_requirements")
+      .select("id, requirement_key, metadata")
+      .eq("organization_id", m.organization_id)
+      .in("requirement_key", reqKeys)
+      .eq("approval_state", "provider_confirmed");
+    const reqByForm = new Map<string, { id: string; mandate_scope: string }>();
+    for (const r of (reqs ?? []) as Array<{ id: string; requirement_key: string; metadata: Record<string, unknown> | null }>) {
+      const md = r.metadata ?? {};
+      if (md["scope"] !== "hr_staff_checklist") continue;
+      const formId = r.requirement_key.replace("company_required:form:", "");
+      reqByForm.set(formId, {
+        id: r.id,
+        mandate_scope: (md["mandate_scope"] as string) || "per_staff",
+      });
+    }
+
+    const reqIds = Array.from(reqByForm.values()).map((r) => r.id);
+    if (!reqIds.length) return { unmet: [] };
+
+    // 4. Pull this staffer's completion rows for those requirements.
+    const { data: comps } = await supabase
+      .from("staff_checklist_completion")
+      .select("requirement_id, status")
+      .eq("organization_id", m.organization_id)
+      .eq("staff_id", data.staffId)
+      .in("requirement_id", reqIds);
+    const satisfied = new Set<string>();
+    for (const c of (comps ?? []) as Array<{ requirement_id: string; status: string }>) {
+      if (["complete", "waived", "not_applicable"].includes(c.status)) {
+        satisfied.add(c.requirement_id);
+      }
+    }
+
+    // 5. Return forms whose requirement is NOT satisfied.
+    const unmet = scoped
+      .map((f) => {
+        const req = reqByForm.get(f.id);
+        if (!req) return null; // no mapped requirement → not gated by this check
+        if (satisfied.has(req.id)) return null;
+        return { form_id: f.id, name: f.name, mandate_scope: req.mandate_scope };
+      })
+      .filter((x): x is { form_id: string; name: string; mandate_scope: string } => x !== null);
+
+    return { unmet };
+  });
+
+
+
 
 
 // ─── STAFF: bell — unread form notifications for me ────────────────────────

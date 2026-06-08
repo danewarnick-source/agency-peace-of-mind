@@ -1052,6 +1052,77 @@ export const listIntakeFormsForClient = createServerFn({ method: "GET" })
     return { forms: eligible, submissions };
   });
 
+// ─── ADMIN/MANAGER: per-shift tracking forms for a client (Stage 3, display).
+// Returns published forms with routing_behavior='per_shift_per_client_tracked'
+// targeted at this client (all_clients OR assigned_clients includes clientId),
+// plus their existing form_submissions for the client. READ-ONLY.
+export const listClientTrackingForms = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ clientId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+
+    const { data: forms, error } = await supabase
+      .from("forms")
+      .select("id, name, description, fields, settings, all_clients, assigned_clients, updated_at")
+      .eq("organization_id", m.organization_id)
+      .eq("status", "published")
+      .order("name", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const eligible = (forms ?? []).filter((f: {
+      settings: FormSettings | null;
+      all_clients: boolean;
+      assigned_clients: string[] | null;
+    }) => {
+      const beh = (f.settings ?? {}).routing_behavior;
+      if (beh !== "per_shift_per_client_tracked") return false;
+      return f.all_clients || (f.assigned_clients ?? []).includes(data.clientId);
+    });
+
+    const formIds = eligible.map((f: { id: string }) => f.id);
+    let submissions: Array<{
+      id: string;
+      form_id: string;
+      submitted_at: string;
+      submitted_by: string | null;
+      answers: Record<string, unknown>;
+      shift_id: string | null;
+    }> = [];
+    const submitterNames: Record<string, string> = {};
+    if (formIds.length) {
+      const { data: subs, error: subErr } = await supabase
+        .from("form_submissions")
+        .select("id, form_id, submitted_at, submitted_by, answers, shift_id")
+        .eq("organization_id", m.organization_id)
+        .eq("client_id", data.clientId)
+        .in("form_id", formIds)
+        .order("submitted_at", { ascending: false });
+      if (subErr) throw new Error(subErr.message);
+      submissions = subs ?? [];
+      const submitterIds = Array.from(
+        new Set(submissions.map((s) => s.submitted_by).filter((x): x is string => !!x)),
+      );
+      if (submitterIds.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name")
+          .in("user_id", submitterIds);
+        for (const p of (profs ?? []) as Array<{ user_id: string; first_name: string | null; last_name: string | null }>) {
+          const name = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim();
+          submitterNames[p.user_id] = name || "Unknown";
+        }
+      }
+    }
+    return { forms: eligible, submissions, submitterNames };
+  });
+
+
+
 // ─── NECTAR: draft a form from a description ──────────────────────────────
 export const nectarDraftForm = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

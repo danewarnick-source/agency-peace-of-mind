@@ -14,11 +14,11 @@ import {
 import {
   Save, Sparkles, Plus, ChevronLeft, Settings as SettingsIcon, Users, FolderTree, CalendarClock, Send, Check, CircleDot, Trash2,
 } from "lucide-react";
-import { getForm, saveForm } from "@/lib/forms.functions";
+import { getForm, saveForm, nectarProposeRouting } from "@/lib/forms.functions";
 import { DeleteFormDialog } from "@/components/forms/delete-form-dialog";
 import {
-  type FormField, type FieldType, type Frequency, type Schedule, type FormSettings,
-  defaultFieldFor, FORM_CATEGORIES, describeFrequency, sanitizeConditions, isFieldVisible,
+  type FormField, type FieldType, type Frequency, type Schedule, type FormSettings, type RoutingBehavior,
+  defaultFieldFor, FORM_CATEGORIES, ROUTING_BEHAVIORS, describeFrequency, sanitizeConditions, isFieldVisible,
 } from "@/lib/forms-utils";
 import { FieldEditor, TYPE_GROUPS, TYPE_LABEL } from "@/components/forms/field-editor";
 import { SortableFields } from "@/components/forms/sortable-fields";
@@ -264,6 +264,13 @@ function EditForm() {
             </div>
           </Card>
 
+          <RoutingBehaviorCard
+            name={name}
+            fields={fields}
+            settings={settings}
+            setSettings={setSettings}
+          />
+
           <div className="flex flex-wrap gap-1.5 rounded-md border border-dashed border-border bg-muted/30 p-2">
             {TYPE_GROUPS.map((g) => (
               <div key={g.name} className="flex flex-wrap gap-1 items-center">
@@ -485,5 +492,133 @@ function FrequencyControl({
         </div>
       )}
     </div>
+  );
+}
+
+function RoutingBehaviorCard({
+  name, fields, settings, setSettings,
+}: {
+  name: string;
+  fields: FormField[];
+  settings: FormSettings;
+  setSettings: (updater: (s: FormSettings) => FormSettings) => void;
+}) {
+  const propose = useServerFn(nectarProposeRouting);
+  const [busy, setBusy] = useState(false);
+  const purpose = settings.usage_purpose ?? "";
+  const chosen = settings.routing_behavior;
+  const proposal = settings.routing_proposal;
+  const chosenSpec = ROUTING_BEHAVIORS.find((b) => b.value === chosen);
+
+  async function suggest() {
+    if (purpose.trim().length < 5) {
+      toast.error("Tell Nectar how this form will be used (a sentence or two).");
+      return;
+    }
+    setBusy(true);
+    try {
+      const out = await propose({
+        data: {
+          purpose: purpose.trim(),
+          formName: name || undefined,
+          fieldLabels: fields
+            .filter((f) => f.type !== "section")
+            .map((f) => f.label)
+            .slice(0, 60),
+        },
+      });
+      setSettings((s) => ({ ...s, routing_proposal: out.proposal }));
+      toast.success("Nectar proposed a routing behavior — review and confirm.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">How will this form be used?</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Describe the purpose in plain English. Nectar can propose a routing behavior — you always confirm or override it. <strong>Declaration only at this stage:</strong> nothing about how the form currently files, satisfies intake, or gates anything changes until each behavior's destination is wired in a later step.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-1.5">
+        <Label className="text-xs">Purpose / intent</Label>
+        <Textarea
+          rows={3}
+          maxLength={2000}
+          placeholder='E.g. "Each staff signs this once before working with a client to confirm they understand our medication policy."'
+          value={purpose}
+          onChange={(e) => setSettings((s) => ({ ...s, usage_purpose: e.target.value }))}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={suggest} disabled={busy}>
+          <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
+          {busy ? "Thinking…" : proposal ? "Suggest again" : "Suggest routing"}
+        </Button>
+        {proposal && (
+          <span className="text-[11px] text-muted-foreground">
+            Last proposal: <strong>{ROUTING_BEHAVIORS.find((b) => b.value === proposal.behavior)?.label ?? proposal.behavior}</strong>
+          </span>
+        )}
+      </div>
+
+      {proposal && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-2">
+          <p>
+            <Sparkles className="inline h-3.5 w-3.5 mr-1 text-amber-600" />
+            Nectar suggests <strong>{ROUTING_BEHAVIORS.find((b) => b.value === proposal.behavior)?.label}</strong>. {proposal.rationale}
+          </p>
+          {chosen !== proposal.behavior && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => setSettings((s) => ({ ...s, routing_behavior: proposal.behavior }))}
+            >
+              <Check className="mr-1 h-3 w-3" /> Accept suggestion
+            </Button>
+          )}
+        </div>
+      )}
+
+      <div className="grid gap-1.5">
+        <Label className="text-xs">Routing behavior {chosen ? "" : <span className="text-muted-foreground">(not set)</span>}</Label>
+        <select
+          value={chosen ?? ""}
+          onChange={(e) => {
+            const v = e.target.value as RoutingBehavior | "";
+            setSettings((s) => ({ ...s, routing_behavior: v ? (v as RoutingBehavior) : undefined }));
+          }}
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          <option value="">— Choose how this form is used —</option>
+          {ROUTING_BEHAVIORS.map((b) => (
+            <option key={b.value} value={b.value}>{b.label}{b.wired ? "" : " (wired in a later step)"}</option>
+          ))}
+        </select>
+        <p className="text-[11px] text-muted-foreground">Nectar proposes; you decide. You can always override.</p>
+      </div>
+
+      {chosenSpec && (
+        <div className={`rounded-md border px-3 py-2 text-xs ${chosenSpec.wired ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+          <p className="font-medium">{chosenSpec.label}</p>
+          <p className="mt-0.5">{chosenSpec.implication}</p>
+          {!chosenSpec.wired && (
+            <p className="mt-1 italic">
+              Routing for this behavior is set up in a later step; for now the form still files normally.
+            </p>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }

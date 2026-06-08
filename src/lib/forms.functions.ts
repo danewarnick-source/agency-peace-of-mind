@@ -938,3 +938,77 @@ Total questions: ${data.fields.length}`;
       },
     };
   });
+
+// ─── NECTAR: propose a routing behavior from the admin's purpose text ─────
+// Capture-only. Does NOT mutate the form, does NOT pick the behavior. The
+// admin sees the proposal in the builder and either accepts or overrides it;
+// only the admin's chosen behavior is persisted (via the normal saveForm
+// path under settings.routing_behavior).
+export const nectarProposeRouting = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    purpose: z.string().min(5).max(2000),
+    formName: z.string().max(160).optional(),
+    fieldLabels: z.array(z.string().max(200)).max(60).optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { userId, supabase } = context as { userId: string; supabase: AnySupabase };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+
+    const allowed = [
+      "general_submission",
+      "notify_only",
+      "client_intake_required",
+      "one_time_attestation",
+      "staff_mandate",
+      "per_shift_per_client_tracked",
+    ] as const;
+
+    const system = `You are NECTAR, the agency's compliance copilot. The admin is declaring how a custom form will be used. Propose ONE routing behavior from the allowed set and a one-line rationale. Output STRICT JSON ONLY, no markdown.
+
+Allowed behaviors (pick exactly one):
+- "general_submission": just filed; no notifications, no checklist, no gate.
+- "notify_only": filed + notifies chosen people on submit.
+- "client_intake_required": satisfies a client-intake checklist item for that client.
+- "one_time_attestation": each staff completes once; filed as a signed record.
+- "staff_mandate": every staff must complete BEFORE working with a client.
+- "per_shift_per_client_tracked": recurring per-client data viewed as a series (this overlaps with the client tracking / behavior support module).
+
+Schema: {"behavior": "<one of the allowed values>", "rationale": "<<= 160 chars, plain English, why this fits>"}
+
+Rules: propose only based on the purpose text and field labels. Never invent. If the purpose is vague, fall back to "general_submission". Keep the rationale specific and short.`;
+
+    const userMsg = JSON.stringify({
+      formName: data.formName ?? "",
+      purpose: data.purpose,
+      fieldLabels: data.fieldLabels ?? [],
+    });
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": apiKey },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "system", content: system }, { role: "user", content: userMsg }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
+    if (res.status === 402) throw new Error("AI workspace credits exhausted.");
+    if (!res.ok) throw new Error(`Nectar routing proposal failed (${res.status}).`);
+
+    const json = await res.json() as { choices?: { message?: { content?: string } }[] };
+    const raw = json.choices?.[0]?.message?.content ?? "{}";
+    let parsed: { behavior?: string; rationale?: string };
+    try { parsed = JSON.parse(raw); } catch { throw new Error("Nectar returned non-JSON."); }
+
+    const behavior = (allowed as readonly string[]).includes(String(parsed.behavior))
+      ? (parsed.behavior as typeof allowed[number])
+      : "general_submission";
+    const rationale = String(parsed.rationale ?? "Defaulted to general submission — purpose text was too vague to classify.").slice(0, 240);
+
+    return { proposal: { behavior, rationale, at: new Date().toISOString() } };
+  });

@@ -73,8 +73,11 @@ function EditForm() {
     setSettings(f.settings ?? {});
   }, [data]);
 
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   function addField(type: FieldType) {
-    setFields((arr) => sanitizeConditions([...arr, defaultFieldFor(type)]));
+    const f = defaultFieldFor(type);
+    setFields((arr) => sanitizeConditions([...arr, f]));
+    setLastAddedId(f.id);
   }
   function updateField(idx: number, next: FormField) {
     setFields((arr) => sanitizeConditions(arr.map((f, i) => i === idx ? next : f)));

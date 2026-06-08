@@ -12,9 +12,10 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
 } from "@/components/ui/alert-dialog";
 import {
-  Save, Sparkles, Plus, ChevronLeft, Settings as SettingsIcon, Users, FolderTree, CalendarClock, Send, Check, CircleDot,
+  Save, Sparkles, Plus, ChevronLeft, Settings as SettingsIcon, Users, FolderTree, CalendarClock, Send, Check, CircleDot, Trash2,
 } from "lucide-react";
 import { getForm, saveForm } from "@/lib/forms.functions";
+import { DeleteFormDialog } from "@/components/forms/delete-form-dialog";
 import {
   type FormField, type FieldType, type Frequency, type Schedule, type FormSettings,
   defaultFieldFor, FORM_CATEGORIES, describeFrequency, sanitizeConditions, isFieldVisible,

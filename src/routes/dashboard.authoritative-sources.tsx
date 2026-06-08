@@ -1693,6 +1693,7 @@ function RequirementRow({
   const [removeOpen, setRemoveOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [trackingOpen, setTrackingOpen] = useState(false);
   const [attestOpen, setAttestOpen] = useState(false);
 
   // Internal vs external classification (stored in metadata, falls back to heuristic)

@@ -75,7 +75,7 @@ export const updateRequirementTracking = createServerFn({ method: "POST" })
     next.updated_at = new Date().toISOString();
     next.updated_by = userId;
 
-    const newMeta: Record<string, Json> = { ...md, tracking: next };
+    const newMeta = { ...md, tracking: next } as Json;
 
     const { error: uErr } = await supabase
       .from("nectar_requirements")

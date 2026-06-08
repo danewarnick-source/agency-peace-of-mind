@@ -55,11 +55,15 @@ const GROUP_TONES = [
 
 export function SortableFields({
   fields, setFields, lastAddedId, onLastAddedConsumed,
+  typeGroups, typeLabel, onInsertAt,
 }: {
   fields: FormField[];
   setFields: (next: FormField[]) => void;
   lastAddedId?: string | null;
   onLastAddedConsumed?: () => void;
+  typeGroups?: { name: string; types: FieldType[] }[];
+  typeLabel?: Record<FieldType, string>;
+  onInsertAt?: (type: FieldType, afterIndex: number) => void;
 }) {
   const groups = useMemo(() => computeGroups(fields), [fields]);
   const [activeId, setActiveId] = useState<string | null>(null);

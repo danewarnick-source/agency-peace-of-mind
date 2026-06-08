@@ -221,18 +221,15 @@ function SortableItem({
     .filter((c) => c.field.type !== "section");
 
   const handle = (
-    <Button
+    <button
       type="button"
-      size="icon"
-      variant="ghost"
-      ref={setNodeRef as unknown as React.Ref<HTMLButtonElement>}
-      className="h-7 w-7 cursor-grab active:cursor-grabbing touch-none"
+      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent cursor-grab active:cursor-grabbing touch-none"
       aria-label="Drag to reorder"
       {...attributes}
       {...listeners}
     >
       <GripVertical className="h-4 w-4" />
-    </Button>
+    </button>
   );
 
   return (
@@ -245,8 +242,10 @@ function SortableItem({
       onMoveDown={onMoveDown}
       onRemove={onRemove}
       dragHandle={handle}
+      containerRef={setNodeRef}
       containerStyle={style}
       isDragging={isDragging}
     />
   );
 }
+

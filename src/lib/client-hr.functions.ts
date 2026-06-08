@@ -28,6 +28,7 @@ export interface ClientIntakeRow {
   evidence_type: string | null;
   renewal: string | null;
   checklist_layer: string | null;
+  purpose: string | null;
   conditional: string | null;
   note: string | null;
   completion: {

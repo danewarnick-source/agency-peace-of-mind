@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ClipboardList } from "lucide-react";
 
-export const Route = createFileRoute("/dashboard/clients/$clientId/intake")({
+export const Route = createFileRoute("/dashboard/client-intake/$clientId")({
   head: () => ({ meta: [{ title: "New Client Intake — HIVE" }] }),
   component: IntakePlaceholder,
 });

@@ -335,6 +335,19 @@ function EditForm() {
         formId={formId} formMeta={{ name, description, frequency, schedule, fields }}
         onPublished={() => { qc.invalidateQueries({ queryKey: ["form-edit", formId] }); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }} />
 
+      <DeleteFormDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        formId={formId}
+        formName={name || data?.form?.name || ""}
+        onDeleted={() => {
+          setBaseline(currentSnapshot); // clear dirty so the unsaved guard doesn't block navigation
+          qc.invalidateQueries({ queryKey: ["forms-admin"] });
+          navigate({ to: "/dashboard/forms" });
+        }}
+      />
+
+
       {/* spacer so sticky footer doesn't cover content */}
       <div className="h-20" aria-hidden />
 

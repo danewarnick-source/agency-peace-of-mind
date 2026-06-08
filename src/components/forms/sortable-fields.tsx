@@ -202,6 +202,18 @@ export function SortableFields({
                       />
                     );
                   })}
+                  {onInsertAt && typeGroups && typeLabel && (g.section || g.fields.length > 0) && (
+                    <InlineInserter
+                      afterIndex={
+                        g.fields.length > 0
+                          ? indexOf(g.fields[g.fields.length - 1].id)
+                          : indexOf(g.section!.id)
+                      }
+                      typeGroups={typeGroups}
+                      typeLabel={typeLabel}
+                      onInsertAt={onInsertAt}
+                    />
+                  )}
                 </div>
               </div>
             );
@@ -210,6 +222,54 @@ export function SortableFields({
       </SortableContext>
       <DragOverlay>{activeId ? <div className="rounded-md border-2 border-primary bg-card/95 px-3 py-2 text-sm shadow-lg">Moving…</div> : null}</DragOverlay>
     </DndContext>
+  );
+}
+
+function InlineInserter({
+  afterIndex, typeGroups, typeLabel, onInsertAt,
+}: {
+  afterIndex: number;
+  typeGroups: { name: string; types: FieldType[] }[];
+  typeLabel: Record<FieldType, string>;
+  onInsertAt: (type: FieldType, afterIndex: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="pt-1">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 w-full justify-center border border-dashed border-border/60 text-xs text-muted-foreground hover:border-primary hover:text-primary"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add field here
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[320px] p-2 space-y-2">
+          {typeGroups.map((g) => (
+            <div key={g.name} className="space-y-1">
+              <p className="px-1 text-[10px] uppercase tracking-wide text-muted-foreground">{g.name}</p>
+              <div className="flex flex-wrap gap-1">
+                {g.types.map((t) => (
+                  <Button
+                    key={t}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => { onInsertAt(t, afterIndex); setOpen(false); }}
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> {typeLabel[t]}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
 

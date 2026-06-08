@@ -676,6 +676,116 @@ function RoutingBehaviorCard({
           </div>
         </>
       )}
+
+      {chosen === "per_shift_per_client_tracked" && (
+        <TrackedDataConfig
+          settings={settings}
+          setSettings={setSettings}
+          allClients={allClients}
+          clientsCount={clientsCount}
+        />
+      )}
     </Card>
+  );
+}
+
+function TrackedDataConfig({
+  settings, setSettings, allClients, clientsCount,
+}: {
+  settings: FormSettings;
+  setSettings: (updater: (s: FormSettings) => FormSettings) => void;
+  allClients: boolean;
+  clientsCount: number;
+}) {
+  const codeMode = settings.tracking_code_mode ?? "all";
+  const chosenCodes = settings.tracking_billing_codes ?? [];
+  const enforcement = settings.tracking_enforcement ?? "optional";
+  const audienceSummary = allClients
+    ? "All clients"
+    : clientsCount > 0
+      ? `${clientsCount} specific client${clientsCount === 1 ? "" : "s"}`
+      : "No clients selected yet";
+
+  function toggleCode(code: string) {
+    setSettings((s) => {
+      const cur = s.tracking_billing_codes ?? [];
+      const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code];
+      return { ...s, tracking_billing_codes: next };
+    });
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50/60 p-3">
+      <div className="grid gap-1.5">
+        <Label className="text-xs">Client targeting</Label>
+        <div className="rounded-md border border-input bg-background px-3 py-2 text-xs flex items-center justify-between gap-3">
+          <span><strong>{audienceSummary}</strong></span>
+          <span className="text-muted-foreground">Change in the <em>Assign</em> step.</span>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Uses this form's existing client audience (all clients, or the specific clients you assign).
+        </p>
+      </div>
+
+      <div className="grid gap-1.5">
+        <Label className="text-xs">Billing-code targeting</Label>
+        <select
+          value={codeMode}
+          onChange={(e) => {
+            const v = e.target.value as "all" | "specific";
+            setSettings((s) => ({ ...s, tracking_code_mode: v }));
+          }}
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          <option value="all">All billing codes</option>
+          <option value="specific">Specific code(s)</option>
+        </select>
+        {codeMode === "specific" && (
+          <div className="rounded-md border border-input bg-background p-2 max-h-56 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-1">
+            {EVV_SERVICE_CODES.map((c) => {
+              const on = chosenCodes.includes(c.code);
+              return (
+                <label
+                  key={c.code}
+                  className={`flex items-start gap-2 rounded px-2 py-1 text-xs cursor-pointer min-h-[36px] ${on ? "bg-emerald-50" : "hover:bg-muted"}`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={on}
+                    onChange={() => toggleCode(c.code)}
+                  />
+                  <span className="leading-tight">{c.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+        <p className="text-[11px] text-muted-foreground">
+          Form fires when a shift matches BOTH the client filter and the code filter.
+        </p>
+      </div>
+
+      <div className="grid gap-1.5">
+        <Label className="text-xs">Enforcement</Label>
+        <select
+          value={enforcement}
+          onChange={(e) => {
+            const v = e.target.value as FormSettings["tracking_enforcement"];
+            setSettings((s) => ({ ...s, tracking_enforcement: v }));
+          }}
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          <option value="optional">Optional — no prompt; staff can fill if they want</option>
+          <option value="reminded">Reminded — nudge during/after shift; can skip (skip is recorded)</option>
+          <option value="required_before_clockout">Required before clock-out — prompt at end of shift (never traps you)</option>
+          <option value="required_before_next_clockin">Required before next clock-in — must finish before starting your next shift</option>
+        </select>
+        <p className="text-[11px] text-muted-foreground">
+          Enforcement prompts at the punch-pad are set up in a later step — this just records your choice.
+          EVV / clock-in / shift records are not affected.
+        </p>
+      </div>
+    </div>
   );
 }

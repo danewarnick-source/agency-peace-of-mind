@@ -96,7 +96,8 @@ export const saveForm = createServerFn({ method: "POST" })
       settings: data.settings,
       created_by: userId,
     };
-    let savedForm: { id: string; name: string; settings: Record<string, unknown> | null; category: string } | null = null;
+    type SavedForm = { id: string; name: string; settings: Record<string, unknown> | null; category: string };
+    let savedForm: SavedForm | null = null;
     if (data.id) {
       const { data: updated, error } = await supabase
         .from("forms").update(payload).eq("id", data.id).select().maybeSingle();

@@ -264,6 +264,13 @@ function EditForm() {
             </div>
           </Card>
 
+          <RoutingBehaviorCard
+            name={name}
+            fields={fields}
+            settings={settings}
+            setSettings={setSettings}
+          />
+
           <div className="flex flex-wrap gap-1.5 rounded-md border border-dashed border-border bg-muted/30 p-2">
             {TYPE_GROUPS.map((g) => (
               <div key={g.name} className="flex flex-wrap gap-1 items-center">

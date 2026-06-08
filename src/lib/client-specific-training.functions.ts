@@ -121,7 +121,7 @@ async function assembleVerbatim(
           label: `${s.forms?.name ?? "Intake form"} (${s.submitted_at?.slice(0, 10) ?? ""})`,
           pairs,
         };
-      }).filter((it) => (it.kind === "kv" ? it.pairs.length > 0 : true));
+      }).filter((it: CSTItem) => (it.kind === "kv" ? it.pairs.length > 0 : true));
       if (items.length) sections.push({ id: sid(), title: "Intake summary", items });
     }
   } catch { /* table may be absent in some orgs */ }

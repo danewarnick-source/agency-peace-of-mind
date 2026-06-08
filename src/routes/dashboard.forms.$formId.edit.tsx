@@ -17,6 +17,7 @@ import {
   defaultFieldFor, FORM_CATEGORIES, describeFrequency, sanitizeConditions, isFieldVisible,
 } from "@/lib/forms-utils";
 import { FieldEditor, TYPE_GROUPS, TYPE_LABEL } from "@/components/forms/field-editor";
+import { SortableFields } from "@/components/forms/sortable-fields";
 import { FieldRenderer } from "@/components/forms/field-renderer";
 import { NectarDraftModal } from "@/components/forms/nectar-draft-modal";
 import { SettingsModal } from "@/components/forms/settings-modal";

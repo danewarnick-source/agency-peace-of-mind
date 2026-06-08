@@ -591,6 +591,122 @@ Rules: 6–16 fields total. Use real interactive types — never a blank text bo
     };
   });
 
+// ─── NECTAR: draft a form by extracting structure from a PDF ──────────────
+// Accepts a base64-encoded PDF. Reuses the same draft shape as nectarDraftForm
+// so the builder applies it identically. Output lands as a DRAFT — never
+// auto-published; human review + existing publish gate apply.
+export const nectarDraftFormFromPdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    pdfBase64: z.string().min(100).max(15_000_000),
+    filename: z.string().max(240).optional(),
+    hint: z.string().max(2000).optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { userId, supabase } = context as { userId: string; supabase: AnySupabase };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+
+    const system = `You are NECTAR. You are given a PDF of an EXISTING paper/digital form used by a DSPD agency. Extract the form's STRUCTURE (sections, questions, input types) and re-express it as a HIVE custom form. Output STRICT JSON only — no markdown.
+
+Schema:
+{
+  "name": "<short form name inferred from PDF title>",
+  "description": "<one short sentence about purpose>",
+  "category": "<one of: general, timesheets, training, incidents, clients, hr, daily_logs, compliance, billing, scheduling, intake>",
+  "frequency": "<one of: as_needed, daily, weekly, monthly, quarterly, annually>",
+  "low_confidence": true|false,
+  "confidence_notes": "<one short sentence; mention if PDF appears scanned/OCR-only or hard to parse>",
+  "fields": [
+    {"type":"section","label":"Section title","instructions":"optional"},
+    {"type":"short_text"|"paragraph"|"dropdown"|"checkboxes"|"yes_no"|"number"|"date"|"time"|"rating"|"signature"|"photo"|"file"|"location"|"email"|"phone",
+     "label":"Question label as it appears on the form",
+     "help":"optional", "placeholder":"optional", "required":true|false,
+     "options":["A","B"], "config": { "display":"box"|"slider","min":0,"max":10,"step":1,"scale":5 } }
+  ]
+}
+
+Mapping rules (extraction, NOT visual cloning):
+- Headings / section dividers → "section".
+- Single-line blank → "short_text". Multi-line / "Explain" / "Notes" → "paragraph".
+- Date blanks (MM/DD/YYYY, "Date:", "DOB") → "date". Time → "time".
+- Yes/No or Y/N for one question → "yes_no".
+- Group of checkboxes with multiple selectable items → "checkboxes" with options.
+- Radio buttons / "Select one" → "dropdown" with options.
+- Numeric only → "number". "Signature" / "Sign here" → "signature".
+- Email / Phone / Address → email/phone/location. Attach photo/upload → photo/file.
+- Likert / star scale → "rating".
+- Preserve document order; group under preceding section heading.
+
+Quality rules:
+- Use real interactive types — never a blank text where date/dropdown/checkboxes/signature fits.
+- Mark required when marked with *, "(required)", "REQUIRED", or obvious intent.
+- Keep labels under 80 chars; preserve original wording.
+- Up to 60 fields. Skip pure layout/decoration.
+- If PDF looks scanned/handwritten/poor quality, set low_confidence=true and return best-effort.
+- Never invent fields not on the form. Never invent PHI.`;
+
+    const userText = `Extract the form structure from this PDF into the JSON schema above.${data.hint ? `\n\nHint from the uploader: ${data.hint}` : ""}${data.filename ? `\n\nFilename: ${data.filename}` : ""}`;
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": apiKey },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: [
+            { type: "text", text: userText },
+            { type: "image_url", image_url: { url: `data:application/pdf;base64,${data.pdfBase64}` } },
+          ] },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
+    if (res.status === 402) throw new Error("AI workspace credits exhausted.");
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`Nectar PDF draft failed (${res.status}). ${txt.slice(0, 200)}`);
+    }
+    const json = await res.json() as { choices?: { message?: { content?: string } }[] };
+    const raw = json.choices?.[0]?.message?.content ?? "{}";
+    let parsed: {
+      name?: string; description?: string; category?: string; frequency?: string;
+      low_confidence?: boolean; confidence_notes?: string; fields?: unknown;
+    };
+    try { parsed = JSON.parse(raw); } catch { throw new Error("Nectar returned non-JSON."); }
+    const fields = Array.isArray(parsed.fields)
+      ? (parsed.fields as Array<Record<string, unknown>>).slice(0, 60).map((f) => {
+          const out: FormField = {
+            id: `f_${Math.random().toString(36).slice(2, 10)}`,
+            type: (typeof f.type === "string" ? f.type : "short_text") as FormField["type"],
+            label: String(f.label ?? "Question").slice(0, 160),
+            help: typeof f.help === "string" ? f.help.slice(0, 240) : undefined,
+            placeholder: typeof f.placeholder === "string" ? f.placeholder.slice(0, 120) : undefined,
+            required: Boolean(f.required),
+            instructions: typeof f.instructions === "string" ? f.instructions.slice(0, 600) : undefined,
+            options: Array.isArray(f.options) ? (f.options as unknown[]).map(String).slice(0, 40) : undefined,
+            config: (typeof f.config === "object" && f.config !== null) ? (f.config as FormField["config"]) : undefined,
+          };
+          return out;
+        })
+      : [];
+    const lowConfidence = Boolean(parsed.low_confidence) || fields.length < 3;
+    return {
+      draft: {
+        name: String(parsed.name ?? data.filename?.replace(/\.pdf$/i, "") ?? "Untitled form").slice(0, 160),
+        description: String(parsed.description ?? "").slice(0, 600),
+        category: String(parsed.category ?? "general"),
+        frequency: String(parsed.frequency ?? "as_needed"),
+        fields,
+      },
+      lowConfidence,
+      confidenceNotes: typeof parsed.confidence_notes === "string" ? parsed.confidence_notes.slice(0, 400) : "",
+    };
+  });
+
 // ─── NECTAR: draft a publish notification ──────────────────────────────────
 export const nectarDraftNotification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

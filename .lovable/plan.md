@@ -1,56 +1,60 @@
-# Stage 1 — Add New Client Fork + `intake_status`
+# Inline "+" inserter at the bottom of each section
 
-Adds a path-choice step to the existing Add New Client flow and persists an org-scoped `intake_status` on `clients`. No intake forms, attestations, reminders, or Needs-attention work — those are later stages.
+Builder-only UX change. Adds a contextual "+" button at the bottom of every section group that opens the existing field-type palette and inserts the chosen field directly after that section's last field — preserving the flat `fields` array shape, drag-reorder grouping, and the existing "just added" flash/scroll/focus behavior.
 
-## 1. Database
+## Files touched
 
-Migration adds one column to `public.clients`:
+- `src/routes/dashboard.forms.$formId.edit.tsx` — expose an `insertAfterIndex` insertion path; pass it (plus the type list) into `SortableFields`. Existing top palette stays unchanged.
+- `src/components/forms/sortable-fields.tsx` — render an "Add field here" button at the bottom of each group; on click open a popover listing field types; on choose, call the insert callback with the group's last-flat-index.
 
-- `intake_status text NOT NULL DEFAULT 'pending'`
-- CHECK constraint values: `pending | in_progress | awaiting_admin_signoff | complete`
+No changes to: `forms-utils.ts`, save path, field types, conditional logic, `field-editor.tsx`, staff rendering.
 
-No new policies — `clients` RLS already gates by org membership, which is the desired admin/manager gating for this field. No grants change.
+## Insertion logic
 
-## 2. Add New Client UI (`src/routes/dashboard.clients.tsx`)
+- `addFieldAt(type, afterIndex)`:
+  - `const f = defaultFieldFor(type)`
+  - `setFields(arr => sanitizeConditions([...arr.slice(0, afterIndex + 1), f, ...arr.slice(afterIndex + 1)]))`
+  - `setLastAddedId(f.id)` → triggers the existing flash + scrollIntoView + label-focus in `SortableItem`.
+- The existing `addField(type)` (top palette) stays as append-to-end.
+- For each rendered group, compute `lastIdx`:
+  - If `g.fields.length > 0` → flat index of the last field in the group.
+  - Else if `g.section` exists (empty section) → flat index of the section header itself (so the new field lands as that section's first child).
+  - Head/ungrouped group (no section, before first section): also supported via the same calc; if it has fields, insert after its last field; if it has nothing it isn't rendered.
+- Choosing "Section / instructions" from the inline menu works identically (it just inserts a `section` field at that location, which the existing `computeGroups` will treat as a new section break).
 
-Modify the existing `AddClientDialog` + parent `addMutation`:
+## UI
 
-- **Step 1 — Choice screen** shown first when the dialog opens. Two large buttons:
-  - "Create profile & begin intake now"
-  - "Create profile only (not ready for intake)"
-  - Small back-link returns to choice from step 2.
-- **Step 2 — Existing form** (unchanged fields, validation, layout). The dialog's submit button label adapts:
-  - intake-now path → "Create & start intake"
-  - profile-only path → "Create profile"
-- One internal local state `mode: 'intake' | 'profile-only' | null` drives both the visible step and the submit behavior. No second/divergent form — the same `AddClientDialog` body renders for both paths.
+- Inline button: small dashed "+ Add field here" button at the bottom of each group's indented field column (inside the same colored group container, after the last `SortableItem`).
+- Opens a shadcn `Popover` (or `DropdownMenu`) containing the same `TYPE_GROUPS` / `TYPE_LABEL` lists already imported in the edit route. To avoid duplicating the type-list constants in `sortable-fields.tsx`, the route passes a render-prop / typed list down:
 
-Submit handler passes `mode` to `addMutation`, which writes `intake_status`:
-- `'profile-only'` → `intake_status: 'pending'`
-- `'intake'` → `intake_status: 'in_progress'`
+```ts
+<SortableFields
+  fields={fields}
+  setFields={setFields}
+  lastAddedId={lastAddedId}
+  onLastAddedConsumed={() => setLastAddedId(null)}
+  typeGroups={TYPE_GROUPS}
+  typeLabel={TYPE_LABEL}
+  onInsertAt={(type, afterIndex) => addFieldAt(type, afterIndex)}
+/>
+```
 
-On success:
-- profile-only → close dialog, stay on directory (current behavior).
-- intake → close dialog, `navigate({ to: '/dashboard/clients/$clientId/intake', params: { clientId: newId } })` (the insert is changed to `.select('id').single()` so we have the new id).
+- Popover content mirrors the top palette layout (grouped by category, same labels, same icons) so the chooser is visually consistent.
 
-Reading: the existing `useQuery` select list adds `intake_status` so later stages can read it; no UI badge is added this stage.
+## Compatibility with existing builder features
 
-## 3. Placeholder intake route
+- **Flash/scroll/focus:** reuses `lastAddedId` → `SortableItem`'s existing `justAdded` effect (no duplication).
+- **Grouped drag-reorder:** the new field is inserted into the flat array between the section's last field and the next section marker, so `computeGroups` naturally groups it under the right section; drag handles work as-is.
+- **Conditional logic:** insertion runs through `sanitizeConditions` like every other mutation.
+- **Save path:** unchanged — still serializes the flat `fields` array.
+- **Top palette:** untouched; still appends to end.
 
-New file `src/routes/dashboard.clients.$clientId.intake.tsx`:
-- Minimal route, reads `clientId` param, renders a centered card titled "Intake procedure — coming in next build" with the client's name (small `useQuery` for first/last name) and a "Back to Clients" link.
-- No forms, no writes.
+## Verify
 
-## 4. Out of scope (explicitly NOT touched)
-
-- Forms, attestations, auto-population, PDF storage.
-- Reminder bubbles, Needs-attention integration, directory badges.
-- Staff portal, EVV, billing, RLS beyond the new column.
-- The edit-client mutation (does not touch `intake_status`).
-
-## 5. Verification
-
-- Open Clients → Directory → Add New Client → choice screen appears.
-- "Create profile only" → form → save → row exists with `intake_status='pending'`, directory shows it, dialog closes.
-- "Begin intake now" → same form → save → row exists with `intake_status='in_progress'`, browser navigates to `/dashboard/clients/{id}/intake` placeholder.
-- Both paths use identical fields/validation; existing save path still works.
-- `select intake_status from clients` returns the values for later stages; staff portal routes unchanged.
+1. Each section shows a "+ Add field here" at its bottom; click opens the type palette popover.
+2. Pick "Short text" inside Section B → new field becomes Section B's last field (NOT the form's last field).
+3. Pick "Section / instructions" from inside Section B → a new section break is inserted at that point; subsequent fields previously trailing B now belong to the new section (consistent with current section semantics).
+4. The new field flashes, scrolls into view, and its label input is focused.
+5. Drag the new field up/down — it reorders and remains grouped under its section.
+6. Save → reload → order and field config persist; staff filler renders identically.
+7. Top palette still appends to the end as before.

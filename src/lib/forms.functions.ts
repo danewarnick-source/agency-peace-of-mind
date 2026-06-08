@@ -171,7 +171,7 @@ export const saveForm = createServerFn({ method: "POST" })
       }
     }
 
-    return { form: savedForm };
+    return { form: savedForm ? { id: savedForm.id, name: savedForm.name } : null };
   });
 
 // ─── ADMIN: archive a form ─────────────────────────────────────────────────

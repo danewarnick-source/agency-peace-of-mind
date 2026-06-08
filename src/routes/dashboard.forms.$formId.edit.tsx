@@ -101,14 +101,14 @@ function EditForm() {
   }, [isDirty]);
 
   // In-app navigation blocker
-  useBlocker({
+  const blocker = useBlocker({
     shouldBlockFn: () => isDirty,
     withResolver: true,
     enableBeforeUnload: false,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any).then?.((res: { status: string; proceed: () => void; reset: () => void }) => {
-    if (res?.status === "blocked") setPendingNav({ proceed: res.proceed, reset: res.reset });
   });
+  useEffect(() => {
+    if (blocker.status === "blocked") setConfirmOpen(true);
+  }, [blocker.status]);
 
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   function addField(type: FieldType) {

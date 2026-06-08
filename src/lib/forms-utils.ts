@@ -159,6 +159,15 @@ export type FormSettings = {
    *  while unmet; admins/owners may override with a typed reason which is
    *  stored on the notification record. */
   mandate_enforcement?: "warn" | "block";
+  /** Per-shift, per-client tracked-data routing (Stage 2 of 5).
+   *  Captures targeting + enforcement choices for forms with
+   *  routing_behavior='per_shift_per_client_tracked'. The choices are
+   *  stored so config persists; the actual front-of-punch prompts and
+   *  the Care-tab section are wired in later stages. Client targeting
+   *  REUSES the existing all_clients / assigned_clients audience. */
+  tracking_code_mode?: "all" | "specific";
+  tracking_billing_codes?: string[];
+  tracking_enforcement?: "optional" | "reminded" | "required_before_clockout" | "required_before_next_clockin";
 };
 
 export type RoutingBehavior =

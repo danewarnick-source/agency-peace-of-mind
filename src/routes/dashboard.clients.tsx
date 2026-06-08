@@ -254,7 +254,7 @@ export function ClientsPage() {
       qc.invalidateQueries({ queryKey: ["clients"] });
       setAddOpen(false);
       if (mode === "intake") {
-        navigate({ to: "/dashboard/clients/$clientId/intake", params: { clientId: id } });
+        navigate({ to: "/dashboard/client-intake/$clientId", params: { clientId: id } });
       }
     },
     onError: (e: Error) => toast.error(e.message),

@@ -721,11 +721,18 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({
     staffId: z.string().uuid(),
     clientId: z.string().uuid().optional(),
+    // Stage 4: NEW (staff, client) assignments being added in this save.
+    // When provided, the gate ALSO checks per-(staff,client) Client-Specific
+    // Training completion for each clientId and merges unmet items into the
+    // same list (default enforcement = WARN). Empty/omitted = legacy behavior.
+    clientIds: z.array(z.string().uuid()).max(100).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
+
+    const unmet: Array<{ form_id: string; name: string; mandate_scope: string; enforcement: "warn" | "block" }> = [];
 
     // 1. All published staff_mandate forms in this org.
     const { data: forms, error: fe } = await supabase
@@ -738,7 +745,6 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
       id: string; name: string; settings: Record<string, unknown> | null;
       all_clients: boolean; assigned_clients: string[] | null;
     }>).filter((f) => (f.settings ?? {})["routing_behavior"] === "staff_mandate");
-    if (!mandateForms.length) return { unmet: [] };
 
     // 2. If clientId provided, drop forms not assigned to that client.
     const scoped = mandateForms.filter((f) => {
@@ -746,7 +752,6 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
       if (f.all_clients) return true;
       return (f.assigned_clients ?? []).includes(data.clientId);
     });
-    if (!scoped.length) return { unmet: [] };
 
     // Map form id → enforcement ('warn' default | 'block') from form settings.
     const enforcementByForm = new Map<string, "warn" | "block">();
@@ -755,56 +760,132 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
       enforcementByForm.set(f.id, enf === "block" ? "block" : "warn");
     }
 
-    // 3. Look up the matching hr_staff_checklist requirements (one per form).
-    const reqKeys = scoped.map((f) => `company_required:form:${f.id}`);
-    const { data: reqs } = await supabase
-      .from("nectar_requirements")
-      .select("id, requirement_key, metadata")
-      .eq("organization_id", m.organization_id)
-      .in("requirement_key", reqKeys)
-      .eq("approval_state", "provider_confirmed");
-    const reqByForm = new Map<string, { id: string; mandate_scope: string }>();
-    for (const r of (reqs ?? []) as Array<{ id: string; requirement_key: string; metadata: Record<string, unknown> | null }>) {
-      const md = r.metadata ?? {};
-      if (md["scope"] !== "hr_staff_checklist") continue;
-      const formId = r.requirement_key.replace("company_required:form:", "");
-      reqByForm.set(formId, {
-        id: r.id,
-        mandate_scope: (md["mandate_scope"] as string) || "per_staff",
-      });
-    }
+    if (scoped.length) {
+      // 3. Look up the matching hr_staff_checklist requirements (one per form).
+      const reqKeys = scoped.map((f) => `company_required:form:${f.id}`);
+      const { data: reqs } = await supabase
+        .from("nectar_requirements")
+        .select("id, requirement_key, metadata")
+        .eq("organization_id", m.organization_id)
+        .in("requirement_key", reqKeys)
+        .eq("approval_state", "provider_confirmed");
+      const reqByForm = new Map<string, { id: string; mandate_scope: string }>();
+      for (const r of (reqs ?? []) as Array<{ id: string; requirement_key: string; metadata: Record<string, unknown> | null }>) {
+        const md = r.metadata ?? {};
+        if (md["scope"] !== "hr_staff_checklist") continue;
+        const formId = r.requirement_key.replace("company_required:form:", "");
+        reqByForm.set(formId, {
+          id: r.id,
+          mandate_scope: (md["mandate_scope"] as string) || "per_staff",
+        });
+      }
 
-    const reqIds = Array.from(reqByForm.values()).map((r) => r.id);
-    if (!reqIds.length) return { unmet: [] };
+      const reqIds = Array.from(reqByForm.values()).map((r) => r.id);
+      if (reqIds.length) {
+        // 4. Pull this staffer's GENERAL (client_id IS NULL) completion rows
+        //    for those requirements. Per-client rows (Stage 1) must not
+        //    accidentally satisfy a general staff-mandate.
+        const { data: comps } = await supabase
+          .from("staff_checklist_completion")
+          .select("requirement_id, status")
+          .eq("organization_id", m.organization_id)
+          .eq("staff_id", data.staffId)
+          .is("client_id", null)
+          .in("requirement_id", reqIds);
+        const satisfied = new Set<string>();
+        for (const c of (comps ?? []) as Array<{ requirement_id: string; status: string }>) {
+          if (["complete", "waived", "not_applicable"].includes(c.status)) {
+            satisfied.add(c.requirement_id);
+          }
+        }
 
-    // 4. Pull this staffer's completion rows for those requirements.
-    const { data: comps } = await supabase
-      .from("staff_checklist_completion")
-      .select("requirement_id, status")
-      .eq("organization_id", m.organization_id)
-      .eq("staff_id", data.staffId)
-      .in("requirement_id", reqIds);
-    const satisfied = new Set<string>();
-    for (const c of (comps ?? []) as Array<{ requirement_id: string; status: string }>) {
-      if (["complete", "waived", "not_applicable"].includes(c.status)) {
-        satisfied.add(c.requirement_id);
+        // 5. Forms whose requirement is NOT satisfied.
+        for (const f of scoped) {
+          const req = reqByForm.get(f.id);
+          if (!req) continue;
+          if (satisfied.has(req.id)) continue;
+          unmet.push({
+            form_id: f.id,
+            name: f.name,
+            mandate_scope: req.mandate_scope,
+            enforcement: enforcementByForm.get(f.id) ?? "warn",
+          });
+        }
       }
     }
 
-    // 5. Return forms whose requirement is NOT satisfied.
-    const unmet = scoped
-      .map((f) => {
-        const req = reqByForm.get(f.id);
-        if (!req) return null; // no mapped requirement → not gated by this check
-        if (satisfied.has(req.id)) return null;
-        return {
-          form_id: f.id,
-          name: f.name,
-          mandate_scope: req.mandate_scope,
-          enforcement: enforcementByForm.get(f.id) ?? "warn",
-        };
-      })
-      .filter((x): x is { form_id: string; name: string; mandate_scope: string; enforcement: "warn" | "block" } => x !== null);
+    // ─── Stage 4: Client-Specific Training per (staff, client) ──────────────
+    // For each NEW (staff, client) assignment in `clientIds`, if the client
+    // has a PUBLISHED client_specific_training and there is NO satisfying
+    // per-client staff_checklist_completion row (status IN complete/waived/
+    // not_applicable) keyed by the org's system anchor requirement
+    // (origin='system', requirement_key='client_specific_training'), flag it.
+    // Default enforcement = WARN (non-blocking). No setting needed this stage.
+    const cstClientIds = data.clientIds ?? [];
+    if (cstClientIds.length) {
+      const { data: trainings } = await supabase
+        .from("client_specific_trainings")
+        .select("id, client_id, status")
+        .eq("organization_id", m.organization_id)
+        .eq("status", "published")
+        .in("client_id", cstClientIds);
+      const publishedByClient = new Map<string, { id: string }>();
+      for (const t of (trainings ?? []) as Array<{ id: string; client_id: string; status: string }>) {
+        publishedByClient.set(t.client_id, { id: t.id });
+      }
+
+      if (publishedByClient.size) {
+        // System anchor requirement — created lazily on first staff
+        // completion (Stage 2b). If absent, no completions exist → all
+        // published-training clients are unmet.
+        const { data: anchor } = await supabase
+          .from("nectar_requirements")
+          .select("id")
+          .eq("organization_id", m.organization_id)
+          .eq("origin", "system")
+          .eq("requirement_key", "client_specific_training")
+          .limit(1)
+          .maybeSingle();
+
+        const satisfiedClientIds = new Set<string>();
+        if (anchor?.id) {
+          const { data: perClientComps } = await supabase
+            .from("staff_checklist_completion")
+            .select("client_id, status")
+            .eq("organization_id", m.organization_id)
+            .eq("staff_id", data.staffId)
+            .eq("requirement_id", anchor.id)
+            .in("client_id", Array.from(publishedByClient.keys()));
+          for (const c of (perClientComps ?? []) as Array<{ client_id: string | null; status: string }>) {
+            if (c.client_id && ["complete", "waived", "not_applicable"].includes(c.status)) {
+              satisfiedClientIds.add(c.client_id);
+            }
+          }
+        }
+
+        const unmetClientIds = Array.from(publishedByClient.keys()).filter((cid) => !satisfiedClientIds.has(cid));
+        if (unmetClientIds.length) {
+          const { data: clientRows } = await supabase
+            .from("clients")
+            .select("id, first_name, last_name")
+            .in("id", unmetClientIds);
+          const nameByClient = new Map<string, string>();
+          for (const c of (clientRows ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {
+            const nm = [c.first_name, c.last_name].filter(Boolean).join(" ").trim() || "client";
+            nameByClient.set(c.id, nm);
+          }
+          for (const cid of unmetClientIds) {
+            const training = publishedByClient.get(cid)!;
+            unmet.push({
+              form_id: training.id, // training uuid — used as React key + notification ref
+              name: `Client-Specific Training: ${nameByClient.get(cid) ?? "client"}`,
+              mandate_scope: "per_staff_per_client",
+              enforcement: "warn", // Stage 4 default
+            });
+          }
+        }
+      }
+    }
 
     return { unmet };
   });

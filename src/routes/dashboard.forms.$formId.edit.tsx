@@ -79,6 +79,14 @@ function EditForm() {
     setFields((arr) => sanitizeConditions([...arr, f]));
     setLastAddedId(f.id);
   }
+  function addFieldAt(type: FieldType, afterIndex: number) {
+    const f = defaultFieldFor(type);
+    setFields((arr) => {
+      const i = Math.max(-1, Math.min(afterIndex, arr.length - 1));
+      return sanitizeConditions([...arr.slice(0, i + 1), f, ...arr.slice(i + 1)]);
+    });
+    setLastAddedId(f.id);
+  }
   function updateField(idx: number, next: FormField) {
     setFields((arr) => sanitizeConditions(arr.map((f, i) => i === idx ? next : f)));
   }
@@ -227,7 +235,15 @@ function EditForm() {
                 Add a field from the palette above, or click <strong>Build with Nectar</strong>.
               </div>
             ) : (
-              <SortableFields fields={fields} setFields={(next) => setFields(next)} lastAddedId={lastAddedId} onLastAddedConsumed={() => setLastAddedId(null)} />
+              <SortableFields
+                fields={fields}
+                setFields={(next) => setFields(next)}
+                lastAddedId={lastAddedId}
+                onLastAddedConsumed={() => setLastAddedId(null)}
+                typeGroups={TYPE_GROUPS}
+                typeLabel={TYPE_LABEL}
+                onInsertAt={addFieldAt}
+              />
             )}
           </div>
 

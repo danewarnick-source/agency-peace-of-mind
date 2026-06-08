@@ -130,10 +130,12 @@ export type FormSettings = {
   notify_email?: boolean;
   submission_limit?: "unlimited" | "1_per_day" | "1_per_week" | "1_per_month" | "1_total";
   remind?: "off" | "3_days_before" | "weekly" | "daily";
+  subcategory?: "application" | "independence" | "consent" | "pnp_attestation";
 };
 
 export const FORM_CATEGORIES = [
   { value: "general", label: "General (Records → Forms only)" },
+  { value: "intake", label: "Client Intake" },
   { value: "timesheets", label: "Timesheets" },
   { value: "training", label: "Training Records" },
   { value: "incidents", label: "Incident Reports" },

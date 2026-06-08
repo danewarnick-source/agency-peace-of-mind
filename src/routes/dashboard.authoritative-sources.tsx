@@ -1711,6 +1711,8 @@ function RequirementRow({
   const externalSystem =
     (md["external_system"] as string | null | undefined) ?? inferred?.externalSystem ?? null;
   const renewalDueAt = (md["renewal_due_at"] as string | null | undefined) ?? null;
+  const trackingMd = (md["tracking"] ?? {}) as Partial<RequirementTracking>;
+  const trackingState = computeRequirementDueState(md);
 
 
 

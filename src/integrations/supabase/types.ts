@@ -1964,6 +1964,66 @@ export type Database = {
         }
         Relationships: []
       }
+      client_specific_trainings: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          attestation_statement: string
+          client_id: string
+          content: Json
+          created_at: string
+          id: string
+          organization_id: string
+          status: string
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attestation_statement?: string
+          client_id: string
+          content?: Json
+          created_at?: string
+          id?: string
+          organization_id: string
+          status?: string
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attestation_statement?: string
+          client_id?: string
+          content?: Json
+          created_at?: string
+          id?: string
+          organization_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_specific_trainings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_specific_trainings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_spending_log: {
         Row: {
           amount: number

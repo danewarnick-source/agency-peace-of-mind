@@ -1,0 +1,398 @@
+// Server functions for Client-Specific Training (Stage 2a — admin build/review/publish).
+// NECTAR PRESENTS verbatim — it does NOT author care guidance.
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from "zod";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySupabase = any;
+
+function adminGuard(role: string | undefined) {
+  if (!role || !["admin", "manager", "super_admin"].includes(role)) {
+    throw new Error("Forbidden: admin access required.");
+  }
+}
+
+async function getMembership(supabase: AnySupabase, userId: string) {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("organization_id, role")
+    .eq("user_id", userId)
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) throw new Error("No active organization membership.");
+  return data as { organization_id: string; role: string };
+}
+
+async function assertClientInOrg(supabase: AnySupabase, clientId: string, orgId: string) {
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, organization_id")
+    .eq("id", clientId)
+    .maybeSingle();
+  if (error || !data) throw new Error("Client not found.");
+  if (data.organization_id !== orgId) throw new Error("Forbidden: client belongs to another org.");
+}
+
+// ── Content shape ────────────────────────────────────────────────────────────
+// Sections of VERBATIM values from authoritative client data — no model prose.
+// item.kind:
+//   'text'  — single verbatim string
+//   'list'  — array of verbatim strings/labels
+//   'kv'    — array of {label, value} pairs (verbatim)
+//   'link'  — array of {label, href} (document filenames + signed/public links)
+//   'note'  — short fixed system label (e.g. "No data on file"); never authored care prose
+export type CSTItem =
+  | { kind: "text"; label: string; value: string }
+  | { kind: "list"; label: string; values: string[] }
+  | { kind: "kv"; label: string; pairs: Array<{ label: string; value: string }> }
+  | { kind: "link"; label: string; links: Array<{ label: string; href: string | null }> }
+  | { kind: "note"; label: string; value: string };
+
+export type CSTSection = { id: string; title: string; items: CSTItem[] };
+export type CSTContent = { sections: CSTSection[] };
+
+const ItemSchema: z.ZodType<CSTItem> = z.union([
+  z.object({ kind: z.literal("text"), label: z.string(), value: z.string() }),
+  z.object({ kind: z.literal("list"), label: z.string(), values: z.array(z.string()) }),
+  z.object({ kind: z.literal("kv"), label: z.string(), pairs: z.array(z.object({ label: z.string(), value: z.string() })) }),
+  z.object({ kind: z.literal("link"), label: z.string(), links: z.array(z.object({ label: z.string(), href: z.string().nullable() })) }),
+  z.object({ kind: z.literal("note"), label: z.string(), value: z.string() }),
+]);
+const SectionSchema = z.object({ id: z.string(), title: z.string().min(1).max(200), items: z.array(ItemSchema).max(50) });
+const ContentSchema = z.object({ sections: z.array(SectionSchema).max(30) });
+
+function sid(): string { return `s_${Math.random().toString(36).slice(2, 10)}`; }
+
+// ── Verbatim assembler ──────────────────────────────────────────────────────
+// Pulls authoritative data and renders raw values into sections.
+// NO model prose, NO interventions, NO how-to.
+async function assembleVerbatim(
+  supabase: AnySupabase,
+  orgId: string,
+  clientId: string,
+): Promise<CSTContent> {
+  const sections: CSTSection[] = [];
+
+  // 1. Identity & support overview (clients core)
+  const { data: client } = await supabase
+    .from("clients")
+    .select("first_name, last_name, date_of_birth, special_directions, pcsp_goals")
+    .eq("id", clientId)
+    .maybeSingle();
+  if (client) {
+    const items: CSTItem[] = [];
+    const fullName = `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim();
+    items.push({
+      kind: "kv",
+      label: "Identity",
+      pairs: [
+        { label: "Name", value: fullName || "—" },
+        { label: "Date of birth", value: client.date_of_birth ? String(client.date_of_birth) : "—" },
+      ],
+    });
+    if (client.special_directions) {
+      items.push({ kind: "text", label: "Special directions", value: String(client.special_directions) });
+    }
+    if (Array.isArray(client.pcsp_goals) && client.pcsp_goals.length) {
+      items.push({ kind: "list", label: "PCSP goals", values: (client.pcsp_goals as unknown[]).map(String) });
+    }
+    if (items.length) sections.push({ id: sid(), title: "Support overview", items });
+  }
+
+  // 2. Intake summary (most recent intake form submissions — verbatim answers)
+  try {
+    const { data: subs } = await supabase
+      .from("form_submissions")
+      .select("answers, submitted_at, forms(name)")
+      .eq("client_id", clientId)
+      .order("submitted_at", { ascending: false })
+      .limit(3);
+    if (subs && subs.length) {
+      const items: CSTItem[] = subs.map((s: { answers: unknown; submitted_at: string; forms: { name: string } | null }) => {
+        const a = (s.answers ?? {}) as Record<string, unknown>;
+        const pairs = Object.entries(a)
+          .filter(([, v]) => v != null && String(v).trim().length)
+          .slice(0, 12)
+          .map(([k, v]) => ({ label: String(k).slice(0, 80), value: String(v).slice(0, 400) }));
+        return {
+          kind: "kv" as const,
+          label: `${s.forms?.name ?? "Intake form"} (${s.submitted_at?.slice(0, 10) ?? ""})`,
+          pairs,
+        };
+      }).filter((it: CSTItem) => (it.kind === "kv" ? it.pairs.length > 0 : true));
+      if (items.length) sections.push({ id: sid(), title: "Intake summary", items });
+    }
+  } catch { /* table may be absent in some orgs */ }
+
+  // 3. Authorized billing codes
+  try {
+    const { data: codes } = await supabase
+      .from("client_billing_codes")
+      .select("service_code, unit_type, service_end_date")
+      .eq("client_id", clientId);
+    if (codes && codes.length) {
+      const today = new Date().toISOString().slice(0, 10);
+      const active = (codes as Array<{ service_code: string; unit_type: string | null; service_end_date: string | null }>)
+        .filter((c) => !c.service_end_date || c.service_end_date >= today);
+      if (active.length) {
+        sections.push({
+          id: sid(),
+          title: "Authorized service codes",
+          items: [{
+            kind: "list",
+            label: "Codes",
+            values: active.map((c) => c.service_code + (c.unit_type ? ` (${c.unit_type})` : "")),
+          }],
+        });
+      }
+    }
+  } catch { /* ignore */ }
+
+  // 4. Medications (name/dose/frequency/PRN/choking risk — verbatim only)
+  try {
+    const { data: meds } = await supabase
+      .from("client_medications")
+      .select("medication_name, dosage, frequency, is_prn, choking_risk, is_active")
+      .eq("client_id", clientId);
+    if (meds && meds.length) {
+      const active = (meds as Array<{ medication_name: string; dosage: string | null; frequency: string | null; is_prn: boolean | null; choking_risk: boolean | null; is_active: boolean | null }>)
+        .filter((m) => m.is_active !== false);
+      if (active.length) {
+        const items: CSTItem[] = active.map((m) => ({
+          kind: "kv" as const,
+          label: m.medication_name,
+          pairs: [
+            { label: "Dose", value: m.dosage ?? "—" },
+            { label: "Frequency", value: m.frequency ?? "—" },
+            { label: "PRN", value: m.is_prn ? "Yes" : "No" },
+            { label: "Choking risk flagged", value: m.choking_risk ? "Yes" : "No" },
+          ],
+        }));
+        sections.push({ id: sid(), title: "Active medications", items });
+      }
+    }
+  } catch { /* ignore */ }
+
+  // 5. Behavior support — status + published behaviors (NO bc_data_entries)
+  try {
+    const { data: bsc } = await supabase
+      .from("behavior_support_clients")
+      .select("status")
+      .eq("client_id", clientId)
+      .maybeSingle();
+    const { data: behaviors } = await supabase
+      .from("bc_behaviors")
+      .select("name, operational_definition, status")
+      .eq("client_id", clientId)
+      .eq("status", "published");
+    const items: CSTItem[] = [];
+    if (bsc?.status) items.push({ kind: "text", label: "BSP status", value: String(bsc.status) });
+    if (behaviors && behaviors.length) {
+      items.push({
+        kind: "kv",
+        label: "Published behaviors",
+        pairs: (behaviors as Array<{ name: string; operational_definition: string | null }>).map((b) => ({
+          label: b.name,
+          value: b.operational_definition ?? "",
+        })),
+      });
+    }
+    if (items.length) sections.push({ id: sid(), title: "Behavior support — status & published behaviors", items });
+  } catch { /* ignore */ }
+
+
+  // 6. Rights & safeguards summary (restriction_summary + status only)
+  try {
+    const { data: hrc } = await supabase
+      .from("hrc_reviews")
+      .select("restriction_summary, status, created_at")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (hrc?.restriction_summary || hrc?.status) {
+      const items: CSTItem[] = [];
+      if (hrc.status) items.push({ kind: "text", label: "Status", value: String(hrc.status) });
+      if (hrc.restriction_summary) items.push({ kind: "text", label: "Restriction summary", value: String(hrc.restriction_summary) });
+      sections.push({ id: sid(), title: "Rights & safeguards summary", items });
+    }
+  } catch { /* ignore */ }
+
+  // 7. Client documents — filenames + links only (verbatim)
+  try {
+    const { data: docs } = await supabase
+      .from("client_documents")
+      .select("file_name, file_url")
+      .eq("client_id", clientId)
+      .limit(25);
+    if (docs && docs.length) {
+      sections.push({
+        id: sid(),
+        title: "Documents on file",
+        items: [{
+          kind: "link",
+          label: "Files",
+          links: (docs as Array<{ file_name: string; file_url: string | null }>).map((d) => ({
+            label: d.file_name,
+            href: d.file_url ?? null,
+          })),
+        }],
+      });
+    }
+  } catch { /* ignore */ }
+
+  if (!sections.length) {
+    sections.push({
+      id: sid(),
+      title: "No authoritative data found",
+      items: [{ kind: "note", label: "Status", value: "No data on file for this client yet." }],
+    });
+  }
+
+  // org scope reference (suppress unused warning)
+  void orgId;
+  return { sections };
+}
+
+// ── GET current training (admin) ────────────────────────────────────────────
+export const getClientSpecificTraining = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    await assertClientInOrg(supabase, data.clientId, m.organization_id);
+    const { data: row, error } = await supabase
+      .from("client_specific_trainings")
+      .select("*")
+      .eq("client_id", data.clientId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { training: row };
+  });
+
+// ── DRAFT (or REBUILD) with NECTAR (admin) ──────────────────────────────────
+// Assembles verbatim sections from authoritative client data and upserts a
+// draft row (status='draft', version bumped on rebuild).
+export const draftClientSpecificTrainingWithNectar = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    clientId: z.string().uuid(),
+    rebuild: z.boolean().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    await assertClientInOrg(supabase, data.clientId, m.organization_id);
+
+    const content = await assembleVerbatim(supabase, m.organization_id, data.clientId);
+
+    const { data: existing } = await supabase
+      .from("client_specific_trainings")
+      .select("id, version")
+      .eq("client_id", data.clientId)
+      .maybeSingle();
+
+    if (existing) {
+      const { data: updated, error: uErr } = await supabase
+        .from("client_specific_trainings")
+        .update({
+          content: content as unknown,
+          status: "draft",
+          version: (existing.version ?? 1) + (data.rebuild ? 1 : 0),
+          approved_by: null,
+          approved_at: null,
+        })
+        .eq("id", existing.id)
+        .select("*")
+        .maybeSingle();
+      if (uErr) throw new Error(uErr.message);
+      return { training: updated };
+    }
+
+    const { data: inserted, error: iErr } = await supabase
+      .from("client_specific_trainings")
+      .insert({
+        organization_id: m.organization_id,
+        client_id: data.clientId,
+        title: "Client-Specific Training",
+        content: content as unknown,
+        status: "draft",
+        version: 1,
+      })
+      .select("*")
+      .maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+    return { training: inserted };
+  });
+
+// ── UPDATE content/title (admin) ────────────────────────────────────────────
+export const updateClientSpecificTraining = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    id: z.string().uuid(),
+    title: z.string().min(1).max(200).optional(),
+    content: ContentSchema.optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    const { data: row, error } = await supabase
+      .from("client_specific_trainings")
+      .select("organization_id, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error || !row) throw new Error("Training not found.");
+    if (row.organization_id !== m.organization_id) throw new Error("Forbidden.");
+    const patch: Record<string, unknown> = {};
+    if (data.title !== undefined) patch.title = data.title;
+    if (data.content !== undefined) patch.content = data.content;
+    // Editing a published version returns it to draft (requires re-approval).
+    if (row.status === "published") {
+      patch.status = "draft";
+      patch.approved_by = null;
+      patch.approved_at = null;
+    }
+    const { data: updated, error: uErr } = await supabase
+      .from("client_specific_trainings")
+      .update(patch)
+      .eq("id", data.id)
+      .select("*")
+      .maybeSingle();
+    if (uErr) throw new Error(uErr.message);
+    return { training: updated };
+  });
+
+// ── APPROVE & PUBLISH (admin) ──────────────────────────────────────────────
+export const publishClientSpecificTraining = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    const { data: row, error } = await supabase
+      .from("client_specific_trainings")
+      .select("organization_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error || !row) throw new Error("Training not found.");
+    if (row.organization_id !== m.organization_id) throw new Error("Forbidden.");
+    const { data: updated, error: uErr } = await supabase
+      .from("client_specific_trainings")
+      .update({
+        status: "published",
+        approved_by: userId,
+        approved_at: new Date().toISOString(),
+      })
+      .eq("id", data.id)
+      .select("*")
+      .maybeSingle();
+    if (uErr) throw new Error(uErr.message);
+    return { training: updated };
+  });

@@ -50,6 +50,7 @@ import { MarCalendar } from "@/components/mar-calendar";
 import { ApprovedLocationsEditor } from "@/components/evv/approved-locations-editor";
 import { ClientPhoto } from "@/components/client-photo";
 import { BehaviorSupportConfigCard } from "@/components/behavior-support/bs-config-card";
+import { ClientSpecificTrainingCard } from "@/components/clients/client-specific-training-card";
 import {
   isClientFeatureEnabled,
   isFeatureTierDisabled,
@@ -663,6 +664,18 @@ function ClientWorkspace({
               organizationId={orgId}
               clientName={`${client.first_name} ${client.last_name}`.trim()}
             />
+          </CareSectionShell>
+
+          <CareSectionShell
+            title="Client-Specific Training"
+            description="NECTAR-assembled training from this client's own authoritative data. Admin reviews, edits, and publishes."
+            linkTo="/dashboard/clients"
+            linkLabel="Open Clients"
+            icon={Sparkles}
+            storageKey={`${client.id}:client-specific-training`}
+            summary="Per-client training"
+          >
+            <ClientSpecificTrainingCard clientId={client.id} />
           </CareSectionShell>
 
           <RightsSafeguardsCard clientId={client.id} />

@@ -2031,6 +2031,7 @@ export type Database = {
           home_latitude: number | null
           home_longitude: number | null
           id: string
+          intake_status: string
           job_code: string[]
           last_name: string
           medicaid_id: string | null
@@ -2055,6 +2056,7 @@ export type Database = {
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
+          intake_status?: string
           job_code?: string[]
           last_name: string
           medicaid_id?: string | null
@@ -2079,6 +2081,7 @@ export type Database = {
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
+          intake_status?: string
           job_code?: string[]
           last_name?: string
           medicaid_id?: string | null
@@ -7952,6 +7955,7 @@ export type Database = {
           home_latitude: number | null
           home_longitude: number | null
           id: string
+          intake_status: string
           job_code: string[]
           last_name: string
           medicaid_id: string | null

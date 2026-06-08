@@ -209,7 +209,7 @@ export function ClientsPage() {
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await (supabase as any)
         .from("clients")
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, account_status, geofence_radius_feet, special_directions, date_of_birth, emergency_contact_name, emergency_contact_phone, feature_config, profile_photo_url")
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, account_status, geofence_radius_feet, special_directions, date_of_birth, emergency_contact_name, emergency_contact_phone, feature_config, profile_photo_url, intake_status")
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
@@ -222,10 +222,12 @@ export function ClientsPage() {
     },
   });
 
+  const navigate = useNavigate();
+
   const addMutation = useMutation({
-    mutationFn: async (input: ClientFormValues) => {
+    mutationFn: async (input: ClientFormValues & { intake_mode: "intake" | "profile-only" }) => {
       const coords = await resolveCoords(input.physical_address);
-      const { error } = await (supabase as any).from("clients").insert({
+      const { data, error } = await (supabase as any).from("clients").insert({
         organization_id:      org!.organization_id,
         first_name:           input.first_name,
         last_name:            input.last_name,
@@ -242,16 +244,22 @@ export function ClientsPage() {
         emergency_contact_phone: input.emergency_contact_phone || null,
         home_latitude:        coords.lat,
         home_longitude:       coords.lng,
-      });
+        intake_status:        input.intake_mode === "intake" ? "in_progress" : "pending",
+      }).select("id").single();
       if (error) throw error;
+      return { id: data!.id as string, mode: input.intake_mode };
     },
-    onSuccess: () => {
-      toast.success("Client added.");
+    onSuccess: ({ id, mode }) => {
+      toast.success(mode === "intake" ? "Client created — starting intake." : "Client added.");
       qc.invalidateQueries({ queryKey: ["clients"] });
       setAddOpen(false);
+      if (mode === "intake") {
+        navigate({ to: "/dashboard/clients/$clientId/intake", params: { clientId: id } });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   const editMutation = useMutation({
     mutationFn: async (input: ClientFormValues & { id: string }) => {
@@ -2375,7 +2383,8 @@ function SettingsTab({
 
 function AddClientDialog({
   pending, onSubmit,
-}: { pending: boolean; onSubmit: (v: ClientFormValues) => void }) {
+}: { pending: boolean; onSubmit: (v: ClientFormValues & { intake_mode: "intake" | "profile-only" }) => void }) {
+  const [mode, setMode] = useState<"intake" | "profile-only" | null>(null);
   const [first, setFirst]         = useState("");
   const [last, setLast]           = useState("");
   const [phone, setPhone]         = useState("");
@@ -2387,11 +2396,55 @@ function AddClientDialog({
 
   const canSubmit = first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim();
 
+  if (!mode) {
+    return (
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add New Client</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <p className="text-sm text-muted-foreground">
+            How do you want to proceed?
+          </p>
+          <button
+            type="button"
+            onClick={() => setMode("intake")}
+            className="w-full rounded-lg border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
+          >
+            <div className="font-semibold">Create profile &amp; begin intake now</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Create the client profile and immediately start the new-client intake procedure.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("profile-only")}
+            className="w-full rounded-lg border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
+          >
+            <div className="font-semibold">Create profile only (not ready for intake)</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Save the client profile now and complete the intake procedure later.
+            </p>
+          </button>
+        </div>
+      </DialogContent>
+    );
+  }
+
   return (
     <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
       <DialogHeader>
-        <DialogTitle>Add New Client</DialogTitle>
+        <DialogTitle>
+          {mode === "intake" ? "New Client — Begin Intake" : "New Client — Profile Only"}
+        </DialogTitle>
       </DialogHeader>
+      <button
+        type="button"
+        onClick={() => setMode(null)}
+        className="-mt-2 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-3 w-3" /> Back
+      </button>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1.5">
@@ -2457,13 +2510,15 @@ function AddClientDialog({
             special_directions: "", date_of_birth: "",
             emergency_contact_name: "", emergency_contact_phone: "",
             profile_photo_url: "",
+            intake_mode: mode,
           })}
           disabled={!canSubmit || pending}
         >
           {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save Client
+          {mode === "intake" ? "Create & Start Intake" : "Create Profile"}
         </Button>
       </DialogFooter>
     </DialogContent>
   );
 }
+

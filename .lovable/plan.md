@@ -1,24 +1,66 @@
-## What's actually happening
+## Goal
 
-- Login is working. Auth logs show successful sign-ins for `admin@tnsutah.com` (email at 15:56 UTC, Google at 16:00 UTC), both returning HTTP 200. You reached `/dashboard/hive-exec` — you couldn't have if login were broken.
-- The "Something went wrong / Failed to fetch dynamically imported module …/assets/dashboard-CHgxu-ZX.js" message is a **stale-asset error**: the page's HTML is referencing a JavaScript chunk hash from a previous build that no longer exists.
-- The preview tab in the screenshot is labeled "Previewing last saved version" and is on `id-preview--…lovable.app`. That URL serves a **frozen saved snapshot** whose HTML is pinned to old asset hashes. A hard refresh re-downloads the same pinned HTML, so it keeps requesting the missing chunk.
-- No code change will fix the saved snapshot — it's immutable. The current dev build and the next saved version are fine.
+When a dynamically-imported route chunk fails to load (stale build hash after a deploy or pinned preview), the app currently white-screens with "Something went wrong." Add narrowly-scoped handling that auto-reloads ONCE on that specific error class, while leaving all other errors visible in the existing error boundary.
 
-## Code audit (confirming nothing is actually broken)
+## Scope
 
-- `staff_certifications` was dropped from the database, but the two remaining string references in `src/lib/internal-audit.functions.ts` and `src/routes/dashboard.internal-audit.tsx` are just an audit-category label; the underlying query reads `external_certifications`. No broken import.
-- Dev-server log shows only the standard "route file exports won't be code-split" warnings — no build failures.
-- No service worker / PWA in `public/` to cause a phantom cached chunk.
+Touch only:
+- `src/routes/__root.tsx` — `ErrorComponent` (detect chunk-load class, render friendly recovery UI / trigger reload)
+- A new tiny helper `src/lib/chunk-reload.ts` — detection predicate + loop-guarded reload
+- `src/routes/__root.tsx` `RootComponent` — install global `error` + `unhandledrejection` listeners (one-time, browser-only)
 
-## Fix (no code changes)
+NOT touched: route definitions, router config, business logic, RLS, data, lazy-loading config. TanStack Router's Vite plugin handles route code-splitting automatically — there is no user-authored `React.lazy` to wrap, so the router's `errorComponent` IS the lazy-import failure surface.
 
-1. Switch the preview off "last saved version" — click the version dropdown at the top-left of the chat panel and pick **"Latest"** (or just open the live preview from the chat header). The live dev preview rebuilds chunks on every change, so it won't 404.
-2. If you specifically need a stable URL to share, **save a new version** (or republish). The new snapshot will be built against the current code and its HTML will reference fresh, valid chunk hashes.
-3. Optional sanity check: open `/dashboard/hive-exec` on the live preview URL after switching — it should render without the error screen.
+## Detection (chunk-load class only)
 
-## What I will NOT change
+A single predicate `isChunkLoadError(err)` matches when ANY of these are true on the error / reason:
+- `name === "ChunkLoadError"`
+- message includes any of (case-insensitive):
+  - `"Failed to fetch dynamically imported module"` (Chrome/Edge)
+  - `"error loading dynamically imported module"` (Vite generic)
+  - `"Importing a module script failed"` (Safari)
+  - `"Unable to preload CSS"` (Vite CSS chunk)
+  - `"dynamically imported module"` (defensive catch-all suffix)
 
-- No edits to auth code, the hive-exec route, the dropped-table cleanup, or any chunking/build config — none of those are the cause.
+Anything else → predicate returns false → existing error boundary renders as today. Real bugs are NOT swallowed.
 
-If after switching to the latest preview you still get the same error on `/dashboard/hive-exec`, send me a fresh screenshot from the live URL and I'll investigate as a real runtime issue (likely a runtime throw in a child component) rather than a stale-snapshot one.
+## Loop guard
+
+`sessionStorage` key `chunk-reload:lastAt` storing a timestamp. `tryAutoReloadOnce()`:
+1. If predicate is false → no-op, return false.
+2. Read `lastAt`. If `Date.now() - lastAt < 10_000` → already reloaded recently; return false (caller shows manual-refresh UI).
+3. Otherwise set `lastAt = Date.now()` and call `window.location.reload()`. Return true.
+
+This guarantees at most one automatic reload per ~10s window per tab, so a persistently-broken chunk cannot infinite-loop.
+
+## Behavior matrix
+
+| Situation | Result |
+|---|---|
+| Route chunk 404 / network fail, first occurrence | Single full reload → fresh HTML + valid hashes |
+| Same chunk fails again within 10s | No reload; friendly card with "Refresh for latest version" button (calls `location.reload()` on click; clears guard key) |
+| Any other thrown error (real bug) | Existing `ErrorComponent` UI shows message + "Try again" (unchanged) |
+| Background async chunk failure (e.g. preload) reaching `unhandledrejection` | Same one-time reload via global listener |
+
+## Files
+
+### `src/lib/chunk-reload.ts` (new)
+Exports `isChunkLoadError(err: unknown): boolean` and `tryAutoReloadOnce(err: unknown): boolean`. Pure browser-safe; guards on `typeof window`.
+
+### `src/routes/__root.tsx`
+- `ErrorComponent`: at top, call `tryAutoReloadOnce(error)`. If predicate matches but guard blocked the reload, render a small "New version available — please refresh" card with a Reload button. Otherwise (non-chunk error) render the existing "Something went wrong" UI unchanged.
+- `RootComponent`: add a `useEffect` that registers `window.addEventListener("error", …)` and `window.addEventListener("unhandledrejection", …)`, each calling `tryAutoReloadOnce` with the underlying error/reason. Cleanup on unmount. SSR-safe (effect only).
+
+## Verification (after build mode)
+
+1. **Real errors still surface**: temporarily throw `new Error("boundary smoke test")` in a leaf component → confirm existing error UI renders, no reload. Remove the throw.
+2. **Chunk-load path**: in DevTools, block `*/assets/*.js` via Network request blocking, navigate to a route → confirm exactly one reload, then unblock → app loads normally.
+3. **Loop guard**: keep the block on, trigger again within 10s → confirm friendly "refresh for latest version" card appears instead of another reload.
+4. **Happy path**: regular navigation across `/dashboard/*` routes — no behavioral change, no extra reloads, no console noise.
+
+## Out of scope / explicitly NOT doing
+
+- Not changing `errorComponent` on individual routes, router config, or `defaultErrorComponent`.
+- Not wrapping any imports in `React.lazy` (router plugin handles splitting).
+- Not auto-reloading on generic errors, network errors, API errors, or auth errors.
+- Not touching `src/server.ts` / `src/start.ts` / SSR error path.

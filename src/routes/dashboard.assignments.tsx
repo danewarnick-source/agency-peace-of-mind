@@ -273,7 +273,7 @@ function AssignmentsPage() {
               {counts.clientsN} clients · {counts.servicesN} services selected
             </span>
             <Button
-              onClick={() => saveMut.mutate()}
+              onClick={() => { void attemptSave(); }}
               disabled={!staffId || saveMut.isPending}
               className="h-11 bg-[image:var(--gradient-amber)] text-[#412402] hover:brightness-95"
             >

@@ -1090,7 +1090,7 @@ export const listClientTrackingForms = createServerFn({ method: "GET" })
       form_id: string;
       submitted_at: string;
       submitted_by: string | null;
-      answers: Record<string, unknown>;
+      answers: Record<string, any>;
       shift_id: string | null;
     }> = [];
     const submitterNames: Record<string, string> = {};

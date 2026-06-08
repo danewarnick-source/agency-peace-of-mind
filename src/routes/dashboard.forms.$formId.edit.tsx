@@ -60,13 +60,16 @@ function EditForm() {
   const [showAssign, setShowAssign] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [baseline, setBaseline] = useState<string>("");
+  const [pendingNav, setPendingNav] = useState<null | { proceed: () => void; reset: () => void }>(null);
 
   useEffect(() => {
     const f = data?.form;
     if (!f) return;
+    const flds = Array.isArray(f.fields) ? f.fields : [];
     setName(f.name ?? ""); setDescription(f.description ?? "");
     setCategory(f.category ?? "general");
-    setFields(Array.isArray(f.fields) ? f.fields : []);
+    setFields(flds);
     setFrequency(f.frequency ?? "as_needed");
     setSchedule(f.schedule ?? {});
     setGroups(f.assigned_groups ?? []);
@@ -74,7 +77,38 @@ function EditForm() {
     setAllClients(f.all_clients ?? true);
     setClients(f.assigned_clients ?? []);
     setSettings(f.settings ?? {});
+    setBaseline(JSON.stringify({
+      name: f.name ?? "", description: f.description ?? "", category: f.category ?? "general",
+      fields: flds, frequency: f.frequency ?? "as_needed", schedule: f.schedule ?? {},
+      groups: f.assigned_groups ?? [], users: f.assigned_users ?? [],
+      allClients: f.all_clients ?? true, clients: f.assigned_clients ?? [],
+      settings: f.settings ?? {},
+    }));
   }, [data]);
+
+  const currentSnapshot = useMemo(() => JSON.stringify({
+    name, description, category, fields, frequency, schedule,
+    groups, users, allClients, clients, settings,
+  }), [name, description, category, fields, frequency, schedule, groups, users, allClients, clients, settings]);
+  const isDirty = baseline !== "" && currentSnapshot !== baseline;
+
+  // Browser-level unsaved warning
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  // In-app navigation blocker
+  useBlocker({
+    shouldBlockFn: () => isDirty,
+    withResolver: true,
+    enableBeforeUnload: false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any).then?.((res: { status: string; proceed: () => void; reset: () => void }) => {
+    if (res?.status === "blocked") setPendingNav({ proceed: res.proceed, reset: res.reset });
+  });
 
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   function addField(type: FieldType) {

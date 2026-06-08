@@ -619,6 +619,26 @@ function RoutingBehaviorCard({
           )}
         </div>
       )}
+
+      {chosen === "staff_mandate" && (
+        <div className="grid gap-1.5">
+          <Label className="text-xs">Mandate scope</Label>
+          <select
+            value={settings.mandate_scope ?? "per_staff"}
+            onChange={(e) => {
+              const v = e.target.value as "per_staff" | "per_staff_per_client";
+              setSettings((s) => ({ ...s, mandate_scope: v }));
+            }}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="per_staff">Per staffer (once — applies everywhere)</option>
+            <option value="per_staff_per_client">Per staffer, per client (set up in a later step)</option>
+          </select>
+          <p className="text-[11px] text-muted-foreground">
+            “Per staffer” fits things like an annual code of conduct. Per-client mandates are wired in a later stage; for now they behave as per-staffer.
+          </p>
+        </div>
+      )}
     </Card>
   );
 }

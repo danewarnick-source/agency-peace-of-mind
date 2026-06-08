@@ -82,6 +82,7 @@ import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.trai
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
 import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashboard.settings.team-access'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
+import { Route as DashboardSettingsAutomationRulesRouteImport } from './routes/dashboard.settings.automation-rules'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
 import { Route as DashboardHubKnowledgeRouteImport } from './routes/dashboard.hub.knowledge'
 import { Route as DashboardHubFinancesRouteImport } from './routes/dashboard.hub.finances'
@@ -501,6 +502,12 @@ const DashboardSettingsBankMappingRoute =
     path: '/bank-mapping',
     getParentRoute: () => DashboardSettingsRoute,
   } as any)
+const DashboardSettingsAutomationRulesRoute =
+  DashboardSettingsAutomationRulesRouteImport.update({
+    id: '/automation-rules',
+    path: '/automation-rules',
+    getParentRoute: () => DashboardSettingsRoute,
+  } as any)
 const DashboardProgramsProgramIdRoute =
   DashboardProgramsProgramIdRouteImport.update({
     id: '/$programId',
@@ -844,6 +851,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hub/finances': typeof DashboardHubFinancesRoute
   '/dashboard/hub/knowledge': typeof DashboardHubKnowledgeRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
+  '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -958,6 +966,7 @@ export interface FileRoutesByTo {
   '/dashboard/hub/finances': typeof DashboardHubFinancesRoute
   '/dashboard/hub/knowledge': typeof DashboardHubKnowledgeRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
+  '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -1078,6 +1087,7 @@ export interface FileRoutesById {
   '/dashboard/hub/finances': typeof DashboardHubFinancesRoute
   '/dashboard/hub/knowledge': typeof DashboardHubKnowledgeRoute
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
+  '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -1199,6 +1209,7 @@ export interface FileRouteTypes {
     | '/dashboard/hub/finances'
     | '/dashboard/hub/knowledge'
     | '/dashboard/programs/$programId'
+    | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
     | '/dashboard/tracks/$trackSlug'
@@ -1313,6 +1324,7 @@ export interface FileRouteTypes {
     | '/dashboard/hub/finances'
     | '/dashboard/hub/knowledge'
     | '/dashboard/programs/$programId'
+    | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
     | '/dashboard/tracks/$trackSlug'
@@ -1432,6 +1444,7 @@ export interface FileRouteTypes {
     | '/dashboard/hub/finances'
     | '/dashboard/hub/knowledge'
     | '/dashboard/programs/$programId'
+    | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
     | '/dashboard/tracks/$trackSlug'
@@ -1989,6 +2002,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsBankMappingRouteImport
       parentRoute: typeof DashboardSettingsRoute
     }
+    '/dashboard/settings/automation-rules': {
+      id: '/dashboard/settings/automation-rules'
+      path: '/automation-rules'
+      fullPath: '/dashboard/settings/automation-rules'
+      preLoaderRoute: typeof DashboardSettingsAutomationRulesRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
     '/dashboard/programs/$programId': {
       id: '/dashboard/programs/$programId'
       path: '/$programId'
@@ -2437,11 +2457,13 @@ const DashboardProgramsRouteWithChildren =
   DashboardProgramsRoute._addFileChildren(DashboardProgramsRouteChildren)
 
 interface DashboardSettingsRouteChildren {
+  DashboardSettingsAutomationRulesRoute: typeof DashboardSettingsAutomationRulesRoute
   DashboardSettingsBankMappingRoute: typeof DashboardSettingsBankMappingRoute
   DashboardSettingsTeamAccessRoute: typeof DashboardSettingsTeamAccessRoute
 }
 
 const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
+  DashboardSettingsAutomationRulesRoute: DashboardSettingsAutomationRulesRoute,
   DashboardSettingsBankMappingRoute: DashboardSettingsBankMappingRoute,
   DashboardSettingsTeamAccessRoute: DashboardSettingsTeamAccessRoute,
 }

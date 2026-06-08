@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet, createRootRouteWithContext, useRouter,
@@ -8,6 +9,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
 import { CelebrationProvider } from "@/components/celebrations/celebration-provider";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
+import { isChunkLoadError, tryAutoReloadOnce, clearChunkReloadGuard } from "@/lib/chunk-reload";
 
 function NotFoundComponent() {
   return (

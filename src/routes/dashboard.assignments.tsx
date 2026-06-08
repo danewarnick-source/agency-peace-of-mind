@@ -308,6 +308,42 @@ function AssignmentsPage() {
           )}
         </Card>
       )}
+
+      <AlertDialog
+        open={!!pendingWarning}
+        onOpenChange={(o) => { if (!o) setPendingWarning(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Required forms not complete
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  This staffer has {pendingWarning?.names.length} incomplete required form
+                  {(pendingWarning?.names.length ?? 0) === 1 ? "" : "s"}:
+                </p>
+                <ul className="list-disc pl-5">
+                  {pendingWarning?.names.map((n) => (<li key={n}>{n}</li>))}
+                </ul>
+                <p className="text-muted-foreground">
+                  You can proceed; this will be recorded.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingWarning(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setPendingWarning(null); saveMut.mutate(); }}
+            >
+              Proceed anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

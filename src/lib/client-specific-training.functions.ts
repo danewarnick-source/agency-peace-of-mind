@@ -593,9 +593,14 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
     if (tcErr || !tc) throw new Error(tcErr?.message ?? "Could not record completion.");
 
     // 2) Per-(staff, client) requirement satisfaction row.
-    const requirementId = await ensureClientTrainingRequirementId(supabase, m.organization_id);
+    //    Both nectar_requirements (provisioning) and staff_checklist_completion
+    //    writes require admin/manager privilege under RLS — we use the service-
+    //    role client because we have already verified server-side that this
+    //    user is assignment-scoped to this client and is acting on themselves.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const requirementId = await ensureClientTrainingRequirementId(supabaseAdmin, m.organization_id);
     // Manual upsert against scc_unique_per_client (cannot use onConflict on a partial index).
-    const { data: existingScc } = await supabase
+    const { data: existingScc } = await supabaseAdmin
       .from("staff_checklist_completion")
       .select("id")
       .eq("staff_id", userId)
@@ -605,7 +610,7 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
       .maybeSingle();
     const completedDate = new Date().toISOString().slice(0, 10);
     if (existingScc?.id) {
-      const { error: uErr } = await supabase
+      const { error: uErr } = await supabaseAdmin
         .from("staff_checklist_completion")
         .update({
           status: "complete",
@@ -617,7 +622,7 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
         .eq("id", existingScc.id);
       if (uErr) throw new Error(uErr.message);
     } else {
-      const { error: iErr } = await supabase
+      const { error: iErr } = await supabaseAdmin
         .from("staff_checklist_completion")
         .insert({
           organization_id: m.organization_id,

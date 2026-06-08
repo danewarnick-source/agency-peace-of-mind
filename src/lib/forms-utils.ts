@@ -153,6 +153,12 @@ export type FormSettings = {
    *  `per_staff_per_client` scope is not yet built; it is shown as a future
    *  option and currently behaves as `per_staff`. */
   mandate_scope?: "per_staff" | "per_staff_per_client";
+  /** Enforcement strength for a staff_mandate form at the assignment
+   *  checkpoint. `warn` (default) = non-blocking warning + proceed-anyway
+   *  notification (existing behavior). `block` = assignment is blocked
+   *  while unmet; admins/owners may override with a typed reason which is
+   *  stored on the notification record. */
+  mandate_enforcement?: "warn" | "block";
 };
 
 export type RoutingBehavior =

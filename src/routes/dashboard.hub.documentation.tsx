@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { ComplianceDeskWrapped } from "./dashboard.compliance-desk";
+import { TimesheetsReconcile } from "@/components/scheduling/timesheets-reconcile";
 import { HostHomeControl } from "./dashboard.host-home-control";
 import { FormsIndex } from "./dashboard.forms.index";
 import { InternalAuditPage } from "./dashboard.internal-audit";

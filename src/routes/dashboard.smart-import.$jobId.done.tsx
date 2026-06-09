@@ -26,6 +26,20 @@ export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   ),
 });
 
+function describeUndo(r: unknown): string {
+  const x = r as { kind: string; display_name?: string; module?: string; field?: string; field_key?: string; tag?: string; staff_id?: string; client_id?: string };
+  switch (x.kind) {
+    case "client_record": return `Delete client profile: ${x.display_name}`;
+    case "feature_flag": return `Disable ${x.module} on ${x.display_name}`;
+    case "bsp_draft": return `Remove draft behavior plan for ${x.display_name}`;
+    case "custom_field": return `Clear custom field "${x.field_key}" on ${x.display_name}`;
+    case "filed_scrap": return `Remove filed note ${x.tag} from ${x.display_name}`;
+    case "assignment": return `Remove staff↔client assignment`;
+    case "profile_field": return `Clear profile.${x.field} on ${x.display_name}`;
+    default: return x.kind;
+  }
+}
+
 function DonePage() {
   const { jobId } = Route.useParams();
   const navigate = useNavigate();

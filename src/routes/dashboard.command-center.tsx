@@ -1211,9 +1211,11 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
             </Card>
           ) : (
             <>
+              <SmartImportRemindersPanel scope="admin" />
               {urgentIncidents.length > 0 && (
                 <section>
                   <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-rose-600">
+
                     <ShieldAlert className="h-4 w-4" /> Incident Reports — State Submission Required
                   </h2>
                   <div className="space-y-2">

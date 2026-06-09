@@ -133,16 +133,9 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
       }).eq("id", data.jobId);
     }
 
-    // Generate persistent reminders for any unresolved items (flagged
-    // subjects, provisional/unverified certs, expiring certs, unanswered
-    // NECTAR questions). Idempotent by recurrence_key.
-    try {
-      const { generateSmartImportReminders } = await import("./smart-import-reminders.functions");
-      await generateSmartImportReminders({ data: { orgId } });
-    } catch { /* non-fatal — sweep will retry */ }
-
     return { results, jobCommitted: stillOpen === 0 };
   });
+
 
 
 // --------------------------------------------------------------

@@ -472,6 +472,76 @@ export function ClientsPage() {
   );
 }
 
+// ─── Compact Intake Chip + Action (list view) ────────────────────────────────
+
+function IntakeChip({
+  organizationId,
+  clientId,
+  intakeStatus,
+}: {
+  organizationId: string | undefined;
+  clientId: string;
+  intakeStatus: string | null | undefined;
+}) {
+  const { isLoading, error, hasItems, required, satisfied, isComplete } =
+    useClientIntakeProgress(organizationId, clientId);
+  if (error) return null;
+  if (isLoading) {
+    return <span className="text-[11px] text-muted-foreground">…</span>;
+  }
+  if (!hasItems) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        Intake —
+      </span>
+    );
+  }
+  const done = isComplete && intakeStatus === "complete";
+  return (
+    <span
+      className={
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums " +
+        (done
+          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+          : "bg-muted text-muted-foreground")
+      }
+    >
+      Intake {satisfied}/{required}
+    </span>
+  );
+}
+
+function IntakeAction({
+  organizationId,
+  clientId,
+  intakeStatus,
+}: {
+  organizationId: string | undefined;
+  clientId: string;
+  intakeStatus: string | null | undefined;
+}) {
+  const { isLoading, error, hasItems, isComplete } = useClientIntakeProgress(
+    organizationId,
+    clientId,
+  );
+  if (isLoading || error) return null;
+  const done = hasItems && isComplete && intakeStatus === "complete";
+  if (done) return null;
+  return (
+    <Button
+      asChild
+      size="sm"
+      variant="outline"
+      className="h-7 gap-1 text-xs"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Link to="/dashboard/client-intake/$clientId" params={{ clientId }}>
+        Continue intake <ChevronRight className="h-3 w-3" />
+      </Link>
+    </Button>
+  );
+}
+
 // ─── Full-Window Client Workspace ─────────────────────────────────────────────
 
 function ClientWorkspace({

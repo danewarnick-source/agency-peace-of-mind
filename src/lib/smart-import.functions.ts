@@ -1,11 +1,13 @@
-// Smart Import server functions — Prompt 2 backbone.
+// Smart Import server functions.
 // Reads from / writes to the Prompt-1 staging schema only; never touches real
-// client/employee records. Extraction is FAKE until Bedrock — the model call is
-// isolated inside generateExtractionFromText so it can be swapped later.
+// client/employee records. The real model call is isolated inside
+// aiExtractFieldsFromText so it can be swapped for AWS Bedrock later.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { Buffer } from "node:buffer";
+
 
 // ----- Input schemas -----
 const ModeEnum = z.enum(["employee", "client"]);

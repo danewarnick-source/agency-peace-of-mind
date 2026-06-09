@@ -81,7 +81,7 @@ export const generateCoverageRequirements = createServerFn({ method: "POST" })
       const { data: tmplOrg, error: tOrgErr } = await supabase
         .from("shift_templates")
         .select("id, name, start_time, end_time, sort")
-        .eq("organization_id", team.organization_id)
+        .eq("organization_id", team.organization_id!)
         .is("team_id", null)
         .eq("active", true)
         .order("sort", { ascending: true });

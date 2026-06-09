@@ -123,6 +123,7 @@ import { Route as DashboardBehaviorSupportClientIdRouteImport } from './routes/d
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
 import { Route as DashboardSmartImportJobIdReviewRouteImport } from './routes/dashboard.smart-import.$jobId.review'
+import { Route as DashboardSmartImportJobIdDoneRouteImport } from './routes/dashboard.smart-import.$jobId.done'
 import { Route as DashboardHiveExecStatesStateCodeRouteImport } from './routes/dashboard.hive-exec.states.$stateCode'
 import { Route as DashboardFormsFormIdSubmissionsRouteImport } from './routes/dashboard.forms.$formId.submissions'
 import { Route as DashboardFormsFormIdFillRouteImport } from './routes/dashboard.forms.$formId.fill'
@@ -732,6 +733,12 @@ const DashboardSmartImportJobIdReviewRoute =
     path: '/$jobId/review',
     getParentRoute: () => DashboardSmartImportRoute,
   } as any)
+const DashboardSmartImportJobIdDoneRoute =
+  DashboardSmartImportJobIdDoneRouteImport.update({
+    id: '/$jobId/done',
+    path: '/$jobId/done',
+    getParentRoute: () => DashboardSmartImportRoute,
+  } as any)
 const DashboardHiveExecStatesStateCodeRoute =
   DashboardHiveExecStatesStateCodeRouteImport.update({
     id: '/$stateCode',
@@ -909,6 +916,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
   '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
@@ -1029,6 +1037,7 @@ export interface FileRoutesByTo {
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
   '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
@@ -1155,6 +1164,7 @@ export interface FileRoutesById {
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
   '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
@@ -1282,6 +1292,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms/$formId/fill'
     | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesByTo: FileRoutesByTo
@@ -1402,6 +1413,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms/$formId/fill'
     | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   id:
@@ -1527,6 +1539,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms/$formId/fill'
     | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesById: FileRoutesById
@@ -2352,6 +2365,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSmartImportJobIdReviewRouteImport
       parentRoute: typeof DashboardSmartImportRoute
     }
+    '/dashboard/smart-import/$jobId/done': {
+      id: '/dashboard/smart-import/$jobId/done'
+      path: '/$jobId/done'
+      fullPath: '/dashboard/smart-import/$jobId/done'
+      preLoaderRoute: typeof DashboardSmartImportJobIdDoneRouteImport
+      parentRoute: typeof DashboardSmartImportRoute
+    }
     '/dashboard/hive-exec/states/$stateCode': {
       id: '/dashboard/hive-exec/states/$stateCode'
       path: '/$stateCode'
@@ -2572,10 +2592,12 @@ const DashboardSettingsRouteWithChildren =
   DashboardSettingsRoute._addFileChildren(DashboardSettingsRouteChildren)
 
 interface DashboardSmartImportRouteChildren {
+  DashboardSmartImportJobIdDoneRoute: typeof DashboardSmartImportJobIdDoneRoute
   DashboardSmartImportJobIdReviewRoute: typeof DashboardSmartImportJobIdReviewRoute
 }
 
 const DashboardSmartImportRouteChildren: DashboardSmartImportRouteChildren = {
+  DashboardSmartImportJobIdDoneRoute: DashboardSmartImportJobIdDoneRoute,
   DashboardSmartImportJobIdReviewRoute: DashboardSmartImportJobIdReviewRoute,
 }
 

@@ -4652,6 +4652,77 @@ export type Database = {
           },
         ]
       }
+      import_field_provenance: {
+        Row: {
+          created_at: string
+          id: string
+          import_job_id: string
+          import_subject_id: string
+          org_id: string
+          provenance: string
+          source_document_id: string | null
+          source_snippet: string | null
+          target_field: string
+          target_record_id: string
+          target_table: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          import_job_id: string
+          import_subject_id: string
+          org_id: string
+          provenance?: string
+          source_document_id?: string | null
+          source_snippet?: string | null
+          target_field: string
+          target_record_id: string
+          target_table: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          import_job_id?: string
+          import_subject_id?: string
+          org_id?: string
+          provenance?: string
+          source_document_id?: string | null
+          source_snippet?: string | null
+          target_field?: string
+          target_record_id?: string
+          target_table?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_field_provenance_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_field_provenance_import_subject_id_fkey"
+            columns: ["import_subject_id"]
+            isOneToOne: false
+            referencedRelation: "import_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_field_provenance_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_field_provenance_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "import_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_jobs: {
         Row: {
           committed_at: string | null
@@ -4784,6 +4855,9 @@ export type Database = {
       }
       import_subjects: {
         Row: {
+          commit_error: string | null
+          committed_at: string | null
+          committed_record_id: string | null
           created_at: string
           display_name: string
           id: string
@@ -4799,6 +4873,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          commit_error?: string | null
+          committed_at?: string | null
+          committed_record_id?: string | null
           created_at?: string
           display_name: string
           id?: string
@@ -4814,6 +4891,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          commit_error?: string | null
+          committed_at?: string | null
+          committed_record_id?: string | null
           created_at?: string
           display_name?: string
           id?: string
@@ -7001,6 +7081,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           attributed_to_admin: boolean
+          committed_at: string | null
           id: string
           import_job_id: string
           org_id: string
@@ -7016,6 +7097,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           attributed_to_admin?: boolean
+          committed_at?: string | null
           id?: string
           import_job_id: string
           org_id: string
@@ -7031,6 +7113,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           attributed_to_admin?: boolean
+          committed_at?: string | null
           id?: string
           import_job_id?: string
           org_id?: string

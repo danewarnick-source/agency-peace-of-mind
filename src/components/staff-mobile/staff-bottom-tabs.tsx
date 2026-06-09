@@ -26,7 +26,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
       className={`${positioning} border-t border-white/10 text-white shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.45)]`}
       style={{
         backgroundImage: "var(--gradient-navy)",
-        ...(framed ? {} : { paddingBottom: "env(safe-area-inset-bottom)" }),
+        paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
       <ul

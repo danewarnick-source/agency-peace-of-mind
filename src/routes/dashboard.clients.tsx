@@ -339,7 +339,12 @@ export function ClientsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <BulkImporter organizationId={org?.organization_id} defaultKind="client" />
+          <Button asChild variant="outline" className="border-primary/40 text-primary hover:bg-primary/5">
+            <Link to="/dashboard/smart-import" search={{ mode: "client" }}>
+              <Sparkles className="mr-2 h-4 w-4" /> Smart Import
+            </Link>
+          </Button>
+
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button size="sm">

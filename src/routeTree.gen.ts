@@ -122,6 +122,7 @@ import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard
 import { Route as DashboardBehaviorSupportClientIdRouteImport } from './routes/dashboard.behavior-support.$clientId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
+import { Route as DashboardSmartImportJobIdReviewRouteImport } from './routes/dashboard.smart-import.$jobId.review'
 import { Route as DashboardHiveExecStatesStateCodeRouteImport } from './routes/dashboard.hive-exec.states.$stateCode'
 import { Route as DashboardFormsFormIdSubmissionsRouteImport } from './routes/dashboard.forms.$formId.submissions'
 import { Route as DashboardFormsFormIdFillRouteImport } from './routes/dashboard.forms.$formId.fill'
@@ -725,6 +726,12 @@ const DashboardAdminCeHoursRoute = DashboardAdminCeHoursRouteImport.update({
   path: '/admin/ce-hours',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSmartImportJobIdReviewRoute =
+  DashboardSmartImportJobIdReviewRouteImport.update({
+    id: '/$jobId/review',
+    path: '/$jobId/review',
+    getParentRoute: () => DashboardSmartImportRoute,
+  } as any)
 const DashboardHiveExecStatesStateCodeRoute =
   DashboardHiveExecStatesStateCodeRouteImport.update({
     id: '/$stateCode',
@@ -835,7 +842,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/smart-import': typeof DashboardSmartImportRoute
+  '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -902,6 +909,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
   '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
 export interface FileRoutesByTo {
@@ -954,7 +962,7 @@ export interface FileRoutesByTo {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/smart-import': typeof DashboardSmartImportRoute
+  '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -1021,6 +1029,7 @@ export interface FileRoutesByTo {
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
   '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
 export interface FileRoutesById {
@@ -1079,7 +1088,7 @@ export interface FileRoutesById {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/smart-import': typeof DashboardSmartImportRoute
+  '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -1146,6 +1155,7 @@ export interface FileRoutesById {
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
   '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
 export interface FileRouteTypes {
@@ -1272,6 +1282,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms/$formId/fill'
     | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/smart-import/$jobId/review'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1391,6 +1402,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms/$formId/fill'
     | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/smart-import/$jobId/review'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   id:
     | '__root__'
@@ -1515,6 +1527,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms/$formId/fill'
     | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/smart-import/$jobId/review'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesById: FileRoutesById
 }
@@ -2332,6 +2345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminCeHoursRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/smart-import/$jobId/review': {
+      id: '/dashboard/smart-import/$jobId/review'
+      path: '/$jobId/review'
+      fullPath: '/dashboard/smart-import/$jobId/review'
+      preLoaderRoute: typeof DashboardSmartImportJobIdReviewRouteImport
+      parentRoute: typeof DashboardSmartImportRoute
+    }
     '/dashboard/hive-exec/states/$stateCode': {
       id: '/dashboard/hive-exec/states/$stateCode'
       path: '/$stateCode'
@@ -2551,6 +2571,17 @@ const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
 const DashboardSettingsRouteWithChildren =
   DashboardSettingsRoute._addFileChildren(DashboardSettingsRouteChildren)
 
+interface DashboardSmartImportRouteChildren {
+  DashboardSmartImportJobIdReviewRoute: typeof DashboardSmartImportJobIdReviewRoute
+}
+
+const DashboardSmartImportRouteChildren: DashboardSmartImportRouteChildren = {
+  DashboardSmartImportJobIdReviewRoute: DashboardSmartImportJobIdReviewRoute,
+}
+
+const DashboardSmartImportRouteWithChildren =
+  DashboardSmartImportRoute._addFileChildren(DashboardSmartImportRouteChildren)
+
 interface DashboardTracksRouteChildren {
   DashboardTracksTrackSlugRoute: typeof DashboardTracksTrackSlugRoute
 }
@@ -2616,7 +2647,7 @@ interface DashboardRouteChildren {
   DashboardScheduleRoute: typeof DashboardScheduleRoute
   DashboardSchedulingRoute: typeof DashboardSchedulingRoute
   DashboardSettingsRoute: typeof DashboardSettingsRouteWithChildren
-  DashboardSmartImportRoute: typeof DashboardSmartImportRoute
+  DashboardSmartImportRoute: typeof DashboardSmartImportRouteWithChildren
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
   DashboardTeamsRoute: typeof DashboardTeamsRoute
@@ -2690,7 +2721,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardScheduleRoute: DashboardScheduleRoute,
   DashboardSchedulingRoute: DashboardSchedulingRoute,
   DashboardSettingsRoute: DashboardSettingsRouteWithChildren,
-  DashboardSmartImportRoute: DashboardSmartImportRoute,
+  DashboardSmartImportRoute: DashboardSmartImportRouteWithChildren,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
   DashboardTeamsRoute: DashboardTeamsRoute,

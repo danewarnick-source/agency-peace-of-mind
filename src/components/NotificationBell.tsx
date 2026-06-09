@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Bell, AlertTriangle, Clock, CheckCircle2, X, GraduationCap } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getOrgCeRoster } from "@/lib/ce.functions";

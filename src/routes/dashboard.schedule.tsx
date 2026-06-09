@@ -264,16 +264,19 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
   return linkWrap;
 }
 
-function AcceptDeclineBar({ shiftId }: { shiftId: string }) {
+function AcceptDeclineBar({ shiftIds }: { shiftIds: string[] | string }) {
+  const ids = Array.isArray(shiftIds) ? shiftIds : [shiftIds];
   const qc = useQueryClient();
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const update = async (status: "accepted" | "declined") => {
+    if (ids.length === 0) return;
     setBusy(status === "accepted" ? "accept" : "decline");
-    const { error } = await (supabase as any).from("scheduled_shifts").update({ status }).eq("id", shiftId);
+    const { error } = await (supabase as any).from("scheduled_shifts").update({ status }).in("id", ids);
     setBusy(null);
     if (error) { toast.error(error.message ?? "Could not update shift."); return; }
-    toast.success(status === "accepted" ? "Shift accepted." : "Shift declined.");
+    toast.success(status === "accepted" ? "Shift accepted." : "Shift declined — admin will be notified.");
     qc.invalidateQueries({ queryKey: ["my-scheduled-shifts"] });
+    qc.invalidateQueries({ queryKey: ["builder-data"] });
   };
   return (
     <div className="flex gap-2">
@@ -300,6 +303,16 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
   const band = bandLabel(first.starts_at);
   const ratioLabel = `1:${shifts.length} group`;
   const names = shifts.map((s) => s.client_name).join(", ");
+  const allAccepted = shifts.every((s) => s.status === "accepted");
+  const allDeclined = shifts.every((s) => s.status === "declined");
+  const groupStatus = allAccepted ? "accepted" : allDeclined ? "declined" : "pending";
+  const statusTone =
+    groupStatus === "accepted"
+      ? "bg-[#117a52]/10 text-[#0d5c3d]"
+      : groupStatus === "declined"
+        ? "bg-destructive/10 text-destructive"
+        : "bg-muted text-muted-foreground";
+  const pendingIds = shifts.filter((s) => s.status === "pending" && s.published).map((s) => s.id);
   return (
     <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
@@ -307,9 +320,14 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{home}</p>
           <h3 className="mt-0.5 break-words text-base font-semibold leading-snug text-foreground">{names}</h3>
         </div>
-        <span className="shrink-0 rounded-full bg-[color:var(--amber-600,#f59324)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,#d97a1c)]">
-          {ratioLabel}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="rounded-full bg-[color:var(--amber-600,#f59324)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,#d97a1c)]">
+            {ratioLabel}
+          </span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}>
+            {groupStatus}
+          </span>
+        </div>
       </div>
       <p className="mt-2 inline-flex items-center gap-1 text-sm text-muted-foreground">
         <Clock className="h-3.5 w-3.5" />
@@ -337,7 +355,11 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
           );
         })}
       </ul>
-      <p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">Scheduled · covering all {shifts.length}</p>
+      {pendingIds.length > 0 && (
+        <div className="mt-3">
+          <AcceptDeclineBar shiftIds={pendingIds} />
+        </div>
+      )}
     </article>
   );
 }

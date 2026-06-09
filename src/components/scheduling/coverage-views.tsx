@@ -36,10 +36,14 @@ function startOfMonth(d: Date) { return startOfDay(new Date(d.getFullYear(), d.g
 function endOfMonth(d: Date) { const x = startOfDay(new Date(d.getFullYear(), d.getMonth()+1, 0)); x.setHours(23,59,59,999); return x; }
 
 function ratiosOn(ratios: Ratio[], dayISO: string) {
+  // Advisory: evaluate as of max(day, today) so ratios set today still apply
+  // to earlier-in-week cells. Mirrors the Homes & Teams card.
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const asOf = dayISO > todayISO ? dayISO : todayISO;
   const m = new Map<string, Ratio>();
   for (const r of ratios) {
-    if (r.effective_start > dayISO) continue;
-    if (r.effective_end && r.effective_end < dayISO) continue;
+    if (r.effective_start > asOf) continue;
+    if (r.effective_end && r.effective_end < asOf) continue;
     m.set(r.client_id, r);
   }
   return m;

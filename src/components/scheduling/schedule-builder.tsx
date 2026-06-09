@@ -61,10 +61,15 @@ function bandTimes(dayISO: string, band: Template) {
 }
 
 function ratiosOn(ratios: Ratio[], dayISO: string) {
+  // Advisory view: evaluate ratios as of max(day, today) so a ratio set today
+  // applies to the current week even on days earlier in the week. Matches the
+  // Homes & Teams card, which always reads "today".
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const asOf = dayISO > todayISO ? dayISO : todayISO;
   const m = new Map<string, Ratio>();
   for (const r of ratios) {
-    if (r.effective_start > dayISO) continue;
-    if (r.effective_end && r.effective_end < dayISO) continue;
+    if (r.effective_start > asOf) continue;
+    if (r.effective_end && r.effective_end < asOf) continue;
     m.set(r.client_id, r);
   }
   return m;

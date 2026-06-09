@@ -1,16 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, Sparkles, Loader2, FileText,
-  Users, ExternalLink,
+  Users, ExternalLink, Undo2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { getDoneReadout, commitSmartImportJob } from "@/lib/smart-import-commit.functions";
 import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
+import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-history.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),
@@ -30,14 +35,33 @@ function DonePage() {
   const commit = useServerFn(commitSmartImportJob);
   const readout = useServerFn(getDoneReadout);
   const generateReminders = useServerFn(generateSmartImportReminders);
+  const preview = useServerFn(previewUndoImport);
+  const undoFn = useServerFn(undoCommittedImport);
 
   const [runState, setRunState] = useState<"idle" | "running" | "done" | "error">(autoRun ? "running" : "idle");
   const [runError, setRunError] = useState<string | null>(null);
+  const [undoOpen, setUndoOpen] = useState(false);
 
   const q = useQuery({
     queryKey: ["smart-import-done", jobId, runState],
     queryFn: () => readout({ data: { jobId } }),
     enabled: runState !== "running",
+  });
+
+  const previewQ = useQuery({
+    queryKey: ["smart-import-undo-preview", jobId],
+    queryFn: () => preview({ data: { jobId } }),
+    enabled: undoOpen,
+  });
+
+  const undoM = useMutation({
+    mutationFn: () => undoFn({ data: { jobId } }),
+    onSuccess: (res) => {
+      toast.success(`Undone — ${res.removed.length} item(s) removed${res.skipped.length ? `, ${res.skipped.length} preserved` : ""}.`);
+      setUndoOpen(false);
+      q.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   useEffect(() => {
@@ -116,6 +140,11 @@ function DonePage() {
           <Button onClick={() => navigate({ to: "/dashboard/smart-import" })}>
             Import another
           </Button>
+          {job.status === "committed" && (
+            <Button variant="outline" onClick={() => setUndoOpen(true)} className="text-destructive">
+              <Undo2 className="mr-2 h-4 w-4" /> Undo this import&apos;s setup
+            </Button>
+          )}
         </div>
       </div>
 
@@ -184,6 +213,71 @@ function DonePage() {
           {audit.length === 0 && <div className="text-muted-foreground">No audit rows yet.</div>}
         </div>
       </div>
+
+      <Dialog open={undoOpen} onOpenChange={setUndoOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-destructive" /> Undo this import&apos;s setup?
+            </DialogTitle>
+            <DialogDescription>
+              Removes only what the import created, via existing delete paths. Fields edited by a person after the import are preserved.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewQ.isLoading && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Building plan…</div>}
+          {previewQ.data && (
+            <div className="max-h-80 space-y-3 overflow-auto text-sm">
+              <div>
+                <div className="mb-1 font-semibold">Will remove ({previewQ.data.removes.length})</div>
+                {previewQ.data.removes.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">Nothing to remove — manual edits cover everything.</div>
+                ) : (
+                  <ul className="space-y-1 text-xs">
+                    {previewQ.data.removes.map((r, i: number) => (
+                      <li key={i} className="rounded border border-border px-2 py-1">{describeUndo(r)}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {previewQ.data.skips.length > 0 && (
+                <div>
+                  <div className="mb-1 font-semibold text-amber-700 dark:text-amber-400">Preserved ({previewQ.data.skips.length})</div>
+                  <ul className="space-y-1 text-xs">
+                    {previewQ.data.skips.map((s, i: number) => (
+                      <li key={i} className="rounded border border-amber-300/40 bg-amber-50/30 px-2 py-1 dark:bg-amber-950/20">
+                        {"reason" in s ? s.reason : "Edited after commit"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUndoOpen(false)}>Cancel</Button>
+            <Button variant="destructive" disabled={undoM.isPending || !previewQ.data} onClick={() => undoM.mutate()}>
+              {undoM.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
+              Confirm undo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function describeUndo(r: unknown): string {
+  const x = r as { kind: string; display_name?: string; module?: string; field?: string; field_key?: string; tag?: string; staff_id?: string; client_id?: string };
+  switch (x.kind) {
+    case "client_record": return `Delete client profile: ${x.display_name}`;
+    case "feature_flag": return `Disable ${x.module} on ${x.display_name}`;
+    case "bsp_draft": return `Remove draft behavior plan for ${x.display_name}`;
+    case "custom_field": return `Clear custom field "${x.field_key}" on ${x.display_name}`;
+    case "filed_scrap": return `Remove filed note ${x.tag} from ${x.display_name}`;
+    case "assignment": return `Remove staff↔client assignment`;
+    case "profile_field": return `Clear profile.${x.field} on ${x.display_name}`;
+    default: return x.kind;
+  }
 }

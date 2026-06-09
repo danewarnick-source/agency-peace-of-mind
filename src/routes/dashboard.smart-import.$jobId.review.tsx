@@ -271,7 +271,7 @@ function SubjectHeader({ subject, onChanged }: { subject: SubjectRow; onChanged:
 // ---------------------------- DedupBanner ----------------------------
 function DedupBanner({
   subject, matched, onChanged,
-}: { subject: SubjectRow; matched: Record<string, unknown> | null; onChanged: () => void }) {
+}: { subject: SubjectRow; matched: Record<string, string | null> | null; onChanged: () => void }) {
   const setDecision = useServerFn(setSubjectDecision);
   const m = useMutation({
     mutationFn: (decision: "update" | "create_new" | "skip") => setDecision({ data: { subjectId: subject.id, decision } }),
@@ -280,9 +280,9 @@ function DedupBanner({
   });
   if (subject.match_status === "new") return null;
   const existingName = matched
-    ? [(matched as Record<string, unknown>).first_name, (matched as Record<string, unknown>).last_name].filter(Boolean).join(" ")
-      || ((matched as Record<string, unknown>).full_name as string)
-      || ((matched as Record<string, unknown>).email as string)
+    ? [(matched as Record<string, string | null>).first_name, (matched as Record<string, string | null>).last_name].filter(Boolean).join(" ")
+      || ((matched as Record<string, string | null>).full_name as string)
+      || ((matched as Record<string, string | null>).email as string)
       || "existing record"
     : "an existing record";
   return (
@@ -314,7 +314,7 @@ type FieldRow = {
 function PlacementLineup({
   fields, targetFields, matched, decision, onChanged,
 }: {
-  fields: FieldRow[]; targetFields: string[]; matched: Record<string, unknown> | null;
+  fields: FieldRow[]; targetFields: string[]; matched: Record<string, string | null> | null;
   decision: SubjectRow["review_decision"]; onChanged: () => void;
 }) {
   const core = fields.filter((f) => !f.is_custom_attribute);

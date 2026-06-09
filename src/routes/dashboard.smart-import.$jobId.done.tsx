@@ -29,6 +29,7 @@ function DonePage() {
 
   const commit = useServerFn(commitSmartImportJob);
   const readout = useServerFn(getDoneReadout);
+  const generateReminders = useServerFn(generateSmartImportReminders);
 
   const [runState, setRunState] = useState<"idle" | "running" | "done" | "error">(autoRun ? "running" : "idle");
   const [runError, setRunError] = useState<string | null>(null);
@@ -45,6 +46,8 @@ function DonePage() {
     (async () => {
       try {
         await commit({ data: { jobId } });
+        // After commit, seed persistent reminders for any leftovers/gaps.
+        try { await generateReminders({ data: {} }); } catch { /* non-fatal */ }
         if (!cancelled) setRunState("done");
       } catch (e) {
         if (!cancelled) {

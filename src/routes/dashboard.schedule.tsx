@@ -257,7 +257,7 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
     return (
       <div className="space-y-2">
         {linkWrap}
-        <AcceptDeclineBar shiftId={s.id} />
+        <AcceptDeclineBar shiftIds={s.id} />
       </div>
     );
   }

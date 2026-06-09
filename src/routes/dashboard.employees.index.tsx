@@ -20,7 +20,7 @@ import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus,
 import { toast } from "sonner";
 
 import { RequirePermission } from "@/components/rbac-guard";
-import { BulkImporter } from "@/components/bulk-importer";
+// Smart Import replaces the legacy NECTAR Bulk Importer dialog.
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
 import { SuggestedTopicsInput } from "@/components/ce/suggested-topics-input";

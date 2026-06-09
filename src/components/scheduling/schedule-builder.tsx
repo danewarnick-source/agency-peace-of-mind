@@ -201,6 +201,7 @@ export function ScheduleBuilder() {
     const ratioMap = ratiosOn(data.ratios, isoDay(weekDays[0]));
     const units = buildUnits(home, data.clients, ratioMap);
     const next = new Map<string, string | null>();
+    const nextStatus = new Map<string, string>();
     for (const sh of data.shifts) {
       const day = isoDay(new Date(sh.starts_at));
       const start = new Date(sh.starts_at);
@@ -212,10 +213,15 @@ export function ScheduleBuilder() {
       // find first empty slot
       for (let i = 0; i < unit.staffNeeded; i++) {
         const k = assignmentKey(unit.key, day, band.id, i);
-        if (!next.has(k)) { next.set(k, sh.staff_id); break; }
+        if (!next.has(k)) {
+          next.set(k, sh.staff_id);
+          if (sh.published) nextStatus.set(k, sh.status);
+          break;
+        }
       }
     }
     setAssignments(next);
+    setStatuses(nextStatus);
     setDrafts(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, home?.id, weekStart.toISOString()]);

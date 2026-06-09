@@ -1,16 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, Sparkles, Loader2, FileText,
-  Users, ExternalLink,
+  Users, ExternalLink, Undo2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { getDoneReadout, commitSmartImportJob } from "@/lib/smart-import-commit.functions";
 import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
+import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-history.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),

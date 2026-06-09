@@ -10,12 +10,14 @@ import { getAgencyHealthSnapshot } from "@/lib/agency-health.functions";
 import type { AgencyHealthSnapshot } from "@/lib/agency-health.functions";
 import {
   ShieldCheck, MapPin, FileCheck2, BadgeCheck, Activity,
-  AlertTriangle, ArrowRight, PartyPopper, Wallet, ClipboardX,
-  FileSignature, Stethoscope, Send, Users, Trophy, CalendarHeart,
-  BookOpen, Network, Receipt, CalendarClock, Share2, Banknote,
+  AlertTriangle, ArrowRight, PartyPopper, Wallet,
+  BookOpen, Network, CalendarClock, ClipboardX, FileSignature,
+  Stethoscope, UserPlus, CalendarPlus, ClipboardCheck, BarChart3,
+  Upload,
 } from "lucide-react";
 import { NectarHeader } from "@/components/nectar/nectar-brand";
 
+// Card prefs preserved for settings compatibility (legacy keys still accepted).
 const CARD_KEYS = ["greeting", "kpis", "attention", "celebrations", "billing"] as const;
 type CardKey = (typeof CARD_KEYS)[number];
 const STORAGE_KEY = "hive.company-overview.cards.v1";
@@ -53,16 +55,14 @@ export function saveOverviewPrefs(prefs: { visible: Record<CardKey, boolean>; or
 }
 
 export const OVERVIEW_CARDS: { key: CardKey; label: string; description: string }[] = [
-  { key: "greeting", label: "NECTAR greeting", description: "Warm welcome + sweet-nectar line for today" },
+  { key: "greeting", label: "NECTAR daily brief", description: "Templated brief built from today's live counts" },
   { key: "kpis", label: "Health KPIs", description: "Audit readiness, EVV, documentation, credentials, compliance" },
-  { key: "attention", label: "Needs your attention", description: "Prioritized action list with deep links" },
+  { key: "attention", label: "Needs you today", description: "Operational to-dos with deep links" },
   { key: "celebrations", label: "Worth celebrating", description: "Anniversaries, certifications, streaks" },
-  { key: "billing", label: "Billing & payroll snapshot", description: "Admin/billing roles only — dollar figures" },
+  { key: "billing", label: "Billing & payroll snapshot", description: "Admin/billing roles only" },
 ];
 
-function fmtPct(n: number) {
-  return `${Math.round(n)}%`;
-}
+function fmtPct(n: number) { return `${Math.round(n)}%`; }
 function fmtUSD(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 }
@@ -72,49 +72,99 @@ function tone(score: number) {
   return { dot: "bg-destructive", text: "text-destructive", chip: "bg-destructive/10 text-destructive border-destructive/30" };
 }
 
-function Greeting({ name }: { name: string }) {
-  const hour = new Date().getHours();
-  const salute = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+type HealthMetrics = { audit: number; evv: number; docs: number; creds: number; overall: number };
+type CountsForBrief = {
+  unacceptedShifts: number;
+  expiringCredentials: number;
+  pendingIncidents: number;
+  missingDailyLogs: number;
+  unsignedNotes: number;
+  requirementsNeedingReview: number;
+  engineMappingGaps: number;
+};
+
+// Isolated brief generator — replace this body with a model call later without
+// touching the page. Never fabricates: only renders the live counts provided.
+function buildDailyBrief(name: string, c: CountsForBrief, m: HealthMetrics | null): string {
+  const salute = (() => {
+    const h = new Date().getHours();
+    return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  })();
+  const parts: string[] = [];
+  if (c.unacceptedShifts) parts.push(`${c.unacceptedShifts} shift${c.unacceptedShifts === 1 ? "" : "s"} still unaccepted`);
+  if (c.expiringCredentials) parts.push(`${c.expiringCredentials} cert${c.expiringCredentials === 1 ? "" : "s"} expiring soon`);
+  if (c.pendingIncidents) parts.push(`${c.pendingIncidents} incident${c.pendingIncidents === 1 ? "" : "s"} to review`);
+  if (c.missingDailyLogs || c.unsignedNotes) {
+    const docs = c.missingDailyLogs + c.unsignedNotes;
+    parts.push(`${docs} doc${docs === 1 ? "" : "s"} due`);
+  }
+  if (c.requirementsNeedingReview || c.engineMappingGaps) {
+    const reqs = c.requirementsNeedingReview + c.engineMappingGaps;
+    parts.push(`${reqs} requirement${reqs === 1 ? "" : "s"} to review`);
+  }
+  const headline = `${salute}, ${name}.`;
+  let body: string;
+  if (parts.length === 0) {
+    body = m && m.overall >= 90
+      ? `Everything is on track — overall compliance is at ${fmtPct(m.overall)}.`
+      : "Nothing in the queue right now — a good moment to get ahead.";
+  } else {
+    const joined = parts.length === 1 ? parts[0]
+      : parts.length === 2 ? `${parts[0]} and ${parts[1]}`
+      : `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+    body = `${joined} — everything else is on track.`;
+  }
+  const tail = m ? ` Overall compliance ${fmtPct(m.overall)}.` : "";
+  return `${headline} ${body}${tail}`;
+}
+
+function DailyBrief({ name, counts, metrics }: { name: string; counts: CountsForBrief; metrics: HealthMetrics | null }) {
+  const text = buildDailyBrief(name, counts, metrics);
+  const [headline, ...rest] = text.split(". ");
+  const body = rest.join(". ");
   return (
     <NectarHeader
       surface="navy"
       markSize="lg"
-      eyebrow="Company Overview"
-      title={`${salute}, ${name}.`}
-      description="Here's your sweet nectar for today — a quick read on company health, what needs you, and what's worth celebrating."
+      eyebrow="Daily brief · NECTAR"
+      title={headline.endsWith(".") ? headline : `${headline}.`}
+      description={body}
     />
   );
 }
 
-function Kpi({
-  icon: Icon, label, value, hint, to,
-}: {
-  icon: typeof ShieldCheck; label: string; value: number; hint: string; to: string;
-}) {
-  const t = tone(value);
+// ─── Quick actions ───────────────────────────────────────────────────────────
+function QuickActions() {
+  const actions: { icon: typeof Upload; label: string; to: string; search?: Record<string, string> }[] = [
+    { icon: Upload, label: "Smart Import", to: "/dashboard/smart-import" },
+    { icon: UserPlus, label: "Add client", to: "/dashboard/clients" },
+    { icon: CalendarPlus, label: "Create shift", to: "/dashboard/scheduling", search: { tab: "builder" } },
+    { icon: ClipboardCheck, label: "Review timesheets", to: "/dashboard/timeclock" },
+    { icon: BarChart3, label: "Run report", to: "/dashboard/reports" },
+  ];
   return (
-    <Link to={to} className="group rounded-xl border border-border bg-card p-4 shadow-card transition hover:border-primary/40">
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-          <Icon className="h-4 w-4 text-foreground" />
-        </span>
-        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${t.chip}`}>
-          {value >= 90 ? "On track" : value >= 75 ? "Attention" : "Action"}
-        </span>
+    <section>
+      <div className="flex flex-wrap gap-2">
+        {actions.map((a) => (
+          <Link
+            key={a.label}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            to={a.to as any}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            search={a.search as any}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium shadow-sm transition hover:border-primary/40 hover:bg-accent/5"
+          >
+            <a.icon className="h-4 w-4 text-primary" />
+            <span>{a.label}</span>
+          </Link>
+        ))}
       </div>
-      <p className="mt-3 text-xs font-medium text-muted-foreground">{label}</p>
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className={`text-3xl font-semibold tabular-nums ${t.text}`}>{fmtPct(value)}</span>
-        <span className={`h-2 w-2 rounded-full ${t.dot}`} />
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-    </Link>
+    </section>
   );
 }
 
-type HealthMetrics = { audit: number; evv: number; docs: number; creds: number; overall: number };
-
-function useHealthMetrics(orgId: string): { metrics: HealthMetrics | null; isLoading: boolean } {
+// ─── KPI strip ───────────────────────────────────────────────────────────────
+function useHealthMetrics(orgId: string): { metrics: HealthMetrics | null; isLoading: boolean; raw: AgencyHealthSnapshot | undefined } {
   const fetchFn = useServerFn(getAgencyHealthSnapshot);
   const { data, isLoading } = useQuery({
     queryKey: ["agency-health", orgId],
@@ -132,68 +182,147 @@ function useHealthMetrics(orgId: string): { metrics: HealthMetrics | null; isLoa
       overall: Math.round((d.client.overall + d.employee.overall) / 2),
     };
   }, [data]);
-  return { metrics, isLoading };
+  return { metrics, isLoading, raw: data as AgencyHealthSnapshot | undefined };
 }
 
-function Kpis({ metrics, isLoading }: { metrics: HealthMetrics | null; isLoading: boolean }) {
+type KpiSpec = {
+  icon: typeof ShieldCheck;
+  label: string;
+  value: number;
+  nextAction: string;
+  to: string;
+  search?: Record<string, string>;
+};
+
+function KpiCard({ spec }: { spec: KpiSpec }) {
+  const t = tone(spec.value);
   return (
-    <section>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold tracking-tight">Health KPIs</h2>
-        <span className="text-xs text-muted-foreground">Last 30 days · color-coded</span>
+    <Link
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      to={spec.to as any}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      search={spec.search as any}
+      className="group cursor-pointer rounded-xl border border-border bg-card p-3 shadow-card transition hover:border-primary/40"
+    >
+      <div className="flex items-center gap-2">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-muted">
+          <spec.icon className="h-3.5 w-3.5 text-foreground" />
+        </span>
+        <span className="text-xs font-medium text-muted-foreground">{spec.label}</span>
       </div>
-      {isLoading || !metrics ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className={`text-2xl font-semibold tabular-nums ${t.text}`}>{fmtPct(spec.value)}</span>
+        <span className={`h-2 w-2 rounded-full ${t.dot}`} />
+      </div>
+      <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary">
+        {spec.nextAction} <ArrowRight className="h-3 w-3" />
+      </p>
+    </Link>
+  );
+}
+
+function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; raw: AgencyHealthSnapshot | undefined; isLoading: boolean }) {
+  if (isLoading || !metrics || !raw) {
+    return (
+      <section>
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Health KPIs</h2>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 animate-pulse rounded-xl border border-border bg-muted/40" />
+            <div key={i} className="h-24 animate-pulse rounded-xl border border-border bg-muted/40" />
           ))}
         </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Kpi icon={ShieldCheck} label="Audit readiness" value={metrics.audit} hint="Logs, eMAR & attendance combined" to="/dashboard/records-desk" />
-          <Kpi icon={MapPin} label="EVV match" value={metrics.evv} hint="Clock-ins inside the geofence" to="/dashboard/timeclock" />
-          <Kpi icon={FileCheck2} label="Documentation" value={metrics.docs} hint="Notes & medication completeness" to="/dashboard/daily-logs" />
-          <Kpi icon={BadgeCheck} label="Credentials current" value={metrics.creds} hint="Approved certs across active staff" to="/dashboard/certifications" />
-          <Kpi icon={Activity} label="Overall compliance" value={metrics.overall} hint="Weighted across the agency" to="/dashboard/records-desk" />
-        </div>
-      )}
+      </section>
+    );
+  }
+  const staffMissingCreds = Math.max(0, raw.employee.credentials.total - raw.employee.credentials.passing);
+  const evvOut = Math.max(0, raw.employee.geofence.total - raw.employee.geofence.passing);
+  const docGaps = Math.max(0, raw.client.daily.total - raw.client.daily.passing)
+    + Math.max(0, raw.employee.emarAccuracy.total - raw.employee.emarAccuracy.passing);
+  const auditGaps = Math.max(0, raw.client.medication.total - raw.client.medication.passing)
+    + Math.max(0, raw.client.attendance.total - raw.client.attendance.passing);
+
+  const specs: KpiSpec[] = [
+    {
+      icon: ShieldCheck, label: "Audit readiness", value: metrics.audit,
+      nextAction: auditGaps ? `Review ${auditGaps} record${auditGaps === 1 ? "" : "s"}` : "Open Records Desk",
+      to: "/dashboard/hub/documentation", search: { tab: "audit" },
+    },
+    {
+      icon: MapPin, label: "EVV match", value: metrics.evv,
+      nextAction: evvOut ? `Investigate ${evvOut} clock-in${evvOut === 1 ? "" : "s"}` : "Open EVV & timesheets",
+      to: "/dashboard/hub/documentation", search: { tab: "evv" },
+    },
+    {
+      icon: FileCheck2, label: "Documentation", value: metrics.docs,
+      nextAction: docGaps ? `Review ${docGaps} doc${docGaps === 1 ? "" : "s"}` : "Open Documentation",
+      to: "/dashboard/hub/documentation", search: { tab: "review" },
+    },
+    {
+      icon: BadgeCheck, label: "Credentials current", value: metrics.creds,
+      nextAction: staffMissingCreds
+        ? `Review ${staffMissingCreds} staff`
+        : "Open Compliance",
+      to: "/dashboard/hub/employees", search: { tab: "compliance" },
+    },
+    {
+      icon: Activity, label: "Overall compliance", value: metrics.overall,
+      nextAction: "Open compliance overview",
+      to: "/dashboard/compliance-desk",
+    },
+  ];
+  return (
+    <section>
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Health KPIs</h2>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        {specs.map((s) => <KpiCard key={s.label} spec={s} />)}
+      </div>
     </section>
   );
 }
 
-type AttentionItem = { icon: typeof AlertTriangle; label: string; count: number; to: string; urgent?: boolean };
+// ─── Generic queue (Needs you today / Backlog) ───────────────────────────────
+type QueueItem = {
+  icon: typeof AlertTriangle;
+  label: string;
+  count: number;
+  to: string;
+  search?: Record<string, string>;
+  urgent?: boolean;
+};
 
-function Attention({ items }: { items: AttentionItem[] }) {
+function QueueSection({
+  title, items, emptyText, intent = "warn",
+}: { title: string; items: QueueItem[]; emptyText: string; intent?: "warn" | "neutral" }) {
   const visible = items.filter((i) => i.count > 0).sort((a, b) => Number(!!b.urgent) - Number(!!a.urgent));
+  const accent = intent === "warn" ? "bg-warning/15 text-warning-foreground" : "bg-muted text-foreground";
+  const Icon = intent === "warn" ? AlertTriangle : BookOpen;
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-warning/15 text-warning-foreground">
-            <AlertTriangle className="h-4 w-4" />
+          <span className={`inline-flex h-8 w-8 items-center justify-center rounded-md ${accent}`}>
+            <Icon className="h-4 w-4" />
           </span>
-          <h2 className="text-lg font-semibold tracking-tight">Needs your attention</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
         </div>
         <span className="text-xs text-muted-foreground">{visible.length} item{visible.length === 1 ? "" : "s"}</span>
       </div>
-
       {visible.length === 0 ? (
-        <p className="rounded-lg border border-success/30 bg-success/5 p-4 text-sm text-success">
-          All clear — nothing urgent waiting on you right now. 🍯
-        </p>
+        <p className="rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-success">{emptyText}</p>
       ) : (
         <ul className="space-y-2">
           {visible.map((it) => (
             <li key={it.label}>
               <Link
-                to={it.to}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5 transition hover:border-primary/40 hover:bg-accent/5"
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                to={it.to as any}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                search={it.search as any}
+                className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5 transition hover:border-primary/40 hover:bg-accent/5"
               >
                 <span className="flex min-w-0 items-start gap-2">
                   <it.icon className={`mt-0.5 h-4 w-4 shrink-0 ${it.urgent ? "text-destructive" : "text-warning-foreground"}`} />
-                  <span className="min-w-0">
-                    <p className="truncate text-sm font-medium">{it.label}</p>
-                  </span>
+                  <p className="truncate text-sm font-medium">{it.label}</p>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">
@@ -210,47 +339,8 @@ function Attention({ items }: { items: AttentionItem[] }) {
   );
 }
 
-function Celebrations({ items }: { items: { kind: string; title: string; detail: string }[] }) {
-  return (
-    <section className="rounded-xl border border-accent/30 bg-accent/5 p-5 shadow-card">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-accent/20 text-accent">
-          <PartyPopper className="h-4 w-4" />
-        </span>
-        <h2 className="text-lg font-semibold tracking-tight">Worth celebrating</h2>
-      </div>
-      {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Quiet week — but every steady day is a win. NECTAR will surface the next milestone here.
-        </p>
-      ) : (
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {items.map((c, i) => {
-            const Icon =
-              c.kind === "anniversary" ? CalendarHeart :
-              c.kind === "training" ? Trophy :
-              c.kind === "evv_streak" ? BadgeCheck : Users;
-            return (
-              <li key={i} className="flex items-start gap-3 rounded-lg border border-border bg-background p-3">
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent/15 text-accent">
-                  <Icon className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{c.title}</p>
-                  <p className="text-xs text-muted-foreground">{c.detail}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function BillingSnapshotCard({
-  claimsReadyAmount, payrollGross,
-}: { claimsReadyAmount: number; payrollGross: number }) {
+// ─── Billing snapshot ────────────────────────────────────────────────────────
+function BillingSnapshotCard({ claimsReadyAmount, payrollGross }: { claimsReadyAmount: number; payrollGross: number }) {
   return (
     <section className="rounded-xl border border-primary/30 bg-card p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -265,14 +355,14 @@ function BillingSnapshotCard({
         </span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link to="/dashboard/billing" className="rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
+        <Link to="/dashboard/billing" className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
           <p className="text-xs font-medium text-muted-foreground">Claims ready to submit</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{fmtUSD(claimsReadyAmount)}</p>
           <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary">
             Open Billing <ArrowRight className="h-3 w-3" />
           </p>
         </Link>
-        <Link to="/dashboard/timeclock" className="rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
+        <Link to="/dashboard/timeclock" className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
           <p className="text-xs font-medium text-muted-foreground">Payroll this period (gross)</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{fmtUSD(payrollGross)}</p>
           <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary">
@@ -284,6 +374,29 @@ function BillingSnapshotCard({
   );
 }
 
+// ─── Celebrate (compact) ─────────────────────────────────────────────────────
+function CelebrateInline({ items }: { items: { kind: string; title: string; detail: string }[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+        <PartyPopper className="h-3.5 w-3.5 text-accent" />
+        Quiet week — NECTAR will surface the next milestone here.
+      </p>
+    );
+  }
+  const first = items[0];
+  const extra = items.length - 1;
+  return (
+    <p className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-foreground">
+      <PartyPopper className="h-3.5 w-3.5 text-accent" />
+      <span className="font-medium">{first.title}</span>
+      <span className="text-muted-foreground">— {first.detail}</span>
+      {extra > 0 && <span className="text-muted-foreground">· +{extra} more</span>}
+    </p>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 export function CompanyOverview() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
@@ -297,7 +410,7 @@ export function CompanyOverview() {
     queryFn: () => fetchOverview({ data: { organizationId: orgId! } }),
   });
 
-  const { metrics, isLoading: healthLoading } = useHealthMetrics(orgId ?? "");
+  const { metrics, raw, isLoading: healthLoading } = useHealthMetrics(orgId ?? "");
 
   const prefs = useMemo(() => getOverviewPrefs(), []);
   const canSeeBilling = can("view_billing") || can("manage_billing");
@@ -309,69 +422,81 @@ export function CompanyOverview() {
     user?.email?.split("@")[0] ??
     "there";
 
-  // Base attention items sourced from the platform-wide Task Center aggregator.
-  const baseItems: AttentionItem[] = data
+  const att = data?.attention;
+  const counts: CountsForBrief = {
+    unacceptedShifts: att?.unacceptedShifts ?? 0,
+    expiringCredentials: att?.expiringCredentials ?? 0,
+    pendingIncidents: att?.pendingIncidents ?? 0,
+    missingDailyLogs: att?.missingDailyLogs ?? 0,
+    unsignedNotes: att?.unsignedNotes ?? 0,
+    requirementsNeedingReview: att?.requirementsNeedingReview ?? 0,
+    engineMappingGaps: att?.engineMappingGaps ?? 0,
+  };
+
+  // Needs you today — distinct operational to-dos only. KPI cards above are
+  // the gauges for compliance/credentials/etc., so we never re-list those here.
+  const needsToday: QueueItem[] = att
     ? [
-        { icon: BadgeCheck, label: "Staff credentials expiring within 30 days", count: data.attention.expiringCredentials, to: "/dashboard/certifications", urgent: true },
-        { icon: Stethoscope, label: "Incident reports pending admin review", count: data.attention.pendingIncidents, to: "/dashboard/records-desk", urgent: true },
-        { icon: BookOpen, label: "Authoritative requirements needing your review", count: data.attention.requirementsNeedingReview, to: "/dashboard/authoritative-sources", urgent: true },
-        { icon: Network, label: "Requirement mappings flagged for review", count: data.attention.engineMappingGaps, to: "/dashboard/authoritative-sources" },
-        { icon: Banknote, label: "Billing submission warnings to action", count: data.attention.pendingBillingWarnings, to: "/dashboard/billing", urgent: true },
-        { icon: Receipt, label: "Reimbursement requests pending approval", count: data.attention.pendingReimbursements, to: "/dashboard/billing" },
-        { icon: CalendarClock, label: "Published shifts not yet accepted", count: data.attention.unacceptedShifts, to: "/dashboard/scheduling" },
-        { icon: Share2, label: "Auditor shares expiring this week", count: data.attention.auditorSharesExpiring, to: "/dashboard/audit" },
-        { icon: ClipboardX, label: "Daily logs returned for revision", count: data.attention.missingDailyLogs, to: "/dashboard/daily-logs" },
-        { icon: FileSignature, label: "Notes awaiting signature (last 7 days)", count: data.attention.unsignedNotes, to: "/dashboard/records-desk" },
-        { icon: Users, label: "Clients off budget pace", count: data.attention.clientsOffPace, to: "/dashboard/billing" },
-        { icon: ShieldCheck, label: "Timesheets awaiting payroll approval", count: data.attention.pendingPayroll, to: "/dashboard/timeclock" },
-        { icon: Send, label: "Claims ready to submit", count: data.attention.claimsReady, to: "/dashboard/billing" },
+        { icon: CalendarClock, label: "Published shifts not yet accepted", count: att.unacceptedShifts, to: "/dashboard/scheduling", search: { tab: "builder" }, urgent: true },
+        { icon: BadgeCheck, label: "Certifications expiring within 30 days", count: att.expiringCredentials, to: "/dashboard/hub/employees", search: { tab: "compliance" }, urgent: true },
+        { icon: Stethoscope, label: "Incident reports pending review", count: att.pendingIncidents, to: "/dashboard/hub/documentation", search: { tab: "review" }, urgent: true },
+        { icon: ClipboardX, label: "Daily logs returned for revision", count: att.missingDailyLogs, to: "/dashboard/hub/documentation", search: { tab: "review" } },
+        { icon: FileSignature, label: "Notes awaiting signature (last 7 days)", count: att.unsignedNotes, to: "/dashboard/hub/documentation", search: { tab: "review" } },
       ]
     : [];
 
-  // KPI reconciliation: any KPI in an Action state (<75) MUST produce a task,
-  // so the panel and the KPI grid can never disagree (the credentials "0% / Action"
-  // contradiction the Overview was missing before).
-  const kpiItems: AttentionItem[] = [];
-  if (metrics) {
-    const push = (cond: boolean, item: AttentionItem) => { if (cond) kpiItems.push(item); };
-    push(metrics.creds < 75 && (data?.attention.expiringCredentials ?? 0) === 0,
-      { icon: BadgeCheck, label: `Credentials KPI in action (${metrics.creds}%) — review staff credentials`, count: 1, to: "/dashboard/certifications", urgent: true });
-    push(metrics.audit < 75,
-      { icon: ShieldCheck, label: `Audit readiness in action (${metrics.audit}%) — open Records Desk`, count: 1, to: "/dashboard/records-desk", urgent: true });
-    push(metrics.evv < 75,
-      { icon: MapPin, label: `EVV match in action (${metrics.evv}%) — investigate clock-ins`, count: 1, to: "/dashboard/timeclock", urgent: true });
-    push(metrics.docs < 75,
-      { icon: FileCheck2, label: `Documentation in action (${metrics.docs}%) — review notes & eMAR`, count: 1, to: "/dashboard/daily-logs" });
-    push(metrics.overall < 75,
-      { icon: Activity, label: `Overall compliance in action (${metrics.overall}%)`, count: 1, to: "/dashboard/records-desk" });
-  }
+  // Setup & backlog — configuration reviews that don't belong in the daily queue.
+  const backlog: QueueItem[] = att
+    ? [
+        { icon: BookOpen, label: "Authoritative requirements needing review", count: att.requirementsNeedingReview, to: "/dashboard/authoritative-sources" },
+        { icon: Network, label: "Requirement mappings flagged for review", count: att.engineMappingGaps, to: "/dashboard/authoritative-sources" },
+      ]
+    : [];
 
-  const attentionItems = [...kpiItems, ...baseItems];
-
-  const sections: Record<CardKey, React.ReactNode> = {
-    greeting: <Greeting name={firstName} />,
-    kpis: <Kpis metrics={metrics} isLoading={healthLoading} />,
-    attention: isLoading || !data ? (
-      <div className="h-48 animate-pulse rounded-xl border border-border bg-muted/40" />
-    ) : (
-      <Attention items={attentionItems} />
-    ),
-    celebrations: isLoading || !data ? (
-      <div className="h-40 animate-pulse rounded-xl border border-border bg-muted/40" />
-    ) : (
-      <Celebrations items={data.celebrations} />
-    ),
-    billing: canSeeBilling && data?.billing
-      ? <BillingSnapshotCard claimsReadyAmount={data.billing.claimsReadyAmount} payrollGross={data.billing.payrollGross} />
-      : null,
-  };
-
+  // Render order: brief → quick actions → needs today → KPI strip → backlog → billing → celebrate
   return (
     <div className="space-y-6">
-      {prefs.order.map((key) =>
-        prefs.visible[key] && sections[key]
-          ? <div key={key}>{sections[key]}</div>
-          : null,
+      {prefs.visible.greeting && (
+        <DailyBrief name={firstName} counts={counts} metrics={metrics} />
+      )}
+
+      <QuickActions />
+
+      {isLoading || !data ? (
+        <div className="h-48 animate-pulse rounded-xl border border-border bg-muted/40" />
+      ) : (
+        prefs.visible.attention && (
+          <QueueSection
+            title="Needs you today"
+            items={needsToday}
+            emptyText="All clear — nothing operational waiting on you right now. 🍯"
+            intent="warn"
+          />
+        )
+      )}
+
+      {prefs.visible.kpis && (
+        <KpiStrip metrics={metrics} raw={raw} isLoading={healthLoading} />
+      )}
+
+      {!isLoading && data && (
+        <QueueSection
+          title="Setup & backlog"
+          items={backlog}
+          emptyText="No configuration reviews pending."
+          intent="neutral"
+        />
+      )}
+
+      {prefs.visible.billing && canSeeBilling && data?.billing && (
+        <BillingSnapshotCard
+          claimsReadyAmount={data.billing.claimsReadyAmount}
+          payrollGross={data.billing.payrollGross}
+        />
+      )}
+
+      {prefs.visible.celebrations && !isLoading && data && (
+        <CelebrateInline items={data.celebrations} />
       )}
     </div>
   );

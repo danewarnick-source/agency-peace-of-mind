@@ -213,6 +213,14 @@ function DashboardLayout() {
     }
   }, [execLoading, viewHydrated, orgLoading, isHiveExecView, isStatePreview, pathname, navigate]);
 
+  const unreadFn = useServerFn(getInboxUnreadCount);
+  const unreadQ = useQuery({
+    enabled: !!org?.organization_id && effectiveView === "admin" && isAdminCapable,
+    queryKey: ["inbox-unread", org?.organization_id ?? null],
+    queryFn: () => unreadFn({ data: { organization_id: org!.organization_id } }),
+    refetchInterval: 60_000,
+  });
+
   const currentPreviewState = isStatePreview
     ? states.find((s) => s.code === stateCode) ?? null
     : null;
@@ -238,14 +246,6 @@ function DashboardLayout() {
   const pageTitle =
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
   const isStaffView = effectiveView === "staff";
-
-  const unreadFn = useServerFn(getInboxUnreadCount);
-  const unreadQ = useQuery({
-    enabled: !!org?.organization_id && effectiveView === "admin" && isAdminCapable,
-    queryKey: ["inbox-unread", org?.organization_id ?? null],
-    queryFn: () => unreadFn({ data: { organization_id: org!.organization_id } }),
-    refetchInterval: 60_000,
-  });
   const inboxUnread = unreadQ.data?.count ?? 0;
 
   const sidebarProps: Omit<SidebarBodyProps, "onNavigate"> = {

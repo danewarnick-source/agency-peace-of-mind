@@ -328,3 +328,21 @@ function Legend() {
     </div>
   );
 }
+
+function NoHomesEmpty() {
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-surface-warm p-8 text-center">
+      <span className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-[#137182]/10 text-[#137182]">
+        <Home className="h-5 w-5" />
+      </span>
+      <h3 className="mt-3 text-base font-semibold">No homes yet</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        Add a home in{" "}
+        <Link to="/dashboard/scheduling" search={{ tab: "homes" }} className="font-medium text-[#137182] hover:underline">
+          Homes &amp; Teams
+        </Link>
+        , set client ratios in Setup, then draft a week in Builder.
+      </p>
+    </div>
+  );
+}

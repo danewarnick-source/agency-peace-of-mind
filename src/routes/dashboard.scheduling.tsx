@@ -89,7 +89,7 @@ function SchedulingShell() {
             type="button"
             onClick={() =>
               navigate({
-                search: (prev) => ({ ...prev, mode: m.key }),
+                search: (prev: Record<string, unknown>) => ({ ...prev, mode: m.key }),
                 replace: true,
               })
             }

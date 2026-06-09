@@ -209,53 +209,75 @@ export function IndividualServicesScheduler() {
     return m;
   }, [data?.catalog]);
 
-  // Individual-services clients: have HHS/PPS/SLH/SLN assigned and do NOT have RHS.
+  // Real assigned codes per client come from the clients row (the same
+  // authorized_dspd_codes / job_code arrays surfaced on the client profile
+  // and Clients directory), NOT from client_billing_codes (which only holds
+  // optional authorization caps).
+  const assignedCodesByClient = useMemo(() => {
+    const m = new Map<string, string[]>();
+    (data?.clients ?? []).forEach((c) => {
+      const set = new Set<string>([
+        ...((c.authorized_dspd_codes ?? []) as string[]),
+        ...((c.job_code ?? []) as string[]),
+      ]);
+      m.set(c.id, Array.from(set));
+    });
+    return m;
+  }, [data?.clients]);
+
+  // A client belongs to Individual services when:
+  //  - none of their assigned codes is a staffed-residential (RHS) code, AND
+  //  - at least one assigned code is schedulable (requires_schedule=true)
+  //    and is NOT staffed_residential — i.e. SLH/SLN/DSI/SEI/CHA/COM/HSQ/
+  //    RP2–RP5/ELS/DSG, etc.
+  // Pure host-home/PPS clients (HHS/PPS only — schedule ✘ in the catalog)
+  // therefore do NOT appear here; host-home living is never scheduled.
   const indivClients = useMemo(() => {
     if (!data) return [];
-    const byClient = new Map<string, Set<string>>();
-    data.cbc.forEach((b) => {
-      if (!byClient.has(b.client_id)) byClient.set(b.client_id, new Set());
-      byClient.get(b.client_id)!.add(b.service_code);
-    });
     return data.clients.filter((c) => {
-      const codes = byClient.get(c.id) ?? new Set();
-      const codesArr = Array.from(codes);
-      const hasRHS = codesArr.some((code) => {
-        const sc = catalogByCode.get(code);
-        return sc?.scheduling_behavior === "staffed_residential";
-      });
+      const codes = assignedCodesByClient.get(c.id) ?? [];
+      const hasRHS = codes.some(
+        (code) => catalogByCode.get(code)?.scheduling_behavior === "staffed_residential",
+      );
       if (hasRHS) return false;
-      return codesArr.some((code) => {
+      return codes.some((code) => {
         const sc = catalogByCode.get(code);
         return (
-          sc?.scheduling_behavior === "host_family_residential" ||
-          sc?.scheduling_behavior === "supported_living"
+          !!sc?.requires_schedule && sc.scheduling_behavior !== "staffed_residential"
         );
       });
     });
-  }, [data, catalogByCode]);
+  }, [data, catalogByCode, assignedCodesByClient]);
 
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const selected =
     indivClients.find((c) => c.id === selectedClientId) ?? indivClients[0] ?? null;
+
+  const selectedAssigned = useMemo(
+    () => (selected ? assignedCodesByClient.get(selected.id) ?? [] : []),
+    [selected, assignedCodesByClient],
+  );
 
   const selectedCbc = useMemo(() => {
     if (!selected || !data) return [];
     return data.cbc.filter((b) => b.client_id === selected.id);
   }, [selected, data]);
 
-  // Schedulable codes for the selected client (from catalog + their assignments).
+  // Schedulable codes for the selected client = catalog-schedulable ∩ assigned,
+  // excluding staffed_residential (which lives on the Residential board).
   const schedulableCodes = useMemo(() => {
-    return selectedCbc
-      .map((b) => ({ code: b.service_code, sc: catalogByCode.get(b.service_code) }))
-      .filter((r) => r.sc?.requires_schedule)
-      .map((r) => r.code);
-  }, [selectedCbc, catalogByCode]);
+    return selectedAssigned.filter((code) => {
+      const sc = catalogByCode.get(code);
+      return !!sc?.requires_schedule && sc.scheduling_behavior !== "staffed_residential";
+    });
+  }, [selectedAssigned, catalogByCode]);
 
   const livingArrangement = useMemo(() => {
-    const codes = selectedCbc.map((b) => b.service_code);
-    return codes.find((c) => catalogByCode.get(c)?.is_living_arrangement) ?? null;
-  }, [selectedCbc, catalogByCode]);
+    return (
+      selectedAssigned.find((c) => catalogByCode.get(c)?.is_living_arrangement) ?? null
+    );
+  }, [selectedAssigned, catalogByCode]);
+
 
   const clientShifts = useMemo(() => {
     if (!selected || !data) return [];

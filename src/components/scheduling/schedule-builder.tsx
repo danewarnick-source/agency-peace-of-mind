@@ -556,11 +556,12 @@ export function ScheduleBuilder() {
 }
 
 function SlotCell({
-  slotKey, staffName, isDraft, unit, day, bandName, pool, continuityFor, weekHours, onPick, onClear,
+  slotKey, staffName, isDraft, status, unit, day, bandName, pool, continuityFor, weekHours, onPick, onClear,
 }: {
   slotKey: string;
   staffName: string | null;
   isDraft?: boolean;
+  status?: string | null;
   unit: Unit; day: string; bandName: string;
   pool: Staff[]; continuityFor: Set<string>; weekHours: Map<string, number>;
   onPick: (id: string) => void; onClear: () => void;
@@ -577,7 +578,21 @@ function SlotCell({
 
   const filledStyle = isDraft
     ? "border-dashed border-violet-400 bg-violet-50 text-violet-900 hover:bg-violet-100 dark:bg-violet-950/30 dark:text-violet-200"
-    : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200";
+    : status === "declined"
+      ? "border-rose-400 bg-rose-100 text-rose-900 hover:bg-rose-200 dark:bg-rose-950/40 dark:text-rose-200"
+      : status === "accepted"
+        ? "border-emerald-500 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-100"
+        : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200";
+
+  const statusBadge = isDraft && staffName
+    ? { label: "draft", cls: "bg-violet-200 text-violet-800" }
+    : status === "accepted"
+      ? { label: "✓", cls: "bg-emerald-200 text-emerald-800" }
+      : status === "declined"
+        ? { label: "declined", cls: "bg-rose-200 text-rose-800" }
+        : status === "pending"
+          ? { label: "scheduled", cls: "bg-muted text-muted-foreground" }
+          : null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -588,11 +603,11 @@ function SlotCell({
               ? filledStyle
               : "border-dashed border-rose-300 bg-rose-50/50 text-rose-700 hover:bg-rose-100/50 dark:bg-rose-950/20 dark:text-rose-200"
           }`}
-          aria-label={staffName ? `${isDraft ? "Proposed" : "Assigned"} to ${staffName}` : `Needs staff for ${unit.label} ${bandName} ${day}`}
+          aria-label={staffName ? `${isDraft ? "Proposed" : status ?? "Assigned"} ${staffName}` : `Needs staff for ${unit.label} ${bandName} ${day}`}
         >
           <div className="flex items-center justify-between gap-1">
             <span className="truncate font-medium">{staffName ?? `needs 1`}</span>
-            {isDraft && staffName && <span className="shrink-0 rounded bg-violet-200 px-1 text-[9px] font-bold uppercase tracking-wide text-violet-800">draft</span>}
+            {statusBadge && <span className={`shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide ${statusBadge.cls}`}>{statusBadge.label}</span>}
           </div>
         </button>
       </PopoverTrigger>

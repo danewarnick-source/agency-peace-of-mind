@@ -120,13 +120,15 @@ function buildDailyBrief(name: string, c: CountsForBrief, m: HealthMetrics | nul
 
 function DailyBrief({ name, counts, metrics }: { name: string; counts: CountsForBrief; metrics: HealthMetrics | null }) {
   const text = buildDailyBrief(name, counts, metrics);
+  const [headline, ...rest] = text.split(". ");
+  const body = rest.join(". ");
   return (
     <NectarHeader
       surface="navy"
       markSize="lg"
       eyebrow="Daily brief · NECTAR"
-      title={text.split(" ").slice(0, 3).join(" ")}
-      description={text}
+      title={headline.endsWith(".") ? headline : `${headline}.`}
+      description={body}
     />
   );
 }

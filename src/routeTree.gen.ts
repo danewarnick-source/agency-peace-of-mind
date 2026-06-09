@@ -101,6 +101,7 @@ import { Route as DashboardHiveExecPlansRouteImport } from './routes/dashboard.h
 import { Route as DashboardHiveExecPermissionsRouteImport } from './routes/dashboard.hive-exec.permissions'
 import { Route as DashboardHiveExecNewCompanyRouteImport } from './routes/dashboard.hive-exec.new-company'
 import { Route as DashboardHiveExecNectarRouteImport } from './routes/dashboard.hive-exec.nectar'
+import { Route as DashboardHiveExecMessagesRouteImport } from './routes/dashboard.hive-exec.messages'
 import { Route as DashboardHiveExecHealthRouteImport } from './routes/dashboard.hive-exec.health'
 import { Route as DashboardHiveExecCompanyMigrationRouteImport } from './routes/dashboard.hive-exec.company-migration'
 import { Route as DashboardHiveExecBaseTemplateRouteImport } from './routes/dashboard.hive-exec.base-template'
@@ -616,6 +617,12 @@ const DashboardHiveExecNectarRoute = DashboardHiveExecNectarRouteImport.update({
   path: '/nectar',
   getParentRoute: () => DashboardHiveExecRoute,
 } as any)
+const DashboardHiveExecMessagesRoute =
+  DashboardHiveExecMessagesRouteImport.update({
+    id: '/messages',
+    path: '/messages',
+    getParentRoute: () => DashboardHiveExecRoute,
+  } as any)
 const DashboardHiveExecHealthRoute = DashboardHiveExecHealthRouteImport.update({
   id: '/health',
   path: '/health',
@@ -901,6 +908,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/base-template': typeof DashboardHiveExecBaseTemplateRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
+  '/dashboard/hive-exec/messages': typeof DashboardHiveExecMessagesRoute
   '/dashboard/hive-exec/nectar': typeof DashboardHiveExecNectarRoute
   '/dashboard/hive-exec/new-company': typeof DashboardHiveExecNewCompanyRoute
   '/dashboard/hive-exec/permissions': typeof DashboardHiveExecPermissionsRoute
@@ -1024,6 +1032,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/base-template': typeof DashboardHiveExecBaseTemplateRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
+  '/dashboard/hive-exec/messages': typeof DashboardHiveExecMessagesRoute
   '/dashboard/hive-exec/nectar': typeof DashboardHiveExecNectarRoute
   '/dashboard/hive-exec/new-company': typeof DashboardHiveExecNewCompanyRoute
   '/dashboard/hive-exec/permissions': typeof DashboardHiveExecPermissionsRoute
@@ -1154,6 +1163,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/base-template': typeof DashboardHiveExecBaseTemplateRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/health': typeof DashboardHiveExecHealthRoute
+  '/dashboard/hive-exec/messages': typeof DashboardHiveExecMessagesRoute
   '/dashboard/hive-exec/nectar': typeof DashboardHiveExecNectarRoute
   '/dashboard/hive-exec/new-company': typeof DashboardHiveExecNewCompanyRoute
   '/dashboard/hive-exec/permissions': typeof DashboardHiveExecPermissionsRoute
@@ -1285,6 +1295,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/base-template'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
+    | '/dashboard/hive-exec/messages'
     | '/dashboard/hive-exec/nectar'
     | '/dashboard/hive-exec/new-company'
     | '/dashboard/hive-exec/permissions'
@@ -1408,6 +1419,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/base-template'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
+    | '/dashboard/hive-exec/messages'
     | '/dashboard/hive-exec/nectar'
     | '/dashboard/hive-exec/new-company'
     | '/dashboard/hive-exec/permissions'
@@ -1537,6 +1549,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/base-template'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/health'
+    | '/dashboard/hive-exec/messages'
     | '/dashboard/hive-exec/nectar'
     | '/dashboard/hive-exec/new-company'
     | '/dashboard/hive-exec/permissions'
@@ -2249,6 +2262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHiveExecNectarRouteImport
       parentRoute: typeof DashboardHiveExecRoute
     }
+    '/dashboard/hive-exec/messages': {
+      id: '/dashboard/hive-exec/messages'
+      path: '/messages'
+      fullPath: '/dashboard/hive-exec/messages'
+      preLoaderRoute: typeof DashboardHiveExecMessagesRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
     '/dashboard/hive-exec/health': {
       id: '/dashboard/hive-exec/health'
       path: '/health'
@@ -2583,6 +2603,7 @@ interface DashboardHiveExecRouteChildren {
   DashboardHiveExecBaseTemplateRoute: typeof DashboardHiveExecBaseTemplateRoute
   DashboardHiveExecCompanyMigrationRoute: typeof DashboardHiveExecCompanyMigrationRoute
   DashboardHiveExecHealthRoute: typeof DashboardHiveExecHealthRoute
+  DashboardHiveExecMessagesRoute: typeof DashboardHiveExecMessagesRoute
   DashboardHiveExecNectarRoute: typeof DashboardHiveExecNectarRoute
   DashboardHiveExecNewCompanyRoute: typeof DashboardHiveExecNewCompanyRoute
   DashboardHiveExecPermissionsRoute: typeof DashboardHiveExecPermissionsRoute
@@ -2599,6 +2620,7 @@ const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
   DashboardHiveExecCompanyMigrationRoute:
     DashboardHiveExecCompanyMigrationRoute,
   DashboardHiveExecHealthRoute: DashboardHiveExecHealthRoute,
+  DashboardHiveExecMessagesRoute: DashboardHiveExecMessagesRoute,
   DashboardHiveExecNectarRoute: DashboardHiveExecNectarRoute,
   DashboardHiveExecNewCompanyRoute: DashboardHiveExecNewCompanyRoute,
   DashboardHiveExecPermissionsRoute: DashboardHiveExecPermissionsRoute,

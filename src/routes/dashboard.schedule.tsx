@@ -257,21 +257,66 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
     return (
       <div className="space-y-2">
         {linkWrap}
-        <AcceptDeclineBar shiftIds={s.id} />
+        <AcceptDeclineBar
+          shiftIds={s.id}
+          meta={{
+            homeName: s.home_name ?? "Home",
+            startISO: s.starts_at,
+            endISO: s.ends_at,
+            clientNames: [s.client_name],
+          }}
+        />
       </div>
     );
   }
   return linkWrap;
 }
 
-function AcceptDeclineBar({ shiftIds }: { shiftIds: string[] | string }) {
+type DeclineMeta = {
+  homeName: string;
+  startISO: string;
+  endISO: string;
+  clientNames: string[];
+};
+
+function AcceptDeclineBar({ shiftIds, meta }: { shiftIds: string[] | string; meta?: DeclineMeta }) {
   const ids = Array.isArray(shiftIds) ? shiftIds : [shiftIds];
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { data: org } = useCurrentOrg();
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const update = async (status: "accepted" | "declined") => {
     if (ids.length === 0) return;
     setBusy(status === "accepted" ? "accept" : "decline");
     const { error } = await (supabase as any).from("scheduled_shifts").update({ status }).in("id", ids);
+    if (!error && status === "declined" && meta && org?.organization_id) {
+      try {
+        // Best-effort staff display name for the admin notification.
+        let staffName = (user?.user_metadata as any)?.full_name as string | undefined;
+        if (!staffName && user?.id) {
+          const { data: prof } = await (supabase as any)
+            .from("profiles").select("first_name, last_name").eq("id", user.id).maybeSingle();
+          if (prof) staffName = `${prof.first_name ?? ""} ${prof.last_name ?? ""}`.trim();
+        }
+        if (!staffName) staffName = user?.email ?? "A staff member";
+        const dayLabel = new Date(meta.startISO).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        const time = fmtTimeRange(meta.startISO, meta.endISO);
+        const band = bandLabel(meta.startISO);
+        const clients = meta.clientNames.join(", ");
+        const groupSuffix = meta.clientNames.length > 1 ? ` (1:${meta.clientNames.length} group)` : "";
+        await (supabase as any).from("notifications").insert({
+          organization_id: org.organization_id,
+          recipient_role: "admin",
+          type: "open_shift_warning",
+          urgency: "urgent",
+          title: `${staffName} declined ${meta.homeName} · ${band} ${time}`,
+          body: `${dayLabel} · ${clients}${groupSuffix} — needs re-cover.`,
+          link_to: "/dashboard/scheduling?tab=builder",
+          related_id: ids[0],
+          related_type: "shift_decline",
+        });
+      } catch { /* advisory only — never block the staff action */ }
+    }
     setBusy(null);
     if (error) { toast.error(error.message ?? "Could not update shift."); return; }
     toast.success(status === "accepted" ? "Shift accepted." : "Shift declined — admin will be notified.");

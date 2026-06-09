@@ -232,26 +232,54 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
     </article>
   );
 
-  if (daily) {
-    return (
-      <Link
-        to="/dashboard/hhs-hub/$clientId"
-        params={{ clientId: s.client_id }}
-        aria-label={`Open Client Hub for ${s.client_name} (${codeLabel})`}
-      >
-        {card}
-      </Link>
-    );
-  }
-  return (
-    <Link
-      to="/dashboard/workspace/$clientId"
-      params={{ clientId: s.client_id }}
-      search={{ tab: "clock-in", ...(code ? { code } : {}) }}
-      aria-label={`Open Time Clock for ${s.client_name} (${codeLabel})`}
-    >
+  const linkWrap = daily ? (
+    <Link to="/dashboard/hhs-hub/$clientId" params={{ clientId: s.client_id }} aria-label={`Open Client Hub for ${s.client_name} (${codeLabel})`}>
       {card}
     </Link>
+  ) : (
+    <Link to="/dashboard/workspace/$clientId" params={{ clientId: s.client_id }} search={{ tab: "clock-in", ...(code ? { code } : {}) }} aria-label={`Open Time Clock for ${s.client_name} (${codeLabel})`}>
+      {card}
+    </Link>
+  );
+
+  if (s.status === "pending" && s.published) {
+    return (
+      <div className="space-y-2">
+        {linkWrap}
+        <AcceptDeclineBar shiftId={s.id} />
+      </div>
+    );
+  }
+  return linkWrap;
+}
+
+function AcceptDeclineBar({ shiftId }: { shiftId: string }) {
+  const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
+  const update = async (status: "accepted" | "declined") => {
+    setBusy(status === "accepted" ? "accept" : "decline");
+    const { error } = await (supabase as any).from("scheduled_shifts").update({ status }).eq("id", shiftId);
+    setBusy(null);
+    if (error) {
+      const { toast } = await import("sonner");
+      toast.error(error.message ?? "Could not update shift.");
+      return;
+    }
+    const { toast } = await import("sonner");
+    toast.success(status === "accepted" ? "Shift accepted." : "Shift declined.");
+    // Soft refresh — invalidate parent query
+    const { useQueryClient } = await import("@tanstack/react-query");
+    // Fall back to reload of cached query via custom event
+    window.dispatchEvent(new CustomEvent("my-schedule:refresh"));
+  };
+  return (
+    <div className="flex gap-2">
+      <Button size="sm" variant="outline" className="flex-1 min-h-[44px]" disabled={!!busy} onClick={() => update("declined")}>
+        {busy === "decline" ? "…" : "Decline"}
+      </Button>
+      <Button size="sm" className="flex-1 min-h-[44px]" disabled={!!busy} onClick={() => update("accepted")}>
+        {busy === "accept" ? "…" : "Accept"}
+      </Button>
+    </div>
   );
 }
 

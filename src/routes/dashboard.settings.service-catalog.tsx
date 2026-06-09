@@ -88,7 +88,7 @@ function ServiceCatalogPage() {
         .eq("organization_id", orgId!)
         .order("code");
       if (error) throw error;
-      return (data ?? []) as ServiceCode[];
+      return ((data ?? []) as unknown) as ServiceCode[];
     },
   });
 

@@ -511,6 +511,7 @@ export function ScheduleBuilder() {
                                 key={k}
                                 slotKey={k}
                                 staffName={staff?.full_name ?? staff?.email ?? null}
+                                isDraft={drafts.has(k)}
                                 unit={u}
                                 day={dISO}
                                 bandName={band.name}

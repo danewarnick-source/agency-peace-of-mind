@@ -410,8 +410,9 @@ export function IndividualServicesScheduler() {
         <div>
           <h2 className="text-base font-semibold">Individual services</h2>
           <p className="text-xs text-muted-foreground">
-            Host home (HHS/PPS) and supported living (SLH/SLN) clients. Schedule per-person
-            service blocks; RHS group-home coverage is on the Residential board.
+            Clients who receive scheduled individual services — supported living
+            (SLH/SLN) plus day/employment and in-home add-ons. RHS group-home coverage
+            is on the Residential board; host-home living itself isn't scheduled.
           </p>
         </div>
         <div className="flex items-center gap-2">

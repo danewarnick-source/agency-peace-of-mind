@@ -22,7 +22,22 @@ export const Route = createFileRoute("/dashboard/smart-import/history")({
   ),
 });
 
-type Job = Awaited<ReturnType<typeof listImportJobs>>[number];
+type Job = {
+  id: string;
+  status: string;
+  mode: string | null;
+  source: string | null;
+  created_at: string;
+  committed_at: string | null;
+  submitted_at: string | null;
+  created_by: string;
+  notes: string | null;
+  documents: number;
+  subjects_total: number;
+  subjects_committed: number;
+  sample_subjects: Array<{ id: string; record_id: string | null; type: string }>;
+  created_by_name: string;
+};
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Draft",

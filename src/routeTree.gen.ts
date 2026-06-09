@@ -81,6 +81,7 @@ import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.bi
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
 import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
+import { Route as DashboardSmartImportHistoryRouteImport } from './routes/dashboard.smart-import.history'
 import { Route as DashboardShiftShiftIdRouteImport } from './routes/dashboard.shift.$shiftId'
 import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashboard.settings.team-access'
 import { Route as DashboardSettingsServiceCatalogRouteImport } from './routes/dashboard.settings.service-catalog'
@@ -502,6 +503,12 @@ const DashboardTracksTrackSlugRoute =
     path: '/$trackSlug',
     getParentRoute: () => DashboardTracksRoute,
   } as any)
+const DashboardSmartImportHistoryRoute =
+  DashboardSmartImportHistoryRouteImport.update({
+    id: '/history',
+    path: '/history',
+    getParentRoute: () => DashboardSmartImportRoute,
+  } as any)
 const DashboardShiftShiftIdRoute = DashboardShiftShiftIdRouteImport.update({
   id: '/shift/$shiftId',
   path: '/shift/$shiftId',
@@ -905,6 +912,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
+  '/dashboard/smart-import/history': typeof DashboardSmartImportHistoryRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
@@ -1027,6 +1035,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
+  '/dashboard/smart-import/history': typeof DashboardSmartImportHistoryRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
@@ -1155,6 +1164,7 @@ export interface FileRoutesById {
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
+  '/dashboard/smart-import/history': typeof DashboardSmartImportHistoryRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
@@ -1284,6 +1294,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/team-access'
     | '/dashboard/shift/$shiftId'
+    | '/dashboard/smart-import/history'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
@@ -1406,6 +1417,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/team-access'
     | '/dashboard/shift/$shiftId'
+    | '/dashboard/smart-import/history'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
@@ -1533,6 +1545,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/team-access'
     | '/dashboard/shift/$shiftId'
+    | '/dashboard/smart-import/history'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
@@ -2085,6 +2098,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardTracksTrackSlugRouteImport
       parentRoute: typeof DashboardTracksRoute
     }
+    '/dashboard/smart-import/history': {
+      id: '/dashboard/smart-import/history'
+      path: '/history'
+      fullPath: '/dashboard/smart-import/history'
+      preLoaderRoute: typeof DashboardSmartImportHistoryRouteImport
+      parentRoute: typeof DashboardSmartImportRoute
+    }
     '/dashboard/shift/$shiftId': {
       id: '/dashboard/shift/$shiftId'
       path: '/shift/$shiftId'
@@ -2613,11 +2633,13 @@ const DashboardSettingsRouteWithChildren =
   DashboardSettingsRoute._addFileChildren(DashboardSettingsRouteChildren)
 
 interface DashboardSmartImportRouteChildren {
+  DashboardSmartImportHistoryRoute: typeof DashboardSmartImportHistoryRoute
   DashboardSmartImportJobIdDoneRoute: typeof DashboardSmartImportJobIdDoneRoute
   DashboardSmartImportJobIdReviewRoute: typeof DashboardSmartImportJobIdReviewRoute
 }
 
 const DashboardSmartImportRouteChildren: DashboardSmartImportRouteChildren = {
+  DashboardSmartImportHistoryRoute: DashboardSmartImportHistoryRoute,
   DashboardSmartImportJobIdDoneRoute: DashboardSmartImportJobIdDoneRoute,
   DashboardSmartImportJobIdReviewRoute: DashboardSmartImportJobIdReviewRoute,
 }

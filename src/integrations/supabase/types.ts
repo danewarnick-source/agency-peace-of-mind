@@ -1039,6 +1039,74 @@ export type Database = {
         }
         Relationships: []
       }
+      callout_escalation_events: {
+        Row: {
+          callout_id: string
+          channel: string
+          created_at: string
+          detail: string | null
+          id: string
+          organization_id: string
+          outcome: string
+          step: number
+          target_role: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          callout_id: string
+          channel: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          organization_id: string
+          outcome: string
+          step: number
+          target_role?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          callout_id?: string
+          channel?: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          organization_id?: string
+          outcome?: string
+          step?: number
+          target_role?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "callout_escalation_events_callout_id_fkey"
+            columns: ["callout_id"]
+            isOneToOne: false
+            referencedRelation: "shift_callouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "callout_escalation_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "callout_escalation_events_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "callout_escalation_events_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ce_ledger: {
         Row: {
           active_minutes: number
@@ -6939,6 +7007,114 @@ export type Database = {
           },
         ]
       }
+      shift_callouts: {
+        Row: {
+          coverage_locked_at: string | null
+          coverage_staff_id: string | null
+          created_at: string
+          id: string
+          manager_acknowledged_at: string | null
+          manager_acknowledged_by: string | null
+          organization_id: string
+          reason: string | null
+          resolved_at: string | null
+          scheduled_shift_id: string
+          staff_id: string
+          status: string
+          updated_at: string
+          urgency: string
+        }
+        Insert: {
+          coverage_locked_at?: string | null
+          coverage_staff_id?: string | null
+          created_at?: string
+          id?: string
+          manager_acknowledged_at?: string | null
+          manager_acknowledged_by?: string | null
+          organization_id: string
+          reason?: string | null
+          resolved_at?: string | null
+          scheduled_shift_id: string
+          staff_id: string
+          status?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Update: {
+          coverage_locked_at?: string | null
+          coverage_staff_id?: string | null
+          created_at?: string
+          id?: string
+          manager_acknowledged_at?: string | null
+          manager_acknowledged_by?: string | null
+          organization_id?: string
+          reason?: string | null
+          resolved_at?: string | null
+          scheduled_shift_id?: string
+          staff_id?: string
+          status?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_callouts_coverage_staff_id_fkey"
+            columns: ["coverage_staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_callouts_coverage_staff_id_fkey"
+            columns: ["coverage_staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_callouts_manager_acknowledged_by_fkey"
+            columns: ["manager_acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_callouts_manager_acknowledged_by_fkey"
+            columns: ["manager_acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_callouts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_callouts_scheduled_shift_id_fkey"
+            columns: ["scheduled_shift_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_callouts_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_callouts_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift_completeness_flags: {
         Row: {
           client_id: string | null
@@ -6997,6 +7173,202 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "evv_timesheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_mar_entries: {
+        Row: {
+          administered_at: string
+          client_id: string
+          client_medication_id: string
+          created_at: string
+          evv_timesheet_id: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          scheduled_shift_id: string | null
+          scheduled_time: string | null
+          staff_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          administered_at?: string
+          client_id: string
+          client_medication_id: string
+          created_at?: string
+          evv_timesheet_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          scheduled_shift_id?: string | null
+          scheduled_time?: string | null
+          staff_id: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          administered_at?: string
+          client_id?: string
+          client_medication_id?: string
+          created_at?: string
+          evv_timesheet_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          scheduled_shift_id?: string | null
+          scheduled_time?: string | null
+          staff_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_mar_entries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_mar_entries_client_medication_id_fkey"
+            columns: ["client_medication_id"]
+            isOneToOne: false
+            referencedRelation: "client_medications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_mar_entries_evv_timesheet_id_fkey"
+            columns: ["evv_timesheet_id"]
+            isOneToOne: false
+            referencedRelation: "evv_timesheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_mar_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_mar_entries_scheduled_shift_id_fkey"
+            columns: ["scheduled_shift_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_mar_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_mar_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_reports: {
+        Row: {
+          client_id: string
+          code_id: string | null
+          created_at: string
+          evv_timesheet_id: string | null
+          goals_worked: Json
+          id: string
+          incidents: Json
+          narrative: string | null
+          organization_id: string
+          scheduled_shift_id: string | null
+          staff_id: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          code_id?: string | null
+          created_at?: string
+          evv_timesheet_id?: string | null
+          goals_worked?: Json
+          id?: string
+          incidents?: Json
+          narrative?: string | null
+          organization_id: string
+          scheduled_shift_id?: string | null
+          staff_id: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          code_id?: string | null
+          created_at?: string
+          evv_timesheet_id?: string | null
+          goals_worked?: Json
+          id?: string
+          incidents?: Json
+          narrative?: string | null
+          organization_id?: string
+          scheduled_shift_id?: string | null
+          staff_id?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_reports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_reports_code_id_fkey"
+            columns: ["code_id"]
+            isOneToOne: false
+            referencedRelation: "provider_authorized_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_reports_evv_timesheet_id_fkey"
+            columns: ["evv_timesheet_id"]
+            isOneToOne: false
+            referencedRelation: "evv_timesheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_reports_scheduled_shift_id_fkey"
+            columns: ["scheduled_shift_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_reports_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_reports_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

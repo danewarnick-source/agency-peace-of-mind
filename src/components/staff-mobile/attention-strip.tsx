@@ -125,7 +125,7 @@ export function AttentionStrip() {
             return (
               <li key={c.key}>
                 <Link
-                  to={c.to}
+                  to={c.to as "/dashboard/forms"}
                   className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${toneCls}`}
                 >
                   <Icon className="h-3.5 w-3.5" />

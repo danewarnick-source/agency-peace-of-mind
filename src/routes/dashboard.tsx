@@ -434,6 +434,7 @@ function SidebarBody({
   pathname,
   signOut,
   onNavigate,
+  inboxUnread,
 }: SidebarBodyProps) {
   return (
     <>

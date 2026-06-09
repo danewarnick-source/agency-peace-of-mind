@@ -405,27 +405,55 @@ export const confirmAssignment = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ---------- Submit job for setup (advance status; nothing real created here) ----------
+// ---------- Submit job for setup ----------
+// Self-service: the Company Admin IS the signer — commit immediately, reusing
+// the same engine as the Done page's auto-run path. Idempotent.
+// White-glove (HIVE migration): keep advisory-only; commit waits for the
+// receiving company's admin sign-off on the Done screen.
 export const submitForSetup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
-    const { data: job } = await sb.from("import_jobs").select("org_id, status").eq("id", data.jobId).single();
+    const { data: job } = await sb
+      .from("import_jobs")
+      .select("org_id, status, source")
+      .eq("id", data.jobId)
+      .single();
     if (!job) throw new Error("Job not found");
+
     await sb.from("import_jobs").update({
       status: "submitted_for_setup",
       submitted_at: new Date().toISOString(),
       submitted_by: context.userId,
     }).eq("id", data.jobId);
+
+    if (job.source === "white_glove") {
+      await sb.from("import_audit").insert({
+        import_job_id: data.jobId,
+        org_id: job.org_id,
+        item: "Submitted for setup — awaiting receiving company sign-off",
+        traces_to: "admin_override",
+        actor: context.userId,
+        action: "submit_for_setup",
+      });
+      return { ok: true, committed: false };
+    }
+
+    const { runJobCommit } = await import("./smart-import-commit.functions");
+    const result = await runJobCommit(sb, context.userId, data.jobId);
+
     await sb.from("import_audit").insert({
       import_job_id: data.jobId,
       org_id: job.org_id,
-      item: "Submitted for setup (advisory — no real records written)",
+      item: result.jobCommitted
+        ? "Submitted for setup — records committed by admin"
+        : "Submitted for setup — partial commit (see per-subject errors)",
       traces_to: "admin_override",
       actor: context.userId,
       action: "submit_for_setup",
     });
-    return { ok: true };
+
+    return { ok: true, committed: result.jobCommitted, results: result.results };
   });

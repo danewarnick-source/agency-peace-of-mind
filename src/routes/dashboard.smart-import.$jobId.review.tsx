@@ -119,11 +119,13 @@ function RosterSummary({
 }: { mode: "employee" | "client"; total: number; ready: number; needReview: number; jobId: string }) {
   const submit = useServerFn(submitForSetup);
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const m = useMutation({
     mutationFn: () => submit({ data: { jobId } }),
     onSuccess: () => {
-      toast.success("Submitted for setup. Proceeds to commit step.");
+      toast.success("Submitted for setup — running commit.");
       qc.invalidateQueries({ queryKey: ["smart-import-review", jobId] });
+      navigate({ to: "/dashboard/smart-import/$jobId/done", params: { jobId }, search: { commit: "1" } as never });
     },
     onError: (e: Error) => toast.error(e.message),
   });

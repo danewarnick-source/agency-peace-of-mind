@@ -446,6 +446,7 @@ export function ScheduleBuilder() {
       qc.invalidateQueries({ queryKey: ["builder-data"] });
       qc.invalidateQueries({ queryKey: ["my-scheduled-shifts"] });
       qc.invalidateQueries({ queryKey: ["coverage-views"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
       toast.success(holes > 0 ? `Published with ${holes} open slot${holes===1?"":"s"}. They'll ride along as reminders.` : "Published. Staff will see Pending shifts.");
     },
     onError: (e: any) => toast.error(e?.message ?? "Could not publish."),

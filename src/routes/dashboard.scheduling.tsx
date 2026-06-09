@@ -54,12 +54,13 @@ import { Link, useSearch } from "@tanstack/react-router";
 import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
 import { CoverageViews } from "@/components/scheduling/coverage-views";
 import { ScheduleBuilder } from "@/components/scheduling/schedule-builder";
+import { TimesheetsReconcile } from "@/components/scheduling/timesheets-reconcile";
 
 const schedulingSearch = z.object({
-  tab: z.enum(["schedule", "builder", "coverage", "homes"]).optional(),
+  tab: z.enum(["schedule", "builder", "coverage", "homes", "timesheets"]).optional(),
 });
 
-type SchedulingTab = "schedule" | "builder" | "coverage" | "homes";
+type SchedulingTab = "schedule" | "builder" | "coverage" | "homes" | "timesheets";
 
 export const Route = createFileRoute("/dashboard/scheduling")({
   head: () => ({ meta: [{ title: "Scheduling" }] }),
@@ -78,6 +79,7 @@ function SchedulingShell() {
             { key: "schedule", label: "Schedule" },
             { key: "builder", label: "Builder" },
             { key: "coverage", label: "Coverage" },
+            { key: "timesheets", label: "Timesheets" },
             { key: "homes", label: "Homes & Teams" },
           ].map((t) => (
             <Link
@@ -99,6 +101,7 @@ function SchedulingShell() {
       {active === "homes" ? <HomesTeamsBoard />
         : active === "coverage" ? <CoverageViews />
         : active === "builder" ? <ScheduleBuilder />
+        : active === "timesheets" ? <TimesheetsReconcile />
         : <SchedulingPage />}
     </div>
   );

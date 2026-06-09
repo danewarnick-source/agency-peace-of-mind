@@ -28,7 +28,22 @@ export const Route = createFileRoute("/dashboard/hub/documentation")({
       basePath="/dashboard/hub/documentation"
       tabs={[
         { key: "review", label: "Review", render: () => <ReviewLanding /> },
-        { key: "evv", label: "EVV & timesheets", render: () => <ComplianceDeskWrapped /> },
+        { key: "evv", label: "EVV & timesheets", render: () => (
+          <div className="space-y-10">
+            <ComplianceDeskWrapped />
+            <section>
+              <header className="mb-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">
+                  Pay-period reconciliation
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Coverage proof, billing burn-down, payroll, and exceptions — all derived from the same EVV punches above. Advisory.
+                </p>
+              </header>
+              <TimesheetsReconcile />
+            </section>
+          </div>
+        ) },
         { key: "host-home", label: "Host home", render: () => <HostHomeControl /> },
         { key: "forms", label: "Forms", render: () => <FormsIndex /> },
         {

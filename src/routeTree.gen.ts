@@ -31,7 +31,6 @@ import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timec
 import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
-import { Route as DashboardSmartImportRouteImport } from './routes/dashboard.smart-import'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardSchedulingRouteImport } from './routes/dashboard.scheduling'
 import { Route as DashboardScheduleRouteImport } from './routes/dashboard.schedule'
@@ -72,6 +71,7 @@ import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.ass
 import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-nectar'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
+import { Route as DashboardSmartImportIndexRouteImport } from './routes/dashboard.smart-import.index'
 import { Route as DashboardHiveExecIndexRouteImport } from './routes/dashboard.hive-exec.index'
 import { Route as DashboardFormsIndexRouteImport } from './routes/dashboard.forms.index'
 import { Route as DashboardFinancialIndexRouteImport } from './routes/dashboard.financial.index'
@@ -244,11 +244,6 @@ const DashboardTeamRoute = DashboardTeamRouteImport.update({
 const DashboardSuperAdminRoute = DashboardSuperAdminRouteImport.update({
   id: '/super-admin',
   path: '/super-admin',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardSmartImportRoute = DashboardSmartImportRouteImport.update({
-  id: '/smart-import',
-  path: '/smart-import',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
@@ -456,6 +451,12 @@ const DashboardTrainingIndexRoute = DashboardTrainingIndexRouteImport.update({
   path: '/training/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSmartImportIndexRoute =
+  DashboardSmartImportIndexRouteImport.update({
+    id: '/smart-import/',
+    path: '/smart-import/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardHiveExecIndexRoute = DashboardHiveExecIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -505,9 +506,9 @@ const DashboardTracksTrackSlugRoute =
   } as any)
 const DashboardSmartImportHistoryRoute =
   DashboardSmartImportHistoryRouteImport.update({
-    id: '/history',
-    path: '/history',
-    getParentRoute: () => DashboardSmartImportRoute,
+    id: '/smart-import/history',
+    path: '/smart-import/history',
+    getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardShiftShiftIdRoute = DashboardShiftShiftIdRouteImport.update({
   id: '/shift/$shiftId',
@@ -737,15 +738,15 @@ const DashboardAdminCeHoursRoute = DashboardAdminCeHoursRouteImport.update({
 } as any)
 const DashboardSmartImportJobIdReviewRoute =
   DashboardSmartImportJobIdReviewRouteImport.update({
-    id: '/$jobId/review',
-    path: '/$jobId/review',
-    getParentRoute: () => DashboardSmartImportRoute,
+    id: '/smart-import/$jobId/review',
+    path: '/smart-import/$jobId/review',
+    getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardSmartImportJobIdDoneRoute =
   DashboardSmartImportJobIdDoneRouteImport.update({
-    id: '/$jobId/done',
-    path: '/$jobId/done',
-    getParentRoute: () => DashboardSmartImportRoute,
+    id: '/smart-import/$jobId/done',
+    path: '/smart-import/$jobId/done',
+    getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardHiveExecStatesStateCodeRoute =
   DashboardHiveExecStatesStateCodeRouteImport.update({
@@ -863,7 +864,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -922,6 +922,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/forms/': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
+  '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
@@ -986,7 +987,6 @@ export interface FileRoutesByTo {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -1045,6 +1045,7 @@ export interface FileRoutesByTo {
   '/dashboard/financial': typeof DashboardFinancialIndexRoute
   '/dashboard/forms': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
+  '/dashboard/smart-import': typeof DashboardSmartImportIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
@@ -1115,7 +1116,6 @@ export interface FileRoutesById {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -1174,6 +1174,7 @@ export interface FileRoutesById {
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/forms/': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
+  '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
@@ -1245,7 +1246,6 @@ export interface FileRouteTypes {
     | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
-    | '/dashboard/smart-import'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -1304,6 +1304,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/'
     | '/dashboard/forms/'
     | '/dashboard/hive-exec/'
+    | '/dashboard/smart-import/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
@@ -1368,7 +1369,6 @@ export interface FileRouteTypes {
     | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
-    | '/dashboard/smart-import'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -1427,6 +1427,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial'
     | '/dashboard/forms'
     | '/dashboard/hive-exec'
+    | '/dashboard/smart-import'
     | '/dashboard/training'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
@@ -1496,7 +1497,6 @@ export interface FileRouteTypes {
     | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
-    | '/dashboard/smart-import'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -1555,6 +1555,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/'
     | '/dashboard/forms/'
     | '/dashboard/hive-exec/'
+    | '/dashboard/smart-import/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
@@ -1746,13 +1747,6 @@ declare module '@tanstack/react-router' {
       path: '/super-admin'
       fullPath: '/dashboard/super-admin'
       preLoaderRoute: typeof DashboardSuperAdminRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/smart-import': {
-      id: '/dashboard/smart-import'
-      path: '/smart-import'
-      fullPath: '/dashboard/smart-import'
-      preLoaderRoute: typeof DashboardSmartImportRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/settings': {
@@ -2035,6 +2029,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardTrainingIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/smart-import/': {
+      id: '/dashboard/smart-import/'
+      path: '/smart-import'
+      fullPath: '/dashboard/smart-import/'
+      preLoaderRoute: typeof DashboardSmartImportIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/hive-exec/': {
       id: '/dashboard/hive-exec/'
       path: '/'
@@ -2100,10 +2101,10 @@ declare module '@tanstack/react-router' {
     }
     '/dashboard/smart-import/history': {
       id: '/dashboard/smart-import/history'
-      path: '/history'
+      path: '/smart-import/history'
       fullPath: '/dashboard/smart-import/history'
       preLoaderRoute: typeof DashboardSmartImportHistoryRouteImport
-      parentRoute: typeof DashboardSmartImportRoute
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/shift/$shiftId': {
       id: '/dashboard/shift/$shiftId'
@@ -2394,17 +2395,17 @@ declare module '@tanstack/react-router' {
     }
     '/dashboard/smart-import/$jobId/review': {
       id: '/dashboard/smart-import/$jobId/review'
-      path: '/$jobId/review'
+      path: '/smart-import/$jobId/review'
       fullPath: '/dashboard/smart-import/$jobId/review'
       preLoaderRoute: typeof DashboardSmartImportJobIdReviewRouteImport
-      parentRoute: typeof DashboardSmartImportRoute
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/smart-import/$jobId/done': {
       id: '/dashboard/smart-import/$jobId/done'
-      path: '/$jobId/done'
+      path: '/smart-import/$jobId/done'
       fullPath: '/dashboard/smart-import/$jobId/done'
       preLoaderRoute: typeof DashboardSmartImportJobIdDoneRouteImport
-      parentRoute: typeof DashboardSmartImportRoute
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/hive-exec/states/$stateCode': {
       id: '/dashboard/hive-exec/states/$stateCode'
@@ -2632,21 +2633,6 @@ const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
 const DashboardSettingsRouteWithChildren =
   DashboardSettingsRoute._addFileChildren(DashboardSettingsRouteChildren)
 
-interface DashboardSmartImportRouteChildren {
-  DashboardSmartImportHistoryRoute: typeof DashboardSmartImportHistoryRoute
-  DashboardSmartImportJobIdDoneRoute: typeof DashboardSmartImportJobIdDoneRoute
-  DashboardSmartImportJobIdReviewRoute: typeof DashboardSmartImportJobIdReviewRoute
-}
-
-const DashboardSmartImportRouteChildren: DashboardSmartImportRouteChildren = {
-  DashboardSmartImportHistoryRoute: DashboardSmartImportHistoryRoute,
-  DashboardSmartImportJobIdDoneRoute: DashboardSmartImportJobIdDoneRoute,
-  DashboardSmartImportJobIdReviewRoute: DashboardSmartImportJobIdReviewRoute,
-}
-
-const DashboardSmartImportRouteWithChildren =
-  DashboardSmartImportRoute._addFileChildren(DashboardSmartImportRouteChildren)
-
 interface DashboardTracksRouteChildren {
   DashboardTracksTrackSlugRoute: typeof DashboardTracksTrackSlugRoute
 }
@@ -2712,7 +2698,6 @@ interface DashboardRouteChildren {
   DashboardScheduleRoute: typeof DashboardScheduleRoute
   DashboardSchedulingRoute: typeof DashboardSchedulingRoute
   DashboardSettingsRoute: typeof DashboardSettingsRouteWithChildren
-  DashboardSmartImportRoute: typeof DashboardSmartImportRouteWithChildren
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
   DashboardTeamsRoute: typeof DashboardTeamsRoute
@@ -2738,13 +2723,17 @@ interface DashboardRouteChildren {
   DashboardHubFinancesRoute: typeof DashboardHubFinancesRoute
   DashboardHubKnowledgeRoute: typeof DashboardHubKnowledgeRoute
   DashboardShiftShiftIdRoute: typeof DashboardShiftShiftIdRoute
+  DashboardSmartImportHistoryRoute: typeof DashboardSmartImportHistoryRoute
   DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
   DashboardWorkspaceClientIdRoute: typeof DashboardWorkspaceClientIdRoute
   DashboardCoursesIndexRoute: typeof DashboardCoursesIndexRoute
   DashboardEmployeesIndexRoute: typeof DashboardEmployeesIndexRoute
+  DashboardSmartImportIndexRoute: typeof DashboardSmartImportIndexRoute
   DashboardTrainingIndexRoute: typeof DashboardTrainingIndexRoute
   DashboardCoursesPersonModuleAssignmentIdRoute: typeof DashboardCoursesPersonModuleAssignmentIdRoute
   DashboardCoursesTopicTopicIdRoute: typeof DashboardCoursesTopicTopicIdRoute
+  DashboardSmartImportJobIdDoneRoute: typeof DashboardSmartImportJobIdDoneRoute
+  DashboardSmartImportJobIdReviewRoute: typeof DashboardSmartImportJobIdReviewRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -2786,7 +2775,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardScheduleRoute: DashboardScheduleRoute,
   DashboardSchedulingRoute: DashboardSchedulingRoute,
   DashboardSettingsRoute: DashboardSettingsRouteWithChildren,
-  DashboardSmartImportRoute: DashboardSmartImportRouteWithChildren,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
   DashboardTeamsRoute: DashboardTeamsRoute,
@@ -2812,14 +2800,18 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardHubFinancesRoute: DashboardHubFinancesRoute,
   DashboardHubKnowledgeRoute: DashboardHubKnowledgeRoute,
   DashboardShiftShiftIdRoute: DashboardShiftShiftIdRoute,
+  DashboardSmartImportHistoryRoute: DashboardSmartImportHistoryRoute,
   DashboardTrainingIdRoute: DashboardTrainingIdRoute,
   DashboardWorkspaceClientIdRoute: DashboardWorkspaceClientIdRoute,
   DashboardCoursesIndexRoute: DashboardCoursesIndexRoute,
   DashboardEmployeesIndexRoute: DashboardEmployeesIndexRoute,
+  DashboardSmartImportIndexRoute: DashboardSmartImportIndexRoute,
   DashboardTrainingIndexRoute: DashboardTrainingIndexRoute,
   DashboardCoursesPersonModuleAssignmentIdRoute:
     DashboardCoursesPersonModuleAssignmentIdRoute,
   DashboardCoursesTopicTopicIdRoute: DashboardCoursesTopicTopicIdRoute,
+  DashboardSmartImportJobIdDoneRoute: DashboardSmartImportJobIdDoneRoute,
+  DashboardSmartImportJobIdReviewRoute: DashboardSmartImportJobIdReviewRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(

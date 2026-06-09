@@ -121,6 +121,7 @@ export function ScheduleBuilder() {
   const [homeId, setHomeId] = useState<string>("");
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [assignments, setAssignments] = useState<Map<string, string | null>>(new Map());
+  const [statuses, setStatuses] = useState<Map<string, string>>(new Map());
   const [drafts, setDrafts] = useState<Set<string>>(new Set());
   const [publishing, setPublishing] = useState(false);
 
@@ -200,6 +201,7 @@ export function ScheduleBuilder() {
     const ratioMap = ratiosOn(data.ratios, isoDay(weekDays[0]));
     const units = buildUnits(home, data.clients, ratioMap);
     const next = new Map<string, string | null>();
+    const nextStatus = new Map<string, string>();
     for (const sh of data.shifts) {
       const day = isoDay(new Date(sh.starts_at));
       const start = new Date(sh.starts_at);
@@ -211,10 +213,15 @@ export function ScheduleBuilder() {
       // find first empty slot
       for (let i = 0; i < unit.staffNeeded; i++) {
         const k = assignmentKey(unit.key, day, band.id, i);
-        if (!next.has(k)) { next.set(k, sh.staff_id); break; }
+        if (!next.has(k)) {
+          next.set(k, sh.staff_id);
+          if (sh.published) nextStatus.set(k, sh.status);
+          break;
+        }
       }
     }
     setAssignments(next);
+    setStatuses(nextStatus);
     setDrafts(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, home?.id, weekStart.toISOString()]);
@@ -256,8 +263,10 @@ export function ScheduleBuilder() {
 
   function setAssignment(key: string, staffId: string | null) {
     setAssignments((prev) => { const next = new Map(prev); if (staffId === null) next.delete(key); else next.set(key, staffId); return next; });
-    // Manual edits promote a draft cell to a confirmed assignment (or clear it).
+    // Manual edits promote a draft cell to a confirmed assignment (or clear it),
+    // and clear any stale published status — it'll be re-set on next Publish.
     setDrafts((prev) => { if (!prev.has(key)) return prev; const next = new Set(prev); next.delete(key); return next; });
+    setStatuses((prev) => { if (!prev.has(key)) return prev; const next = new Map(prev); next.delete(key); return next; });
   }
 
   function nectarDraft() {
@@ -337,6 +346,7 @@ export function ScheduleBuilder() {
 
   function clearAll() {
     setAssignments(new Map());
+    setStatuses(new Map());
     setDrafts(new Set());
     toast.message("Cleared. Nothing is published until you click Publish.");
   }
@@ -368,7 +378,9 @@ export function ScheduleBuilder() {
   const filled = Array.from(assignments.values()).filter(Boolean).length;
   const holes = totalSlots - filled;
   const overtimeFlags = Array.from(staffWeekHours.entries()).filter(([, h]) => h > 40);
-  const flagCount = (holes > 0 ? 1 : 0) + overtimeFlags.length + planYearPacing.filter((p) => p.weeklyTarget > 0 && p.delivered < p.weeklyTarget).length;
+  const declinedCount = Array.from(statuses.values()).filter((s) => s === "declined").length;
+  const acceptedCount = Array.from(statuses.values()).filter((s) => s === "accepted").length;
+  const flagCount = (holes > 0 ? 1 : 0) + overtimeFlags.length + declinedCount + planYearPacing.filter((p) => p.weeklyTarget > 0 && p.delivered < p.weeklyTarget).length;
 
   const publishMut = useMutation({
     mutationFn: async () => {
@@ -468,7 +480,7 @@ export function ScheduleBuilder() {
         </div>
       </div>
 
-      <ReadinessPanel holes={holes} overtimeFlags={overtimeFlags} pacing={planYearPacing} flagCount={flagCount} />
+      <ReadinessPanel holes={holes} overtimeFlags={overtimeFlags} pacing={planYearPacing} flagCount={flagCount} declinedCount={declinedCount} acceptedCount={acceptedCount} />
 
       {!data || !home ? (
         <p className="text-sm text-muted-foreground">{dataQ.isLoading ? "Loading…" : "Pick a home to begin."}</p>
@@ -517,6 +529,7 @@ export function ScheduleBuilder() {
                                 slotKey={k}
                                 staffName={staff?.full_name ?? staff?.email ?? null}
                                 isDraft={drafts.has(k)}
+                                status={statuses.get(k) ?? null}
                                 unit={u}
                                 day={dISO}
                                 bandName={band.name}
@@ -543,11 +556,12 @@ export function ScheduleBuilder() {
 }
 
 function SlotCell({
-  slotKey, staffName, isDraft, unit, day, bandName, pool, continuityFor, weekHours, onPick, onClear,
+  slotKey, staffName, isDraft, status, unit, day, bandName, pool, continuityFor, weekHours, onPick, onClear,
 }: {
   slotKey: string;
   staffName: string | null;
   isDraft?: boolean;
+  status?: string | null;
   unit: Unit; day: string; bandName: string;
   pool: Staff[]; continuityFor: Set<string>; weekHours: Map<string, number>;
   onPick: (id: string) => void; onClear: () => void;
@@ -564,7 +578,21 @@ function SlotCell({
 
   const filledStyle = isDraft
     ? "border-dashed border-violet-400 bg-violet-50 text-violet-900 hover:bg-violet-100 dark:bg-violet-950/30 dark:text-violet-200"
-    : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200";
+    : status === "declined"
+      ? "border-rose-400 bg-rose-100 text-rose-900 hover:bg-rose-200 dark:bg-rose-950/40 dark:text-rose-200"
+      : status === "accepted"
+        ? "border-emerald-500 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-100"
+        : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200";
+
+  const statusBadge = isDraft && staffName
+    ? { label: "draft", cls: "bg-violet-200 text-violet-800" }
+    : status === "accepted"
+      ? { label: "✓", cls: "bg-emerald-200 text-emerald-800" }
+      : status === "declined"
+        ? { label: "declined", cls: "bg-rose-200 text-rose-800" }
+        : status === "pending"
+          ? { label: "scheduled", cls: "bg-muted text-muted-foreground" }
+          : null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -575,11 +603,11 @@ function SlotCell({
               ? filledStyle
               : "border-dashed border-rose-300 bg-rose-50/50 text-rose-700 hover:bg-rose-100/50 dark:bg-rose-950/20 dark:text-rose-200"
           }`}
-          aria-label={staffName ? `${isDraft ? "Proposed" : "Assigned"} to ${staffName}` : `Needs staff for ${unit.label} ${bandName} ${day}`}
+          aria-label={staffName ? `${isDraft ? "Proposed" : status ?? "Assigned"} ${staffName}` : `Needs staff for ${unit.label} ${bandName} ${day}`}
         >
           <div className="flex items-center justify-between gap-1">
             <span className="truncate font-medium">{staffName ?? `needs 1`}</span>
-            {isDraft && staffName && <span className="shrink-0 rounded bg-violet-200 px-1 text-[9px] font-bold uppercase tracking-wide text-violet-800">draft</span>}
+            {statusBadge && <span className={`shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide ${statusBadge.cls}`}>{statusBadge.label}</span>}
           </div>
         </button>
       </PopoverTrigger>
@@ -617,8 +645,8 @@ function SlotCell({
   );
 }
 
-function ReadinessPanel({ holes, overtimeFlags, pacing, flagCount }: {
-  holes: number; overtimeFlags: Array<[string, number]>; pacing: Array<{ client: string; code: string; weeklyTarget: number; delivered: number }>; flagCount: number;
+function ReadinessPanel({ holes, overtimeFlags, pacing, flagCount, declinedCount, acceptedCount }: {
+  holes: number; overtimeFlags: Array<[string, number]>; pacing: Array<{ client: string; code: string; weeklyTarget: number; delivered: number }>; flagCount: number; declinedCount: number; acceptedCount: number;
 }) {
   const ready = flagCount === 0;
   return (
@@ -627,8 +655,13 @@ function ReadinessPanel({ holes, overtimeFlags, pacing, flagCount }: {
         {ready ? <Check className="h-4 w-4 text-emerald-700" /> : <AlertTriangle className="h-4 w-4 text-amber-700" />}
         <h3 className="text-sm font-semibold">{ready ? "Ready to publish" : `${flagCount} to resolve (advisory)`}</h3>
       </div>
-      <ul className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-3">
+      <ul className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-5">
         <li>Open slots: <strong className="text-foreground tabular-nums">{holes}</strong></li>
+        <li>Accepted: <strong className="text-emerald-700 tabular-nums">{acceptedCount}</strong></li>
+        <li className={declinedCount > 0 ? "" : ""}>
+          Declined: <strong className={`tabular-nums ${declinedCount > 0 ? "text-rose-700" : "text-foreground"}`}>{declinedCount}</strong>
+          {declinedCount > 0 && <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-rose-700">re-cover</span>}
+        </li>
         <li>Overtime watch: <strong className="text-foreground tabular-nums">{overtimeFlags.length}</strong></li>
         <li>Services off pace: <strong className="text-foreground tabular-nums">{pacing.filter((p) => p.weeklyTarget > 0 && p.delivered < p.weeklyTarget).length}</strong></li>
       </ul>

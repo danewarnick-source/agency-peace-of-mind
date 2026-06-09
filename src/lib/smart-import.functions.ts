@@ -528,10 +528,12 @@ export const getSmartImportSummary = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// FAKE EXTRACTION SERVICE (swap for Bedrock later)
-// Isolated so the real implementation can replace this single function.
+// EXTRACTION SERVICE
+// All three helpers below are isolated so the underlying engine can be
+// swapped (e.g. for AWS Bedrock) without touching the orchestration above.
 // ============================================================
-type FakeField = {
+
+type ExtractedFieldOut = {
   target_field: string;
   value: string;
   status: "placed" | "review" | "flag";
@@ -541,104 +543,138 @@ type FakeField = {
   is_custom: boolean;
 };
 
-function generateExtractionFromText(
+// ---- 1) Text extraction (PDF, DOCX) ----
+async function extractPdfText(buf: Buffer): Promise<string> {
+  // unpdf works in serverless / Cloudflare Worker runtimes.
+  const { getDocumentProxy, extractText } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(buf));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return Array.isArray(text) ? text.join("\n") : (text ?? "");
+}
+
+async function extractDocxText(buf: Buffer): Promise<string> {
+  const mammoth = (await import("mammoth")).default ?? (await import("mammoth"));
+  // mammoth accepts { buffer } in Node-compatible runtimes.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await (mammoth as any).extractRawText({ buffer: buf });
+  return (result?.value as string) ?? "";
+}
+
+// ---- 2) AI field extraction (Lovable AI Gateway → Gemini, swappable) ----
+async function aiExtractFieldsFromText(
   text: string,
   mode: "employee" | "client",
-): { display_name: string; fields: FakeField[]; unfiled: string[] } {
-  const fields: FakeField[] = [];
-  const unfiled: string[] = [];
-
-  const nameMatch =
-    /name[:\s]+([A-Z][A-Za-z'’-]+(?:\s+[A-Z][A-Za-z'’-]+){0,3})/i.exec(text) ??
-    /\b([A-Z][a-z]+\s+[A-Z][a-z]+)\b/.exec(text);
-  const display = nameMatch?.[1]?.trim() || "Imported subject";
-
-  if (nameMatch?.[1]) {
-    const parts = nameMatch[1].trim().split(/\s+/);
-    if (parts.length >= 2) {
-      fields.push({
-        target_field: "first_name", value: parts[0], status: "placed", confidence: 0.9,
-        snippet: nameMatch[0], provenance: "source", is_custom: false,
-      });
-      fields.push({
-        target_field: "last_name", value: parts[parts.length - 1], status: "placed", confidence: 0.9,
-        snippet: nameMatch[0], provenance: "source", is_custom: false,
-      });
-    } else {
-      fields.push({
-        target_field: "full_name", value: nameMatch[1], status: "placed", confidence: 0.85,
-        snippet: nameMatch[0], provenance: "source", is_custom: false,
-      });
-    }
+): Promise<{ display_name: string; fields: ExtractedFieldOut[]; unfiled: string[] }> {
+  const apiKey = process.env.LOVABLE_API_KEY;
+  if (!apiKey) {
+    throw new Error("AI extraction is not configured (LOVABLE_API_KEY missing). Cannot read documents.");
   }
 
-  const email = /([\w.+-]+@[\w-]+\.[\w.-]+)/.exec(text)?.[1];
-  if (email && mode === "employee") {
-    fields.push({
-      target_field: "email", value: email, status: "placed", confidence: 0.95,
-      snippet: email, provenance: "source", is_custom: false,
-    });
-  }
+  const targetFields =
+    mode === "client"
+      ? [
+          "first_name", "last_name", "full_name", "date_of_birth", "phone",
+          "address", "medicaid_id", "job_code", "team_name",
+          "medications", "guardian_name", "service_codes", "goals",
+          "diagnoses", "allergies", "emergency_contact",
+        ]
+      : [
+          "full_name", "first_name", "last_name", "email", "phone",
+          "position", "hire_date", "team_name",
+        ];
 
-  const phone = /(\+?\d[\d\s().-]{7,}\d)/.exec(text)?.[1];
-  if (phone) {
-    fields.push({
-      target_field: "phone", value: phone.trim(), status: "placed", confidence: 0.85,
-      snippet: phone, provenance: "source", is_custom: false,
-    });
-  }
-
-  if (mode === "client") {
-    const medicaid = /(?:medicaid|member|client)\s*(?:id|#)[:\s]+([A-Z0-9-]{4,})/i.exec(text)?.[1];
-    if (medicaid) {
-      fields.push({
-        target_field: "medicaid_id", value: medicaid, status: "placed", confidence: 0.9,
-        snippet: medicaid, provenance: "source", is_custom: false,
-      });
-    }
-    const dob = /(?:dob|date of birth)[:\s]+([\d/.-]{6,10})/i.exec(text)?.[1];
-    if (dob) {
-      const malformed = looksMalformed("date_of_birth", dob);
-      fields.push({
-        target_field: "date_of_birth", value: dob,
-        status: malformed ? "flag" : "placed",
-        confidence: malformed ? 0.5 : 0.88,
-        snippet: dob, provenance: "source", is_custom: false,
-      });
-    }
-  } else {
-    const hire = /(?:hire date|start date)[:\s]+([\d/.-]{6,10})/i.exec(text)?.[1];
-    if (hire) {
-      const malformed = looksMalformed("hire_date", hire);
-      fields.push({
-        target_field: "hire_date", value: hire,
-        status: malformed ? "flag" : "placed",
-        confidence: malformed ? 0.5 : 0.85,
-        snippet: hire, provenance: "source", is_custom: false,
-      });
-    }
-  }
-
-  // Anything that mentions allergies / notes / preferences becomes a custom attribute
-  const customMatch = /(allerg(?:y|ies)|preference|notes?)[:\s]+([^\n.]{2,120})/i.exec(text);
-  if (customMatch) {
-    fields.push({
-      target_field: customMatch[1].toLowerCase().replace(/[^a-z0-9]+/g, "_"),
-      value: customMatch[2].trim(),
-      status: "review",
-      confidence: 0.7,
-      snippet: customMatch[0],
-      provenance: "inferred",
-      is_custom: true,
-    });
-  }
-
-  // Anything else that's a sentence with no recognized pattern → unfiled
-  const sentences = text.split(/[\n.]+/).map((s) => s.trim()).filter((s) => s.length > 8 && s.length < 200);
-  for (const s of sentences.slice(0, 3)) {
-    if (fields.some((f) => f.snippet.includes(s.slice(0, 12)))) continue;
-    unfiled.push(s);
-  }
-
-  return { display_name: display, fields, unfiled };
+  const system = `You extract structured fields from a Utah DSPD ${mode === "client" ? "client (PCSP / intake / Medicaid)" : "employee / HR"} document.
+Return STRICT JSON with shape:
+{
+  "display_name": string,
+  "fields": Array<{
+    "target_field": string,        // one of the allowed targets, OR a snake_case custom key
+    "value": string,                // the extracted value as plain text
+    "confidence": number,           // 0..1
+    "source_snippet": string        // short verbatim quote (<200 chars)
+  }>,
+  "unfiled": string[]               // sentences/scraps you couldn't place
 }
+Allowed core targets: ${targetFields.join(", ")}.
+Rules:
+- Use the allowed core target_field names exactly when the value clearly maps.
+- For information that doesn't map (e.g. provider notes), invent a snake_case key and still return it as a field; it will be treated as a custom attribute.
+- For lists (medications, service_codes, goals, diagnoses), join entries with "; ".
+- Dates as ISO YYYY-MM-DD when possible.
+- Never invent data. If a field isn't present, omit it.
+- Return ONLY JSON, no commentary.`;
+
+  const truncated = text.length > 60_000 ? text.slice(0, 60_000) : text;
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "X-Lovable-AIG-SDK": "fetch",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: `Extract from this document text:\n\n${truncated}` },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (res.status === 429) throw new Error("AI is busy (rate limit). Try again in a moment.");
+  if (res.status === 402) throw new Error("AI workspace credits exhausted. Add credits to continue.");
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`AI extraction failed (${res.status}): ${t.slice(0, 200)}`);
+  }
+
+  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const raw = json.choices?.[0]?.message?.content ?? "{}";
+  let parsed: {
+    display_name?: string;
+    fields?: Array<{ target_field: string; value: string; confidence?: number; source_snippet?: string }>;
+    unfiled?: string[];
+  };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("AI returned malformed JSON; document may be unreadable.");
+  }
+
+  const knownSet = new Set(targetFields);
+  const fields: ExtractedFieldOut[] = [];
+  for (const f of parsed.fields ?? []) {
+    const tf = String(f.target_field || "").trim();
+    const val = String(f.value ?? "").trim();
+    if (!tf || !val) continue;
+    const isKnown = knownSet.has(tf);
+    const malformed = isKnown && looksMalformed(tf, val);
+    const conf = typeof f.confidence === "number" ? Math.max(0, Math.min(1, f.confidence)) : 0.8;
+    fields.push({
+      target_field: tf,
+      value: val,
+      status: malformed ? "flag" : isKnown ? "placed" : "review",
+      confidence: malformed ? Math.min(conf, 0.55) : conf,
+      snippet: String(f.source_snippet || val).slice(0, 200),
+      provenance: isKnown ? "source" : "inferred",
+      is_custom: !isKnown,
+    });
+  }
+
+  let display = String(parsed.display_name || "").trim();
+  if (!display) {
+    const fn = fields.find((f) => f.target_field === "first_name")?.value;
+    const ln = fields.find((f) => f.target_field === "last_name")?.value;
+    const full = fields.find((f) => f.target_field === "full_name")?.value;
+    display = full || `${fn ?? ""} ${ln ?? ""}`.trim() || "Imported subject";
+  }
+
+  return {
+    display_name: display,
+    fields,
+    unfiled: (parsed.unfiled ?? []).map((s) => String(s)).filter((s) => s.length > 4).slice(0, 20),
+  };
+}
+

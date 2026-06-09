@@ -143,7 +143,7 @@ export function ScheduleBuilder() {
       const toISO = new Date(addDays(weekStart, 7).getTime() - 1).toISOString();
       const lastWeekFrom = addDays(weekStart, -7).toISOString();
       const lastWeekTo = new Date(weekStart.getTime() - 1).toISOString();
-      const [clientsR, ratiosR, tmplOverride, tmplOrg, designR, shiftsR, lastWeekR, billingR, codesR, staffR] = await Promise.all([
+      const [clientsR, ratiosR, tmplOverride, tmplOrg, designR, shiftsR, lastWeekR, billingR, codesR, memsR] = await Promise.all([
         (supabase as any).from("clients").select("id, first_name, last_name, team_id").eq("organization_id", orgId).eq("account_status","active"),
         (supabase as any).from("client_ratios").select("client_id, ratio_staff, ratio_clients, effective_start, effective_end").eq("organization_id", orgId),
         (supabase as any).from("shift_templates").select("id, name, start_time, end_time, sort, team_id").eq("team_id", homeId).eq("active", true).order("sort"),
@@ -153,7 +153,7 @@ export function ScheduleBuilder() {
         (supabase as any).from("scheduled_shifts").select("client_id, staff_id, starts_at, ends_at, code_id, job_code").eq("organization_id", orgId).gte("starts_at", lastWeekFrom).lte("starts_at", lastWeekTo),
         (supabase as any).from("client_billing_codes").select("client_id, service_code, annual_unit_authorization, weekly_cap_units").eq("organization_id", orgId),
         (supabase as any).from("provider_authorized_codes").select("id, code, kind").eq("organization_id", orgId),
-        (supabase as any).from("org_member_directory").select("id, full_name, email").eq("organization_id", orgId),
+        (supabase as any).from("organization_members").select("user_id").eq("organization_id", orgId).eq("active", true),
       ]);
       const clients = (clientsR.data ?? []) as Client[];
       const ratios = (ratiosR.data ?? []) as Ratio[];
@@ -161,7 +161,15 @@ export function ScheduleBuilder() {
       if (templates.length === 0) templates = (tmplOrg.data ?? []) as Template[];
       if (templates.length === 0) templates = DEFAULT_BANDS;
       const designated = new Set(((designR.data ?? []) as any[]).map((d) => d.staff_id));
-      const allStaff = ((staffR.data ?? []) as Staff[]).filter((s) => !!s.id);
+      // Resolve staff pool from organization_members + profiles (same source
+      // Homes & Teams uses), so the home's care team always appears here.
+      const memberIds = ((memsR.data ?? []) as any[]).map((m) => m.user_id as string);
+      let allStaff: Staff[] = [];
+      if (memberIds.length) {
+        const { data: profs } = await (supabase as any)
+          .from("profiles").select("id, full_name, email").in("id", memberIds);
+        allStaff = ((profs ?? []) as Staff[]).filter((s) => !!s.id);
+      }
       const homeStaff = allStaff.filter((s) => designated.has(s.id));
       return {
         clients,
@@ -393,7 +401,7 @@ export function ScheduleBuilder() {
           <Link to="/dashboard/scheduling" search={{ tab: "homes" }} className="font-medium text-[#137182] hover:underline">
             Homes &amp; Teams
           </Link>
-          , set client ratios in Setup, then come back here to draft a week.
+          , then tap any resident chip on the household card to set their staffing ratio. Come back here to draft a week.
         </p>
       </div>
     );

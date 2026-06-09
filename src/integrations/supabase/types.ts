@@ -1964,6 +1964,63 @@ export type Database = {
         }
         Relationships: []
       }
+      client_ratios: {
+        Row: {
+          client_id: string
+          created_at: string
+          effective_end: string | null
+          effective_start: string
+          id: string
+          notes: string | null
+          organization_id: string
+          ratio_clients: number
+          ratio_staff: number
+          setting: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          effective_end?: string | null
+          effective_start?: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          ratio_clients: number
+          ratio_staff: number
+          setting: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          effective_end?: string | null
+          effective_start?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          ratio_clients?: number
+          ratio_staff?: number
+          setting?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_ratios_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ratios_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_specific_trainings: {
         Row: {
           approved_at: string | null
@@ -3832,6 +3889,110 @@ export type Database = {
             columns: ["triggering_org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      home_designations: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          label: string
+          organization_id: string
+          sort: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          label: string
+          organization_id: string
+          sort?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          label?: string
+          organization_id?: string
+          sort?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "home_designations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      home_staff_designations: {
+        Row: {
+          created_at: string
+          designation_id: string
+          id: string
+          organization_id: string
+          staff_id: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          designation_id: string
+          id?: string
+          organization_id: string
+          staff_id: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          designation_id?: string
+          id?: string
+          organization_id?: string
+          staff_id?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "home_staff_designations_designation_id_fkey"
+            columns: ["designation_id"]
+            isOneToOne: false
+            referencedRelation: "home_designations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_staff_designations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_staff_designations_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_staff_designations_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_staff_designations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -6182,41 +6343,53 @@ export type Database = {
       provider_authorized_codes: {
         Row: {
           added_by: string | null
+          carve_out: boolean
           code: string
           created_at: string
           id: string
+          kind: string
           label: string | null
           notes: string | null
           organization_id: string
+          sort: number
           source: string
           source_document_id: string | null
           status: string
+          unit: string
           updated_at: string
         }
         Insert: {
           added_by?: string | null
+          carve_out?: boolean
           code: string
           created_at?: string
           id?: string
+          kind?: string
           label?: string | null
           notes?: string | null
           organization_id: string
+          sort?: number
           source?: string
           source_document_id?: string | null
           status?: string
+          unit?: string
           updated_at?: string
         }
         Update: {
           added_by?: string | null
+          carve_out?: boolean
           code?: string
           created_at?: string
           id?: string
+          kind?: string
           label?: string | null
           notes?: string | null
           organization_id?: string
+          sort?: number
           source?: string
           source_document_id?: string | null
           status?: string
+          unit?: string
           updated_at?: string
         }
         Relationships: [
@@ -6588,6 +6761,7 @@ export type Database = {
       scheduled_shifts: {
         Row: {
           client_id: string
+          code_id: string | null
           created_at: string
           created_by: string | null
           ends_at: string
@@ -6607,6 +6781,7 @@ export type Database = {
         }
         Insert: {
           client_id: string
+          code_id?: string | null
           created_at?: string
           created_by?: string | null
           ends_at: string
@@ -6626,6 +6801,7 @@ export type Database = {
         }
         Update: {
           client_id?: string
+          code_id?: string | null
           created_at?: string
           created_by?: string | null
           ends_at?: string
@@ -6649,6 +6825,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_shifts_code_id_fkey"
+            columns: ["code_id"]
+            isOneToOne: false
+            referencedRelation: "provider_authorized_codes"
             referencedColumns: ["id"]
           },
           {
@@ -6814,6 +6997,60 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "evv_timesheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          end_time: string
+          id: string
+          name: string
+          organization_id: string
+          sort: number
+          start_time: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          end_time: string
+          id?: string
+          name: string
+          organization_id: string
+          sort?: number
+          start_time: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          end_time?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          sort?: number
+          start_time?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_templates_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]

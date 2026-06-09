@@ -140,6 +140,11 @@ function DonePage() {
           <Button onClick={() => navigate({ to: "/dashboard/smart-import" })}>
             Import another
           </Button>
+          {job.status === "committed" && (
+            <Button variant="outline" onClick={() => setUndoOpen(true)} className="text-destructive">
+              <Undo2 className="mr-2 h-4 w-4" /> Undo this import&apos;s setup
+            </Button>
+          )}
         </div>
       </div>
 

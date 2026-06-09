@@ -18,7 +18,7 @@ export const getReviewJob = createServerFn({ method: "POST" })
     const sb = context.supabase as any;
     const { data: job, error } = await sb
       .from("import_jobs")
-      .select("id, org_id, mode, status, source, scale, notes, created_at, submitted_at")
+      .select("id, org_id, mode, status, source, scale, notes, created_at, submitted_at, target_org_id, provider_signoff_at, provider_signoff_by, engagement_status")
       .eq("id", data.jobId)
       .single();
     if (error || !job) throw new Error("Job not found");

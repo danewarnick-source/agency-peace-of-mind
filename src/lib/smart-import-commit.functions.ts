@@ -35,10 +35,25 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
 
     const { data: job, error: jerr } = await sb
       .from("import_jobs")
-      .select("id, org_id, mode, status")
+      .select("id, org_id, mode, status, source, target_org_id, provider_signoff_at")
       .eq("id", data.jobId)
       .single();
     if (jerr || !job) throw new Error("Job not found");
+
+    // White-glove (Executive Company Migration) gate: HIVE staff prep, but
+    // commit only after the receiving company's admin signs off.
+    if (job.source === "white_glove") {
+      if (!job.target_org_id) throw new Error("White-glove job missing target company.");
+      if (!job.provider_signoff_at) {
+        throw new Error("Provider sign-off required before commit.");
+      }
+      const { data: isAdmin } = await sb.rpc("has_org_role", {
+        _org: job.target_org_id, _user: context.userId, _role: "admin",
+      });
+      if (!isAdmin) {
+        throw new Error("Only the receiving company's admin can commit a white-glove migration.");
+      }
+    }
 
     // Idempotent: re-commit is a no-op for already-committed subjects.
     const { data: subjects } = await sb
@@ -46,7 +61,8 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
       .select("*")
       .eq("import_job_id", data.jobId);
 
-    const orgId = job.org_id as string;
+    // For white-glove, write into the target customer's org, not HIVE's.
+    const orgId = (job.source === "white_glove" ? job.target_org_id : job.org_id) as string;
     const results: Array<{
       subjectId: string;
       display_name: string;

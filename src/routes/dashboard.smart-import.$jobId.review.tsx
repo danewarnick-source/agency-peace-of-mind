@@ -23,6 +23,7 @@ import {
   setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
   computeProvisioningForecast, togglePlanItem, confirmAssignment, submitForSetup,
 } from "@/lib/smart-import-review.functions";
+import { providerSignoff } from "@/lib/hive-migration.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
   head: () => ({ meta: [{ title: "Smart Import Review — NECTAR" }] }),
@@ -79,7 +80,11 @@ function ReviewPage() {
 
       <AttributionBar />
 
-      <RosterSummary mode={mode} total={total} ready={ready} needReview={needReview} jobId={jobId} />
+      {job.data.job.source === "white_glove" && (
+        <WhiteGloveBanner job={job.data.job} onChanged={() => job.refetch()} />
+      )}
+
+      <RosterSummary mode={mode} total={total} ready={ready} needReview={needReview} jobId={jobId} whiteGlove={job.data.job.source === "white_glove"} signedOff={!!job.data.job.provider_signoff_at} />
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <SubjectQueue subjects={subjects} selectedId={selectedId} onSelect={setSelectedId} />
@@ -115,8 +120,8 @@ function AttributionBar() {
 
 // ---------------------------- RosterSummary ----------------------------
 function RosterSummary({
-  mode, total, ready, needReview, jobId,
-}: { mode: "employee" | "client"; total: number; ready: number; needReview: number; jobId: string }) {
+  mode, total, ready, needReview, jobId, whiteGlove, signedOff,
+}: { mode: "employee" | "client"; total: number; ready: number; needReview: number; jobId: string; whiteGlove?: boolean; signedOff?: boolean }) {
   const submit = useServerFn(submitForSetup);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -130,6 +135,7 @@ function RosterSummary({
     onError: (e: Error) => toast.error(e.message),
   });
   const noun = mode === "client" ? "client" : "staff";
+  const commitDisabled = m.isPending || ready === 0 || (whiteGlove && !signedOff);
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -139,9 +145,60 @@ function RosterSummary({
         </div>
         <p className="mt-1 text-xs text-muted-foreground">Advisory throughout — flags surface to act on, never block.</p>
       </div>
-      <Button onClick={() => m.mutate()} disabled={m.isPending || ready === 0} size="lg">
+      <Button onClick={() => m.mutate()} disabled={commitDisabled} size="lg" title={whiteGlove && !signedOff ? "Waiting for provider sign-off" : undefined}>
         {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         <Send className="mr-2 h-4 w-4" /> Submit for setup
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------- WhiteGloveBanner (HIVE migration) ----------------------------
+function WhiteGloveBanner({
+  job, onChanged,
+}: {
+  job: {
+    id: string; source: string; target_org_id: string | null;
+    provider_signoff_at: string | null; provider_signoff_by: string | null;
+  };
+  onChanged: () => void;
+}) {
+  const { user } = useAuth();
+  const signoffFn = useServerFn(providerSignoff);
+  const m = useMutation({
+    mutationFn: () => signoffFn({ data: { jobId: job.id } }),
+    onSuccess: () => { toast.success("Sign-off recorded. Commit unlocked."); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (job.provider_signoff_at) {
+    return (
+      <div className="flex items-start gap-2 rounded-xl border border-emerald-400/40 bg-emerald-50/40 p-3 text-sm dark:bg-emerald-950/30">
+        <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
+        <div>
+          <strong>Provider signed off.</strong> Commit is unlocked. (signed{" "}
+          {new Date(job.provider_signoff_at).toLocaleString()})
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-amber-400/50 bg-amber-50/40 p-3 text-sm dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-2">
+        <ShieldCheck className="mt-0.5 h-4 w-4 text-amber-700" />
+        <div className="text-amber-900 dark:text-amber-100">
+          <strong>White-glove migration.</strong> HIVE staff can prep this job, but
+          commit is locked until the receiving company's admin signs off below.
+        </div>
+      </div>
+      <Button
+        size="sm"
+        variant="default"
+        disabled={m.isPending}
+        onClick={() => m.mutate()}
+        title={`Provider sign-off as ${user?.email ?? "current user"}`}
+      >
+        {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Sign off &amp; unlock commit
       </Button>
     </div>
   );

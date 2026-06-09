@@ -14,6 +14,9 @@ const CreateJobInput = z.object({
   organizationId: z.string().uuid(),
   mode: ModeEnum,
   notes: z.string().max(2000).optional(),
+  source: z.enum(["self_service", "white_glove"]).default("self_service"),
+  scale: z.enum(["single", "bulk"]).default("single"),
+  targetOrgId: z.string().uuid().optional(),
 });
 
 const RecordDocInput = z.object({
@@ -139,8 +142,9 @@ export const createSmartImportJob = createServerFn({ method: "POST" })
       .insert({
         org_id: data.organizationId,
         mode: data.mode,
-        source: "self_service",
-        scale: "single",
+        source: data.source,
+        scale: data.scale,
+        target_org_id: data.targetOrgId ?? null,
         status: "draft",
         notes: data.notes ?? null,
       })

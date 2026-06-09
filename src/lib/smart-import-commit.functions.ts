@@ -48,7 +48,7 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
         throw new Error("Provider sign-off required before commit.");
       }
       const { data: isAdmin } = await sb.rpc("has_org_role", {
-        _org_id: job.target_org_id, _user_id: context.userId, _role: "admin",
+        _org: job.target_org_id, _user: context.userId, _role: "admin",
       });
       if (!isAdmin) {
         throw new Error("Only the receiving company's admin can commit a white-glove migration.");

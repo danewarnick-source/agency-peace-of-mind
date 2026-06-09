@@ -79,6 +79,7 @@ function SchedulingShell() {
             { key: "schedule", label: "Schedule" },
             { key: "builder", label: "Builder" },
             { key: "coverage", label: "Coverage" },
+            { key: "timesheets", label: "Timesheets" },
             { key: "homes", label: "Homes & Teams" },
           ].map((t) => (
             <Link
@@ -100,6 +101,7 @@ function SchedulingShell() {
       {active === "homes" ? <HomesTeamsBoard />
         : active === "coverage" ? <CoverageViews />
         : active === "builder" ? <ScheduleBuilder />
+        : active === "timesheets" ? <TimesheetsReconcile />
         : <SchedulingPage />}
     </div>
   );

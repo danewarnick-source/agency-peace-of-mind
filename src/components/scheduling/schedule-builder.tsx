@@ -378,7 +378,9 @@ export function ScheduleBuilder() {
   const filled = Array.from(assignments.values()).filter(Boolean).length;
   const holes = totalSlots - filled;
   const overtimeFlags = Array.from(staffWeekHours.entries()).filter(([, h]) => h > 40);
-  const flagCount = (holes > 0 ? 1 : 0) + overtimeFlags.length + planYearPacing.filter((p) => p.weeklyTarget > 0 && p.delivered < p.weeklyTarget).length;
+  const declinedCount = Array.from(statuses.values()).filter((s) => s === "declined").length;
+  const acceptedCount = Array.from(statuses.values()).filter((s) => s === "accepted").length;
+  const flagCount = (holes > 0 ? 1 : 0) + overtimeFlags.length + declinedCount + planYearPacing.filter((p) => p.weeklyTarget > 0 && p.delivered < p.weeklyTarget).length;
 
   const publishMut = useMutation({
     mutationFn: async () => {

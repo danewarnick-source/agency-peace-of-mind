@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselect";
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
+import { LivingArrangementFlag } from "@/components/clients/living-arrangement-flag";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { ClientIntakeChecklistCard } from "@/components/clients/client-intake-checklist-card";
 import { PerShiftFormsCareSection } from "@/components/clients/per-shift-forms-care-section";

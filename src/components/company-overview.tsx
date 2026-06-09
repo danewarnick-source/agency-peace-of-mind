@@ -11,8 +11,8 @@ import type { AgencyHealthSnapshot } from "@/lib/agency-health.functions";
 import {
   ShieldCheck, MapPin, FileCheck2, BadgeCheck, Activity,
   AlertTriangle, ArrowRight, PartyPopper, Wallet,
-  Users, BookOpen, Network, CalendarClock, ClipboardX, FileSignature,
-  Stethoscope, Sparkles, UserPlus, CalendarPlus, ClipboardCheck, BarChart3,
+  BookOpen, Network, CalendarClock, ClipboardX, FileSignature,
+  Stethoscope, UserPlus, CalendarPlus, ClipboardCheck, BarChart3,
   Upload,
 } from "lucide-react";
 import { NectarHeader } from "@/components/nectar/nectar-brand";

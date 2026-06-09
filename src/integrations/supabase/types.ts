@@ -7820,6 +7820,7 @@ export type Database = {
           id: string
           manager_id: string | null
           organization_id: string | null
+          setting: string
           team_name: string
           tenant_id: string | null
           updated_at: string
@@ -7829,6 +7830,7 @@ export type Database = {
           id?: string
           manager_id?: string | null
           organization_id?: string | null
+          setting?: string
           team_name: string
           tenant_id?: string | null
           updated_at?: string
@@ -7838,6 +7840,7 @@ export type Database = {
           id?: string
           manager_id?: string | null
           organization_id?: string | null
+          setting?: string
           team_name?: string
           tenant_id?: string | null
           updated_at?: string

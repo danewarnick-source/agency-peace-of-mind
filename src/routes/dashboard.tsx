@@ -48,6 +48,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/scheduling", label: "Scheduling", icon: CalendarDays },
   { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing" },
+  { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

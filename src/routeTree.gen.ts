@@ -31,6 +31,7 @@ import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timec
 import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
+import { Route as DashboardSmartImportRouteImport } from './routes/dashboard.smart-import'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardSchedulingRouteImport } from './routes/dashboard.scheduling'
 import { Route as DashboardScheduleRouteImport } from './routes/dashboard.schedule'
@@ -239,6 +240,11 @@ const DashboardTeamRoute = DashboardTeamRouteImport.update({
 const DashboardSuperAdminRoute = DashboardSuperAdminRouteImport.update({
   id: '/super-admin',
   path: '/super-admin',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSmartImportRoute = DashboardSmartImportRouteImport.update({
+  id: '/smart-import',
+  path: '/smart-import',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
@@ -829,6 +835,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
+  '/dashboard/smart-import': typeof DashboardSmartImportRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -947,6 +954,7 @@ export interface FileRoutesByTo {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
+  '/dashboard/smart-import': typeof DashboardSmartImportRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -1071,6 +1079,7 @@ export interface FileRoutesById {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
+  '/dashboard/smart-import': typeof DashboardSmartImportRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -1196,6 +1205,7 @@ export interface FileRouteTypes {
     | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
+    | '/dashboard/smart-import'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -1314,6 +1324,7 @@ export interface FileRouteTypes {
     | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
+    | '/dashboard/smart-import'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -1437,6 +1448,7 @@ export interface FileRouteTypes {
     | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
+    | '/dashboard/smart-import'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -1681,6 +1693,13 @@ declare module '@tanstack/react-router' {
       path: '/super-admin'
       fullPath: '/dashboard/super-admin'
       preLoaderRoute: typeof DashboardSuperAdminRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/smart-import': {
+      id: '/dashboard/smart-import'
+      path: '/smart-import'
+      fullPath: '/dashboard/smart-import'
+      preLoaderRoute: typeof DashboardSmartImportRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/settings': {
@@ -2597,6 +2616,7 @@ interface DashboardRouteChildren {
   DashboardScheduleRoute: typeof DashboardScheduleRoute
   DashboardSchedulingRoute: typeof DashboardSchedulingRoute
   DashboardSettingsRoute: typeof DashboardSettingsRouteWithChildren
+  DashboardSmartImportRoute: typeof DashboardSmartImportRoute
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
   DashboardTeamsRoute: typeof DashboardTeamsRoute
@@ -2670,6 +2690,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardScheduleRoute: DashboardScheduleRoute,
   DashboardSchedulingRoute: DashboardSchedulingRoute,
   DashboardSettingsRoute: DashboardSettingsRouteWithChildren,
+  DashboardSmartImportRoute: DashboardSmartImportRoute,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
   DashboardTeamsRoute: DashboardTeamsRoute,

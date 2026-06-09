@@ -255,22 +255,15 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
 }
 
 function AcceptDeclineBar({ shiftId }: { shiftId: string }) {
+  const qc = useQueryClient();
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const update = async (status: "accepted" | "declined") => {
     setBusy(status === "accepted" ? "accept" : "decline");
     const { error } = await (supabase as any).from("scheduled_shifts").update({ status }).eq("id", shiftId);
     setBusy(null);
-    if (error) {
-      const { toast } = await import("sonner");
-      toast.error(error.message ?? "Could not update shift.");
-      return;
-    }
-    const { toast } = await import("sonner");
+    if (error) { toast.error(error.message ?? "Could not update shift."); return; }
     toast.success(status === "accepted" ? "Shift accepted." : "Shift declined.");
-    // Soft refresh — invalidate parent query
-    const { useQueryClient } = await import("@tanstack/react-query");
-    // Fall back to reload of cached query via custom event
-    window.dispatchEvent(new CustomEvent("my-schedule:refresh"));
+    qc.invalidateQueries({ queryKey: ["my-scheduled-shifts"] });
   };
   return (
     <div className="flex gap-2">

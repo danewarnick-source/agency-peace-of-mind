@@ -164,7 +164,7 @@ function SmartImportPage() {
       for (let i = 0; i < files.length; i++) {
         const chip = files[i];
         setProgress(`Uploading ${i + 1} of ${files.length}: ${chip.file.name}`);
-        const path = `${newJobId}/${crypto.randomUUID()}-${chip.file.name.replace(/[^\w.-]/g, "_")}`;
+        const path = `${org.organization_id}/${newJobId}/${crypto.randomUUID()}-${chip.file.name.replace(/[^\w.-]/g, "_")}`;
         const { error: upErr } = await supabase.storage
           .from("import-documents")
           .upload(path, chip.file, { contentType: chip.file.type || "application/octet-stream", upsert: false });
@@ -209,7 +209,7 @@ function SmartImportPage() {
             return out;
           });
           // No document for pasted content — use a placeholder doc row
-          const path = `${newJobId}/${crypto.randomUUID()}-pasted.csv`;
+          const path = `${org.organization_id}/${newJobId}/${crypto.randomUUID()}-pasted.csv`;
           await supabase.storage.from("import-documents").upload(path, new Blob([pasteText], { type: "text/csv" }), { upsert: false });
           const { documentId } = await recordDoc({
             data: {

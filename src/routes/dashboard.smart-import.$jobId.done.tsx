@@ -44,7 +44,10 @@ function DonePage() {
   const { jobId } = Route.useParams();
   const navigate = useNavigate();
   const search = (typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null);
-  const autoRun = search?.get("commit") === "1";
+  // TanStack's typed search serializes "1" as the JSON string `"1"`, so the
+  // URL ends up `?commit=%221%22`. Strip surrounding quotes before comparing.
+  const rawCommit = (search?.get("commit") ?? "").replace(/^"|"$/g, "");
+  const autoRun = rawCommit === "1";
 
   const commit = useServerFn(commitSmartImportJob);
   const readout = useServerFn(getDoneReadout);

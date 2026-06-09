@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -31,8 +33,17 @@ import {
   Trash2,
   AlertTriangle,
   CalendarDays,
+  Wand2,
+  Pencil,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  parseScheduleSentence,
+  type NectarScheduleResult,
+  type NectarSchedulePlan,
+} from "@/lib/nectar-schedule-parse.functions";
+
 
 type ServiceCode = {
   code: string;

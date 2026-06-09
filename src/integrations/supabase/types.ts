@@ -6925,6 +6925,65 @@ export type Database = {
           },
         ]
       }
+      service_codes: {
+        Row: {
+          carve_out: boolean
+          category: string
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_living_arrangement: boolean
+          name: string | null
+          organization_id: string
+          requires_evv: boolean
+          requires_schedule: boolean
+          scheduling_behavior: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          carve_out?: boolean
+          category: string
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_living_arrangement?: boolean
+          name?: string | null
+          organization_id: string
+          requires_evv?: boolean
+          requires_schedule?: boolean
+          scheduling_behavior: string
+          unit: string
+          updated_at?: string
+        }
+        Update: {
+          carve_out?: boolean
+          category?: string
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_living_arrangement?: boolean
+          name?: string | null
+          organization_id?: string
+          requires_evv?: boolean
+          requires_schedule?: boolean
+          scheduling_behavior?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_codes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift_behavior_observations: {
         Row: {
           antecedent_context: string | null
@@ -9200,6 +9259,10 @@ export type Database = {
         Returns: undefined
       }
       restore_my_admin_role: { Args: never; Returns: undefined }
+      seed_standard_service_codes: {
+        Args: { _org: string }
+        Returns: undefined
+      }
       set_company_executive: {
         Args: { _grant: boolean; _membership_id: string }
         Returns: undefined

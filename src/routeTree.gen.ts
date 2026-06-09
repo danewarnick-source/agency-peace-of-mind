@@ -82,6 +82,7 @@ import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.trai
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
 import { Route as DashboardShiftShiftIdRouteImport } from './routes/dashboard.shift.$shiftId'
 import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashboard.settings.team-access'
+import { Route as DashboardSettingsServiceCatalogRouteImport } from './routes/dashboard.settings.service-catalog'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardSettingsAutomationRulesRouteImport } from './routes/dashboard.settings.automation-rules'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
@@ -503,6 +504,12 @@ const DashboardSettingsTeamAccessRoute =
     path: '/team-access',
     getParentRoute: () => DashboardSettingsRoute,
   } as any)
+const DashboardSettingsServiceCatalogRoute =
+  DashboardSettingsServiceCatalogRouteImport.update({
+    id: '/service-catalog',
+    path: '/service-catalog',
+    getParentRoute: () => DashboardSettingsRoute,
+  } as any)
 const DashboardSettingsBankMappingRoute =
   DashboardSettingsBankMappingRouteImport.update({
     id: '/bank-mapping',
@@ -867,6 +874,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
+  '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -984,6 +992,7 @@ export interface FileRoutesByTo {
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
+  '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -1107,6 +1116,7 @@ export interface FileRoutesById {
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
+  '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
@@ -1231,6 +1241,7 @@ export interface FileRouteTypes {
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
+    | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/team-access'
     | '/dashboard/shift/$shiftId'
     | '/dashboard/tracks/$trackSlug'
@@ -1348,6 +1359,7 @@ export interface FileRouteTypes {
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
+    | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/team-access'
     | '/dashboard/shift/$shiftId'
     | '/dashboard/tracks/$trackSlug'
@@ -1470,6 +1482,7 @@ export interface FileRouteTypes {
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
+    | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/team-access'
     | '/dashboard/shift/$shiftId'
     | '/dashboard/tracks/$trackSlug'
@@ -2027,6 +2040,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsTeamAccessRouteImport
       parentRoute: typeof DashboardSettingsRoute
     }
+    '/dashboard/settings/service-catalog': {
+      id: '/dashboard/settings/service-catalog'
+      path: '/service-catalog'
+      fullPath: '/dashboard/settings/service-catalog'
+      preLoaderRoute: typeof DashboardSettingsServiceCatalogRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
     '/dashboard/settings/bank-mapping': {
       id: '/dashboard/settings/bank-mapping'
       path: '/bank-mapping'
@@ -2498,12 +2518,14 @@ const DashboardProgramsRouteWithChildren =
 interface DashboardSettingsRouteChildren {
   DashboardSettingsAutomationRulesRoute: typeof DashboardSettingsAutomationRulesRoute
   DashboardSettingsBankMappingRoute: typeof DashboardSettingsBankMappingRoute
+  DashboardSettingsServiceCatalogRoute: typeof DashboardSettingsServiceCatalogRoute
   DashboardSettingsTeamAccessRoute: typeof DashboardSettingsTeamAccessRoute
 }
 
 const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
   DashboardSettingsAutomationRulesRoute: DashboardSettingsAutomationRulesRoute,
   DashboardSettingsBankMappingRoute: DashboardSettingsBankMappingRoute,
+  DashboardSettingsServiceCatalogRoute: DashboardSettingsServiceCatalogRoute,
   DashboardSettingsTeamAccessRoute: DashboardSettingsTeamAccessRoute,
 }
 

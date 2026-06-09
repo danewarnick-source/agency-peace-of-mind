@@ -143,7 +143,7 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
       const { data, error } = await supabase
         .from("scheduled_shifts")
         .select(
-          "id, client_id, job_code, starts_at, ends_at, status, published, clients:client_id(first_name, last_name)",
+          "id, client_id, job_code, starts_at, ends_at, status, published, clients:client_id(first_name, last_name, team_id, teams:team_id(team_name))",
         )
         .eq("staff_id", user!.id)
         .eq("organization_id", org!.organization_id)
@@ -158,6 +158,7 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
         client_name: r.clients
           ? `${r.clients.first_name ?? ""} ${r.clients.last_name ?? ""}`.trim()
           : "Client",
+        home_name: r.clients?.teams?.team_name ?? null,
         job_code: r.job_code,
         starts_at: r.starts_at,
         ends_at: r.ends_at,
@@ -167,6 +168,7 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
     },
   });
 }
+
 
 function ShiftCard({ s }: { s: ScheduledShift }) {
   const daily = isDaily(s.job_code);

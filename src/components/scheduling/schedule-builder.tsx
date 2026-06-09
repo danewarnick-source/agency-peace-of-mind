@@ -538,10 +538,11 @@ export function ScheduleBuilder() {
 }
 
 function SlotCell({
-  slotKey, staffName, unit, day, bandName, pool, continuityFor, weekHours, onPick, onClear,
+  slotKey, staffName, isDraft, unit, day, bandName, pool, continuityFor, weekHours, onPick, onClear,
 }: {
   slotKey: string;
   staffName: string | null;
+  isDraft?: boolean;
   unit: Unit; day: string; bandName: string;
   pool: Staff[]; continuityFor: Set<string>; weekHours: Map<string, number>;
   onPick: (id: string) => void; onClear: () => void;
@@ -556,18 +557,25 @@ function SlotCell({
     });
   }, [pool, continuityFor, weekHours]);
 
+  const filledStyle = isDraft
+    ? "border-dashed border-violet-400 bg-violet-50 text-violet-900 hover:bg-violet-100 dark:bg-violet-950/30 dark:text-violet-200"
+    : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200";
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           className={`w-full rounded border px-1.5 py-1 text-left text-[11px] transition ${
             staffName
-              ? "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200"
+              ? filledStyle
               : "border-dashed border-rose-300 bg-rose-50/50 text-rose-700 hover:bg-rose-100/50 dark:bg-rose-950/20 dark:text-rose-200"
           }`}
-          aria-label={staffName ? `Assigned to ${staffName}` : `Needs staff for ${unit.label} ${bandName} ${day}`}
+          aria-label={staffName ? `${isDraft ? "Proposed" : "Assigned"} to ${staffName}` : `Needs staff for ${unit.label} ${bandName} ${day}`}
         >
-          <div className="truncate font-medium">{staffName ?? `needs 1`}</div>
+          <div className="flex items-center justify-between gap-1">
+            <span className="truncate font-medium">{staffName ?? `needs 1`}</span>
+            {isDraft && staffName && <span className="shrink-0 rounded bg-violet-200 px-1 text-[9px] font-bold uppercase tracking-wide text-violet-800">draft</span>}
+          </div>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" align="start">

@@ -128,6 +128,7 @@ export function ScheduleBuilder() {
   const [statuses, setStatuses] = useState<Map<string, string>>(new Map());
   const [drafts, setDrafts] = useState<Set<string>>(new Set());
   const [publishing, setPublishing] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
 
   const weekEnd = addDays(weekStart, 6);
   const weekDays = useMemo(() => Array.from({length:7}, (_,i) => addDays(weekStart, i)), [weekStart]);

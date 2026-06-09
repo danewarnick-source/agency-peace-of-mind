@@ -1,30 +1,38 @@
-## Why the toast didn't appear
+## What's wrong now
 
-The toast wiring is already in place in `NotificationBell.tsx` — it listens on a Supabase realtime channel for `INSERT`s into `public.notifications` and pops a sonner toast for urgent coverage-risk rows (`type = 'open_shift_warning'`).
+The admin only sees the bell badge update — no popup. The toast logic exists in `NotificationBell.tsx`, but it only fires inside the realtime `INSERT` callback. If the realtime event is missed (tab was backgrounded, connection blip, page just loaded, navigated between routes, etc.), the 30-second poll still refreshes the bell count — but nothing toasts. That matches exactly what you're seeing: number on the bell, no popup.
 
-The reason nothing shows up: the `notifications` table is **not** part of the `supabase_realtime` publication, so Postgres never broadcasts the insert. The bell still gets new rows on its 30-second poll, which is why the bell entry appears but no toast does.
+The notifications are correct in the DB (`type: open_shift_warning`, `urgency: urgent`, with a clear title like "Dane declined Maple House · Overnight 11:00 PM – 7:00 AM"), so the data side is fine. The gap is purely "live event missed → no toast".
 
-Verified directly against the database:
+## Fix (one file)
 
-```text
-SELECT tablename FROM pg_publication_tables
- WHERE pubname='supabase_realtime' AND tablename='notifications';
--> 0 rows
-```
+Edit only `src/components/NotificationBell.tsx`. Reuse the existing sonner toast and existing notification data — no new system, no schema changes, no new screens.
 
-## The fix (one migration, nothing else)
+Add a small "toast on first sight" effect alongside the existing realtime listener:
 
-Add `public.notifications` to the realtime publication so INSERTs are broadcast to the channel the bell is already subscribed to.
+- Keep a `useRef<Set<string>>` of notification IDs we've already toasted in this session (persist the set in `sessionStorage` keyed by org id so route changes / remounts don't re-toast the same row, but a fresh login does surface anything still unread).
+- Whenever the `notifications` query data changes, iterate the list and for each row where:
+  - `type === "open_shift_warning"` AND
+  - `urgency === "urgent" || "critical"` AND
+  - `read_at === null` AND `dismissed_at === null` AND
+  - id is not already in the seen-set
+  
+  …call the same `toast(n.title, { description, action: Open → n.link_to })` already used today, then add the id to the seen-set.
+- Keep the existing realtime `INSERT` handler, but route it through the same "toast if not yet seen" helper so live events and polled/initial-load events use one code path and can't double-toast.
+- Leave the bell entry untouched — toast is purely additive; dismissing the toast doesn't mark read or dismiss the row.
 
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
-```
+This guarantees: live insert → instant toast (as today); missed live insert → toast appears on next poll/refetch (within 30s) or on next page load; already-seen-in-this-session rows never re-toast.
 
-No app code, no new components, no new notification system, no changes to what's already in the bell. RLS on `notifications` already scopes rows to the right org/recipient, so realtime delivery inherits the same access rules.
+## Out of scope
 
-## Acceptance after the change
+- No changes to the bell UI, the notification table, RLS, the publication, or the decline flow.
+- Routine (non-urgent, non-coverage-risk) notifications still don't toast.
+- No auto-reassign, no new roles, no new notification types.
 
-- Staff decline → admin sees the sonner toast pop in automatically (no bell click), with the shift name and an "Open" action that jumps to the shift.
-- Same notification still sits in the bell and persists until the shift is re-covered; dismissing the toast doesn't clear it.
-- Routine notifications still don't toast (the toast filter is `type === 'open_shift_warning'` + urgency `urgent`/`critical`).
-- Advisory only; no auto-reassign; no new roles.
+## Acceptance
+
+- As Tom or Dane, declining a published Maple House shift makes a sonner toast pop in the admin's top-right automatically — naming the shift, with an "Open" action.
+- If the admin was offline / on another tab when the decline happened, opening the app (or just waiting up to 30s) still pops the toast for that unread urgent decline once.
+- The same notification still sits in the bell and persists until the shift is re-covered. Dismissing the toast does not clear the bell entry.
+- The same urgent decline does not re-toast on every navigation in the same session.
+- Routine notifications still don't toast.

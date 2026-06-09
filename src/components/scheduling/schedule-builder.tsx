@@ -116,6 +116,7 @@ export function ScheduleBuilder() {
   const [homeId, setHomeId] = useState<string>("");
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [assignments, setAssignments] = useState<Map<string, string | null>>(new Map());
+  const [drafts, setDrafts] = useState<Set<string>>(new Set());
   const [publishing, setPublishing] = useState(false);
 
   const weekEnd = addDays(weekStart, 6);
@@ -209,6 +210,7 @@ export function ScheduleBuilder() {
       }
     }
     setAssignments(next);
+    setDrafts(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, home?.id, weekStart.toISOString()]);
 
@@ -249,35 +251,59 @@ export function ScheduleBuilder() {
 
   function setAssignment(key: string, staffId: string | null) {
     setAssignments((prev) => { const next = new Map(prev); if (staffId === null) next.delete(key); else next.set(key, staffId); return next; });
+    // Manual edits promote a draft cell to a confirmed assignment (or clear it).
+    setDrafts((prev) => { if (!prev.has(key)) return prev; const next = new Set(prev); next.delete(key); return next; });
   }
 
   function nectarDraft() {
     if (!data || !home) return;
-    const next = new Map<string, string | null>();
-    let rrIdx = 0;
     const pool = homeStaff.length ? homeStaff : data.allStaff;
     if (!pool.length) { toast.error("No staff to draft from. Add staff in Homes & Teams."); return; }
+    const next = new Map(assignments);
+    const newDrafts = new Set(drafts);
+    let proposed = 0;
+    let leftOpen = 0;
     for (const day of weekDays) {
       const dISO = isoDay(day);
       for (const band of bands) {
+        // Track staff already booked in this day+band across any unit (existing + just-proposed)
+        const usedThisBand = new Set<string>();
         for (const unit of units) {
-          // prefer continuity for this unit's primary client
-          const cont = continuity.get(unit.clientIds[0]);
-          const ranked = [...pool].sort((a,b) => {
-            const ac = cont?.has(a.id) ? -1 : 0;
-            const bc = cont?.has(b.id) ? -1 : 0;
+          for (let i = 0; i < unit.staffNeeded; i++) {
+            const k = assignmentKey(unit.key, dISO, band.id, i);
+            const existing = next.get(k);
+            if (existing) { usedThisBand.add(existing); }
+          }
+        }
+        for (const unit of units) {
+          // Prefer continuity for this unit's primary client (assigned here before)
+          const cont = continuity.get(unit.clientIds[0]) ?? new Set<string>();
+          const ranked = [...pool].sort((a, b) => {
+            const ac = cont.has(a.id) ? -1 : 0;
+            const bc = cont.has(b.id) ? -1 : 0;
             return ac - bc;
           });
           for (let i = 0; i < unit.staffNeeded; i++) {
-            const staff = ranked[(rrIdx + i) % ranked.length];
-            next.set(assignmentKey(unit.key, dISO, band.id, i), staff.id);
+            const k = assignmentKey(unit.key, dISO, band.id, i);
+            if (next.get(k)) continue; // don't overwrite existing assignment
+            // pick first ranked staffer not already booked in this band
+            const pick = ranked.find((s) => !usedThisBand.has(s.id));
+            if (!pick) { leftOpen++; continue; } // not enough staff — leave open as a coverage gap
+            next.set(k, pick.id);
+            newDrafts.add(k);
+            usedThisBand.add(pick.id);
+            proposed++;
           }
-          rrIdx++;
         }
       }
     }
     setAssignments(next);
-    toast.success("NECTAR drafted the week. Nothing is published yet — review and Publish when ready.");
+    setDrafts(newDrafts);
+    if (proposed === 0) {
+      toast.message("Nothing to draft — all slots are already filled.");
+    } else {
+      toast.success(`NECTAR proposed ${proposed} slot${proposed===1?"":"s"}${leftOpen ? `; ${leftOpen} left open (not enough team).` : "."} Nothing is published — review and edit, then Publish.`);
+    }
   }
 
   function copyLastWeek() {
@@ -300,11 +326,13 @@ export function ScheduleBuilder() {
       }
     }
     setAssignments(next);
+    setDrafts(new Set());
     toast.success("Copied last week's pattern.");
   }
 
   function clearAll() {
     setAssignments(new Map());
+    setDrafts(new Set());
     toast.message("Cleared. Nothing is published until you click Publish.");
   }
 
@@ -483,6 +511,7 @@ export function ScheduleBuilder() {
                                 key={k}
                                 slotKey={k}
                                 staffName={staff?.full_name ?? staff?.email ?? null}
+                                isDraft={drafts.has(k)}
                                 unit={u}
                                 day={dISO}
                                 bandName={band.name}
@@ -509,10 +538,11 @@ export function ScheduleBuilder() {
 }
 
 function SlotCell({
-  slotKey, staffName, unit, day, bandName, pool, continuityFor, weekHours, onPick, onClear,
+  slotKey, staffName, isDraft, unit, day, bandName, pool, continuityFor, weekHours, onPick, onClear,
 }: {
   slotKey: string;
   staffName: string | null;
+  isDraft?: boolean;
   unit: Unit; day: string; bandName: string;
   pool: Staff[]; continuityFor: Set<string>; weekHours: Map<string, number>;
   onPick: (id: string) => void; onClear: () => void;
@@ -527,18 +557,25 @@ function SlotCell({
     });
   }, [pool, continuityFor, weekHours]);
 
+  const filledStyle = isDraft
+    ? "border-dashed border-violet-400 bg-violet-50 text-violet-900 hover:bg-violet-100 dark:bg-violet-950/30 dark:text-violet-200"
+    : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200";
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           className={`w-full rounded border px-1.5 py-1 text-left text-[11px] transition ${
             staffName
-              ? "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200"
+              ? filledStyle
               : "border-dashed border-rose-300 bg-rose-50/50 text-rose-700 hover:bg-rose-100/50 dark:bg-rose-950/20 dark:text-rose-200"
           }`}
-          aria-label={staffName ? `Assigned to ${staffName}` : `Needs staff for ${unit.label} ${bandName} ${day}`}
+          aria-label={staffName ? `${isDraft ? "Proposed" : "Assigned"} to ${staffName}` : `Needs staff for ${unit.label} ${bandName} ${day}`}
         >
-          <div className="truncate font-medium">{staffName ?? `needs 1`}</div>
+          <div className="flex items-center justify-between gap-1">
+            <span className="truncate font-medium">{staffName ?? `needs 1`}</span>
+            {isDraft && staffName && <span className="shrink-0 rounded bg-violet-200 px-1 text-[9px] font-bold uppercase tracking-wide text-violet-800">draft</span>}
+          </div>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" align="start">

@@ -1,14 +1,18 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Copy, Eraser, Send, AlertTriangle, Check, Loader2, ChevronLeft, ChevronRight, Home } from "lucide-react";
+import { Sparkles, Copy, Eraser, Send, AlertTriangle, Check, Loader2, ChevronLeft, ChevronRight, Home, Wand2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { parseCoverageSentence, type NectarCoverageResult, type NectarCoveragePlan } from "@/lib/nectar-schedule-parse.functions";
 
 type Team = { id: string; team_name: string; setting: string | null };
 type Client = { id: string; first_name: string; last_name: string; team_id: string | null };

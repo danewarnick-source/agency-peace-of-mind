@@ -8,12 +8,10 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, Clock, FileText, ArrowRight, Users } from "lucide-react";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
-import { TodayShiftBanner } from "@/components/today-shift-banner";
 import { CompanyOverview } from "@/components/company-overview";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
-import { OtherAssignmentsReminder } from "@/components/training/other-assignments-reminder";
-import { CeReminderCard } from "@/components/ce/ce-reminder-card";
-import { FormsReminderCard } from "@/components/forms/forms-reminder-card";
+import { TodayHero } from "@/components/staff-mobile/today-hero";
+import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 
@@ -144,12 +142,10 @@ function Overview() {
             title="My Caseload"
             subtitle="Your assigned clients, today's shift, and anything that needs your attention."
           />
-          <TodayShiftBanner />
-          <CeReminderCard />
-          <FormsReminderCard />
-          <OtherAssignmentsReminder />
-          <StaffClientGrid />
+          <TodayHero />
+          <AttentionStrip />
           <ComplianceInbox />
+          <StaffClientGrid />
 
         </div>
       )}

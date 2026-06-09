@@ -49,10 +49,51 @@ import { AlertTriangle, Lock } from "lucide-react";
 import { NectarGuidanceStrip } from "@/components/nectar/nectar-guidance-strip";
 import { NectarAutoAssignDialog } from "@/components/nectar/nectar-auto-assign-dialog";
 
+import { z } from "zod";
+import { Link, useSearch } from "@tanstack/react-router";
+import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
+
+const schedulingSearch = z.object({
+  tab: z.enum(["schedule", "homes"]).optional(),
+});
+
 export const Route = createFileRoute("/dashboard/scheduling")({
   head: () => ({ meta: [{ title: "Scheduling" }] }),
-  component: SchedulingPage,
+  validateSearch: (s) => schedulingSearch.parse(s),
+  component: SchedulingShell,
 });
+
+function SchedulingShell() {
+  const { tab } = useSearch({ from: "/dashboard/scheduling" });
+  const active = tab ?? "schedule";
+  return (
+    <div className="space-y-4">
+      <div className="border-b border-border">
+        <nav className="-mb-px flex flex-wrap gap-1" aria-label="Scheduling tabs">
+          {[
+            { key: "schedule", label: "Schedule" },
+            { key: "homes", label: "Homes & Teams" },
+          ].map((t) => (
+            <Link
+              key={t.key}
+              to="/dashboard/scheduling"
+              search={{ tab: t.key as "schedule" | "homes" }}
+              replace
+              className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                active === t.key
+                  ? "border-[#137182] text-[#137182]"
+                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+      {active === "homes" ? <HomesTeamsBoard /> : <SchedulingPage />}
+    </div>
+  );
+}
 
 type Shift = {
   id: string;

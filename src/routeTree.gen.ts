@@ -72,6 +72,7 @@ import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.ass
 import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-nectar'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
+import { Route as DashboardSmartImportIndexRouteImport } from './routes/dashboard.smart-import.index'
 import { Route as DashboardHiveExecIndexRouteImport } from './routes/dashboard.hive-exec.index'
 import { Route as DashboardFormsIndexRouteImport } from './routes/dashboard.forms.index'
 import { Route as DashboardFinancialIndexRouteImport } from './routes/dashboard.financial.index'
@@ -456,6 +457,12 @@ const DashboardTrainingIndexRoute = DashboardTrainingIndexRouteImport.update({
   path: '/training/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSmartImportIndexRoute =
+  DashboardSmartImportIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => DashboardSmartImportRoute,
+  } as any)
 const DashboardHiveExecIndexRoute = DashboardHiveExecIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -922,6 +929,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/forms/': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
+  '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
@@ -986,7 +994,6 @@ export interface FileRoutesByTo {
   '/dashboard/schedule': typeof DashboardScheduleRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
-  '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
@@ -1045,6 +1052,7 @@ export interface FileRoutesByTo {
   '/dashboard/financial': typeof DashboardFinancialIndexRoute
   '/dashboard/forms': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
+  '/dashboard/smart-import': typeof DashboardSmartImportIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
@@ -1174,6 +1182,7 @@ export interface FileRoutesById {
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/forms/': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
+  '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
@@ -1304,6 +1313,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/'
     | '/dashboard/forms/'
     | '/dashboard/hive-exec/'
+    | '/dashboard/smart-import/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
@@ -1368,7 +1378,6 @@ export interface FileRouteTypes {
     | '/dashboard/schedule'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
-    | '/dashboard/smart-import'
     | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
@@ -1427,6 +1436,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial'
     | '/dashboard/forms'
     | '/dashboard/hive-exec'
+    | '/dashboard/smart-import'
     | '/dashboard/training'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
@@ -1555,6 +1565,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/'
     | '/dashboard/forms/'
     | '/dashboard/hive-exec/'
+    | '/dashboard/smart-import/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
@@ -2034,6 +2045,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/training/'
       preLoaderRoute: typeof DashboardTrainingIndexRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/smart-import/': {
+      id: '/dashboard/smart-import/'
+      path: '/'
+      fullPath: '/dashboard/smart-import/'
+      preLoaderRoute: typeof DashboardSmartImportIndexRouteImport
+      parentRoute: typeof DashboardSmartImportRoute
     }
     '/dashboard/hive-exec/': {
       id: '/dashboard/hive-exec/'
@@ -2634,12 +2652,14 @@ const DashboardSettingsRouteWithChildren =
 
 interface DashboardSmartImportRouteChildren {
   DashboardSmartImportHistoryRoute: typeof DashboardSmartImportHistoryRoute
+  DashboardSmartImportIndexRoute: typeof DashboardSmartImportIndexRoute
   DashboardSmartImportJobIdDoneRoute: typeof DashboardSmartImportJobIdDoneRoute
   DashboardSmartImportJobIdReviewRoute: typeof DashboardSmartImportJobIdReviewRoute
 }
 
 const DashboardSmartImportRouteChildren: DashboardSmartImportRouteChildren = {
   DashboardSmartImportHistoryRoute: DashboardSmartImportHistoryRoute,
+  DashboardSmartImportIndexRoute: DashboardSmartImportIndexRoute,
   DashboardSmartImportJobIdDoneRoute: DashboardSmartImportJobIdDoneRoute,
   DashboardSmartImportJobIdReviewRoute: DashboardSmartImportJobIdReviewRoute,
 }

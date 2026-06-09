@@ -173,18 +173,6 @@ export function CoverageViews() {
         <p className="text-sm text-muted-foreground">Loading coverage…</p>
       ) : data.teams.length === 0 ? (
         <NoHomesEmpty />
-      ) : null}
-      {data && data.teams.length > 0 && (zoom === "week" ? (
-        <WeekMatrix data={data} anchor={anchor} onDrill={(d) => { setAnchor(d); setZoom("day"); }} />
-      ) : zoom === "month" ? (
-        <MonthHeatmap data={data} anchor={anchor} onDrill={(d) => { setAnchor(d); setZoom("day"); }} />
-      ) : (
-        <DayBreakdown data={data} anchor={anchor} />
-      ))}
-      {/* placeholder removed by structural change */}
-      {false && (
-        <p className="text-sm text-muted-foreground">Loading coverage…</p>
-      )}
       ) : zoom === "week" ? (
         <WeekMatrix data={data} anchor={anchor} onDrill={(d) => { setAnchor(d); setZoom("day"); }} />
       ) : zoom === "month" ? (

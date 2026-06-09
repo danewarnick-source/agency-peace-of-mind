@@ -459,15 +459,17 @@ export function IndividualServicesScheduler() {
           </p>
           {indivClients.length === 0 && (
             <div className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">
-              No host-home or supported-living clients found. Assign HHS/PPS/SLH/SLN to a
-              client to see them here.
+              No clients with schedulable individual services found. Assign a
+              schedulable code (e.g. SLH, SLN, DSI, SEI, CHA, COM, HSQ) to a non-RHS
+              client to see them here. Host-home (HHS/PPS) living itself is never
+              scheduled or clocked in.
             </div>
           )}
           {indivClients.map((c) => {
-            const cbcCodes = (data?.cbc ?? [])
-              .filter((b) => b.client_id === c.id)
-              .map((b) => b.service_code)
-              .filter((code) => catalogByCode.get(code)?.requires_schedule);
+            const assigned = assignedCodesByClient.get(c.id) ?? [];
+            const cbcCodes = assigned.filter(
+              (code) => catalogByCode.get(code)?.requires_schedule,
+            );
             const blockCount = (data?.shifts ?? []).filter((s) => s.client_id === c.id).length;
             const living =
               cbcCodes.find((code) => catalogByCode.get(code)?.is_living_arrangement) ?? null;

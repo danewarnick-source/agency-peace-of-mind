@@ -838,6 +838,7 @@ function ScheduleServiceDialog({
   userId,
   client,
   day,
+  weekStart,
   schedulableCodes,
   catalogByCode,
   staff,
@@ -851,6 +852,7 @@ function ScheduleServiceDialog({
   userId: string;
   client: Client;
   day: Date;
+  weekStart: Date;
   schedulableCodes: string[];
   catalogByCode: Map<string, ServiceCode>;
   staff: Staff[];
@@ -867,47 +869,63 @@ function ScheduleServiceDialog({
   const [staffId, setStaffId] = useState<string>(
     regularStaffByCode.get(schedulableCodes[0] ?? "") ?? "",
   );
-  const [date, setDate] = useState<string>(isoDate(day));
+  const [days, setDays] = useState<number[]>([day.getDay()]);
   const [start, setStart] = useState<string>("09:00");
   const [end, setEnd] = useState<string>("12:00");
   const [recurrence, setRecurrence] = useState<"none" | "weekly">("none");
   const [busy, setBusy] = useState(false);
 
-  const startISO = new Date(`${date}T${start}:00`).toISOString();
-  const endISO = new Date(`${date}T${end}:00`).toISOString();
-  const hours = Math.max(0, hoursBetween(startISO, endISO));
   const sc = catalogByCode.get(code);
   const isQuarter = sc?.unit === "quarter_hour";
-  const units = isQuarter ? Math.round(hours * 4) : Math.round(hours);
+  const perDayHours = Math.max(
+    0,
+    (new Date(`2000-01-01T${end}:00`).getTime() - new Date(`2000-01-01T${start}:00`).getTime()) / 3_600_000,
+  );
+  const totalHours = perDayHours * days.length;
+  const units = isQuarter ? Math.round(totalHours * 4) : Math.round(totalHours);
   const codeBurn = burndown.find((b) => b.code === code);
-  const projected = (codeBurn?.scheduledHours ?? 0) + hours;
+  const projected = (codeBurn?.scheduledHours ?? 0) + totalHours;
   const target = codeBurn?.targetHours ?? 0;
+
+  function toggleDay(d: number) {
+    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
+  }
 
   async function save(publish: boolean) {
     if (!code) return toast.error("Pick a service code.");
     if (!staffId) return toast.error("Pick a staffer.");
-    if (hours <= 0) return toast.error("End must be after start.");
+    if (perDayHours <= 0) return toast.error("End must be after start.");
+    if (days.length === 0) return toast.error("Pick at least one day.");
     setBusy(true);
-    const payload = {
-      organization_id: orgId,
-      staff_id: staffId,
-      client_id: client.id,
-      job_code: code,
-      shift_type: "hourly",
-      starts_at: startISO,
-      ends_at: endISO,
-      status: "pending",
-      published: publish,
-      is_recurring: recurrence === "weekly",
-      recurrence_rule: recurrence === "weekly" ? "weekly" : null,
-      recurrence_end_date: null,
-      created_by: userId,
-    };
+    const isRecurring = recurrence === "weekly";
+    const payload = days.map((d) => {
+      const dt = addDays(weekStart, d);
+      const dateStr = isoDate(dt);
+      return {
+        organization_id: orgId,
+        staff_id: staffId,
+        client_id: client.id,
+        job_code: code,
+        shift_type: "hourly",
+        starts_at: new Date(`${dateStr}T${start}:00`).toISOString(),
+        ends_at: new Date(`${dateStr}T${end}:00`).toISOString(),
+        status: "pending",
+        published: publish,
+        is_recurring: isRecurring,
+        recurrence_rule: isRecurring ? "weekly" : null,
+        recurrence_end_date: null,
+        created_by: userId,
+      };
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any).from("scheduled_shifts").insert(payload);
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success(publish ? "Scheduled and published." : "Draft saved.");
+    toast.success(
+      publish
+        ? `Scheduled & published ${payload.length} block${payload.length === 1 ? "" : "s"}.`
+        : `Saved ${payload.length} draft block${payload.length === 1 ? "" : "s"}.`,
+    );
     onSaved();
     onClose();
   }
@@ -920,8 +938,8 @@ function ScheduleServiceDialog({
             Schedule a service · {client.first_name} {client.last_name}
           </DialogTitle>
           <DialogDescription>
-            Reuses the same publish + EVV/clock-in mechanism as residential. Drafts stay
-            hidden from staff until published.
+            Pick one or more days, a time window, and recurrence. Drafts stay
+            hidden from staff until you publish.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -936,9 +954,7 @@ function ScheduleServiceDialog({
                   if (r) setStaffId(r);
                 }}
               >
-                <SelectTrigger className="mt-1 h-9">
-                  <SelectValue placeholder="Code" />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Code" /></SelectTrigger>
                 <SelectContent>
                   {schedulableCodes.map((c) => (
                     <SelectItem key={c} value={c}>
@@ -951,9 +967,7 @@ function ScheduleServiceDialog({
             <div>
               <Label>Staff</Label>
               <Select value={staffId} onValueChange={setStaffId}>
-                <SelectTrigger className="mt-1 h-9">
-                  <SelectValue placeholder="Pick staffer" />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Pick staffer" /></SelectTrigger>
                 <SelectContent>
                   {staff.map((s) => {
                     const isReg = regularStaffByCode.get(code) === s.id;
@@ -967,68 +981,73 @@ function ScheduleServiceDialog({
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="mt-1 h-9"
-              />
+
+          <div>
+            <Label>Days</Label>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {DAYS.map((label, i) => {
+                const active = days.includes(i);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => toggleDay(i)}
+                    className={`min-h-[36px] min-w-[44px] rounded-md border px-2.5 text-xs font-semibold transition ${
+                      active
+                        ? "border-[#137182] bg-[#137182] text-white"
+                        : "border-border bg-background text-foreground hover:border-[#137182]/50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {days.length} day{days.length === 1 ? "" : "s"} selected this week ·{" "}
+              {days.map((d) => DAYS[d]).join(" / ") || "—"}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Start</Label>
-              <Input
-                type="time"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className="mt-1 h-9"
-              />
+              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 h-9" />
             </div>
             <div>
               <Label>End</Label>
-              <Input
-                type="time"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className="mt-1 h-9"
-              />
+              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 h-9" />
             </div>
           </div>
+
           <div>
             <Label>Recurrence</Label>
             <Select value={recurrence} onValueChange={(v) => setRecurrence(v as "none" | "weekly")}>
-              <SelectTrigger className="mt-1 h-9">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">This week only</SelectItem>
-                <SelectItem value="weekly">Every week</SelectItem>
+                <SelectItem value="weekly">Every week (same days, same time)</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
           <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs">
             <p className="font-semibold">Live math</p>
             <p className="mt-1">
-              {hours.toFixed(2)} hours
+              {perDayHours.toFixed(2)} hrs × {days.length} day{days.length === 1 ? "" : "s"} ={" "}
+              {totalHours.toFixed(2)} hrs
               {isQuarter && ` · ${units} quarter-hour units`}
             </p>
             {codeBurn && target > 0 && (
               <p className="mt-1 text-muted-foreground">
-                Takes {code} to {projected.toFixed(1)}h of {target.toFixed(1)}h authorized this
-                week.
+                Takes {code} to {projected.toFixed(1)}h of {target.toFixed(1)}h authorized this week.
               </p>
             )}
           </div>
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button variant="outline" onClick={() => save(false)} disabled={busy}>
-            Save as draft
-          </Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="outline" onClick={() => save(false)} disabled={busy}>Save as draft</Button>
           <Button onClick={() => save(true)} disabled={busy}>
             <Send className="h-4 w-4" /> Publish
           </Button>
@@ -1037,3 +1056,390 @@ function ScheduleServiceDialog({
     </Dialog>
   );
 }
+
+// ----------------- NECTAR natural-language scheduler -----------------
+
+function NectarScheduleDialog({
+  open,
+  onClose,
+  orgId,
+  userId,
+  client,
+  weekStart,
+  schedulableCodes,
+  staff,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  orgId: string;
+  userId: string;
+  client: Client;
+  weekStart: Date;
+  schedulableCodes: string[];
+  staff: Staff[];
+  onSaved: () => void;
+}) {
+  const parseFn = useServerFn(parseScheduleSentence);
+  const [sentence, setSentence] = useState(
+    `Schedule ${staff[0]?.full_name?.split(" ")[0] ?? "a staffer"} with ${client.first_name} every Mon, Wed, Fri 10:00a–3:00p.`,
+  );
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<NectarScheduleResult | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function ask() {
+    if (!sentence.trim()) return;
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await parseFn({
+        data: {
+          sentence: sentence.trim(),
+          clients: [
+            {
+              id: client.id,
+              name: `${client.first_name} ${client.last_name}`.trim(),
+              schedulable_codes: schedulableCodes,
+            },
+          ],
+          staff: staff.map((s) => ({
+            id: s.id,
+            name: s.full_name ?? s.email ?? "—",
+          })),
+        },
+      });
+      setResult(res);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "NECTAR couldn't reach the gateway.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirm(plan: NectarSchedulePlan) {
+    setSaving(true);
+    const payload = plan.days.map((d) => {
+      const dt = addDays(weekStart, d);
+      const dateStr = isoDate(dt);
+      return {
+        organization_id: orgId,
+        staff_id: plan.staff_id,
+        client_id: plan.client_id,
+        job_code: plan.code,
+        shift_type: "hourly",
+        starts_at: new Date(`${dateStr}T${plan.start}:00`).toISOString(),
+        ends_at: new Date(`${dateStr}T${plan.end}:00`).toISOString(),
+        status: "pending",
+        published: false, // NECTAR never auto-publishes
+        is_recurring: plan.recurrence === "weekly",
+        recurrence_rule: plan.recurrence === "weekly" ? "weekly" : null,
+        recurrence_end_date: null,
+        created_by: userId,
+      };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("scheduled_shifts").insert(payload);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(`NECTAR added ${payload.length} draft block${payload.length === 1 ? "" : "s"}. Publish when ready.`);
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-[#137182]" /> Ask NECTAR to schedule
+          </DialogTitle>
+          <DialogDescription>
+            Describe the shift in plain English. NECTAR proposes draft blocks — nothing
+            publishes until you choose to.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <Textarea
+            value={sentence}
+            onChange={(e) => setSentence(e.target.value)}
+            rows={3}
+            className="text-sm"
+            placeholder="e.g. Schedule Dane with Johnny every Mon, Wed, Fri from 10am to 3pm."
+          />
+          <div className="flex justify-end">
+            <Button size="sm" onClick={ask} disabled={busy || !sentence.trim()}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {busy ? "Thinking…" : "Parse with NECTAR"}
+            </Button>
+          </div>
+
+          {result?.kind === "ask" && (
+            <div className="rounded-lg border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              <p className="font-semibold">NECTAR needs one detail:</p>
+              <p className="mt-1">{result.question}</p>
+              <p className="mt-2 text-[11px] opacity-80">
+                Add the missing detail to the sentence and parse again.
+              </p>
+            </div>
+          )}
+
+          {result?.kind === "ok" && (
+            <div className="space-y-2 rounded-lg border border-[#137182]/40 bg-[#137182]/5 p-3 text-sm">
+              <p className="font-semibold text-[#137182]">Preview — confirm to create as drafts:</p>
+              <p className="font-mono text-xs">{result.summary}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {result.days.length} block{result.days.length === 1 ? "" : "s"} will be added this week
+                {result.recurrence === "weekly" ? " and marked as weekly recurring" : ""}.
+                Nothing publishes automatically.
+              </p>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button size="sm" variant="outline" onClick={() => setResult(null)} disabled={saving}>
+                  Edit sentence
+                </Button>
+                <Button size="sm" onClick={() => confirm(result)} disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Confirm & save drafts
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={busy || saving}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ----------------- Edit / change / delete existing block -----------------
+
+function EditShiftDialog({
+  shift,
+  onClose,
+  orgId,
+  staff,
+  schedulableCodes,
+  catalogByCode,
+  onSaved,
+}: {
+  shift: Shift;
+  onClose: () => void;
+  orgId: string;
+  staff: Staff[];
+  schedulableCodes: string[];
+  catalogByCode: Map<string, ServiceCode>;
+  onSaved: () => void;
+}) {
+  const initStart = new Date(shift.starts_at);
+  const initEnd = new Date(shift.ends_at);
+  const toTime = (d: Date) =>
+    `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+  const [staffId, setStaffId] = useState(shift.staff_id);
+  const [code, setCode] = useState(shift.job_code ?? schedulableCodes[0] ?? "");
+  const [start, setStart] = useState(toTime(initStart));
+  const [end, setEnd] = useState(toTime(initEnd));
+  const [scope, setScope] = useState<"one" | "series">("one");
+  const [busy, setBusy] = useState(false);
+
+  const dateStr = isoDate(initStart);
+  const newStartISO = new Date(`${dateStr}T${start}:00`).toISOString();
+  const newEndISO = new Date(`${dateStr}T${end}:00`).toISOString();
+  const dayOfWeek = initStart.getDay();
+  const origStartHHMM = toTime(initStart);
+
+  async function fetchSeriesIds(): Promise<string[]> {
+    // Series = same client, code, weekly recurring, same DOW & same start time-of-day,
+    // starting on or after this occurrence.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
+      .from("scheduled_shifts")
+      .select("id, starts_at")
+      .eq("organization_id", orgId)
+      .eq("client_id", shift.client_id)
+      .eq("job_code", shift.job_code)
+      .eq("is_recurring", true)
+      .gte("starts_at", shift.starts_at);
+    if (error || !data) return [shift.id];
+    return (data as Array<{ id: string; starts_at: string }>)
+      .filter((r) => {
+        const d = new Date(r.starts_at);
+        return d.getDay() === dayOfWeek && toTime(d) === origStartHHMM;
+      })
+      .map((r) => r.id);
+  }
+
+  async function save() {
+    if (newStartISO >= newEndISO) return toast.error("End must be after start.");
+    setBusy(true);
+    const ids = scope === "series" && shift.is_recurring ? await fetchSeriesIds() : [shift.id];
+    if (scope === "series" && shift.is_recurring) {
+      // For the series, we only update staff and code (time-of-day stays consistent
+      // across occurrences but each row's calendar date stays put).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from("scheduled_shifts")
+        .update({ staff_id: staffId, job_code: code })
+        .in("id", ids);
+      // Apply time change per row so each occurrence keeps its own date.
+      if (!error) {
+        for (const id of ids) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: row } = await (supabase as any)
+            .from("scheduled_shifts").select("starts_at").eq("id", id).single();
+          if (!row) continue;
+          const d = isoDate(new Date(row.starts_at as string));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any).from("scheduled_shifts").update({
+            starts_at: new Date(`${d}T${start}:00`).toISOString(),
+            ends_at: new Date(`${d}T${end}:00`).toISOString(),
+          }).eq("id", id);
+        }
+      }
+      setBusy(false);
+      if (error) return toast.error(error.message);
+      toast.success(`Updated ${ids.length} occurrences in this series.`);
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from("scheduled_shifts")
+        .update({
+          staff_id: staffId,
+          job_code: code,
+          starts_at: newStartISO,
+          ends_at: newEndISO,
+        })
+        .eq("id", shift.id);
+      setBusy(false);
+      if (error) return toast.error(error.message);
+      toast.success("Block updated.");
+    }
+    onSaved();
+    onClose();
+  }
+
+  async function remove() {
+    setBusy(true);
+    const ids = scope === "series" && shift.is_recurring ? await fetchSeriesIds() : [shift.id];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from("scheduled_shifts").delete().in("id", ids);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success(
+      ids.length > 1 ? `Deleted ${ids.length} occurrences.` : "Block deleted.",
+    );
+    onSaved();
+    onClose();
+  }
+
+  async function quickSwap(newStaffId: string) {
+    setStaffId(newStaffId);
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            Edit block · {shift.job_code} ·{" "}
+            {initStart.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+          </DialogTitle>
+          <DialogDescription>
+            Change staff, time window, or service — or delete this block. Drafts stay
+            hidden from staff; published changes update their schedule.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {shift.is_recurring && (
+            <div className="rounded-md border border-amber-300/50 bg-amber-50 p-2 text-xs dark:bg-amber-950/30">
+              <p className="mb-1 font-semibold">Recurring block — apply changes to:</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setScope("one")}
+                  className={`min-h-[36px] flex-1 rounded border px-2 text-xs font-semibold ${
+                    scope === "one"
+                      ? "border-[#137182] bg-[#137182] text-white"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  This occurrence only
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScope("series")}
+                  className={`min-h-[36px] flex-1 rounded border px-2 text-xs font-semibold ${
+                    scope === "series"
+                      ? "border-[#137182] bg-[#137182] text-white"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  Whole series (this + future)
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Service</Label>
+              <Select value={code} onValueChange={setCode}>
+                <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {schedulableCodes.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c} — {catalogByCode.get(c)?.name ?? ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Staff</Label>
+              <Select value={staffId} onValueChange={quickSwap}>
+                <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {staff.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.full_name ?? s.email ?? "—"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-[10px] text-muted-foreground">Quick-swap staff supported.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Start</Label>
+              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 h-9" />
+            </div>
+            <div>
+              <Label>End</Label>
+              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 h-9" />
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="destructive" onClick={remove} disabled={busy} className="mr-auto">
+            <Trash2 className="h-4 w-4" /> Delete
+          </Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={save} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

@@ -1307,3 +1307,97 @@ function StaffPanel({
     </div>
   );
 }
+
+// ============================================================================
+// ResidentChip — tap to set the resident's staffing ratio inline.
+// Advisory only. Writes go to client_ratios (setting='residential'); a prior
+// open ratio row is closed first so the new one is the active one.
+// ============================================================================
+const RATIO_OPTIONS: { label: string; staff: number; clients: number; hint: string }[] = [
+  { label: "1:1", staff: 1, clients: 1, hint: "One staff dedicated to this resident" },
+  { label: "1:2", staff: 1, clients: 2, hint: "Shared 1:2 with another resident" },
+  { label: "1:3", staff: 1, clients: 3, hint: "Shared 1:3 with two other residents" },
+  { label: "2:1", staff: 2, clients: 1, hint: "Enhanced — two staff for this resident" },
+];
+
+function ResidentChip({
+  client,
+  ratio,
+  onSetRatio,
+  onMove,
+}: {
+  client: ClientRow;
+  ratio: Ratio | null;
+  onSetRatio: (staff: number, clients: number) => void;
+  onMove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const activeKey = ratio ? `${ratio.ratio_staff}:${ratio.ratio_clients}` : null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-xs hover:border-primary hover:bg-primary/5"
+          aria-label={`Set staffing ratio for ${client.first_name} ${client.last_name}`}
+        >
+          <span className="font-medium">
+            {client.first_name} {client.last_name}
+          </span>
+          <span
+            className={`rounded px-1 py-px text-[10px] tabular-nums ${
+              ratio
+                ? "bg-primary/10 text-primary"
+                : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {ratio ? `${ratio.ratio_staff}:${ratio.ratio_clients}` : "set ratio"}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-3">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Staffing ratio · {client.first_name}
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {RATIO_OPTIONS.map((opt) => {
+            const k = `${opt.staff}:${opt.clients}`;
+            const isActive = k === activeKey;
+            return (
+              <button
+                key={k}
+                onClick={() => {
+                  onSetRatio(opt.staff, opt.clients);
+                  setOpen(false);
+                }}
+                title={opt.hint}
+                className={`rounded-md border px-2 py-1.5 text-xs font-medium tabular-nums transition ${
+                  isActive
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card hover:border-primary hover:bg-primary/5"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+          Sets this resident's coverage ratio. Required staff per shift is
+          summed across residents in the home.
+        </p>
+        <div className="mt-2 flex justify-end border-t pt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setOpen(false);
+              onMove();
+            }}
+          >
+            Move to another home…
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}

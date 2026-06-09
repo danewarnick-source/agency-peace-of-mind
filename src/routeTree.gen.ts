@@ -131,6 +131,7 @@ import { Route as DashboardFormsFormIdEditRouteImport } from './routes/dashboard
 import { Route as DashboardCoursesTopicTopicIdRouteImport } from './routes/dashboard.courses.topic.$topicId'
 import { Route as DashboardCoursesPersonModuleAssignmentIdRouteImport } from './routes/dashboard.courses.person-module.$assignmentId'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
+import { Route as ApiPublicHooksSmartImportRemindersRouteImport } from './routes/api/public/hooks/smart-import-reminders'
 import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
 import { Route as DashboardHiveExecStatesStateCodeOnboardingRouteImport } from './routes/dashboard.hive-exec.states.$stateCode.onboarding'
 
@@ -781,6 +782,12 @@ const DashboardCoursesCourseIdEditRoute =
     path: '/edit',
     getParentRoute: () => DashboardCoursesCourseIdRoute,
   } as any)
+const ApiPublicHooksSmartImportRemindersRoute =
+  ApiPublicHooksSmartImportRemindersRouteImport.update({
+    id: '/api/public/hooks/smart-import-reminders',
+    path: '/api/public/hooks/smart-import-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksNectarSchedulesRoute =
   ApiPublicHooksNectarSchedulesRouteImport.update({
     id: '/api/public/hooks/nectar-schedules',
@@ -909,6 +916,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
+  '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
@@ -1030,6 +1038,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
+  '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
@@ -1157,6 +1166,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
+  '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
@@ -1285,6 +1295,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
+    | '/api/public/hooks/smart-import-reminders'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
@@ -1406,6 +1417,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec'
     | '/dashboard/training'
     | '/api/public/hooks/nectar-schedules'
+    | '/api/public/hooks/smart-import-reminders'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
@@ -1532,6 +1544,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/'
     | '/dashboard/training/'
     | '/api/public/hooks/nectar-schedules'
+    | '/api/public/hooks/smart-import-reminders'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
@@ -1563,6 +1576,7 @@ export interface RootRouteChildren {
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
   ApiPublicHooksNectarSchedulesRoute: typeof ApiPublicHooksNectarSchedulesRoute
+  ApiPublicHooksSmartImportRemindersRoute: typeof ApiPublicHooksSmartImportRemindersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2421,6 +2435,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdEditRouteImport
       parentRoute: typeof DashboardCoursesCourseIdRoute
     }
+    '/api/public/hooks/smart-import-reminders': {
+      id: '/api/public/hooks/smart-import-reminders'
+      path: '/api/public/hooks/smart-import-reminders'
+      fullPath: '/api/public/hooks/smart-import-reminders'
+      preLoaderRoute: typeof ApiPublicHooksSmartImportRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/nectar-schedules': {
       id: '/api/public/hooks/nectar-schedules'
       path: '/api/public/hooks/nectar-schedules'
@@ -2802,6 +2823,8 @@ const rootRouteChildren: RootRouteChildren = {
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
   ApiPublicHooksNectarSchedulesRoute: ApiPublicHooksNectarSchedulesRoute,
+  ApiPublicHooksSmartImportRemindersRoute:
+    ApiPublicHooksSmartImportRemindersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

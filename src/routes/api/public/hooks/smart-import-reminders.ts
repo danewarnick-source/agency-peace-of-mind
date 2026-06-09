@@ -58,7 +58,7 @@ export const Route = createFileRoute("/api/public/hooks/smart-import-reminders")
             const { data: s } = await supabaseAdmin
               .from("import_subjects")
               .select("review_status, match_status, committed_at, review_decision")
-              .eq("id", n.related_id)
+              .eq("id", n.related_id ?? "")
               .maybeSingle();
             if (!s) { stillOpen = false; }
             else if (s.committed_at && s.review_status !== "needs_info" && s.review_status !== "flagged" && s.match_status !== "ambiguous") {
@@ -68,7 +68,7 @@ export const Route = createFileRoute("/api/public/hooks/smart-import-reminders")
             const { data: c } = await supabaseAdmin
               .from("import_cert_documents")
               .select("state, expiry_date")
-              .eq("id", n.related_id)
+              .eq("id", n.related_id ?? "")
               .maybeSingle();
             if (!c) { stillOpen = false; }
             else if (n.type === "smart_import_cert_expiring") {
@@ -85,7 +85,7 @@ export const Route = createFileRoute("/api/public/hooks/smart-import-reminders")
             const { data: q } = await supabaseAdmin
               .from("import_nectar_questions")
               .select("answered_at")
-              .eq("id", n.related_id)
+              .eq("id", n.related_id ?? "")
               .maybeSingle();
             if (!q || q.answered_at) stillOpen = false;
           }

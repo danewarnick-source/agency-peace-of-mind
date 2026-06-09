@@ -379,6 +379,20 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
         }
       }
 
+      // ---- Fail loudly: if no subject made it through, the upload was
+      // unreadable or the model returned nothing. Never report "complete" on 0.
+      if (allSubjects.length === 0) {
+        throw new Error("Extraction produced no subjects. The uploaded file(s) could not be read, or the AI returned no fields. Try a clearer document or paste the text directly.");
+      }
+      // Verify at least one field was actually extracted across the whole job.
+      const { count: anyFieldCount } = await sb
+        .from("extracted_fields")
+        .select("id", { count: "exact", head: true })
+        .eq("import_job_id", data.jobId);
+      if (!anyFieldCount) {
+        throw new Error("Extraction completed but no fields were captured. The document may be a scanned image (no embedded text) — paste the text or upload a text-based PDF.");
+      }
+
 
       // ---- Dedup / match (read-only against real tables) ----
       let matchedCount = 0;

@@ -255,6 +255,9 @@ function SmartImportPage() {
         <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Back
         </Link>
+        <Link to="/dashboard/smart-import/history" className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted">
+          Import history
+        </Link>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">

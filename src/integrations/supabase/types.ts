@@ -4464,6 +4464,51 @@ export type Database = {
           },
         ]
       }
+      import_access_log: {
+        Row: {
+          action: string
+          actor: string
+          created_at: string
+          details: Json
+          id: string
+          import_job_id: string
+          target_org_id: string | null
+        }
+        Insert: {
+          action: string
+          actor: string
+          created_at?: string
+          details?: Json
+          id?: string
+          import_job_id: string
+          target_org_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          import_job_id?: string
+          target_org_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_access_log_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_access_log_target_org_id_fkey"
+            columns: ["target_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_audit: {
         Row: {
           action: string
@@ -4729,10 +4774,14 @@ export type Database = {
           committed_by: string | null
           created_at: string
           created_by: string
+          engagement_status: string
           id: string
           mode: string | null
           notes: string | null
           org_id: string
+          provider_signoff_at: string | null
+          provider_signoff_by: string | null
+          quote_amount_cents: number | null
           scale: string | null
           source: string | null
           source_summary: string | null
@@ -4746,10 +4795,14 @@ export type Database = {
           committed_by?: string | null
           created_at?: string
           created_by?: string
+          engagement_status?: string
           id?: string
           mode?: string | null
           notes?: string | null
           org_id: string
+          provider_signoff_at?: string | null
+          provider_signoff_by?: string | null
+          quote_amount_cents?: number | null
           scale?: string | null
           source?: string | null
           source_summary?: string | null
@@ -4763,10 +4816,14 @@ export type Database = {
           committed_by?: string | null
           created_at?: string
           created_by?: string
+          engagement_status?: string
           id?: string
           mode?: string | null
           notes?: string | null
           org_id?: string
+          provider_signoff_at?: string | null
+          provider_signoff_by?: string | null
+          quote_amount_cents?: number | null
           scale?: string | null
           source?: string | null
           source_summary?: string | null
@@ -9526,6 +9583,7 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: string }
+      can_access_import_job: { Args: { _job_id: string }; Returns: boolean }
       can_view_client_intake: {
         Args: { _client: string; _org: string; _viewer: string }
         Returns: boolean

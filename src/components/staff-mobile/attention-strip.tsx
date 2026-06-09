@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, FileText, GraduationCap, BookOpen, ChevronRight } from "lucide-react";
+import { AlertTriangle, FileText, GraduationCap, BookOpen, ChevronRight, BellRing } from "lucide-react";
 import { getMyCeStatus } from "@/lib/ce.functions";
 import { listMyForms, getMyFormNotifications } from "@/lib/forms.functions";
 import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
+import { listSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import {
   periodKeyFor, dueDateFor, isOverdue,
   type Frequency, type Schedule,

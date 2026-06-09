@@ -52,9 +52,10 @@ import { NectarAutoAssignDialog } from "@/components/nectar/nectar-auto-assign-d
 import { z } from "zod";
 import { Link, useSearch } from "@tanstack/react-router";
 import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
+import { DayTimeline } from "@/components/scheduling/day-timeline";
 
 const schedulingSearch = z.object({
-  tab: z.enum(["schedule", "homes"]).optional(),
+  tab: z.enum(["schedule", "day", "homes"]).optional(),
 });
 
 export const Route = createFileRoute("/dashboard/scheduling")({
@@ -72,12 +73,13 @@ function SchedulingShell() {
         <nav className="-mb-px flex flex-wrap gap-1" aria-label="Scheduling tabs">
           {[
             { key: "schedule", label: "Schedule" },
+            { key: "day", label: "Day view" },
             { key: "homes", label: "Homes & Teams" },
           ].map((t) => (
             <Link
               key={t.key}
               to="/dashboard/scheduling"
-              search={{ tab: t.key as "schedule" | "homes" }}
+              search={{ tab: t.key as "schedule" | "day" | "homes" }}
               replace
               className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
                 active === t.key
@@ -90,10 +92,11 @@ function SchedulingShell() {
           ))}
         </nav>
       </div>
-      {active === "homes" ? <HomesTeamsBoard /> : <SchedulingPage />}
+      {active === "homes" ? <HomesTeamsBoard /> : active === "day" ? <DayTimeline /> : <SchedulingPage />}
     </div>
   );
 }
+
 
 type Shift = {
   id: string;

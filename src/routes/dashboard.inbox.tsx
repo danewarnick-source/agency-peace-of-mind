@@ -225,5 +225,3 @@ function InboxPage() {
   );
 }
 
-// Silence unused-effect warning if linter complains; no-op
-useEffect;

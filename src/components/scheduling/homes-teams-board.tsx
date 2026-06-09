@@ -328,6 +328,39 @@ export function HomesTeamsBoard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const setRatio = useMutation({
+    mutationFn: async (v: {
+      client_id: string;
+      ratio_staff: number;
+      ratio_clients: number;
+    }) => {
+      // Close any prior open ratio rows for this client (any setting),
+      // then insert a fresh row effective today. Keeps history intact.
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yISO = yesterday.toISOString().slice(0, 10);
+      await supabase
+        .from("client_ratios")
+        .update({ effective_end: yISO } as never)
+        .eq("client_id", v.client_id)
+        .is("effective_end", null);
+      const { error } = await supabase.from("client_ratios").insert({
+        organization_id: orgId,
+        client_id: v.client_id,
+        setting: "residential",
+        ratio_staff: v.ratio_staff,
+        ratio_clients: v.ratio_clients,
+        effective_start: today,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ht-ratios", orgId] });
+      toast.success("Staffing ratio updated");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const deleteHome = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("teams").delete().eq("id", id);

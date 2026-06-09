@@ -22,7 +22,7 @@ import {
 
 const SearchSchema = z.object({ mode: z.enum(["employee", "client"]).optional() });
 
-export const Route = createFileRoute("/dashboard/smart-import")({
+export const Route = createFileRoute("/dashboard/smart-import/")({
   head: () => ({ meta: [{ title: "Smart Import — NECTAR" }] }),
   validateSearch: (s) => SearchSchema.parse(s),
   component: () => (

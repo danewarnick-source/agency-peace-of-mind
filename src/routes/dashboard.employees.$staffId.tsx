@@ -258,8 +258,10 @@ function StaffProfilePage() {
 
         {/* ----- REQUIREMENTS ----- */}
         <TabsContent value="requirements" className="mt-4 space-y-4">
+          <SmartImportRemindersPanel scope="admin" relatedRecordId={staffId} compact />
           <RequirementsTab organizationId={orgId} staffId={staffId} />
         </TabsContent>
+
 
         {/* ----- ACTIVITY ----- */}
         <TabsContent value="activity" className="mt-4">

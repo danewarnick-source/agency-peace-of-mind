@@ -116,7 +116,7 @@ function SchedulingShell() {
                 <Link
                   key={t.key}
                   to="/dashboard/scheduling"
-                  search={(prev) => ({ ...prev, tab: t.key as SchedulingTab })}
+                  search={(prev: Record<string, unknown>) => ({ ...prev, tab: t.key as SchedulingTab })}
                   replace
                   className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
                     active === t.key

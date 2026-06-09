@@ -46,6 +46,7 @@ import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-l
 import { Route as DashboardNectarDocsRouteImport } from './routes/dashboard.nectar-docs'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardInternalAuditRouteImport } from './routes/dashboard.internal-audit'
+import { Route as DashboardInboxRouteImport } from './routes/dashboard.inbox'
 import { Route as DashboardHrcRouteImport } from './routes/dashboard.hrc'
 import { Route as DashboardHrAdminRouteImport } from './routes/dashboard.hr-admin'
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
@@ -321,6 +322,11 @@ const DashboardInvitationsRoute = DashboardInvitationsRouteImport.update({
 const DashboardInternalAuditRoute = DashboardInternalAuditRouteImport.update({
   id: '/internal-audit',
   path: '/internal-audit',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardInboxRoute = DashboardInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardHrcRoute = DashboardHrcRouteImport.update({
@@ -863,6 +869,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/hrc': typeof DashboardHrcRoute
+  '/dashboard/inbox': typeof DashboardInboxRoute
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -988,6 +995,7 @@ export interface FileRoutesByTo {
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/hrc': typeof DashboardHrcRoute
+  '/dashboard/inbox': typeof DashboardInboxRoute
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -1118,6 +1126,7 @@ export interface FileRoutesById {
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/hrc': typeof DashboardHrcRoute
+  '/dashboard/inbox': typeof DashboardInboxRoute
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -1250,6 +1259,7 @@ export interface FileRouteTypes {
     | '/dashboard/host-home-control'
     | '/dashboard/hr-admin'
     | '/dashboard/hrc'
+    | '/dashboard/inbox'
     | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/nectar-docs'
@@ -1375,6 +1385,7 @@ export interface FileRouteTypes {
     | '/dashboard/host-home-control'
     | '/dashboard/hr-admin'
     | '/dashboard/hrc'
+    | '/dashboard/inbox'
     | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/nectar-docs'
@@ -1504,6 +1515,7 @@ export interface FileRouteTypes {
     | '/dashboard/host-home-control'
     | '/dashboard/hr-admin'
     | '/dashboard/hrc'
+    | '/dashboard/inbox'
     | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/nectar-docs'
@@ -1875,6 +1887,13 @@ declare module '@tanstack/react-router' {
       path: '/internal-audit'
       fullPath: '/dashboard/internal-audit'
       preLoaderRoute: typeof DashboardInternalAuditRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/inbox': {
+      id: '/dashboard/inbox'
+      path: '/inbox'
+      fullPath: '/dashboard/inbox'
+      preLoaderRoute: typeof DashboardInboxRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/hrc': {
@@ -2740,6 +2759,7 @@ interface DashboardRouteChildren {
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
   DashboardHrAdminRoute: typeof DashboardHrAdminRouteWithChildren
   DashboardHrcRoute: typeof DashboardHrcRoute
+  DashboardInboxRoute: typeof DashboardInboxRoute
   DashboardInternalAuditRoute: typeof DashboardInternalAuditRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardNectarDocsRoute: typeof DashboardNectarDocsRoute
@@ -2814,6 +2834,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,
   DashboardHrAdminRoute: DashboardHrAdminRouteWithChildren,
   DashboardHrcRoute: DashboardHrcRoute,
+  DashboardInboxRoute: DashboardInboxRoute,
   DashboardInternalAuditRoute: DashboardInternalAuditRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardNectarDocsRoute: DashboardNectarDocsRoute,

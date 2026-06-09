@@ -581,6 +581,7 @@ function ClientWorkspace({
                 : "No codes"
             }
           >
+            <LivingArrangementFlag clientId={client.id} />
             <CareBillingCodesEditor client={client} onSave={onSave} saving={saving} />
             <div className="mt-4">
               <BillingCodesDetail

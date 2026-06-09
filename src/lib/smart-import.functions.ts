@@ -14,6 +14,9 @@ const CreateJobInput = z.object({
   organizationId: z.string().uuid(),
   mode: ModeEnum,
   notes: z.string().max(2000).optional(),
+  source: z.enum(["self_service", "white_glove"]).default("self_service"),
+  scale: z.enum(["single", "bulk"]).default("single"),
+  targetOrgId: z.string().uuid().optional(),
 });
 
 const RecordDocInput = z.object({

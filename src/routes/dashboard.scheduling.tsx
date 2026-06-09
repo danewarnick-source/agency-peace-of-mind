@@ -53,12 +53,13 @@ import { z } from "zod";
 import { Link, useSearch } from "@tanstack/react-router";
 import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
 import { CoverageViews } from "@/components/scheduling/coverage-views";
+import { ScheduleBuilder } from "@/components/scheduling/schedule-builder";
 
 const schedulingSearch = z.object({
-  tab: z.enum(["schedule", "coverage", "homes"]).optional(),
+  tab: z.enum(["schedule", "builder", "coverage", "homes"]).optional(),
 });
 
-type SchedulingTab = "schedule" | "coverage" | "homes";
+type SchedulingTab = "schedule" | "builder" | "coverage" | "homes";
 
 export const Route = createFileRoute("/dashboard/scheduling")({
   head: () => ({ meta: [{ title: "Scheduling" }] }),
@@ -75,6 +76,7 @@ function SchedulingShell() {
         <nav className="-mb-px flex flex-wrap gap-1" aria-label="Scheduling tabs">
           {[
             { key: "schedule", label: "Schedule" },
+            { key: "builder", label: "Builder" },
             { key: "coverage", label: "Coverage" },
             { key: "homes", label: "Homes & Teams" },
           ].map((t) => (
@@ -94,7 +96,10 @@ function SchedulingShell() {
           ))}
         </nav>
       </div>
-      {active === "homes" ? <HomesTeamsBoard /> : active === "coverage" ? <CoverageViews /> : <SchedulingPage />}
+      {active === "homes" ? <HomesTeamsBoard />
+        : active === "coverage" ? <CoverageViews />
+        : active === "builder" ? <ScheduleBuilder />
+        : <SchedulingPage />}
     </div>
   );
 }

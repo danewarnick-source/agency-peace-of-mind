@@ -56,7 +56,7 @@ import { CoverageViews } from "@/components/scheduling/coverage-views";
 import { ScheduleBuilder } from "@/components/scheduling/schedule-builder";
 
 const schedulingSearch = z.object({
-  tab: z.enum(["builder", "coverage", "homes"]).catch("coverage").optional(),
+  tab: z.enum(["builder", "coverage", "homes"]).catch("builder").optional(),
 });
 
 type SchedulingTab = "builder" | "coverage" | "homes";
@@ -69,14 +69,14 @@ export const Route = createFileRoute("/dashboard/scheduling")({
 
 function SchedulingShell() {
   const { tab } = useSearch({ from: "/dashboard/scheduling" });
-  const active: SchedulingTab = tab ?? "coverage";
+  const active: SchedulingTab = tab ?? "builder";
   return (
     <div className="space-y-4">
       <div className="border-b border-border">
         <nav className="-mb-px flex flex-wrap gap-1" aria-label="Scheduling tabs">
           {[
-            { key: "coverage", label: "Coverage" },
             { key: "builder", label: "Builder" },
+            { key: "coverage", label: "Coverage" },
             { key: "homes", label: "Homes & Teams" },
           ].map((t) => (
             <Link

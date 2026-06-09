@@ -228,33 +228,36 @@ function ActiveClockPanel({ shift, userId }: { shift: Shift; userId?: string }) 
 }
 
 function RhsOverviewPanel({ shift }: { shift: Shift }) {
+  const code = shift.code?.code ?? "RHS";
   const { data } = useQuery({
-    queryKey: ["rhs-overview", shift.client_id, shift.code_id],
+    queryKey: ["rhs-overview", shift.client_id, code],
     queryFn: async () => {
       const { data: auth } = await supabase
-        .from("client_authorizations" as any)
-        .select("authorized_units, unit, period_start, period_end")
+        .from("client_billing_codes")
+        .select("annual_unit_authorization, unit_type, service_start_date, service_end_date")
         .eq("client_id", shift.client_id)
-        .eq("code_id", shift.code_id ?? "00000000-0000-0000-0000-000000000000")
-        .order("period_start", { ascending: false })
-        .limit(1)
+        .eq("service_code", code)
         .maybeSingle();
-      const periodStart = (auth as any)?.period_start ?? new Date(new Date().getFullYear(), 0, 1).toISOString();
-      const periodEnd = (auth as any)?.period_end ?? new Date(new Date().getFullYear(), 11, 31).toISOString();
+      const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+      const periodStart = (auth as any)?.service_start_date ?? yearStart;
+      const periodEnd = (auth as any)?.service_end_date ?? new Date(new Date().getFullYear(), 11, 31).toISOString();
       const { data: punches } = await supabase
         .from("evv_timesheets")
         .select("clock_in_timestamp, clock_out_timestamp")
         .eq("client_id", shift.client_id)
-        .eq("service_type_code", shift.code?.code ?? "RHS")
-        .gte("clock_in_timestamp", periodStart)
-        .lte("clock_in_timestamp", periodEnd)
+        .eq("service_type_code", code)
+        .gte("clock_in_timestamp", new Date(periodStart).toISOString())
+        .lte("clock_in_timestamp", new Date(periodEnd).toISOString())
         .not("clock_out_timestamp", "is", null);
       const deliveredHours = (punches ?? []).reduce((acc: number, p: any) => {
         const ms = new Date(p.clock_out_timestamp).getTime() - new Date(p.clock_in_timestamp).getTime();
         return acc + ms / 3_600_000;
       }, 0);
-      const authorized = Number((auth as any)?.authorized_units ?? 0);
-      return { authorized, delivered: deliveredHours, remaining: Math.max(0, authorized - deliveredHours), unit: (auth as any)?.unit ?? "hour" };
+      const unitType = (auth as any)?.unit_type ?? "H";
+      // Convert authorized units to hours when stored as 15-min units (Q)
+      const rawAuth = Number((auth as any)?.annual_unit_authorization ?? 0);
+      const authorized = unitType === "Q" ? rawAuth / 4 : rawAuth;
+      return { authorized, delivered: deliveredHours, remaining: Math.max(0, authorized - deliveredHours), unit: "hour" };
     },
   });
 

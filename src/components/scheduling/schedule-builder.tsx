@@ -412,7 +412,15 @@ export function ScheduleBuilder() {
       }
       // wipe existing shifts in week for this home's clients (advisory replace)
       const homeClientArr = Array.from(homeClientIds);
+      let priorShiftIds: string[] = [];
       if (homeClientArr.length) {
+        const { data: prior } = await (supabase as any).from("scheduled_shifts")
+          .select("id")
+          .eq("organization_id", orgId)
+          .in("client_id", homeClientArr)
+          .gte("starts_at", weekStart.toISOString())
+          .lte("starts_at", new Date(addDays(weekStart,7).getTime()-1).toISOString());
+        priorShiftIds = ((prior ?? []) as Array<{ id: string }>).map((r) => r.id);
         await (supabase as any).from("scheduled_shifts")
           .delete()
           .eq("organization_id", orgId)
@@ -423,6 +431,15 @@ export function ScheduleBuilder() {
       if (rows.length) {
         const { error } = await (supabase as any).from("scheduled_shifts").insert(rows);
         if (error) throw error;
+      }
+      // Resolve any open "shift declined" admin notifications tied to the wiped shifts.
+      if (priorShiftIds.length) {
+        await (supabase as any).from("notifications")
+          .update({ dismissed_at: new Date().toISOString() })
+          .eq("organization_id", orgId)
+          .eq("related_type", "shift_decline")
+          .in("related_id", priorShiftIds)
+          .is("dismissed_at", null);
       }
     },
     onSuccess: () => {

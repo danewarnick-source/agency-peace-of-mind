@@ -58,13 +58,20 @@ export const getReviewSubject = createServerFn({ method: "POST" })
       sb.from("import_nectar_questions").select("*").eq("import_subject_id", data.subjectId),
     ]);
 
-    // Pull matched existing record (read-only) for diff
-    let matched: Record<string, unknown> | null = null;
+    // Pull matched existing record (read-only) for diff — coerce to string|null for transport
+    let matched: Record<string, string | null> | null = null;
     if (subject.matched_record_id) {
       const table = subject.subject_type === "client" ? "clients" : "profiles";
       const { data: row } = await sb.from(table).select("*").eq("id", subject.matched_record_id).maybeSingle();
-      matched = row ?? null;
+      if (row) {
+        matched = {};
+        for (const [k, v] of Object.entries(row as Record<string, unknown>)) {
+          matched[k] = v == null ? null : String(v);
+        }
+      }
     }
+
+
 
     return {
       subject,

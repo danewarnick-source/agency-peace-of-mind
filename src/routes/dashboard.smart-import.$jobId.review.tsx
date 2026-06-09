@@ -520,7 +520,7 @@ function CertRow({
     if (!file) return;
     setUploading(true);
     try {
-      const path = `import/${subjectId}/${certKey}-${Date.now()}-${file.name}`;
+      const path = `cert/${jobId}/${subjectId}/${certKey}-${Date.now()}-${file.name.replace(/[^\w.-]/g, "_")}`;
       const { error: upErr } = await supabase.storage.from("import-documents").upload(path, file, { upsert: false });
       if (upErr) throw new Error(upErr.message);
       // crude expiry inference: try to parse a date in the filename

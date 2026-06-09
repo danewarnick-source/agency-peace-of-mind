@@ -505,6 +505,7 @@ function CertRow({
   existing: { id: string; cert_key: string; state: "unverified"|"verified"|"provisional"; file_name?: string|null; expiry_date?: string|null } | undefined;
   onChanged: () => void; hint?: string;
 }) {
+  const { jobId } = Route.useParams();
   const upsert = useServerFn(upsertCertDocument);
   const [uploading, setUploading] = useState(false);
 

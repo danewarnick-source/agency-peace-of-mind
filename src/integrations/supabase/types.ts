@@ -6020,12 +6020,17 @@ export type Database = {
           dismissed_at: string | null
           id: string
           link_to: string | null
+          next_remind_at: string | null
           organization_id: string
           read_at: string | null
           recipient_role: string
           recipient_user_id: string | null
+          recurrence_interval: string | null
+          recurrence_key: string | null
           related_id: string | null
           related_type: string | null
+          resolved_at: string | null
+          resolved_by: string | null
           title: string
           type: string
           urgency: string
@@ -6036,12 +6041,17 @@ export type Database = {
           dismissed_at?: string | null
           id?: string
           link_to?: string | null
+          next_remind_at?: string | null
           organization_id: string
           read_at?: string | null
           recipient_role?: string
           recipient_user_id?: string | null
+          recurrence_interval?: string | null
+          recurrence_key?: string | null
           related_id?: string | null
           related_type?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           title: string
           type: string
           urgency?: string
@@ -6052,12 +6062,17 @@ export type Database = {
           dismissed_at?: string | null
           id?: string
           link_to?: string | null
+          next_remind_at?: string | null
           organization_id?: string
           read_at?: string | null
           recipient_role?: string
           recipient_user_id?: string | null
+          recurrence_interval?: string | null
+          recurrence_key?: string | null
           related_id?: string | null
           related_type?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           title?: string
           type?: string
           urgency?: string

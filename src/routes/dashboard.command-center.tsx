@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 import { AddonLock } from "@/components/nectar/addon-lock";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
+import { SmartImportRemindersPanel } from "@/components/smart-import/reminders-panel";
 
 const cmdSearch = z.object({
   cc: z.enum(["urgent", "pending", "approved", "analytics", "nectar"]).optional(),
@@ -1203,16 +1204,22 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
       {tab === "urgent" && (
         <div className="space-y-6">
           {urgentCount === 0 && !incLoading && !tsLoading ? (
-            <Card className="p-12 text-center">
-              <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-500" />
-              <p className="text-lg font-semibold text-emerald-700 dark:text-emerald-400">All Clear</p>
-              <p className="mt-1 text-sm text-muted-foreground">No urgent items require your attention right now.</p>
-            </Card>
+            <div className="space-y-4">
+              <SmartImportRemindersPanel scope="admin" />
+              <Card className="p-12 text-center">
+                <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-500" />
+                <p className="text-lg font-semibold text-emerald-700 dark:text-emerald-400">All Clear</p>
+                <p className="mt-1 text-sm text-muted-foreground">No urgent items require your attention right now.</p>
+              </Card>
+            </div>
           ) : (
             <>
+              <SmartImportRemindersPanel scope="admin" />
+
               {urgentIncidents.length > 0 && (
                 <section>
                   <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-rose-600">
+
                     <ShieldAlert className="h-4 w-4" /> Incident Reports — State Submission Required
                   </h2>
                   <div className="space-y-2">

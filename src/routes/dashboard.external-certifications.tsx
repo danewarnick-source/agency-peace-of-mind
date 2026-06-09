@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, FileCheck, FileX, Clock4, AlertTriangle, Download } from "lucide-react";
 import { toast } from "sonner";
+import { MySmartImportCertReminders } from "@/components/smart-import/my-cert-reminders";
 
 export const Route = createFileRoute("/dashboard/external-certifications")({ component: ExternalCertsPage });
 
@@ -102,7 +103,9 @@ function ExternalCertsPage() {
 
   return (
     <div className="space-y-6">
+      <MySmartImportCertReminders />
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] flex flex-wrap items-center justify-between gap-3">
+
         <div>
           <h2 className="text-base font-semibold">External Certifications</h2>
           <p className="text-sm text-muted-foreground">

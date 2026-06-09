@@ -10,6 +10,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getDoneReadout, commitSmartImportJob } from "@/lib/smart-import-commit.functions";
+import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),
@@ -28,6 +29,7 @@ function DonePage() {
 
   const commit = useServerFn(commitSmartImportJob);
   const readout = useServerFn(getDoneReadout);
+  const generateReminders = useServerFn(generateSmartImportReminders);
 
   const [runState, setRunState] = useState<"idle" | "running" | "done" | "error">(autoRun ? "running" : "idle");
   const [runError, setRunError] = useState<string | null>(null);
@@ -44,6 +46,8 @@ function DonePage() {
     (async () => {
       try {
         await commit({ data: { jobId } });
+        // After commit, seed persistent reminders for any leftovers/gaps.
+        try { await generateReminders({ data: {} }); } catch { /* non-fatal */ }
         if (!cancelled) setRunState("done");
       } catch (e) {
         if (!cancelled) {

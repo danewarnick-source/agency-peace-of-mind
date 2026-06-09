@@ -14,6 +14,7 @@ import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
 import { OtherAssignmentsAdminSection } from "@/components/training/other-assignments-section";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
 import { getStaffChecklist } from "@/lib/hr-staff.functions";
+import { SmartImportRemindersPanel } from "@/components/smart-import/reminders-panel";
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (
@@ -258,8 +259,10 @@ function StaffProfilePage() {
 
         {/* ----- REQUIREMENTS ----- */}
         <TabsContent value="requirements" className="mt-4 space-y-4">
+          <SmartImportRemindersPanel scope="admin" relatedRecordId={staffId} compact />
           <RequirementsTab organizationId={orgId} staffId={staffId} />
         </TabsContent>
+
 
         {/* ----- ACTIVITY ----- */}
         <TabsContent value="activity" className="mt-4">

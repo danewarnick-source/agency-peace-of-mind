@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, FileText, GraduationCap, BookOpen, ChevronRight } from "lucide-react";
+import { AlertTriangle, FileText, GraduationCap, BookOpen, ChevronRight, BellRing } from "lucide-react";
 import { getMyCeStatus } from "@/lib/ce.functions";
 import { listMyForms, getMyFormNotifications } from "@/lib/forms.functions";
 import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
+import { listSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import {
   periodKeyFor, dueDateFor, isOverdue,
   type Frequency, type Schedule,
@@ -32,11 +33,14 @@ export function AttentionStrip() {
   const fetchForms = useServerFn(listMyForms);
   const fetchBell = useServerFn(getMyFormNotifications);
   const fetchOther = useServerFn(getMyOtherAssignmentsSummary);
+  const fetchSI = useServerFn(listSmartImportReminders);
 
   const { data: ce } = useQuery({ queryKey: ["ce-status"], queryFn: () => fetchCe(), staleTime: 60_000 });
   const { data: formsData } = useQuery({ queryKey: ["my-forms"], queryFn: () => fetchForms(), staleTime: 60_000 });
   const { data: bell } = useQuery({ queryKey: ["my-form-notifs"], queryFn: () => fetchBell(), staleTime: 60_000 });
   const { data: other } = useQuery({ queryKey: ["my-other-assignments-summary"], queryFn: () => fetchOther() });
+  const { data: si } = useQuery({ queryKey: ["my-smart-import-reminders"], queryFn: () => fetchSI({ data: { scope: "mine" } }), staleTime: 60_000 });
+
 
   const chips: Chip[] = [];
 
@@ -105,6 +109,20 @@ export function AttentionStrip() {
         : `${other.open_count} training${other.open_count === 1 ? "" : "s"} open`,
     });
   }
+
+  // Smart Import reminders for me — provisional/expiring certs needing upload.
+  const siCount = (si?.reminders ?? []).length;
+  if (siCount > 0) {
+    const hasCritical = (si?.reminders ?? []).some((r: { urgency: string }) => r.urgency === "critical");
+    chips.push({
+      key: "smart-import",
+      to: "/dashboard/external-certifications",
+      icon: BellRing,
+      tone: hasCritical ? "danger" : "warn",
+      label: `${siCount} cert reminder${siCount === 1 ? "" : "s"}`,
+    });
+  }
+
 
   // If nothing needs attention, render the NECTAR card on its own (slim).
   return (

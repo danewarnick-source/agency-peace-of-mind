@@ -263,8 +263,10 @@ export function ScheduleBuilder() {
 
   function setAssignment(key: string, staffId: string | null) {
     setAssignments((prev) => { const next = new Map(prev); if (staffId === null) next.delete(key); else next.set(key, staffId); return next; });
-    // Manual edits promote a draft cell to a confirmed assignment (or clear it).
+    // Manual edits promote a draft cell to a confirmed assignment (or clear it),
+    // and clear any stale published status — it'll be re-set on next Publish.
     setDrafts((prev) => { if (!prev.has(key)) return prev; const next = new Set(prev); next.delete(key); return next; });
+    setStatuses((prev) => { if (!prev.has(key)) return prev; const next = new Map(prev); next.delete(key); return next; });
   }
 
   function nectarDraft() {

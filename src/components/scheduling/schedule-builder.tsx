@@ -346,6 +346,7 @@ export function ScheduleBuilder() {
 
   function clearAll() {
     setAssignments(new Map());
+    setStatuses(new Map());
     setDrafts(new Set());
     toast.message("Cleared. Nothing is published until you click Publish.");
   }

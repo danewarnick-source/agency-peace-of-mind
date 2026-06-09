@@ -675,7 +675,7 @@ export function IndividualServicesScheduler() {
                 </div>
                 {burndown.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    No schedulable authorizations on file for this client.
+                    No schedulable services assigned to this client yet.
                   </p>
                 ) : (
                   <div className="space-y-2">

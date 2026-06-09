@@ -1,14 +1,18 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Copy, Eraser, Send, AlertTriangle, Check, Loader2, ChevronLeft, ChevronRight, Home } from "lucide-react";
+import { Sparkles, Copy, Eraser, Send, AlertTriangle, Check, Loader2, ChevronLeft, ChevronRight, Home, Wand2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { parseCoverageSentence, type NectarCoverageResult, type NectarCoveragePlan } from "@/lib/nectar-schedule-parse.functions";
 
 type Team = { id: string; team_name: string; setting: string | null };
 type Client = { id: string; first_name: string; last_name: string; team_id: string | null };
@@ -124,6 +128,7 @@ export function ScheduleBuilder() {
   const [statuses, setStatuses] = useState<Map<string, string>>(new Map());
   const [drafts, setDrafts] = useState<Set<string>>(new Set());
   const [publishing, setPublishing] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
 
   const weekEnd = addDays(weekStart, 6);
   const weekDays = useMemo(() => Array.from({length:7}, (_,i) => addDays(weekStart, i)), [weekStart]);
@@ -344,6 +349,45 @@ export function ScheduleBuilder() {
     toast.success("Copied last week's pattern.");
   }
 
+  function applyCoveragePicks(plan: NectarCoveragePlan): { applied: number; skipped: number } {
+    let applied = 0;
+    let skipped = 0;
+    const next = new Map(assignments);
+    const newDrafts = new Set(drafts);
+    for (const p of plan.picks) {
+      const unit = units.find((u) => u.key === p.unit_key);
+      if (!unit) { skipped++; continue; }
+      // Track who's already booked in this day+band across all units, to avoid
+      // double-booking a staffer in the same band (same constraint nectarDraft uses).
+      const usedThisBand = new Set<string>();
+      for (const u of units) {
+        for (let i = 0; i < u.staffNeeded; i++) {
+          const k = assignmentKey(u.key, p.day_iso, p.band_id, i);
+          const sid = next.get(k);
+          if (sid) usedThisBand.add(sid);
+        }
+      }
+      if (usedThisBand.has(p.staff_id)) { skipped++; continue; }
+      // Find first empty slot for this unit/day/band.
+      let placed = false;
+      for (let i = 0; i < unit.staffNeeded; i++) {
+        const k = assignmentKey(unit.key, p.day_iso, p.band_id, i);
+        if (!next.get(k)) {
+          next.set(k, p.staff_id);
+          newDrafts.add(k);
+          applied++;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) skipped++;
+    }
+    setAssignments(next);
+    setDrafts(newDrafts);
+    return { applied, skipped };
+  }
+
+
   function clearAll() {
     setAssignments(new Map());
     setStatuses(new Map());
@@ -489,6 +533,9 @@ export function ScheduleBuilder() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setAskOpen(true)} disabled={!data || !home}>
+            <Wand2 className="mr-1 h-4 w-4" />Ask NECTAR to schedule
+          </Button>
           <Button variant="outline" size="sm" onClick={nectarDraft} disabled={!data}><Sparkles className="mr-1 h-4 w-4" />NECTAR draft</Button>
           <Button variant="outline" size="sm" onClick={copyLastWeek} disabled={!data}><Copy className="mr-1 h-4 w-4" />Copy last week</Button>
           <Button variant="outline" size="sm" onClick={clearAll}><Eraser className="mr-1 h-4 w-4" />Clear</Button>
@@ -569,7 +616,149 @@ export function ScheduleBuilder() {
           </table>
         </div>
       )}
+
+      {data && home && (
+        <AskNectarCoverageDialog
+          open={askOpen}
+          onClose={() => setAskOpen(false)}
+          homeName={home.team_name}
+          units={units}
+          bands={bands}
+          weekDays={weekDays}
+          staff={homeStaff.length ? homeStaff : data.allStaff}
+          onConfirm={(plan) => {
+            const { applied, skipped } = applyCoveragePicks(plan);
+            if (applied === 0) {
+              toast.message(`Nothing to add — those slot${skipped === 1 ? " is" : "s are"} already filled.`);
+            } else {
+              toast.success(`NECTAR proposed ${applied} slot${applied === 1 ? "" : "s"}${skipped ? `; ${skipped} skipped (already filled or double-booked).` : "."} Review and Publish when ready.`);
+            }
+            setAskOpen(false);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ----------------- Ask NECTAR — residential coverage variant -----------------
+
+function AskNectarCoverageDialog({
+  open,
+  onClose,
+  homeName,
+  units,
+  bands,
+  weekDays,
+  staff,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  homeName: string;
+  units: Unit[];
+  bands: Template[];
+  weekDays: Date[];
+  staff: Staff[];
+  onConfirm: (plan: NectarCoveragePlan) => void;
+}) {
+  const parseFn = useServerFn(parseCoverageSentence);
+  const firstUnit = units[0]?.label?.split(" ")[0] ?? "the home";
+  const firstStaff = staff[0]?.full_name?.split(" ")[0] ?? "a staffer";
+  const [sentence, setSentence] = useState(
+    `Cover ${firstUnit} overnight Mon–Fri with ${firstStaff}.`,
+  );
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<NectarCoverageResult | null>(null);
+
+  async function ask() {
+    if (!sentence.trim()) return;
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await parseFn({
+        data: {
+          sentence: sentence.trim(),
+          home_name: homeName,
+          units: units.map((u) => ({ key: u.key, label: u.label, staff_needed: u.staffNeeded })),
+          bands: bands.map((b) => ({ id: b.id, name: b.name, start_time: b.start_time, end_time: b.end_time })),
+          days: weekDays.map((d) => {
+            const x = new Date(d); x.setHours(0,0,0,0);
+            return x.toISOString().slice(0,10);
+          }),
+          staff: staff.map((s) => ({ id: s.id, name: s.full_name ?? s.email ?? "—" })),
+        },
+      });
+      setResult(res);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "NECTAR couldn't reach the gateway.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-[#137182]" /> Ask NECTAR to schedule
+          </DialogTitle>
+          <DialogDescription>
+            Describe the coverage in plain English. NECTAR proposes draft cells — nothing
+            publishes until you click Publish week.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <Textarea
+            value={sentence}
+            onChange={(e) => setSentence(e.target.value)}
+            rows={3}
+            className="text-sm"
+            placeholder="e.g. Cover the Maple house overnight Mon–Fri with Sarah."
+          />
+          <div className="flex justify-end">
+            <Button size="sm" onClick={ask} disabled={busy || !sentence.trim()}>
+              {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
+              {busy ? "Thinking…" : "Parse with NECTAR"}
+            </Button>
+          </div>
+
+          {result?.kind === "ask" && (
+            <div className="rounded-lg border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              <p className="font-semibold">NECTAR needs one detail:</p>
+              <p className="mt-1">{result.question}</p>
+              <p className="mt-2 text-[11px] opacity-80">Add the missing detail and parse again.</p>
+            </div>
+          )}
+
+          {result?.kind === "ok" && (
+            <div className="space-y-2 rounded-lg border border-[#137182]/40 bg-[#137182]/5 p-3 text-sm">
+              <p className="font-semibold text-[#137182]">Preview — confirm to add as drafts:</p>
+              <p className="font-mono text-xs">{result.summary}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {result.picks.length} slot{result.picks.length === 1 ? "" : "s"} will be added as drafts.
+                Nothing publishes automatically.
+              </p>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button size="sm" variant="outline" onClick={() => setResult(null)}>
+                  Edit sentence
+                </Button>
+                <Button size="sm" onClick={() => onConfirm(result)}>
+                  <Send className="mr-1 h-4 w-4" />
+                  Confirm & save drafts
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -533,6 +533,9 @@ export function ScheduleBuilder() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setAskOpen(true)} disabled={!data || !home}>
+            <Wand2 className="mr-1 h-4 w-4" />Ask NECTAR to schedule
+          </Button>
           <Button variant="outline" size="sm" onClick={nectarDraft} disabled={!data}><Sparkles className="mr-1 h-4 w-4" />NECTAR draft</Button>
           <Button variant="outline" size="sm" onClick={copyLastWeek} disabled={!data}><Copy className="mr-1 h-4 w-4" />Copy last week</Button>
           <Button variant="outline" size="sm" onClick={clearAll}><Eraser className="mr-1 h-4 w-4" />Clear</Button>

@@ -402,7 +402,15 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
       </ul>
       {pendingIds.length > 0 && (
         <div className="mt-3">
-          <AcceptDeclineBar shiftIds={pendingIds} />
+          <AcceptDeclineBar
+            shiftIds={pendingIds}
+            meta={{
+              homeName: home,
+              startISO: first.starts_at,
+              endISO: first.ends_at,
+              clientNames: shifts.map((x) => x.client_name),
+            }}
+          />
         </div>
       )}
     </article>

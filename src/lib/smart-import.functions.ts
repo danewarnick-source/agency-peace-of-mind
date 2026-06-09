@@ -142,8 +142,9 @@ export const createSmartImportJob = createServerFn({ method: "POST" })
       .insert({
         org_id: data.organizationId,
         mode: data.mode,
-        source: "self_service",
-        scale: "single",
+        source: data.source,
+        scale: data.scale,
+        target_org_id: data.targetOrgId ?? null,
         status: "draft",
         notes: data.notes ?? null,
       })

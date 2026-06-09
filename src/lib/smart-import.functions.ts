@@ -287,9 +287,57 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
         }
       }
 
-      // ---- Text blobs: one subject each (fake AI extraction) ----
+      // ---- Text blobs + uploaded PDF/DOCX docs: AI extraction ----
+      // Server-side: pull every recorded document for this job, download from
+      // the private bucket, convert to text, then AI-extract. Client-supplied
+      // text blobs that are obvious placeholders ("Imported document: …") are
+      // dropped — the server is the source of truth for file text.
+      const realTextBlobs: Array<{
+        source_document_id: string | null;
+        file_name: string;
+        text: string;
+      }> = [];
+
+      // Real pasted text from the client (not the placeholder).
       for (const blob of data.textBlobs) {
-        const extracted = generateExtractionFromText(blob.text, mode);
+        if (blob.text && !/^Imported document:/i.test(blob.text.trim())) {
+          realTextBlobs.push(blob);
+        }
+      }
+
+      // Download + extract text for every uploaded doc that's not a roster.
+      const { data: docs } = await sb
+        .from("import_documents")
+        .select("id, file_name, file_type, storage_path")
+        .eq("import_job_id", data.jobId);
+      for (const doc of docs ?? []) {
+        const fname = String(doc.file_name || "").toLowerCase();
+        const ftype = String(doc.file_type || "").toLowerCase();
+        const isPdf = fname.endsWith(".pdf") || ftype.includes("pdf");
+        const isDocx = fname.endsWith(".docx") || ftype.includes("word");
+        if (!isPdf && !isDocx) continue; // CSV/XLSX handled by rosterBatches
+        try {
+          const { data: file, error: dlErr } = await sb.storage
+            .from("import-documents")
+            .download(doc.storage_path);
+          if (dlErr || !file) throw new Error(dlErr?.message ?? "download failed");
+          const buf = Buffer.from(await file.arrayBuffer());
+          const text = isPdf ? await extractPdfText(buf) : await extractDocxText(buf);
+          if (!text || text.trim().length < 20) {
+            throw new Error(`Could not read text from ${doc.file_name} (scanned PDF or empty file).`);
+          }
+          realTextBlobs.push({
+            source_document_id: doc.id as string,
+            file_name: doc.file_name as string,
+            text: text.slice(0, 200_000),
+          });
+        } catch (e) {
+          throw new Error(`Failed to extract text from ${doc.file_name}: ${(e as Error).message}`);
+        }
+      }
+
+      for (const blob of realTextBlobs) {
+        const extracted = await aiExtractFieldsFromText(blob.text, mode);
         const { data: subj, error: serr } = await sb
           .from("import_subjects")
           .insert({
@@ -330,6 +378,7 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
           });
         }
       }
+
 
       // ---- Dedup / match (read-only against real tables) ----
       let matchedCount = 0;

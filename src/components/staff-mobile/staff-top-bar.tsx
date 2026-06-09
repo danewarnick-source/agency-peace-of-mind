@@ -38,15 +38,16 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
   const headerCls = framed
-    ? "relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-3 text-white"
-    : "sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 px-3 text-white md:hidden";
+    ? "relative z-30 flex shrink-0 items-center justify-between border-b border-white/10 px-3 text-white"
+    : "sticky top-0 z-30 flex items-center justify-between border-b border-white/10 px-3 text-white md:hidden";
 
   return (
     <header
       className={headerCls}
       style={{
         backgroundImage: "var(--gradient-navy)",
-        ...(framed ? {} : { paddingTop: "env(safe-area-inset-top)" }),
+        paddingTop: "env(safe-area-inset-top)",
+        minHeight: "calc(3.5rem + env(safe-area-inset-top))",
       }}
     >
       <div className="flex min-w-0 items-center gap-2.5">

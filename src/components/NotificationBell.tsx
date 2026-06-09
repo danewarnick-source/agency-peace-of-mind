@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Bell, AlertTriangle, Clock, CheckCircle2, X, GraduationCap } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getOrgCeRoster } from "@/lib/ce.functions";
@@ -98,10 +99,27 @@ export function NotificationBell() {
       .on("postgres_changes", {
         event: "INSERT", schema: "public", table: "notifications",
         filter: `organization_id=eq.${org.organization_id}`,
-      }, () => qc.invalidateQueries({ queryKey: ["notifications", org.organization_id] }))
+      }, (payload) => {
+        qc.invalidateQueries({ queryKey: ["notifications", org.organization_id] });
+        const n = payload.new as AppNotification | undefined;
+        // Only urgent coverage-risk events toast (declines today; call-outs/open gaps later).
+        // Routine notifications stay quietly in the bell.
+        const isCoverageRisk =
+          n?.type === "open_shift_warning" &&
+          (n?.urgency === "urgent" || n?.urgency === "critical");
+        if (n && isCoverageRisk) {
+          toast(n.title, {
+            description: n.body,
+            duration: 6000,
+            action: n.link_to
+              ? { label: "Open", onClick: () => navigate({ to: n.link_to as never }) }
+              : undefined,
+          });
+        }
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [org?.organization_id, qc]);
+  }, [org?.organization_id, qc, navigate]);
 
   const markReadMut = useMutation({
     mutationFn: async (id: string) => {

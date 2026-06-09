@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles } from "lucide-react";
+import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
 import { RequirePermission } from "@/components/rbac-guard";
@@ -360,7 +361,7 @@ export function EmployeesPage() {
                   .split(/\s+/)
                   .filter(Boolean)
                   .slice(0, 2)
-                  .map((p) => p[0]?.toUpperCase() ?? "")
+                  .map((p: string) => p[0]?.toUpperCase() ?? "")
                   .join("") || "—";
                 const openProfile = () => {
                   window.location.href = `/dashboard/employees/${m.user_id}`;

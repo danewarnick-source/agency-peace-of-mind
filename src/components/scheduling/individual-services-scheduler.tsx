@@ -325,7 +325,9 @@ export function IndividualServicesScheduler() {
     return map;
   }, [selected, data, schedulableCodes]);
 
-  // Burn-down per authorized code (weekly target = annual/52 for hourly; weekly_cap_units overrides).
+  // Burn-down iterates the client's actual schedulable assignments. Authorization
+  // caps come from client_billing_codes when present; otherwise targets are 0
+  // (advisory — "no auth on file" shows but never blocks scheduling).
   const burndown = useMemo(() => {
     if (!selected || !data) return [] as Array<{
       code: string;
@@ -335,30 +337,31 @@ export function IndividualServicesScheduler() {
       scheduledUnits: number;
       targetUnits: number;
     }>;
-    return selectedCbc
-      .filter((b) => catalogByCode.get(b.service_code)?.requires_schedule)
-      .map((b) => {
-        const sc = catalogByCode.get(b.service_code);
-        const isQuarter = sc?.unit === "quarter_hour";
-        const targetUnits =
-          b.weekly_cap_units ?? Math.round((b.annual_unit_authorization ?? 0) / 52);
-        const targetHours = isQuarter ? targetUnits / 4 : targetUnits;
-        const scheduledHours = clientShifts
-          .filter((s) => s.job_code === b.service_code)
-          .reduce((sum, s) => sum + hoursBetween(s.starts_at, s.ends_at), 0);
-        const scheduledUnits = isQuarter
-          ? Math.round(scheduledHours * 4)
-          : Math.round(scheduledHours);
-        return {
-          code: b.service_code,
-          unit: sc?.unit ?? "quarter_hour",
-          scheduledHours,
-          targetHours,
-          scheduledUnits,
-          targetUnits,
-        };
-      });
-  }, [selected, data, selectedCbc, clientShifts, catalogByCode]);
+    return schedulableCodes.map((code) => {
+      const sc = catalogByCode.get(code);
+      const isQuarter = sc?.unit === "quarter_hour";
+      const cbc = selectedCbc.find((b) => b.service_code === code);
+      const targetUnits = cbc
+        ? cbc.weekly_cap_units ?? Math.round((cbc.annual_unit_authorization ?? 0) / 52)
+        : 0;
+      const targetHours = isQuarter ? targetUnits / 4 : targetUnits;
+      const scheduledHours = clientShifts
+        .filter((s) => s.job_code === code)
+        .reduce((sum, s) => sum + hoursBetween(s.starts_at, s.ends_at), 0);
+      const scheduledUnits = isQuarter
+        ? Math.round(scheduledHours * 4)
+        : Math.round(scheduledHours);
+      return {
+        code,
+        unit: sc?.unit ?? "quarter_hour",
+        scheduledHours,
+        targetHours,
+        scheduledUnits,
+        targetUnits,
+      };
+    });
+  }, [selected, data, schedulableCodes, selectedCbc, clientShifts, catalogByCode]);
+
 
   // NECTAR overall suggestion: largest gap.
   const nectarSuggest = useMemo(() => {

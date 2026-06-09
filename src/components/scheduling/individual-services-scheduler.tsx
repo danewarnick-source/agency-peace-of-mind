@@ -51,7 +51,13 @@ type ServiceCode = {
   unit: "day" | "quarter_hour" | "session" | "monthly" | "one_time";
 };
 
-type Client = { id: string; first_name: string; last_name: string };
+type Client = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  authorized_dspd_codes: string[] | null;
+  job_code: string[] | null;
+};
 type ClientCode = {
   client_id: string;
   service_code: string;

@@ -20,6 +20,7 @@ const TABS = [
   { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },
   { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },
   { to: "/dashboard/hive-exec/company-migration", label: "Company Migration", icon: ArrowRightLeft },
+  { to: "/dashboard/hive-exec/messages", label: "Message Center", icon: Mail },
 ];
 
 function HiveExecLayout() {

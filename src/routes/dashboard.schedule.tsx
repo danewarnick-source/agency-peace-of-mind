@@ -40,12 +40,14 @@ type ScheduledShift = {
   id: string;
   client_id: string;
   client_name: string;
+  home_name: string | null;
   job_code: string | null;
   starts_at: string;
   ends_at: string;
   status: string;
   published: boolean;
 };
+
 
 type ViewMode = "day" | "week" | "month";
 
@@ -141,7 +143,7 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
       const { data, error } = await supabase
         .from("scheduled_shifts")
         .select(
-          "id, client_id, job_code, starts_at, ends_at, status, published, clients:client_id(first_name, last_name)",
+          "id, client_id, job_code, starts_at, ends_at, status, published, clients:client_id(first_name, last_name, team_id, teams:team_id(team_name))",
         )
         .eq("staff_id", user!.id)
         .eq("organization_id", org!.organization_id)
@@ -156,6 +158,7 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
         client_name: r.clients
           ? `${r.clients.first_name ?? ""} ${r.clients.last_name ?? ""}`.trim()
           : "Client",
+        home_name: r.clients?.teams?.team_name ?? null,
         job_code: r.job_code,
         starts_at: r.starts_at,
         ends_at: r.ends_at,
@@ -165,6 +168,7 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
     },
   });
 }
+
 
 function ShiftCard({ s }: { s: ScheduledShift }) {
   const daily = isDaily(s.job_code);
@@ -197,15 +201,21 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="break-words text-base font-semibold leading-snug text-foreground">
-              {s.client_name}
-            </h3>
+            <div className="min-w-0">
+              {s.home_name && (
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{s.home_name}</p>
+              )}
+              <h3 className="break-words text-base font-semibold leading-snug text-foreground">
+                {s.client_name}
+              </h3>
+            </div>
             <span
               className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}
             >
               {s.status}
             </span>
           </div>
+
           <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground">
             <Clock className="h-3.5 w-3.5" />
             <span className="tabular-nums">{fmtTimeRange(s.starts_at, s.ends_at)}</span>
@@ -277,6 +287,61 @@ function AcceptDeclineBar({ shiftId }: { shiftId: string }) {
   );
 }
 
+function bandLabel(startISO: string): string {
+  const h = new Date(startISO).getHours();
+  if (h >= 5 && h < 13) return "Day";
+  if (h >= 13 && h < 21) return "Swing";
+  return "Overnight";
+}
+
+function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
+  const first = shifts[0];
+  const home = first.home_name ?? "Home";
+  const band = bandLabel(first.starts_at);
+  const ratioLabel = `1:${shifts.length} group`;
+  const names = shifts.map((s) => s.client_name).join(", ");
+  return (
+    <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{home}</p>
+          <h3 className="mt-0.5 break-words text-base font-semibold leading-snug text-foreground">{names}</h3>
+        </div>
+        <span className="shrink-0 rounded-full bg-[color:var(--amber-600,#f59324)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,#d97a1c)]">
+          {ratioLabel}
+        </span>
+      </div>
+      <p className="mt-2 inline-flex items-center gap-1 text-sm text-muted-foreground">
+        <Clock className="h-3.5 w-3.5" />
+        <span className="tabular-nums">{band} · {fmtTimeRange(first.starts_at, first.ends_at)}</span>
+      </p>
+      <ul className="mt-3 space-y-1">
+        {shifts.map((s) => {
+          const daily = isDaily(s.job_code);
+          const code = s.job_code ?? "";
+          return (
+            <li key={s.id}>
+              <Link
+                to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
+                params={{ clientId: s.client_id }}
+                {...(daily ? {} : { search: { tab: "clock-in", ...(code ? { code } : {}) } as any })}
+                className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-warm px-2 py-1.5 text-xs hover:border-[color:var(--amber-600,#f59324)]/60"
+              >
+                <span className="truncate font-medium text-foreground">{s.client_name}</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,#d97a1c)]">
+                  {daily ? "Client Hub" : "Time Clock"}
+                  <ArrowRight className="h-3 w-3" />
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">Scheduled · covering all {shifts.length}</p>
+    </article>
+  );
+}
+
 function ShiftList({ shifts }: { shifts: ScheduledShift[] }) {
   // Group by local date for week/month views; for day view groups collapse to one.
   const groups = useMemo(() => {
@@ -290,6 +355,19 @@ function ShiftList({ shifts }: { shifts: ScheduledShift[] }) {
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [shifts]);
 
+  // Within each day, collapse shifts that share the same starts_at+ends_at
+  // (admin published one slot for a grouped unit → one card listing all clients).
+  function bandGroups(items: ScheduledShift[]): ScheduledShift[][] {
+    const m = new Map<string, ScheduledShift[]>();
+    for (const s of items) {
+      const k = `${s.starts_at}|${s.ends_at}`;
+      const arr = m.get(k) ?? [];
+      arr.push(s);
+      m.set(k, arr);
+    }
+    return Array.from(m.values());
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {groups.map(([key, items]) => (
@@ -298,9 +376,9 @@ function ShiftList({ shifts }: { shifts: ScheduledShift[] }) {
             {fmtDayHeader(key)}
           </h2>
           <ul className="flex flex-col gap-3">
-            {items.map((s) => (
-              <li key={s.id}>
-                <ShiftCard s={s} />
+            {bandGroups(items).map((bg) => (
+              <li key={bg[0].id}>
+                {bg.length === 1 ? <ShiftCard s={bg[0]} /> : <GroupCard shifts={bg} />}
               </li>
             ))}
           </ul>
@@ -309,6 +387,7 @@ function ShiftList({ shifts }: { shifts: ScheduledShift[] }) {
     </div>
   );
 }
+
 
 function EmptyState() {
   return (

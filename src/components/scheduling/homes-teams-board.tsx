@@ -604,20 +604,19 @@ export function HomesTeamsBoard() {
                         {residents.map((c) => {
                           const r = ratios.get(c.id);
                           return (
-                            <button
+                            <ResidentChip
                               key={c.id}
-                              onClick={() => setMoveClient(c)}
-                              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-xs hover:border-primary hover:bg-primary/5"
-                            >
-                              <span className="font-medium">
-                                {c.first_name} {c.last_name}
-                              </span>
-                              {r && (
-                                <span className="rounded bg-muted px-1 py-px text-[10px] text-muted-foreground tabular-nums">
-                                  {r.ratio_staff}:{r.ratio_clients}
-                                </span>
-                              )}
-                            </button>
+                              client={c}
+                              ratio={r ?? null}
+                              onSetRatio={(staff, clients) =>
+                                setRatio.mutate({
+                                  client_id: c.id,
+                                  ratio_staff: staff,
+                                  ratio_clients: clients,
+                                })
+                              }
+                              onMove={() => setMoveClient(c)}
+                            />
                           );
                         })}
                       </div>

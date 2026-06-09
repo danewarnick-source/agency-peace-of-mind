@@ -341,7 +341,7 @@ function NoHomesEmpty() {
         <Link to="/dashboard/scheduling" search={{ tab: "homes" }} className="font-medium text-[#137182] hover:underline">
           Homes &amp; Teams
         </Link>
-        , set client ratios in Setup, then draft a week in Builder.
+        , tap each resident's chip to set their staffing ratio, then draft a week in Builder.
       </p>
     </div>
   );

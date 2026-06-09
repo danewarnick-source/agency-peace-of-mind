@@ -30,38 +30,42 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
+    return runJobCommit(context.supabase, context.userId, data.jobId);
+  });
+
+// Internal helper — usable from other server fns (e.g. submitForSetup) so
+// the self-service path can commit in one shot without re-entering the
+// server-fn boundary.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function runJobCommit(sbIn: any, userId: string, jobId: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = context.supabase as any;
+    const sb = sbIn as any;
 
     const { data: job, error: jerr } = await sb
       .from("import_jobs")
       .select("id, org_id, mode, status, source, target_org_id, provider_signoff_at")
-      .eq("id", data.jobId)
+      .eq("id", jobId)
       .single();
     if (jerr || !job) throw new Error("Job not found");
 
-    // White-glove (Executive Company Migration) gate: HIVE staff prep, but
-    // commit only after the receiving company's admin signs off.
     if (job.source === "white_glove") {
       if (!job.target_org_id) throw new Error("White-glove job missing target company.");
       if (!job.provider_signoff_at) {
         throw new Error("Provider sign-off required before commit.");
       }
       const { data: isAdmin } = await sb.rpc("has_org_role", {
-        _org: job.target_org_id, _user: context.userId, _role: "admin",
+        _org: job.target_org_id, _user: userId, _role: "admin",
       });
       if (!isAdmin) {
         throw new Error("Only the receiving company's admin can commit a white-glove migration.");
       }
     }
 
-    // Idempotent: re-commit is a no-op for already-committed subjects.
     const { data: subjects } = await sb
       .from("import_subjects")
       .select("*")
-      .eq("import_job_id", data.jobId);
+      .eq("import_job_id", jobId);
 
-    // For white-glove, write into the target customer's org, not HIVE's.
     const orgId = (job.source === "white_glove" ? job.target_org_id : job.org_id) as string;
     const results: Array<{
       subjectId: string;
@@ -75,7 +79,6 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
     for (const subj of subjects ?? []) {
       const gaps: string[] = [];
 
-      // Skip subjects not approved for commit
       if (subj.committed_at) {
         results.push({ subjectId: subj.id, display_name: subj.display_name, committed: true, record_id: subj.committed_record_id, gaps: ["already committed"] });
         continue;
@@ -86,7 +89,7 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
       }
       if (subj.review_decision === "skip") {
         await sb.from("import_subjects").update({ committed_at: new Date().toISOString(), commit_error: "skipped by admin" }).eq("id", subj.id);
-        await audit(sb, data.jobId, orgId, subj.id, "Subject skipped (admin decision)", "admin_override", context.userId, "skip_subject");
+        await audit(sb, jobId, orgId, subj.id, "Subject skipped (admin decision)", "admin_override", userId, "skip_subject");
         results.push({ subjectId: subj.id, display_name: subj.display_name, committed: true, record_id: null, gaps: ["skipped"] });
         continue;
       }
@@ -99,26 +102,18 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
         let recordId: string | null = null;
 
         if (subj.subject_type === "client") {
-          recordId = await commitClient(sb, orgId, subj, fieldsList, data.jobId, context.userId, gaps);
+          recordId = await commitClient(sb, orgId, subj, fieldsList, jobId, userId, gaps);
         } else {
-          recordId = await commitEmployee(sb, orgId, subj, fieldsList, data.jobId, context.userId, gaps);
+          recordId = await commitEmployee(sb, orgId, subj, fieldsList, jobId, userId, gaps);
         }
 
         if (!recordId) throw new Error("Failed to produce target record id");
 
-        // Custom attributes -> custom_field_values
-        await attachCustomAttributes(sb, orgId, subj, recordId, fieldsList.filter((f: { is_custom_attribute: boolean }) => f.is_custom_attribute), data.jobId, context.userId);
+        await attachCustomAttributes(sb, orgId, subj, recordId, fieldsList.filter((f: { is_custom_attribute: boolean }) => f.is_custom_attribute), jobId, userId);
+        await commitCerts(sb, orgId, subj, recordId, jobId, userId, gaps);
+        await commitUnfiled(sb, subj, recordId, jobId, userId);
+        await applyProvisioning(sb, orgId, subj, recordId, jobId, userId, gaps);
 
-        // Certs
-        await commitCerts(sb, orgId, subj, recordId, data.jobId, context.userId, gaps);
-
-        // Unfiled scraps
-        await commitUnfiled(sb, subj, recordId, data.jobId, context.userId);
-
-        // Provisioning plan
-        await applyProvisioning(sb, orgId, subj, recordId, data.jobId, context.userId, gaps);
-
-        // Stamp subject committed
         await sb.from("import_subjects").update({
           committed_record_id: recordId,
           committed_at: new Date().toISOString(),
@@ -126,31 +121,29 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
           commit_error: null,
         }).eq("id", subj.id);
 
-        await audit(sb, data.jobId, orgId, subj.id, `Committed ${subj.subject_type} record`, "admin_override", context.userId, "commit_subject");
+        await audit(sb, jobId, orgId, subj.id, `Committed ${subj.subject_type} record`, "admin_override", userId, "commit_subject");
         results.push({ subjectId: subj.id, display_name: subj.display_name, committed: true, record_id: recordId, gaps });
       } catch (e) {
         const msg = (e as Error).message || String(e);
         await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
-        await audit(sb, data.jobId, orgId, subj.id, `Commit failed: ${msg}`, "admin_override", context.userId, "commit_failed");
+        await audit(sb, jobId, orgId, subj.id, `Commit failed: ${msg}`, "admin_override", userId, "commit_failed");
         results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps, error: msg });
       }
     }
 
-    // Apply assignment map for confirmed relationships (idempotent via unique constraint)
-    await applyAssignmentMap(sb, orgId, data.jobId, context.userId);
+    await applyAssignmentMap(sb, orgId, jobId, userId);
 
-    // If no failures remain among ready subjects, stamp the job
     const stillOpen = (results || []).filter((r) => !r.committed).length;
     if (stillOpen === 0) {
       await sb.from("import_jobs").update({
         status: "committed",
         committed_at: new Date().toISOString(),
-        committed_by: context.userId,
-      }).eq("id", data.jobId);
+        committed_by: userId,
+      }).eq("id", jobId);
     }
 
     return { results, jobCommitted: stillOpen === 0 };
-  });
+}
 
 
 

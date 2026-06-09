@@ -150,7 +150,7 @@ export function IndividualServicesScheduler() {
           .eq("organization_id", orgId!),
         supabase
           .from("clients")
-          .select("id,first_name,last_name")
+          .select("id,first_name,last_name,authorized_dspd_codes,job_code")
           .eq("organization_id", orgId!)
           .order("last_name"),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, FileCheck, FileX, Clock4, AlertTriangle, Download } from "lucide-react";
 import { toast } from "sonner";
+import { MySmartImportCertReminders } from "@/components/smart-import/my-cert-reminders";
 
 export const Route = createFileRoute("/dashboard/external-certifications")({ component: ExternalCertsPage });
 

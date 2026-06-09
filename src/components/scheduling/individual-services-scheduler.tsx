@@ -647,17 +647,29 @@ export function IndividualServicesScheduler() {
                             return (
                               <div
                                 key={s.id}
-                                className={`group relative rounded p-1.5 text-[10px] text-white ${codeColor(
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setEditShift(s)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setEditShift(s);
+                                  }
+                                }}
+                                className={`group relative cursor-pointer rounded p-1.5 text-[10px] text-white transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-white/70 ${codeColor(
                                   s.job_code ?? "",
                                 )} ${s.published ? "" : "opacity-70 ring-1 ring-dashed ring-white/70"}`}
                               >
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="font-mono font-semibold">{s.job_code}</span>
-                                  {!s.published && (
-                                    <span className="rounded bg-white/25 px-1 text-[9px]">
-                                      Draft
-                                    </span>
-                                  )}
+                                  <div className="flex items-center gap-1">
+                                    {s.is_recurring && (
+                                      <span title="Recurring weekly" className="rounded bg-white/25 px-1 text-[9px]">↻</span>
+                                    )}
+                                    {!s.published && (
+                                      <span className="rounded bg-white/25 px-1 text-[9px]">Draft</span>
+                                    )}
+                                  </div>
                                 </div>
                                 <p className="leading-tight">{fmtRange(s.starts_at, s.ends_at)}</p>
                                 <p className="truncate leading-tight opacity-90">{staffName}</p>
@@ -667,10 +679,18 @@ export function IndividualServicesScheduler() {
                                   </p>
                                 )}
                                 <div className="absolute right-0.5 top-0.5 hidden gap-0.5 group-hover:flex">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setEditShift(s); }}
+                                    className="rounded bg-white/30 p-0.5 hover:bg-white/50"
+                                    title="Edit"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
                                   {!s.published && (
                                     <button
                                       type="button"
-                                      onClick={() => publishShift(s.id)}
+                                      onClick={(e) => { e.stopPropagation(); publishShift(s.id); }}
                                       className="rounded bg-white/30 p-0.5 hover:bg-white/50"
                                       title="Publish"
                                     >
@@ -679,9 +699,9 @@ export function IndividualServicesScheduler() {
                                   )}
                                   <button
                                     type="button"
-                                    onClick={() => deleteShift(s.id)}
+                                    onClick={(e) => { e.stopPropagation(); deleteShift(s.id); }}
                                     className="rounded bg-white/30 p-0.5 hover:bg-white/50"
-                                    title="Delete"
+                                    title="Delete (this occurrence)"
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </button>
@@ -689,6 +709,7 @@ export function IndividualServicesScheduler() {
                               </div>
                             );
                           })}
+
                           {dayShifts.length === 0 && (
                             <p className="px-1 pt-1 text-[10px] text-muted-foreground/60">—</p>
                           )}

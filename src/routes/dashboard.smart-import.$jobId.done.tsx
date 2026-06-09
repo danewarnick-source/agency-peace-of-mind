@@ -10,6 +10,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getDoneReadout, commitSmartImportJob } from "@/lib/smart-import-commit.functions";
+import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),

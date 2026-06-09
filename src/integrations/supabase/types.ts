@@ -153,6 +153,86 @@ export type Database = {
           },
         ]
       }
+      assignment_map: {
+        Row: {
+          client_record_id: string | null
+          client_subject_id: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          import_job_id: string
+          inference_reason: string | null
+          org_id: string
+          relation_type: string
+          staff_record_id: string | null
+          staff_subject_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_record_id?: string | null
+          client_subject_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          import_job_id: string
+          inference_reason?: string | null
+          org_id: string
+          relation_type: string
+          staff_record_id?: string | null
+          staff_subject_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_record_id?: string | null
+          client_subject_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          import_job_id?: string
+          inference_reason?: string | null
+          org_id?: string
+          relation_type?: string
+          staff_record_id?: string | null
+          staff_subject_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_map_client_subject_id_fkey"
+            columns: ["client_subject_id"]
+            isOneToOne: false
+            referencedRelation: "import_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_map_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_map_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_map_staff_subject_id_fkey"
+            columns: ["staff_subject_id"]
+            isOneToOne: false
+            referencedRelation: "import_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_file_documents: {
         Row: {
           added_by: string | null
@@ -3087,9 +3167,15 @@ export type Database = {
       extracted_fields: {
         Row: {
           confidence: number | null
+          edited_at: string | null
+          edited_by: string | null
           id: string
           import_job_id: string
+          import_subject_id: string | null
+          is_custom_attribute: boolean
           org_id: string
+          original_target_field: string | null
+          original_value: string | null
           provenance: string
           source_document_id: string | null
           source_snippet: string | null
@@ -3100,9 +3186,15 @@ export type Database = {
         }
         Insert: {
           confidence?: number | null
+          edited_at?: string | null
+          edited_by?: string | null
           id?: string
           import_job_id: string
+          import_subject_id?: string | null
+          is_custom_attribute?: boolean
           org_id: string
+          original_target_field?: string | null
+          original_value?: string | null
           provenance?: string
           source_document_id?: string | null
           source_snippet?: string | null
@@ -3113,9 +3205,15 @@ export type Database = {
         }
         Update: {
           confidence?: number | null
+          edited_at?: string | null
+          edited_by?: string | null
           id?: string
           import_job_id?: string
+          import_subject_id?: string | null
+          is_custom_attribute?: boolean
           org_id?: string
+          original_target_field?: string | null
+          original_value?: string | null
           provenance?: string
           source_document_id?: string | null
           source_snippet?: string | null
@@ -3130,6 +3228,13 @@ export type Database = {
             columns: ["import_job_id"]
             isOneToOne: false
             referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extracted_fields_import_subject_id_fkey"
+            columns: ["import_subject_id"]
+            isOneToOne: false
+            referencedRelation: "import_subjects"
             referencedColumns: ["id"]
           },
           {
@@ -4368,6 +4473,7 @@ export type Database = {
           import_job_id: string
           item: string
           org_id: string
+          subject_id: string | null
           traces_to: string | null
         }
         Insert: {
@@ -4378,6 +4484,7 @@ export type Database = {
           import_job_id: string
           item: string
           org_id: string
+          subject_id?: string | null
           traces_to?: string | null
         }
         Update: {
@@ -4388,6 +4495,7 @@ export type Database = {
           import_job_id?: string
           item?: string
           org_id?: string
+          subject_id?: string | null
           traces_to?: string | null
         }
         Relationships: [
@@ -4405,35 +4513,127 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "import_audit_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "import_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_cert_documents: {
+        Row: {
+          cert_key: string
+          created_at: string
+          expiry_date: string | null
+          file_name: string | null
+          id: string
+          import_job_id: string
+          import_subject_id: string
+          notes: string | null
+          org_id: string
+          signed_off_at: string | null
+          signed_off_by: string | null
+          state: string
+          storage_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          cert_key: string
+          created_at?: string
+          expiry_date?: string | null
+          file_name?: string | null
+          id?: string
+          import_job_id: string
+          import_subject_id: string
+          notes?: string | null
+          org_id: string
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          state?: string
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cert_key?: string
+          created_at?: string
+          expiry_date?: string | null
+          file_name?: string | null
+          id?: string
+          import_job_id?: string
+          import_subject_id?: string
+          notes?: string | null
+          org_id?: string
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          state?: string
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_cert_documents_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_cert_documents_import_subject_id_fkey"
+            columns: ["import_subject_id"]
+            isOneToOne: false
+            referencedRelation: "import_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_cert_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       import_documents: {
         Row: {
+          checksum: string | null
           file_name: string
+          file_size: number | null
           file_type: string | null
           id: string
           import_job_id: string
+          mime_type: string | null
           org_id: string
           storage_path: string
           uploaded_at: string
+          uploaded_by: string | null
         }
         Insert: {
+          checksum?: string | null
           file_name: string
+          file_size?: number | null
           file_type?: string | null
           id?: string
           import_job_id: string
+          mime_type?: string | null
           org_id: string
           storage_path: string
           uploaded_at?: string
+          uploaded_by?: string | null
         }
         Update: {
+          checksum?: string | null
           file_name?: string
+          file_size?: number | null
           file_type?: string | null
           id?: string
           import_job_id?: string
+          mime_type?: string | null
           org_id?: string
           storage_path?: string
           uploaded_at?: string
+          uploaded_by?: string | null
         }
         Relationships: [
           {
@@ -4459,9 +4659,16 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          mode: string | null
+          notes: string | null
           org_id: string
+          scale: string | null
+          source: string | null
           source_summary: string | null
           status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          target_org_id: string | null
         }
         Insert: {
           committed_at?: string | null
@@ -4469,9 +4676,16 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          mode?: string | null
+          notes?: string | null
           org_id: string
+          scale?: string | null
+          source?: string | null
           source_summary?: string | null
           status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          target_org_id?: string | null
         }
         Update: {
           committed_at?: string | null
@@ -4479,13 +4693,151 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          mode?: string | null
+          notes?: string | null
           org_id?: string
+          scale?: string | null
+          source?: string | null
           source_summary?: string | null
           status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          target_org_id?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "import_jobs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_jobs_target_org_id_fkey"
+            columns: ["target_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_nectar_questions: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          answered_by: string | null
+          context: string | null
+          created_at: string
+          id: string
+          import_job_id: string
+          import_subject_id: string | null
+          org_id: string
+          question: string
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          context?: string | null
+          created_at?: string
+          id?: string
+          import_job_id: string
+          import_subject_id?: string | null
+          org_id: string
+          question: string
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          context?: string | null
+          created_at?: string
+          id?: string
+          import_job_id?: string
+          import_subject_id?: string | null
+          org_id?: string
+          question?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_nectar_questions_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_nectar_questions_import_subject_id_fkey"
+            columns: ["import_subject_id"]
+            isOneToOne: false
+            referencedRelation: "import_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_nectar_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_subjects: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          import_job_id: string
+          match_status: string
+          matched_record_id: string | null
+          org_id: string
+          review_decision: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          subject_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          import_job_id: string
+          match_status?: string
+          matched_record_id?: string | null
+          org_id: string
+          review_decision?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          subject_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          import_job_id?: string
+          match_status?: string
+          matched_record_id?: string | null
+          org_id?: string
+          review_decision?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          subject_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_subjects_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_subjects_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -6648,37 +7000,46 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          attributed_to_admin: boolean
           id: string
           import_job_id: string
           org_id: string
+          override_note: string | null
           planned_action: string
           reason: string | null
           rule_id: string | null
           state: string
+          subject_id: string | null
           target_module: string
         }
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          attributed_to_admin?: boolean
           id?: string
           import_job_id: string
           org_id: string
+          override_note?: string | null
           planned_action: string
           reason?: string | null
           rule_id?: string | null
           state?: string
+          subject_id?: string | null
           target_module: string
         }
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          attributed_to_admin?: boolean
           id?: string
           import_job_id?: string
           org_id?: string
+          override_note?: string | null
           planned_action?: string
           reason?: string | null
           rule_id?: string | null
           state?: string
+          subject_id?: string | null
           target_module?: string
         }
         Relationships: [
@@ -6703,11 +7064,19 @@ export type Database = {
             referencedRelation: "provisioning_rules"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "provisioning_plan_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "import_subjects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       provisioning_rules: {
         Row: {
           action_type: string
+          applies_to: string
           created_at: string
           created_by: string
           default_state: string
@@ -6721,6 +7090,7 @@ export type Database = {
         }
         Insert: {
           action_type: string
+          applies_to?: string
           created_at?: string
           created_by?: string
           default_state?: string
@@ -6734,6 +7104,7 @@ export type Database = {
         }
         Update: {
           action_type?: string
+          applies_to?: string
           created_at?: string
           created_by?: string
           default_state?: string
@@ -8861,6 +9232,7 @@ export type Database = {
           filed_to: string | null
           id: string
           import_job_id: string
+          import_subject_id: string | null
           org_id: string
           source_document_id: string | null
           text: string
@@ -8871,6 +9243,7 @@ export type Database = {
           filed_to?: string | null
           id?: string
           import_job_id: string
+          import_subject_id?: string | null
           org_id: string
           source_document_id?: string | null
           text: string
@@ -8881,6 +9254,7 @@ export type Database = {
           filed_to?: string | null
           id?: string
           import_job_id?: string
+          import_subject_id?: string | null
           org_id?: string
           source_document_id?: string | null
           text?: string
@@ -8891,6 +9265,13 @@ export type Database = {
             columns: ["import_job_id"]
             isOneToOne: false
             referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unfiled_items_import_subject_id_fkey"
+            columns: ["import_subject_id"]
+            isOneToOne: false
+            referencedRelation: "import_subjects"
             referencedColumns: ["id"]
           },
           {

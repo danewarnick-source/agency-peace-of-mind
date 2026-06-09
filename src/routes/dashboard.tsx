@@ -85,6 +85,7 @@ type SidebarBodyProps = {
   pathname: string;
   signOut: () => Promise<void>;
   onNavigate?: () => void;
+  inboxUnread: number;
 };
 
 

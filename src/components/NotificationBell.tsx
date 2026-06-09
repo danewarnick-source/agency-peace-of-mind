@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -64,6 +64,64 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const toastedIdsRef = useRef<Set<string>>(new Set());
+  const toastStorageKey = org?.organization_id
+    ? `notification-bell-toasted:${org.organization_id}`
+    : null;
+
+  const persistToastedIds = useCallback(() => {
+    if (typeof window === "undefined" || !toastStorageKey) return;
+    window.sessionStorage.setItem(
+      toastStorageKey,
+      JSON.stringify(Array.from(toastedIdsRef.current)),
+    );
+  }, [toastStorageKey]);
+
+  const isCoverageRiskNotification = useCallback((n: AppNotification | undefined) => (
+    n?.type === "open_shift_warning" &&
+    (n?.urgency === "urgent" || n?.urgency === "critical")
+  ), []);
+
+  const maybeToastNotification = useCallback((n: AppNotification | undefined) => {
+    if (
+      !n ||
+      !isCoverageRiskNotification(n) ||
+      !!n.read_at ||
+      !!n.dismissed_at ||
+      toastedIdsRef.current.has(n.id)
+    ) return;
+
+    toastedIdsRef.current.add(n.id);
+    persistToastedIds();
+    toast(n.title, {
+      description: n.body,
+      duration: 6000,
+      action: n.link_to
+        ? { label: "Open", onClick: () => navigate({ to: n.link_to as never }) }
+        : undefined,
+    });
+  }, [isCoverageRiskNotification, navigate, persistToastedIds]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!toastStorageKey) {
+      toastedIdsRef.current = new Set();
+      return;
+    }
+
+    const raw = window.sessionStorage.getItem(toastStorageKey);
+    if (!raw) {
+      toastedIdsRef.current = new Set();
+      return;
+    }
+
+    try {
+      const ids = JSON.parse(raw);
+      toastedIdsRef.current = new Set(Array.isArray(ids) ? ids : []);
+    } catch {
+      toastedIdsRef.current = new Set();
+    }
+  }, [toastStorageKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -101,25 +159,17 @@ export function NotificationBell() {
         filter: `organization_id=eq.${org.organization_id}`,
       }, (payload) => {
         qc.invalidateQueries({ queryKey: ["notifications", org.organization_id] });
-        const n = payload.new as AppNotification | undefined;
-        // Only urgent coverage-risk events toast (declines today; call-outs/open gaps later).
-        // Routine notifications stay quietly in the bell.
-        const isCoverageRisk =
-          n?.type === "open_shift_warning" &&
-          (n?.urgency === "urgent" || n?.urgency === "critical");
-        if (n && isCoverageRisk) {
-          toast(n.title, {
-            description: n.body,
-            duration: 6000,
-            action: n.link_to
-              ? { label: "Open", onClick: () => navigate({ to: n.link_to as never }) }
-              : undefined,
-          });
-        }
+        maybeToastNotification(payload.new as AppNotification | undefined);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [org?.organization_id, qc, navigate]);
+  }, [org?.organization_id, qc, maybeToastNotification]);
+
+  useEffect(() => {
+    notifications.forEach((notification) => {
+      maybeToastNotification(notification);
+    });
+  }, [notifications, maybeToastNotification]);
 
   const markReadMut = useMutation({
     mutationFn: async (id: string) => {

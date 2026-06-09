@@ -201,15 +201,21 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="break-words text-base font-semibold leading-snug text-foreground">
-              {s.client_name}
-            </h3>
+            <div className="min-w-0">
+              {s.home_name && (
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{s.home_name}</p>
+              )}
+              <h3 className="break-words text-base font-semibold leading-snug text-foreground">
+                {s.client_name}
+              </h3>
+            </div>
             <span
               className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}
             >
               {s.status}
             </span>
           </div>
+
           <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground">
             <Clock className="h-3.5 w-3.5" />
             <span className="tabular-nums">{fmtTimeRange(s.starts_at, s.ends_at)}</span>

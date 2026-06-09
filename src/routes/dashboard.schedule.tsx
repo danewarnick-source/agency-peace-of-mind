@@ -40,12 +40,14 @@ type ScheduledShift = {
   id: string;
   client_id: string;
   client_name: string;
+  home_name: string | null;
   job_code: string | null;
   starts_at: string;
   ends_at: string;
   status: string;
   published: boolean;
 };
+
 
 type ViewMode = "day" | "week" | "month";
 

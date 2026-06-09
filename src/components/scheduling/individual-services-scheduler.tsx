@@ -386,11 +386,14 @@ export function IndividualServicesScheduler() {
   // Schedule dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDay, setDialogDay] = useState<Date | null>(null);
+  const [nectarOpen, setNectarOpen] = useState(false);
+  const [editShift, setEditShift] = useState<Shift | null>(null);
 
   function openDialog(day: Date) {
     setDialogDay(day);
     setDialogOpen(true);
   }
+
 
   async function publishShift(id: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

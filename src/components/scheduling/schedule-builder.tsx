@@ -480,7 +480,7 @@ export function ScheduleBuilder() {
         </div>
       </div>
 
-      <ReadinessPanel holes={holes} overtimeFlags={overtimeFlags} pacing={planYearPacing} flagCount={flagCount} />
+      <ReadinessPanel holes={holes} overtimeFlags={overtimeFlags} pacing={planYearPacing} flagCount={flagCount} declinedCount={declinedCount} acceptedCount={acceptedCount} />
 
       {!data || !home ? (
         <p className="text-sm text-muted-foreground">{dataQ.isLoading ? "Loading…" : "Pick a home to begin."}</p>

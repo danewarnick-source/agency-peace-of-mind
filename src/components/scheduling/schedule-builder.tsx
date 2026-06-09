@@ -210,6 +210,7 @@ export function ScheduleBuilder() {
       }
     }
     setAssignments(next);
+    setDrafts(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, home?.id, weekStart.toISOString()]);
 

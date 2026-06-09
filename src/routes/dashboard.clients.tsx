@@ -42,6 +42,7 @@ import { ClientDocumentsCard } from "@/components/clients/client-documents-card"
 import { ClientIntakeChecklistCard } from "@/components/clients/client-intake-checklist-card";
 import { PerShiftFormsCareSection } from "@/components/clients/per-shift-forms-care-section";
 import { IntakeProgress } from "@/components/clients/intake-progress";
+import { useClientIntakeProgress } from "@/hooks/use-client-intake-progress";
 import { ClientLoanMarker } from "@/components/loans/client-loan-marker";
 // Smart Import replaces the legacy NECTAR Bulk Importer dialog.
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
@@ -382,84 +383,162 @@ export function ClientsPage() {
             <p>{search ? "No clients match your search." : "No clients yet. Add your first client to get started."}</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="font-semibold">Full Name</TableHead>
-                <TableHead className="font-semibold">Medicaid ID</TableHead>
-                <TableHead className="font-semibold">Service Codes</TableHead>
-                <TableHead className="font-semibold">Phone</TableHead>
-                <TableHead className="font-semibold">Address</TableHead>
-                <TableHead className="font-semibold">PCSP Goals</TableHead>
-                <TableHead className="font-semibold w-[220px]">Intake</TableHead>
-                <TableHead className="text-right font-semibold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((c) => (
-                <TableRow
-                  key={c.id}
-                  className="cursor-pointer hover:bg-muted/30 transition"
-                  onClick={() => setActiveClient(c)}
-                >
-                  <TableCell className="font-semibold">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                        {c.first_name[0]}{c.last_name[0]}
-                      </span>
-                      {c.first_name} {c.last_name}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {c.medicaid_id || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {(c.job_code ?? []).length
-                        ? (c.job_code ?? []).map((code) => (
-                            <Badge key={code} variant="outline" className="font-mono text-[10px]"
-                              title={jobCodeLabel(code)}>{code}</Badge>
-                          ))
-                        : <span className="text-xs text-muted-foreground">—</span>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{c.phone_number || "—"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
-                    {c.physical_address || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {(c.pcsp_goals ?? []).length
-                        ? (c.pcsp_goals ?? []).slice(0, 2).map((g) => (
-                            <Badge key={g} variant="secondary" className="text-[10px] font-normal">{g}</Badge>
-                          ))
-                        : <span className="text-xs text-muted-foreground">No goals</span>}
-                      {(c.pcsp_goals ?? []).length > 2 && (
-                        <Badge variant="outline" className="text-[10px]">+{c.pcsp_goals.length - 2}</Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="w-[220px] align-middle" onClick={(e) => e.stopPropagation()}>
-                    <IntakeProgress
-                      organizationId={org?.organization_id}
-                      clientId={c.id}
-                      intakeStatus={c.intake_status}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="sm" onClick={() => setActiveClient(c)}
-                      className="gap-1.5">
-                      <Pencil className="h-3.5 w-3.5" /> Open
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
+          <div className="max-h-[calc(100vh-16rem)] overflow-auto">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur supports-[backdrop-filter]:bg-muted/60">
+                <TableRow>
+                  <TableHead className="font-semibold">Full Name</TableHead>
+                  <TableHead className="font-semibold">Medicaid ID</TableHead>
+                  <TableHead className="font-semibold">Service Codes</TableHead>
+                  <TableHead className="font-semibold">Phone</TableHead>
+                  <TableHead className="font-semibold">Address</TableHead>
+                  <TableHead className="font-semibold w-[110px]">Intake</TableHead>
+                  <TableHead className="text-right font-semibold w-[160px]">Action</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((c) => {
+                  const codes = c.job_code ?? [];
+                  const shownCodes = codes.slice(0, 3);
+                  const extraCodes = codes.length - shownCodes.length;
+                  return (
+                    <TableRow
+                      key={c.id}
+                      className="cursor-pointer h-12 hover:bg-muted/50 transition-colors"
+                      onClick={() => setActiveClient(c)}
+                    >
+                      <TableCell className="font-semibold whitespace-nowrap py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                            {c.first_name[0]}{c.last_name[0]}
+                          </span>
+                          <span className="truncate">{c.first_name} {c.last_name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap py-2">
+                        {c.medicaid_id || "—"}
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          {shownCodes.length ? (
+                            <>
+                              {shownCodes.map((code) => (
+                                <Badge key={code} variant="outline" className="font-mono text-[10px]"
+                                  title={jobCodeLabel(code)}>{code}</Badge>
+                              ))}
+                              {extraCodes > 0 && (
+                                <Badge variant="secondary" className="text-[10px]" title={codes.slice(3).join(", ")}>
+                                  +{extraCodes}
+                                </Badge>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap py-2">
+                        {c.phone_number || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground py-2 max-w-[220px]">
+                        <div className="truncate" title={c.physical_address ?? undefined}>
+                          {c.physical_address || "—"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2 w-[110px]">
+                        <IntakeChip
+                          organizationId={org?.organization_id}
+                          clientId={c.id}
+                          intakeStatus={c.intake_status}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right py-2 w-[160px]" onClick={(e) => e.stopPropagation()}>
+                        <IntakeAction
+                          organizationId={org?.organization_id}
+                          clientId={c.id}
+                          intakeStatus={c.intake_status}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Compact Intake Chip + Action (list view) ────────────────────────────────
+
+function IntakeChip({
+  organizationId,
+  clientId,
+  intakeStatus,
+}: {
+  organizationId: string | undefined;
+  clientId: string;
+  intakeStatus: string | null | undefined;
+}) {
+  const { isLoading, error, hasItems, required, satisfied, isComplete } =
+    useClientIntakeProgress(organizationId, clientId);
+  if (error) return null;
+  if (isLoading) {
+    return <span className="text-[11px] text-muted-foreground">…</span>;
+  }
+  if (!hasItems) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        Intake —
+      </span>
+    );
+  }
+  const done = isComplete && intakeStatus === "complete";
+  return (
+    <span
+      className={
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums " +
+        (done
+          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+          : "bg-muted text-muted-foreground")
+      }
+    >
+      Intake {satisfied}/{required}
+    </span>
+  );
+}
+
+function IntakeAction({
+  organizationId,
+  clientId,
+  intakeStatus,
+}: {
+  organizationId: string | undefined;
+  clientId: string;
+  intakeStatus: string | null | undefined;
+}) {
+  const { isLoading, error, hasItems, isComplete } = useClientIntakeProgress(
+    organizationId,
+    clientId,
+  );
+  if (isLoading || error) return null;
+  const done = hasItems && isComplete && intakeStatus === "complete";
+  if (done) return null;
+  return (
+    <Button
+      asChild
+      size="sm"
+      variant="outline"
+      className="h-7 gap-1 text-xs"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Link to="/dashboard/client-intake/$clientId" params={{ clientId }}>
+        Continue intake <ChevronRight className="h-3 w-3" />
+      </Link>
+    </Button>
   );
 }
 

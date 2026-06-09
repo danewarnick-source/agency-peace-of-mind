@@ -79,7 +79,11 @@ function ReviewPage() {
 
       <AttributionBar />
 
-      <RosterSummary mode={mode} total={total} ready={ready} needReview={needReview} jobId={jobId} />
+      {job.data.job.source === "white_glove" && (
+        <WhiteGloveBanner job={job.data.job} onChanged={() => job.refetch()} />
+      )}
+
+      <RosterSummary mode={mode} total={total} ready={ready} needReview={needReview} jobId={jobId} whiteGlove={job.data.job.source === "white_glove"} signedOff={!!job.data.job.provider_signoff_at} />
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <SubjectQueue subjects={subjects} selectedId={selectedId} onSelect={setSelectedId} />

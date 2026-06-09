@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles } from "lucide-react";
+import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
 import { RequirePermission } from "@/components/rbac-guard";
@@ -336,76 +337,151 @@ export function EmployeesPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="p-4 text-left">Name</th>
-              <th className="p-4 text-left">Login</th>
-              <th className="p-4 text-left">Role</th>
-              <th className="p-4 text-left">Position</th>
-              <th className="p-4 text-left">Status</th>
-              <th className="p-4 text-left">Start date</th>
-              <th className="p-4 text-left">End date</th>
-              <th className="p-4 text-left">Joined</th>
-              <th className="p-4" />
-
-            </tr>
-          </thead>
-          <tbody>
-            {members?.map((m) => {
-              const name = m.profile?.full_name ?? "—";
-              const login = m.profile?.username ?? m.profile?.email ?? "—";
-              const needsReset = m.profile?.must_change_password;
-              const position = (m.profile?.position ?? "") as Position | "";
-              return (
-                <tr key={m.id} className="border-b border-border last:border-0">
-                  <td className="p-4 font-medium"><Link to="/dashboard/employees/$staffId" params={{ staffId: m.user_id }} className="hover:underline">{name}</Link>{needsReset && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">Pending first login</span>}</td>
-                  <td className="p-4 text-muted-foreground">{login}</td>
-                  <td className="p-4"><span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span></td>
-                  <td className="p-4">{position ? <Badge variant="outline" className="font-normal">{position}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</td>
-                  <td className="p-4 text-xs">{m.active ? <span className="text-emerald-600">Active</span> : <span className="text-muted-foreground">Deactivated</span>}</td>
-                  <td className="p-4 text-xs text-muted-foreground">{m.profile?.start_date ?? m.profile?.hire_date ?? "—"}</td>
-                  <td className="p-4 text-xs text-muted-foreground">{m.profile?.end_date ?? "—"}</td>
-                  <td className="p-4 text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</td>
-
-                  <td className="p-4 text-right whitespace-nowrap">
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      const topics = ((m.profile as { ce_suggested_topics?: string[] | null } | undefined)?.ce_suggested_topics ?? []) as string[];
-                      setEditTopics(topics);
-                      setEditingMember({
-                        membershipId: m.id,
-                        userId: m.user_id,
-                        fullName: m.profile?.full_name ?? "",
-                        email: m.profile?.email ?? "",
-                        employeeId: m.profile?.employee_id ?? "",
-                        role: m.role as Role,
-                        active: m.active,
-                        position,
-                        workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
-                        hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
-                        dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
-                        startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
-                        endDate: (m.profile?.end_date ?? "") as string,
-                        ceSuggestedTopics: topics,
-                      });
-                    }}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}>
-                      <UsersIcon className="mr-1 h-3.5 w-3.5" /> 👥 Manage Caseload
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setAssignOpen(m.user_id)}><BookOpen className="mr-1 h-3.5 w-3.5" /> Assign</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setResetUser({ id: m.user_id, name })}><KeyRound className="mr-1 h-3.5 w-3.5" /> Reset</Button>
-                    {m.user_id !== user?.id && (
-                      <Button variant="ghost" size="sm" onClick={() => toggleActiveMutation.mutate({ memberId: m.id, active: !m.active })}>
-                        {m.active ? <UserX className="h-3.5 w-3.5 text-destructive" /> : <UserCheck className="h-3.5 w-3.5 text-emerald-600" />}
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="max-h-[calc(100vh-16rem)] overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur supports-[backdrop-filter]:bg-muted/60 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">Name</th>
+                <th className="px-4 py-3 text-left font-semibold">Login</th>
+                <th className="px-4 py-3 text-left font-semibold">Role</th>
+                <th className="px-4 py-3 text-left font-semibold">Status</th>
+                <th className="px-4 py-3 text-left font-semibold">Start date</th>
+                <th className="px-4 py-3 text-right font-semibold w-[220px]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members?.map((m) => {
+                const name = m.profile?.full_name ?? "—";
+                const login = m.profile?.username ?? m.profile?.email ?? "—";
+                const needsReset = m.profile?.must_change_password;
+                const position = (m.profile?.position ?? "") as Position | "";
+                const startDate = (m.profile?.start_date ?? m.profile?.hire_date ?? null) as string | null;
+                const initials = (name || "—")
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((p: string) => p[0]?.toUpperCase() ?? "")
+                  .join("") || "—";
+                const openProfile = () => {
+                  window.location.href = `/dashboard/employees/${m.user_id}`;
+                };
+                const openEdit = () => {
+                  const topics = ((m.profile as { ce_suggested_topics?: string[] | null } | undefined)?.ce_suggested_topics ?? []) as string[];
+                  setEditTopics(topics);
+                  setEditingMember({
+                    membershipId: m.id,
+                    userId: m.user_id,
+                    fullName: m.profile?.full_name ?? "",
+                    email: m.profile?.email ?? "",
+                    employeeId: m.profile?.employee_id ?? "",
+                    role: m.role as Role,
+                    active: m.active,
+                    position,
+                    workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
+                    hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
+                    dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
+                    startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
+                    endDate: (m.profile?.end_date ?? "") as string,
+                    ceSuggestedTopics: topics,
+                  });
+                };
+                return (
+                  <tr
+                    key={m.id}
+                    className="cursor-pointer h-12 border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
+                    onClick={openProfile}
+                  >
+                    <td className="px-4 py-2 font-medium whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                          {initials}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="truncate">{name}</span>
+                            {needsReset && (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 whitespace-nowrap">
+                                Pending first login
+                              </span>
+                            )}
+                          </div>
+                          {position && (
+                            <div className="text-xs text-muted-foreground truncate">{position}</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground whitespace-nowrap max-w-[220px]">
+                      <div className="truncate" title={login}>{login}</div>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span
+                        className={
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium " +
+                          (m.active
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground")
+                        }
+                      >
+                        {m.active ? "Active" : "Deactivated"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                      {startDate
+                        ? new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-2 text-right whitespace-nowrap w-[220px]" onClick={(e) => e.stopPropagation()}>
+                      <div className="inline-flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}
+                        >
+                          <UsersIcon className="mr-1 h-3.5 w-3.5" /> Manage Caseload
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="More actions">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={openEdit}>
+                              <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setAssignOpen(m.user_id)}>
+                              <BookOpen className="mr-2 h-3.5 w-3.5" /> Assign course
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setResetUser({ id: m.user_id, name })}>
+                              <KeyRound className="mr-2 h-3.5 w-3.5" /> Reset password
+                            </DropdownMenuItem>
+                            {m.user_id !== user?.id && (
+                              <DropdownMenuItem
+                                onSelect={() => toggleActiveMutation.mutate({ memberId: m.id, active: !m.active })}
+                                className={m.active ? "text-destructive focus:text-destructive" : ""}
+                              >
+                                {m.active ? (
+                                  <><UserX className="mr-2 h-3.5 w-3.5" /> Deactivate</>
+                                ) : (
+                                  <><UserCheck className="mr-2 h-3.5 w-3.5" /> Reactivate</>
+                                )}
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <Dialog open={!!assignOpen} onOpenChange={(o) => !o && setAssignOpen(null)}>

@@ -401,7 +401,7 @@ export function ScheduleBuilder() {
           <Link to="/dashboard/scheduling" search={{ tab: "homes" }} className="font-medium text-[#137182] hover:underline">
             Homes &amp; Teams
           </Link>
-          , set client ratios in Setup, then come back here to draft a week.
+          , then tap any resident chip on the household card to set their staffing ratio. Come back here to draft a week.
         </p>
       </div>
     );

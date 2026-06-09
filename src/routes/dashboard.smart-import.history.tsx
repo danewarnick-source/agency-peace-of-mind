@@ -120,7 +120,7 @@ function HistoryPage() {
             </tr>
           </thead>
           <tbody>
-            {(q.data ?? []).map((j) => (
+            {((q.data ?? []) as Job[]).map((j) => (
               <tr key={j.id} className="border-t border-border align-top">
                 <td className="px-3 py-2 whitespace-nowrap">{new Date(j.created_at).toLocaleString()}</td>
                 <td className="px-3 py-2 capitalize">{j.mode ?? "—"}</td>

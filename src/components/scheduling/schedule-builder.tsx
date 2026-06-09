@@ -116,6 +116,7 @@ export function ScheduleBuilder() {
   const [homeId, setHomeId] = useState<string>("");
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [assignments, setAssignments] = useState<Map<string, string | null>>(new Map());
+  const [drafts, setDrafts] = useState<Set<string>>(new Set());
   const [publishing, setPublishing] = useState(false);
 
   const weekEnd = addDays(weekStart, 6);

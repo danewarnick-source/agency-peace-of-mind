@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 import { AddonLock } from "@/components/nectar/addon-lock";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
+import { SmartImportRemindersPanel } from "@/components/smart-import/reminders-panel";
 
 const cmdSearch = z.object({
   cc: z.enum(["urgent", "pending", "approved", "analytics", "nectar"]).optional(),

@@ -119,8 +119,8 @@ function AttributionBar() {
 
 // ---------------------------- RosterSummary ----------------------------
 function RosterSummary({
-  mode, total, ready, needReview, jobId,
-}: { mode: "employee" | "client"; total: number; ready: number; needReview: number; jobId: string }) {
+  mode, total, ready, needReview, jobId, whiteGlove, signedOff,
+}: { mode: "employee" | "client"; total: number; ready: number; needReview: number; jobId: string; whiteGlove?: boolean; signedOff?: boolean }) {
   const submit = useServerFn(submitForSetup);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -134,6 +134,7 @@ function RosterSummary({
     onError: (e: Error) => toast.error(e.message),
   });
   const noun = mode === "client" ? "client" : "staff";
+  const commitDisabled = m.isPending || ready === 0 || (whiteGlove && !signedOff);
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between">
       <div>

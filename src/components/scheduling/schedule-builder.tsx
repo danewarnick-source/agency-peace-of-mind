@@ -349,6 +349,45 @@ export function ScheduleBuilder() {
     toast.success("Copied last week's pattern.");
   }
 
+  function applyCoveragePicks(plan: NectarCoveragePlan): { applied: number; skipped: number } {
+    let applied = 0;
+    let skipped = 0;
+    const next = new Map(assignments);
+    const newDrafts = new Set(drafts);
+    for (const p of plan.picks) {
+      const unit = units.find((u) => u.key === p.unit_key);
+      if (!unit) { skipped++; continue; }
+      // Track who's already booked in this day+band across all units, to avoid
+      // double-booking a staffer in the same band (same constraint nectarDraft uses).
+      const usedThisBand = new Set<string>();
+      for (const u of units) {
+        for (let i = 0; i < u.staffNeeded; i++) {
+          const k = assignmentKey(u.key, p.day_iso, p.band_id, i);
+          const sid = next.get(k);
+          if (sid) usedThisBand.add(sid);
+        }
+      }
+      if (usedThisBand.has(p.staff_id)) { skipped++; continue; }
+      // Find first empty slot for this unit/day/band.
+      let placed = false;
+      for (let i = 0; i < unit.staffNeeded; i++) {
+        const k = assignmentKey(unit.key, p.day_iso, p.band_id, i);
+        if (!next.get(k)) {
+          next.set(k, p.staff_id);
+          newDrafts.add(k);
+          applied++;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) skipped++;
+    }
+    setAssignments(next);
+    setDrafts(newDrafts);
+    return { applied, skipped };
+  }
+
+
   function clearAll() {
     setAssignments(new Map());
     setStatuses(new Map());

@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -23,6 +23,9 @@ import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 import { ListChecks } from "lucide-react";
 import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getInboxUnreadCount } from "@/lib/inbox-messages.functions";
 
 
 export const Route = createFileRoute("/dashboard")({
@@ -48,6 +51,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/scheduling", label: "Scheduling", icon: CalendarDays },
   { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing" },
+  { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
@@ -81,6 +85,7 @@ type SidebarBodyProps = {
   pathname: string;
   signOut: () => Promise<void>;
   onNavigate?: () => void;
+  inboxUnread: number;
 };
 
 
@@ -234,6 +239,15 @@ function DashboardLayout() {
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
   const isStaffView = effectiveView === "staff";
 
+  const unreadFn = useServerFn(getInboxUnreadCount);
+  const unreadQ = useQuery({
+    enabled: !!org?.organization_id && effectiveView === "admin" && isAdminCapable,
+    queryKey: ["inbox-unread", org?.organization_id ?? null],
+    queryFn: () => unreadFn({ data: { organization_id: org!.organization_id } }),
+    refetchInterval: 60_000,
+  });
+  const inboxUnread = unreadQ.data?.count ?? 0;
+
   const sidebarProps: Omit<SidebarBodyProps, "onNavigate"> = {
     user,
     role,
@@ -253,6 +267,7 @@ function DashboardLayout() {
     showNectarCluster: effectiveView === "admin",
     pathname,
     signOut,
+    inboxUnread,
   };
 
 
@@ -419,6 +434,7 @@ function SidebarBody({
   pathname,
   signOut,
   onNavigate,
+  inboxUnread,
 }: SidebarBodyProps) {
   return (
     <>
@@ -566,7 +582,16 @@ function SidebarBody({
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }`}
             >
-              <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} /> {item.label}
+              <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} />
+              <span className="flex-1">{item.label}</span>
+              {item.to === "/dashboard/inbox" && inboxUnread > 0 && (
+                <span
+                  aria-label={`${inboxUnread} unread`}
+                  className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"
+                >
+                  {inboxUnread > 99 ? "99+" : inboxUnread}
+                </span>
+              )}
             </Link>
           );
         })}

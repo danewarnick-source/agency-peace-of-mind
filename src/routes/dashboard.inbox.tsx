@@ -1,0 +1,227 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Mail, Paperclip, Inbox as InboxIcon, Download, ArrowLeft, AlertCircle } from "lucide-react";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { RequireRole } from "@/components/rbac-guard";
+import {
+  listInboxMessages,
+  openInboxMessage,
+  type InboxMessageDetail,
+} from "@/lib/inbox-messages.functions";
+
+export const Route = createFileRoute("/dashboard/inbox")({
+  head: () => ({ meta: [{ title: "Inbox — HIVE" }] }),
+  component: () => (
+    <RequireRole roles={["admin", "manager", "super_admin"]}>
+      <InboxPage />
+    </RequireRole>
+  ),
+});
+
+function formatBytes(n: number | null): string {
+  if (!n && n !== 0) return "—";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function InboxPage() {
+  const { data: org } = useCurrentOrg();
+  const orgId = org?.organization_id ?? null;
+  const queryClient = useQueryClient();
+  const listFn = useServerFn(listInboxMessages);
+  const openFn = useServerFn(openInboxMessage);
+
+  const [openMsg, setOpenMsg] = useState<InboxMessageDetail | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+
+  const listQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["inbox-messages", orgId],
+    queryFn: () => listFn({ data: { organization_id: orgId! } }),
+  });
+
+  const handleOpen = async (messageId: string) => {
+    if (!orgId) return;
+    setOpening(messageId);
+    try {
+      const detail = await openFn({ data: { organization_id: orgId, message_id: messageId } });
+      setOpenMsg(detail);
+      // Refetch list + unread bubble
+      queryClient.invalidateQueries({ queryKey: ["inbox-messages", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["inbox-unread", orgId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not open message");
+    } finally {
+      setOpening(null);
+    }
+  };
+
+  if (!orgId) {
+    return <div className="text-sm text-muted-foreground">Loading organization…</div>;
+  }
+
+  if (openMsg) {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setOpenMsg(null)}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to Inbox
+        </button>
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <h1 className="font-display text-2xl font-bold tracking-tight">{openMsg.subject}</h1>
+          <div className="mt-1 text-xs text-muted-foreground">
+            From <span className="font-medium text-foreground">{openMsg.sender_name}</span>
+            <span className="mx-1.5">·</span>
+            {formatDate(openMsg.created_at)}
+          </div>
+          <div className="mt-5 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {openMsg.body || <span className="italic text-muted-foreground">(no body)</span>}
+          </div>
+          {openMsg.attachments.length > 0 && (
+            <div className="mt-6 border-t border-border pt-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Attachments ({openMsg.attachments.length})
+              </div>
+              <ul className="space-y-1.5">
+                {openMsg.attachments.map((a) => (
+                  <li
+                    key={a.id}
+                    className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{a.filename}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {formatBytes(a.size_bytes)}
+                      </span>
+                    </div>
+                    {a.signed_url ? (
+                      <a
+                        href={a.signed_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={a.filename}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                      >
+                        <Download className="h-3.5 w-3.5" /> Download
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-destructive">
+                        <AlertCircle className="h-3.5 w-3.5" /> Unavailable
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <header className="flex items-end justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <InboxIcon className="h-4 w-4" /> <span>Admin · Inbox</span>
+          </div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Inbox</h1>
+          <p className="text-sm text-muted-foreground">
+            Messages from HIVE Executives to your organization.
+          </p>
+        </div>
+      </header>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        {listQ.isLoading ? (
+          <div className="p-6 text-sm text-muted-foreground">Loading messages…</div>
+        ) : listQ.isError ? (
+          <div className="p-6 text-sm text-destructive">
+            {listQ.error instanceof Error ? listQ.error.message : "Failed to load inbox."}
+          </div>
+        ) : !listQ.data || listQ.data.length === 0 ? (
+          <div className="p-10 text-center text-sm text-muted-foreground">
+            <Mail className="mx-auto mb-2 h-6 w-6 opacity-60" />
+            No messages yet.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 font-semibold">Subject</th>
+                <th className="px-4 py-2 font-semibold">From</th>
+                <th className="px-4 py-2 font-semibold">Received</th>
+                <th className="px-4 py-2 font-semibold">Files</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {listQ.data.map((m) => {
+                const unread = m.read_at === null;
+                return (
+                  <tr
+                    key={m.recipient_id}
+                    onClick={() => handleOpen(m.message_id)}
+                    className="cursor-pointer border-t border-border hover:bg-muted/40"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {unread && (
+                          <span className="inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-destructive">
+                            New
+                          </span>
+                        )}
+                        <span className={unread ? "font-semibold" : ""}>{m.subject}</span>
+                      </div>
+                    </td>
+                    <td className={`px-4 py-3 ${unread ? "font-medium" : "text-muted-foreground"}`}>
+                      {m.sender_name}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{formatDate(m.created_at)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {m.attachment_count > 0 ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Paperclip className="h-3.5 w-3.5" /> {m.attachment_count}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        disabled={opening === m.message_id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpen(m.message_id);
+                        }}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                      >
+                        {opening === m.message_id ? "Opening…" : "Open"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+

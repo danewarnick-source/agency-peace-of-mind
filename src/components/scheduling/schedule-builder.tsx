@@ -251,35 +251,59 @@ export function ScheduleBuilder() {
 
   function setAssignment(key: string, staffId: string | null) {
     setAssignments((prev) => { const next = new Map(prev); if (staffId === null) next.delete(key); else next.set(key, staffId); return next; });
+    // Manual edits promote a draft cell to a confirmed assignment (or clear it).
+    setDrafts((prev) => { if (!prev.has(key)) return prev; const next = new Set(prev); next.delete(key); return next; });
   }
 
   function nectarDraft() {
     if (!data || !home) return;
-    const next = new Map<string, string | null>();
-    let rrIdx = 0;
     const pool = homeStaff.length ? homeStaff : data.allStaff;
     if (!pool.length) { toast.error("No staff to draft from. Add staff in Homes & Teams."); return; }
+    const next = new Map(assignments);
+    const newDrafts = new Set(drafts);
+    let proposed = 0;
+    let leftOpen = 0;
     for (const day of weekDays) {
       const dISO = isoDay(day);
       for (const band of bands) {
+        // Track staff already booked in this day+band across any unit (existing + just-proposed)
+        const usedThisBand = new Set<string>();
         for (const unit of units) {
-          // prefer continuity for this unit's primary client
-          const cont = continuity.get(unit.clientIds[0]);
-          const ranked = [...pool].sort((a,b) => {
-            const ac = cont?.has(a.id) ? -1 : 0;
-            const bc = cont?.has(b.id) ? -1 : 0;
+          for (let i = 0; i < unit.staffNeeded; i++) {
+            const k = assignmentKey(unit.key, dISO, band.id, i);
+            const existing = next.get(k);
+            if (existing) { usedThisBand.add(existing); }
+          }
+        }
+        for (const unit of units) {
+          // Prefer continuity for this unit's primary client (assigned here before)
+          const cont = continuity.get(unit.clientIds[0]) ?? new Set<string>();
+          const ranked = [...pool].sort((a, b) => {
+            const ac = cont.has(a.id) ? -1 : 0;
+            const bc = cont.has(b.id) ? -1 : 0;
             return ac - bc;
           });
           for (let i = 0; i < unit.staffNeeded; i++) {
-            const staff = ranked[(rrIdx + i) % ranked.length];
-            next.set(assignmentKey(unit.key, dISO, band.id, i), staff.id);
+            const k = assignmentKey(unit.key, dISO, band.id, i);
+            if (next.get(k)) continue; // don't overwrite existing assignment
+            // pick first ranked staffer not already booked in this band
+            const pick = ranked.find((s) => !usedThisBand.has(s.id));
+            if (!pick) { leftOpen++; continue; } // not enough staff — leave open as a coverage gap
+            next.set(k, pick.id);
+            newDrafts.add(k);
+            usedThisBand.add(pick.id);
+            proposed++;
           }
-          rrIdx++;
         }
       }
     }
     setAssignments(next);
-    toast.success("NECTAR drafted the week. Nothing is published yet — review and Publish when ready.");
+    setDrafts(newDrafts);
+    if (proposed === 0) {
+      toast.message("Nothing to draft — all slots are already filled.");
+    } else {
+      toast.success(`NECTAR proposed ${proposed} slot${proposed===1?"":"s"}${leftOpen ? `; ${leftOpen} left open (not enough team).` : "."} Nothing is published — review and edit, then Publish.`);
+    }
   }
 
   function copyLastWeek() {
@@ -302,11 +326,13 @@ export function ScheduleBuilder() {
       }
     }
     setAssignments(next);
+    setDrafts(new Set());
     toast.success("Copied last week's pattern.");
   }
 
   function clearAll() {
     setAssignments(new Map());
+    setDrafts(new Set());
     toast.message("Cleared. Nothing is published until you click Publish.");
   }
 

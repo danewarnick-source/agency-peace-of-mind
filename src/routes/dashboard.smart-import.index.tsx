@@ -192,9 +192,10 @@ function SmartImportPage() {
             });
           }
         } else {
-          const text = await readDocText(chip.file);
-          textBlobs.push({ source_document_id: documentId, file_name: chip.file.name, text });
+          // PDF/DOCX: server downloads from the bucket and extracts text
+          // itself (real PDF parse + AI). Don't send a client-side placeholder.
         }
+
       }
 
       if (pasteText.trim()) {

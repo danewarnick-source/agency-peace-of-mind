@@ -110,6 +110,20 @@ export function AttentionStrip() {
     });
   }
 
+  // Smart Import reminders for me — provisional/expiring certs needing upload.
+  const siCount = (si?.reminders ?? []).length;
+  if (siCount > 0) {
+    const hasCritical = (si?.reminders ?? []).some((r: { urgency: string }) => r.urgency === "critical");
+    chips.push({
+      key: "smart-import",
+      to: "/dashboard/external-certifications",
+      icon: BellRing,
+      tone: hasCritical ? "danger" : "warn",
+      label: `${siCount} cert reminder${siCount === 1 ? "" : "s"}`,
+    });
+  }
+
+
   // If nothing needs attention, render the NECTAR card on its own (slim).
   return (
     <div className="space-y-2">

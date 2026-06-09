@@ -213,6 +213,57 @@ function DonePage() {
           {audit.length === 0 && <div className="text-muted-foreground">No audit rows yet.</div>}
         </div>
       </div>
+
+      <Dialog open={undoOpen} onOpenChange={setUndoOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-destructive" /> Undo this import&apos;s setup?
+            </DialogTitle>
+            <DialogDescription>
+              Removes only what the import created, via existing delete paths. Fields edited by a person after the import are preserved.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewQ.isLoading && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Building plan…</div>}
+          {previewQ.data && (
+            <div className="max-h-80 space-y-3 overflow-auto text-sm">
+              <div>
+                <div className="mb-1 font-semibold">Will remove ({previewQ.data.removes.length})</div>
+                {previewQ.data.removes.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">Nothing to remove — manual edits cover everything.</div>
+                ) : (
+                  <ul className="space-y-1 text-xs">
+                    {previewQ.data.removes.map((r, i: number) => (
+                      <li key={i} className="rounded border border-border px-2 py-1">{describeUndo(r)}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {previewQ.data.skips.length > 0 && (
+                <div>
+                  <div className="mb-1 font-semibold text-amber-700 dark:text-amber-400">Preserved ({previewQ.data.skips.length})</div>
+                  <ul className="space-y-1 text-xs">
+                    {previewQ.data.skips.map((s, i: number) => (
+                      <li key={i} className="rounded border border-amber-300/40 bg-amber-50/30 px-2 py-1 dark:bg-amber-950/20">
+                        {"reason" in s ? s.reason : "Edited after commit"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUndoOpen(false)}>Cancel</Button>
+            <Button variant="destructive" disabled={undoM.isPending || !previewQ.data} onClick={() => undoM.mutate()}>
+              {undoM.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
+              Confirm undo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3107,6 +3107,110 @@ export type Database = {
           },
         ]
       }
+      exec_message_attachments: {
+        Row: {
+          created_at: string
+          filename: string
+          id: string
+          message_id: string
+          mime_type: string | null
+          size_bytes: number | null
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          filename: string
+          id?: string
+          message_id: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          filename?: string
+          id?: string
+          message_id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exec_message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "exec_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exec_message_recipients: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          organization_id: string
+          read_at: string | null
+          read_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          organization_id: string
+          read_at?: string | null
+          read_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          organization_id?: string
+          read_at?: string | null
+          read_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exec_message_recipients_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "exec_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exec_message_recipients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exec_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          sender_user_id: string
+          subject: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          id?: string
+          sender_user_id: string
+          subject: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          sender_user_id?: string
+          subject?: string
+        }
+        Relationships: []
+      }
       external_certifications: {
         Row: {
           cert_name: string | null

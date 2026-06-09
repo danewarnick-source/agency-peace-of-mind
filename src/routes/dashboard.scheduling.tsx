@@ -50,16 +50,19 @@ import { NectarGuidanceStrip } from "@/components/nectar/nectar-guidance-strip";
 import { NectarAutoAssignDialog } from "@/components/nectar/nectar-auto-assign-dialog";
 
 import { z } from "zod";
-import { Link, useSearch } from "@tanstack/react-router";
+import { Link, useSearch, useNavigate } from "@tanstack/react-router";
 import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
 import { CoverageViews } from "@/components/scheduling/coverage-views";
 import { ScheduleBuilder } from "@/components/scheduling/schedule-builder";
+import { IndividualServicesScheduler } from "@/components/scheduling/individual-services-scheduler";
 
 const schedulingSearch = z.object({
+  mode: z.enum(["residential", "individual"]).catch("residential").optional(),
   tab: z.enum(["builder", "coverage", "homes"]).catch("builder").optional(),
 });
 
 type SchedulingTab = "builder" | "coverage" | "homes";
+type SchedulingMode = "residential" | "individual";
 
 export const Route = createFileRoute("/dashboard/scheduling")({
   head: () => ({ meta: [{ title: "Scheduling" }] }),
@@ -68,45 +71,81 @@ export const Route = createFileRoute("/dashboard/scheduling")({
 });
 
 function SchedulingShell() {
-  const { tab } = useSearch({ from: "/dashboard/scheduling" });
+  const { tab, mode } = useSearch({ from: "/dashboard/scheduling" });
+  const navigate = useNavigate({ from: "/dashboard/scheduling" });
+  const activeMode: SchedulingMode = mode ?? "residential";
   const active: SchedulingTab = tab ?? "builder";
+
   return (
     <div className="space-y-4">
-      <div className="border-b border-border">
-        <nav className="-mb-px flex flex-wrap gap-1" aria-label="Scheduling tabs">
-          {[
-            { key: "builder", label: "Builder" },
-            { key: "coverage", label: "Coverage" },
-            { key: "homes", label: "Homes & Teams" },
-          ].map((t) => (
-            <Link
-              key={t.key}
-              to="/dashboard/scheduling"
-              search={{ tab: t.key as SchedulingTab }}
-              replace
-              className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-                active === t.key
-                  ? "border-[#137182] text-[#137182]"
-                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
-        <p className="px-1 pt-2 text-[11px] text-muted-foreground">
-          Looking for timesheet reconciliation?{" "}
-          <Link to="/dashboard/hub/documentation" search={{ tab: "evv" }} className="font-medium text-[#137182] hover:underline">
-            Open Documentation → EVV &amp; timesheets
-          </Link>.
-        </p>
+      {/* Mode toggle */}
+      <div className="inline-flex rounded-lg border border-border bg-card p-1 text-sm">
+        {([
+          { key: "residential", label: "Residential coverage" },
+          { key: "individual", label: "Individual services" },
+        ] as { key: SchedulingMode; label: string }[]).map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            onClick={() =>
+              navigate({
+                search: (prev) => ({ ...prev, mode: m.key }),
+                replace: true,
+              })
+            }
+            className={`rounded-md px-3 py-1.5 font-medium transition ${
+              activeMode === m.key
+                ? "bg-[#137182] text-white"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
-      {active === "homes" ? <HomesTeamsBoard />
-        : active === "builder" ? <ScheduleBuilder />
-        : <CoverageViews />}
+
+      {activeMode === "residential" ? (
+        <>
+          <div className="border-b border-border">
+            <nav className="-mb-px flex flex-wrap gap-1" aria-label="Scheduling tabs">
+              {[
+                { key: "builder", label: "Builder" },
+                { key: "coverage", label: "Coverage" },
+                { key: "homes", label: "Homes & Teams" },
+              ].map((t) => (
+                <Link
+                  key={t.key}
+                  to="/dashboard/scheduling"
+                  search={(prev) => ({ ...prev, tab: t.key as SchedulingTab })}
+                  replace
+                  className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                    active === t.key
+                      ? "border-[#137182] text-[#137182]"
+                      : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                  }`}
+                >
+                  {t.label}
+                </Link>
+              ))}
+            </nav>
+            <p className="px-1 pt-2 text-[11px] text-muted-foreground">
+              Looking for timesheet reconciliation?{" "}
+              <Link to="/dashboard/hub/documentation" search={{ tab: "evv" }} className="font-medium text-[#137182] hover:underline">
+                Open Documentation → EVV &amp; timesheets
+              </Link>.
+            </p>
+          </div>
+          {active === "homes" ? <HomesTeamsBoard />
+            : active === "builder" ? <ScheduleBuilder />
+            : <CoverageViews />}
+        </>
+      ) : (
+        <IndividualServicesScheduler />
+      )}
     </div>
   );
 }
+
 
 type Shift = {
   id: string;

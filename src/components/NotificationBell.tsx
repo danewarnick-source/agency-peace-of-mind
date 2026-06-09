@@ -65,8 +65,8 @@ export function NotificationBell() {
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const toastedIdsRef = useRef<Set<string>>(new Set());
-  const toastStorageKey = org?.organization_id
-    ? `notification-bell-toasted:${org.organization_id}`
+  const toastStorageKey = org?.organization_id && user?.id
+    ? `notification-bell-toasted:${org.organization_id}:${user.id}`
     : null;
 
   const persistToastedIds = useCallback(() => {

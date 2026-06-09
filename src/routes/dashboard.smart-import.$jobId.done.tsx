@@ -35,14 +35,33 @@ function DonePage() {
   const commit = useServerFn(commitSmartImportJob);
   const readout = useServerFn(getDoneReadout);
   const generateReminders = useServerFn(generateSmartImportReminders);
+  const preview = useServerFn(previewUndoImport);
+  const undoFn = useServerFn(undoCommittedImport);
 
   const [runState, setRunState] = useState<"idle" | "running" | "done" | "error">(autoRun ? "running" : "idle");
   const [runError, setRunError] = useState<string | null>(null);
+  const [undoOpen, setUndoOpen] = useState(false);
 
   const q = useQuery({
     queryKey: ["smart-import-done", jobId, runState],
     queryFn: () => readout({ data: { jobId } }),
     enabled: runState !== "running",
+  });
+
+  const previewQ = useQuery({
+    queryKey: ["smart-import-undo-preview", jobId],
+    queryFn: () => preview({ data: { jobId } }),
+    enabled: undoOpen,
+  });
+
+  const undoM = useMutation({
+    mutationFn: () => undoFn({ data: { jobId } }),
+    onSuccess: (res) => {
+      toast.success(`Undone — ${res.removed.length} item(s) removed${res.skipped.length ? `, ${res.skipped.length} preserved` : ""}.`);
+      setUndoOpen(false);
+      q.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   useEffect(() => {

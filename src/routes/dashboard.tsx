@@ -582,7 +582,16 @@ function SidebarBody({
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }`}
             >
-              <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} /> {item.label}
+              <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} />
+              <span className="flex-1">{item.label}</span>
+              {item.to === "/dashboard/inbox" && inboxUnread > 0 && (
+                <span
+                  aria-label={`${inboxUnread} unread`}
+                  className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"
+                >
+                  {inboxUnread > 99 ? "99+" : inboxUnread}
+                </span>
+              )}
             </Link>
           );
         })}

@@ -52,11 +52,13 @@ import { NectarAutoAssignDialog } from "@/components/nectar/nectar-auto-assign-d
 import { z } from "zod";
 import { Link, useSearch } from "@tanstack/react-router";
 import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
-import { DayTimeline } from "@/components/scheduling/day-timeline";
+import { CoverageViews } from "@/components/scheduling/coverage-views";
 
 const schedulingSearch = z.object({
-  tab: z.enum(["schedule", "day", "homes"]).optional(),
+  tab: z.enum(["schedule", "coverage", "homes"]).optional(),
 });
+
+type SchedulingTab = "schedule" | "coverage" | "homes";
 
 export const Route = createFileRoute("/dashboard/scheduling")({
   head: () => ({ meta: [{ title: "Scheduling" }] }),
@@ -66,20 +68,20 @@ export const Route = createFileRoute("/dashboard/scheduling")({
 
 function SchedulingShell() {
   const { tab } = useSearch({ from: "/dashboard/scheduling" });
-  const active = tab ?? "schedule";
+  const active: SchedulingTab = tab ?? "schedule";
   return (
     <div className="space-y-4">
       <div className="border-b border-border">
         <nav className="-mb-px flex flex-wrap gap-1" aria-label="Scheduling tabs">
           {[
             { key: "schedule", label: "Schedule" },
-            { key: "day", label: "Day view" },
+            { key: "coverage", label: "Coverage" },
             { key: "homes", label: "Homes & Teams" },
           ].map((t) => (
             <Link
               key={t.key}
               to="/dashboard/scheduling"
-              search={{ tab: t.key as "schedule" | "day" | "homes" }}
+              search={{ tab: t.key as SchedulingTab }}
               replace
               className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
                 active === t.key
@@ -92,11 +94,10 @@ function SchedulingShell() {
           ))}
         </nav>
       </div>
-      {active === "homes" ? <HomesTeamsBoard /> : active === "day" ? <DayTimeline /> : <SchedulingPage />}
+      {active === "homes" ? <HomesTeamsBoard /> : active === "coverage" ? <CoverageViews /> : <SchedulingPage />}
     </div>
   );
 }
-
 
 type Shift = {
   id: string;

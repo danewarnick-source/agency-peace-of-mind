@@ -307,6 +307,18 @@ export function NotificationBell() {
                           {!n.read_at && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />}
                         </div>
                       </button>
+                      {n.link_to && (
+                        <div className="flex justify-end px-4 pb-2.5 -mt-1">
+                          <Button
+                            size="sm"
+                            variant={!n.read_at && (n.urgency === "urgent" || n.urgency === "critical") ? "default" : "secondary"}
+                            className="h-11 md:h-8 text-xs font-medium"
+                            onClick={(e) => { e.stopPropagation(); handleClick(n); }}
+                          >
+                            {!n.read_at && (n.urgency === "urgent" || n.urgency === "critical") ? "Resolve →" : "Open →"}
+                          </Button>
+                        </div>
+                      )}
                       {!synthetic && (
                         <button type="button" onClick={(e) => { e.stopPropagation(); dismissMut.mutate(n.id); }}
                           className="absolute right-2 top-2 rounded p-0.5 text-muted-foreground/50 opacity-0 transition hover:bg-accent hover:text-foreground group-hover:opacity-100"

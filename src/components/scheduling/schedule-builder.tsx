@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Copy, Eraser, Send, AlertTriangle, Check, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Sparkles, Copy, Eraser, Send, AlertTriangle, Check, Loader2, ChevronLeft, ChevronRight, Home } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -380,9 +381,28 @@ export function ScheduleBuilder() {
     onError: (e: any) => toast.error(e?.message ?? "Could not publish."),
   });
 
+  if (teams.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-surface-warm p-8 text-center">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-[#137182]/10 text-[#137182]">
+          <Home className="h-5 w-5" />
+        </span>
+        <h3 className="mt-3 text-base font-semibold">No homes yet</h3>
+        <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+          Add a home in{" "}
+          <Link to="/dashboard/scheduling" search={{ tab: "homes" }} className="font-medium text-[#137182] hover:underline">
+            Homes &amp; Teams
+          </Link>
+          , set client ratios in Setup, then come back here to draft a week.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Select value={homeId} onValueChange={setHomeId}>
             <SelectTrigger className="w-full sm:w-64"><SelectValue placeholder="Pick a home" /></SelectTrigger>

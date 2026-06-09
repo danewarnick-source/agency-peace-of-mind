@@ -54,13 +54,12 @@ import { Link, useSearch } from "@tanstack/react-router";
 import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
 import { CoverageViews } from "@/components/scheduling/coverage-views";
 import { ScheduleBuilder } from "@/components/scheduling/schedule-builder";
-import { TimesheetsReconcile } from "@/components/scheduling/timesheets-reconcile";
 
 const schedulingSearch = z.object({
-  tab: z.enum(["schedule", "builder", "coverage", "homes", "timesheets"]).optional(),
+  tab: z.enum(["builder", "coverage", "homes"]).catch("coverage").optional(),
 });
 
-type SchedulingTab = "schedule" | "builder" | "coverage" | "homes" | "timesheets";
+type SchedulingTab = "builder" | "coverage" | "homes";
 
 export const Route = createFileRoute("/dashboard/scheduling")({
   head: () => ({ meta: [{ title: "Scheduling" }] }),
@@ -70,16 +69,14 @@ export const Route = createFileRoute("/dashboard/scheduling")({
 
 function SchedulingShell() {
   const { tab } = useSearch({ from: "/dashboard/scheduling" });
-  const active: SchedulingTab = tab ?? "schedule";
+  const active: SchedulingTab = tab ?? "coverage";
   return (
     <div className="space-y-4">
       <div className="border-b border-border">
         <nav className="-mb-px flex flex-wrap gap-1" aria-label="Scheduling tabs">
           {[
-            { key: "schedule", label: "Schedule" },
-            { key: "builder", label: "Builder" },
             { key: "coverage", label: "Coverage" },
-            { key: "timesheets", label: "Timesheets" },
+            { key: "builder", label: "Builder" },
             { key: "homes", label: "Homes & Teams" },
           ].map((t) => (
             <Link
@@ -97,12 +94,16 @@ function SchedulingShell() {
             </Link>
           ))}
         </nav>
+        <p className="px-1 pt-2 text-[11px] text-muted-foreground">
+          Looking for timesheet reconciliation?{" "}
+          <Link to="/dashboard/hub/documentation" search={{ tab: "evv" }} className="font-medium text-[#137182] hover:underline">
+            Open Documentation → EVV &amp; timesheets
+          </Link>.
+        </p>
       </div>
       {active === "homes" ? <HomesTeamsBoard />
-        : active === "coverage" ? <CoverageViews />
         : active === "builder" ? <ScheduleBuilder />
-        : active === "timesheets" ? <TimesheetsReconcile />
-        : <SchedulingPage />}
+        : <CoverageViews />}
     </div>
   );
 }

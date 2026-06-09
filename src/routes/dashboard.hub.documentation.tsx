@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { ComplianceDeskWrapped } from "./dashboard.compliance-desk";
+import { TimesheetsReconcile } from "@/components/scheduling/timesheets-reconcile";
 import { HostHomeControl } from "./dashboard.host-home-control";
 import { FormsIndex } from "./dashboard.forms.index";
 import { InternalAuditPage } from "./dashboard.internal-audit";
@@ -27,7 +28,22 @@ export const Route = createFileRoute("/dashboard/hub/documentation")({
       basePath="/dashboard/hub/documentation"
       tabs={[
         { key: "review", label: "Review", render: () => <ReviewLanding /> },
-        { key: "evv", label: "EVV & timesheets", render: () => <ComplianceDeskWrapped /> },
+        { key: "evv", label: "EVV & timesheets", render: () => (
+          <div className="space-y-10">
+            <ComplianceDeskWrapped />
+            <section>
+              <header className="mb-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">
+                  Pay-period reconciliation
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Coverage proof, billing burn-down, payroll, and exceptions — all derived from the same EVV punches above. Advisory.
+                </p>
+              </header>
+              <TimesheetsReconcile />
+            </section>
+          </div>
+        ) },
         { key: "host-home", label: "Host home", render: () => <HostHomeControl /> },
         { key: "forms", label: "Forms", render: () => <FormsIndex /> },
         {

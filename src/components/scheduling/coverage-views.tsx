@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, CalendarDays, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Sparkles, Home } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
@@ -170,6 +171,8 @@ export function CoverageViews() {
 
       {isLoading || !data ? (
         <p className="text-sm text-muted-foreground">Loading coverage…</p>
+      ) : data.teams.length === 0 ? (
+        <NoHomesEmpty />
       ) : zoom === "week" ? (
         <WeekMatrix data={data} anchor={anchor} onDrill={(d) => { setAnchor(d); setZoom("day"); }} />
       ) : zoom === "month" ? (
@@ -322,6 +325,24 @@ function Legend() {
         </span>
       ))}
       <span className="inline-flex items-center gap-1"><Sparkles className="h-3 w-3" /> 1:1 service scheduled</span>
+    </div>
+  );
+}
+
+function NoHomesEmpty() {
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-surface-warm p-8 text-center">
+      <span className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-[#137182]/10 text-[#137182]">
+        <Home className="h-5 w-5" />
+      </span>
+      <h3 className="mt-3 text-base font-semibold">No homes yet</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        Add a home in{" "}
+        <Link to="/dashboard/scheduling" search={{ tab: "homes" }} className="font-medium text-[#137182] hover:underline">
+          Homes &amp; Teams
+        </Link>
+        , set client ratios in Setup, then draft a week in Builder.
+      </p>
     </div>
   );
 }

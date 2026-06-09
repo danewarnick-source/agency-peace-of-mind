@@ -545,8 +545,25 @@ export function IndividualServicesScheduler() {
                     {livingArrangement && ` · Living: ${livingArrangement}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 text-[11px]">
-                  <span className="inline-flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setNectarOpen(true)}
+                    className="h-8 gap-1.5 border-[#137182]/40 text-[#137182] hover:bg-[#137182]/5"
+                    disabled={schedulableCodes.length === 0}
+                  >
+                    <Wand2 className="h-3.5 w-3.5" /> Ask NECTAR to schedule
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => openDialog(addDays(weekStart, new Date().getDay()))}
+                    className="h-8 gap-1.5"
+                    disabled={schedulableCodes.length === 0}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Schedule a service
+                  </Button>
+                  <span className="inline-flex items-center gap-1 pl-2">
                     <span className="h-2 w-2 rounded-full bg-blue-500" /> Published
                   </span>
                   <span className="inline-flex items-center gap-1">
@@ -554,6 +571,7 @@ export function IndividualServicesScheduler() {
                     Draft
                   </span>
                 </div>
+
               </div>
 
               {/* NECTAR strip */}

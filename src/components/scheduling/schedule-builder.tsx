@@ -645,8 +645,8 @@ function SlotCell({
   );
 }
 
-function ReadinessPanel({ holes, overtimeFlags, pacing, flagCount }: {
-  holes: number; overtimeFlags: Array<[string, number]>; pacing: Array<{ client: string; code: string; weeklyTarget: number; delivered: number }>; flagCount: number;
+function ReadinessPanel({ holes, overtimeFlags, pacing, flagCount, declinedCount, acceptedCount }: {
+  holes: number; overtimeFlags: Array<[string, number]>; pacing: Array<{ client: string; code: string; weeklyTarget: number; delivered: number }>; flagCount: number; declinedCount: number; acceptedCount: number;
 }) {
   const ready = flagCount === 0;
   return (
@@ -655,8 +655,13 @@ function ReadinessPanel({ holes, overtimeFlags, pacing, flagCount }: {
         {ready ? <Check className="h-4 w-4 text-emerald-700" /> : <AlertTriangle className="h-4 w-4 text-amber-700" />}
         <h3 className="text-sm font-semibold">{ready ? "Ready to publish" : `${flagCount} to resolve (advisory)`}</h3>
       </div>
-      <ul className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-3">
+      <ul className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-5">
         <li>Open slots: <strong className="text-foreground tabular-nums">{holes}</strong></li>
+        <li>Accepted: <strong className="text-emerald-700 tabular-nums">{acceptedCount}</strong></li>
+        <li className={declinedCount > 0 ? "" : ""}>
+          Declined: <strong className={`tabular-nums ${declinedCount > 0 ? "text-rose-700" : "text-foreground"}`}>{declinedCount}</strong>
+          {declinedCount > 0 && <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-rose-700">re-cover</span>}
+        </li>
         <li>Overtime watch: <strong className="text-foreground tabular-nums">{overtimeFlags.length}</strong></li>
         <li>Services off pace: <strong className="text-foreground tabular-nums">{pacing.filter((p) => p.weeklyTarget > 0 && p.delivered < p.weeklyTarget).length}</strong></li>
       </ul>

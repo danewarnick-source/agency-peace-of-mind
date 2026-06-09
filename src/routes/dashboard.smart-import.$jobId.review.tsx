@@ -23,6 +23,7 @@ import {
   setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
   computeProvisioningForecast, togglePlanItem, confirmAssignment, submitForSetup,
 } from "@/lib/smart-import-review.functions";
+import { providerSignoff } from "@/lib/hive-migration.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
   head: () => ({ meta: [{ title: "Smart Import Review — NECTAR" }] }),

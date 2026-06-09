@@ -80,6 +80,7 @@ import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.bi
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
 import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
+import { Route as DashboardShiftShiftIdRouteImport } from './routes/dashboard.shift.$shiftId'
 import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashboard.settings.team-access'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardSettingsAutomationRulesRouteImport } from './routes/dashboard.settings.automation-rules'
@@ -491,6 +492,11 @@ const DashboardTracksTrackSlugRoute =
     path: '/$trackSlug',
     getParentRoute: () => DashboardTracksRoute,
   } as any)
+const DashboardShiftShiftIdRoute = DashboardShiftShiftIdRouteImport.update({
+  id: '/shift/$shiftId',
+  path: '/shift/$shiftId',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardSettingsTeamAccessRoute =
   DashboardSettingsTeamAccessRouteImport.update({
     id: '/team-access',
@@ -862,6 +868,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
+  '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
@@ -978,6 +985,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
+  '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
@@ -1100,6 +1108,7 @@ export interface FileRoutesById {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
+  '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
@@ -1223,6 +1232,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
+    | '/dashboard/shift/$shiftId'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
@@ -1339,6 +1349,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
+    | '/dashboard/shift/$shiftId'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
@@ -1460,6 +1471,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/team-access'
+    | '/dashboard/shift/$shiftId'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
@@ -2000,6 +2012,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/tracks/$trackSlug'
       preLoaderRoute: typeof DashboardTracksTrackSlugRouteImport
       parentRoute: typeof DashboardTracksRoute
+    }
+    '/dashboard/shift/$shiftId': {
+      id: '/dashboard/shift/$shiftId'
+      path: '/shift/$shiftId'
+      fullPath: '/dashboard/shift/$shiftId'
+      preLoaderRoute: typeof DashboardShiftShiftIdRouteImport
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/settings/team-access': {
       id: '/dashboard/settings/team-access'
@@ -2580,6 +2599,7 @@ interface DashboardRouteChildren {
   DashboardHubEmployeesRoute: typeof DashboardHubEmployeesRoute
   DashboardHubFinancesRoute: typeof DashboardHubFinancesRoute
   DashboardHubKnowledgeRoute: typeof DashboardHubKnowledgeRoute
+  DashboardShiftShiftIdRoute: typeof DashboardShiftShiftIdRoute
   DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
   DashboardWorkspaceClientIdRoute: typeof DashboardWorkspaceClientIdRoute
   DashboardCoursesIndexRoute: typeof DashboardCoursesIndexRoute
@@ -2652,6 +2672,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardHubEmployeesRoute: DashboardHubEmployeesRoute,
   DashboardHubFinancesRoute: DashboardHubFinancesRoute,
   DashboardHubKnowledgeRoute: DashboardHubKnowledgeRoute,
+  DashboardShiftShiftIdRoute: DashboardShiftShiftIdRoute,
   DashboardTrainingIdRoute: DashboardTrainingIdRoute,
   DashboardWorkspaceClientIdRoute: DashboardWorkspaceClientIdRoute,
   DashboardCoursesIndexRoute: DashboardCoursesIndexRoute,

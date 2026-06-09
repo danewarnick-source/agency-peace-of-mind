@@ -51,7 +51,13 @@ type ServiceCode = {
   unit: "day" | "quarter_hour" | "session" | "monthly" | "one_time";
 };
 
-type Client = { id: string; first_name: string; last_name: string };
+type Client = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  authorized_dspd_codes: string[] | null;
+  job_code: string[] | null;
+};
 type ClientCode = {
   client_id: string;
   service_code: string;
@@ -144,7 +150,7 @@ export function IndividualServicesScheduler() {
           .eq("organization_id", orgId!),
         supabase
           .from("clients")
-          .select("id,first_name,last_name")
+          .select("id,first_name,last_name,authorized_dspd_codes,job_code")
           .eq("organization_id", orgId!)
           .order("last_name"),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -203,53 +209,75 @@ export function IndividualServicesScheduler() {
     return m;
   }, [data?.catalog]);
 
-  // Individual-services clients: have HHS/PPS/SLH/SLN assigned and do NOT have RHS.
+  // Real assigned codes per client come from the clients row (the same
+  // authorized_dspd_codes / job_code arrays surfaced on the client profile
+  // and Clients directory), NOT from client_billing_codes (which only holds
+  // optional authorization caps).
+  const assignedCodesByClient = useMemo(() => {
+    const m = new Map<string, string[]>();
+    (data?.clients ?? []).forEach((c) => {
+      const set = new Set<string>([
+        ...((c.authorized_dspd_codes ?? []) as string[]),
+        ...((c.job_code ?? []) as string[]),
+      ]);
+      m.set(c.id, Array.from(set));
+    });
+    return m;
+  }, [data?.clients]);
+
+  // A client belongs to Individual services when:
+  //  - none of their assigned codes is a staffed-residential (RHS) code, AND
+  //  - at least one assigned code is schedulable (requires_schedule=true)
+  //    and is NOT staffed_residential — i.e. SLH/SLN/DSI/SEI/CHA/COM/HSQ/
+  //    RP2–RP5/ELS/DSG, etc.
+  // Pure host-home/PPS clients (HHS/PPS only — schedule ✘ in the catalog)
+  // therefore do NOT appear here; host-home living is never scheduled.
   const indivClients = useMemo(() => {
     if (!data) return [];
-    const byClient = new Map<string, Set<string>>();
-    data.cbc.forEach((b) => {
-      if (!byClient.has(b.client_id)) byClient.set(b.client_id, new Set());
-      byClient.get(b.client_id)!.add(b.service_code);
-    });
     return data.clients.filter((c) => {
-      const codes = byClient.get(c.id) ?? new Set();
-      const codesArr = Array.from(codes);
-      const hasRHS = codesArr.some((code) => {
-        const sc = catalogByCode.get(code);
-        return sc?.scheduling_behavior === "staffed_residential";
-      });
+      const codes = assignedCodesByClient.get(c.id) ?? [];
+      const hasRHS = codes.some(
+        (code) => catalogByCode.get(code)?.scheduling_behavior === "staffed_residential",
+      );
       if (hasRHS) return false;
-      return codesArr.some((code) => {
+      return codes.some((code) => {
         const sc = catalogByCode.get(code);
         return (
-          sc?.scheduling_behavior === "host_family_residential" ||
-          sc?.scheduling_behavior === "supported_living"
+          !!sc?.requires_schedule && sc.scheduling_behavior !== "staffed_residential"
         );
       });
     });
-  }, [data, catalogByCode]);
+  }, [data, catalogByCode, assignedCodesByClient]);
 
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const selected =
     indivClients.find((c) => c.id === selectedClientId) ?? indivClients[0] ?? null;
+
+  const selectedAssigned = useMemo(
+    () => (selected ? assignedCodesByClient.get(selected.id) ?? [] : []),
+    [selected, assignedCodesByClient],
+  );
 
   const selectedCbc = useMemo(() => {
     if (!selected || !data) return [];
     return data.cbc.filter((b) => b.client_id === selected.id);
   }, [selected, data]);
 
-  // Schedulable codes for the selected client (from catalog + their assignments).
+  // Schedulable codes for the selected client = catalog-schedulable ∩ assigned,
+  // excluding staffed_residential (which lives on the Residential board).
   const schedulableCodes = useMemo(() => {
-    return selectedCbc
-      .map((b) => ({ code: b.service_code, sc: catalogByCode.get(b.service_code) }))
-      .filter((r) => r.sc?.requires_schedule)
-      .map((r) => r.code);
-  }, [selectedCbc, catalogByCode]);
+    return selectedAssigned.filter((code) => {
+      const sc = catalogByCode.get(code);
+      return !!sc?.requires_schedule && sc.scheduling_behavior !== "staffed_residential";
+    });
+  }, [selectedAssigned, catalogByCode]);
 
   const livingArrangement = useMemo(() => {
-    const codes = selectedCbc.map((b) => b.service_code);
-    return codes.find((c) => catalogByCode.get(c)?.is_living_arrangement) ?? null;
-  }, [selectedCbc, catalogByCode]);
+    return (
+      selectedAssigned.find((c) => catalogByCode.get(c)?.is_living_arrangement) ?? null
+    );
+  }, [selectedAssigned, catalogByCode]);
+
 
   const clientShifts = useMemo(() => {
     if (!selected || !data) return [];
@@ -297,7 +325,9 @@ export function IndividualServicesScheduler() {
     return map;
   }, [selected, data, schedulableCodes]);
 
-  // Burn-down per authorized code (weekly target = annual/52 for hourly; weekly_cap_units overrides).
+  // Burn-down iterates the client's actual schedulable assignments. Authorization
+  // caps come from client_billing_codes when present; otherwise targets are 0
+  // (advisory — "no auth on file" shows but never blocks scheduling).
   const burndown = useMemo(() => {
     if (!selected || !data) return [] as Array<{
       code: string;
@@ -307,30 +337,31 @@ export function IndividualServicesScheduler() {
       scheduledUnits: number;
       targetUnits: number;
     }>;
-    return selectedCbc
-      .filter((b) => catalogByCode.get(b.service_code)?.requires_schedule)
-      .map((b) => {
-        const sc = catalogByCode.get(b.service_code);
-        const isQuarter = sc?.unit === "quarter_hour";
-        const targetUnits =
-          b.weekly_cap_units ?? Math.round((b.annual_unit_authorization ?? 0) / 52);
-        const targetHours = isQuarter ? targetUnits / 4 : targetUnits;
-        const scheduledHours = clientShifts
-          .filter((s) => s.job_code === b.service_code)
-          .reduce((sum, s) => sum + hoursBetween(s.starts_at, s.ends_at), 0);
-        const scheduledUnits = isQuarter
-          ? Math.round(scheduledHours * 4)
-          : Math.round(scheduledHours);
-        return {
-          code: b.service_code,
-          unit: sc?.unit ?? "quarter_hour",
-          scheduledHours,
-          targetHours,
-          scheduledUnits,
-          targetUnits,
-        };
-      });
-  }, [selected, data, selectedCbc, clientShifts, catalogByCode]);
+    return schedulableCodes.map((code) => {
+      const sc = catalogByCode.get(code);
+      const isQuarter = sc?.unit === "quarter_hour";
+      const cbc = selectedCbc.find((b) => b.service_code === code);
+      const targetUnits = cbc
+        ? cbc.weekly_cap_units ?? Math.round((cbc.annual_unit_authorization ?? 0) / 52)
+        : 0;
+      const targetHours = isQuarter ? targetUnits / 4 : targetUnits;
+      const scheduledHours = clientShifts
+        .filter((s) => s.job_code === code)
+        .reduce((sum, s) => sum + hoursBetween(s.starts_at, s.ends_at), 0);
+      const scheduledUnits = isQuarter
+        ? Math.round(scheduledHours * 4)
+        : Math.round(scheduledHours);
+      return {
+        code,
+        unit: sc?.unit ?? "quarter_hour",
+        scheduledHours,
+        targetHours,
+        scheduledUnits,
+        targetUnits,
+      };
+    });
+  }, [selected, data, schedulableCodes, selectedCbc, clientShifts, catalogByCode]);
+
 
   // NECTAR overall suggestion: largest gap.
   const nectarSuggest = useMemo(() => {
@@ -379,8 +410,9 @@ export function IndividualServicesScheduler() {
         <div>
           <h2 className="text-base font-semibold">Individual services</h2>
           <p className="text-xs text-muted-foreground">
-            Host home (HHS/PPS) and supported living (SLH/SLN) clients. Schedule per-person
-            service blocks; RHS group-home coverage is on the Residential board.
+            Clients who receive scheduled individual services — supported living
+            (SLH/SLN) plus day/employment and in-home add-ons. RHS group-home coverage
+            is on the Residential board; host-home living itself isn't scheduled.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -427,15 +459,17 @@ export function IndividualServicesScheduler() {
           </p>
           {indivClients.length === 0 && (
             <div className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">
-              No host-home or supported-living clients found. Assign HHS/PPS/SLH/SLN to a
-              client to see them here.
+              No clients with schedulable individual services found. Assign a
+              schedulable code (e.g. SLH, SLN, DSI, SEI, CHA, COM, HSQ) to a non-RHS
+              client to see them here. Host-home (HHS/PPS) living itself is never
+              scheduled or clocked in.
             </div>
           )}
           {indivClients.map((c) => {
-            const cbcCodes = (data?.cbc ?? [])
-              .filter((b) => b.client_id === c.id)
-              .map((b) => b.service_code)
-              .filter((code) => catalogByCode.get(code)?.requires_schedule);
+            const assigned = assignedCodesByClient.get(c.id) ?? [];
+            const cbcCodes = assigned.filter(
+              (code) => catalogByCode.get(code)?.requires_schedule,
+            );
             const blockCount = (data?.shifts ?? []).filter((s) => s.client_id === c.id).length;
             const living =
               cbcCodes.find((code) => catalogByCode.get(code)?.is_living_arrangement) ?? null;
@@ -641,7 +675,7 @@ export function IndividualServicesScheduler() {
                 </div>
                 {burndown.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    No schedulable authorizations on file for this client.
+                    No schedulable services assigned to this client yet.
                   </p>
                 ) : (
                   <div className="space-y-2">

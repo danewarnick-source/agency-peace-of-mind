@@ -43,7 +43,7 @@ import { ClientIntakeChecklistCard } from "@/components/clients/client-intake-ch
 import { PerShiftFormsCareSection } from "@/components/clients/per-shift-forms-care-section";
 import { IntakeProgress } from "@/components/clients/intake-progress";
 import { ClientLoanMarker } from "@/components/loans/client-loan-marker";
-import { BulkImporter } from "@/components/bulk-importer";
+// Smart Import replaces the legacy NECTAR Bulk Importer dialog.
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
 import { MedicationsManager } from "@/components/medications-manager";

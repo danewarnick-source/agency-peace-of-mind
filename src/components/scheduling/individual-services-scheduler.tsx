@@ -784,6 +784,7 @@ export function IndividualServicesScheduler() {
           userId={user.id}
           client={selected}
           day={dialogDay ?? new Date()}
+          weekStart={weekStart}
           schedulableCodes={schedulableCodes}
           catalogByCode={catalogByCode}
           staff={data.staff}
@@ -794,9 +795,41 @@ export function IndividualServicesScheduler() {
           }}
         />
       )}
+
+      {nectarOpen && selected && data && orgId && user && (
+        <NectarScheduleDialog
+          open={nectarOpen}
+          onClose={() => setNectarOpen(false)}
+          orgId={orgId}
+          userId={user.id}
+          client={selected}
+          weekStart={weekStart}
+          schedulableCodes={schedulableCodes}
+          staff={data.staff}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["indiv-sched", orgId] })}
+        />
+      )}
+
+      {editShift && data && orgId && (
+        <EditShiftDialog
+          shift={editShift}
+          onClose={() => setEditShift(null)}
+          orgId={orgId}
+          staff={data.staff}
+          schedulableCodes={
+            schedulableCodes.includes(editShift.job_code ?? "")
+              ? schedulableCodes
+              : [editShift.job_code ?? "", ...schedulableCodes].filter(Boolean)
+          }
+          catalogByCode={catalogByCode}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["indiv-sched", orgId] })}
+        />
+      )}
     </div>
   );
 }
+
+
 
 function ScheduleServiceDialog({
   open,

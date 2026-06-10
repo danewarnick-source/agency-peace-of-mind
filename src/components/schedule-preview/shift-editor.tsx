@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Trash2, Loader2 } from "lucide-react";
+import { Trash2, Loader2, Repeat } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -17,7 +17,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import {
-  saveShift, deleteShift, type ShiftDraft,
+  saveShift, deleteShift, saveWeeklyRecurringShift,
+  fetchSeriesIdsForward, updateSeries, deleteSeries,
+  type ShiftDraft,
 } from "@/lib/schedule-preview-mutations";
 import { isDaily, type ShiftRow, type ClientRow, type StaffRow } from "@/hooks/use-schedule-preview";
 import { staffHasTimeOffOverlap } from "@/lib/schedule-requests";
@@ -39,11 +41,23 @@ function toLocalInput(iso: string | Date): string {
 function fromLocalInput(s: string): string {
   return new Date(s).toISOString();
 }
+function toHHMM(s: string): string {
+  // s is "YYYY-MM-DDTHH:MM" from datetime-local
+  return s.slice(11, 16);
+}
 function defaultRange(day: Date): { start: string; end: string } {
   const s = new Date(day); s.setHours(9, 0, 0, 0);
   const e = new Date(day); e.setHours(17, 0, 0, 0);
   return { start: toLocalInput(s), end: toLocalInput(e) };
 }
+function toDateInput(iso: string | Date): string {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 10);
+}
+
+const DOW_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+const DOW_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function ShiftEditorDialog({
   open, onOpenChange, ctx, clients, staff, siteId, weekStartIso, approvedTimeOff,
@@ -51,10 +65,10 @@ export function ShiftEditorDialog({
   open: boolean;
   onOpenChange: (b: boolean) => void;
   ctx: EditorContext | null;
-  clients: ClientRow[];     // all clients (for site-scoped picker)
+  clients: ClientRow[];
   staff: StaffRow[];
-  siteId: string;           // the currently selected site, or "__all__"
-  weekStartIso: string;     // for query invalidation
+  siteId: string;
+  weekStartIso: string;
   approvedTimeOff?: Map<string, Array<[number, number]>>;
 }) {
   const qc = useQueryClient();
@@ -62,8 +76,8 @@ export function ShiftEditorDialog({
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
   const editing = ctx?.shift ?? null;
+  const editingIsRecurring = !!editing?.is_recurring;
 
-  // Site-scoped client list when a site is picked. When "All sites", show all.
   const eligibleClients = useMemo(() => {
     if (siteId === "__all__") return clients;
     if (siteId === "__unassigned__") return clients.filter((c) => !c.team_id);
@@ -78,6 +92,14 @@ export function ShiftEditorDialog({
   const [notes, setNotes] = useState("");
   const [published, setPublished] = useState(false);
 
+  // Recurrence (create only — edit cannot change the rule, only scope)
+  const [repeat, setRepeat] = useState<"none" | "weekly">("none");
+  const [dows, setDows] = useState<number[]>([]);
+  const [endDate, setEndDate] = useState<string>("");
+
+  // Edit scope when editing a recurring shift
+  const [scope, setScope] = useState<"one" | "series">("one");
+
   useEffect(() => {
     if (!open) return;
     if (editing) {
@@ -88,6 +110,10 @@ export function ShiftEditorDialog({
       setEnds(toLocalInput(editing.ends_at));
       setNotes("");
       setPublished(!!editing.published);
+      setRepeat("none"); // editing path uses scope toggle instead
+      setDows([]);
+      setEndDate("");
+      setScope("one");
     } else {
       const day = ctx?.day ?? new Date();
       const r = defaultRange(day);
@@ -98,34 +124,47 @@ export function ShiftEditorDialog({
       setEnds(r.end);
       setNotes("");
       setPublished(false);
+      setRepeat("none");
+      setDows([day.getDay()]);
+      // Default end-date = 4 weeks out
+      const ed = new Date(day); ed.setDate(ed.getDate() + 28);
+      setEndDate(toDateInput(ed));
+      setScope("one");
     }
   }, [open, editing, ctx]);
 
+  // Keep DOW selection in sync with the seed weekday on create
+  useEffect(() => {
+    if (editing || !starts) return;
+    const seedDow = new Date(starts).getDay();
+    setDows((prev) => (prev.includes(seedDow) ? prev : [...prev, seedDow].sort()));
+  }, [starts, editing]);
+
   const selectedClient = eligibleClients.find((c) => c.id === clientId) ?? clients.find((c) => c.id === clientId);
   const authorizedCodes = selectedClient?.job_code ?? [];
-  // Filter the master EVV code list to ones authorized for this client.
   const codeChoices = useMemo(
     () => EVV_SERVICE_CODES.filter((c) => authorizedCodes.includes(c.code)),
     [authorizedCodes],
   );
 
-  // Reset code if not in authorized list
   useEffect(() => {
     if (jobCode && authorizedCodes.length && !authorizedCodes.includes(jobCode)) setJobCode("");
   }, [jobCode, authorizedCodes]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["schedule-preview", orgId, weekStartIso] });
 
+  function toggleDow(d: number) {
+    setDows((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
+  }
+
   const save = useMutation({
     mutationFn: async () => {
-      const draft: ShiftDraft = {
+      const baseDraft: ShiftDraft = {
         id: editing?.id,
         organization_id: orgId,
         staff_id: staffId,
         client_id: clientId,
         job_code: jobCode,
-        // Mirror the existing scheduler: daily codes use 'daily_host_home',
-        // everything else defaults to 'hourly'.
         shift_type: isDaily(jobCode) ? "daily_host_home" : "hourly",
         starts_at: starts ? fromLocalInput(starts) : "",
         ends_at: ends ? fromLocalInput(ends) : "",
@@ -134,10 +173,53 @@ export function ShiftEditorDialog({
         published,
         created_by: user?.id ?? "",
       };
-      return saveShift(draft);
+
+      // EDIT PATH
+      if (editing) {
+        if (editingIsRecurring && scope === "series") {
+          // Bulk-edit this & all future matching occurrences in the series.
+          const ids = await fetchSeriesIdsForward(
+            {
+              id: editing.id,
+              client_id: editing.client_id,
+              job_code: editing.job_code,
+              starts_at: editing.starts_at,
+            },
+            orgId,
+          );
+          await updateSeries(ids, orgId, {
+            staff_id: staffId,
+            job_code: jobCode,
+            shift_type: baseDraft.shift_type,
+            notes: baseDraft.notes,
+            published,
+            startHHMM: toHHMM(starts),
+            endHHMM: toHHMM(ends),
+          });
+          return { kind: "series-update", count: ids.length };
+        }
+        await saveShift(baseDraft);
+        return { kind: "single-update", count: 1 };
+      }
+
+      // CREATE PATH
+      if (repeat === "weekly") {
+        if (!endDate) throw new Error("Pick a recurrence end date.");
+        const count = await saveWeeklyRecurringShift(baseDraft, {
+          daysOfWeek: dows,
+          endDateISO: new Date(endDate).toISOString(),
+        });
+        return { kind: "series-create", count };
+      }
+      await saveShift(baseDraft);
+      return { kind: "single-create", count: 1 };
     },
-    onSuccess: () => {
-      toast.success(editing ? "Shift updated." : "Shift created.");
+    onSuccess: (r) => {
+      if (r.kind === "series-create")
+        toast.success(`Created ${r.count} shift${r.count === 1 ? "" : "s"} in the series.`);
+      else if (r.kind === "series-update")
+        toast.success(`Updated ${r.count} occurrence${r.count === 1 ? "" : "s"}.`);
+      else toast.success(editing ? "Shift updated." : "Shift created.");
       invalidate();
       onOpenChange(false);
     },
@@ -146,11 +228,27 @@ export function ShiftEditorDialog({
 
   const del = useMutation({
     mutationFn: async () => {
-      if (!editing) return;
+      if (!editing) return { count: 0 };
+      if (editingIsRecurring && scope === "series") {
+        const ids = await fetchSeriesIdsForward(
+          {
+            id: editing.id,
+            client_id: editing.client_id,
+            job_code: editing.job_code,
+            starts_at: editing.starts_at,
+          },
+          orgId,
+        );
+        await deleteSeries(ids, orgId);
+        return { count: ids.length };
+      }
       await deleteShift(editing.id, orgId);
+      return { count: 1 };
     },
-    onSuccess: () => {
-      toast.success("Shift deleted.");
+    onSuccess: (r) => {
+      toast.success(
+        r.count > 1 ? `Deleted ${r.count} occurrences.` : "Shift deleted.",
+      );
       invalidate();
       onOpenChange(false);
     },
@@ -159,7 +257,7 @@ export function ShiftEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit shift" : "Add shift"}</DialogTitle>
           <DialogDescription>
@@ -168,9 +266,41 @@ export function ShiftEditorDialog({
         </DialogHeader>
 
         <div className="grid gap-3 py-2">
+          {editing && editingIsRecurring && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+              <p className="mb-1 font-semibold flex items-center gap-1">
+                <Repeat className="h-3.5 w-3.5" /> Recurring shift — apply changes to:
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setScope("one")}
+                  className={`min-h-[44px] flex-1 rounded border px-2 text-xs font-semibold ${
+                    scope === "one"
+                      ? "border-[#137182] bg-[#137182] text-white"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  This occurrence only
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScope("series")}
+                  className={`min-h-[44px] flex-1 rounded border px-2 text-xs font-semibold ${
+                    scope === "series"
+                      ? "border-[#137182] bg-[#137182] text-white"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  This &amp; all future in series
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-1.5">
             <Label>Client / individual</Label>
-            <Select value={clientId} onValueChange={setClientId}>
+            <Select value={clientId} onValueChange={setClientId} disabled={!!editing}>
               <SelectTrigger><SelectValue placeholder="Select a person" /></SelectTrigger>
               <SelectContent>
                 {eligibleClients.length === 0 && <SelectItem value="__none__" disabled>No people at this site</SelectItem>}
@@ -234,6 +364,63 @@ export function ShiftEditorDialog({
             </div>
           </div>
 
+          {/* Recurrence — create-time only. Editing scope is handled above. */}
+          {!editing && (
+            <div className="rounded-md border p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm flex items-center gap-1.5">
+                  <Repeat className="h-4 w-4" /> Repeat
+                </Label>
+                <Select value={repeat} onValueChange={(v) => setRepeat(v as "none" | "weekly")}>
+                  <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Does not repeat</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {repeat === "weekly" && (
+                <>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Days of week</Label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {DOW_LABELS.map((lbl, idx) => {
+                        const on = dows.includes(idx);
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => toggleDow(idx)}
+                            title={DOW_FULL[idx]}
+                            className={`min-h-[44px] min-w-[44px] rounded-md border px-2 text-xs font-semibold ${
+                              on
+                                ? "border-[#137182] bg-[#137182] text-white"
+                                : "border-border bg-background hover:bg-accent"
+                            }`}
+                          >
+                            {lbl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs text-muted-foreground">Repeat until</Label>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      min={starts ? starts.slice(0, 10) : undefined}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Creates one shift per checked weekday, each week, through the end date. Same fields as the existing scheduler.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="grid gap-1.5">
             <Label>Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={500} placeholder="Optional" />
@@ -254,9 +441,14 @@ export function ShiftEditorDialog({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { if (confirm("Delete this shift?")) del.mutate(); }}
+                onClick={() => {
+                  const msg = editingIsRecurring && scope === "series"
+                    ? "Delete this and all future occurrences in the series?"
+                    : "Delete this shift?";
+                  if (confirm(msg)) del.mutate();
+                }}
                 disabled={del.isPending}
-                className="text-destructive border-destructive/30"
+                className="text-destructive border-destructive/30 min-h-[44px]"
               >
                 {del.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
                 Delete
@@ -264,10 +456,10 @@ export function ShiftEditorDialog({
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="min-h-[44px]">Cancel</Button>
+            <Button onClick={() => save.mutate()} disabled={save.isPending} className="min-h-[44px]">
               {save.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              {editing ? "Save" : "Create"}
+              {editing ? "Save" : repeat === "weekly" ? "Create series" : "Create"}
             </Button>
           </div>
         </DialogFooter>

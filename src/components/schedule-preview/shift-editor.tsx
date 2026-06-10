@@ -78,11 +78,10 @@ export function ShiftEditorDialog({
   const editing = ctx?.shift ?? null;
   const editingIsRecurring = !!editing?.is_recurring;
 
-  const eligibleClients = useMemo(() => {
-    if (siteId === "__all__") return clients;
-    if (siteId === "__unassigned__") return clients.filter((c) => !c.team_id);
-    return clients.filter((c) => c.team_id === siteId);
-  }, [clients, siteId]);
+  // Show ALL org clients regardless of which site lane the dialog opened from.
+  // Site lanes still organize the calendar view; scheduling itself is org-wide.
+  const eligibleClients = useMemo(() => clients, [clients]);
+  void siteId;
 
   const [staffId, setStaffId] = useState("");
   const [clientId, setClientId] = useState("");

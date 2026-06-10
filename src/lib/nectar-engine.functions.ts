@@ -182,8 +182,7 @@ async function aiPropose(
   citation: string | null,
   facts: OrgEntityFacts,
 ) {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+  // AI credentials are validated inside the Bedrock adapter (fails loudly).
   const userBody = `REQUIREMENT TITLE: ${reqTitle}
 DESCRIPTION: ${reqDescription ?? "—"}
 CITATION: ${citation ?? "—"}
@@ -195,25 +194,24 @@ PROVIDER ENTITIES:
 - Staff roles/credentials present: ${facts.roles.length ? facts.roles.join(", ") : "(none configured)"}
 - Client count: ${facts.clientCount}
 - Jurisdictions: ${facts.jurisdictions.join(", ")}`;
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+
+  const { callBedrockChatCompletions, BedrockError } = await import("@/lib/ai-bedrock.server");
+  let json;
+  try {
+    json = await callBedrockChatCompletions({
       messages: [
         { role: "system", content: MAP_SYSTEM_PROMPT },
         { role: "user", content: userBody },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
-  if (res.status === 402) throw new Error("AI credits exhausted.");
-  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-  const json = await res.json();
+    });
+  } catch (e) {
+    if (e instanceof BedrockError) {
+      if (e.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+      throw new Error(e.message);
+    }
+    throw e;
+  }
   const raw: unknown = (() => {
     try {
       return JSON.parse(json.choices?.[0]?.message?.content ?? "{}");

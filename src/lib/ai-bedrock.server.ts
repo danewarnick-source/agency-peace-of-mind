@@ -341,7 +341,7 @@ export async function gatewayFetch(
     let toolConfig: Record<string, unknown> | undefined;
     if (hasTools) {
       const tc: Record<string, unknown> = {
-        tools: body.tools!.map((t) => ({
+        tools: (body.tools as any[]).map((t: any) => ({
           toolSpec: {
             name: t.function.name,
             description: t.function.description ?? "",

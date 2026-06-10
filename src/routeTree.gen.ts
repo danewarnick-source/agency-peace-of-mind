@@ -51,6 +51,7 @@ import { Route as DashboardInboxRouteImport } from './routes/dashboard.inbox'
 import { Route as DashboardHrcRouteImport } from './routes/dashboard.hrc'
 import { Route as DashboardHrAdminRouteImport } from './routes/dashboard.hr-admin'
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
+import { Route as DashboardHomesRouteImport } from './routes/dashboard.homes'
 import { Route as DashboardHiveExecRouteImport } from './routes/dashboard.hive-exec'
 import { Route as DashboardHelpRouteImport } from './routes/dashboard.help'
 import { Route as DashboardFormsRouteImport } from './routes/dashboard.forms'
@@ -352,6 +353,11 @@ const DashboardHostHomeControlRoute =
     path: '/host-home-control',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardHomesRoute = DashboardHomesRouteImport.update({
+  id: '/homes',
+  path: '/homes',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardHiveExecRoute = DashboardHiveExecRouteImport.update({
   id: '/hive-exec',
   path: '/hive-exec',
@@ -873,6 +879,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
+  '/dashboard/homes': typeof DashboardHomesRoute
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/hrc': typeof DashboardHrcRoute
@@ -1000,6 +1007,7 @@ export interface FileRoutesByTo {
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/help': typeof DashboardHelpRoute
+  '/dashboard/homes': typeof DashboardHomesRoute
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/hrc': typeof DashboardHrcRoute
@@ -1132,6 +1140,7 @@ export interface FileRoutesById {
   '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
+  '/dashboard/homes': typeof DashboardHomesRoute
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/hrc': typeof DashboardHrcRoute
@@ -1266,6 +1275,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms'
     | '/dashboard/help'
     | '/dashboard/hive-exec'
+    | '/dashboard/homes'
     | '/dashboard/host-home-control'
     | '/dashboard/hr-admin'
     | '/dashboard/hrc'
@@ -1393,6 +1403,7 @@ export interface FileRouteTypes {
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/help'
+    | '/dashboard/homes'
     | '/dashboard/host-home-control'
     | '/dashboard/hr-admin'
     | '/dashboard/hrc'
@@ -1524,6 +1535,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms'
     | '/dashboard/help'
     | '/dashboard/hive-exec'
+    | '/dashboard/homes'
     | '/dashboard/host-home-control'
     | '/dashboard/hr-admin'
     | '/dashboard/hrc'
@@ -1935,6 +1947,13 @@ declare module '@tanstack/react-router' {
       path: '/host-home-control'
       fullPath: '/dashboard/host-home-control'
       preLoaderRoute: typeof DashboardHostHomeControlRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/homes': {
+      id: '/dashboard/homes'
+      path: '/homes'
+      fullPath: '/dashboard/homes'
+      preLoaderRoute: typeof DashboardHomesRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/hive-exec': {
@@ -2776,6 +2795,7 @@ interface DashboardRouteChildren {
   DashboardFormsRoute: typeof DashboardFormsRouteWithChildren
   DashboardHelpRoute: typeof DashboardHelpRoute
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
+  DashboardHomesRoute: typeof DashboardHomesRoute
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
   DashboardHrAdminRoute: typeof DashboardHrAdminRouteWithChildren
   DashboardHrcRoute: typeof DashboardHrcRoute
@@ -2852,6 +2872,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardFormsRoute: DashboardFormsRouteWithChildren,
   DashboardHelpRoute: DashboardHelpRoute,
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
+  DashboardHomesRoute: DashboardHomesRoute,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,
   DashboardHrAdminRoute: DashboardHrAdminRouteWithChildren,
   DashboardHrcRoute: DashboardHrcRoute,

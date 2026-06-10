@@ -132,11 +132,15 @@ export const runInternalAudit = createServerFn({ method: "POST" })
             "id, client_id, service_code, service_start_date, service_end_date, annual_unit_authorization",
           )
           .eq("organization_id", orgId),
+        // Daily/HHS records now live in daily_logs (record_date -> log_date,
+        // provider_id -> user_id). hhs_daily_records is orphaned. Aliases keep the
+        // audit checks below (recency, missing signature, thin narrative) unchanged
+        // (same mapping as the billing surfaces in PR #5).
         supabase
-          .from("hhs_daily_records")
-          .select("id, client_id, record_date, provider_id, narrative, signature_data_url")
+          .from("daily_logs")
+          .select("id, client_id, record_date:log_date, provider_id:user_id, narrative, signature_data_url")
           .eq("organization_id", orgId)
-          .gte("record_date", new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10)),
+          .gte("log_date", new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10)),
         supabase
           .from("evv_timesheets")
           .select("id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, status")

@@ -25,7 +25,7 @@ import {
 export const Route = createFileRoute("/dashboard/schedule-preview")({
   head: () => ({
     meta: [
-      { title: "Schedule (new) — HIVE" },
+      { title: "Schedule — HIVE" },
       { name: "description", content: "Weekly schedule — site coverage, staff/client grid." },
     ],
     links: [
@@ -155,9 +155,6 @@ function SchedulePreviewPage() {
         </div>
         <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
-          <Link to="/dashboard/scheduling" search={{ mode: "individual" }} style={btn()} title="Legacy individual-services scheduler">
-            Legacy 1-on-1
-          </Link>
           <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>
         </div>
       </div>

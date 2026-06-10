@@ -20,6 +20,8 @@ import {
   saveShift, deleteShift, type ShiftDraft,
 } from "@/lib/schedule-preview-mutations";
 import { isDaily, type ShiftRow, type ClientRow, type StaffRow } from "@/hooks/use-schedule-preview";
+import { staffHasTimeOffOverlap } from "@/lib/schedule-requests";
+import { AlertTriangle } from "lucide-react";
 
 export type EditorContext = {
   shift?: ShiftRow;        // existing
@@ -44,7 +46,7 @@ function defaultRange(day: Date): { start: string; end: string } {
 }
 
 export function ShiftEditorDialog({
-  open, onOpenChange, ctx, clients, staff, siteId, weekStartIso,
+  open, onOpenChange, ctx, clients, staff, siteId, weekStartIso, approvedTimeOff,
 }: {
   open: boolean;
   onOpenChange: (b: boolean) => void;
@@ -53,6 +55,7 @@ export function ShiftEditorDialog({
   staff: StaffRow[];
   siteId: string;           // the currently selected site, or "__all__"
   weekStartIso: string;     // for query invalidation
+  approvedTimeOff?: Map<string, Array<[number, number]>>;
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -192,6 +195,16 @@ export function ShiftEditorDialog({
               scheduled_shifts.staff_id is NOT NULL, so this app has no "open" shift state — a staffer is required.
             </p>
           </div>
+
+          {approvedTimeOff && staffId && starts && ends &&
+            staffHasTimeOffOverlap(approvedTimeOff, staffId, fromLocalInput(starts), fromLocalInput(ends)) && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                Heads up — this staffer has approved time off overlapping this shift. You can still save; this is advisory only.
+              </span>
+            </div>
+          )}
 
           <div className="grid gap-1.5">
             <Label>Billing code</Label>

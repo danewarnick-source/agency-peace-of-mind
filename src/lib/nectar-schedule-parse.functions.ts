@@ -87,32 +87,25 @@ Rules:
       today_weekday_index: new Date().getDay(),
     });
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": apiKey,
-        "X-Lovable-AIG-SDK": "fetch",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+    const { callBedrockChatCompletions, BedrockError } = await import("@/lib/ai-bedrock.server");
+    let raw: string;
+    try {
+      const json = await callBedrockChatCompletions({
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
         ],
         response_format: { type: "json_object" },
-      }),
-    });
-
-    if (res.status === 429) throw new Error("NECTAR is busy — try again in a moment.");
-    if (res.status === 402) throw new Error("AI workspace credits exhausted. Add credits to continue.");
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`AI error (${res.status}): ${txt.slice(0, 200)}`);
+      });
+      raw = json.choices?.[0]?.message?.content ?? "{}";
+    } catch (e) {
+      if (e instanceof BedrockError) {
+        if (e.status === 429) throw new Error("NECTAR is busy — try again in a moment.");
+        if (e.status === 401) throw new Error(e.message);
+        throw new Error(`AI error (${e.status}): ${e.message}`);
+      }
+      throw e;
     }
-
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = json.choices?.[0]?.message?.content ?? "{}";
 
     let parsed: unknown;
     try { parsed = JSON.parse(raw); } catch {

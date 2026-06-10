@@ -120,14 +120,18 @@ function ComplianceInbox() {
 
 function Overview() {
   const { data: org } = useCurrentOrg();
-  const { view, subView } = usePortalView();
+  const { view, subView, hasStoredView } = usePortalView();
 
   const isManager = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  // Default admin-capable users to the admin Home when they haven't explicitly
+  // picked a portal view — otherwise a fresh admin lands on the empty staff
+  // "My Caseload". An admin who deliberately chose Staff View keeps it.
+  const effectiveView = hasStoredView ? view : isManager ? "admin" : "staff";
   // State (Build/Preview) renders the REAL admin/staff surfaces parameterized by the
   // selected state's template. When Admin sub-view is selected, show the real
   // Company Overview (not the staff caseload).
-  const isStatePreviewAdmin = view === "state_preview" && subView === "admin";
-  const showAdmin = (isManager && view === "admin") || isStatePreviewAdmin;
+  const isStatePreviewAdmin = effectiveView === "state_preview" && subView === "admin";
+  const showAdmin = (isManager && effectiveView === "admin") || isStatePreviewAdmin;
 
 
   return (

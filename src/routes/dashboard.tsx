@@ -94,7 +94,7 @@ function DashboardLayout() {
   const { session, loading, user } = useAuth();
   const { data: org, isLoading: orgLoading } = useCurrentOrg();
   const { can } = usePermissions();
-  const { view, setView, stateCode, setStateCode, subView, setSubView, hydrated: viewHydrated } = usePortalView();
+  const { view, hasStoredView, setView, stateCode, setStateCode, subView, setSubView, hydrated: viewHydrated } = usePortalView();
   const [states, setStates] = useState<PlatformStateLite[]>([]);
   const { isExecutive, isLoading: execLoading } = useIsHiveExecutive();
   const navigate = useNavigate();
@@ -140,11 +140,27 @@ function DashboardLayout() {
       navigate({ to: "/dashboard/hrc", replace: true });
     }
   }, [loading, session, isCommitteeMember, pathname, navigate]);
+
+  // First-login default: admin-capable users land on the admin portal (Home +
+  // admin nav), NOT the empty staff caseload. Persist "admin" once when they
+  // have no stored choice, so every view-aware surface (nav, home, caseload,
+  // daily logs, forms) agrees. An explicit choice — including Staff View — is
+  // preserved and never overridden. The synchronous resolution below keeps the
+  // very first frame correct so there's no flash before this persists.
+  useEffect(() => {
+    if (!viewHydrated || orgLoading || execLoading) return;
+    if (!hasStoredView && isAdminCapable) setView("admin");
+  }, [viewHydrated, orgLoading, execLoading, hasStoredView, isAdminCapable, setView]);
   // PV type is hoisted to module scope.
   const allowedViews: PV[] = ["staff"];
   if (isAdminCapable) { allowedViews.push("admin", "staff_mobile"); }
   if (isExecutive) { allowedViews.push("hive_exec", "state_preview"); }
-  const rawView: PV = allowedViews.includes(view as PV) ? (view as PV) : "staff";
+  // Default admin-capable users (who haven't explicitly chosen a view) to the
+  // admin portal, so a fresh admin lands on the admin Home + nav rather than the
+  // empty staff caseload. An explicit choice (incl. Staff View) is preserved.
+  const defaultView: PV = isAdminCapable ? "admin" : "staff";
+  const resolvedView: PV = hasStoredView ? view : defaultView;
+  const rawView: PV = allowedViews.includes(resolvedView) ? resolvedView : "staff";
   const isMobilePreview = rawView === "staff_mobile";
   const isHiveExecView  = rawView === "hive_exec";
   const isStatePreview  = rawView === "state_preview";

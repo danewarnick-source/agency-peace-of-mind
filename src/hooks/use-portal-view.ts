@@ -15,6 +15,19 @@ function readView(): PortalView {
   return "staff";
 }
 
+// Whether the user has ever explicitly chosen a portal view. Lets consumers
+// distinguish "no choice yet" (default) from an explicit "staff" choice, so a
+// fresh admin can default to the admin Home instead of the empty staff caseload
+// without overriding an admin who deliberately switched to Staff View.
+function readHasStoredView(): boolean {
+  if (typeof window === "undefined") return false;
+  const v = window.localStorage.getItem(KEY);
+  return (
+    v === "staff" || v === "admin" || v === "staff_mobile" ||
+    v === "hive_exec" || v === "state_preview"
+  );
+}
+
 function readStateCode(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(STATE_KEY);
@@ -28,17 +41,20 @@ function readSub(): StatePreviewSubView {
 
 export function usePortalView() {
   const [view, setView] = useState<PortalView>("staff");
+  const [hasStoredView, setHasStoredView] = useState(false);
   const [stateCode, setStateCodeState] = useState<string | null>(null);
   const [subView, setSubViewState] = useState<StatePreviewSubView>("admin");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setView(readView());
+    setHasStoredView(readHasStoredView());
     setStateCodeState(readStateCode());
     setSubViewState(readSub());
     setHydrated(true);
     const handler = () => {
       setView(readView());
+      setHasStoredView(readHasStoredView());
       setStateCodeState(readStateCode());
       setSubViewState(readSub());
     };
@@ -54,6 +70,7 @@ export function usePortalView() {
     window.localStorage.setItem(KEY, v);
     window.dispatchEvent(new Event(EVT));
     setView(v);
+    setHasStoredView(true);
   }, []);
 
   const setStateCode = useCallback((code: string | null) => {
@@ -69,5 +86,5 @@ export function usePortalView() {
     setSubViewState(s);
   }, []);
 
-  return { view, setView: update, stateCode, setStateCode, subView, setSubView, hydrated };
+  return { view, hasStoredView, setView: update, stateCode, setStateCode, subView, setSubView, hydrated };
 }

@@ -62,6 +62,7 @@ function getClient(): BedrockRuntimeClient {
   return new BedrockRuntimeClient({
     region,
     credentials: { accessKeyId, secretAccessKey },
+    requestHandler: new FetchHttpHandler(),
   });
 }
 

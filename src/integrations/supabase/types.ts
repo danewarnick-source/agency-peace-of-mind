@@ -4268,28 +4268,34 @@ export type Database = {
       }
       home_staff_designations: {
         Row: {
+          active: boolean
           created_at: string
           designation_id: string
           id: string
           organization_id: string
+          position: Database["public"]["Enums"]["home_position"]
           staff_id: string
           team_id: string
           updated_at: string
         }
         Insert: {
+          active?: boolean
           created_at?: string
           designation_id: string
           id?: string
           organization_id: string
+          position?: Database["public"]["Enums"]["home_position"]
           staff_id: string
           team_id: string
           updated_at?: string
         }
         Update: {
+          active?: boolean
           created_at?: string
           designation_id?: string
           id?: string
           organization_id?: string
+          position?: Database["public"]["Enums"]["home_position"]
           staff_id?: string
           team_id?: string
           updated_at?: string
@@ -9034,32 +9040,47 @@ export type Database = {
       }
       teams: {
         Row: {
+          active: boolean
+          address: string | null
+          capacity: number | null
+          color: string | null
           created_at: string
           id: string
           manager_id: string | null
           organization_id: string | null
           setting: string
           team_name: string
+          team_type: string
           tenant_id: string | null
           updated_at: string
         }
         Insert: {
+          active?: boolean
+          address?: string | null
+          capacity?: number | null
+          color?: string | null
           created_at?: string
           id?: string
           manager_id?: string | null
           organization_id?: string | null
           setting?: string
           team_name: string
+          team_type?: string
           tenant_id?: string | null
           updated_at?: string
         }
         Update: {
+          active?: boolean
+          address?: string | null
+          capacity?: number | null
+          color?: string | null
           created_at?: string
           id?: string
           manager_id?: string | null
           organization_id?: string | null
           setting?: string
           team_name?: string
+          team_type?: string
           tenant_id?: string | null
           updated_at?: string
         }
@@ -10187,6 +10208,7 @@ export type Database = {
       hive_ticket_severity: "low" | "medium" | "high" | "critical"
       hive_ticket_source: "auto" | "manual"
       hive_ticket_status: "new" | "in_progress" | "resolved"
+      home_position: "manager" | "supervisor" | "staff"
       invitation_status: "pending" | "accepted" | "revoked"
       other_assignment_proposer: "admin" | "manager" | "nectar"
       other_assignment_status: "not_started" | "in_progress" | "completed"
@@ -10365,6 +10387,7 @@ export const Constants = {
       hive_ticket_severity: ["low", "medium", "high", "critical"],
       hive_ticket_source: ["auto", "manual"],
       hive_ticket_status: ["new", "in_progress", "resolved"],
+      home_position: ["manager", "supervisor", "staff"],
       invitation_status: ["pending", "accepted", "revoked"],
       other_assignment_proposer: ["admin", "manager", "nectar"],
       other_assignment_status: ["not_started", "in_progress", "completed"],

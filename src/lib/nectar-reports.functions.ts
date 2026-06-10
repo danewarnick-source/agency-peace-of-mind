@@ -422,11 +422,14 @@ async function runBudgetStatus(
       .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
       .eq("organization_id", orgId)
       .gte("clock_in_timestamp", earliestStart.toISOString()),
+    // Daily/HHS service days now live in daily_logs (record_date -> log_date);
+    // hhs_daily_records is orphaned. Alias keeps the per-code day counting unchanged
+    // (same mapping as the billing surfaces in PR #5).
     supabase
-      .from("hhs_daily_records")
-      .select("client_id, record_date")
+      .from("daily_logs")
+      .select("client_id, record_date:log_date")
       .eq("organization_id", orgId)
-      .gte("record_date", earliestStart.toISOString().slice(0, 10)),
+      .gte("log_date", earliestStart.toISOString().slice(0, 10)),
   ]);
   if (tsRes.error) throw tsRes.error;
   if (dlRes.error) throw dlRes.error;

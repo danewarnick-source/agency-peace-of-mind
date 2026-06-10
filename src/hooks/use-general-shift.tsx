@@ -1,134 +1,195 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./use-auth";
+import { useCurrentOrg } from "./use-org";
 
 // Free-form so it accepts both built-in (Training/Admin/Travel/Meeting/Other)
 // and any custom categories an admin adds in Time & Pay settings.
 export type GeneralCategory = string;
 
 export type GeneralShift = {
+  id: string;
   category: GeneralCategory;
   note: string;
   start_iso: string;
 };
 
-export type CompletedGeneralShift = GeneralShift & {
+export type CompletedGeneralShift = {
+  category: GeneralCategory;
+  note: string;
+  start_iso: string;
   end_iso: string;
   hours: number;
 };
 
-const KEY = "hive-general-shift";
-const LOG_KEY = "hive-general-shifts-log";
-const EVT = "hive-general-shift-change";
+// general_shifts is intentionally not in the generated Supabase types yet; this
+// repo accesses such tables via an untyped client (same pattern as other
+// recently-added tables). Runtime/PostgREST is unaffected.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
 
-function read(): GeneralShift | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as GeneralShift;
-  } catch {
-    return null;
-  }
-}
+type GeneralShiftRow = {
+  id: string;
+  category: string | null;
+  note: string | null;
+  clock_in_timestamp: string;
+  clock_out_timestamp: string | null;
+};
 
-function readLog(): CompletedGeneralShift[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(LOG_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? (arr as CompletedGeneralShift[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeLog(entries: CompletedGeneralShift[]) {
-  // Trim to last 365 days to keep storage small.
-  const cutoff = Date.now() - 365 * 24 * 60 * 60 * 1000;
-  const kept = entries.filter((e) => new Date(e.end_iso).getTime() >= cutoff);
-  window.localStorage.setItem(LOG_KEY, JSON.stringify(kept));
+function hoursBetween(startIso: string, endIso: string): number {
+  return Math.max(
+    0,
+    (new Date(endIso).getTime() - new Date(startIso).getTime()) / 3_600_000,
+  );
 }
 
 /**
- * Tracks an active non-client (general) work shift in localStorage so the
- * persistent green clocked-in bar and the General Time Clock UI share one
- * source. Distinct from EVV client shifts — those live in `evv_timesheets`
- * via `useActiveShift`.
+ * Tracks the staff member's active non-client (general) work shift. Persisted
+ * SERVER-SIDE in `public.general_shifts` (org-scoped, RLS-protected) so it
+ * survives a refresh and is visible across devices — the same durable home
+ * client/EVV shifts have in `evv_timesheets` via `useActiveShift`.
  *
- * Completed shifts are appended to a per-device log so the NECTAR pay-period
- * summary can include Training/Admin/Travel/Meeting time alongside client
- * services.
+ * The active shift is the caller's most recent row with no clock_out yet.
  */
 export function useGeneralShift() {
-  const [shift, setShift] = useState<GeneralShift | null>(null);
+  const { user } = useAuth();
+  const { data: org } = useCurrentOrg();
+  const qc = useQueryClient();
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    setShift(read());
-    const h = () => setShift(read());
-    window.addEventListener(EVT, h);
-    window.addEventListener("storage", h);
-    return () => {
-      window.removeEventListener(EVT, h);
-      window.removeEventListener("storage", h);
-    };
-  }, []);
+  const userId = user?.id;
 
-  const start = useCallback((s: Omit<GeneralShift, "start_iso">) => {
-    const next: GeneralShift = { ...s, start_iso: new Date().toISOString() };
-    window.localStorage.setItem(KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event(EVT));
-    setShift(next);
-  }, []);
+  const { data: shift } = useQuery<GeneralShift | null>({
+    enabled: !!userId,
+    queryKey: ["general-shift", userId],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    queryFn: async (): Promise<GeneralShift | null> => {
+      const { data, error } = await db
+        .from("general_shifts")
+        .select("id, category, note, clock_in_timestamp")
+        .eq("user_id", userId)
+        .is("clock_out_timestamp", null)
+        .order("clock_in_timestamp", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const row = data as GeneralShiftRow;
+      return {
+        id: row.id,
+        category: row.category ?? "general",
+        note: row.note ?? "",
+        start_iso: row.clock_in_timestamp,
+      };
+    },
+  });
 
-  const stop = useCallback((opts?: { note?: string }) => {
-    const current = read();
-    if (current) {
-      const end_iso = new Date().toISOString();
-      const hours = Math.max(
-        0,
-        (new Date(end_iso).getTime() - new Date(current.start_iso).getTime()) /
-          3_600_000,
+  const invalidate = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["general-shift", userId] });
+    qc.invalidateQueries({ queryKey: ["general-shift-log", userId] });
+  }, [qc, userId]);
+
+  // Set organization_id + user_id here; RLS (WITH CHECK user_id = auth.uid()
+  // AND is_org_member) enforces them server-side so they can't be spoofed —
+  // exactly how the EVV punch writes evv_timesheets.
+  const start = useCallback(
+    (s: Omit<GeneralShift, "id" | "start_iso">) => {
+      if (!userId || !org?.organization_id) return;
+      (async () => {
+        const { error } = await db.from("general_shifts").insert({
+          organization_id: org.organization_id,
+          user_id: userId,
+          category: s.category,
+          note: s.note?.trim() ? s.note.trim() : null,
+        });
+        if (error) console.error("[general-shift] start failed", error);
+        invalidate();
+      })().catch((e) => console.error("[general-shift] start failed", e));
+    },
+    [userId, org?.organization_id, invalidate],
+  );
+
+  const stop = useCallback(
+    (opts?: { note?: string }) => {
+      if (!userId) return;
+      (async () => {
+        const patch: Record<string, unknown> = {
+          clock_out_timestamp: new Date().toISOString(),
+        };
+        if (typeof opts?.note === "string") patch.note = opts.note.trim();
+        const { error } = await db
+          .from("general_shifts")
+          .update(patch)
+          .eq("user_id", userId)
+          .is("clock_out_timestamp", null);
+        if (error) console.error("[general-shift] stop failed", error);
+        invalidate();
+      })().catch((e) => console.error("[general-shift] stop failed", e));
+    },
+    [userId, invalidate],
+  );
+
+  // Debounced so typing in the note box doesn't hit the server per keystroke;
+  // the final note is also persisted on stop().
+  const updateNote = useCallback(
+    (note: string) => {
+      if (!userId) return;
+      // Optimistic local update so the UI reflects the note immediately.
+      qc.setQueryData<GeneralShift | null>(["general-shift", userId], (prev) =>
+        prev ? { ...prev, note } : prev,
       );
-      const finalNote = opts?.note?.trim() ?? current.note;
-      const log = readLog();
-      log.push({ ...current, note: finalNote, end_iso, hours });
-      writeLog(log);
-    }
-    window.localStorage.removeItem(KEY);
-    window.dispatchEvent(new Event(EVT));
-    setShift(null);
-  }, []);
+      if (noteTimer.current) clearTimeout(noteTimer.current);
+      noteTimer.current = setTimeout(() => {
+        Promise.resolve(
+          db
+            .from("general_shifts")
+            .update({ note: note.trim() })
+            .eq("user_id", userId)
+            .is("clock_out_timestamp", null),
+        ).catch((e) => console.error("[general-shift] note update failed", e));
+      }, 700);
+    },
+    [qc, userId],
+  );
 
-  const updateNote = useCallback((note: string) => {
-    const current = read();
-    if (!current) return;
-    const next = { ...current, note };
-    window.localStorage.setItem(KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event(EVT));
-    setShift(next);
-  }, []);
-
-
-  return { shift, start, stop, updateNote };
+  return { shift: shift ?? null, start, stop, updateNote };
 }
 
-
 /**
- * Read-only access to the persisted completed-general-shift log. Re-reads
- * whenever a general shift starts/stops so consumers (pay-period summary)
- * stay current.
+ * Read-only access to the staff member's completed general shifts (last 365
+ * days) from the server, so the NECTAR pay-period summary can include
+ * Training/Admin/Travel/Meeting time alongside client services.
  */
 export function useGeneralShiftLog(): CompletedGeneralShift[] {
-  const [log, setLog] = useState<CompletedGeneralShift[]>([]);
-  useEffect(() => {
-    setLog(readLog());
-    const h = () => setLog(readLog());
-    window.addEventListener(EVT, h);
-    window.addEventListener("storage", h);
-    return () => {
-      window.removeEventListener(EVT, h);
-      window.removeEventListener("storage", h);
-    };
-  }, []);
-  return log;
+  const { user } = useAuth();
+  const userId = user?.id;
+
+  const { data } = useQuery<CompletedGeneralShift[]>({
+    enabled: !!userId,
+    queryKey: ["general-shift-log", userId],
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    queryFn: async (): Promise<CompletedGeneralShift[]> => {
+      const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await db
+        .from("general_shifts")
+        .select("category, note, clock_in_timestamp, clock_out_timestamp")
+        .eq("user_id", userId)
+        .not("clock_out_timestamp", "is", null)
+        .gte("clock_out_timestamp", cutoff)
+        .order("clock_out_timestamp", { ascending: false });
+      if (error) throw error;
+      return ((data ?? []) as GeneralShiftRow[]).map((r) => ({
+        category: r.category ?? "general",
+        note: r.note ?? "",
+        start_iso: r.clock_in_timestamp,
+        end_iso: r.clock_out_timestamp as string,
+        hours: hoursBetween(r.clock_in_timestamp, r.clock_out_timestamp as string),
+      }));
+    },
+  });
+
+  return data ?? [];
 }

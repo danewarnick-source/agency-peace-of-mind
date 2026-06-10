@@ -18,7 +18,7 @@ function fmtElapsed(ms: number) {
 
 /**
  * Persistent "clocked-in" status bar. Surfaces either an EVV client shift
- * (from `evv_timesheets`) or a non-client general work shift (localStorage).
+ * (from `evv_timesheets`) or a non-client general work shift (`general_shifts`).
  * Rendered just above the bottom tab bar via the staff mobile shell or the
  * desktop preview frame.
  */

@@ -117,16 +117,60 @@ const fmtTime = (iso: string) => {
   return m ? `${h}:${String(m).padStart(2, "0")}${ampm}` : `${h}${ampm}`;
 };
 
-function shiftColor(s: ShiftRow, colorBy: ColorBy): string {
-  if (colorBy === "staff") {
-    const key = s.staff_id ?? "open";
-    let h = 0;
-    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-    return `hsl(${h % 360} 55% 38%)`;
+/**
+ * Visual shift-type palette — derives a human-readable label and a calm,
+ * light card color per shift. Uses explicit `shift_type` when set; otherwise
+ * infers from job_code and start-hour to match the demo (Morning / Swing /
+ * Overnight / Day / 1:1 Support / DSI / Respite).
+ */
+type ShiftTypeInfo = { label: string; bg: string; fg: string; accent: string };
+
+function inferShiftTypeKey(s: ShiftRow): string {
+  const explicit = (s.shift_type ?? "").toString().trim().toLowerCase();
+  if (explicit && SHIFT_TYPE_PALETTE[explicit]) return explicit;
+  const code = (s.job_code ?? "").toUpperCase();
+  if (code === "DSI") return "dsi";
+  if (code === "DSG") return "day";
+  if (code.startsWith("RP") || code === "RL6") return "respite";
+  if (code === "HHS" || code === "RHS") {
+    const h = new Date(s.starts_at).getHours();
+    if (h >= 21 || h < 5) return "overnight";
+    if (h >= 14) return "swing";
+    return "morning";
   }
-  if (isDaily(s.job_code)) return TEAL;
-  if (s.job_code === "DSI") return GOLD;
-  return NAVY;
+  const h = new Date(s.starts_at).getHours();
+  if (h >= 21 || h < 5) return "overnight";
+  if (h >= 14 && h < 21) return "swing";
+  if (h >= 5 && h < 11) return "morning";
+  return "support";
+}
+
+const SHIFT_TYPE_PALETTE: Record<string, ShiftTypeInfo> = {
+  morning:   { label: "Morning",     bg: "#e8f6f0", fg: "#0f6a47", accent: "#1f9d6b" },
+  swing:     { label: "Swing",       bg: "#eeeafb", fg: "#3e3372", accent: "#5b4b9e" },
+  overnight: { label: "Overnight",   bg: "#e7eaf5", fg: "#1a2350", accent: NAVY },
+  day:       { label: "Day",         bg: "#fdf3e3", fg: "#8a5a00", accent: GOLD },
+  support:   { label: "1:1 Support", bg: "#fdf3e3", fg: "#8a5a00", accent: GOLD },
+  dsi:       { label: "DSI",         bg: "#e6f1f3", fg: "#0a5560", accent: TEAL },
+  respite:   { label: "Respite",     bg: "#fdeaf3", fg: "#8a2d63", accent: "#c5478f" },
+};
+
+function shiftTypeInfo(s: ShiftRow): ShiftTypeInfo {
+  const key = inferShiftTypeKey(s);
+  return SHIFT_TYPE_PALETTE[key] ?? { label: s.shift_type || s.job_code || "Shift", bg: "#eef0f6", fg: INK, accent: TEAL };
+}
+
+function staffTint(staffId: string | null): ShiftTypeInfo {
+  const key = staffId ?? "open";
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return {
+    label: "Staff",
+    bg: `hsl(${hue} 70% 94%)`,
+    fg: `hsl(${hue} 45% 28%)`,
+    accent: `hsl(${hue} 55% 45%)`,
+  };
 }
 
 function SchedulePreviewPage() {

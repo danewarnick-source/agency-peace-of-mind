@@ -239,7 +239,17 @@ function SchedulePreviewPage() {
             Read-only view of your existing schedule. Nothing here can edit shifts.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="ghost" size="sm" asChild className="min-h-[44px]">
+            <Link to="/dashboard/homes">
+              <Home className="h-4 w-4 mr-1" /> Homes &amp; Teams
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="min-h-[44px]" title="Legacy individual-services scheduler (recurring shifts)">
+            <Link to="/dashboard/scheduling" search={{ mode: "individual" }}>
+              Legacy 1-on-1
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" onClick={goPrev} className="min-h-[44px]">
             <ChevronLeft className="h-4 w-4" />
           </Button>

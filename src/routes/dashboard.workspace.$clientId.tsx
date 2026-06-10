@@ -38,6 +38,7 @@ import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
 import { ReimbursementShiftPanel } from "@/components/staff-mobile/reimbursement-shift-panel";
 import { ClientSpendingShiftPanel } from "@/components/staff-mobile/client-spending-shift-panel";
 import { useActiveShift } from "@/hooks/use-active-shift";
+import { useTodayShifts } from "@/hooks/use-today-shifts";
 import { ClientPhoto } from "@/components/client-photo";
 import { useClientFeature } from "@/lib/client-features";
 

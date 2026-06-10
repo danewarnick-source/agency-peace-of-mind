@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, FileText, Sparkles, Archive, Send, Edit3, Trash2 } from "lucide-react";
+import { Plus, FileText, Sparkles, Archive, Send, Edit3, Trash2, ChevronRight } from "lucide-react";
 import { useEffectiveView } from "@/hooks/use-effective-view";
+import { useCaseload } from "@/hooks/use-caseload";
 import {
   listForms, listMyForms, archiveForm, saveForm,
   getMyFormNotifications, markFormNotificationsRead,
@@ -127,12 +128,25 @@ type FormRow = {
 };
 
 function StaffList() {
+  const navigate = useNavigate();
   const fetchMine = useServerFn(listMyForms);
   const fetchBell = useServerFn(getMyFormNotifications);
   const markRead = useServerFn(markFormNotificationsRead);
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["my-forms"], queryFn: () => fetchMine() });
   const { data: bell } = useQuery({ queryKey: ["my-form-notifs"], queryFn: () => fetchBell() });
+
+  // A staff form is submitted in the context of a client, and the fill screen
+  // requires a clientId. Forms here are assigned to the staff (not a client), so
+  // "Complete form" opens a picker of the staff member's caseload; choosing a
+  // client navigates to the fill screen WITH the required clientId.
+  const { data: caseload = [], isLoading: caseloadLoading } = useCaseload();
+  const [pickFor, setPickFor] = useState<FormRow | null>(null);
+  function chooseClient(clientId: string) {
+    const f = pickFor;
+    setPickFor(null);
+    if (f) navigate({ to: "/dashboard/forms/$formId/fill", params: { formId: f.id }, search: { clientId } });
+  }
 
   const [popup, setPopup] = useState<{ id: string; title: string; body: string } | null>(null);
   useEffect(() => {
@@ -177,8 +191,8 @@ function StaffList() {
             const due = dueDateFor(f.frequency, f.schedule);
             const overdue = isOverdue(due);
             return (
-              <Link key={f.id} to="/dashboard/forms/$formId/fill" params={{ formId: f.id }}
-                className="block rounded-lg border border-border bg-card p-4 hover:bg-muted/40 min-h-[44px]">
+              <button key={f.id} type="button" onClick={() => setPickFor(f)}
+                className="block w-full text-left rounded-lg border border-border bg-card p-4 hover:bg-muted/40 min-h-[44px]">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-semibold truncate">{f.name}</p>
@@ -186,8 +200,10 @@ function StaffList() {
                   </div>
                   <Badge variant={overdue ? "destructive" : "secondary"}>{overdue ? "Overdue" : "Due"} {formatDue(due)}</Badge>
                 </div>
-                <Button size="sm" className="mt-3 min-h-[40px]"><Send className="mr-1.5 h-3.5 w-3.5" /> Complete form</Button>
-              </Link>
+                <span className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground min-h-[40px]">
+                  <Send className="h-3.5 w-3.5" /> Complete form
+                </span>
+              </button>
             );
           })}
           {buckets.due.length === 0 && <Empty>All caught up.</Empty>}
@@ -197,12 +213,14 @@ function StaffList() {
       <Section title="Start anytime" subtitle="Forms you can submit whenever you like.">
         <div className="grid gap-2 md:grid-cols-2">
           {buckets.anytime.map((f) => (
-            <Link key={f.id} to="/dashboard/forms/$formId/fill" params={{ formId: f.id }}
-              className="block rounded-lg border border-border bg-card p-4 hover:bg-muted/40 min-h-[44px]">
+            <button key={f.id} type="button" onClick={() => setPickFor(f)}
+              className="block w-full text-left rounded-lg border border-border bg-card p-4 hover:bg-muted/40 min-h-[44px]">
               <p className="font-semibold truncate">{f.name}</p>
               <p className="text-xs text-muted-foreground">As needed</p>
-              <Button size="sm" className="mt-3 min-h-[40px]"><Send className="mr-1.5 h-3.5 w-3.5" /> Complete form</Button>
-            </Link>
+              <span className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground min-h-[40px]">
+                <Send className="h-3.5 w-3.5" /> Complete form
+              </span>
+            </button>
           ))}
           {buckets.anytime.length === 0 && <Empty>No anytime forms assigned.</Empty>}
         </div>
@@ -219,6 +237,35 @@ function StaffList() {
           {buckets.submitted.length === 0 && <Empty>No submissions yet this period.</Empty>}
         </div>
       </Section>
+
+      <Dialog open={!!pickFor} onOpenChange={(o) => !o && setPickFor(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Which client is this form for?</DialogTitle></DialogHeader>
+          {pickFor && <p className="text-sm text-muted-foreground">{pickFor.name}</p>}
+          {caseloadLoading ? (
+            <p className="py-4 text-sm text-muted-foreground">Loading your clients…</p>
+          ) : caseload.length === 0 ? (
+            <p className="py-4 text-sm text-muted-foreground">
+              You don't have any assigned clients yet. Ask your administrator to assign you to a
+              client before completing this form.
+            </p>
+          ) : (
+            <div className="max-h-72 space-y-1 overflow-y-auto py-1">
+              {caseload.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => chooseClient(c.id)}
+                  className="flex min-h-[44px] w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2.5 text-left text-sm hover:bg-muted"
+                >
+                  <span className="font-medium">{c.last_name}, {c.first_name}</span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!popup} onOpenChange={(o) => !o && dismissPopup()}>
         <DialogContent className="max-w-md">

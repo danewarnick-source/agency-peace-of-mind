@@ -44,9 +44,10 @@ function ReportsPage() {
 function StandardReports() {
   const { data: org } = useCurrentOrg();
 
+  // Training reports (1–3) come from course_assignments…
   const { data: assigns } = useQuery({
     enabled: !!org,
-    queryKey: ["report-data", org?.organization_id],
+    queryKey: ["report-assignments", org?.organization_id],
     queryFn: async () => {
       const { data } = await supabase
         .from("course_assignments")
@@ -56,30 +57,115 @@ function StandardReports() {
     },
   });
 
-  const exportCsv = (name: string) => {
-    if (!assigns?.length) return toast.error("Nothing to export yet");
-    const rows = [
-      ["user_id", "course", "category", "status", "progress", "due_date", "completed_at"],
-      ...assigns.map((a) => [
-        a.user_id, (a.courses as { title: string } | null)?.title ?? "",
-        (a.courses as { category: string } | null)?.category ?? "",
-        a.status, String(a.progress), a.due_date ?? "", a.completed_at ?? "",
-      ]),
-    ];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  // …while Certification Renewals comes from external_certifications (uploaded
+  // staff credentials with an expiry), a completely different dataset.
+  const { data: certs } = useQuery({
+    enabled: !!org,
+    queryKey: ["report-external-certs", org?.organization_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("external_certifications")
+        .select("user_id, cert_name, cert_type, status, expires_at, issuer")
+        .eq("organization_id", org!.organization_id)
+        .not("expires_at", "is", null);
+      return data ?? [];
+    },
+  });
+
+  const courseTitle = (a: { courses: unknown }) =>
+    (a.courses as { title: string } | null)?.title ?? "";
+  const courseCategory = (a: { courses: unknown }) =>
+    (a.courses as { category: string } | null)?.category ?? "";
+
+  const download = (
+    filename: string,
+    headers: string[],
+    rows: Array<Array<string | number | null>>,
+  ) => {
+    const all = [headers, ...rows];
+    const csv = all
+      .map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${name}.csv`; a.click();
+    a.href = url;
+    a.download = `${filename}.csv`;
+    a.click();
     URL.revokeObjectURL(url);
     toast.success("Report downloaded");
   };
 
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 1) Compliance Summary — every training assignment.
+  const exportComplianceSummary = () => {
+    const list = assigns ?? [];
+    if (!list.length) return toast.error("No training assignments to export yet");
+    download(
+      "compliance-summary",
+      ["user_id", "course", "category", "status", "progress", "due_date", "completed_at"],
+      list.map((a) => [
+        a.user_id, courseTitle(a), courseCategory(a),
+        a.status, a.progress, a.due_date ?? "", a.completed_at ?? "",
+      ]),
+    );
+  };
+
+  // 2) Training Completion — only completed assignments.
+  const exportTrainingCompletion = () => {
+    const list = (assigns ?? []).filter((a) => a.status === "completed" || !!a.completed_at);
+    if (!list.length) return toast.error("No completed training to export yet");
+    download(
+      "training-completion",
+      ["user_id", "course", "category", "completed_at", "progress"],
+      list.map((a) => [
+        a.user_id, courseTitle(a), courseCategory(a), a.completed_at ?? "", a.progress,
+      ]),
+    );
+  };
+
+  // 3) Overdue Training — past the due date and not yet completed.
+  const exportOverdueTraining = () => {
+    const list = (assigns ?? []).filter((a) => {
+      if (a.status === "completed" || a.completed_at) return false;
+      if (a.status === "overdue") return true;
+      return !!a.due_date && a.due_date.slice(0, 10) < today;
+    });
+    if (!list.length) return toast.error("No overdue training to export — nothing is past due");
+    download(
+      "overdue-training",
+      ["user_id", "course", "category", "status", "due_date", "progress"],
+      list.map((a) => [
+        a.user_id, courseTitle(a), courseCategory(a), a.status, a.due_date ?? "", a.progress,
+      ]),
+    );
+  };
+
+  // 4) Certification Renewals — external certs expiring within the next 90 days.
+  const exportCertificationRenewals = () => {
+    const startMs = Date.now();
+    const horizonMs = startMs + 90 * 24 * 60 * 60 * 1000;
+    const list = (certs ?? []).filter((c) => {
+      if (!c.expires_at) return false;
+      const t = new Date(c.expires_at).getTime();
+      return isFinite(t) && t >= startMs && t <= horizonMs;
+    });
+    if (!list.length) return toast.error("No certifications expiring in the next 90 days");
+    download(
+      "certification-renewals",
+      ["user_id", "certification", "type", "status", "expires_at", "issuer"],
+      list.map((c) => [
+        c.user_id, c.cert_name ?? "", c.cert_type, c.status, c.expires_at ?? "", c.issuer ?? "",
+      ]),
+    );
+  };
+
   const reports = [
-    { name: "Compliance Summary", desc: "All training assignments with status and progress." },
-    { name: "Training Completion", desc: "Completed courses across the organization." },
-    { name: "Overdue Training", desc: "Assignments past their due date." },
-    { name: "Certification Renewals", desc: "Certificates expiring in the next 90 days." },
+    { name: "Compliance Summary", desc: "All training assignments with status and progress.", onExport: exportComplianceSummary },
+    { name: "Training Completion", desc: "Completed courses across the organization.", onExport: exportTrainingCompletion },
+    { name: "Overdue Training", desc: "Assignments past their due date.", onExport: exportOverdueTraining },
+    { name: "Certification Renewals", desc: "Certificates expiring in the next 90 days.", onExport: exportCertificationRenewals },
   ];
 
   return (
@@ -95,7 +181,7 @@ function StandardReports() {
               <p className="text-xs text-muted-foreground">{r.desc}</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => exportCsv(r.name.toLowerCase().replace(/\s+/g, "-"))}>
+          <Button variant="outline" size="sm" onClick={r.onExport}>
             <FileDown className="mr-2 h-3.5 w-3.5" /> Download CSV
           </Button>
         </div>

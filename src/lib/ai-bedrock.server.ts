@@ -173,7 +173,9 @@ import { InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 export interface GatewayFetchResponse {
   ok: boolean;
   status: number;
-  json(): Promise<unknown>;
+  // Loose return type — call sites consume varied shapes (chat completions,
+  // embeddings, tool calls). Narrow inside the caller as needed.
+  json(): Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   text(): Promise<string>;
 }
 
@@ -360,7 +362,8 @@ export async function gatewayFetch(
       modelId,
       system: systemPrompt ? [{ text: systemPrompt }] : undefined,
       messages: convo,
-      toolConfig,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      toolConfig: toolConfig as any,
       inferenceConfig: {
         maxTokens: body.max_tokens ?? 4096,
         temperature: body.temperature ?? 0.2,

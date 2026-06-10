@@ -231,7 +231,23 @@ export function NectarCommandBar({
         <p style={{ margin: 0, fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: SCHED.muted }}>
           Advisory only — proposals are reviewed before any shift is saved.
         </p>
-        <button onClick={() => setImportOpen(true)} style={{ background: "#fff", border: `1px solid ${SCHED.line}`, borderRadius: 9, padding: "6px 11px", fontSize: 12.5, fontWeight: 600, color: SCHED.ink, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <button
+          onClick={() => setImportOpen(true)}
+          style={{
+            background: "#0B1126",
+            border: "1px solid #f5a623",
+            boxShadow: "inset 0 0 0 1px rgba(245,166,35,0.25)",
+            borderRadius: 9,
+            padding: "6px 11px",
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: "#ffffff",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
           <Upload className="h-3.5 w-3.5" /> Import a schedule
         </button>
       </div>

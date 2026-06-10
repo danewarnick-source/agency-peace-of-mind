@@ -3547,6 +3547,64 @@ export type Database = {
           },
         ]
       }
+      general_shifts: {
+        Row: {
+          category: string
+          clock_in_timestamp: string
+          clock_out_timestamp: string | null
+          created_at: string
+          id: string
+          note: string | null
+          organization_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          clock_in_timestamp?: string
+          clock_out_timestamp?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          organization_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          clock_in_timestamp?: string
+          clock_out_timestamp?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          organization_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "general_shifts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "general_shifts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "general_shifts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hhs_client_inventories: {
         Row: {
           added_on: string

@@ -34,6 +34,7 @@ import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.supe
 import { Route as DashboardSmartImportRouteImport } from './routes/dashboard.smart-import'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardSchedulingRouteImport } from './routes/dashboard.scheduling'
+import { Route as DashboardSchedulePreviewRouteImport } from './routes/dashboard.schedule-preview'
 import { Route as DashboardScheduleRouteImport } from './routes/dashboard.schedule'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
@@ -264,6 +265,12 @@ const DashboardSchedulingRoute = DashboardSchedulingRouteImport.update({
   path: '/scheduling',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSchedulePreviewRoute =
+  DashboardSchedulePreviewRouteImport.update({
+    id: '/schedule-preview',
+    path: '/schedule-preview',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardScheduleRoute = DashboardScheduleRouteImport.update({
   id: '/schedule',
   path: '/schedule',
@@ -882,6 +889,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/schedule': typeof DashboardScheduleRoute
+  '/dashboard/schedule-preview': typeof DashboardSchedulePreviewRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
@@ -1008,6 +1016,7 @@ export interface FileRoutesByTo {
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/schedule': typeof DashboardScheduleRoute
+  '/dashboard/schedule-preview': typeof DashboardSchedulePreviewRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
@@ -1139,6 +1148,7 @@ export interface FileRoutesById {
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/roles': typeof DashboardRolesRoute
   '/dashboard/schedule': typeof DashboardScheduleRoute
+  '/dashboard/schedule-preview': typeof DashboardSchedulePreviewRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
@@ -1272,6 +1282,7 @@ export interface FileRouteTypes {
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/schedule'
+    | '/dashboard/schedule-preview'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
     | '/dashboard/smart-import'
@@ -1398,6 +1409,7 @@ export interface FileRouteTypes {
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/schedule'
+    | '/dashboard/schedule-preview'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
     | '/dashboard/super-admin'
@@ -1528,6 +1540,7 @@ export interface FileRouteTypes {
     | '/dashboard/reports'
     | '/dashboard/roles'
     | '/dashboard/schedule'
+    | '/dashboard/schedule-preview'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
     | '/dashboard/smart-import'
@@ -1803,6 +1816,13 @@ declare module '@tanstack/react-router' {
       path: '/scheduling'
       fullPath: '/dashboard/scheduling'
       preLoaderRoute: typeof DashboardSchedulingRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/schedule-preview': {
+      id: '/dashboard/schedule-preview'
+      path: '/schedule-preview'
+      fullPath: '/dashboard/schedule-preview'
+      preLoaderRoute: typeof DashboardSchedulePreviewRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/schedule': {
@@ -2772,6 +2792,7 @@ interface DashboardRouteChildren {
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardScheduleRoute: typeof DashboardScheduleRoute
+  DashboardSchedulePreviewRoute: typeof DashboardSchedulePreviewRoute
   DashboardSchedulingRoute: typeof DashboardSchedulingRoute
   DashboardSettingsRoute: typeof DashboardSettingsRouteWithChildren
   DashboardSmartImportRoute: typeof DashboardSmartImportRouteWithChildren
@@ -2847,6 +2868,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,
   DashboardScheduleRoute: DashboardScheduleRoute,
+  DashboardSchedulePreviewRoute: DashboardSchedulePreviewRoute,
   DashboardSchedulingRoute: DashboardSchedulingRoute,
   DashboardSettingsRoute: DashboardSettingsRouteWithChildren,
   DashboardSmartImportRoute: DashboardSmartImportRouteWithChildren,
@@ -2914,13 +2936,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

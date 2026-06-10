@@ -288,6 +288,7 @@ function SchedulePreviewPage() {
           view={view}
           setView={setView}
           settings={settings}
+          onOpenEditor={openEditor}
         />
       ) : null}
 
@@ -295,6 +296,16 @@ function SchedulePreviewPage() {
         Site type inferred from shift codes ({"{HHS, RHS, DSG, RL6, RP3, RP4, RP5}"} = residential). Clients with no
         team are grouped as “1-on-1 Services”.
       </p>
+
+      <ShiftEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        ctx={editorCtx}
+        clients={data?.clients ?? []}
+        staff={data?.staff ?? []}
+        siteId={siteId}
+        weekStartIso={weekStart.toISOString()}
+      />
     </PageShell>
   );
 }

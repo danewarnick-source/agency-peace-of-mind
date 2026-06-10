@@ -47,8 +47,7 @@ export const parseScheduleSentence = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => InputSchema.parse(input))
   .handler(async ({ data }): Promise<NectarScheduleResult> => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("AI gateway is not configured.");
+    // AI credentials are validated inside the Bedrock adapter (fails loudly).
 
     const system = `You are NECTAR, a scheduling assistant. Parse the user's sentence
 into a structured shift proposal for ONE client.
@@ -213,8 +212,7 @@ export const parseCoverageSentence = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => CoverageInputSchema.parse(input))
   .handler(async ({ data }): Promise<NectarCoverageResult> => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("AI gateway is not configured.");
+    // AI credentials are validated inside the Bedrock adapter (fails loudly).
 
     const system = `You are NECTAR, a residential coverage assistant. Parse the user's
 sentence into a list of slot picks for ONE home this week.

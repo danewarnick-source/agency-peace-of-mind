@@ -518,7 +518,7 @@ function SiteWeekGrid({
       return (
         <button
           onClick={quickAdd}
-          className="group w-full h-full min-h-[36px] flex items-center justify-center rounded-md opacity-0 hover:opacity-100 focus:opacity-100 transition"
+          className="w-full min-h-[36px] flex items-center justify-center rounded-md opacity-40 hover:opacity-100 focus:opacity-100 transition"
           style={{ border: "1px dashed rgba(13,17,43,0.2)" }}
           aria-label="Add shift"
         >

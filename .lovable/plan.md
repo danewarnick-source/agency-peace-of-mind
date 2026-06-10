@@ -1,52 +1,36 @@
 ## Problem
 
-Clicking "Review placement" on the Smart Import summary updates the URL to `/dashboard/smart-import/<jobId>/review`, but the visible page stays on the Smart Import landing screen. Same root cause will affect `…/done` and `…/history`.
+The `/reset-password` page calls `supabase.auth.updateUser({ password })` directly, but does nothing to establish a session from the recovery link. When the user clicks the email link, Supabase redirects to `/reset-password#access_token=...&type=recovery` (or `?code=...` for PKCE flow). The client must either:
 
-## Why
+- detect the PASSWORD_RECOVERY event from `onAuthStateChange`, or
+- call `supabase.auth.exchangeCodeForSession(code)` when a `?code=` is present.
 
-`src/routes/dashboard.smart-import.tsx` has child routes in the file tree:
+Without that, there is no session → `updateUser` throws **"Auth session missing!"**.
 
-```text
-dashboard.smart-import.tsx                  ← parent
-dashboard.smart-import.$jobId.review.tsx    ← child
-dashboard.smart-import.$jobId.done.tsx      ← child
-dashboard.smart-import.history.tsx          ← child
-```
+A second contributing factor: `AuthProvider` clears the React Query cache on every identity change. The recovery link establishes a brand-new session on this tab, which is fine, but we need to make sure the reset page renders the form regardless and surfaces a clear error if the link is expired/invalid.
 
-In TanStack's flat file routing this makes `dashboard.smart-import.tsx` a layout for its children. A layout MUST render `<Outlet />` for child routes to appear. The current file renders the landing UI directly with no `<Outlet />`, so child routes match the URL but render nowhere — the parent UI stays mounted.
+## Fix (single file: `src/routes/reset-password.tsx`)
 
-## Fix (smallest, conventional)
-
-Split the parent into a real layout + an index route. No logic changes.
-
-1. Create `src/routes/dashboard.smart-import.index.tsx` containing the current landing/summary page (everything that's in `dashboard.smart-import.tsx` today — `SmartImportPage`, `SummaryView`, helpers, imports). This becomes the `/dashboard/smart-import` route.
-
-2. Replace `src/routes/dashboard.smart-import.tsx` with a minimal pathless layout:
-
-   ```tsx
-   import { createFileRoute, Outlet } from "@tanstack/react-router";
-   export const Route = createFileRoute("/dashboard/smart-import")({
-     component: () => <Outlet />,
-   });
-   ```
-
-That's it. The router auto-regenerates `routeTree.gen.ts`.
-
-## What this fixes
-
-- `Review placement` → renders `dashboard.smart-import.$jobId.review.tsx`.
-- `…/done` → renders the Done page (post-commit screen, undo, etc.).
-- `Import history` link → renders the History page in place instead of falling back to the landing UI.
-- Landing UI at `/dashboard/smart-import` is unchanged (now served by `…index.tsx`).
+1. On mount, inspect the URL:
+   - If `window.location.search` contains `code`, call `supabase.auth.exchangeCodeForSession(code)`. On success, clean the URL (`history.replaceState`).
+   - Else if `window.location.hash` contains `type=recovery` with `access_token` + `refresh_token`, call `supabase.auth.setSession({ access_token, refresh_token })`, then clean the hash.
+   - Also subscribe to `supabase.auth.onAuthStateChange`; treat `PASSWORD_RECOVERY` as "ready".
+2. Track three states: `verifying`, `ready`, `error`.
+   - `verifying` → show "Verifying reset link…"
+   - `error` → show "This reset link is invalid or has expired" + link back to `/forgot-password`.
+   - `ready` → show the existing new-password form.
+3. Keep the existing `updateUser({ password })` + `must_change_password=false` update + redirect to `/dashboard`. No other behavior changes.
+4. No changes to `forgot-password.tsx` — it already passes the correct `redirectTo`.
 
 ## Out of scope
 
-- No changes to RLS, upload paths, server functions, or any review/done/history page logic.
-- No new routes or features.
+- No backend/SQL changes.
+- No changes to `AuthProvider`, router, or other routes.
+- No change to the email template or Supabase auth config.
 
-## Verification
+## Verify
 
-- Visit `/dashboard/smart-import` → landing page renders (unchanged).
-- Upload a doc, click `Review placement` → review page renders at `/dashboard/smart-import/<jobId>/review`.
-- Click `Import history` → history page renders at `/dashboard/smart-import/history`.
-- After commit, Done page renders at `/dashboard/smart-import/<jobId>/done`.
+- Request a reset for `trueblueprobert@gmail.com` from `/forgot-password`.
+- Open the email link → lands on `/reset-password`, briefly shows "Verifying…", then the form.
+- Submit a new password → success toast, redirected to `/dashboard`.
+- Open a stale/expired link → friendly "invalid or expired" message, no console crash.

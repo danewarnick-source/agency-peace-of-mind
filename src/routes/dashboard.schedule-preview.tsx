@@ -36,6 +36,8 @@ import {
   type ClientRow,
   type StaffRow,
 } from "@/hooks/use-schedule-preview";
+import { ShiftEditorDialog, type EditorContext } from "@/components/schedule-preview/shift-editor";
+import { Plus } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/schedule-preview")({
   head: () => ({
@@ -133,6 +135,9 @@ function SchedulePreviewPage() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [siteId, setSiteId] = useState<string>("__all__");
   const [view, setView] = useState<ViewMode>(settings.defaultView);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorCtx, setEditorCtx] = useState<EditorContext | null>(null);
+  const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
   // Re-sync default view when settings change
   useEffect(() => { setView(settings.defaultView); }, [settings.defaultView]);

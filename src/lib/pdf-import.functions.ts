@@ -214,9 +214,6 @@ Prompting levels (informational): prompting_levels (array of strings)
 Additional information: additional_sections — for diagnoses (with ICD-10), allergies, immunizations, risk assessment, daily schedule, communication dictionary, financial / rep-payee, support team roster, HRC review history, rights restrictions, and any other rich block that does not map above. Each item: {label, content}. Keep content concise but complete (up to ~2000 chars).`;
 
 async function runExtraction(docText: string, sourceLabel: string): Promise<ExtractedClient> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY not configured");
-
   if (!docText.trim()) {
     throw new Error(`Could not read any text from this ${sourceLabel}.`);
   }
@@ -225,43 +222,36 @@ async function runExtraction(docText: string, sourceLabel: string): Promise<Extr
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 55_000);
-  let res: Response;
+
+  const { callBedrockChatCompletions, BedrockError } = await import("@/lib/ai-bedrock.server");
+  let raw: string | undefined;
   try {
-    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    const json = await callBedrockChatCompletions({
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `${USER_INSTRUCTIONS}\n\n--- DOCUMENT TEXT START ---\n${truncated}\n--- DOCUMENT TEXT END ---`,
+        },
+      ],
+      response_format: { type: "json_object" },
       signal: controller.signal,
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `${USER_INSTRUCTIONS}\n\n--- DOCUMENT TEXT START ---\n${truncated}\n--- DOCUMENT TEXT END ---`,
-          },
-        ],
-        response_format: { type: "json_object" },
-      }),
+      maxTokens: 8192,
     });
+    raw = json.choices?.[0]?.message?.content;
   } catch (e) {
     clearTimeout(timeoutId);
     if ((e as { name?: string })?.name === "AbortError") {
       throw new Error("AI request timed out. Please try again — large documents may need a retry.");
     }
+    if (e instanceof BedrockError) {
+      if (e.status === 429) throw new Error("AI rate limit — try again shortly.");
+      throw new Error(e.message);
+    }
     throw e;
   }
   clearTimeout(timeoutId);
 
-  if (!res.ok) {
-    const t = await res.text();
-    if (res.status === 429) throw new Error("AI rate limit — try again shortly.");
-    if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Lovable AI.");
-    if (res.status === 504 || res.status === 524) throw new Error("AI request timed out. Please try again.");
-    throw new Error(`AI gateway error: ${res.status} ${t.slice(0, 200)}`);
-  }
-
-  const j = await res.json();
-  const raw = j.choices?.[0]?.message?.content;
   if (!raw) throw new Error("AI returned no content");
   const tryParse = (s: string): unknown => {
     try { return JSON.parse(s); } catch { return undefined; }

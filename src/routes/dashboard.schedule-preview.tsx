@@ -38,6 +38,7 @@ import {
 } from "@/hooks/use-schedule-preview";
 import { ShiftEditorDialog, type EditorContext } from "@/components/schedule-preview/shift-editor";
 import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
+import { NectarCommandBar } from "@/components/schedule-preview/nectar-command-bar";
 import { useOrgScheduleRequests, buildApprovedTimeOffIndex } from "@/lib/schedule-requests";
 import { Plus } from "lucide-react";
 
@@ -272,6 +273,14 @@ function SchedulePreviewPage() {
           ))}
         </div>
       </div>
+
+      <NectarCommandBar
+        weekStart={weekStart}
+        clients={data?.clients ?? []}
+        staff={data?.staff ?? []}
+        teams={data?.teams ?? []}
+        shifts={data?.shifts ?? []}
+      />
 
       {isLoading ? (
         <Card className="p-8 mt-4 text-sm opacity-70 text-center">Loading schedule…</Card>

@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HIVE — Schedule (demo v5)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B1126; --gold:#f5a623; --teal:#137182; --ink:#0d112b;
+    --paper:#f6f7fb; --card:#fff; --line:#e6e8f0; --muted:#6b7280;
+    --gap:#e0463e; --gap-bg:#fdeceb; --ok:#1f9d6b; --ok-bg:#e8f6f0;
+    --warn:#b8791a; --warn-bg:#fdf3e3; --teal-bg:#e6f1f3; --purple:#5b4b9e; --purple-bg:#eeeafb;
+    --shadow:0 1px 2px rgba(11,17,38,.06),0 8px 24px rgba(11,17,38,.06);
+    font-family:"Plus Jakarta Sans",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-size:14px;line-height:1.45}
+  button{font-family:inherit;cursor:pointer}
+  .demo-banner{background:var(--gold);color:var(--ink);text-align:center;font-weight:700;font-size:12px;letter-spacing:.04em;padding:6px;text-transform:uppercase}
+  .topbar{background:var(--navy);color:#fff;display:flex;align-items:center;gap:18px;padding:12px 22px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px}
+  .brand .dot{width:22px;height:22px;border-radius:6px;background:var(--gold);display:grid;place-items:center;color:var(--navy);font-weight:800;font-size:13px}
+  .topbar nav{display:flex;gap:6px;margin-left:8px}
+  .topbar nav a{color:#c8ccdd;text-decoration:none;padding:7px 12px;border-radius:8px;font-weight:600;font-size:13px}
+  .topbar nav a.active{background:rgba(255,255,255,.1);color:#fff}
+  .topbar .spacer{flex:1}
+  .who{display:flex;align-items:center;gap:9px;font-weight:600;font-size:13px}
+  .who .av{width:28px;height:28px;border-radius:50%;background:var(--teal);display:grid;place-items:center;font-size:12px;font-weight:700}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px}
+  .head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:14px}
+  .head h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .head p{margin:4px 0 0;color:var(--muted);font-weight:500}
+  .actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:9px 14px;border-radius:10px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:#cfd3e2}
+  .btn.teal{background:var(--teal);border-color:var(--teal);color:#fff}
+  .btn .ic{font-size:15px;line-height:1}
+
+  .nbar{display:flex;gap:9px;align-items:center;background:var(--navy);border-radius:12px;padding:8px 8px 8px 14px;margin-bottom:14px}
+  .nbar .orb{width:26px;height:26px;border-radius:8px;background:var(--gold);display:grid;place-items:center;color:var(--navy);font-weight:800;font-size:13px;flex:none}
+  .nbar input{flex:1;background:transparent;border:none;outline:none;color:#fff;font-size:14px;font-family:inherit;min-width:0}
+  .nbar input::placeholder{color:#8b93b0}
+  .nbar .send{background:var(--gold);color:var(--navy);border:none;border-radius:9px;padding:8px 15px;font-weight:700;font-size:13px;flex:none}
+  .nbar .ex{background:transparent;border:none;color:#aeb6cf;font-size:12px;font-weight:600;flex:none;padding:0 6px}
+  .nresp{background:#fff;border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.5;margin-bottom:14px;display:none}
+  .nresp.show{display:block}
+  .nresp .h{font-weight:800;color:var(--teal);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+  .nresp .cta{margin-top:9px;display:flex;gap:8px}
+  .nresp .cta button{border-radius:8px;padding:7px 12px;font-weight:700;font-size:12.5px;border:1px solid var(--line);background:#fff}
+  .nresp .cta button.go{background:var(--gold);border-color:var(--gold)}
+  .exrow{flex-wrap:wrap;gap:7px;margin-bottom:14px;display:none}
+  .exrow.show{display:flex}
+  .exrow button{background:#fff;border:1px solid var(--line);border-radius:99px;padding:7px 13px;font-size:12.5px;font-weight:600;color:var(--ink)}
+  .exrow button:hover{border-color:var(--teal);color:var(--teal)}
+
+  .controls{background:var(--card);border:1px solid var(--line);border-radius:14px 14px 0 0;border-bottom:none;padding:11px 14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .weeknav{display:flex;align-items:center;gap:9px}
+  .weeknav b{font-size:14px;white-space:nowrap}
+  .arrow{border:1px solid var(--line);background:#fff;width:28px;height:28px;border-radius:8px;font-size:14px}
+  .homes{display:flex;gap:6px;flex-wrap:wrap}
+  .homes button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:7px;color:var(--ink)}
+  .homes button.active{background:var(--navy);border-color:var(--navy);color:#fff}
+  .homes button .od{width:7px;height:7px;border-radius:50%;background:var(--gap)}
+  .spacer{flex:1}
+  .seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{border:none;background:#fff;padding:7px 13px;font-weight:700;font-size:12.5px;color:var(--muted)}
+  .seg button.active{background:var(--teal-bg);color:#0c5562}
+  .seg.disabled{opacity:.4;pointer-events:none}
+
+  .board{background:var(--card);border:1px solid var(--line);border-radius:0 0 16px 16px;box-shadow:var(--shadow);overflow:hidden}
+  .grid{width:100%;border-collapse:collapse;table-layout:fixed}
+  .grid th,.grid td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);vertical-align:top}
+  .grid th{background:#fbfbfe;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;padding:9px 8px;text-align:center}
+  .grid th.rh{text-align:left}
+  .grid .rowhead{width:150px;padding:10px 12px;font-weight:700;font-size:13px;background:#fbfbfe}
+  .grid .rowhead small{display:block;color:var(--muted);font-weight:500;font-size:11px;margin-top:1px}
+  .grid td{padding:6px;height:66px}
+  .grid td:last-child,.grid th:last-child{border-right:none}
+  table.compact td{height:44px;padding:4px}
+  table.compact .chip{padding:3px 7px;font-size:11px;margin-bottom:3px}
+  table.compact .chip small{font-size:9.5px}
+
+  .chip{display:block;border-radius:8px;padding:5px 8px;margin-bottom:4px;font-size:11.5px;font-weight:600;border:1px solid transparent;cursor:pointer}
+  .chip:hover{filter:brightness(.97);box-shadow:0 0 0 2px rgba(19,113,130,.15)}
+  .chip small{display:block;font-weight:500;opacity:.82;font-size:10px}
+  .chip.off{background:#f1f2f6;border-color:#e3e5ee;color:#8a8fa3;font-style:italic;cursor:default}
+  .chip.off:hover{filter:none;box-shadow:none}
+  .chip.gap{background:var(--gap-bg);border-color:#f3c9c6;color:var(--gap);display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .chip.gap .post{background:var(--gap);color:#fff;border-radius:6px;font-size:9.5px;padding:2px 6px;font-weight:700}
+  .addcell{display:block;width:100%;text-align:center;border:1px dashed transparent;background:transparent;color:#c4c8d4;border-radius:7px;padding:2px;font-size:15px;font-weight:700;line-height:1.1;margin-top:1px}
+  td:hover .addcell{border-color:#dde0ea;color:var(--muted)}
+  .addcell:hover{border-color:var(--teal)!important;color:var(--teal)!important}
+
+  .status{display:flex;align-items:center;justify-content:center;height:100%;font-weight:700;font-size:12px;border-radius:8px;gap:6px}
+  .status.cov{background:var(--ok-bg);color:#0e6a45}
+  .status.open{background:var(--gap-bg);color:var(--gap);cursor:pointer}
+  .status .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .drill{cursor:pointer}.drill:hover .rowhead{color:var(--teal)}
+  .hint{color:var(--muted);font-size:12px;padding:10px 14px;border-top:1px solid var(--line);background:#fbfbfe}
+  .note{margin-top:14px;color:var(--muted);font-size:12.5px;text-align:center}
+
+  .cov24{font-size:10px;font-weight:800;border-radius:6px;padding:2px 6px;margin-bottom:5px;text-align:center}
+  .cov24.ok{background:var(--ok-bg);color:#0e6a45}
+  .cov24.bad{background:var(--warn-bg);color:var(--warn)}
+  .drop{border:2px dashed #cfd4e2;border-radius:12px;padding:24px;text-align:center;color:var(--muted);font-weight:600;cursor:pointer}
+  .drop:hover{border-color:var(--teal);color:var(--teal)}
+  .drop .big{font-size:28px}
+  .modal textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-family:inherit;font-size:13px;min-height:60px;resize:vertical}
+  .nectar-import{display:none;margin-top:12px;background:var(--teal-bg);border:1px solid #cfe4e8;border-left:3px solid var(--teal);border-radius:10px;padding:12px;font-size:13px;color:#0c5562;line-height:1.5}
+  .nectar-import.show{display:block}
+  .nectar-import .h{font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+
+  /* under-board week strip */
+  .weekstrip{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:760px){.weekstrip{grid-template-columns:1fr}}
+  .wcard{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .wcard .wh{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .wcard .wh b{font-size:13.5px;font-weight:800}
+  .wcard .wh .cnt{background:var(--gap-bg);color:var(--gap);font-size:11px;font-weight:800;border-radius:99px;padding:2px 9px}
+  .wcard .wh .cnt.calm{background:var(--teal-bg);color:#0c5562}
+  .wbody{padding:6px 14px 10px;max-height:230px;overflow:auto}
+  .wrow{display:flex;align-items:center;gap:10px;padding:10px 0}
+  .wrow + .wrow{border-top:1px solid #f0f1f6}
+  .wrow .av{width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;display:grid;place-items:center;font-weight:700;font-size:11px;flex:none}
+  .wrow .info{flex:1;min-width:0}.wrow .info b{font-size:13px;font-weight:700;display:block}.wrow .info span{display:block;color:var(--muted);font-size:12px}
+  .wtag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;flex:none}
+  .wtag.pto{background:var(--teal-bg);color:#0c5562}.wtag.sick{background:var(--warn-bg);color:var(--warn)}.wtag.swap{background:var(--purple-bg);color:#463b7e}
+  .acts{display:flex;gap:6px;flex:none}
+  .wbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 9px;font-weight:700;font-size:11.5px}
+  .wbtn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+  .wbtn.deny:hover{border-color:var(--gap);color:var(--gap)}
+  .wempty{color:var(--muted);text-align:center;padding:22px 8px;font-weight:500;font-size:12.5px}
+  .wempty .big{font-size:26px;margin-bottom:5px}
+
+  /* drawer */
+  .scrim{position:fixed;inset:0;background:rgba(11,17,38,.45);display:none;z-index:40}.scrim.show{display:block}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:430px;max-width:92vw;background:#fff;box-shadow:-12px 0 40px rgba(11,17,38,.25);transform:translateX(100%);transition:transform .25s;z-index:50;overflow:auto}
+  .drawer.show{transform:translateX(0)}
+  .dh{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}
+  .dh h3{margin:0;font-size:18px;font-weight:800}.dh .x{border:none;background:#f1f2f6;width:30px;height:30px;border-radius:8px;font-size:16px}
+  .sect{padding:16px 20px;border-bottom:1px solid var(--line)}
+  .sect h4{margin:0 0 4px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--navy)}
+  .sect p{margin:0 0 12px;color:var(--muted);font-size:12.5px}
+  .choice{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px}
+  .choice button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 12px;font-weight:600;font-size:12.5px;color:var(--ink)}
+  .choice button.on{background:var(--teal-bg);border-color:#cfe4e8;color:#0c5562}
+  .toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0}
+  .toggle + .toggle{border-top:1px solid #f0f1f6}
+  .toggle .tx b{font-weight:700;font-size:13px}.toggle .tx span{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+  .sw{flex:none;width:42px;height:24px;border-radius:99px;background:#d7d9e4;position:relative;border:none;transition:background .15s}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .sw.on{background:var(--teal)}.sw.on::after{left:20px}
+
+  /* shift type editor */
+  .strow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #f0f1f6}
+  .strow:first-child{border-top:none}
+  .strow .sq{width:13px;height:13px;border-radius:4px;flex:none}
+  .strow .nm{font-weight:700;font-size:13px}
+  .strow .tm{color:var(--muted);font-size:12px;margin-left:auto}
+  .strow .ed{border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 10px;font-size:11.5px;font-weight:700;margin-left:8px}
+  .strow.editing{flex-wrap:wrap;gap:7px}
+  .strow input[type=text]{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-family:inherit;font-size:13px}
+  .strow input.nmI{flex:1;min-width:90px}.strow input.tI{width:52px}
+  .strow input[type=color]{width:34px;height:34px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:2px}
+  .addshift{display:flex;gap:7px;margin-top:12px;align-items:center}
+  .addshift input[type=text]{border:1px solid var(--line);border-radius:8px;padding:8px 9px;font-family:inherit;font-size:13px;flex:1;min-width:0}
+  .addshift input.t{flex:none;width:46px}
+  .addshift input[type=color]{width:36px;height:36px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:2px}
+  .addbtn{margin-top:9px;border:1px dashed #d2d6e2;background:#fff;color:var(--teal);border-radius:9px;padding:9px;width:100%;font-weight:700;font-size:12.5px}
+
+  /* edit/add shift modal */
+  .modal{position:fixed;inset:0;display:none;place-items:center;z-index:55;padding:18px}
+  .modal.show{display:grid}
+  .modal .box{background:#fff;border-radius:16px;width:430px;max-width:100%;box-shadow:0 20px 60px rgba(11,17,38,.4);overflow:hidden;max-height:92vh;display:flex;flex-direction:column}
+  .modal .dh{position:static}
+  .modal .mbody{padding:16px 20px;overflow:auto}
+  .modal label{display:block;font-weight:700;font-size:12px;margin:13px 0 5px;color:var(--navy)}
+  .modal label:first-child{margin-top:0}
+  .modal input[type=text],.modal select{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-family:inherit;font-size:13.5px;background:#fff;color:var(--ink)}
+  .frow{display:flex;gap:10px}.frow>div{flex:1}
+  .modal-acts{display:flex;align-items:center;gap:8px;margin-top:18px}
+  .modal-acts .wbtn{padding:9px 14px;font-size:13px}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;font-size:13.5px;box-shadow:0 10px 30px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:.25s;z-index:60;display:flex;gap:9px;align-items:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}.toast .k{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="demo-banner">Interactive concept · HIVE Schedule v5 · fake data</div>
+
+<div class="topbar">
+  <div class="brand"><span class="dot">H</span> HIVE</div>
+  <nav><a href="#">Home</a><a href="#" class="active">Schedule</a><a href="#">Caseload</a><a href="#">Time &amp; Pay</a><a href="#">Reports</a></nav>
+  <div class="spacer"></div>
+  <div class="who"><span class="av">DW</span> Dane Warnick · Admin</div>
+</div>
+
+<div class="wrap">
+  <div class="head">
+    <div><h1>Schedule</h1><p>True North Supports · click any shift to edit, or a + on an open slot to add one</p></div>
+    <div class="actions">
+      <button class="btn" id="importBtn"><span class="ic">⇪</span> Import</button>
+      <button class="btn" id="settingsBtn"><span class="ic">⚙</span> Settings</button>
+      <button class="btn teal" id="publishBtn"><span class="ic">✓</span> Publish</button>
+    </div>
+  </div>
+
+  <div class="nbar">
+    <span class="orb">✦</span>
+    <input id="nInput" placeholder="Ask NECTAR — “cover Maple this week”, “Shandi off Thu–Sat”, “fill Oak’s Wed overnight”" />
+    <button class="ex" id="exToggle">Examples</button>
+    <button class="send" id="nSend">Draft it</button>
+  </div>
+  <div class="exrow" id="exRow">
+    <button data-ex="cover">Cover Maple this week</button>
+    <button data-ex="off">Shandi off Thu–Sat</button>
+    <button data-ex="fill">Fill Oak’s Wed overnight</button>
+  </div>
+  <div class="nresp" id="nResp"></div>
+
+  <div class="controls">
+    <div class="weeknav"><button class="arrow">‹</button><b>Jun 9 – 15</b><button class="arrow">›</button></div>
+    <div class="homes" id="homePills"></div>
+    <div class="spacer"></div>
+    <div class="seg" id="viewSeg">
+      <button data-mode="staff" class="active">Staff</button>
+      <button data-mode="client">Client</button>
+      <button data-mode="both">Both</button>
+    </div>
+  </div>
+  <div class="board">
+    <table class="grid" id="grid"><thead id="gridHead"></thead><tbody id="gridBody"></tbody></table>
+    <div class="hint" id="gridHint"></div>
+  </div>
+
+  <div class="weekstrip">
+    <div class="wcard">
+      <div class="wh"><b>Needs your approval</b><span class="cnt" id="apprCnt">3</span></div>
+      <div class="wbody" id="apprBody">
+        <div class="wrow" data-name="Shandi Hernandez" data-when="Thu 12 – Sat 14 · vacation" data-kind="pto">
+          <span class="av">SH</span><div class="info"><b>Shandi Hernandez</b><span>Time off · Thu 12 – Sat 14</span></div>
+          <span class="wtag pto">Vacation</span>
+          <div class="acts"><button class="wbtn ok appr">Approve</button><button class="wbtn deny">Deny</button></div>
+        </div>
+        <div class="wrow" data-name="Tom Becker" data-when="Wed 11 · medical" data-kind="pto">
+          <span class="av">TB</span><div class="info"><b>Tom Becker</b><span>Time off · Wed 11</span></div>
+          <span class="wtag sick">Medical</span>
+          <div class="acts"><button class="wbtn ok appr">Approve</button><button class="wbtn deny">Deny</button></div>
+        </div>
+        <div class="wrow" data-name="McKay ⇄ Justin" data-kind="swap">
+          <span class="av" style="background:var(--purple)">⇄</span><div class="info"><b>Shift swap</b><span>McKay → Justin · Sat overnight, Oak</span></div>
+          <span class="wtag swap">Swap</span>
+          <div class="acts"><button class="wbtn ok appr">Approve</button><button class="wbtn deny">Deny</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="wcard">
+      <div class="wh"><b>Out this week</b><span class="cnt calm" id="outCnt">1</span></div>
+      <div class="wbody" id="outBody">
+        <div class="wrow"><span class="av">MG</span><div class="info"><b>Mike Grajek</b><span>Fri 13 · personal</span></div><span class="wtag pto">Off</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">Demo only — nothing saves. Click a shift to edit it; hover an open slot for the + to add one. Shift types, names, times and colors are all editable in Settings.</div>
+</div>
+
+<!-- settings -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="dh"><h3>Schedule settings</h3><button class="x" id="closeDrawer">✕</button></div>
+
+  <div class="sect">
+    <h4>View &amp; display</h4>
+    <p>How the board looks by default.</p>
+    <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">Default view</div>
+    <div class="choice" id="setMode"><button data-mode="staff" class="on">Staff only</button><button data-mode="client">Client only</button><button data-mode="both">Staff + client</button></div>
+    <div style="font-weight:700;font-size:12.5px;margin:12px 0 6px">Opens on</div>
+    <div class="choice" id="setLanding"><button data-land="home" class="on">A single home</button><button data-land="all">All homes overview</button></div>
+    <div style="font-weight:700;font-size:12.5px;margin:12px 0 6px">Row density</div>
+    <div class="choice" id="setDensity"><button data-d="comfortable" class="on">Comfortable</button><button data-d="compact">Compact</button></div>
+    <div style="font-weight:700;font-size:12.5px;margin:12px 0 6px">Color shifts by</div>
+    <div class="choice" id="setColor"><button data-c="shift" class="on">Shift type</button><button data-c="staff">Staff member</button></div>
+    <div class="toggle" style="margin-top:6px"><div class="tx"><b>Show shift times on cards</b></div><button class="sw on" id="swTimes"></button></div>
+    <div class="toggle"><div class="tx"><b>Show resident count per home</b></div><button class="sw on" id="swResidents"></button></div>
+  </div>
+
+  <div class="sect">
+    <h4>Your shift types</h4>
+    <p>Fully customizable — rename, change the times, recolor, or add your own. These are what you pick from when adding a shift.</p>
+    <div id="shiftList"></div>
+    <div class="addshift">
+      <input type="text" id="newName" placeholder="New shift name">
+      <input type="text" class="t" id="newStart" placeholder="6a">
+      <input type="text" class="t" id="newEnd" placeholder="2p">
+      <input type="color" id="newColor" value="#137182">
+    </div>
+    <button class="addbtn" id="addShift">+ Add shift type</button>
+  </div>
+
+  <div class="sect">
+    <h4>Staffing</h4>
+    <div class="toggle"><div class="tx"><b>Allow multiple staff per shift &amp; overlap</b></div><button class="sw on" data-sw></button></div>
+    <div class="toggle"><div class="tx"><b>Require matching certification</b><span>Warn (never block) when a staffer lacks a needed cert.</span></div><button class="sw on" data-sw></button></div>
+    <div class="toggle"><div class="tx"><b>Overtime warning</b></div><button class="sw on" data-sw></button></div>
+  </div>
+</aside>
+
+<!-- edit/add shift modal -->
+<div class="modal" id="editModal"><div class="box">
+  <div class="dh"><h3 id="editTitle">Edit shift</h3><button class="x" id="closeEdit">✕</button></div>
+  <div class="mbody">
+    <label>Shift type</label>
+    <select id="fType"></select>
+    <div class="frow"><div><label>Start</label><input type="text" id="fStart"></div><div><label>End</label><input type="text" id="fEnd"></div></div>
+    <label>Staff</label>
+    <select id="fStaff"></select>
+    <label>Client</label>
+    <select id="fClient"></select>
+    <label>Note (optional)</label>
+    <input type="text" id="fNote" placeholder="e.g. med pass at 4p">
+    <div class="modal-acts">
+      <button class="wbtn deny" id="fDelete">Delete</button>
+      <span style="flex:1"></span>
+      <button class="wbtn" id="fCancel">Cancel</button>
+      <button class="wbtn ok" id="fSave">Save</button>
+    </div>
+  </div>
+</div></div>
+
+<!-- NECTAR import modal -->
+<div class="modal" id="importModal"><div class="box">
+  <div class="dh"><h3>NECTAR import</h3><button class="x" id="closeImport">✕</button></div>
+  <div class="mbody">
+    <p style="margin:0 0 12px;color:var(--muted);font-size:13px">Bring a schedule from your old system. NECTAR reads the file, maps it to your sites, staff and shift types, and shows a preview — nothing lands until you approve it.</p>
+    <div class="drop"><div class="big">⇪</div>Drop a CSV / export here, or click to browse</div>
+    <div style="text-align:center;color:var(--muted);font-size:12px;margin:10px 0">or paste the export</div>
+    <textarea id="pasteArea" placeholder="Paste rows from When I Work, Connecteam, a spreadsheet…"></textarea>
+    <div id="importResp" class="nectar-import"></div>
+    <div class="modal-acts"><span style="flex:1"></span><button class="wbtn" id="cancelImport">Cancel</button><button class="wbtn ok" id="runImport">NECTAR, read &amp; map</button></div>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const DAYS=['Mon 9','Tue 10','Wed 11','Thu 12','Fri 13','Sat 14','Sun 15'];
+
+  // ---- customizable shift types ----
+  let SHIFT_TYPES=[
+    {key:'morning',name:'Morning',start:'6a',end:'2p',hex:'#137182'},
+    {key:'swing',name:'Swing',start:'2p',end:'10p',hex:'#5b4b9e'},
+    {key:'noc',name:'Overnight',start:'10p',end:'6a',hex:'#3a3f78'},
+    {key:'day',name:'Day',start:'9a',end:'3p',hex:'#b8791a'},
+    {key:'one',name:'1:1 Support',start:'9a',end:'3p',hex:'#8a5a12'},
+    {key:'dsi',name:'DSI',start:'9a',end:'3p',hex:'#1f9d6b'},
+    {key:'respite',name:'Respite',start:'4p',end:'8p',hex:'#a14a8a'},
+  ];
+  function stype(k){return SHIFT_TYPES.find(t=>t.key===k)||SHIFT_TYPES[0];}
+  function tname(k){return stype(k).name;}
+
+  const STAFF=['J. Probert','J. Warnick','M. Probert','M. Grajek','A. Reyes','J. Moore','S. Hernandez','T. Becker','McKay Probert','Justin Moore'];
+  const staffColor={};const palette=['#137182','#5b4b9e','#3a3f78','#b8791a','#1f9d6b','#a14a8a','#456b2f','#9e5b3a','#2f6b7a','#7a4a2f'];
+  function colorFor(n){if(!staffColor[n])staffColor[n]=palette[Object.keys(staffColor).length%palette.length];return staffColor[n];}
+
+  // ---- data ----
+  let idSeq=1;
+  function mk(d,key,staff,client,opt={}){const t=stype(key);return {id:idSeq++,d,key,time:opt.time||`${t.start}–${t.end}`,staff:staff||null,client:client||'house',note:opt.note||'',gap:!!opt.gap,off:!!opt.off};}
+  function buildMaple(){const e=[];for(let d=0;d<7;d++){
+    if(d===4)e.push(mk(d,'morning',null,'house',{gap:true}));else e.push(mk(d,'morning','J. Probert','house'));
+    e.push(mk(d,'noc','M. Probert','house'));
+    if(d<5)e.push(mk(d,'one','J. Warnick','Jordan M.'));
+  }return e;}
+  function buildOak(){const e=[];for(let d=0;d<7;d++){
+    e.push(mk(d,'morning','M. Grajek','house'));
+    e.push(mk(d,'swing','A. Reyes','house'));
+    if(d===2)e.push(mk(d,'noc',null,'house',{gap:true}));else e.push(mk(d,'noc','J. Moore','house'));
+  }return e;}
+  function buildCedar(){const e=[];for(let d=0;d<7;d++){
+    if(d===3)e.push(mk(d,'day','S. Hernandez','Casey L.',{off:true,time:''}));
+    else if(d===5)e.push(mk(d,'day',null,'Casey L.',{gap:true}));
+    else if(d===6)e.push(mk(d,'day','T. Becker','Casey L.'));
+    else e.push(mk(d,'day','S. Hernandez','Casey L.'));
+  }return e;}
+  function buildDay(){const e=[];for(let d=0;d<5;d++){
+    e.push(mk(d,'day','Day team (3)','house'));
+    e.push(mk(d,'one','T. Becker','Mia W.'));
+  }return e;}
+  function buildOneOnOne(){const e=[];for(let d=0;d<5;d++){
+    e.push(mk(d,'dsi','S. Hernandez','Riley P.'));
+    e.push(mk(d,'dsi','T. Becker','Noah B.'));
+    if(d<3)e.push(mk(d,'one','A. Reyes','Ava S.'));
+    if(d===4)e.push(mk(d,'dsi',null,'Noah B.',{gap:true}));
+  }return e;}
+  const HOMES={
+    maple:{name:'Maple',type:'group',sub:'2 residents',residents:['Jordan M.','Alex T.'],e:buildMaple()},
+    oak:{name:'Oak',type:'group',sub:'3 residents',residents:['Sam R.','Dee K.','Priya N.'],e:buildOak()},
+    cedar:{name:'Cedar',type:'group',sub:'1 resident',residents:['Casey L.'],e:buildCedar()},
+    day:{name:'Day Program',type:'day',sub:'8 attendees',residents:['Mia W.'],e:buildDay()},
+    oneonone:{name:'1-on-1 Services',type:'oneonone',sub:'community · not in a home',residents:['Riley P.','Noah B.','Ava S.'],e:buildOneOnOne()},
+  };
+
+  const state={home:'maple',mode:'staff',density:'comfortable',color:'shift',showTimes:true,showResidents:true};
+
+  // ---- pills ----
+  const homePills=document.getElementById('homePills');
+  function hasGap(h){return HOMES[h].e.some(x=>x.gap);}
+  function renderPills(){
+    homePills.innerHTML='';
+    const all=document.createElement('button');all.textContent='All homes';if(state.home==='all')all.classList.add('active');all.onclick=()=>{state.home='all';render();};homePills.appendChild(all);
+    Object.keys(HOMES).forEach(h=>{const b=document.createElement('button');b.innerHTML=HOMES[h].name+(hasGap(h)?' <span class="od"></span>':'');if(state.home===h)b.classList.add('active');b.onclick=()=>{state.home=h;render();};homePills.appendChild(b);});
+  }
+
+  function tint(c,hex){c.style.background=hex+'1a';c.style.borderColor=hex+'55';c.style.color=hex;}
+
+  // ---- render board ----
+  function render(){
+    renderPills();
+    const head=document.getElementById('gridHead'),bodyEl=document.getElementById('gridBody'),hint=document.getElementById('gridHint'),grid=document.getElementById('grid'),seg=document.getElementById('viewSeg');
+    grid.className='grid'+(state.density==='compact'?' compact':'');
+    head.innerHTML='';bodyEl.innerHTML='';
+
+    if(state.home==='all'){
+      seg.classList.add('disabled');
+      head.innerHTML='<tr><th class="rh">Home</th>'+DAYS.map(d=>`<th>${d}</th>`).join('')+'</tr>';
+      Object.keys(HOMES).forEach(h=>{
+        const home=HOMES[h];const tr=document.createElement('tr');tr.className='drill';
+        tr.innerHTML=`<td class="rowhead">${home.name}${state.showResidents?`<small>${home.sub}</small>`:''}</td>`;
+        for(let d=0;d<7;d++){const td=document.createElement('td');const de=home.e.filter(x=>x.d===d);const gaps=de.filter(x=>x.gap).length;const cov=de.filter(x=>!x.gap&&!x.off).length;
+          if(!de.length)td.innerHTML='<div class="status" style="color:#c4c8d4">—</div>';
+          else if(gaps)td.innerHTML=`<div class="status open"><span class="dot"></span>${gaps} open</div>`;
+          else if(home.type==='group')td.innerHTML='<div class="status cov">✓ 24h</div>';
+          else td.innerHTML=`<div class="status cov"><span class="dot"></span>${cov} set</div>`;
+          tr.appendChild(td);}
+        tr.onclick=()=>{state.home=h;render();};
+        bodyEl.appendChild(tr);
+      });
+      hint.textContent='Each cell shows coverage status. Click a home to open its full week.';
+      return;
+    }
+
+    seg.classList.remove('disabled');
+    const home=HOMES[state.home];
+    head.innerHTML='<tr><th class="rh">'+(state.mode==='client'?'Client':'Staff')+'</th>'+DAYS.map(d=>`<th>${d}</th>`).join('')+'</tr>';
+
+    // rows + the preset each row implies for quick-add
+    let rows=[];
+    if(state.mode==='client'){
+      rows.push({label:'House coverage',sub:'all residents',match:e=>e.client==='house',preset:{client:'house'},house:true});
+      home.residents.forEach(r=>rows.push({label:r,match:e=>e.client===r,preset:{client:r}}));
+    }else{
+      [...new Set(home.e.filter(e=>e.staff).map(e=>e.staff))].forEach(s=>rows.push({label:s,match:e=>e.staff===s,preset:{staff:s}}));
+      if(home.e.some(e=>e.gap))rows.push({label:'Open / unassigned',match:e=>e.gap,preset:{staff:null}});
+    }
+
+    rows.forEach(row=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td class="rowhead">${row.label}${row.sub&&state.showResidents?`<small>${row.sub}</small>`:''}</td>`;
+      for(let d=0;d<7;d++){
+        const td=document.createElement('td');
+        if(row.house&&home.type==='group'){
+          const de=home.e.filter(e=>e.d===d);
+          const covered=de.length&&!de.some(e=>e.gap);
+          const cov=document.createElement('div');cov.className='cov24 '+(covered?'ok':'bad');
+          cov.textContent=covered?'✓ 24h covered':'⚠ gap in 24h';
+          td.appendChild(cov);
+        }
+        home.e.filter(e=>e.d===d&&row.match(e)).forEach(e=>td.appendChild(chipFor(e)));
+        // quick-add +
+        const add=document.createElement('button');add.className='addcell';add.textContent='+';add.title='Add a shift';
+        add.onclick=()=>openEditor({mode:'add',day:d,presetStaff:('staff'in row.preset?row.preset.staff:null),presetClient:(row.preset.client||'house')});
+        td.appendChild(add);
+        tr.appendChild(td);
+      }
+      bodyEl.appendChild(tr);
+    });
+    const w=state.mode==='staff'?'who works when':state.mode==='client'?'who covers each person':'staff paired with the client they support';
+    hint.textContent=`${home.name} · ${w}. Click a shift to edit; hover a cell for the + to add.`;
+  }
+
+  function chipFor(e){
+    const c=document.createElement('div');
+    if(e.off){c.className='chip off';c.innerHTML=`<span>Time off</span>${state.mode!=='staff'?`<small>${e.staff}</small>`:''}`;return c;}
+    if(e.gap){c.className='chip gap';c.innerHTML=`<span>${tname(e.key)} · open</span><span class="post">Assign</span>`;c.onclick=()=>openEditor({mode:'edit',entry:e});return c;}
+    c.className='chip';
+    let top,sub;
+    if(state.mode==='staff'){top=tname(e.key);sub=state.showTimes&&e.time?`<small>${e.time}</small>`:'';}
+    else if(state.mode==='client'){top=e.staff;sub=`<small>${tname(e.key)}${e.time?' · '+e.time:''}</small>`;}
+    else{top=tname(e.key);sub=`<small>${e.client==='house'?'House':e.client}${e.time?' · '+e.time:''}</small>`;}
+    c.innerHTML=`<span>${top}</span>${sub}`;
+    const hex=(state.color==='staff'&&e.staff)?colorFor(e.staff):stype(e.key).hex;
+    tint(c,hex);
+    c.onclick=()=>openEditor({mode:'edit',entry:e});
+    return c;
+  }
+
+  // ---- edit / add modal ----
+  let editCtx=null;
+  const editModal=document.getElementById('editModal');
+  const fType=document.getElementById('fType'),fStaff=document.getElementById('fStaff'),fClient=document.getElementById('fClient'),
+        fStart=document.getElementById('fStart'),fEnd=document.getElementById('fEnd'),fNote=document.getElementById('fNote');
+  function fillSelect(sel,items,val){sel.innerHTML='';items.forEach(it=>{const o=document.createElement('option');o.value=it.v;o.textContent=it.t;if(it.v===val)o.selected=true;sel.appendChild(o);});}
+  function openEditor(ctx){
+    const home=HOMES[state.home];editCtx=ctx;
+    fillSelect(fType,SHIFT_TYPES.map(t=>({v:t.key,t:t.name})), ctx.mode==='edit'?ctx.entry.key:SHIFT_TYPES[0].key);
+    fillSelect(fStaff,[{v:'__none',t:'Unassigned (open shift)'}].concat(STAFF.map(s=>({v:s,t:s}))), ctx.mode==='edit'?(ctx.entry.staff||'__none'):(ctx.presetStaff||'__none'));
+    fillSelect(fClient,[{v:'house',t:'House (all residents)'}].concat(home.residents.map(r=>({v:r,t:r}))), ctx.mode==='edit'?ctx.entry.client:(ctx.presetClient||'house'));
+    if(ctx.mode==='edit'){const tt=(ctx.entry.time||'').split('–');fStart.value=tt[0]||'';fEnd.value=tt[1]||'';fNote.value=ctx.entry.note||'';document.getElementById('editTitle').textContent=ctx.entry.gap?'Assign open shift':'Edit shift';document.getElementById('fDelete').style.display='';}
+    else{const t=stype(fType.value);fStart.value=t.start;fEnd.value=t.end;fNote.value='';document.getElementById('editTitle').textContent='Add shift · '+DAYS[ctx.day];document.getElementById('fDelete').style.display='none';}
+    editModal.classList.add('show');
+  }
+  fType.onchange=()=>{const t=stype(fType.value);fStart.value=t.start;fEnd.value=t.end;};
+  function closeEditor(){editModal.classList.remove('show');editCtx=null;}
+  document.getElementById('closeEdit').onclick=closeEditor;
+  document.getElementById('fCancel').onclick=closeEditor;
+  editModal.onclick=e=>{if(e.target===editModal)closeEditor();};
+  document.getElementById('fSave').onclick=()=>{
+    const home=HOMES[state.home];const staffVal=fStaff.value==='__none'?null:fStaff.value;
+    const data={key:fType.value,time:`${fStart.value||'?'}–${fEnd.value||'?'}`,staff:staffVal,client:fClient.value,note:fNote.value,gap:staffVal===null,off:false};
+    if(editCtx.mode==='edit'){Object.assign(editCtx.entry,data);say(staffVal?`Shift updated — ${staffVal}`:'Saved as open shift');}
+    else{home.e.push(Object.assign(mk(editCtx.day,data.key,staffVal,data.client,{time:data.time,note:data.note,gap:data.gap})));say(staffVal?`Shift added — ${staffVal}, ${DAYS[editCtx.day]}`:'Open shift added');}
+    closeEditor();render();
+  };
+  document.getElementById('fDelete').onclick=()=>{
+    const home=HOMES[state.home];if(editCtx&&editCtx.mode==='edit'){home.e=home.e.filter(x=>x.id!==editCtx.entry.id);say('Shift removed');}
+    closeEditor();render();
+  };
+
+  // ---- toast ----
+  const toast=document.getElementById('toast');let tT;
+  function say(m){toast.innerHTML='<span class="k">●</span>'+m;toast.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>toast.classList.remove('show'),2600);}
+
+  // ---- view segmented ----
+  document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;document.querySelectorAll('#viewSeg button').forEach(x=>x.classList.toggle('active',x===b));render();});
+
+  // ---- NECTAR ----
+  const nResp=document.getElementById('nResp');
+  const R={
+    cover:{h:'Drafted',b:'Filled Maple’s week — Morning and Overnight every day from your rotation, plus Jordan’s 1:1 support weekdays. Friday morning is still open; flagged it.',go:'Review'},
+    off:{h:'Time off',b:'Marked Shandi off Thu–Sat at Cedar. That opened Saturday — added to open shifts.',go:'Open Cedar'},
+    fill:{h:'Coverage found',b:'For Oak’s Wednesday overnight, J. Moore and M. Grajek are both eligible and under 40 hrs.',go:'Offer to both'},
+    generic:{h:'Drafted',b:'Drafted that against your sites, shift types and availability. Affected shifts are flagged for review before publish.',go:'Review'}
+  };
+  function showResp(k){const r=R[k]||R.generic;nResp.innerHTML=`<div class="h">✦ NECTAR · ${r.h}</div>${r.b}<div class="cta"><button class="go">${r.go}</button><button class="dis">Discard</button></div>`;nResp.classList.add('show');
+    nResp.querySelector('.go').onclick=()=>{if(k==='off'){state.home='cedar';render();}if(k==='fill'){state.home='oak';render();}say('Opened for review — nothing publishes until you confirm');};
+    nResp.querySelector('.dis').onclick=()=>nResp.classList.remove('show');}
+  document.querySelectorAll('#exRow button').forEach(b=>b.onclick=()=>{document.getElementById('nInput').value=b.textContent;showResp(b.dataset.ex);});
+  document.getElementById('exToggle').onclick=()=>document.getElementById('exRow').classList.toggle('show');
+  function handleType(){const v=document.getElementById('nInput').value.toLowerCase();let k='generic';if(/off|vacation|sick/.test(v))k='off';else if(/fill|overnight|oak/.test(v))k='fill';else if(/cover|week/.test(v))k='cover';showResp(k);}
+  document.getElementById('nSend').onclick=handleType;
+  document.getElementById('nInput').addEventListener('keydown',e=>{if(e.key==='Enter')handleType();});
+
+  // ---- settings choices ----
+  function wireChoice(id,apply){document.querySelectorAll('#'+id+' button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.toggle('on',x===b));apply(b);});}
+  wireChoice('setMode',b=>{state.mode=b.dataset.mode;document.querySelectorAll('#viewSeg button').forEach(x=>x.classList.toggle('active',x.dataset.mode===state.mode));render();say('Default view set');});
+  wireChoice('setLanding',b=>{state.home=b.dataset.land==='all'?'all':'maple';render();say('Landing set');});
+  wireChoice('setDensity',b=>{state.density=b.dataset.d;render();say(state.density+' density');});
+  wireChoice('setColor',b=>{state.color=b.dataset.c;render();say('Coloring by '+(state.color==='staff'?'staff member':'shift type'));});
+  document.getElementById('swTimes').onclick=function(){this.classList.toggle('on');state.showTimes=this.classList.contains('on');render();};
+  document.getElementById('swResidents').onclick=function(){this.classList.toggle('on');state.showResidents=this.classList.contains('on');render();};
+  document.querySelectorAll('[data-sw]').forEach(s=>s.onclick=()=>s.classList.toggle('on'));
+
+  // ---- shift type editor (customizable) ----
+  const shiftList=document.getElementById('shiftList');
+  function renderShiftTypes(){
+    shiftList.innerHTML='';
+    SHIFT_TYPES.forEach(t=>{
+      const row=document.createElement('div');row.className='strow';
+      row.innerHTML=`<span class="sq" style="background:${t.hex}"></span><span class="nm">${t.name}</span><span class="tm">${t.start}–${t.end}</span><button class="ed">Edit</button>`;
+      row.querySelector('.ed').onclick=()=>editType(row,t);
+      shiftList.appendChild(row);
+    });
+  }
+  function editType(row,t){
+    row.classList.add('editing');
+    row.innerHTML=`<input type="color" value="${t.hex}"><input type="text" class="nmI" value="${t.name}"><input type="text" class="tI" value="${t.start}"><input type="text" class="tI" value="${t.end}"><button class="ed save">Save</button><button class="ed cancel">Cancel</button>`;
+    const [col,nm,st,en]=row.querySelectorAll('input');
+    row.querySelector('.save').onclick=()=>{t.hex=col.value;t.name=nm.value||t.name;t.start=st.value||t.start;t.end=en.value||t.end;renderShiftTypes();render();say(`“${t.name}” updated`);};
+    row.querySelector('.cancel').onclick=()=>renderShiftTypes();
+  }
+  document.getElementById('addShift').onclick=()=>{
+    const nm=document.getElementById('newName').value||'New shift',st=document.getElementById('newStart').value||'9a',en=document.getElementById('newEnd').value||'5p',hex=document.getElementById('newColor').value;
+    SHIFT_TYPES.push({key:'t'+(idSeq++),name:nm,start:st,end:en,hex});
+    renderShiftTypes();
+    document.getElementById('newName').value='';document.getElementById('newStart').value='';document.getElementById('newEnd').value='';
+    say(`Added shift type “${nm}” — now selectable when adding a shift`);
+  };
+
+  // ---- week strip ----
+  function apprRefresh(){const n=document.querySelectorAll('#apprBody .wrow').length;document.getElementById('apprCnt').textContent=n;if(!n)document.getElementById('apprBody').innerHTML='<div class="wempty"><div class="big">✓</div>All caught up — no pending requests</div>';}
+  function addOut(name,when){const out=document.getElementById('outBody');const init=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();const row=document.createElement('div');row.className='wrow';row.innerHTML=`<span class="av">${init}</span><div class="info"><b>${name}</b><span>${when}</span></div><span class="wtag pto">Off</span>`;out.appendChild(row);document.getElementById('outCnt').textContent=document.querySelectorAll('#outBody .wrow').length;}
+  document.querySelectorAll('#apprBody .appr').forEach(b=>b.onclick=()=>{const row=b.closest('.wrow'),kind=row.dataset.kind,name=row.dataset.name;row.style.opacity=.4;if(kind==='swap')say('Swap approved — schedule updated &amp; both staff notified');else{say(`Approved — ${name} blocked from scheduling those days`);addOut(name,row.dataset.when);}setTimeout(()=>{row.remove();apprRefresh();},420);});
+  document.querySelectorAll('#apprBody .deny').forEach(b=>b.onclick=()=>{const row=b.closest('.wrow');row.style.opacity=.4;say('Request denied — staff notified');setTimeout(()=>{row.remove();apprRefresh();},420);});
+
+  // ---- drawer / misc ----
+  const drawer=document.getElementById('drawer'),scrim=document.getElementById('scrim');
+  document.getElementById('settingsBtn').onclick=()=>{drawer.classList.add('show');scrim.classList.add('show');};
+  document.getElementById('closeDrawer').onclick=()=>{drawer.classList.remove('show');scrim.classList.remove('show');};
+  scrim.onclick=()=>{drawer.classList.remove('show');scrim.classList.remove('show');};
+  document.getElementById('publishBtn').onclick=()=>say('Schedule published — staff notified');
+  const importModal=document.getElementById('importModal');
+  document.getElementById('importBtn').onclick=()=>{importModal.classList.add('show');document.getElementById('importResp').classList.remove('show');document.getElementById('runImport').textContent='NECTAR, read & map';};
+  document.getElementById('closeImport').onclick=()=>importModal.classList.remove('show');
+  document.getElementById('cancelImport').onclick=()=>importModal.classList.remove('show');
+  importModal.onclick=e=>{if(e.target===importModal)importModal.classList.remove('show');};
+  document.getElementById('runImport').onclick=function(){
+    const resp=document.getElementById('importResp');
+    if(!resp.classList.contains('show')){
+      resp.innerHTML='<div class="h">✦ NECTAR read your file</div>Found <b>38 shifts</b> across <b>4 sites</b> and <b>9 staff</b>, and mapped them to your shift types (Morning, Swing, Overnight, DSI). <b>2 staff names</b> didn’t match anyone in HIVE — I left those unassigned for you. Place this on the week for review?';
+      resp.classList.add('show');this.textContent='Place on schedule for review';
+    }else{importModal.classList.remove('show');say('NECTAR placed 38 shifts — review &amp; publish, nothing is live yet');}
+  };
+
+  renderShiftTypes();
+  render();
+</script>
+</body>
+</html>

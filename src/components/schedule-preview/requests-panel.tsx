@@ -1,15 +1,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, CalendarOff, ArrowLeftRight, Loader2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
-import { useCurrentOrg } from "@/hooks/use-org";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useOrgScheduleRequests,
@@ -20,28 +16,50 @@ import {
   type TimeOffRequest,
 } from "@/lib/schedule-requests";
 import type { StaffRow } from "@/hooks/use-schedule-preview";
+import { SCHED } from "./sched-ui";
+
+// ── tokens / small style helpers (ported from the demo weekstrip) ─────
+const wcard: React.CSSProperties = { background: "#fff", border: `1px solid ${SCHED.line}`, borderRadius: 14, boxShadow: SCHED.shadow, overflow: "hidden" };
+const wh: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: `1px solid ${SCHED.line}` };
+const wbody: React.CSSProperties = { padding: "6px 14px 10px", maxHeight: 260, overflow: "auto" };
+const wrow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: `1px solid #f0f1f6` };
+const av: React.CSSProperties = { width: 28, height: 28, borderRadius: "50%", background: SCHED.teal, color: "#fff", display: "grid", placeItems: "center", fontWeight: 700, fontSize: 11, flex: "none" };
+const info: React.CSSProperties = { flex: 1, minWidth: 0 };
+const infoB: React.CSSProperties = { fontSize: 13, fontWeight: 700, display: "block" };
+const infoS: React.CSSProperties = { display: "block", color: SCHED.muted, fontSize: 12 };
+const acts: React.CSSProperties = { display: "flex", gap: 6, flex: "none" };
+const wbtn: React.CSSProperties = { border: `1px solid ${SCHED.line}`, background: "#fff", borderRadius: 8, padding: "6px 9px", fontWeight: 700, fontSize: 11.5, cursor: "pointer" };
+const wbtnOk: React.CSSProperties = { ...wbtn, background: SCHED.ok, borderColor: SCHED.ok, color: "#fff" };
+const wempty: React.CSSProperties = { color: SCHED.muted, textAlign: "center", padding: "22px 8px", fontWeight: 500, fontSize: 12.5 };
+
+function cnt(calm: boolean): React.CSSProperties {
+  return { fontSize: 11, fontWeight: 800, borderRadius: 99, padding: "2px 9px", ...(calm ? { background: SCHED.tealBg, color: "#0c5562" } : { background: SCHED.gapBg, color: SCHED.gap }) };
+}
+function tagStyle(kind: "pto" | "sick" | "swap"): React.CSSProperties {
+  const base: React.CSSProperties = { fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 99, flex: "none" };
+  if (kind === "sick") return { ...base, background: SCHED.warnBg, color: SCHED.warn };
+  if (kind === "swap") return { ...base, background: SCHED.purpleBg, color: "#463b7e" };
+  return { ...base, background: SCHED.tealBg, color: "#0c5562" };
+}
 
 function fmtDate(d: string) {
-  return new Date(d + "T12:00:00").toLocaleDateString(undefined, {
-    month: "short", day: "numeric", year: "numeric",
-  });
+  return new Date(d + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 function nameOf(id: string | null, staff: StaffRow[]): string {
   if (!id) return "—";
   return staff.find((s) => s.id === id)?.name ?? "Staff";
 }
+function initials(name: string): string {
+  return name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+}
+function isSick(t: string): boolean {
+  const v = (t || "").toLowerCase();
+  return v.includes("sick") || v.includes("medical");
+}
 
-export function RequestsPanel({
-  weekStart,
-  staff,
-}: {
-  weekStart: Date;
-  staff: StaffRow[];
-}) {
+export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: StaffRow[] }) {
   const { data } = useOrgScheduleRequests();
-  const weekEnd = useMemo(() => {
-    const d = new Date(weekStart); d.setDate(d.getDate() + 7); return d;
-  }, [weekStart]);
+  const weekEnd = useMemo(() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); return d; }, [weekStart]);
 
   const pendingTimeOff = (data?.timeOff ?? []).filter((r) => r.status === "pending");
   const pendingSwaps = (data?.swaps ?? []).filter((r) => r.status === "pending");
@@ -51,57 +69,59 @@ export function RequestsPanel({
     const e = new Date(r.end_date + "T23:59:59").getTime();
     return s <= weekEnd.getTime() && e >= weekStart.getTime();
   });
+  const pendingCount = pendingTimeOff.length + pendingSwaps.length;
 
   return (
-    <div className="mt-6 grid gap-4 md:grid-cols-2">
-      <Card className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <h2 className="font-semibold">Needs your approval</h2>
-          <Badge variant="secondary" className="text-[10px]">
-            {pendingTimeOff.length + pendingSwaps.length}
-          </Badge>
-        </div>
-        {pendingTimeOff.length + pendingSwaps.length === 0 ? (
-          <p className="text-sm opacity-60">Nothing pending.</p>
-        ) : (
-          <ul className="space-y-2">
-            {pendingTimeOff.map((r) => (
-              <TimeOffRow key={r.id} req={r} staff={staff} />
-            ))}
-            {pendingSwaps.map((r) => (
-              <SwapRow key={r.id} req={r} staff={staff} />
-            ))}
-          </ul>
-        )}
-      </Card>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }} className="sched-weekstrip">
+      <style>{`@media(max-width:760px){.sched-weekstrip{grid-template-columns:1fr!important}}`}</style>
 
-      <Card className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <CalendarOff className="h-4 w-4 opacity-60" />
-          <h2 className="font-semibold">Out this week</h2>
-          <Badge variant="secondary" className="text-[10px]">{outThisWeek.length}</Badge>
+      <div style={wcard}>
+        <div style={wh}>
+          <b style={{ fontSize: 13.5, fontWeight: 800 }}>Needs your approval</b>
+          <span style={cnt(pendingCount === 0)}>{pendingCount}</span>
         </div>
-        {outThisWeek.length === 0 ? (
-          <p className="text-sm opacity-60">Everyone available.</p>
-        ) : (
-          <ul className="space-y-2">
-            {outThisWeek.map((r) => (
-              <li key={r.id} className="rounded-md border p-2 text-sm">
-                <div className="font-medium">{nameOf(r.staff_id, staff)}</div>
-                <div className="text-xs opacity-70">
-                  {fmtDate(r.start_date)} – {fmtDate(r.end_date)} · {r.type.toUpperCase()}
+        <div style={wbody}>
+          {pendingCount === 0 ? (
+            <div style={wempty}><div style={{ fontSize: 26, marginBottom: 5 }}>✓</div>All caught up — no pending requests</div>
+          ) : (
+            <>
+              {pendingTimeOff.map((r, i) => <TimeOffRow key={r.id} req={r} staff={staff} first={i === 0} />)}
+              {pendingSwaps.map((r) => <SwapRow key={r.id} req={r} staff={staff} />)}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={wcard}>
+        <div style={wh}>
+          <b style={{ fontSize: 13.5, fontWeight: 800 }}>Out this week</b>
+          <span style={cnt(true)}>{outThisWeek.length}</span>
+        </div>
+        <div style={wbody}>
+          {outThisWeek.length === 0 ? (
+            <div style={wempty}>Everyone available this week</div>
+          ) : (
+            outThisWeek.map((r, i) => {
+              const name = nameOf(r.staff_id, staff);
+              return (
+                <div key={r.id} style={{ ...wrow, ...(i === 0 ? { borderTop: "none" } : null) }}>
+                  <span style={av}>{initials(name)}</span>
+                  <div style={info}>
+                    <b style={infoB}>{name}</b>
+                    <span style={infoS}>{fmtDate(r.start_date)} – {fmtDate(r.end_date)} · {r.type.toUpperCase()}</span>
+                  </div>
+                  <span style={tagStyle(isSick(r.type) ? "sick" : "pto")}>Off</span>
                 </div>
-                {r.note && <div className="text-xs mt-1 opacity-80">{r.note}</div>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+              );
+            })
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-function TimeOffRow({ req, staff }: { req: TimeOffRequest; staff: StaffRow[] }) {
+function TimeOffRow({ req, staff, first }: { req: TimeOffRequest; staff: StaffRow[]; first: boolean }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const decide = useMutation({
@@ -109,38 +129,23 @@ function TimeOffRow({ req, staff }: { req: TimeOffRequest; staff: StaffRow[] }) 
       if (!user?.id) throw new Error("Sign in required.");
       await decideTimeOff(req, d, user.id);
     },
-    onSuccess: () => {
-      toast.success("Updated.");
-      qc.invalidateQueries({ queryKey: ["schedule-requests"] });
-    },
+    onSuccess: () => { toast.success("Updated."); qc.invalidateQueries({ queryKey: ["schedule-requests"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const name = nameOf(req.staff_id, staff);
   return (
-    <li className="rounded-md border p-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <CalendarOff className="h-3.5 w-3.5 opacity-60" />
-            <span className="font-medium text-sm">{nameOf(req.staff_id, staff)}</span>
-            <Badge variant="outline" className="text-[10px]">{req.type.toUpperCase()}</Badge>
-          </div>
-          <div className="text-xs opacity-70 mt-0.5">
-            {fmtDate(req.start_date)} – {fmtDate(req.end_date)}
-          </div>
-          {req.note && <div className="text-xs mt-1 opacity-80 truncate">{req.note}</div>}
-        </div>
-        <div className="flex flex-col gap-1 shrink-0">
-          <Button size="sm" variant="outline" disabled={decide.isPending}
-            onClick={() => decide.mutate("approved")} className="min-h-[32px] h-8 text-xs">
-            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
-          </Button>
-          <Button size="sm" variant="outline" disabled={decide.isPending}
-            onClick={() => decide.mutate("denied")} className="min-h-[32px] h-8 text-xs">
-            <XCircle className="h-3.5 w-3.5 mr-1" /> Deny
-          </Button>
-        </div>
+    <div style={{ ...wrow, ...(first ? { borderTop: "none" } : null) }}>
+      <span style={av}>{initials(name)}</span>
+      <div style={info}>
+        <b style={infoB}>{name}</b>
+        <span style={infoS}>Time off · {fmtDate(req.start_date)} – {fmtDate(req.end_date)}{req.note ? ` · ${req.note}` : ""}</span>
       </div>
-    </li>
+      <span style={tagStyle(isSick(req.type) ? "sick" : "pto")}>{req.type.toUpperCase()}</span>
+      <div style={acts}>
+        <button style={wbtnOk} disabled={decide.isPending} onClick={() => decide.mutate("approved")}>Approve</button>
+        <button style={wbtn} disabled={decide.isPending} onClick={() => decide.mutate("denied")}>Deny</button>
+      </div>
+    </div>
   );
 }
 
@@ -149,7 +154,6 @@ function SwapRow({ req, staff }: { req: SwapRequest; staff: StaffRow[] }) {
   const { user } = useAuth();
   const [pickedTo, setPickedTo] = useState<string>(req.to_staff_id ?? "");
 
-  // Load shift details once so we can call saveShift via approveSwap.
   const { data: shift } = useQuery({
     queryKey: ["swap-shift", req.shift_id],
     queryFn: async () => {
@@ -193,54 +197,42 @@ function SwapRow({ req, staff }: { req: SwapRequest; staff: StaffRow[] }) {
       if (!user?.id) throw new Error("Sign in required.");
       await denySwap(req, user.id);
     },
-    onSuccess: () => {
-      toast.success("Denied.");
-      qc.invalidateQueries({ queryKey: ["schedule-requests"] });
-    },
+    onSuccess: () => { toast.success("Denied."); qc.invalidateQueries({ queryKey: ["schedule-requests"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const fromName = nameOf(req.from_staff_id, staff);
+  const toName = req.to_staff_id ? nameOf(req.to_staff_id, staff) : "open swap";
   const range = shift
-    ? `${new Date(shift.starts_at as string).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+    ? new Date(shift.starts_at as string).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
     : "Loading shift…";
 
   return (
-    <li className="rounded-md border p-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <ArrowLeftRight className="h-3.5 w-3.5 opacity-60" />
-            <span className="font-medium text-sm truncate">
-              {nameOf(req.from_staff_id, staff)} → {req.to_staff_id ? nameOf(req.to_staff_id, staff) : "open swap"}
-            </span>
+    <div style={wrow}>
+      <span style={{ ...av, background: SCHED.purple }}>⇄</span>
+      <div style={info}>
+        <b style={infoB}>Shift swap</b>
+        <span style={infoS}>{fromName} → {toName} · {range}{req.note ? ` · ${req.note}` : ""}</span>
+        {!req.to_staff_id && (
+          <div style={{ marginTop: 6 }}>
+            <Select value={pickedTo} onValueChange={setPickedTo}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Assign to…" /></SelectTrigger>
+              <SelectContent>
+                {staff.filter((s) => s.id !== req.from_staff_id).map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="text-xs opacity-70 mt-0.5">{range}</div>
-          {req.note && <div className="text-xs mt-1 opacity-80 truncate">{req.note}</div>}
-          {!req.to_staff_id && (
-            <div className="mt-2">
-              <Select value={pickedTo} onValueChange={setPickedTo}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Assign to…" /></SelectTrigger>
-                <SelectContent>
-                  {staff.filter((s) => s.id !== req.from_staff_id).map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-1 shrink-0">
-          <Button size="sm" variant="outline" disabled={approve.isPending || !shift}
-            onClick={() => approve.mutate()} className="min-h-[32px] h-8 text-xs">
-            {approve.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}
-            Approve
-          </Button>
-          <Button size="sm" variant="outline" disabled={deny.isPending}
-            onClick={() => deny.mutate()} className="min-h-[32px] h-8 text-xs">
-            <XCircle className="h-3.5 w-3.5 mr-1" /> Deny
-          </Button>
-        </div>
+        )}
       </div>
-    </li>
+      <span style={tagStyle("swap")}>Swap</span>
+      <div style={acts}>
+        <button style={wbtnOk} disabled={approve.isPending || !shift} onClick={() => approve.mutate()}>
+          {approve.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Approve"}
+        </button>
+        <button style={wbtn} disabled={deny.isPending} onClick={() => deny.mutate()}>Deny</button>
+      </div>
+    </div>
   );
 }

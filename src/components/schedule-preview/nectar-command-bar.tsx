@@ -2,8 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Sparkles, Send, Upload, X, Check, Loader2, AlertTriangle, ArrowLeftRight, Plus, Pencil } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Send, Upload, X, Check, Loader2, AlertTriangle, ArrowLeftRight, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +21,13 @@ import {
 } from "@/lib/nectar-schedule-actions.functions";
 import { saveShift } from "@/lib/schedule-preview-mutations";
 import type { ClientRow, StaffRow, TeamRow, ShiftRow } from "@/hooks/use-schedule-preview";
+import { SCHED } from "./sched-ui";
+
+const EXAMPLES = [
+  "Cover the Maple house this week",
+  "Mark Shandi off Thursday through Saturday",
+  "Fill Oak's Wednesday overnight",
+];
 
 const TEAL = "#137182";
 const GOLD = "#f5a623";
@@ -56,6 +62,7 @@ export function NectarCommandBar({
   const [proposal, setProposal] = useState<NectarProposal | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
+  const [showExamples, setShowExamples] = useState(false);
 
   const context = useMemo(() => {
     const teamById = new Map(teams.map((t) => [t.id, t.team_name] as const));
@@ -180,38 +187,54 @@ export function NectarCommandBar({
   });
 
   return (
-    <Card className="mt-4 border-2 p-3" style={{ borderColor: "rgba(19,113,130,0.25)" }}>
-      <div className="flex items-start gap-2">
-        <Sparkles className="h-4 w-4 mt-2 shrink-0" style={{ color: TEAL }} />
-        <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center">
-          <Input
-            value={sentence}
-            onChange={(e) => setSentence(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && sentence.trim()) ask.mutate(); }}
-            placeholder='Ask NECTAR — e.g. "cover Maple this week" or "Shandi off Thu–Sat"'
-            className="min-h-[44px] flex-1"
-            disabled={ask.isPending}
-          />
-          <div className="flex gap-2">
-            <Button
-              onClick={() => ask.mutate()}
-              disabled={ask.isPending || !sentence.trim()}
-              className="min-h-[44px]"
-              style={{ background: TEAL, color: "white" }}
-            >
-              {ask.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              <span className="ml-1.5">Propose</span>
-            </Button>
-            <Button variant="outline" onClick={() => setImportOpen(true)} className="min-h-[44px]">
-              <Upload className="h-4 w-4 mr-1.5" /> Import
-            </Button>
-          </div>
-        </div>
+    <div style={{ marginTop: 14, marginBottom: 14, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+      <style>{`.nbar-input::placeholder{color:#8b93b0}`}</style>
+      {/* Navy NECTAR command bar (matches HIVE-Schedule-Demo-v6) */}
+      <div style={{ display: "flex", gap: 9, alignItems: "center", background: SCHED.navy, borderRadius: 12, padding: "8px 8px 8px 14px" }}>
+        <span style={{ width: 26, height: 26, borderRadius: 8, background: SCHED.gold, display: "grid", placeItems: "center", color: SCHED.navy, fontWeight: 800, fontSize: 13, flex: "none" }}>✦</span>
+        <input
+          className="nbar-input"
+          value={sentence}
+          onChange={(e) => setSentence(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && sentence.trim()) ask.mutate(); }}
+          placeholder='Ask NECTAR — “cover Maple this week”, “Shandi off Thu–Sat”, “fill Oak’s Wed overnight”'
+          disabled={ask.isPending}
+          style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#fff", fontSize: 14, fontFamily: "inherit", minWidth: 0 }}
+        />
+        <button onClick={() => setShowExamples((s) => !s)} style={{ background: "transparent", border: "none", color: "#aeb6cf", fontSize: 12, fontWeight: 600, flex: "none", padding: "0 6px", cursor: "pointer" }}>
+          Examples
+        </button>
+        <button
+          onClick={() => ask.mutate()}
+          disabled={ask.isPending || !sentence.trim()}
+          style={{ background: SCHED.gold, color: SCHED.navy, border: "none", borderRadius: 9, padding: "8px 15px", fontWeight: 700, fontSize: 13, flex: "none", cursor: "pointer", opacity: ask.isPending || !sentence.trim() ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}
+        >
+          {ask.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Draft it
+        </button>
       </div>
 
-      <p className="mt-2 text-[10px] uppercase tracking-wider opacity-50">
-        Advisory only — proposals are reviewed before any shift is saved. (Fake data only until BAA Bedrock cut-over.)
-      </p>
+      {showExamples && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 9 }}>
+          {EXAMPLES.map((ex) => (
+            <button
+              key={ex}
+              onClick={() => { setSentence(ex); setShowExamples(false); }}
+              style={{ background: "#fff", border: `1px solid ${SCHED.line}`, borderRadius: 99, padding: "7px 13px", fontSize: 12.5, fontWeight: 600, color: SCHED.ink, cursor: "pointer" }}
+            >
+              {ex}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <p style={{ margin: 0, fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: SCHED.muted }}>
+          Advisory only — proposals are reviewed before any shift is saved.
+        </p>
+        <button onClick={() => setImportOpen(true)} style={{ background: "#fff", border: `1px solid ${SCHED.line}`, borderRadius: 9, padding: "6px 11px", fontSize: 12.5, fontWeight: 600, color: SCHED.ink, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Upload className="h-3.5 w-3.5" /> Import a schedule
+        </button>
+      </div>
 
       {proposal && (
         <ProposalReview
@@ -230,7 +253,7 @@ export function NectarCommandBar({
         onSubmit={() => importMut.mutate()}
         pending={importMut.isPending}
       />
-    </Card>
+    </div>
   );
 }
 

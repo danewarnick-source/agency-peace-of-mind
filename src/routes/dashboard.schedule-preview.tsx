@@ -1,36 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Settings as SettingsIcon,
-  Home,
-  Users,
-  AlertTriangle,
-  CheckCircle2,
-  Lock,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  SheetDescription,
-} from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Lock } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
   useSchedulePreview,
   startOfWeek,
   dayCoverageMinutes,
   inferSiteType,
-  isDaily,
   UNASSIGNED_SITE_ID,
   type ShiftRow,
   type ClientRow,
@@ -40,16 +16,17 @@ import { ShiftEditorDialog, type EditorContext } from "@/components/schedule-pre
 import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 import { NectarCommandBar } from "@/components/schedule-preview/nectar-command-bar";
 import { useOrgScheduleRequests, buildApprovedTimeOffIndex } from "@/lib/schedule-requests";
-import { Plus } from "lucide-react";
+import { SettingsDrawer } from "@/components/schedule-preview/settings-drawer";
+import {
+  SCHED, font, type Settings, useSettings, type ViewMode,
+  shiftAccentHex, shiftTypeLabel, fmtTime, DAY_LABELS,
+} from "@/components/schedule-preview/sched-ui";
 
 export const Route = createFileRoute("/dashboard/schedule-preview")({
   head: () => ({
     meta: [
       { title: "Schedule (new) — HIVE" },
-      {
-        name: "description",
-        content: "Read-only schedule preview: site coverage, weekly grid by staff or client.",
-      },
+      { name: "description", content: "Weekly schedule — site coverage, staff/client grid." },
     ],
     links: [
       {
@@ -61,116 +38,8 @@ export const Route = createFileRoute("/dashboard/schedule-preview")({
   component: SchedulePreviewPage,
 });
 
-// HIVE palette (inline, page-scoped — no global token edits).
-const NAVY = "#0B1126";
-const GOLD = "#f5a623";
-const TEAL = "#137182";
-const INK = "#0d112b";
-
-type ViewMode = "staff" | "client" | "both";
-type Density = "comfortable" | "compact";
-type ColorBy = "shift_type" | "staff";
-
-type Settings = {
-  defaultView: ViewMode;
-  startOnAllSites: boolean;
-  density: Density;
-  colorBy: ColorBy;
-  showTimes: boolean;
-  showResidentCount: boolean;
-};
-const DEFAULT_SETTINGS: Settings = {
-  defaultView: "staff",
-  startOnAllSites: true,
-  density: "comfortable",
-  colorBy: "shift_type",
-  showTimes: true,
-  showResidentCount: true,
-};
-const SETTINGS_KEY = "hive.schedulePreview.settings";
-
-function useSettings() {
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      if (raw) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
-    } catch {/* ignore */}
-  }, []);
-  const update = (patch: Partial<Settings>) =>
-    setSettings((s) => {
-      const next = { ...s, ...patch };
-      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch {/* ignore */}
-      return next;
-    });
-  return [settings, update] as const;
-}
-
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
-const fmtTime = (iso: string) => {
-  const d = new Date(iso);
-  let h = d.getHours();
-  const m = d.getMinutes();
-  const ampm = h >= 12 ? "p" : "a";
-  h = h % 12 || 12;
-  return m ? `${h}:${String(m).padStart(2, "0")}${ampm}` : `${h}${ampm}`;
-};
-
-/**
- * Visual shift-type palette — derives a human-readable label and a calm,
- * light card color per shift. Uses explicit `shift_type` when set; otherwise
- * infers from job_code and start-hour to match the demo (Morning / Swing /
- * Overnight / Day / 1:1 Support / DSI / Respite).
- */
-type ShiftTypeInfo = { label: string; bg: string; fg: string; accent: string };
-
-function inferShiftTypeKey(s: ShiftRow): string {
-  const explicit = (s.shift_type ?? "").toString().trim().toLowerCase();
-  if (explicit && SHIFT_TYPE_PALETTE[explicit]) return explicit;
-  const code = (s.job_code ?? "").toUpperCase();
-  if (code === "DSI") return "dsi";
-  if (code === "DSG") return "day";
-  if (code.startsWith("RP") || code === "RL6") return "respite";
-  if (code === "HHS" || code === "RHS") {
-    const h = new Date(s.starts_at).getHours();
-    if (h >= 21 || h < 5) return "overnight";
-    if (h >= 14) return "swing";
-    return "morning";
-  }
-  const h = new Date(s.starts_at).getHours();
-  if (h >= 21 || h < 5) return "overnight";
-  if (h >= 14 && h < 21) return "swing";
-  if (h >= 5 && h < 11) return "morning";
-  return "support";
-}
-
-const SHIFT_TYPE_PALETTE: Record<string, ShiftTypeInfo> = {
-  morning:   { label: "Morning",     bg: "#e8f6f0", fg: "#0f6a47", accent: "#1f9d6b" },
-  swing:     { label: "Swing",       bg: "#eeeafb", fg: "#3e3372", accent: "#5b4b9e" },
-  overnight: { label: "Overnight",   bg: "#e7eaf5", fg: "#1a2350", accent: NAVY },
-  day:       { label: "Day",         bg: "#fdf3e3", fg: "#8a5a00", accent: GOLD },
-  support:   { label: "1:1 Support", bg: "#fdf3e3", fg: "#8a5a00", accent: GOLD },
-  dsi:       { label: "DSI",         bg: "#e6f1f3", fg: "#0a5560", accent: TEAL },
-  respite:   { label: "Respite",     bg: "#fdeaf3", fg: "#8a2d63", accent: "#c5478f" },
-};
-
-function shiftTypeInfo(s: ShiftRow): ShiftTypeInfo {
-  const key = inferShiftTypeKey(s);
-  return SHIFT_TYPE_PALETTE[key] ?? { label: s.shift_type || s.job_code || "Shift", bg: "#eef0f6", fg: INK, accent: TEAL };
-}
-
-function staffTint(staffId: string | null): ShiftTypeInfo {
-  const key = staffId ?? "open";
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  const hue = h % 360;
-  return {
-    label: "Staff",
-    bg: `hsl(${hue} 70% 94%)`,
-    fg: `hsl(${hue} 45% 28%)`,
-    accent: `hsl(${hue} 55% 45%)`,
-  };
+function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 function SchedulePreviewPage() {
@@ -179,6 +48,7 @@ function SchedulePreviewPage() {
   const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
 
   const [settings, setSettings] = useSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [siteId, setSiteId] = useState<string>("__all__");
   const [view, setView] = useState<ViewMode>(settings.defaultView);
@@ -186,13 +56,12 @@ function SchedulePreviewPage() {
   const [editorCtx, setEditorCtx] = useState<EditorContext | null>(null);
   const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
-  // Re-sync default view when settings change
   useEffect(() => { setView(settings.defaultView); }, [settings.defaultView]);
+  // Honor the "opens on" preference once, on first paint.
+  const [landed, setLanded] = useState(false);
   useEffect(() => {
-    if (!settings.startOnAllSites) {
-      // keep current siteId (might be __all__ on first paint — user can pick)
-    }
-  }, [settings.startOnAllSites]);
+    if (!landed) { setSiteId(settings.startOnAllSites ? "__all__" : siteId); setLanded(true); }
+  }, [landed, settings.startOnAllSites, siteId]);
 
   const { data, isLoading } = useSchedulePreview(weekStart);
   const { data: requests } = useOrgScheduleRequests();
@@ -201,26 +70,22 @@ function SchedulePreviewPage() {
     [requests?.timeOff],
   );
 
-  const days = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(weekStart);
-      d.setDate(d.getDate() + i);
-      return d;
-    });
-  }, [weekStart]);
+  const days = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; }),
+    [weekStart],
+  );
 
   const sites = useMemo(() => {
     const teams = data?.teams ?? [];
     const clients = data?.clients ?? [];
     const list = teams.map((t) => ({ id: t.id, name: t.team_name }));
-    const hasUnassigned = clients.some((c) => !c.team_id);
-    if (hasUnassigned) list.push({ id: UNASSIGNED_SITE_ID, name: "1-on-1 Services" });
+    if (clients.some((c) => !c.team_id)) list.push({ id: UNASSIGNED_SITE_ID, name: "1-on-1 Services" });
     return list;
   }, [data]);
 
   const siteClients = useMemo(() => {
-    if (!data) return new Map<string, ClientRow[]>();
     const m = new Map<string, ClientRow[]>();
+    if (!data) return m;
     for (const s of sites) m.set(s.id, []);
     for (const c of data.clients) {
       const key = c.team_id ?? UNASSIGNED_SITE_ID;
@@ -231,10 +96,10 @@ function SchedulePreviewPage() {
   }, [data, sites]);
 
   const siteShifts = useMemo(() => {
-    if (!data) return new Map<string, ShiftRow[]>();
+    const m = new Map<string, ShiftRow[]>();
+    if (!data) return m;
     const clientToSite = new Map<string, string>();
     for (const c of data.clients) clientToSite.set(c.id, c.team_id ?? UNASSIGNED_SITE_ID);
-    const m = new Map<string, ShiftRow[]>();
     for (const s of sites) m.set(s.id, []);
     for (const sh of data.shifts) {
       const key = sh.client_id ? clientToSite.get(sh.client_id) : null;
@@ -245,19 +110,26 @@ function SchedulePreviewPage() {
     return m;
   }, [data, sites]);
 
-  if (orgLoading) return <PageShell><div className="p-8 text-sm opacity-70">Loading…</div></PageShell>;
+  // A site has an open slot ("gap") if any of its shifts is unassigned.
+  const siteHasGap = useMemo(() => {
+    const m = new Map<string, boolean>();
+    for (const s of sites) m.set(s.id, (siteShifts.get(s.id) ?? []).some((sh) => !sh.staff_id));
+    return m;
+  }, [sites, siteShifts]);
+
+  if (orgLoading) return <Shell><div style={{ padding: 24, color: SCHED.muted, fontSize: 13 }}>Loading…</div></Shell>;
   if (!isAdmin) {
     return (
-      <PageShell>
-        <Card className="p-8 text-center max-w-md mx-auto mt-12">
-          <Lock className="h-8 w-8 mx-auto mb-3 opacity-60" />
-          <p className="font-semibold">Admin or manager access required</p>
-          <p className="text-sm opacity-70 mt-1">Schedule (new) is currently admin-only during preview.</p>
-          <Link to="/dashboard" className="inline-block mt-4 text-sm underline" style={{ color: TEAL }}>
+      <Shell>
+        <div style={card({ padding: 32, textAlign: "center", maxWidth: 420, margin: "48px auto" })}>
+          <Lock className="h-8 w-8" style={{ margin: "0 auto 12px", opacity: 0.6 }} />
+          <p style={{ fontWeight: 700 }}>Admin or manager access required</p>
+          <p style={{ fontSize: 13, color: SCHED.muted, marginTop: 4 }}>Schedule is admin-only.</p>
+          <Link to="/dashboard" style={{ display: "inline-block", marginTop: 16, fontSize: 13, color: SCHED.teal, textDecoration: "underline" }}>
             Back to dashboard
           </Link>
-        </Card>
-      </PageShell>
+        </div>
+      </Shell>
     );
   }
 
@@ -267,67 +139,30 @@ function SchedulePreviewPage() {
 
   const isAll = siteId === "__all__";
   const currentSite = sites.find((s) => s.id === siteId);
+  const weekEnd = days[6];
+  const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${weekEnd.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  const orgName = org?.organization_name ?? "Your agency";
 
   return (
-    <PageShell>
-      {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <Shell>
+      {/* ── Header ───────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
         <div>
-          <h1
-            className="text-2xl font-bold tracking-tight"
-            style={{ color: INK, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
-          >
-            Schedule <span style={{ color: GOLD }}>· preview</span>
-          </h1>
-          <p className="text-sm opacity-70 mt-0.5">
-            Read-only view of your existing schedule. Nothing here can edit shifts.
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-.02em", color: SCHED.ink }}>Schedule</h1>
+          <p style={{ margin: "4px 0 0", color: SCHED.muted, fontWeight: 500 }}>
+            {orgName} · click any shift to edit, or a + on an open slot to add one
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="ghost" size="sm" asChild className="min-h-[44px]">
-            <Link to="/dashboard/homes">
-              <Home className="h-4 w-4 mr-1" /> Homes &amp; Teams
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild className="min-h-[44px]" title="Legacy individual-services scheduler (recurring shifts)">
-            <Link to="/dashboard/scheduling" search={{ mode: "individual" }}>
-              Legacy 1-on-1
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" onClick={goPrev} className="min-h-[44px]">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={goToday} className="min-h-[44px]">
-            <CalendarDays className="h-4 w-4 mr-1" /> This week
-          </Button>
-          <Button variant="outline" size="sm" onClick={goNext} className="min-h-[44px]">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <SettingsDrawer settings={settings} onChange={setSettings} />
+        <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
+          <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
+          <Link to="/dashboard/scheduling" search={{ mode: "individual" }} style={btn()} title="Legacy individual-services scheduler">
+            Legacy 1-on-1
+          </Link>
+          <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>
         </div>
       </div>
 
-      {/* Week range */}
-      <p className="text-xs uppercase tracking-wider opacity-60 mt-2">
-        Week of {weekStart.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
-      </p>
-
-      {/* Site picker */}
-      <div className="mt-4 -mx-1 overflow-x-auto">
-        <div className="flex gap-2 px-1 pb-2 min-w-fit">
-          <SiteButton active={isAll} onClick={() => setSiteId("__all__")} label="All sites" icon={<Home className="h-3.5 w-3.5" />} />
-          {sites.map((s) => (
-            <SiteButton
-              key={s.id}
-              active={siteId === s.id}
-              onClick={() => setSiteId(s.id)}
-              label={s.name}
-              icon={s.id === UNASSIGNED_SITE_ID ? <Users className="h-3.5 w-3.5" /> : <Home className="h-3.5 w-3.5" />}
-            />
-          ))}
-        </div>
-      </div>
-
+      {/* ── NECTAR command bar (logic reused; styled to match) ────────── */}
       <NectarCommandBar
         weekStart={weekStart}
         clients={data?.clients ?? []}
@@ -336,84 +171,139 @@ function SchedulePreviewPage() {
         shifts={data?.shifts ?? []}
       />
 
-      {isLoading ? (
-        <Card className="p-8 mt-4 text-sm opacity-70 text-center">Loading schedule…</Card>
-      ) : isAll ? (
-        <AllSitesOverview
-          days={days}
-          sites={sites}
-          siteClients={siteClients}
-          siteShifts={siteShifts}
-          settings={settings}
-          onPickSite={setSiteId}
-        />
-      ) : currentSite ? (
-        <SiteWeekGrid
-          siteId={currentSite.id}
-          siteName={currentSite.name}
-          days={days}
-          clients={siteClients.get(currentSite.id) ?? []}
-          shifts={siteShifts.get(currentSite.id) ?? []}
-          staff={data?.staff ?? []}
-          view={view}
-          setView={setView}
-          settings={settings}
-          onOpenEditor={openEditor}
-        />
-      ) : null}
+      {/* ── Controls bar (rounded top, attached to board) ─────────────── */}
+      <div style={controlsBar}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <button style={arrowBtn} onClick={goPrev} aria-label="Previous week">‹</button>
+          <b style={{ fontSize: 14, whiteSpace: "nowrap" }}>{weekLabel}</b>
+          <button style={arrowBtn} onClick={goNext} aria-label="Next week">›</button>
+          <button style={{ ...arrowBtn, width: "auto", padding: "0 10px", fontSize: 12.5, fontWeight: 600 }} onClick={goToday}>Today</button>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <HomePill active={isAll} label="All homes" onClick={() => setSiteId("__all__")} />
+          {sites.map((s) => (
+            <HomePill key={s.id} active={siteId === s.id} label={s.name} gap={!!siteHasGap.get(s.id)} onClick={() => setSiteId(s.id)} />
+          ))}
+        </div>
+        <div style={{ flex: 1 }} />
+        <ViewSeg value={view} onChange={setView} disabled={isAll} />
+      </div>
 
+      {/* ── Board ─────────────────────────────────────────────────────── */}
+      <div style={board}>
+        {isLoading ? (
+          <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>Loading schedule…</div>
+        ) : isAll ? (
+          <AllHomesBoard
+            days={days} sites={sites} siteClients={siteClients} siteShifts={siteShifts}
+            settings={settings} onPickSite={setSiteId}
+          />
+        ) : currentSite ? (
+          <SiteWeekGrid
+            key={currentSite.id}
+            siteId={currentSite.id} siteName={currentSite.name} days={days}
+            clients={siteClients.get(currentSite.id) ?? []} shifts={siteShifts.get(currentSite.id) ?? []}
+            staff={data?.staff ?? []} view={view} settings={settings} onOpenEditor={openEditor}
+          />
+        ) : (
+          <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>No sites or 1-on-1 clients yet.</div>
+        )}
+      </div>
+
+      {/* ── Week strip (requests) ─────────────────────────────────────── */}
       <RequestsPanel weekStart={weekStart} staff={data?.staff ?? []} />
 
-      <p className="text-[11px] opacity-50 mt-6">
-        Site type inferred from shift codes ({"{HHS, RHS, DSG, RL6, RP3, RP4, RP5}"} = residential). Clients with no
-        team are grouped as “1-on-1 Services”.
+      <p style={{ marginTop: 14, color: SCHED.muted, fontSize: 12.5, textAlign: "center" }}>
+        Site type inferred from shift codes (HHS, RHS, DSG, RL6, RP3–5 = residential). Clients with no team are grouped as “1-on-1 Services”.
       </p>
 
+      <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} onChange={setSettings} />
+
       <ShiftEditorDialog
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-        ctx={editorCtx}
-        clients={data?.clients ?? []}
-        staff={data?.staff ?? []}
-        siteId={siteId}
-        weekStartIso={weekStart.toISOString()}
-        approvedTimeOff={approvedTimeOff}
+        open={editorOpen} onOpenChange={setEditorOpen} ctx={editorCtx}
+        clients={data?.clients ?? []} staff={data?.staff ?? []} siteId={siteId}
+        weekStartIso={weekStart.toISOString()} approvedTimeOff={approvedTimeOff}
       />
-    </PageShell>
+    </Shell>
   );
 }
 
-function PageShell({ children }: { children: React.ReactNode }) {
+// ── Shell + small chrome helpers ──────────────────────────────────────
+function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="min-h-[60vh] p-4 md:p-6"
-      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
-    >
+    <div style={{ ...font, background: SCHED.paper, color: SCHED.ink, padding: 22, minHeight: "60vh" }}>
+      {/* :hover affordances the inline styles can't express (quick-add reveal, drill, chip) */}
+      <style>{`
+        .sched-cell .sched-add{border-color:transparent;color:#c4c8d4}
+        .sched-cell:hover .sched-add{border-color:#dde0ea;color:${SCHED.muted}}
+        .sched-add:hover{border-color:${SCHED.teal}!important;color:${SCHED.teal}!important}
+        .sched-drill:hover td:first-child{color:${SCHED.teal}}
+        .sched-chip:hover{filter:brightness(.97);box-shadow:0 0 0 2px rgba(19,113,130,.15)}
+      `}</style>
       {children}
     </div>
   );
 }
+function card(extra: React.CSSProperties): React.CSSProperties {
+  return { background: SCHED.card, border: `1px solid ${SCHED.line}`, borderRadius: 14, boxShadow: SCHED.shadow, ...extra };
+}
+function btn(): React.CSSProperties {
+  return {
+    border: `1px solid ${SCHED.line}`, background: "#fff", color: SCHED.ink, padding: "9px 14px",
+    borderRadius: 10, fontWeight: 600, fontSize: 13, display: "inline-flex", alignItems: "center",
+    gap: 7, textDecoration: "none", cursor: "pointer",
+  };
+}
+const controlsBar: React.CSSProperties = {
+  background: SCHED.card, border: `1px solid ${SCHED.line}`, borderRadius: "14px 14px 0 0",
+  borderBottom: "none", padding: "11px 14px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+};
+const board: React.CSSProperties = {
+  background: SCHED.card, border: `1px solid ${SCHED.line}`, borderRadius: "0 0 16px 16px",
+  boxShadow: SCHED.shadow, overflow: "hidden",
+};
+const arrowBtn: React.CSSProperties = {
+  border: `1px solid ${SCHED.line}`, background: "#fff", width: 28, height: 28, borderRadius: 8, fontSize: 14, cursor: "pointer", color: SCHED.ink,
+};
 
-function SiteButton({
-  active, onClick, label, icon,
-}: { active: boolean; onClick: () => void; label: string; icon: React.ReactNode }) {
+function HomePill({ active, label, gap, onClick }: { active: boolean; label: string; gap?: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-full px-3.5 min-h-[40px] text-sm font-medium transition relative"
       style={{
-        background: active ? NAVY : "transparent",
-        color: active ? "white" : INK,
-        border: `1px solid ${active ? NAVY : "rgba(13,17,43,0.15)"}`,
+        border: `1px solid ${active ? SCHED.navy : SCHED.line}`, background: active ? SCHED.navy : "#fff",
+        color: active ? "#fff" : SCHED.ink, borderRadius: 9, padding: "7px 12px", fontWeight: 600,
+        fontSize: 12.5, display: "flex", alignItems: "center", gap: 7, cursor: "pointer", whiteSpace: "nowrap",
       }}
     >
-      {icon}
-      <span className="whitespace-nowrap">{label}</span>
+      {label}
+      {gap && <span style={{ width: 7, height: 7, borderRadius: "50%", background: SCHED.gap }} />}
     </button>
   );
 }
 
-function AllSitesOverview({
+function ViewSeg({ value, onChange, disabled }: { value: ViewMode; onChange: (v: ViewMode) => void; disabled?: boolean }) {
+  const items: ViewMode[] = ["staff", "client", "both"];
+  return (
+    <div style={{ display: "flex", border: `1px solid ${SCHED.line}`, borderRadius: 9, overflow: "hidden", opacity: disabled ? 0.4 : 1, pointerEvents: disabled ? "none" : "auto" }}>
+      {items.map((v) => {
+        const on = value === v;
+        return (
+          <button
+            key={v}
+            onClick={() => onChange(v)}
+            style={{ border: "none", background: on ? SCHED.tealBg : "#fff", padding: "7px 13px", fontWeight: 700, fontSize: 12.5, color: on ? "#0c5562" : SCHED.muted, cursor: "pointer" }}
+          >
+            {v === "staff" ? "Staff" : v === "client" ? "Client" : "Both"}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── All-homes status board ────────────────────────────────────────────
+function AllHomesBoard({
   days, sites, siteClients, siteShifts, settings, onPickSite,
 }: {
   days: Date[];
@@ -423,23 +313,14 @@ function AllSitesOverview({
   settings: Settings;
   onPickSite: (id: string) => void;
 }) {
-  if (sites.length === 0) {
-    return <Card className="p-8 mt-4 text-center text-sm opacity-70">No sites or 1-on-1 clients yet.</Card>;
-  }
+  if (sites.length === 0) return <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>No sites yet.</div>;
   return (
-    <Card className="mt-4 overflow-x-auto">
-      <table className="w-full text-sm border-separate border-spacing-0">
+    <>
+      <table style={grid}>
         <thead>
           <tr>
-            <th className="text-left p-3 font-semibold sticky left-0 z-10 bg-white" style={{ color: INK }}>
-              Site
-            </th>
-            {days.map((d, i) => (
-              <th key={i} className="p-2 text-center font-semibold" style={{ color: INK }}>
-                <div className="text-[11px] uppercase opacity-60">{DAY_LABELS[i]}</div>
-                <div>{fmt(d)}</div>
-              </th>
-            ))}
+            <th style={{ ...gTh, ...gThLeft, width: 150 }}>Home</th>
+            {days.map((d, i) => <th key={i} style={gTh}>{DAY_LABELS[d.getDay()]} {d.getDate()}</th>)}
           </tr>
         </thead>
         <tbody>
@@ -448,78 +329,37 @@ function AllSitesOverview({
             const shifts = siteShifts.get(s.id) ?? [];
             const type = inferSiteType(s.id, clients, shifts);
             return (
-              <tr
-                key={s.id}
-                className="cursor-pointer hover:bg-black/[0.02] border-t"
-                style={{ borderColor: "rgba(13,17,43,0.06)" }}
-                onClick={() => onPickSite(s.id)}
-              >
-                <td className="p-3 sticky left-0 bg-white">
-                  <div className="font-semibold" style={{ color: INK }}>{s.name}</div>
-                  <div className="text-[11px] opacity-60 mt-0.5 flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] py-0 h-4"
-                      style={{ borderColor: type === "residential" ? TEAL : GOLD, color: type === "residential" ? TEAL : GOLD }}
-                    >
-                      {type === "residential" ? "Residential" : "Day / 1:1"}
-                    </Badge>
-                    {settings.showResidentCount && <span>{clients.length} {clients.length === 1 ? "person" : "people"}</span>}
-                  </div>
+              <tr key={s.id} style={{ cursor: "pointer" }} onClick={() => onPickSite(s.id)} className="sched-drill">
+                <td style={rowHead}>
+                  {s.name}
+                  {settings.showResidentCount && (
+                    <small style={rowHeadSmall}>{type === "residential" ? "Residential" : "Day / 1:1"} · {clients.length} {clients.length === 1 ? "person" : "people"}</small>
+                  )}
                 </td>
                 {days.map((d, i) => {
-                  const dayShifts = shifts.filter((sh) => sameDay(new Date(sh.starts_at), d));
-                  return (
-                    <td key={i} className="p-2 text-center align-middle">
-                      <CoverageCell type={type} day={d} shifts={dayShifts} />
-                    </td>
-                  );
+                  const de = shifts.filter((sh) => sameDay(new Date(sh.starts_at), d));
+                  const open = de.filter((sh) => !sh.staff_id).length;
+                  const setCnt = de.length - open;
+                  let content: React.ReactNode;
+                  if (de.length === 0) content = <div style={{ ...statusBase, color: "#c4c8d4" }}>—</div>;
+                  else if (open > 0) content = <div style={{ ...statusBase, ...statusOpen }}><span style={dot} />{open} open</div>;
+                  else if (type === "residential") content = <div style={{ ...statusBase, ...statusCov }}>✓ 24h</div>;
+                  else content = <div style={{ ...statusBase, ...statusCov }}><span style={dot} />{setCnt} set</div>;
+                  return <td key={i} style={gTd}>{content}</td>;
                 })}
               </tr>
             );
           })}
         </tbody>
       </table>
-    </Card>
+      <div style={hint}>Each cell shows coverage status. Click a home to open its full week.</div>
+    </>
   );
 }
 
-function CoverageCell({ type, day, shifts }: { type: "residential" | "day"; day: Date; shifts: ShiftRow[] }) {
-  if (type === "residential") {
-    const mins = dayCoverageMinutes(day, shifts);
-    const ok = mins >= 24 * 60 - 1;
-    if (ok) {
-      return (
-        <span
-          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold"
-          style={{ background: "rgba(19,113,130,0.12)", color: TEAL }}
-        >
-          <CheckCircle2 className="h-3 w-3" /> 24h
-        </span>
-      );
-    }
-    const gap = 24 * 60 - mins;
-    return (
-      <span
-        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold"
-        style={{ background: "rgba(245,166,35,0.15)", color: "#8a5a00" }}
-      >
-        <AlertTriangle className="h-3 w-3" />
-        {gap >= 60 ? `${Math.round(gap / 60)}h gap` : `${gap}m gap`}
-      </span>
-    );
-  }
-  const open = shifts.filter((s) => !s.staff_id).length;
-  return (
-    <div className="text-[11px]">
-      <div className="font-semibold" style={{ color: INK }}>{shifts.length} shifts</div>
-      {open > 0 && <div className="opacity-70" style={{ color: GOLD }}>{open} open</div>}
-    </div>
-  );
-}
-
+// ── Single-home week grid ─────────────────────────────────────────────
 function SiteWeekGrid({
-  siteId, siteName, days, clients, shifts, staff, view, setView, settings, onOpenEditor,
+  siteId, siteName, days, clients, shifts, staff, view, settings, onOpenEditor,
 }: {
   siteId: string;
   siteName: string;
@@ -528,288 +368,176 @@ function SiteWeekGrid({
   shifts: ShiftRow[];
   staff: StaffRow[];
   view: ViewMode;
-  setView: (v: ViewMode) => void;
   settings: Settings;
   onOpenEditor: (ctx: EditorContext) => void;
 }) {
   const type = inferSiteType(siteId, clients, shifts);
-  const cellPad = settings.density === "compact" ? "p-1.5" : "p-2";
-  const cardPad = settings.density === "compact" ? "px-2 py-1" : "px-2.5 py-1.5";
-
-  // Build rows by view
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const clientById = new Map(clients.map((c) => [c.id, c]));
-  const clientName = (id: string | null) => {
-    if (!id) return "—";
-    const c = clientById.get(id);
-    return c ? `${c.first_name} ${c.last_name}`.trim() : "Client";
-  };
+  const clientName = (id: string | null) => (id ? (clientById.get(id) ? `${clientById.get(id)!.first_name} ${clientById.get(id)!.last_name}`.trim() : "Client") : "House");
+  const staffName = (id: string | null) => (id ? (staffById.get(id)?.name ?? "Staff") : "Open");
 
-  type Row = { id: string; label: string; sublabel?: string };
+  type Row = { id: string; label: string; sublabel?: string; house?: boolean };
   let rows: Row[] = [];
   if (view === "client") {
-    if (type === "residential") {
-      rows.push({ id: "__house__", label: "House coverage", sublabel: "All residents" });
-    }
-    rows = rows.concat(
-      clients.map((c) => ({ id: c.id, label: `${c.first_name} ${c.last_name}`.trim() })),
-    );
+    if (type === "residential") rows.push({ id: "__house__", label: "House coverage", sublabel: "All residents", house: true });
+    rows = rows.concat(clients.map((c) => ({ id: c.id, label: `${c.first_name} ${c.last_name}`.trim() })));
   } else {
-    // staff or both
     const staffIds = new Set<string>();
     for (const s of shifts) if (s.staff_id) staffIds.add(s.staff_id);
-    rows = Array.from(staffIds).map((id) => ({
-      id,
-      label: staffById.get(id)?.name ?? "Staff",
-    }));
+    rows = Array.from(staffIds).map((id) => ({ id, label: staffById.get(id)?.name ?? "Staff" }));
     rows.sort((a, b) => a.label.localeCompare(b.label));
-    const openCount = shifts.filter((s) => !s.staff_id).length;
-    if (openCount > 0) rows.unshift({ id: "__open__", label: "Open shifts" });
+    if (shifts.some((s) => !s.staff_id)) rows.push({ id: "__open__", label: "Open / unassigned" });
   }
 
-  const cellsFor = (row: Row, day: Date) => {
-    if (row.id === "__house__") {
-      const dayShifts = shifts.filter((s) => sameDay(new Date(s.starts_at), day));
-      return <CoverageCell type="residential" day={day} shifts={dayShifts} />;
-    }
-    const matches = shifts.filter((s) => {
-      if (!sameDay(new Date(s.starts_at), day)) return false;
-      if (view === "client") return s.client_id === row.id;
-      if (row.id === "__open__") return !s.staff_id;
-      return s.staff_id === row.id;
-    });
-
-    // Quick-add affordance for empty cells.
-    const quickAdd = () => {
-      const ctx: EditorContext = { day };
-      if (view === "client") ctx.clientId = row.id;
-      else ctx.staffId = row.id === "__open__" ? null : row.id;
-      onOpenEditor(ctx);
-    };
-
-    if (matches.length === 0) {
-      return (
-        <button
-          onClick={quickAdd}
-          className="w-full min-h-[36px] flex items-center justify-center rounded-md opacity-40 hover:opacity-100 focus:opacity-100 transition"
-          style={{ border: "1px dashed rgba(13,17,43,0.2)" }}
-          aria-label="Add shift"
-        >
-          <Plus className="h-3.5 w-3.5" style={{ color: TEAL }} />
-        </button>
-      );
-    }
-    return (
-      <div className="flex flex-col gap-1">
-        {matches.map((s) => {
-          const info = settings.colorBy === "staff" ? staffTint(s.staff_id) : shiftTypeInfo(s);
-          const staffLabel = s.staff_id ? (staffById.get(s.staff_id)?.name ?? "Staff") : "Open";
-          const cName = clientName(s.client_id);
-          // Secondary text: in staff/both rows the row IS the staff, so show client.
-          // In client rows the row IS the client, so show staff.
-          const secondary = view === "client" ? staffLabel : cName;
-          return (
-            <button
-              key={s.id}
-              onClick={() => onOpenEditor({ shift: s })}
-              className={`text-left rounded-lg ${cardPad} text-[11px] font-medium leading-tight transition hover:brightness-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-1`}
-              style={{
-                background: info.bg,
-                color: info.fg,
-                borderLeft: `3px solid ${info.accent}`,
-                boxShadow: "0 1px 2px rgba(11,17,38,0.04)",
-                opacity: s.published ? 1 : 0.7,
-                fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-              }}
-              title={`${info.label} · ${fmtTime(s.starts_at)}–${fmtTime(s.ends_at)} — click to edit`}
-            >
-              <div className="font-bold text-[12px] tracking-tight">{info.label}</div>
-              {settings.showTimes && (
-                <div className="opacity-80 text-[10.5px] mt-0.5">{fmtTime(s.starts_at)}–{fmtTime(s.ends_at)}</div>
-              )}
-              <div className="truncate opacity-90 mt-0.5">{secondary}</div>
-            </button>
-          );
-        })}
-        <button
-          onClick={quickAdd}
-          className="text-[10px] py-0.5 rounded opacity-0 hover:opacity-100 focus:opacity-100 transition"
-          style={{ color: TEAL }}
-          aria-label="Add another shift"
-        >
-          + add
-        </button>
-      </div>
-    );
+  const matchRow = (row: Row, s: ShiftRow) => {
+    if (view === "client") return s.client_id === row.id;
+    if (row.id === "__open__") return !s.staff_id;
+    return s.staff_id === row.id;
   };
 
-  return (
-    <Card className="mt-4 overflow-hidden">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between p-3 border-b" style={{ borderColor: "rgba(13,17,43,0.08)" }}>
-        <div>
-          <div className="font-semibold" style={{ color: INK }}>{siteName}</div>
-          <div className="text-[11px] opacity-60">
-            {type === "residential" ? "Residential / group home" : "Day / 1-on-1"} · {clients.length} {clients.length === 1 ? "person" : "people"}
-          </div>
-        </div>
-        <div className="inline-flex rounded-full p-0.5" style={{ background: "rgba(13,17,43,0.06)" }}>
-          {(["staff", "client", "both"] as ViewMode[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className="px-3 min-h-[36px] text-xs font-semibold rounded-full transition"
-              style={{
-                background: view === v ? "white" : "transparent",
-                color: view === v ? INK : "rgba(13,17,43,0.65)",
-                boxShadow: view === v ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
-              }}
-            >
-              {v === "staff" ? "Staff" : v === "client" ? "Client" : "Both"}
-            </button>
-          ))}
-        </div>
-      </div>
+  const quickAdd = (row: Row, day: Date) => {
+    const ctx: EditorContext = { day };
+    if (view === "client") ctx.clientId = row.id === "__house__" ? undefined : row.id;
+    else ctx.staffId = row.id === "__open__" ? null : row.id;
+    onOpenEditor(ctx);
+  };
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-separate border-spacing-0">
-          <thead>
-            <tr>
-              <th className="text-left p-3 font-semibold sticky left-0 z-10 bg-white" style={{ color: INK, minWidth: 180 }}>
-                {view === "client" ? "Person" : "Staff"}
-              </th>
-              {days.map((d, i) => (
-                <th key={i} className="p-2 text-center font-semibold" style={{ color: INK, minWidth: 130 }}>
-                  <div className="text-[11px] uppercase opacity-60">{DAY_LABELS[i]}</div>
-                  <div>{fmt(d)}</div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={8} className="p-8 text-center text-sm opacity-60">No shifts this week.</td></tr>
-            ) : rows.map((row) => (
-              <tr key={row.id} className="border-t" style={{ borderColor: "rgba(13,17,43,0.06)" }}>
-                <td className="p-3 sticky left-0 bg-white align-top">
-                  <div className="font-medium" style={{ color: INK }}>{row.label}</div>
-                  {row.sublabel && <div className="text-[11px] opacity-60">{row.sublabel}</div>}
-                </td>
-                {days.map((d, i) => (
-                  <td key={i} className={`${cellPad} align-top`}>
-                    {cellsFor(row, d)}
+  const compact = settings.density === "compact";
+
+  return (
+    <>
+      <table style={{ ...grid, ...(compact ? gridCompact : null) }}>
+        <thead>
+          <tr>
+            <th style={{ ...gTh, ...gThLeft }}>{view === "client" ? "Client" : "Staff"}</th>
+            {days.map((d, i) => <th key={i} style={gTh}>{DAY_LABELS[d.getDay()]} {d.getDate()}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>No shifts this week.</td></tr>
+          ) : rows.map((row) => (
+            <tr key={row.id}>
+              <td style={rowHead}>
+                {row.label}
+                {row.sublabel && settings.showResidentCount && <small style={rowHeadSmall}>{row.sublabel}</small>}
+              </td>
+              {days.map((d, i) => {
+                const cellShifts = shifts.filter((s) => sameDay(new Date(s.starts_at), d) && matchRow(row, s));
+                return (
+                  <td key={i} style={{ ...gTd, ...(compact ? gTdCompact : null) }} className="sched-cell">
+                    {row.house && type === "residential" && <CoverageBadge day={d} shifts={shifts.filter((s) => sameDay(new Date(s.starts_at), d))} />}
+                    {cellShifts.map((s) => (
+                      <ShiftChip
+                        key={s.id} shift={s} view={view} settings={settings}
+                        staffName={staffName(s.staff_id)} clientName={clientName(s.client_id)}
+                        onClick={() => onOpenEditor({ shift: s })}
+                      />
+                    ))}
+                    <button style={addCell} className="sched-add" title="Add a shift" onClick={() => quickAdd(row, d)}>+</button>
                   </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={hint}>
+        {siteName} · {view === "staff" ? "who works when" : view === "client" ? "who covers each person" : "staff paired with the client they support"}. Click a shift to edit; hover a cell for the + to add.
       </div>
-    </Card>
+    </>
   );
 }
 
-function SettingsDrawer({ settings, onChange }: { settings: Settings; onChange: (p: Partial<Settings>) => void }) {
+function CoverageBadge({ day, shifts }: { day: Date; shifts: ShiftRow[] }) {
+  const mins = dayCoverageMinutes(day, shifts);
+  const ok = mins >= 24 * 60 - 1 && shifts.every((s) => s.staff_id);
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="min-h-[44px]">
-          <SettingsIcon className="h-4 w-4" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>Display settings</SheetTitle>
-          <SheetDescription>Personal preferences for the Schedule (new) page. Saved on this device.</SheetDescription>
-        </SheetHeader>
-        <div className="space-y-5 mt-6">
-          <div>
-            <Label className="text-xs uppercase tracking-wider opacity-60">Default view</Label>
-            <div className="inline-flex rounded-full p-0.5 mt-2" style={{ background: "rgba(13,17,43,0.06)" }}>
-              {(["staff", "client", "both"] as ViewMode[]).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onChange({ defaultView: v })}
-                  className="px-3 min-h-[36px] text-xs font-semibold rounded-full"
-                  style={{
-                    background: settings.defaultView === v ? "white" : "transparent",
-                    color: settings.defaultView === v ? INK : "rgba(13,17,43,0.65)",
-                  }}
-                >
-                  {v[0].toUpperCase() + v.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs uppercase tracking-wider opacity-60">Density</Label>
-            <div className="inline-flex rounded-full p-0.5 mt-2" style={{ background: "rgba(13,17,43,0.06)" }}>
-              {(["comfortable", "compact"] as Density[]).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onChange({ density: v })}
-                  className="px-3 min-h-[36px] text-xs font-semibold rounded-full capitalize"
-                  style={{
-                    background: settings.density === v ? "white" : "transparent",
-                    color: settings.density === v ? INK : "rgba(13,17,43,0.65)",
-                  }}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs uppercase tracking-wider opacity-60">Color cards by</Label>
-            <div className="inline-flex rounded-full p-0.5 mt-2" style={{ background: "rgba(13,17,43,0.06)" }}>
-              {(["shift_type", "staff"] as ColorBy[]).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onChange({ colorBy: v })}
-                  className="px-3 min-h-[36px] text-xs font-semibold rounded-full"
-                  style={{
-                    background: settings.colorBy === v ? "white" : "transparent",
-                    color: settings.colorBy === v ? INK : "rgba(13,17,43,0.65)",
-                  }}
-                >
-                  {v === "shift_type" ? "Shift type" : "Staff"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <ToggleRow
-            label="Start on All sites"
-            checked={settings.startOnAllSites}
-            onChange={(b) => onChange({ startOnAllSites: b })}
-          />
-          <ToggleRow
-            label="Show shift times on cards"
-            checked={settings.showTimes}
-            onChange={(b) => onChange({ showTimes: b })}
-          />
-          <ToggleRow
-            label="Show people count on site rows"
-            checked={settings.showResidentCount}
-            onChange={(b) => onChange({ showResidentCount: b })}
-          />
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (b: boolean) => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <Label className="text-sm">{label}</Label>
-      <Switch checked={checked} onCheckedChange={onChange} />
+    <div style={{ fontSize: 10, fontWeight: 800, borderRadius: 6, padding: "2px 6px", marginBottom: 5, textAlign: "center", ...(ok ? { background: SCHED.okBg, color: "#0e6a45" } : { background: SCHED.warnBg, color: SCHED.warn }) }}>
+      {ok ? "✓ 24h covered" : "⚠ gap in 24h"}
     </div>
   );
 }
 
-function sameDay(a: Date, b: Date) {
+function ShiftChip({
+  shift, view, settings, staffName, clientName, onClick,
+}: {
+  shift: ShiftRow;
+  view: ViewMode;
+  settings: Settings;
+  staffName: string;
+  clientName: string;
+  onClick: () => void;
+}) {
+  const compact = settings.density === "compact";
+  const isOpen = !shift.staff_id;
+  const label = shiftTypeLabel(shift);
+
+  if (isOpen) {
+    return (
+      <button className="sched-chip" onClick={onClick} style={{ ...chipBase, ...(compact ? chipCompact : null), background: SCHED.gapBg, borderColor: "#f3c9c6", color: SCHED.gap, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+        <span>{label} · open</span>
+        <span style={{ background: SCHED.gap, color: "#fff", borderRadius: 6, fontSize: 9.5, padding: "2px 6px", fontWeight: 700 }}>Assign</span>
+      </button>
+    );
+  }
+
+  const hex = settings.colorBy === "staff" && shift.staff_id ? staffHex(shift.staff_id) : shiftAccentHex(shift);
+  let top: string;
+  let sub: string;
+  if (view === "staff") { top = label; sub = settings.showTimes ? `${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)}` : ""; }
+  else if (view === "client") { top = staffName; sub = `${label}${settings.showTimes ? ` · ${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)}` : ""}`; }
+  else { top = label; sub = `${clientName}${settings.showTimes ? ` · ${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)}` : ""}`; }
+
   return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
+    <button
+      className="sched-chip"
+      onClick={onClick}
+      title={`${label} · ${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)} — click to edit`}
+      style={{ ...chipBase, ...(compact ? chipCompact : null), background: hex + "1a", borderColor: hex + "55", color: hex, opacity: shift.published ? 1 : 0.8 }}
+    >
+      <span>{top}</span>
+      {sub && <small style={{ display: "block", fontWeight: 500, opacity: 0.82, fontSize: compact ? 9.5 : 10 }}>{sub}</small>}
+    </button>
   );
 }
+
+// Deterministic per-staff hue (used when "Color by → Staff member").
+function staffHex(staffId: string): string {
+  let h = 0;
+  for (let i = 0; i < staffId.length; i++) h = (h * 31 + staffId.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return hslToHex(hue, 55, 45);
+}
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100; l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const c = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return Math.round(255 * c).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+// ── table styles ──────────────────────────────────────────────────────
+const grid: React.CSSProperties = { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" };
+const gridCompact: React.CSSProperties = {};
+const gTh: React.CSSProperties = {
+  background: "#fbfbfe", fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: SCHED.muted,
+  fontWeight: 700, padding: "9px 8px", textAlign: "center", borderBottom: `1px solid ${SCHED.line}`, borderRight: `1px solid ${SCHED.line}`,
+};
+const gThLeft: React.CSSProperties = { textAlign: "left", width: 150 };
+const gTd: React.CSSProperties = { padding: 6, height: 66, verticalAlign: "top", borderBottom: `1px solid ${SCHED.line}`, borderRight: `1px solid ${SCHED.line}` };
+const gTdCompact: React.CSSProperties = { height: 44, padding: 4 };
+const rowHead: React.CSSProperties = { width: 150, padding: "10px 12px", fontWeight: 700, fontSize: 13, background: "#fbfbfe", verticalAlign: "top", borderBottom: `1px solid ${SCHED.line}`, borderRight: `1px solid ${SCHED.line}` };
+const rowHeadSmall: React.CSSProperties = { display: "block", color: SCHED.muted, fontWeight: 500, fontSize: 11, marginTop: 1 };
+const chipBase: React.CSSProperties = { display: "block", width: "100%", textAlign: "left", borderRadius: 8, padding: "5px 8px", marginBottom: 4, fontSize: 11.5, fontWeight: 600, border: "1px solid transparent", cursor: "pointer" };
+const chipCompact: React.CSSProperties = { padding: "3px 7px", fontSize: 11, marginBottom: 3 };
+const addCell: React.CSSProperties = { display: "block", width: "100%", textAlign: "center", border: "1px dashed transparent", background: "transparent", color: "#c4c8d4", borderRadius: 7, padding: 2, fontSize: 15, fontWeight: 700, lineHeight: 1.1, marginTop: 1, cursor: "pointer" };
+const statusBase: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontWeight: 700, fontSize: 12, borderRadius: 8, gap: 6 };
+const statusCov: React.CSSProperties = { background: SCHED.okBg, color: "#0e6a45" };
+const statusOpen: React.CSSProperties = { background: SCHED.gapBg, color: SCHED.gap };
+const dot: React.CSSProperties = { width: 7, height: 7, borderRadius: "50%", background: "currentColor" };
+const hint: React.CSSProperties = { color: SCHED.muted, fontSize: 12, padding: "10px 14px", borderTop: `1px solid ${SCHED.line}`, background: "#fbfbfe" };

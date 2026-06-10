@@ -12,6 +12,9 @@ export type ShiftRow = {
   ends_at: string;
   status: string | null;
   published: boolean | null;
+  is_recurring: boolean | null;
+  recurrence_rule: string | null;
+  recurrence_end_date: string | null;
 };
 export type ClientRow = { id: string; first_name: string; last_name: string; team_id: string | null; job_code: string[] };
 export type TeamRow = { id: string; team_name: string };
@@ -32,7 +35,7 @@ export function useSchedulePreview(weekStart: Date) {
       const [shiftsRes, clientsRes, teamsRes, profilesRes] = await Promise.all([
         supabase
           .from("scheduled_shifts")
-          .select("id, staff_id, client_id, job_code, shift_type, starts_at, ends_at, status, published")
+          .select("id, staff_id, client_id, job_code, shift_type, starts_at, ends_at, status, published, is_recurring, recurrence_rule, recurrence_end_date")
           .eq("organization_id", orgId!)
           .gte("starts_at", weekStart.toISOString())
           .lt("starts_at", weekEnd.toISOString()),

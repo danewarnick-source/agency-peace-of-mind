@@ -93,14 +93,8 @@ Deno.serve(async (req) => {
       return json({ error: "Provide { bucket, path } or { imageBase64 }" }, 400);
     }
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+    const { gatewayFetch } = await import("../_shared/bedrock-fetch.ts");
+    const aiRes = await gatewayFetch({
         messages: [
           {
             role: "system",
@@ -135,7 +129,6 @@ Deno.serve(async (req) => {
           },
         ],
         tool_choice: { type: "function", function: { name: "return_receipt" } },
-      }),
     });
 
     if (!aiRes.ok) {

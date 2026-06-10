@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 const MedSchema = z.object({
   medication_name: z.string().min(1).max(200),
   dosage: z.string().max(100).optional().nullable(),
@@ -41,10 +43,7 @@ export const parseMedicationsAI = createServerFn({ method: "POST" })
       });
     }
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const res = await gatewayFetch({
         model: "google/gemini-2.5-flash",
         messages: [
           {
@@ -87,8 +86,7 @@ export const parseMedicationsAI = createServerFn({ method: "POST" })
           },
         ],
         tool_choice: { type: "function", function: { name: "return_medications" } },
-      }),
-    });
+      });
 
     if (!res.ok) {
       const t = await res.text();

@@ -71,17 +71,13 @@ Deno.serve(async (req) => {
         ? `Format this person-specific support information into a training module for staff who support ${personLabel ?? "this person"}. Keep identifying details accurate. Source content:\n\n${sourceText}`
         : `Format these agency policies & procedures into a staff training module. Source content:\n\n${sourceText}`;
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+    const { gatewayFetch } = await import("../_shared/bedrock-fetch.ts");
+    const aiRes = await gatewayFetch({
         messages: [
           { role: "system", content: SYSTEM },
           { role: "user", content: userPrompt },
         ],
         response_format: { type: "json_object" },
-      }),
     });
 
     if (aiRes.status === 429) return json({ error: "Rate limited. Try again in a moment." }, 429);

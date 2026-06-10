@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 // =============================================================
 // NECTAR Universal Document Store — server functions
 // All other features (billing rate auto-fill, audit auto-pull,
@@ -92,10 +94,7 @@ For each field include source_locator (e.g. "page 3", "§4.2", "row 12 of budget
 async function callLovableAI(documentText: string, hint?: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
@@ -105,8 +104,7 @@ async function callLovableAI(documentText: string, hint?: string) {
         },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
+    });
   if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
   if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
   if (!res.ok) throw new Error(`AI gateway error ${res.status}`);

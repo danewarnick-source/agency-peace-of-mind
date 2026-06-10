@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 /**
  * Server function: parse a client's 1056 budget or PCSP form using NECTAR
  * (Lovable AI / Gemini) and return the Plan Budget table rows so the UI can
@@ -79,14 +81,7 @@ Rules:
 - If a column is not present in the document, return null for that field.
 - Return ONLY JSON, no commentary.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": apiKey,
-        "X-Lovable-AIG-SDK": "fetch",
-      },
-      body: JSON.stringify({
+    const res = await gatewayFetch({
         model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: system },
@@ -99,8 +94,7 @@ Rules:
           },
         ],
         response_format: { type: "json_object" },
-      }),
-    });
+      });
 
     if (res.status === 429) throw new Error("NECTAR is busy right now — please try again in a moment.");
     if (res.status === 402) throw new Error("AI workspace credits exhausted. Add credits to continue.");

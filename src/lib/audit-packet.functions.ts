@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 type ExtractedItem = {
   sub_folder: "staff" | "client" | "admin" | "other";
   title: string;
@@ -41,21 +43,14 @@ const ExtractionSchema = z.object({
 async function callLovableAI(letterText: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: `AUDIT LETTER:\n\n${letterText.slice(0, 60000)}` },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
+    });
   if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
   if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
   if (!res.ok) throw new Error(`AI gateway error ${res.status}`);

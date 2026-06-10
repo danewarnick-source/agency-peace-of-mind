@@ -11,6 +11,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { createHash } from "crypto";
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 // ──────────────── Types ────────────────────────────────────────────────────
 
 export type CeStepLesson = {
@@ -258,22 +260,14 @@ OUTPUT — STRICT JSON, no markdown, matching this shape:
 
 FLOOR: at least 3 lesson+check pairs and exactly 1 reflect. Target ≥30 total steps. Every check has 3–4 options, exactly one correct, every option gets per-option feedback. Plain language. No markdown inside body strings.`;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: "google/gemini-3-flash-preview",
       messages: [
         { role: "system", content: system },
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
+    });
   if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
   if (res.status === 402) throw new Error("AI workspace credits exhausted. Please add credits.");
   if (!res.ok) throw new Error(`Nectar generation failed (${res.status}).`);

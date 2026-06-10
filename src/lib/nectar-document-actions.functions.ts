@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 import {
   DETECTED_TYPES,
   DETECTED_TYPE_LABELS,
@@ -85,13 +87,7 @@ async function classifyWithAI(
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return { type: "unknown", confidence: 0, reason: "no_api_key" };
   const snippet = (text || "").slice(0, 12000);
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: CLASSIFY_SYSTEM },
@@ -101,8 +97,7 @@ async function classifyWithAI(
         },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
+    });
   if (!res.ok) return { type: "unknown", confidence: 0, reason: `ai_${res.status}` };
   const body = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
@@ -210,21 +205,14 @@ type DraftItem = {
 async function extractChecklistItems(text: string): Promise<DraftItem[]> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return [];
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: CHECKLIST_SYSTEM },
         { role: "user", content: text.slice(0, 50000) },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
+    });
   if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
   const body = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;

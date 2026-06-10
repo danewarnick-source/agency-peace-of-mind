@@ -86,6 +86,26 @@ function ClientWorkspace() {
     [allowedCodes],
   );
 
+  // Auto-prefill the clock-in service code from today's scheduled shift for
+  // this client, even when the user didn't arrive via the Today hero deep link.
+  const { data: todayShifts } = useTodayShifts();
+  const scheduledCode = useMemo(() => {
+    if (presetCode) return undefined; // URL wins
+    const mine = (todayShifts ?? []).filter(
+      (s) => s.client_id === clientId && !!s.job_code,
+    );
+    if (mine.length === 0) return undefined;
+    const now = Date.now();
+    const current = mine.find(
+      (s) => new Date(s.starts_at).getTime() <= now && new Date(s.ends_at).getTime() >= now,
+    );
+    const upcoming = mine
+      .filter((s) => new Date(s.starts_at).getTime() >= now)
+      .sort((a, b) => +new Date(a.starts_at) - +new Date(b.starts_at))[0];
+    return (current ?? upcoming ?? mine[0]).job_code ?? undefined;
+  }, [todayShifts, clientId, presetCode]);
+  const effectivePresetCode = presetCode ?? scheduledCode;
+
   useEffect(() => {
     if (!isLoading && caseload && !client) {
       toast.error("You are not assigned to this individual.");

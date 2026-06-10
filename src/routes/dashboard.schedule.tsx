@@ -25,6 +25,9 @@ import {
 } from "@/components/ui/collapsible";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { GeneralTimeClock } from "@/components/staff-mobile/general-time-clock";
+import { RequestTimeOffDialog } from "@/components/schedule-preview/request-time-off-dialog";
+import { RequestSwapDialog } from "@/components/schedule-preview/request-swap-dialog";
+import { CalendarOff, ArrowLeftRight } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/schedule")({
   head: () => ({ meta: [{ title: "My Schedule — HIVE" }] }),
@@ -236,9 +239,24 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
           </div>
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-end text-xs font-semibold text-[color:var(--amber-700,#d97a1c)]">
-        {daily ? "Open Client Hub" : "Open Time Clock"}
-        <ArrowRight className="ml-1 h-3.5 w-3.5" />
+      <div className="mt-3 flex items-center justify-between gap-2 text-xs font-semibold text-[color:var(--amber-700,#d97a1c)]">
+        <RequestSwapDialog
+          shiftId={s.id}
+          shiftLabel={`${s.client_name} · ${fmtTimeRange(s.starts_at, s.ends_at)}`}
+          trigger={
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeftRight className="h-3 w-3" /> Request swap
+            </button>
+          }
+        />
+        <span className="inline-flex items-center">
+          {daily ? "Open Client Hub" : "Open Time Clock"}
+          <ArrowRight className="ml-1 h-3.5 w-3.5" />
+        </span>
       </div>
     </article>
   );
@@ -496,6 +514,17 @@ function SchedulePage() {
         title="My Schedule"
         subtitle="Tap a shift to open the client's Hub and clock in. EVV is enforced inside the Hub."
       />
+
+      <div className="flex justify-end">
+        <RequestTimeOffDialog
+          trigger={
+            <Button variant="outline" size="sm" className="min-h-[40px]">
+              <CalendarOff className="h-4 w-4 mr-1" /> Request time off
+            </Button>
+          }
+        />
+      </div>
+
 
       {/* View toggle */}
       <div

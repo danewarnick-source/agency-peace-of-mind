@@ -1,43 +1,34 @@
-## 1. Sidebar — remove Homes & Teams, rename Schedule → Scheduler
+# Scheduling options + clock-in prefill
 
-`src/routes/dashboard.tsx` (ADMIN_NAV)
-- Delete the `"/dashboard/homes" — Homes & Teams` entry.
-- Rename the Schedule entry's label to **"Scheduler"** (route stays `/dashboard/schedule-preview`).
+Two small, surgical front-end changes. No schema, RLS, or billing logic touched.
 
-The `/dashboard/homes` route itself stays — it just isn't in the sidebar anymore.
+## 1. Scheduling dialog — show all options
 
-## 2. Inside the scheduler — entry point to Homes & Teams
+File: `src/components/schedule-preview/shift-editor.tsx`
 
-`src/routes/dashboard.schedule-preview.tsx`
-- Header `<h1>` text: `Schedule` → **`Scheduler`**.
-- `head().meta.title`: `Schedule — HIVE` → `Scheduler — HIVE`.
-- Keep the existing **"Homes & Teams"** button next to the gear (it already links to `/dashboard/homes`). That is now the only path into Homes & Teams.
+Current behavior:
+- **Staff dropdown** — already lists every staff member. ✅
+- **Client dropdown** — filtered by the active site (team) selector. If the editor is opened from a site lane other than "All sites", clients on other teams are hidden.
+- **Billing code dropdown** — filtered to the selected client's `job_code` (authorized codes). If the client has no authorized codes, the list is empty.
 
-## 3. Settings drawer — match the two screenshots
+Changes:
+- Always populate the Client dropdown with **all org clients** (drop the `eligibleClients` site filter inside the dialog). Keep the site lanes on the page itself unchanged — this is dialog-only.
+- For the Billing code dropdown: when the selected client has authorized codes, show those (current behavior — "applicable" codes). When the client has **no** authorized codes, fall back to the full `EVV_SERVICE_CODES` list instead of showing an empty/disabled state, so a code can still be picked.
+- No change to staff list.
 
-`src/components/schedule-preview/settings-drawer.tsx` already has View & Display (Default view, Opens on, Row density, Color shifts by, Show shift times, Show resident count). Add the two missing sections:
+## 2. Time clock auto-prefill from scheduled shift
 
-**Your shift types** (screenshot 2, top)
-- List rows: color swatch · name · start–end time · `Edit`. Seeded from the existing palette in `sched-ui.ts` (Morning 6a–2p, Swing 2p–10p, Overnight 10p–6a, Day 9a–3p, 1:1 Support 9a–3p, DSI 9a–3p, Respite 4p–8p).
-- Edit row → small inline form (name / start / end / color picker / Save / Delete).
-- Bottom "Add shift type" row: name input, start, end, color, dashed "+ Add shift type" button.
-- Persistence: extend the existing `localStorage` Settings blob (`hive.schedulePreview.settings`) with a `shiftTypes` array. No DB, no schema change.
-- Wire it back to `shiftAccentHex` / `shiftTypeLabel` in `sched-ui.ts` so card colors and titles on the board reflect edits.
+The deep link from the Today hero (`/dashboard/workspace/$clientId?tab=clock-in&code=XXX`) already presets and locks the job code via `PunchPad`'s `presetServiceCode` / `lockServiceCode` props. Gap: if a staff opens the client workspace directly (not via the Today hero card), the code is not preset.
 
-**Staffing** (screenshot 2, bottom)
-- Three toggles, persisted in the same Settings blob:
-  - Allow multiple staff per shift & overlap
-  - Require matching certification (subtext: "Warn (never block) when a staffer lacks a needed cert.")
-  - Overtime warning
+File: `src/routes/dashboard.workspace.$clientId.tsx`
 
-These toggles are **UI + persisted preference only** in this pass — they do not change `scheduled_shifts`, EVV, billing, or pay logic. Wiring them into actual conflict/cert/OT checks is a follow-up. Calling that out so it isn't a surprise.
+- When `presetCode` is absent from the URL search params, look up today's scheduled shift for this staff + this client from `useTodayShifts()` (already loaded elsewhere in the staff mobile shell; add the hook here).
+- If exactly one matching shift exists with a `job_code`, pass it to `PunchPad` as `presetServiceCode` and set `lockServiceCode` to true — same behavior as the deep-linked path.
+- If multiple shifts exist for the same client today, pick the one whose `[starts_at, ends_at]` window contains "now"; otherwise the next upcoming; otherwise leave unset (let the staffer choose).
+- No change to the General Time Clock page (`/dashboard/timeclock`) — that's for non-client time (Training/Admin/Travel/Meeting) and has no client/job context.
 
 ## Guardrails
 
-- No changes to `scheduled_shifts` schema, EVV/time-clock, billing/Form 520, revenue, or pay.
-- No new DB tables — all new settings live in the same per-device `localStorage` key already in use.
-- `/dashboard/homes` route, `homes-teams-board` component, and the deep-link redirects from `/dashboard/teams` are untouched.
-
-## Rollback
-
-Revert this change in git: sidebar gets Homes & Teams back, header reverts to "Schedule", settings drawer drops the two new sections, and stored shift-type / staffing prefs in localStorage are simply ignored.
+- No changes to `scheduled_shifts`, `evv_timesheets`, EVV punch logic, billing, or pay code.
+- No new tables, RLS, or migrations.
+- Dialog change is presentation-only; saves still go through the existing `saveShift` validator (client + code + staff required).

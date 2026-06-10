@@ -37,6 +37,8 @@ import {
   type StaffRow,
 } from "@/hooks/use-schedule-preview";
 import { ShiftEditorDialog, type EditorContext } from "@/components/schedule-preview/shift-editor";
+import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
+import { useOrgScheduleRequests, buildApprovedTimeOffIndex } from "@/lib/schedule-requests";
 import { Plus } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/schedule-preview")({
@@ -148,6 +150,11 @@ function SchedulePreviewPage() {
   }, [settings.startOnAllSites]);
 
   const { data, isLoading } = useSchedulePreview(weekStart);
+  const { data: requests } = useOrgScheduleRequests();
+  const approvedTimeOff = useMemo(
+    () => buildApprovedTimeOffIndex(requests?.timeOff ?? []),
+    [requests?.timeOff],
+  );
 
   const days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -292,6 +299,8 @@ function SchedulePreviewPage() {
         />
       ) : null}
 
+      <RequestsPanel weekStart={weekStart} staff={data?.staff ?? []} />
+
       <p className="text-[11px] opacity-50 mt-6">
         Site type inferred from shift codes ({"{HHS, RHS, DSG, RL6, RP3, RP4, RP5}"} = residential). Clients with no
         team are grouped as “1-on-1 Services”.
@@ -305,6 +314,7 @@ function SchedulePreviewPage() {
         staff={data?.staff ?? []}
         siteId={siteId}
         weekStartIso={weekStart.toISOString()}
+        approvedTimeOff={approvedTimeOff}
       />
     </PageShell>
   );

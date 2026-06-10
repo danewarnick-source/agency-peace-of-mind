@@ -13,7 +13,7 @@ export type ShiftRow = {
   status: string | null;
   published: boolean | null;
 };
-export type ClientRow = { id: string; first_name: string; last_name: string; team_id: string | null };
+export type ClientRow = { id: string; first_name: string; last_name: string; team_id: string | null; job_code: string[] };
 export type TeamRow = { id: string; team_name: string };
 export type StaffRow = { id: string; name: string };
 
@@ -38,7 +38,7 @@ export function useSchedulePreview(weekStart: Date) {
           .lt("starts_at", weekEnd.toISOString()),
         supabase
           .from("clients")
-          .select("id, first_name, last_name, team_id")
+          .select("id, first_name, last_name, team_id, job_code")
           .eq("organization_id", orgId!),
         supabase.from("teams").select("id, team_name").eq("organization_id", orgId!),
         supabase

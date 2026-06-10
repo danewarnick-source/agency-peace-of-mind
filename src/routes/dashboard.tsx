@@ -53,6 +53,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/homes", label: "Homes & Teams", icon: Users },
   { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing" },
+  { to: "/dashboard/reports", label: "Reports", icon: FileText, perm: "export_reports" },
   { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

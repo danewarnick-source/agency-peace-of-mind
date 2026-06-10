@@ -85,32 +85,26 @@ export type NectarProposal =
   | { kind: "ask"; question: string }
   | { kind: "ok"; actions: ProposedAction[]; unmatched: Unmatched[]; summary: string };
 
-// ─── Shared gateway call ───────────────────────────────────────────────────
-async function callGateway(apiKey: string, system: string, user: string) {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+// ─── Shared gateway call (AWS Bedrock / Claude via Converse API) ───────────
+async function callGateway(_apiKey: string, system: string, user: string) {
+  const { callBedrockChatCompletions, BedrockError } = await import("@/lib/ai-bedrock.server");
+  try {
+    const json = await callBedrockChatCompletions({
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
-  if (res.status === 429) throw new Error("NECTAR is busy — try again in a moment.");
-  if (res.status === 402) throw new Error("AI workspace credits exhausted. Add credits to continue.");
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`AI error (${res.status}): ${txt.slice(0, 200)}`);
+    });
+    return json.choices?.[0]?.message?.content ?? "{}";
+  } catch (e) {
+    if (e instanceof BedrockError) {
+      if (e.status === 429) throw new Error("NECTAR is busy — try again in a moment.");
+      if (e.status === 401) throw new Error(e.message);
+      throw new Error(`AI error (${e.status}): ${e.message}`);
+    }
+    throw e;
   }
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  return json.choices?.[0]?.message?.content ?? "{}";
 }
 
 // ─── Action validators (resolve names → IDs against context) ───────────────

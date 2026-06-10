@@ -65,15 +65,12 @@ export async function saveShift(draft: ShiftDraft) {
     created_by: draft.created_by,
   };
   if (draft.id) {
-    const { error } = await (supabase as never as ReturnType<typeof supabase.from>)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;
-    const { error: e2 } = await (supabase as any)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
       .from("scheduled_shifts")
       .update(payload)
       .eq("id", draft.id)
       .eq("organization_id", draft.organization_id); // org scope guard
-    if (e2) throw e2;
     if (error) throw error;
     return draft.id;
   }

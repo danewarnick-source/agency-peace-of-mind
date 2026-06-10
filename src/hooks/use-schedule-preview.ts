@@ -32,7 +32,7 @@ export function useSchedulePreview(weekStart: Date) {
     enabled: !!orgId,
     queryKey: ["schedule-preview", orgId, weekStart.toISOString()],
     queryFn: async () => {
-      const [shiftsRes, clientsRes, teamsRes, profilesRes] = await Promise.all([
+      const [shiftsRes, clientsRes, teamsRes, membersRes] = await Promise.all([
         supabase
           .from("scheduled_shifts")
           .select("id, staff_id, client_id, job_code, shift_type, starts_at, ends_at, status, published, is_recurring, recurrence_rule, recurrence_end_date")
@@ -44,15 +44,29 @@ export function useSchedulePreview(weekStart: Date) {
           .select("id, first_name, last_name, team_id, job_code")
           .eq("organization_id", orgId!),
         supabase.from("teams").select("id, team_name").eq("organization_id", orgId!),
+        // Org-to-user membership lives here (profiles.tenant_id is unused).
         supabase
-          .from("profiles")
-          .select("id, first_name, last_name, full_name")
-          .eq("tenant_id", orgId!),
+          .from("organization_members")
+          .select("user_id")
+          .eq("organization_id", orgId!),
       ]);
       if (shiftsRes.error) throw shiftsRes.error;
       const shifts = (shiftsRes.data ?? []) as ShiftRow[];
       const clients = (clientsRes.data ?? []) as ClientRow[];
       const teams = (teamsRes.data ?? []) as TeamRow[];
+      const memberIds = Array.from(
+        new Set(
+          ((membersRes.data ?? []) as Array<{ user_id: string | null }>)
+            .map((m) => m.user_id)
+            .filter((x): x is string => !!x),
+        ),
+      );
+      const profilesRes = memberIds.length
+        ? await supabase
+            .from("profiles")
+            .select("id, first_name, last_name, full_name")
+            .in("id", memberIds)
+        : { data: [] as Array<{ id: string; first_name: string | null; last_name: string | null; full_name: string | null }>, error: null };
       const staffMap = new Map<string, StaffRow>();
       for (const p of (profilesRes.data ?? []) as Array<{
         id: string; first_name: string | null; last_name: string | null; full_name: string | null;
@@ -63,7 +77,11 @@ export function useSchedulePreview(weekStart: Date) {
           "Staff";
         staffMap.set(p.id, { id: p.id, name });
       }
-      // Make sure every staff_id on a shift has a row, even if not in profiles fetch
+      // Ensure every member is present even if they have no profile row yet.
+      for (const id of memberIds) {
+        if (!staffMap.has(id)) staffMap.set(id, { id, name: "Staff" });
+      }
+      // Safety net: any staff_id on an existing shift that's not in the member list.
       for (const s of shifts) {
         if (s.staff_id && !staffMap.has(s.staff_id))
           staffMap.set(s.staff_id, { id: s.staff_id, name: "Staff" });

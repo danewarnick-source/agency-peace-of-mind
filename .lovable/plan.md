@@ -1,34 +1,35 @@
-# Scheduling options + clock-in prefill
+# Fix empty Staff dropdown in scheduler
 
-Two small, surgical front-end changes. No schema, RLS, or billing logic touched.
+## Root cause
 
-## 1. Scheduling dialog — show all options
+`src/hooks/use-schedule-preview.ts` loads staff with:
 
-File: `src/components/schedule-preview/shift-editor.tsx`
+```ts
+supabase.from("profiles").select(...).eq("tenant_id", orgId!)
+```
 
-Current behavior:
-- **Staff dropdown** — already lists every staff member. ✅
-- **Client dropdown** — filtered by the active site (team) selector. If the editor is opened from a site lane other than "All sites", clients on other teams are hidden.
-- **Billing code dropdown** — filtered to the selected client's `job_code` (authorized codes). If the client has no authorized codes, the list is empty.
+`profiles.tenant_id` is `NULL` for every row in this database — org-to-user membership lives in `organization_members(organization_id, user_id, role)`. The query returns 0 rows, so the staff list is built solely from `staff_id`s already present on existing shifts, each falling back to the literal label `"Staff"`. Result: the dropdown shows duplicate `"Staff"` entries and no real members (e.g., Dane, Tom, etc.) can be picked.
 
-Changes:
-- Always populate the Client dropdown with **all org clients** (drop the `eligibleClients` site filter inside the dialog). Keep the site lanes on the page itself unchanged — this is dialog-only.
-- For the Billing code dropdown: when the selected client has authorized codes, show those (current behavior — "applicable" codes). When the client has **no** authorized codes, fall back to the full `EVV_SERVICE_CODES` list instead of showing an empty/disabled state, so a code can still be picked.
-- No change to staff list.
+Brandon Johnson in the screenshot is a **client** (Caseload Assignment Center lists clients), not a staff member, so he correctly doesn't belong in the Staff dropdown. The fix below restores every real org member to the dropdown.
 
-## 2. Time clock auto-prefill from scheduled shift
+## Change
 
-The deep link from the Today hero (`/dashboard/workspace/$clientId?tab=clock-in&code=XXX`) already presets and locks the job code via `PunchPad`'s `presetServiceCode` / `lockServiceCode` props. Gap: if a staff opens the client workspace directly (not via the Today hero card), the code is not preset.
+File: `src/hooks/use-schedule-preview.ts` — staff load only.
 
-File: `src/routes/dashboard.workspace.$clientId.tsx`
+1. Query `organization_members` for the current org to get every `user_id` (any role).
+2. Fetch matching rows from `profiles` by `id IN (user_ids)`.
+3. Build the staff map from those profiles (same name fallback as today).
+4. Keep the existing safety net that adds any `staff_id` from shifts that isn't in the member list, so legacy shifts still render.
 
-- When `presetCode` is absent from the URL search params, look up today's scheduled shift for this staff + this client from `useTodayShifts()` (already loaded elsewhere in the staff mobile shell; add the hook here).
-- If exactly one matching shift exists with a `job_code`, pass it to `PunchPad` as `presetServiceCode` and set `lockServiceCode` to true — same behavior as the deep-linked path.
-- If multiple shifts exist for the same client today, pick the one whose `[starts_at, ends_at]` window contains "now"; otherwise the next upcoming; otherwise leave unset (let the staffer choose).
-- No change to the General Time Clock page (`/dashboard/timeclock`) — that's for non-client time (Training/Admin/Travel/Meeting) and has no client/job context.
+No schema changes, no RLS changes, no edits to scheduled_shifts, EVV, billing, or pay.
+
+## Out of scope
+
+- Caseload-aware ordering (sorting staff assigned to the selected client first). Not requested — leave for later.
+- Filtering staff by role. Per the user's note ("If client is assigned to staff, they should show as option for scheduling"), the dropdown should be permissive; admins/managers/employees all remain selectable. Per‑client gating is enforced elsewhere via `staff_assignments`.
 
 ## Guardrails
 
-- No changes to `scheduled_shifts`, `evv_timesheets`, EVV punch logic, billing, or pay code.
-- No new tables, RLS, or migrations.
-- Dialog change is presentation-only; saves still go through the existing `saveShift` validator (client + code + staff required).
+- One file touched.
+- No mutations or migrations.
+- Same return shape (`StaffRow[]`) — no caller changes needed.

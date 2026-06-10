@@ -1,0 +1,385 @@
+import { useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Sparkles, Send, Upload, X, Check, Loader2, AlertTriangle, ArrowLeftRight, Plus, Pencil } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/hooks/use-auth";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  proposeSchedulingActions,
+  proposeScheduleImport,
+  type NectarProposal,
+  type ProposedAction,
+} from "@/lib/nectar-schedule-actions.functions";
+import { saveShift } from "@/lib/schedule-preview-mutations";
+import type { ClientRow, StaffRow, TeamRow, ShiftRow } from "@/hooks/use-schedule-preview";
+
+const TEAL = "#137182";
+const GOLD = "#f5a623";
+
+function fmtWhen(iso: string) {
+  return new Date(iso).toLocaleString(undefined, {
+    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  });
+}
+
+export function NectarCommandBar({
+  weekStart,
+  clients,
+  staff,
+  teams,
+  shifts,
+}: {
+  weekStart: Date;
+  clients: ClientRow[];
+  staff: StaffRow[];
+  teams: TeamRow[];
+  shifts: ShiftRow[];
+}) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const { data: org } = useCurrentOrg();
+  const orgId = org?.organization_id ?? "";
+  const propose = useServerFn(proposeSchedulingActions);
+  const proposeImport = useServerFn(proposeScheduleImport);
+
+  const [sentence, setSentence] = useState("");
+  const [proposal, setProposal] = useState<NectarProposal | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+
+  const context = useMemo(() => {
+    const teamById = new Map(teams.map((t) => [t.id, t.team_name] as const));
+    return {
+      week_start_iso: weekStart.toISOString(),
+      teams: teams.map((t) => ({ id: t.id, name: t.team_name })),
+      clients: clients.map((c) => ({
+        id: c.id,
+        name: `${c.first_name} ${c.last_name}`.trim(),
+        team_id: c.team_id,
+        team_name: c.team_id ? teamById.get(c.team_id) ?? null : null,
+        schedulable_codes: c.job_code ?? [],
+      })),
+      staff: staff.map((s) => ({ id: s.id, name: s.name })),
+      shifts: shifts.filter((s) => s.staff_id && s.client_id).map((s) => ({
+        id: s.id,
+        client_id: s.client_id!,
+        staff_id: s.staff_id!,
+        job_code: s.job_code,
+        starts_at: s.starts_at,
+        ends_at: s.ends_at,
+      })),
+    };
+  }, [weekStart, clients, staff, teams, shifts]);
+
+  const ask = useMutation({
+    mutationFn: async () => {
+      const result = await propose({ data: { ...context, sentence } });
+      return result as NectarProposal;
+    },
+    onSuccess: (p) => setProposal(p),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const importMut = useMutation({
+    mutationFn: async () => {
+      const result = await proposeImport({ data: { ...context, raw_text: importText } });
+      return result as NectarProposal;
+    },
+    onSuccess: (p) => { setProposal(p); setImportOpen(false); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const apply = useMutation({
+    mutationFn: async (actions: ProposedAction[]) => {
+      if (!orgId || !user?.id) throw new Error("Sign in required.");
+      // Apply sequentially; reuse Phase 2 saveShift for create + edit + reassign.
+      // For reassign/edit we must read the current shift row first because saveShift
+      // requires the full payload (it does an UPDATE of all editable columns).
+      const shiftById = new Map(shifts.map((s) => [s.id, s] as const));
+      let okCount = 0;
+      const errs: string[] = [];
+      for (const a of actions) {
+        try {
+          if (a.op === "create") {
+            await saveShift({
+              organization_id: orgId,
+              staff_id: a.staff_id,
+              client_id: a.client_id,
+              job_code: a.job_code,
+              shift_type: ["HHS","RHS","DSG","RL6","RP3","RP4","RP5"].includes(a.job_code)
+                ? "daily_host_home" : "hourly",
+              starts_at: a.starts_at,
+              ends_at: a.ends_at,
+              notes: a.reason || null,
+              status: "pending",
+              published: false,
+              created_by: user.id,
+            });
+          } else if (a.op === "reassign") {
+            const cur = shiftById.get(a.shift_id);
+            if (!cur) throw new Error("Shift no longer exists");
+            await saveShift({
+              id: cur.id,
+              organization_id: orgId,
+              staff_id: a.to_staff_id,
+              client_id: cur.client_id!,
+              job_code: cur.job_code ?? "",
+              shift_type: cur.shift_type ?? "hourly",
+              starts_at: cur.starts_at,
+              ends_at: cur.ends_at,
+              notes: null,
+              status: cur.status ?? "pending",
+              published: !!cur.published,
+              created_by: user.id,
+            });
+          } else {
+            const cur = shiftById.get(a.shift_id);
+            if (!cur) throw new Error("Shift no longer exists");
+            const job = a.patch.job_code ?? cur.job_code ?? "";
+            await saveShift({
+              id: cur.id,
+              organization_id: orgId,
+              staff_id: cur.staff_id!,
+              client_id: cur.client_id!,
+              job_code: job,
+              shift_type: ["HHS","RHS","DSG","RL6","RP3","RP4","RP5"].includes(job)
+                ? "daily_host_home" : "hourly",
+              starts_at: a.patch.starts_at ?? cur.starts_at,
+              ends_at: a.patch.ends_at ?? cur.ends_at,
+              notes: null,
+              status: cur.status ?? "pending",
+              published: !!cur.published,
+              created_by: user.id,
+            });
+          }
+          okCount++;
+        } catch (e) {
+          errs.push((e as Error).message);
+        }
+      }
+      return { okCount, errs };
+    },
+    onSuccess: ({ okCount, errs }) => {
+      if (okCount) toast.success(`${okCount} change${okCount === 1 ? "" : "s"} applied.`);
+      if (errs.length) toast.error(`${errs.length} failed: ${errs[0]}`);
+      qc.invalidateQueries({ queryKey: ["schedule-preview"] });
+      setProposal(null);
+      setSentence("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="mt-4 border-2 p-3" style={{ borderColor: "rgba(19,113,130,0.25)" }}>
+      <div className="flex items-start gap-2">
+        <Sparkles className="h-4 w-4 mt-2 shrink-0" style={{ color: TEAL }} />
+        <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center">
+          <Input
+            value={sentence}
+            onChange={(e) => setSentence(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && sentence.trim()) ask.mutate(); }}
+            placeholder='Ask NECTAR — e.g. "cover Maple this week" or "Shandi off Thu–Sat"'
+            className="min-h-[44px] flex-1"
+            disabled={ask.isPending}
+          />
+          <div className="flex gap-2">
+            <Button
+              onClick={() => ask.mutate()}
+              disabled={ask.isPending || !sentence.trim()}
+              className="min-h-[44px]"
+              style={{ background: TEAL, color: "white" }}
+            >
+              {ask.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <span className="ml-1.5">Propose</span>
+            </Button>
+            <Button variant="outline" onClick={() => setImportOpen(true)} className="min-h-[44px]">
+              <Upload className="h-4 w-4 mr-1.5" /> Import
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-2 text-[10px] uppercase tracking-wider opacity-50">
+        Advisory only — proposals are reviewed before any shift is saved. (Fake data only until BAA Bedrock cut-over.)
+      </p>
+
+      {proposal && (
+        <ProposalReview
+          proposal={proposal}
+          onDiscard={() => setProposal(null)}
+          onApprove={() => proposal.kind === "ok" && apply.mutate(proposal.actions)}
+          applying={apply.isPending}
+        />
+      )}
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        text={importText}
+        setText={setImportText}
+        onSubmit={() => importMut.mutate()}
+        pending={importMut.isPending}
+      />
+    </Card>
+  );
+}
+
+function ProposalReview({
+  proposal, onDiscard, onApprove, applying,
+}: {
+  proposal: NectarProposal;
+  onDiscard: () => void;
+  onApprove: () => void;
+  applying: boolean;
+}) {
+  if (proposal.kind === "ask") {
+    return (
+      <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-700" />
+          <div className="flex-1">
+            <p className="font-medium text-amber-900">NECTAR needs more info:</p>
+            <p className="text-amber-800 mt-0.5">{proposal.question}</p>
+          </div>
+          <Button size="sm" variant="ghost" onClick={onDiscard}><X className="h-4 w-4" /></Button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-md border-2 border-dashed p-3" style={{ borderColor: GOLD, background: "rgba(245,166,35,0.05)" }}>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Badge style={{ background: GOLD, color: "white" }}>DRAFT</Badge>
+          <span className="text-sm font-medium truncate">{proposal.summary}</span>
+        </div>
+        <div className="flex gap-1 shrink-0">
+          <Button size="sm" variant="outline" onClick={onDiscard} disabled={applying}>
+            <X className="h-4 w-4 mr-1" /> Discard
+          </Button>
+          <Button size="sm" onClick={onApprove} disabled={applying || proposal.actions.length === 0}
+            style={{ background: TEAL, color: "white" }}>
+            {applying ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
+            Approve & apply
+          </Button>
+        </div>
+      </div>
+      <ul className="space-y-1 max-h-72 overflow-y-auto">
+        {proposal.actions.map((a, i) => <ActionRow key={i} a={a} />)}
+      </ul>
+      {proposal.unmatched.length > 0 && (
+        <details className="mt-2">
+          <summary className="text-xs text-muted-foreground cursor-pointer">
+            {proposal.unmatched.length} unmatched — won't be applied
+          </summary>
+          <ul className="mt-1 space-y-1 text-xs">
+            {proposal.unmatched.map((u, i) => (
+              <li key={i} className="text-muted-foreground">
+                <span className="font-medium">{u.reason}</span>: <span className="opacity-70">{u.line.slice(0, 120)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function ActionRow({ a }: { a: ProposedAction }) {
+  const Icon = a.op === "create" ? Plus : a.op === "reassign" ? ArrowLeftRight : Pencil;
+  const tint = a.op === "create" ? TEAL : a.op === "reassign" ? GOLD : "#666";
+  return (
+    <li className="flex items-start gap-2 rounded-md bg-white border p-2 text-xs">
+      <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: tint }} />
+      <div className="min-w-0 flex-1">
+        {a.op === "create" && (
+          <>
+            <div className="font-medium">
+              New: {a.staff_name} → {a.client_name}
+              {a.team_name && <span className="opacity-60"> · {a.team_name}</span>}
+            </div>
+            <div className="opacity-70">
+              {a.job_code} · {fmtWhen(a.starts_at)} – {fmtWhen(a.ends_at)}
+            </div>
+          </>
+        )}
+        {a.op === "reassign" && (
+          <>
+            <div className="font-medium">Reassign: {a.from_staff_name} → {a.to_staff_name}</div>
+            {a.reason && <div className="opacity-70">{a.reason}</div>}
+          </>
+        )}
+        {a.op === "edit" && (
+          <>
+            <div className="font-medium">Edit shift {a.shift_id.slice(0, 8)}</div>
+            <div className="opacity-70">
+              {a.patch.starts_at && `start → ${fmtWhen(a.patch.starts_at)} `}
+              {a.patch.ends_at && `end → ${fmtWhen(a.patch.ends_at)} `}
+              {a.patch.job_code && `code → ${a.patch.job_code}`}
+            </div>
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ImportDialog({
+  open, onOpenChange, text, setText, onSubmit, pending,
+}: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  text: string;
+  setText: (s: string) => void;
+  onSubmit: () => void;
+  pending: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Import schedule</DialogTitle>
+          <DialogDescription>
+            Paste CSV or a tabular export from another scheduler. NECTAR will map columns to staff, client, code, and times. You'll review before anything is saved.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 py-2">
+          <Input
+            type="file"
+            accept=".csv,.tsv,.txt"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              const text = await f.text();
+              setText(text);
+            }}
+          />
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={12}
+            placeholder="staff_name,client_name,code,start,end&#10;Sarah Chen,Maple Johnny,DSI,2026-06-15 09:00,2026-06-15 13:00"
+            className="font-mono text-xs"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={onSubmit} disabled={pending || !text.trim()} style={{ background: TEAL, color: "white" }}>
+            {pending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            Parse with NECTAR
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

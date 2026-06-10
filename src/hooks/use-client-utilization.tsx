@@ -99,14 +99,16 @@ export function useClientUtilization() {
       }
 
       // Daily-billed completed days this month — all staff in org
+      // Daily/HHS service days now live in daily_logs (record_date -> log_date,
+      // provider_id -> user_id). hhs_daily_records is orphaned. daily_logs has no
+      // service_code, so we attribute days to whatever daily code(s) the client has
+      // authorized at render time. Aliases keep the aggregation below unchanged.
       const { data: dlRows, error: dlErr } = await supabase
-        .from("hhs_daily_records")
-        // service_code may not exist on hhs_daily_records; we attribute days
-        // to whatever daily code(s) the client has authorized at render time.
-        .select("client_id, provider_id, record_date")
+        .from("daily_logs")
+        .select("client_id, provider_id:user_id, record_date:log_date")
         .eq("organization_id", org!.organization_id)
-        .gte("record_date", month.start.toISOString().slice(0, 10))
-        .lte("record_date", month.end.toISOString().slice(0, 10));
+        .gte("log_date", month.start.toISOString().slice(0, 10))
+        .lte("log_date", month.end.toISOString().slice(0, 10));
       if (dlErr) throw dlErr;
       // Aggregate distinct dates per client; we tag them under a synthetic
       // "*DAILY*" bucket and the caller maps that onto each daily code.

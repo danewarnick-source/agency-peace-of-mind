@@ -137,12 +137,15 @@ export function useNectarPayPeriod() {
       if (has_daily_assignment) {
         const startDate = start.toISOString().slice(0, 10);
         const endDate = end.toISOString().slice(0, 10);
+        // Daily/HHS service days now live in daily_logs (record_date -> log_date,
+        // provider_id -> user_id). hhs_daily_records is orphaned. Aliases keep the
+        // distinct-day pay math below unchanged.
         const { data: dlRows, error: dlErr } = await supabase
-          .from("hhs_daily_records")
-          .select("record_date, client_id")
-          .eq("provider_id", user!.id)
-          .gte("record_date", startDate)
-          .lte("record_date", endDate);
+          .from("daily_logs")
+          .select("record_date:log_date, client_id")
+          .eq("user_id", user!.id)
+          .gte("log_date", startDate)
+          .lte("log_date", endDate);
         if (dlErr) throw dlErr;
         const dayKeys = new Set<string>();
         for (const r of (dlRows ?? []) as Array<{ record_date: string; client_id: string }>) {

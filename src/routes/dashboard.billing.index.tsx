@@ -48,11 +48,14 @@ function BillingOverviewPage() {
           .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
           .eq("organization_id", org!.organization_id)
           .gte("clock_in_timestamp", yearStart),
+        // Daily/HHS service days now live in daily_logs (record_date -> log_date).
+        // hhs_daily_records is orphaned (nothing writes it). Alias log_date back to
+        // record_date so the distinct-day counting below is unchanged.
         supabase
-          .from("hhs_daily_records")
-          .select("client_id, record_date")
+          .from("daily_logs")
+          .select("client_id, record_date:log_date")
           .eq("organization_id", org!.organization_id)
-          .gte("record_date", yearStart.slice(0, 10)),
+          .gte("log_date", yearStart.slice(0, 10)),
       ]);
       if (tsRes.error) throw tsRes.error;
       if (dlRes.error) throw dlRes.error;

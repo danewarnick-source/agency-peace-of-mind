@@ -142,7 +142,10 @@ export function ShiftEditorDialog({
   const selectedClient = eligibleClients.find((c) => c.id === clientId) ?? clients.find((c) => c.id === clientId);
   const authorizedCodes = selectedClient?.job_code ?? [];
   const codeChoices = useMemo(
-    () => EVV_SERVICE_CODES.filter((c) => authorizedCodes.includes(c.code)),
+    () =>
+      authorizedCodes.length
+        ? EVV_SERVICE_CODES.filter((c) => authorizedCodes.includes(c.code))
+        : EVV_SERVICE_CODES, // fall back to all codes when the client has none authorized
     [authorizedCodes],
   );
 

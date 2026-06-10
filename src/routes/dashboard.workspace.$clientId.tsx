@@ -269,8 +269,8 @@ function ClientWorkspace() {
                 geofenceRadiusFeet: client.geofence_radius_feet ?? 1000,
                 pcspGoals: client.pcsp_goals ?? [],
               }}
-              presetServiceCode={presetCode}
-              lockServiceCode={!!presetCode}
+              presetServiceCode={effectivePresetCode}
+              lockServiceCode={!!effectivePresetCode}
             />
             <ActiveShiftReimbursementSlot clientId={client.id} />
           </TabsContent>

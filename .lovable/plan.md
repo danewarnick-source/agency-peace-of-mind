@@ -1,35 +1,26 @@
-# Fix empty Staff dropdown in scheduler
+# Fix: "http2.connect is not implemented" on Bedrock calls
 
 ## Root cause
-
-`src/hooks/use-schedule-preview.ts` loads staff with:
-
-```ts
-supabase.from("profiles").select(...).eq("tenant_id", orgId!)
-```
-
-`profiles.tenant_id` is `NULL` for every row in this database — org-to-user membership lives in `organization_members(organization_id, user_id, role)`. The query returns 0 rows, so the staff list is built solely from `staff_id`s already present on existing shifts, each falling back to the literal label `"Staff"`. Result: the dropdown shows duplicate `"Staff"` entries and no real members (e.g., Dane, Tom, etc.) can be picked.
-
-Brandon Johnson in the screenshot is a **client** (Caseload Assignment Center lists clients), not a staff member, so he correctly doesn't belong in the Staff dropdown. The fix below restores every real org member to the dropdown.
+The AWS SDK's default HTTP transport uses Node's `http2` module. Cloudflare Workers (workerd) stubs `http2` but doesn't implement `http2.connect`, so every Bedrock call throws before leaving the Worker. The model ID change was fine — Bedrock is just never reached.
 
 ## Change
+In `src/lib/ai-bedrock.server.ts`, construct `BedrockRuntimeClient` with a fetch-based request handler instead of the default Node http2 handler:
 
-File: `src/hooks/use-schedule-preview.ts` — staff load only.
+```ts
+import { FetchHttpHandler } from "@smithy/fetch-http-handler";
 
-1. Query `organization_members` for the current org to get every `user_id` (any role).
-2. Fetch matching rows from `profiles` by `id IN (user_ids)`.
-3. Build the staff map from those profiles (same name fallback as today).
-4. Keep the existing safety net that adds any `staff_id` from shifts that isn't in the member list, so legacy shifts still render.
+new BedrockRuntimeClient({
+  region,
+  credentials: { accessKeyId, secretAccessKey },
+  requestHandler: new FetchHttpHandler(),
+});
+```
 
-No schema changes, no RLS changes, no edits to scheduled_shifts, EVV, billing, or pay.
+`@smithy/fetch-http-handler` is already present under `node_modules` as a transitive dep, so no install is needed. If module resolution complains, add it explicitly with `bun add @smithy/fetch-http-handler`.
 
-## Out of scope
+No changes to the Deno edge mirror (`supabase/functions/_shared/bedrock-fetch.ts`) — Deno's AWS SDK already uses fetch.
 
-- Caseload-aware ordering (sorting staff assigned to the selected client first). Not requested — leave for later.
-- Filtering staff by role. Per the user's note ("If client is assigned to staff, they should show as option for scheduling"), the dropdown should be permissive; admins/managers/employees all remain selectable. Per‑client gating is enforced elsewhere via `staff_assignments`.
+No UI, model behavior, prompt, or call-site changes. Loud-failure contract (401 / 429 / clear errors) is preserved.
 
-## Guardrails
-
-- One file touched.
-- No mutations or migrations.
-- Same return shape (`StaffRow[]`) — no caller changes needed.
+## Verify
+Click **Draft it** on the Scheduler with a real prompt. Expect either a real proposal or a clear Bedrock-side error — not the `http2.connect` message.

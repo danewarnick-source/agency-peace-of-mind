@@ -13,6 +13,7 @@ import {
   type ContentBlock,
   type Message,
 } from "@aws-sdk/client-bedrock-runtime";
+import { FetchHttpHandler } from "@smithy/fetch-http-handler";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";

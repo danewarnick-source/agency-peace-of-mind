@@ -25,7 +25,7 @@ import {
 export const Route = createFileRoute("/dashboard/schedule-preview")({
   head: () => ({
     meta: [
-      { title: "Schedule — HIVE" },
+      { title: "Scheduler — HIVE" },
       { name: "description", content: "Weekly schedule — site coverage, staff/client grid." },
     ],
     links: [
@@ -148,7 +148,7 @@ function SchedulePreviewPage() {
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-.02em", color: SCHED.ink }}>Schedule</h1>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-.02em", color: SCHED.ink }}>Scheduler</h1>
           <p style={{ margin: "4px 0 0", color: SCHED.muted, fontWeight: 500 }}>
             {orgName} · click any shift to edit, or a + on an open slot to add one
           </p>

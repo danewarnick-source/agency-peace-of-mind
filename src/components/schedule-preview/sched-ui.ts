@@ -40,21 +40,41 @@ export function fmtTime(iso: string): string {
   return m ? `${h}:${String(m).padStart(2, "0")}${ampm}` : `${h}${ampm}`;
 }
 
-// ── Shift-type palette (hexes match the demo's SHIFT_TYPES) ────────────
-type TypeInfo = { label: string; hex: string };
-const PALETTE: Record<string, TypeInfo> = {
-  morning:   { label: "Morning",     hex: "#137182" },
-  swing:     { label: "Swing",       hex: "#5b4b9e" },
-  overnight: { label: "Overnight",   hex: "#3a3f78" },
-  day:       { label: "Day",         hex: "#b8791a" },
-  support:   { label: "1:1 Support", hex: "#8a5a12" },
-  dsi:       { label: "DSI",         hex: "#1f9d6b" },
-  respite:   { label: "Respite",     hex: "#a14a8a" },
+// ── Shift type model (customizable via Settings drawer, persisted per-device) ─
+export type ShiftType = {
+  key: string;        // stable id (lowercase)
+  label: string;      // display name
+  start: string;      // 24h "HH:MM"
+  end: string;        // 24h "HH:MM"
+  color: string;      // hex
 };
 
-function inferKey(s: ShiftRow): string {
+export const DEFAULT_SHIFT_TYPES: ShiftType[] = [
+  { key: "morning",   label: "Morning",     start: "06:00", end: "14:00", color: "#137182" },
+  { key: "swing",     label: "Swing",       start: "14:00", end: "22:00", color: "#5b4b9e" },
+  { key: "overnight", label: "Overnight",   start: "22:00", end: "06:00", color: "#3a3f78" },
+  { key: "day",       label: "Day",         start: "09:00", end: "15:00", color: "#b8791a" },
+  { key: "support",   label: "1:1 Support", start: "09:00", end: "15:00", color: "#8a5a12" },
+  { key: "dsi",       label: "DSI",         start: "09:00", end: "15:00", color: "#1f9d6b" },
+  { key: "respite",   label: "Respite",     start: "16:00", end: "20:00", color: "#a14a8a" },
+];
+
+/** Read the user's customized shift-type list (or defaults) from localStorage. */
+function readShiftTypes(): ShiftType[] {
+  if (typeof window === "undefined") return DEFAULT_SHIFT_TYPES;
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return DEFAULT_SHIFT_TYPES;
+    const parsed = JSON.parse(raw);
+    const list = parsed?.shiftTypes;
+    if (Array.isArray(list) && list.length > 0) return list as ShiftType[];
+  } catch { /* ignore */ }
+  return DEFAULT_SHIFT_TYPES;
+}
+
+function inferKey(s: ShiftRow, types: ShiftType[]): string {
   const explicit = (s.shift_type ?? "").toString().trim().toLowerCase();
-  if (explicit && PALETTE[explicit]) return explicit;
+  if (explicit && types.some((t) => t.key === explicit)) return explicit;
   const code = (s.job_code ?? "").toUpperCase();
   if (code === "DSI") return "dsi";
   if (code === "DSG") return "day";
@@ -67,10 +87,14 @@ function inferKey(s: ShiftRow): string {
 }
 
 export function shiftAccentHex(s: ShiftRow): string {
-  return PALETTE[inferKey(s)]?.hex ?? SCHED.teal;
+  const types = readShiftTypes();
+  const k = inferKey(s, types);
+  return types.find((t) => t.key === k)?.color ?? SCHED.teal;
 }
 export function shiftTypeLabel(s: ShiftRow): string {
-  return PALETTE[inferKey(s)]?.label ?? s.shift_type ?? s.job_code ?? "Shift";
+  const types = readShiftTypes();
+  const k = inferKey(s, types);
+  return types.find((t) => t.key === k)?.label ?? s.shift_type ?? s.job_code ?? "Shift";
 }
 
 // ── Display settings (persisted per-device; logic preserved verbatim) ──
@@ -85,6 +109,10 @@ export type Settings = {
   colorBy: ColorBy;
   showTimes: boolean;
   showResidentCount: boolean;
+  shiftTypes: ShiftType[];
+  allowMultipleStaff: boolean;
+  requireMatchingCert: boolean;
+  overtimeWarning: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -94,6 +122,10 @@ export const DEFAULT_SETTINGS: Settings = {
   colorBy: "shift_type",
   showTimes: true,
   showResidentCount: true,
+  shiftTypes: DEFAULT_SHIFT_TYPES,
+  allowMultipleStaff: true,
+  requireMatchingCert: true,
+  overtimeWarning: true,
 };
 
 const SETTINGS_KEY = "hive.schedulePreview.settings";

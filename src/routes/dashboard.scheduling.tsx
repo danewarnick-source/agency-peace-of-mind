@@ -52,7 +52,7 @@ import { NectarAutoAssignDialog } from "@/components/nectar/nectar-auto-assign-d
 
 import { z } from "zod";
 import { Link, useSearch, useNavigate } from "@tanstack/react-router";
-import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
+// HomesTeamsBoard now lives at its own route /dashboard/homes — see redirect below.
 import { CoverageViews } from "@/components/scheduling/coverage-views";
 import { ScheduleBuilder } from "@/components/scheduling/schedule-builder";
 import { IndividualServicesScheduler } from "@/components/scheduling/individual-services-scheduler";

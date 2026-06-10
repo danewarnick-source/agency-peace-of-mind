@@ -36,6 +36,8 @@ import {
   type ClientRow,
   type StaffRow,
 } from "@/hooks/use-schedule-preview";
+import { ShiftEditorDialog, type EditorContext } from "@/components/schedule-preview/shift-editor";
+import { Plus } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/schedule-preview")({
   head: () => ({
@@ -133,6 +135,9 @@ function SchedulePreviewPage() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [siteId, setSiteId] = useState<string>("__all__");
   const [view, setView] = useState<ViewMode>(settings.defaultView);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorCtx, setEditorCtx] = useState<EditorContext | null>(null);
+  const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
   // Re-sync default view when settings change
   useEffect(() => { setView(settings.defaultView); }, [settings.defaultView]);
@@ -283,6 +288,7 @@ function SchedulePreviewPage() {
           view={view}
           setView={setView}
           settings={settings}
+          onOpenEditor={openEditor}
         />
       ) : null}
 
@@ -290,6 +296,16 @@ function SchedulePreviewPage() {
         Site type inferred from shift codes ({"{HHS, RHS, DSG, RL6, RP3, RP4, RP5}"} = residential). Clients with no
         team are grouped as “1-on-1 Services”.
       </p>
+
+      <ShiftEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        ctx={editorCtx}
+        clients={data?.clients ?? []}
+        staff={data?.staff ?? []}
+        siteId={siteId}
+        weekStartIso={weekStart.toISOString()}
+      />
     </PageShell>
   );
 }
@@ -430,7 +446,7 @@ function CoverageCell({ type, day, shifts }: { type: "residential" | "day"; day:
 }
 
 function SiteWeekGrid({
-  siteId, siteName, days, clients, shifts, staff, view, setView, settings,
+  siteId, siteName, days, clients, shifts, staff, view, setView, settings, onOpenEditor,
 }: {
   siteId: string;
   siteName: string;
@@ -441,6 +457,7 @@ function SiteWeekGrid({
   view: ViewMode;
   setView: (v: ViewMode) => void;
   settings: Settings;
+  onOpenEditor: (ctx: EditorContext) => void;
 }) {
   const type = inferSiteType(siteId, clients, shifts);
   const cellPad = settings.density === "compact" ? "p-1.5" : "p-2";
@@ -488,7 +505,27 @@ function SiteWeekGrid({
       if (row.id === "__open__") return !s.staff_id;
       return s.staff_id === row.id;
     });
-    if (matches.length === 0) return <span className="text-xs opacity-30">·</span>;
+
+    // Quick-add affordance for empty cells.
+    const quickAdd = () => {
+      const ctx: EditorContext = { day };
+      if (view === "client") ctx.clientId = row.id;
+      else ctx.staffId = row.id === "__open__" ? null : row.id;
+      onOpenEditor(ctx);
+    };
+
+    if (matches.length === 0) {
+      return (
+        <button
+          onClick={quickAdd}
+          className="w-full min-h-[36px] flex items-center justify-center rounded-md opacity-40 hover:opacity-100 focus:opacity-100 transition"
+          style={{ border: "1px dashed rgba(13,17,43,0.2)" }}
+          aria-label="Add shift"
+        >
+          <Plus className="h-3.5 w-3.5" style={{ color: TEAL }} />
+        </button>
+      );
+    }
     return (
       <div className="flex flex-col gap-1">
         {matches.map((s) => {
@@ -498,11 +535,12 @@ function SiteWeekGrid({
               ? clientName(s.client_id)
               : (s.staff_id ? staffById.get(s.staff_id)?.name : "Open") ?? "Open";
           return (
-            <div
+            <button
               key={s.id}
-              className={`rounded-md ${cardPad} text-[11px] text-white font-medium leading-tight`}
-              style={{ background: bg, opacity: s.published ? 1 : 0.7 }}
-              title={`${s.job_code ?? ""} ${fmtTime(s.starts_at)}–${fmtTime(s.ends_at)}`}
+              onClick={() => onOpenEditor({ shift: s })}
+              className={`text-left rounded-md ${cardPad} text-[11px] text-white font-medium leading-tight hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-1`}
+              style={{ background: bg, opacity: s.published ? 1 : 0.75 }}
+              title={`${s.job_code ?? ""} ${fmtTime(s.starts_at)}–${fmtTime(s.ends_at)} — click to edit`}
             >
               {settings.showTimes && (
                 <div className="opacity-90">{fmtTime(s.starts_at)}–{fmtTime(s.ends_at)}</div>
@@ -510,9 +548,17 @@ function SiteWeekGrid({
               {view !== "client" && <div className="truncate">{secondary}</div>}
               {view === "client" && <div className="truncate opacity-90">{secondary}</div>}
               {s.job_code && <div className="opacity-80 text-[10px] uppercase tracking-wide">{s.job_code}</div>}
-            </div>
+            </button>
           );
         })}
+        <button
+          onClick={quickAdd}
+          className="text-[10px] py-0.5 rounded opacity-0 hover:opacity-100 focus:opacity-100 transition"
+          style={{ color: TEAL }}
+          aria-label="Add another shift"
+        >
+          + add
+        </button>
       </div>
     );
   };

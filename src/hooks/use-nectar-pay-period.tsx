@@ -177,29 +177,28 @@ export function useNectarPayPeriod() {
       const daily_earnings = has_daily_assignment ? daily_days * daily_rate : 0;
 
       // Non-client (General Time Clock) hours — Training/Admin/Travel/
-      // Meeting/etc. Persisted client-side in localStorage; sum the
-      // completed entries that fall inside this pay period.
+      // Meeting/etc. Now persisted SERVER-SIDE in public.general_shifts; sum the
+      // completed shifts whose clock-out falls inside this pay period.
       let general_hours = 0;
-      if (typeof window !== "undefined") {
-        try {
-          const raw = window.localStorage.getItem("hive-general-shifts-log");
-          if (raw) {
-            const arr = JSON.parse(raw) as Array<{
-              start_iso: string;
-              end_iso: string;
-              hours: number;
-            }>;
-            const startMs = start.getTime();
-            const endMs = end.getTime();
-            for (const r of arr) {
-              const t = new Date(r.end_iso).getTime();
-              if (!isFinite(t)) continue;
-              if (t < startMs || t > endMs) continue;
-              if (typeof r.hours === "number" && r.hours > 0) general_hours += r.hours;
-            }
-          }
-        } catch {
-          /* ignore corrupt log */
+      {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: gsRows, error: gsErr } = await (supabase as any)
+          .from("general_shifts")
+          .select("clock_in_timestamp, clock_out_timestamp")
+          .eq("user_id", user!.id)
+          .not("clock_out_timestamp", "is", null)
+          .gte("clock_out_timestamp", start.toISOString())
+          .lte("clock_out_timestamp", end.toISOString());
+        if (gsErr) throw gsErr;
+        for (const r of (gsRows ?? []) as Array<{
+          clock_in_timestamp: string;
+          clock_out_timestamp: string;
+        }>) {
+          const h =
+            (new Date(r.clock_out_timestamp).getTime() -
+              new Date(r.clock_in_timestamp).getTime()) /
+            3_600_000;
+          if (isFinite(h) && h > 0) general_hours += h;
         }
       }
       const general_earnings = general_hours * hourly_rate;

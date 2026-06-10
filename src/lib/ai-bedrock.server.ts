@@ -330,26 +330,30 @@ export async function gatewayFetch(
         ? `${system}\n\nIMPORTANT: Respond with a single valid JSON object only. No prose, no code fences, no commentary.`
         : system;
 
-    let toolConfig: ConstructorParameters<typeof ConverseCommand>[0]["toolConfig"] | undefined;
+    // Bedrock's typed `toolConfig` shape doesn't accept plain JSON schemas via
+    // its TS overloads, so we build as a permissive object and cast at the
+    // ConverseCommand boundary. Runtime shape is correct.
+    let toolConfig: Record<string, unknown> | undefined;
     if (hasTools) {
-      toolConfig = {
+      const tc: Record<string, unknown> = {
         tools: body.tools!.map((t) => ({
           toolSpec: {
             name: t.function.name,
             description: t.function.description ?? "",
-            inputSchema: { json: t.function.parameters as Record<string, unknown> },
+            inputSchema: { json: t.function.parameters },
           },
         })),
       };
       if (body.tool_choice && body.tool_choice !== "none") {
         if (body.tool_choice === "auto") {
-          toolConfig.toolChoice = { auto: {} };
+          tc.toolChoice = { auto: {} };
         } else if (body.tool_choice === "required") {
-          toolConfig.toolChoice = { any: {} };
+          tc.toolChoice = { any: {} };
         } else if (typeof body.tool_choice === "object") {
-          toolConfig.toolChoice = { tool: { name: body.tool_choice.function.name } };
+          tc.toolChoice = { tool: { name: body.tool_choice.function.name } };
         }
       }
+      toolConfig = tc;
     }
 
     const cmd = new ConverseCommand({

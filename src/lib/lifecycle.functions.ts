@@ -18,6 +18,25 @@ async function assertManager(actorId: string, orgId: string) {
   }
 }
 
+// Verify the TARGET employee actually belongs to the organization the caller
+// administers. Without this, the service-role writes below (which bypass RLS)
+// could touch a profile/user in a DIFFERENT org just by passing that user's id
+// — a cross-organization IDOR. We check for a membership row regardless of its
+// `active` flag on purpose: archiveEntity sets active=false, and deleteEntity may
+// run afterwards on an already-archived employee, so an active-only check would
+// break that legitimate flow. Existence of any row still proves same-org ownership.
+async function assertEmployeeInOrg(targetUserId: string, orgId: string) {
+  const { data } = await supabaseAdmin
+    .from("organization_members")
+    .select("user_id")
+    .eq("user_id", targetUserId)
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  if (!data) {
+    throw new Error("Forbidden: target employee does not belong to this organization");
+  }
+}
+
 async function staffActiveBlockers(_staffId: string, _orgId: string) {
   // Time-clock module removed; no active-shift blockers to check.
   return null;
@@ -51,6 +70,8 @@ export const archiveEntity = createServerFn({ method: "POST" })
     await assertManager(context.userId, data.organizationId);
 
     if (data.kind === "employee") {
+      await assertEmployeeInOrg(data.id, data.organizationId);
+
       const blocker = await staffActiveBlockers(data.id, data.organizationId);
       if (blocker) throw new Error(blocker);
 
@@ -93,6 +114,8 @@ export const deleteEntity = createServerFn({ method: "POST" })
     await assertManager(context.userId, data.organizationId);
 
     if (data.kind === "employee") {
+      await assertEmployeeInOrg(data.id, data.organizationId);
+
       const blocker = await staffActiveBlockers(data.id, data.organizationId);
       if (blocker) throw new Error(blocker);
 

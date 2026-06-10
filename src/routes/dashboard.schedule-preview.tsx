@@ -602,25 +602,32 @@ function SiteWeekGrid({
     return (
       <div className="flex flex-col gap-1">
         {matches.map((s) => {
-          const bg = shiftColor(s, settings.colorBy);
-          const secondary =
-            view === "both" || view === "staff"
-              ? clientName(s.client_id)
-              : (s.staff_id ? staffById.get(s.staff_id)?.name : "Open") ?? "Open";
+          const info = settings.colorBy === "staff" ? staffTint(s.staff_id) : shiftTypeInfo(s);
+          const staffLabel = s.staff_id ? (staffById.get(s.staff_id)?.name ?? "Staff") : "Open";
+          const cName = clientName(s.client_id);
+          // Secondary text: in staff/both rows the row IS the staff, so show client.
+          // In client rows the row IS the client, so show staff.
+          const secondary = view === "client" ? staffLabel : cName;
           return (
             <button
               key={s.id}
               onClick={() => onOpenEditor({ shift: s })}
-              className={`text-left rounded-md ${cardPad} text-[11px] text-white font-medium leading-tight hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-1`}
-              style={{ background: bg, opacity: s.published ? 1 : 0.75 }}
-              title={`${s.job_code ?? ""} ${fmtTime(s.starts_at)}–${fmtTime(s.ends_at)} — click to edit`}
+              className={`text-left rounded-lg ${cardPad} text-[11px] font-medium leading-tight transition hover:brightness-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-1`}
+              style={{
+                background: info.bg,
+                color: info.fg,
+                borderLeft: `3px solid ${info.accent}`,
+                boxShadow: "0 1px 2px rgba(11,17,38,0.04)",
+                opacity: s.published ? 1 : 0.7,
+                fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+              }}
+              title={`${info.label} · ${fmtTime(s.starts_at)}–${fmtTime(s.ends_at)} — click to edit`}
             >
+              <div className="font-bold text-[12px] tracking-tight">{info.label}</div>
               {settings.showTimes && (
-                <div className="opacity-90">{fmtTime(s.starts_at)}–{fmtTime(s.ends_at)}</div>
+                <div className="opacity-80 text-[10.5px] mt-0.5">{fmtTime(s.starts_at)}–{fmtTime(s.ends_at)}</div>
               )}
-              {view !== "client" && <div className="truncate">{secondary}</div>}
-              {view === "client" && <div className="truncate opacity-90">{secondary}</div>}
-              {s.job_code && <div className="opacity-80 text-[10px] uppercase tracking-wide">{s.job_code}</div>}
+              <div className="truncate opacity-90 mt-0.5">{secondary}</div>
             </button>
           );
         })}

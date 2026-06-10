@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { useScheduleV2, setScheduleV2Flag } from "@/lib/schedule-v2-flag";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -51,7 +52,7 @@ import { NectarAutoAssignDialog } from "@/components/nectar/nectar-auto-assign-d
 
 import { z } from "zod";
 import { Link, useSearch, useNavigate } from "@tanstack/react-router";
-import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
+// HomesTeamsBoard now lives at its own route /dashboard/homes — see redirect below.
 import { CoverageViews } from "@/components/scheduling/coverage-views";
 import { ScheduleBuilder } from "@/components/scheduling/schedule-builder";
 import { IndividualServicesScheduler } from "@/components/scheduling/individual-services-scheduler";
@@ -75,14 +76,33 @@ function SchedulingShell() {
   const navigate = useNavigate({ from: "/dashboard/scheduling" });
   const activeMode: SchedulingMode = mode ?? "residential";
   const active: SchedulingTab = tab ?? "builder";
+  const v2On = useScheduleV2();
+
+  // Homes & Teams is fully promoted to its own route — always redirect.
+  if (tab === "homes") {
+    return <Navigate to="/dashboard/homes" replace />;
+  }
+  // Schedule V2 cut-over: when the flag is ON, the new page is primary.
+  // Builder / Coverage / Residential mode → new page. Individual mode stays
+  // on the legacy scheduler (recurrence UI not yet ported) — see escape hatch.
+  if (v2On && activeMode === "residential") {
+    return <Navigate to="/dashboard/schedule-preview" replace />;
+  }
 
   return (
     <div className="space-y-4">
+      {v2On && activeMode === "individual" && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <strong>Legacy 1-on-1 scheduler.</strong> The new Schedule does not yet
+          support recurring shift creation for individual services. This page
+          will be retired once that lands.
+        </div>
+      )}
       {/* Mode toggle */}
       <div className="inline-flex rounded-lg border border-border bg-card p-1 text-sm">
         {([
           { key: "residential", label: "Residential coverage" },
-          { key: "individual", label: "Individual services" },
+          { key: "individual", label: v2On ? "Individual services (legacy)" : "Individual services" },
         ] as { key: SchedulingMode; label: string }[]).map((m) => (
           <button
             key={m.key}
@@ -110,7 +130,7 @@ function SchedulingShell() {
             <nav className="-mb-px flex flex-wrap gap-1" aria-label="Scheduling tabs">
               {[
                 { key: "builder", label: "Builder" },
-                { key: "coverage", label: "Coverage" },
+                { key: "coverage", label: v2On ? "Coverage (legacy)" : "Coverage" },
                 { key: "homes", label: "Homes & Teams" },
               ].map((t) => (
                 <Link
@@ -135,13 +155,23 @@ function SchedulingShell() {
               </Link>.
             </p>
           </div>
-          {active === "homes" ? <HomesTeamsBoard />
-            : active === "builder" ? <ScheduleBuilder />
-            : <CoverageViews />}
+          {active === "builder" ? <ScheduleBuilder /> : <CoverageViews />}
         </>
       ) : (
         <IndividualServicesScheduler />
       )}
+
+      {/* Dev/QA: flip the flag for this browser only. Reversible at any time. */}
+      <div className="pt-4 text-[11px] text-muted-foreground">
+        Schedule V2 is currently <strong>{v2On ? "ON" : "OFF"}</strong>.{" "}
+        <button
+          type="button"
+          className="underline hover:text-foreground"
+          onClick={() => { setScheduleV2Flag(!v2On); }}
+        >
+          {v2On ? "Switch this browser back to the legacy scheduler" : "Try the new Schedule in this browser"}
+        </button>
+      </div>
     </div>
   );
 }

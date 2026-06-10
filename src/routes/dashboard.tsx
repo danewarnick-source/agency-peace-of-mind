@@ -50,6 +50,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/scheduling", label: "Scheduling", icon: CalendarDays },
   { to: "/dashboard/schedule-preview", label: "Schedule (new)", icon: CalendarDays },
+  { to: "/dashboard/homes", label: "Homes & Teams", icon: Users },
   { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing" },
   { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },

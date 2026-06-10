@@ -74,12 +74,14 @@ export function useClientBudget(clientId: string | undefined) {
         .gte("clock_in_timestamp", earliestStart.toISOString());
       if (tsErr) throw tsErr;
 
+      // Daily/HHS service days now live in daily_logs (record_date -> log_date);
+      // hhs_daily_records is orphaned. Alias keeps the day-counting below unchanged.
       const { data: dlRows, error: dlErr } = await supabase
-        .from("hhs_daily_records")
-        .select("record_date")
+        .from("daily_logs")
+        .select("record_date:log_date")
         .eq("organization_id", org!.organization_id)
         .eq("client_id", clientId!)
-        .gte("record_date", earliestStart.toISOString().slice(0, 10));
+        .gte("log_date", earliestStart.toISOString().slice(0, 10));
       if (dlErr) throw dlErr;
 
       return codes.map((code): CodeBudget => {

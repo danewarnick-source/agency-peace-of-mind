@@ -116,12 +116,14 @@ function ReadinessBarInner() {
           .eq("organization_id", orgId!)
           .gte("clock_in_timestamp", periodStartISO)
           .not("clock_out_timestamp", "is", null),
+        // Daily/HHS narrative days now live in daily_logs (record_date -> log_date);
+        // hhs_daily_records is orphaned. Attendance below is a separate signal.
         supabase
-          .from("hhs_daily_records")
-          .select("client_id, record_date")
+          .from("daily_logs")
+          .select("client_id, record_date:log_date")
           .eq("organization_id", orgId!)
-          .gte("record_date", periodStartDate)
-          .lte("record_date", periodEndDate),
+          .gte("log_date", periodStartDate)
+          .lte("log_date", periodEndDate),
         supabase
           .from("hhs_monthly_attendance")
           .select("client_id, record_date")

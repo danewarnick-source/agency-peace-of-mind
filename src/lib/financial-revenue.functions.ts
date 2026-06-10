@@ -15,7 +15,7 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
  *     submission reads:
  *       - public.client_billing_codes
  *       - public.evv_timesheets
- *       - public.hhs_daily_records
+ *       - public.daily_logs (daily/HHS service days; record_date is log_date)
  *   • NOT entitled (base tier) → return MANUALLY entered billed figures
  *     from provider_ledger_entries WHERE category='billed_manual'.
  *
@@ -100,12 +100,14 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
         .gte("clock_in_timestamp", `${yearStart}T00:00:00Z`)
         .lt("clock_in_timestamp", `${yearEndExclusive}T00:00:00Z`)
         .not("clock_out_timestamp", "is", null),
+      // Daily/HHS service days now live in daily_logs (record_date -> log_date);
+      // hhs_daily_records is orphaned. Alias keeps aggregateDailyDays() unchanged.
       supabase
-        .from("hhs_daily_records")
-        .select("organization_id, client_id, record_date")
+        .from("daily_logs")
+        .select("organization_id, client_id, record_date:log_date")
         .eq("organization_id", organizationId)
-        .gte("record_date", yearStart)
-        .lte("record_date", yearEndInclusive),
+        .gte("log_date", yearStart)
+        .lte("log_date", yearEndInclusive),
     ]);
     if (codesRes.error) throw new Error(codesRes.error.message);
     if (tsRes.error) throw new Error(tsRes.error.message);
@@ -156,7 +158,7 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
       source: {
         mode: "auto_520" as const,
         entitled: true as const,
-        tables: ["client_billing_codes", "evv_timesheets", "hhs_daily_records"],
+        tables: ["client_billing_codes", "evv_timesheets", "daily_logs"],
         note: "Same source as the 520 Billing submission.",
       },
       received: { available: false as const },

@@ -112,12 +112,14 @@ function Billing520Page() {
     enabled: !!org?.organization_id,
     queryKey: ["520-daily", org?.organization_id, periodStart.toISOString()],
     queryFn: async () => {
+      // Daily/HHS service days now live in daily_logs (record_date -> log_date);
+      // hhs_daily_records is orphaned. Alias keeps aggregateDailyDays() unchanged.
       const { data, error } = await supabase
-        .from("hhs_daily_records")
-        .select("client_id, record_date")
+        .from("daily_logs")
+        .select("client_id, record_date:log_date")
         .eq("organization_id", org!.organization_id)
-        .gte("record_date", periodStartStr)
-        .lte("record_date", periodEndStr);
+        .gte("log_date", periodStartStr)
+        .lte("log_date", periodEndStr);
       if (error) throw error;
       return data ?? [];
     },

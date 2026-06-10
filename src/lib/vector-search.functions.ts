@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
+import { gatewayFetch, gatewayEmbeddingsFetch } from "@/lib/ai-bedrock.server";
+
 const EMBED_MODEL = "google/gemini-embedding-001";
 const EMBED_DIMS = 1536;
 const ROUTER_MODEL = "google/gemini-2.5-flash";
@@ -41,11 +43,7 @@ function validateBackfill(input: unknown): BackfillInput {
 async function embed(text: string): Promise<number[]> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: EMBED_MODEL, input: text.slice(0, 8000), dimensions: EMBED_DIMS }),
-  });
+  const res = await gatewayEmbeddingsFetch({ model: EMBED_MODEL, input: text.slice(0, 8000), dimensions: EMBED_DIMS });
   if (res.status === 429) throw new Error("AI rate limit reached. Please retry shortly.");
   if (res.status === 402) throw new Error("AI workspace credits exhausted.");
   if (!res.ok) throw new Error(`Embedding error (${res.status}).`);
@@ -84,18 +82,14 @@ Parse the admin's natural-language request and return STRICT JSON with these key
                                    "went into the community", "showed aggression"). false for pure name/date/time lookups.
 Return ONLY the JSON object, nothing else.`;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: ROUTER_MODEL,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
         { role: "user", content: query },
       ],
-    }),
-  });
+    });
   if (res.status === 429) throw new Error("AI rate limit reached. Please retry shortly.");
   if (res.status === 402) throw new Error("AI workspace credits exhausted.");
   if (!res.ok) throw new Error(`Router error (${res.status}).`);

@@ -9,6 +9,8 @@ import { z } from "zod";
 import { Buffer } from "node:buffer";
 
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 // ----- Input schemas -----
 const ModeEnum = z.enum(["employee", "client"]);
 
@@ -606,22 +608,14 @@ Rules:
 
   const truncated = text.length > 60_000 ? text.slice(0, 60_000) : text;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: system },
         { role: "user", content: `Extract from this document text:\n\n${truncated}` },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
+    });
 
   if (res.status === 429) throw new Error("AI is busy (rate limit). Try again in a moment.");
   if (res.status === 402) throw new Error("AI workspace credits exhausted. Add credits to continue.");

@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface CoachResult {
@@ -62,22 +64,14 @@ async function callAI(system: string, user: string): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: "google/gemini-3-flash-preview",
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
+    });
 
   if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
   if (res.status === 402) throw new Error("AI workspace credits exhausted. Please add credits.");

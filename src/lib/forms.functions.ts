@@ -6,6 +6,8 @@ import { z } from "zod";
 import type { FormField, FormSettings, Schedule, Frequency } from "./forms-utils";
 import { periodKeyFor } from "./forms-utils";
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
 
@@ -1382,15 +1384,11 @@ Schema:
   ]
 }
 Rules: 6–16 fields total. Use real interactive types — never a blank text box where a date/dropdown/rating fits. Mark obviously-required fields required. Keep labels under 80 chars. Never invent PHI; structure-only.`;
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": apiKey },
-      body: JSON.stringify({
+    const res = await gatewayFetch({
         model: "google/gemini-3-flash-preview",
         messages: [{ role: "system", content: system }, { role: "user", content: data.description }],
         response_format: { type: "json_object" },
-      }),
-    });
+      });
     if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
     if (res.status === 402) throw new Error("AI workspace credits exhausted.");
     if (!res.ok) throw new Error(`Nectar draft failed (${res.status}).`);
@@ -1483,10 +1481,7 @@ Quality rules:
 - Never invent fields not on the form. Never invent PHI.`;
 
     const userText = `Extract the form structure from this PDF into the JSON schema above.${data.hint ? `\n\nHint from the uploader: ${data.hint}` : ""}${data.filename ? `\n\nFilename: ${data.filename}` : ""}`;
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": apiKey },
-      body: JSON.stringify({
+    const res = await gatewayFetch({
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: system },
@@ -1496,8 +1491,7 @@ Quality rules:
           ] },
         ],
         response_format: { type: "json_object" },
-      }),
-    });
+      });
     if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
     if (res.status === 402) throw new Error("AI workspace credits exhausted.");
     if (!res.ok) {
@@ -1565,15 +1559,11 @@ Frequency: ${data.frequency}
 Schedule JSON: ${JSON.stringify(data.schedule)}
 Required fields: ${required.length ? required.join("; ") : "(none)"}
 Total questions: ${data.fields.length}`;
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": apiKey },
-      body: JSON.stringify({
+    const res = await gatewayFetch({
         model: "google/gemini-3-flash-preview",
         messages: [{ role: "system", content: system }, { role: "user", content: userMsg }],
         response_format: { type: "json_object" },
-      }),
-    });
+      });
     if (!res.ok) throw new Error(`Nectar notification draft failed (${res.status}).`);
     const json = await res.json() as { choices?: { message?: { content?: string } }[] };
     const raw = json.choices?.[0]?.message?.content ?? "{}";
@@ -1635,15 +1625,11 @@ Rules: propose only based on the purpose text and field labels. Never invent. If
       fieldLabels: data.fieldLabels ?? [],
     });
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": apiKey },
-      body: JSON.stringify({
+    const res = await gatewayFetch({
         model: "google/gemini-3-flash-preview",
         messages: [{ role: "system", content: system }, { role: "user", content: userMsg }],
         response_format: { type: "json_object" },
-      }),
-    });
+      });
     if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
     if (res.status === 402) throw new Error("AI workspace credits exhausted.");
     if (!res.ok) throw new Error(`Nectar routing proposal failed (${res.status}).`);

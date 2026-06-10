@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { anchorsForPrompt, findAnchor } from "@/lib/nectar/tour-anchors";
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 export interface GuideStep {
   /** Anchor id from TOUR_ANCHORS (must exist). */
   anchor: string;
@@ -40,15 +42,11 @@ function strField(v: unknown, max = 2000): string {
 async function callAi(messages: Array<{ role: string; content: string }>) {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("AI gateway is not configured.");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: "google/gemini-2.5-flash",
       messages,
       response_format: { type: "json_object" },
-    }),
-  });
+    });
   if (res.status === 429) throw new Error("NECTAR is busy — please try again in a moment.");
   if (res.status === 402) throw new Error("AI credits exhausted for this workspace.");
   if (!res.ok) throw new Error(`AI error ${res.status}`);

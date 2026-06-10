@@ -7,6 +7,8 @@ import { reportPlatformEvent } from "./hive-tickets.functions";
 import { markDraftedByNectar } from "./nectar-approvals.functions";
 
 
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+
 // =============================================================
 // Foundation B — Authoritative sources, derived requirements,
 // and the immutable attestation log.
@@ -746,21 +748,14 @@ const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(200).default
 async function extractRequirementsFromText(text: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  const res = await gatewayFetch({
       model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: REQ_SYSTEM_PROMPT },
         { role: "user", content: `DOCUMENT TEXT:\n\n${text.slice(0, 60000)}` },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
+    });
   if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
   if (res.status === 402)
     throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
@@ -1215,21 +1210,14 @@ CITATION: ${req.source_citation ?? "—"}
 REQUIREMENT TITLE: ${req.title}
 REQUIREMENT TEXT: ${req.description ?? "(no extended text — restate the title only)"}`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+    const res = await gatewayFetch({
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: EXPLAIN_SYSTEM_PROMPT },
           { role: "user", content: userBody },
         ],
         response_format: { type: "json_object" },
-      }),
-    });
+      });
     if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
     if (res.status === 402) throw new Error("AI credits exhausted.");
     if (!res.ok) throw new Error(`AI gateway error ${res.status}`);

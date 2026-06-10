@@ -317,7 +317,10 @@ function buildBedrockMessages(messages: OpenAIMessage[]): { system: string; conv
  * res.json() / res.text()` consumers keep working unchanged.
  */
 export async function gatewayFetch(
-  body: OpenAIChatBody,
+  // Loose body type — call sites build OpenAI chat-completions bodies with
+  // varied content/tool shapes. Validated at runtime by buildBedrockMessages.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  body: any,
   opts?: { signal?: AbortSignal },
 ): Promise<GatewayFetchResponse> {
   try {

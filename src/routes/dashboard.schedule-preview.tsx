@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Lock } from "lucide-react";
 import { CoverageBar24h } from "@/components/scheduling/coverage-bar-24h";
 import { publishShifts } from "@/lib/scheduling/shifts.functions";
+import { listLocations } from "@/lib/scheduling/locations.functions";
+import { WeeklyTargetMeter } from "@/components/scheduling/weekly-target-meter";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
   useSchedulePreview,
@@ -83,6 +85,21 @@ function SchedulePreviewPage() {
 
   const { data, isLoading } = useSchedulePreview(weekStart);
   const { data: requests } = useOrgScheduleRequests();
+  const listLocCall = useServerFn(listLocations);
+  const locationsQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["locations", org?.organization_id],
+    queryFn: () => listLocCall({ data: { organizationId: org!.organization_id } }),
+  });
+  // host-home names (lowercased) — used to give the All-Homes board a
+  // distinct row variant and to tag the home pills.
+  const hostHomeNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of locationsQ.data ?? []) {
+      if (l.type === "host_home" && l.active !== false) set.add(String(l.name ?? "").toLowerCase());
+    }
+    return set;
+  }, [locationsQ.data]);
   const approvedTimeOff = useMemo(
     () => buildApprovedTimeOffIndex(requests?.timeOff ?? []),
     [requests?.timeOff],
@@ -206,7 +223,14 @@ function SchedulePreviewPage() {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <HomePill active={isAll} label="All homes" onClick={() => setSiteId("__all__")} />
           {sites.map((s) => (
-            <HomePill key={s.id} active={siteId === s.id} label={s.name} gap={!!siteHasGap.get(s.id)} onClick={() => setSiteId(s.id)} />
+            <HomePill
+              key={s.id}
+              active={siteId === s.id}
+              label={s.name}
+              gap={!!siteHasGap.get(s.id)}
+              host={hostHomeNames.has(s.name.toLowerCase())}
+              onClick={() => setSiteId(s.id)}
+            />
           ))}
         </div>
         <div style={{ flex: 1 }} />
@@ -221,6 +245,7 @@ function SchedulePreviewPage() {
           <AllHomesBoard
             days={days} sites={sites} siteClients={siteClients} siteShifts={siteShifts}
             settings={settings} onPickSite={setSiteId}
+            hostHomeNames={hostHomeNames}
             onOpenDay={(sid, sname, d) => setTimelineCtx({ siteId: sid, siteName: sname, day: d })}
           />
         ) : currentSite ? (
@@ -342,7 +367,7 @@ const arrowBtn: React.CSSProperties = {
   border: `1px solid ${SCHED.line}`, background: "#fff", width: 28, height: 28, borderRadius: 8, fontSize: 14, cursor: "pointer", color: SCHED.ink,
 };
 
-function HomePill({ active, label, gap, onClick }: { active: boolean; label: string; gap?: boolean; onClick: () => void }) {
+function HomePill({ active, label, gap, host, onClick }: { active: boolean; label: string; gap?: boolean; host?: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -353,6 +378,13 @@ function HomePill({ active, label, gap, onClick }: { active: boolean; label: str
       }}
     >
       {label}
+      {host && (
+        <span style={{
+          fontSize: 9, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase",
+          padding: "2px 5px", borderRadius: 4,
+          background: active ? "rgba(255,255,255,.18)" : "#eef2ff", color: active ? "#fff" : "#4f46e5",
+        }}>HOST</span>
+      )}
       {gap && <span style={{ width: 7, height: 7, borderRadius: "50%", background: SCHED.gap }} />}
     </button>
   );
@@ -380,7 +412,7 @@ function ViewSeg({ value, onChange, disabled }: { value: ViewMode; onChange: (v:
 
 // ── All-homes status board ────────────────────────────────────────────
 function AllHomesBoard({
-  days, sites, siteClients, siteShifts, settings, onPickSite, onOpenDay,
+  days, sites, siteClients, siteShifts, settings, onPickSite, onOpenDay, hostHomeNames,
 }: {
   days: Date[];
   sites: { id: string; name: string }[];
@@ -389,6 +421,7 @@ function AllHomesBoard({
   settings: Settings;
   onPickSite: (id: string) => void;
   onOpenDay?: (siteId: string, siteName: string, day: Date) => void;
+  hostHomeNames?: Set<string>;
 }) {
   if (sites.length === 0) return <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>No sites yet.</div>;
   return (
@@ -405,12 +438,42 @@ function AllHomesBoard({
             const clients = siteClients.get(s.id) ?? [];
             const shifts = siteShifts.get(s.id) ?? [];
             const type = inferSiteType(s.id, clients, shifts);
+            const isHost = !!hostHomeNames?.has(s.name.toLowerCase());
+            // Weekly DS hours scheduled for this home (used by the host-home meter).
+            const dsHours = shifts.reduce((acc, sh) => {
+              const code = (sh.job_code ?? "").toUpperCase();
+              if (!["DSI", "DSG", "DSP", "EPR"].includes(code)) return acc;
+              return acc + Math.max(0, (new Date(sh.ends_at).getTime() - new Date(sh.starts_at).getTime()) / 3600000);
+            }, 0);
+            // Placeholder weekly DS target until per-client targets land in
+            // this view: 25h/week per client is the worksheet baseline.
+            const dsTarget = Math.max(0, clients.length * 25);
             return (
               <tr key={s.id} style={{ cursor: "pointer" }} onClick={() => onPickSite(s.id)} className="sched-drill">
                 <td style={rowHead}>
-                  {s.name}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {s.name}
+                    {isHost && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase",
+                        padding: "1px 4px", borderRadius: 4, background: "#eef2ff", color: "#4f46e5",
+                      }}>HOST</span>
+                    )}
+                  </div>
                   {settings.showResidentCount && (
-                    <small style={rowHeadSmall}>{type === "residential" ? "Residential" : "Day / 1:1"} · {clients.length} {clients.length === 1 ? "person" : "people"}</small>
+                    <small style={rowHeadSmall}>
+                      {isHost ? "Host home" : type === "residential" ? "Residential" : "Day / 1:1"} · {clients.length} {clients.length === 1 ? "person" : "people"}
+                    </small>
+                  )}
+                  {isHost && dsTarget > 0 && (
+                    <div style={{ marginTop: 6, maxWidth: 130 }}>
+                      <WeeklyTargetMeter
+                        serviceCode="DSI"
+                        scheduledHours={dsHours}
+                        targetHours={dsTarget}
+                        compact
+                      />
+                    </div>
                   )}
                 </td>
                 {days.map((d, i) => {
@@ -418,7 +481,19 @@ function AllHomesBoard({
                   const open = de.filter((sh) => !sh.staff_id).length;
                   const setCnt = de.length - open;
                   let content: React.ReactNode;
-                  if (de.length === 0) content = <div style={{ ...statusBase, color: "#c4c8d4" }}>—</div>;
+                  if (isHost) {
+                    // Three status dots: daily-note-done, overnight-confirmed,
+                    // agency-visit-hours > 0. Real data is wired in Phase 2;
+                    // for now show a faded triple-dot indicator. Host homes
+                    // NEVER show a red gap, by design.
+                    content = (
+                      <div style={{ ...statusBase, gap: 4, justifyContent: "center" }}>
+                        <span title="Daily note" style={{ ...dot, background: "#cbd5e1" }} />
+                        <span title="Overnight confirmed" style={{ ...dot, background: "#cbd5e1" }} />
+                        <span title="Agency visit hours" style={{ ...dot, background: "#cbd5e1" }} />
+                      </div>
+                    );
+                  } else if (de.length === 0) content = <div style={{ ...statusBase, color: "#c4c8d4" }}>—</div>;
                   else if (open > 0) content = <div style={{ ...statusBase, ...statusOpen }}><span style={dot} />{open} open</div>;
                   else if (type === "residential") content = <div style={{ ...statusBase, ...statusCov }}>✓ 24h</div>;
                   else content = <div style={{ ...statusBase, ...statusCov }}><span style={dot} />{setCnt} set</div>;
@@ -438,7 +513,9 @@ function AllHomesBoard({
           })}
         </tbody>
       </table>
-      <div style={hint}>Each cell shows coverage status. Click a home to open its full week.</div>
+      <div style={hint}>
+        Each cell shows coverage status. Host homes show daily-note / overnight / agency-visit dots and a weekly DS-hours meter — never a red gap. Click a home to open its full week.
+      </div>
     </>
   );
 }

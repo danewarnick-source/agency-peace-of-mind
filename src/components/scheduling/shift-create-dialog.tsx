@@ -56,6 +56,9 @@ export function ShiftCreateDialog({
   const [staffId, setStaffId] = useState<string | null>(null);
   const [override, setOverride] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Recurrence: weekday checkboxes (0=Sun..6=Sat) + end-on (inclusive) date.
+  const [recurDays, setRecurDays] = useState<Set<number>>(new Set());
+  const [recurUntil, setRecurUntil] = useState<string>("");
 
   // Reset on open
   useEffect(() => {
@@ -67,6 +70,8 @@ export function ShiftCreateDialog({
       setOverride("");
       setAwake(false);
       setPickedLocationId(locationId ?? null);
+      setRecurDays(new Set());
+      setRecurUntil("");
       const base = initialDay ? new Date(initialDay) : new Date();
       base.setHours(9, 0, 0, 0);
       const end = new Date(base); end.setHours(base.getHours() + 4);
@@ -128,30 +133,71 @@ export function ShiftCreateDialog({
     return false;
   }
 
+  // Build the list of (start, end) pairs to create. The base pair is the
+  // first; if recurrence is set, we add one occurrence per matching weekday
+  // up to and including recurUntil. We keep the same wall-clock start/end
+  // and just shift the date.
+  function expandOccurrences(): Array<{ start: Date; end: Date }> {
+    const baseStart = new Date(startPicker);
+    const baseEnd = new Date(endPicker);
+    const out: Array<{ start: Date; end: Date }> = [{ start: baseStart, end: baseEnd }];
+    if (recurDays.size === 0 || !recurUntil) return out;
+    const until = new Date(recurUntil); until.setHours(23, 59, 59, 999);
+    const seen = new Set<string>([baseStart.toISOString()]);
+    const cur = new Date(baseStart); cur.setDate(cur.getDate() + 1);
+    const durationMs = baseEnd.getTime() - baseStart.getTime();
+    while (cur <= until) {
+      if (recurDays.has(cur.getDay())) {
+        const s = new Date(cur);
+        s.setHours(baseStart.getHours(), baseStart.getMinutes(), 0, 0);
+        const e = new Date(s.getTime() + durationMs);
+        const key = s.toISOString();
+        if (!seen.has(key)) { out.push({ start: s, end: e }); seen.add(key); }
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  }
+
   async function handleCreate() {
     if (!clientId || !code || !staffId) return;
     setSubmitting(true);
+    const occurrences = expandOccurrences();
+    let created = 0;
+    let failed = 0;
     try {
-      await createCall({
-        data: {
-          organizationId,
-          clientId,
-          serviceCode: code,
-          staffId,
-          startsAtIso: pickerToIso(startPicker),
-          endsAtIso: pickerToIso(endPicker),
-          locationId: effectiveLocationId,
-          isAwakeOvernight: awake,
-          status: "draft",
-          createdFrom: "manual",
-          overrideReason: override.trim() || undefined,
-        },
-      });
-      toast.success("Shift created");
-      onCreated?.();
-      onOpenChange(false);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Could not create shift");
+      for (const occ of occurrences) {
+        try {
+          await createCall({
+            data: {
+              organizationId,
+              clientId,
+              serviceCode: code,
+              staffId,
+              startsAtIso: occ.start.toISOString(),
+              endsAtIso: occ.end.toISOString(),
+              locationId: effectiveLocationId,
+              isAwakeOvernight: awake,
+              status: "draft",
+              createdFrom: "manual",
+              overrideReason: override.trim() || undefined,
+            },
+          });
+          created++;
+        } catch (err) {
+          failed++;
+          console.warn("recurrence occurrence failed", err);
+        }
+      }
+      if (created > 0) {
+        toast.success(occurrences.length === 1
+          ? "Shift created"
+          : `Created ${created} of ${occurrences.length} shifts${failed ? ` (${failed} skipped)` : ""}`);
+        onCreated?.();
+        onOpenChange(false);
+      } else {
+        toast.error("Could not create any shifts");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -308,6 +354,51 @@ export function ShiftCreateDialog({
               </div>
               <div className="text-[11px] text-muted-foreground mt-1">
                 Picking a host home location excludes its host staff from the picker.
+              </div>
+            </div>
+
+            <div className="rounded-md border p-2 space-y-2">
+              <Label className="text-xs">Repeat weekly (optional)</Label>
+              <div className="flex flex-wrap gap-1">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, idx) => {
+                  const on = recurDays.has(idx);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        const next = new Set(recurDays);
+                        if (on) next.delete(idx); else next.add(idx);
+                        setRecurDays(next);
+                      }}
+                      className={cn(
+                        "min-w-[44px] min-h-[36px] rounded-md border px-2 text-xs font-semibold",
+                        on ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 gap-2 items-end">
+                <div>
+                  <Label className="text-[11px]">Until (inclusive)</Label>
+                  <Input
+                    type="date"
+                    value={recurUntil}
+                    onChange={(e) => setRecurUntil(e.target.value)}
+                    min={startPicker.slice(0, 10)}
+                  />
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {recurDays.size === 0 || !recurUntil
+                    ? "One-off — pick weekdays + an end date to repeat."
+                    : (() => {
+                      const n = expandOccurrences().length;
+                      return `${n} shift${n === 1 ? "" : "s"} will be created.`;
+                    })()}
+                </div>
               </div>
             </div>
           </div>

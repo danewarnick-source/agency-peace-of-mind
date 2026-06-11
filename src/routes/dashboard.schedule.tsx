@@ -271,7 +271,10 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
     </Link>
   );
 
-  if (s.status === "pending" && s.published) {
+  // Treat both legacy "pending" and the widened "published" status as
+  // awaiting-acceptance. "draft" and "cancelled" never reach this view
+  // (filtered by the fetch query), and "open" shifts have no staff_id.
+  if ((s.status === "pending" || s.status === "published") && s.published) {
     return (
       <div className="space-y-2">
         {linkWrap}
@@ -375,7 +378,7 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
       : groupStatus === "declined"
         ? "bg-destructive/10 text-destructive"
         : "bg-muted text-muted-foreground";
-  const pendingIds = shifts.filter((s) => s.status === "pending" && s.published).map((s) => s.id);
+  const pendingIds = shifts.filter((s) => (s.status === "pending" || s.status === "published") && s.published).map((s) => s.id);
   return (
     <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">

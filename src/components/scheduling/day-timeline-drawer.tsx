@@ -136,6 +136,21 @@ export function DayTimelineDrawer({
             </div>
           ))}
 
+          {/* Uncovered requirement bands */}
+          {gaps.map((g, i) => (
+            <div
+              key={`gap-${i}`}
+              className="absolute left-12 right-2 bg-destructive/15 border-l-2 border-destructive pointer-events-none"
+              style={{
+                top: `${(g.topPct / 100) * HOUR_HEIGHT * 24}px`,
+                height: `${(g.heightPct / 100) * HOUR_HEIGHT * 24}px`,
+                backgroundImage:
+                  "repeating-linear-gradient(45deg, rgba(220,38,38,0.18) 0 4px, transparent 4px 8px)",
+              }}
+              title="Uncovered against coverage requirement"
+            />
+          ))}
+
           {/* Shift blocks */}
           <div className="absolute inset-y-0 left-12 right-2">
             {(shiftsQ.data ?? []).map((s) => {

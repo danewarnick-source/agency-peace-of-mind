@@ -1,7 +1,15 @@
 # Session Report — Claude Code work order (2026-06-11)
 
-Branch: `claude/busy-cray-w323d6` · all 11 commits typecheck + build green.
-Tasks 0–8 complete. One SQL handoff is pending (locations cleanup).
+Branch: `claude/busy-cray-w323d6` · all commits typecheck + build green.
+Tasks 0–8 complete, merged to `main`. SQL handoffs pending (see below).
+
+> **Post-review revision (`c56875e`):** the six new service-code display labels
+> were corrected per owner (CMP/CMS are Caregiver Compensation — Supported
+> Living Natural, not companion services; SJP/SJR are placement/retention
+> milestones; ELS = Extended Living Supports), and the SQL handoff was revised —
+> `home_designations` is NOT legacy and is no longer deleted; a conditional
+> repair section re-seeds its four care-team labels if an earlier cleanup
+> removed them.
 
 ## Commits (oldest → newest)
 
@@ -21,20 +29,17 @@ Tasks 0–8 complete. One SQL handoff is pending (locations cleanup).
 
 ## SQL handoffs pending (docs/SQL_HANDOFF.md)
 
-1. **Locations cleanup** — run block 1b (verify) first; if it already says
-   `Maple House [residential]` skip 1a. Otherwise run 1a then 1b.
-   Note: 1a also wipes `home_designations` (per the work order). The Homes &
-   Teams "care team" designation picker reads that table, so its label list
-   will be empty afterwards — flagging so it's not a surprise. Scheduling
-   eligibility no longer depends on it (host staff now resolve via the team).
+1. **Locations cleanup** — run block 1b (verify) first; if it already returns
+   exactly `Maple House [residential]` skip 1a. Otherwise run 1a then 1b.
+   `home_designations` is untouched by the cleanup.
+2. **Care-team designations repair (conditional)** — run the 2a count check;
+   only if it returns 0 (an earlier cleanup version deleted the rows), run 2b
+   to re-seed House Manager / Lead / Supervisor / DSP for every org.
+3. **ELS rename** — one-line update so the live `service_codes` name matches
+   the corrected "Extended Living Supports" label.
 
-## Things for you to double-check (couldn't verify without the DB / state docs)
+## Things for you to double-check
 
-- **Labels for the six new codes** in `src/lib/evv-codes.ts`: CMP ("Companion
-  Supports – Personal"), CMS ("…– Shared"), SJD/SJP/SJR ("Supported Job
-  Development/Placement/Retention"), ELS ("Employment/Life Skills (Bridge)").
-  EVV flags and behavior are per the work order; the display NAMES are my best
-  guess — correct them in that one file if the contract says otherwise.
 - **Variable-rate codes** now = HHS, RHS, DSI, SEI (was DSI, SEI) per the
   CLAUDE.md worksheet-rate rule — drives the amber "no worksheet rate" badge.
 - The work order said the bs-config-card embed was already fixed; on this

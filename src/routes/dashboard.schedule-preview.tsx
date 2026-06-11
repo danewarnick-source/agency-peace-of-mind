@@ -26,6 +26,7 @@ import { ShiftCreateDialog } from "@/components/scheduling/shift-create-dialog";
 import { DayTimelineDrawer } from "@/components/scheduling/day-timeline-drawer";
 import { WeeklyTargetsDialog } from "@/components/scheduling/weekly-targets-dialog";
 import { CoverageRequirementsDialog } from "@/components/scheduling/coverage-requirements-dialog";
+import { LocationsDialog } from "@/components/scheduling/locations-dialog";
 import {
   SCHED, font, type Settings, useSettings, type ViewMode,
   shiftAccentHex, shiftTypeLabel, fmtTime, DAY_LABELS,

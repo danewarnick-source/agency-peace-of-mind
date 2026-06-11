@@ -275,7 +275,7 @@ the manager approves or discards it.
 
 Return strict JSON, ONE of:
 
-1) { "kind": "ask", "question": "<one short specific question>" }
+1) { "kind": "ask", "question": "<one short specific question>", "reply_type": "yes_no" | "options" | "text", "options"?: [{ "id": "...", "label": "..." }] }
 2) {
      "kind": "ok",
      "actions": [

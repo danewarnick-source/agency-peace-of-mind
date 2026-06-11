@@ -56,4 +56,4 @@ Four batches, each independently shippable. Reuses existing tables (`shift_swap_
 
 **Migration**: extend `scheduled_shifts.status` allowed values (no schema change needed if `text`); add `claimed_by` column? — not needed, `staff_id` + `'pending'` status conveys it.
 
-Starting Batch A now. Say "next" to advance through B → C → D.
+Status: ✅ Batch A · ✅ Batch B · ✅ Batch C · ✅ Batch D — Phase 3 complete.

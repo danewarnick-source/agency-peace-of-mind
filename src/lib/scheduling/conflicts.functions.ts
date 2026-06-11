@@ -110,9 +110,27 @@ export const evaluateRange = createServerFn({ method: "POST" })
       }
     }
 
+    // 4) approved time-off in window for these staff → ptoRanges in ctx
+    if (staffIds.length) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: ptoRows } = await (supabase as any)
+        .from("time_off_requests")
+        .select("staff_id, start_date, end_date, status")
+        .eq("organization_id", data.organizationId)
+        .eq("status", "approved")
+        .in("staff_id", staffIds);
+      for (const r of (ptoRows ?? []) as Array<{ staff_id: string; start_date: string; end_date: string }>) {
+        const sMs = new Date(r.start_date + "T00:00:00").getTime();
+        const eMs = new Date(r.end_date + "T23:59:59.999").getTime();
+        const slot = staffCtx[r.staff_id] ?? (staffCtx[r.staff_id] = { active: true });
+        (slot.ptoRanges ?? (slot.ptoRanges = [])).push([sMs, eMs]);
+      }
+    }
+
     return evaluateShifts(shiftRows, {
       rules: (cfg?.rule_settings ?? {}) as Partial<Record<PolicyRuleCode, RuleMode>>,
       otThresholdHours: Number(cfg?.ot_threshold_hours ?? 40),
       staff: staffCtx,
     });
   });
+

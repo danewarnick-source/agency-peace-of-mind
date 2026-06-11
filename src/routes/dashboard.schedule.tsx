@@ -528,6 +528,15 @@ function SchedulePage() {
         />
       </div>
 
+      {org?.organization_id && (
+        <OpenShiftsPanel
+          organizationId={org.organization_id}
+          startIso={range.from.toISOString()}
+          endIso={range.to.toISOString()}
+          mode="staff"
+        />
+      )}
+
 
       {/* View toggle */}
       <div

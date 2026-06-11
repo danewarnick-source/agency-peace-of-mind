@@ -1,8 +1,13 @@
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
   SCHED, font, type Settings, type ViewMode, type Density, type ColorBy, type ShiftType,
 } from "./sched-ui";
+import { getRuleSettings, updateRuleSettings } from "@/lib/scheduling/conflicts.functions";
+import { POLICY_RULES, type PolicyRuleCode, type RuleMode } from "@/lib/scheduling/conflicts";
+import { toast } from "sonner";
 
 /**
  * Schedule display settings — drawer/sidebar.

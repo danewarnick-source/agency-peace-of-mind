@@ -308,23 +308,63 @@ export function NectarCommandBar({
 }
 
 function ProposalReview({
-  proposal, onDiscard, onApprove, applying,
+  proposal, onDiscard, onApprove, applying, onAnswer, onReplyWithText, answering,
 }: {
   proposal: NectarProposal;
   onDiscard: () => void;
   onApprove: () => void;
   applying: boolean;
+  onAnswer: (label: string) => void;
+  onReplyWithText: () => void;
+  answering: boolean;
 }) {
   if (proposal.kind === "ask") {
+    const replyType = proposal.reply_type ?? (proposal.options?.length ? "options" : "text");
+    const yesNo: { id: string; label: string }[] = [
+      { id: "yes", label: "Yes" },
+      { id: "no", label: "No" },
+    ];
+    const choices =
+      replyType === "yes_no" ? yesNo :
+      replyType === "options" ? (proposal.options ?? []) :
+      [];
     return (
       <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
         <div className="flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-700" />
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="font-medium text-amber-900">NECTAR needs more info:</p>
             <p className="text-amber-800 mt-0.5">{proposal.question}</p>
+            {choices.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {choices.map((opt) => {
+                  const isYes = replyType === "yes_no" && opt.id === "yes";
+                  return (
+                    <Button
+                      key={opt.id}
+                      size="sm"
+                      variant={isYes ? "default" : "outline"}
+                      disabled={answering}
+                      onClick={() => onAnswer(opt.label)}
+                      style={isYes ? { background: TEAL, color: "white" } : undefined}
+                    >
+                      {answering ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                      {opt.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onReplyWithText}
+              disabled={answering}
+              className="mt-2 text-xs font-medium text-amber-900 underline-offset-2 hover:underline disabled:opacity-50"
+            >
+              Reply with text…
+            </button>
           </div>
-          <Button size="sm" variant="ghost" onClick={onDiscard}><X className="h-4 w-4" /></Button>
+          <Button size="sm" variant="ghost" onClick={onDiscard} disabled={answering}><X className="h-4 w-4" /></Button>
         </div>
       </div>
     );

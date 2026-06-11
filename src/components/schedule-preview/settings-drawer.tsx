@@ -16,12 +16,13 @@ import { toast } from "sonner";
  * staffing toggles are advisory-only for now (no schema/EVV/billing changes).
  */
 export function SettingsDrawer({
-  open, onOpenChange, settings, onChange,
+  open, onOpenChange, settings, onChange, organizationId,
 }: {
   open: boolean;
   onOpenChange: (b: boolean) => void;
   settings: Settings;
   onChange: (patch: Partial<Settings>) => void;
+  organizationId?: string;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

@@ -293,10 +293,7 @@ Hard rules:
     });
 
     const raw = await callGateway(apiKey, system, user);
-    let parsed: unknown;
-    try { parsed = JSON.parse(raw); } catch {
-      return { kind: "ask", question: "I didn't catch that — try: 'Cover Maple house overnight Mon–Fri with Sarah'." };
-    }
+    const parsed = parseModelJson(raw, "nectar-schedule");
     return validateAndResolve(parsed, data);
   });
 

@@ -36,6 +36,8 @@ export interface AskNectarStaffProps {
   clientId?: string;
   /** Compact heading variant for embedding into sheets. */
   compact?: boolean;
+  /** Auto-send this question once on mount. */
+  initialQuestion?: string;
 }
 
 /**
@@ -45,7 +47,7 @@ export interface AskNectarStaffProps {
  * just renders the conversation. No DB persistence: each session is in
  * React state only.
  */
-export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProps) {
+export function AskNectarStaff({ clientId, compact = false, initialQuestion }: AskNectarStaffProps) {
   const ask = useServerFn(askNectarStaff);
   const { data: org } = useCurrentOrg();
   const organizationId = org?.organization_id;

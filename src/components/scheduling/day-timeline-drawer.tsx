@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { classesForCode, familyForCode } from "@/lib/scheduling/code-colors";
 import { listShiftsInRange } from "@/lib/scheduling/shifts.functions";
+import { AddSegmentDialog, type ParentShiftInfo } from "@/components/scheduling/add-segment-dialog";
 
 interface Props {
   open: boolean;

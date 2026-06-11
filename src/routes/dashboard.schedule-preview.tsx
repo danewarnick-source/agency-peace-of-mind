@@ -19,6 +19,7 @@ import { NectarCommandBar } from "@/components/schedule-preview/nectar-command-b
 import { useOrgScheduleRequests, buildApprovedTimeOffIndex } from "@/lib/schedule-requests";
 import { SettingsDrawer } from "@/components/schedule-preview/settings-drawer";
 import { ShiftCreateDialog } from "@/components/scheduling/shift-create-dialog";
+import { DayTimelineDrawer } from "@/components/scheduling/day-timeline-drawer";
 import {
   SCHED, font, type Settings, useSettings, type ViewMode,
   shiftAccentHex, shiftTypeLabel, fmtTime, DAY_LABELS,
@@ -57,6 +58,7 @@ function SchedulePreviewPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorCtx, setEditorCtx] = useState<EditorContext | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [timelineCtx, setTimelineCtx] = useState<{ siteId: string; siteName: string; day: Date } | null>(null);
   const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
   useEffect(() => { setView(settings.defaultView); }, [settings.defaultView]);
@@ -198,6 +200,7 @@ function SchedulePreviewPage() {
           <AllHomesBoard
             days={days} sites={sites} siteClients={siteClients} siteShifts={siteShifts}
             settings={settings} onPickSite={setSiteId}
+            onOpenDay={(sid, sname, d) => setTimelineCtx({ siteId: sid, siteName: sname, day: d })}
           />
         ) : currentSite ? (
           <SiteWeekGrid
@@ -232,6 +235,17 @@ function SchedulePreviewPage() {
           onOpenChange={setCreateOpen}
           organizationId={org.organization_id}
           clients={(data?.clients ?? []).map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))}
+        />
+      )}
+
+      {org?.organization_id && (
+        <DayTimelineDrawer
+          open={!!timelineCtx}
+          onOpenChange={(v) => { if (!v) setTimelineCtx(null); }}
+          organizationId={org.organization_id}
+          day={timelineCtx?.day ?? null}
+          locationName={timelineCtx?.siteName}
+          onCreateClick={(d) => { setTimelineCtx(null); setCreateOpen(true); void d; }}
         />
       )}
     </Shell>
@@ -314,7 +328,7 @@ function ViewSeg({ value, onChange, disabled }: { value: ViewMode; onChange: (v:
 
 // ── All-homes status board ────────────────────────────────────────────
 function AllHomesBoard({
-  days, sites, siteClients, siteShifts, settings, onPickSite,
+  days, sites, siteClients, siteShifts, settings, onPickSite, onOpenDay,
 }: {
   days: Date[];
   sites: { id: string; name: string }[];
@@ -322,6 +336,7 @@ function AllHomesBoard({
   siteShifts: Map<string, ShiftRow[]>;
   settings: Settings;
   onPickSite: (id: string) => void;
+  onOpenDay?: (siteId: string, siteName: string, day: Date) => void;
 }) {
   if (sites.length === 0) return <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>No sites yet.</div>;
   return (
@@ -355,7 +370,16 @@ function AllHomesBoard({
                   else if (open > 0) content = <div style={{ ...statusBase, ...statusOpen }}><span style={dot} />{open} open</div>;
                   else if (type === "residential") content = <div style={{ ...statusBase, ...statusCov }}>✓ 24h</div>;
                   else content = <div style={{ ...statusBase, ...statusCov }}><span style={dot} />{setCnt} set</div>;
-                  return <td key={i} style={gTd}>{content}</td>;
+                  return (
+                    <td
+                      key={i}
+                      style={{ ...gTd, cursor: "pointer" }}
+                      onClick={(e) => { e.stopPropagation(); onOpenDay?.(s.id, s.name, d); }}
+                      title="Open day timeline"
+                    >
+                      {content}
+                    </td>
+                  );
                 })}
               </tr>
             );

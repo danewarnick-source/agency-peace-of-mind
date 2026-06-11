@@ -11,6 +11,7 @@ import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
 import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
 import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
+import { CopyWeekMenu } from "@/components/scheduling/copy-week-menu";
 import { WeeklyTargetMeter } from "@/components/scheduling/weekly-target-meter";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
@@ -244,6 +245,13 @@ function SchedulePreviewPage() {
           <button style={btn()} onClick={() => setTargetsOpen(true)}>Weekly targets</button>
           <button style={btn()} onClick={() => setLocationsOpen(true)}>Locations</button>
           <button style={btn()} onClick={() => setCoverageOpen(true)}>Coverage rules</button>
+          {org?.organization_id && (
+            <CopyWeekMenu
+              organizationId={org.organization_id}
+              weekStart={weekStart}
+              onApplied={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
+            />
+          )}
           <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
           <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>

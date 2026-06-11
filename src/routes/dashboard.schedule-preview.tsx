@@ -6,7 +6,7 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import {
   useSchedulePreview,
   startOfWeek,
-  dayCoverageMinutes,
+  // dayCoverageMinutes removed — superseded by CoverageBar24h
   inferSiteType,
   UNASSIGNED_SITE_ID,
   type ShiftRow,

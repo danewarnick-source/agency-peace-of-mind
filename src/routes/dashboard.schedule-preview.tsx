@@ -367,7 +367,7 @@ const arrowBtn: React.CSSProperties = {
   border: `1px solid ${SCHED.line}`, background: "#fff", width: 28, height: 28, borderRadius: 8, fontSize: 14, cursor: "pointer", color: SCHED.ink,
 };
 
-function HomePill({ active, label, gap, onClick }: { active: boolean; label: string; gap?: boolean; onClick: () => void }) {
+function HomePill({ active, label, gap, host, onClick }: { active: boolean; label: string; gap?: boolean; host?: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -378,6 +378,13 @@ function HomePill({ active, label, gap, onClick }: { active: boolean; label: str
       }}
     >
       {label}
+      {host && (
+        <span style={{
+          fontSize: 9, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase",
+          padding: "2px 5px", borderRadius: 4,
+          background: active ? "rgba(255,255,255,.18)" : "#eef2ff", color: active ? "#fff" : "#4f46e5",
+        }}>HOST</span>
+      )}
       {gap && <span style={{ width: 7, height: 7, borderRadius: "50%", background: SCHED.gap }} />}
     </button>
   );

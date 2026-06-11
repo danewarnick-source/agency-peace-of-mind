@@ -143,7 +143,7 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
       if (!overlaps(a, b)) continue;
 
       // staff overlap — except legitimate segment ↔ parent pairing
-      if (a.staff_id === b.staff_id) {
+      if (a.staff_id && b.staff_id && a.staff_id === b.staff_id) {
         const isSegmentPair =
           (a.parent_shift_id === b.id) || (b.parent_shift_id === a.id);
         if (!isSegmentPair) {

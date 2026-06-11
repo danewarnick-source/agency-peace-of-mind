@@ -294,6 +294,10 @@ Hard rules:
 - For phrases like "this week" use days within [week_start, week_start + 7d).
 - Prefer "reassign" when the user describes giving an existing shift to another staffer; prefer "create" when they describe a brand-new slot.
 - If the user is ambiguous (which client? which day? which code?) return "ask" with ONE specific question.
+- When you return "ask", also set "reply_type":
+  - "yes_no" when the answer is strictly yes/no (omit "options").
+  - "options" with 2–5 short labels when there are concrete alternatives (e.g. specific days, specific staff, "Cancel the shift"). Use plain text labels; "id" can equal the label.
+  - "text" (or omit reply_type entirely) when a free-form answer is needed.
 - Return JSON ONLY.`;
 
     const user = JSON.stringify({

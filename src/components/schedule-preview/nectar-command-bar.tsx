@@ -289,6 +289,9 @@ export function NectarCommandBar({
           onDiscard={() => setProposal(null)}
           onApprove={() => proposal.kind === "ok" && apply.mutate(proposal.actions)}
           applying={apply.isPending}
+          onAnswer={answerAsk}
+          onReplyWithText={replyWithText}
+          answering={ask.isPending}
         />
       )}
 

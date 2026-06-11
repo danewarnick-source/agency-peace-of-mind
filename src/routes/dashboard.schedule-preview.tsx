@@ -17,6 +17,7 @@ import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 import { NectarCommandBar } from "@/components/schedule-preview/nectar-command-bar";
 import { useOrgScheduleRequests, buildApprovedTimeOffIndex } from "@/lib/schedule-requests";
 import { SettingsDrawer } from "@/components/schedule-preview/settings-drawer";
+import { ShiftCreateDialog } from "@/components/scheduling/shift-create-dialog";
 import {
   SCHED, font, type Settings, useSettings, type ViewMode,
   shiftAccentHex, shiftTypeLabel, fmtTime, DAY_LABELS,
@@ -54,6 +55,7 @@ function SchedulePreviewPage() {
   const [view, setView] = useState<ViewMode>(settings.defaultView);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorCtx, setEditorCtx] = useState<EditorContext | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
   useEffect(() => { setView(settings.defaultView); }, [settings.defaultView]);
@@ -154,6 +156,7 @@ function SchedulePreviewPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
+          <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
           <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>
         </div>
@@ -221,6 +224,15 @@ function SchedulePreviewPage() {
         clients={data?.clients ?? []} staff={data?.staff ?? []} siteId={siteId}
         weekStartIso={weekStart.toISOString()} approvedTimeOff={approvedTimeOff}
       />
+
+      {org?.organization_id && (
+        <ShiftCreateDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          organizationId={org.organization_id}
+          clients={(data?.clients ?? []).map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))}
+        />
+      )}
     </Shell>
   );
 }

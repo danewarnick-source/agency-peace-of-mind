@@ -241,6 +241,11 @@ export function NectarCommandBar({
         <p style={{ margin: 0, fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: SCHED.muted }}>
           Advisory only — proposals are reviewed before any shift is saved.
         </p>
+        {emptyContext && (
+          <p style={{ margin: 0, fontSize: 12, color: "#9a3412", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "4px 8px" }}>
+            {emptyReason}
+          </p>
+        )}
         <button
           onClick={() => setImportOpen(true)}
           style={{

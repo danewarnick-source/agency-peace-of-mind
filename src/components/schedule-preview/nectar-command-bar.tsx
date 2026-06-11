@@ -88,8 +88,17 @@ export function NectarCommandBar({
     };
   }, [weekStart, clients, staff, teams, shifts]);
 
+  const emptyContext = clients.length === 0 || staff.length === 0;
+  const emptyReason =
+    clients.length === 0 && staff.length === 0
+      ? "No clients or staff are loaded for this week — NECTAR has nothing to schedule against."
+      : clients.length === 0
+        ? "No clients are loaded for this week — NECTAR needs at least one client to draft a shift."
+        : "No staff are loaded for this week — NECTAR needs at least one staff member to draft a shift.";
+
   const ask = useMutation({
     mutationFn: async () => {
+      if (emptyContext) throw new Error(emptyReason);
       const result = await propose({ data: { ...context, sentence } });
       return result as NectarProposal;
     },
@@ -99,6 +108,7 @@ export function NectarCommandBar({
 
   const importMut = useMutation({
     mutationFn: async () => {
+      if (emptyContext) throw new Error(emptyReason);
       const result = await proposeImport({ data: { ...context, raw_text: importText } });
       return result as NectarProposal;
     },
@@ -231,6 +241,11 @@ export function NectarCommandBar({
         <p style={{ margin: 0, fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: SCHED.muted }}>
           Advisory only — proposals are reviewed before any shift is saved.
         </p>
+        {emptyContext && (
+          <p style={{ margin: 0, fontSize: 12, color: "#9a3412", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "4px 8px" }}>
+            {emptyReason}
+          </p>
+        )}
         <button
           onClick={() => setImportOpen(true)}
           style={{

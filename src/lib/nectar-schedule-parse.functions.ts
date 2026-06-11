@@ -2,6 +2,22 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+// Parse a model response that should be JSON. Strips code fences, falls back
+// to extracting the first {...} block. Throws with a snippet of the raw
+// output if it still won't parse so the toast shows what the model said.
+function parseModelJson(raw: string, label: string): unknown {
+  const cleaned = raw.replace(/```json\s*|```/gi, "").trim();
+  try { return JSON.parse(cleaned); } catch { /* fall through */ }
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (match) {
+    try { return JSON.parse(match[0]); } catch { /* fall through */ }
+  }
+  console.error(`[${label}] non-JSON model output:`, raw.slice(0, 500));
+  const snippet = raw.trim().slice(0, 300).replace(/\s+/g, " ");
+  throw new Error(`NECTAR returned an unexpected response: ${snippet || "(empty)"}`);
+}
+
+
 /**
  * NECTAR — parse a natural-language scheduling sentence into a structured
  * draft proposal. The caller supplies a small reference set (this client's
@@ -106,10 +122,7 @@ Rules:
       throw e;
     }
 
-    let parsed: unknown;
-    try { parsed = JSON.parse(raw); } catch {
-      return { kind: "ask", question: "I didn't catch that — try: 'Schedule Dane with Johnny every Mon/Wed/Fri 10a–3p'." };
-    }
+    const parsed = parseModelJson(raw, "nectar-parse-sentence");
 
     const Ask = z.object({ kind: z.literal("ask"), question: z.string().min(1).max(300) });
     const Ok = z.object({
@@ -269,10 +282,7 @@ Rules:
       throw e;
     }
 
-    let parsed: unknown;
-    try { parsed = JSON.parse(raw); } catch {
-      return { kind: "ask", question: "I didn't catch that — try: 'Cover the Maple house overnight Mon–Fri with Sarah'." };
-    }
+    const parsed = parseModelJson(raw, "nectar-parse-coverage");
 
     const Ask = z.object({ kind: z.literal("ask"), question: z.string().min(1).max(300) });
     const Pick = z.object({

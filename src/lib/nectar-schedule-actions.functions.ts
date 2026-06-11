@@ -107,6 +107,21 @@ async function callGateway(_apiKey: string, system: string, user: string) {
   }
 }
 
+// Parse a model response that should be JSON. Strips code fences, falls back
+// to extracting the first {...} block. Throws with a snippet of the raw
+// output if it still won't parse, so callers can surface what the model said.
+function parseModelJson(raw: string, label: string): unknown {
+  const cleaned = raw.replace(/```json\s*|```/gi, "").trim();
+  try { return JSON.parse(cleaned); } catch { /* fall through */ }
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (match) {
+    try { return JSON.parse(match[0]); } catch { /* fall through */ }
+  }
+  console.error(`[${label}] non-JSON model output:`, raw.slice(0, 500));
+  const snippet = raw.trim().slice(0, 300).replace(/\s+/g, " ");
+  throw new Error(`NECTAR returned an unexpected response: ${snippet || "(empty)"}`);
+}
+
 // ─── Action validators (resolve names → IDs against context) ───────────────
 const RawCreate = z.object({
   op: z.literal("create"),
@@ -278,10 +293,7 @@ Hard rules:
     });
 
     const raw = await callGateway(apiKey, system, user);
-    let parsed: unknown;
-    try { parsed = JSON.parse(raw); } catch {
-      return { kind: "ask", question: "I didn't catch that — try: 'Cover Maple house overnight Mon–Fri with Sarah'." };
-    }
+    const parsed = parseModelJson(raw, "nectar-schedule");
     return validateAndResolve(parsed, data);
   });
 
@@ -327,9 +339,6 @@ Hard rules:
     });
 
     const raw = await callGateway(apiKey, system, user);
-    let parsed: unknown;
-    try { parsed = JSON.parse(raw); } catch {
-      return { kind: "ask", question: "I couldn't parse that file. Paste a header row + a few example rows." };
-    }
+    const parsed = parseModelJson(raw, "nectar-import");
     return validateAndResolve(parsed, data);
   });

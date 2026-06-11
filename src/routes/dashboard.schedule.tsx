@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
 import { respondToShift } from "@/lib/scheduling/workflow.functions";
+import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
 import { useGeneralShift } from "@/hooks/use-general-shift";
 import { fmtElapsed } from "@/components/staff-mobile/general-time-clock";
 import { Button } from "@/components/ui/button";
@@ -502,6 +503,8 @@ function SchedulePage() {
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const { settings } = useTimePaySettings();
   const { data: shifts, isLoading } = useMyScheduledShifts(view, anchor);
+  const { data: org } = useCurrentOrg();
+  const range = rangeFor(view, anchor);
 
   const goPrev = () => setAnchor((a) => shiftAnchor(view, a, -1));
   const goNext = () => setAnchor((a) => shiftAnchor(view, a, 1));
@@ -525,6 +528,15 @@ function SchedulePage() {
           }
         />
       </div>
+
+      {org?.organization_id && (
+        <OpenShiftsPanel
+          organizationId={org.organization_id}
+          startIso={range.from.toISOString()}
+          endIso={range.to.toISOString()}
+          mode="staff"
+        />
+      )}
 
 
       {/* View toggle */}

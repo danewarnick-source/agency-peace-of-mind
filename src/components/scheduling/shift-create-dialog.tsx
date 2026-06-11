@@ -13,6 +13,7 @@ import { classesForCode, familyForCode, isDailyCode, maxRecommendedHours, minSta
 import { listClientAuthorizedCodes } from "@/lib/scheduling/client-codes.functions";
 import { rankStaffForShift } from "@/lib/scheduling/eligibility.functions";
 import { createShift } from "@/lib/scheduling/shifts.functions";
+import { postOpenShift } from "@/lib/scheduling/open-shifts.functions";
 import { listLocations } from "@/lib/scheduling/locations.functions";
 
 type Step = "client" | "code" | "time" | "staff";
@@ -81,6 +82,40 @@ export function ShiftCreateDialog({
   }, [open, initialClientId, initialDay, locationId]);
 
   const createCall = useServerFn(createShift);
+  const postOpenCall = useServerFn(postOpenShift);
+
+  async function handleCreateOpen() {
+    if (!clientId || !code) return;
+    setSubmitting(true);
+    const occurrences = expandOccurrences();
+    let created = 0;
+    try {
+      for (const occ of occurrences) {
+        try {
+          await postOpenCall({
+            data: {
+              organizationId,
+              clientId,
+              serviceCode: code,
+              startsAtIso: occ.start.toISOString(),
+              endsAtIso: occ.end.toISOString(),
+              locationId: effectiveLocationId ?? undefined,
+            },
+          });
+          created++;
+        } catch (err) { console.warn(err); }
+      }
+      if (created > 0) {
+        toast.success(`Posted ${created} open shift${created === 1 ? "" : "s"}`);
+        onCreated?.();
+        onOpenChange(false);
+      } else {
+        toast.error("Could not post open shift");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
   const rankCall = useServerFn(rankStaffForShift);
   const listCodesCall = useServerFn(listClientAuthorizedCodes);
   const listLocCall = useServerFn(listLocations);
@@ -406,7 +441,18 @@ export function ShiftCreateDialog({
 
         {step === "staff" && (
           <div className="space-y-2">
-            <Label>Eligible staff</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>Eligible staff</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCreateOpen}
+                disabled={submitting || !clientId || !code}
+                title="Post this as an open shift — staff can claim it"
+              >
+                Post as open shift
+              </Button>
+            </div>
             {rankQ.isLoading ? (
               <div className="p-4 text-sm text-muted-foreground">Ranking staff…</div>
             ) : (

@@ -39,7 +39,7 @@ export const POLICY_RULES: Array<{
 
 export type Shift = {
   id: string;
-  staff_id: string;
+  staff_id: string | null;
   client_id: string;
   service_code: string | null;
   starts_at: string;
@@ -113,8 +113,8 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
     const a = shifts[i];
     if (a.status === "cancelled" || a.status === "declined") continue;
 
-    // staff inactive
-    const staff = ctx.staff[a.staff_id];
+    // staff inactive (open shifts have no staff yet — skip)
+    const staff = a.staff_id ? ctx.staff[a.staff_id] : undefined;
     if (staff && staff.active === false) {
       out.push({ shiftId: a.id, severity: "hard", code: "staff_inactive", message: "Staff is inactive." });
     }
@@ -143,7 +143,7 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
       if (!overlaps(a, b)) continue;
 
       // staff overlap — except legitimate segment ↔ parent pairing
-      if (a.staff_id === b.staff_id) {
+      if (a.staff_id && b.staff_id && a.staff_id === b.staff_id) {
         const isSegmentPair =
           (a.parent_shift_id === b.id) || (b.parent_shift_id === a.id);
         if (!isSegmentPair) {
@@ -176,6 +176,7 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
   // ---- POLICY rules per-shift ----
   for (const s of shifts) {
     if (s.status === "cancelled" || s.status === "declined") continue;
+    if (!s.staff_id) continue; // open shift — staff-specific rules don't apply
     const staff = ctx.staff[s.staff_id];
     const dur = hoursBetween(s.starts_at, s.ends_at);
     const code = (s.service_code ?? "").toUpperCase();
@@ -238,6 +239,7 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
   const byStaff = new Map<string, Shift[]>();
   for (const s of shifts) {
     if (s.status === "cancelled" || s.status === "declined") continue;
+    if (!s.staff_id) continue;
     const arr = byStaff.get(s.staff_id) ?? [];
     arr.push(s); byStaff.set(s.staff_id, arr);
   }

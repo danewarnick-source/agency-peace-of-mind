@@ -7691,6 +7691,7 @@ export type Database = {
       scheduled_shifts: {
         Row: {
           callout_reason: string | null
+          claim_requested_by: string | null
           client_id: string
           code_id: string | null
           created_at: string
@@ -7711,13 +7712,14 @@ export type Database = {
           recurrence_rule: string | null
           service_code: string | null
           shift_type: string
-          staff_id: string
+          staff_id: string | null
           starts_at: string
           status: string
           updated_at: string
         }
         Insert: {
           callout_reason?: string | null
+          claim_requested_by?: string | null
           client_id: string
           code_id?: string | null
           created_at?: string
@@ -7738,13 +7740,14 @@ export type Database = {
           recurrence_rule?: string | null
           service_code?: string | null
           shift_type?: string
-          staff_id: string
+          staff_id?: string | null
           starts_at: string
           status?: string
           updated_at?: string
         }
         Update: {
           callout_reason?: string | null
+          claim_requested_by?: string | null
           client_id?: string
           code_id?: string | null
           created_at?: string
@@ -7765,12 +7768,26 @@ export type Database = {
           recurrence_rule?: string | null
           service_code?: string | null
           shift_type?: string
-          staff_id?: string
+          staff_id?: string | null
           starts_at?: string
           status?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "scheduled_shifts_claim_requested_by_fkey"
+            columns: ["claim_requested_by"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_shifts_claim_requested_by_fkey"
+            columns: ["claim_requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "scheduled_shifts_client_id_fkey"
             columns: ["client_id"]
@@ -10084,6 +10101,58 @@ export type Database = {
             columns: ["module_id"]
             isOneToOne: false
             referencedRelation: "training_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      week_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          organization_id: string
+          payload: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          payload: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          payload?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "week_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "week_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "week_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

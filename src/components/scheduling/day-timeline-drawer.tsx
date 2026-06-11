@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { classesForCode, familyForCode } from "@/lib/scheduling/code-colors";
+import { classesForCode, familyForCode, isDailyCode } from "@/lib/scheduling/code-colors";
 import { listShiftsInRange } from "@/lib/scheduling/shifts.functions";
 import { AddSegmentDialog, type ParentShiftInfo } from "@/components/scheduling/add-segment-dialog";
 

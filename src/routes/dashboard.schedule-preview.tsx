@@ -257,6 +257,10 @@ function SchedulePreviewPage() {
           day={timelineCtx?.day ?? null}
           locationName={timelineCtx?.siteName}
           onCreateClick={(d) => { setTimelineCtx(null); setCreateOpen(true); void d; }}
+          onShiftClick={(id) => {
+            const shift = (data?.shifts ?? []).find((s) => s.id === id);
+            if (shift) { setTimelineCtx(null); openEditor({ shift }); }
+          }}
         />
       )}
     </Shell>

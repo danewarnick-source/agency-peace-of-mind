@@ -133,30 +133,71 @@ export function ShiftCreateDialog({
     return false;
   }
 
+  // Build the list of (start, end) pairs to create. The base pair is the
+  // first; if recurrence is set, we add one occurrence per matching weekday
+  // up to and including recurUntil. We keep the same wall-clock start/end
+  // and just shift the date.
+  function expandOccurrences(): Array<{ start: Date; end: Date }> {
+    const baseStart = new Date(startPicker);
+    const baseEnd = new Date(endPicker);
+    const out: Array<{ start: Date; end: Date }> = [{ start: baseStart, end: baseEnd }];
+    if (recurDays.size === 0 || !recurUntil) return out;
+    const until = new Date(recurUntil); until.setHours(23, 59, 59, 999);
+    const seen = new Set<string>([baseStart.toISOString()]);
+    const cur = new Date(baseStart); cur.setDate(cur.getDate() + 1);
+    const durationMs = baseEnd.getTime() - baseStart.getTime();
+    while (cur <= until) {
+      if (recurDays.has(cur.getDay())) {
+        const s = new Date(cur);
+        s.setHours(baseStart.getHours(), baseStart.getMinutes(), 0, 0);
+        const e = new Date(s.getTime() + durationMs);
+        const key = s.toISOString();
+        if (!seen.has(key)) { out.push({ start: s, end: e }); seen.add(key); }
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  }
+
   async function handleCreate() {
     if (!clientId || !code || !staffId) return;
     setSubmitting(true);
+    const occurrences = expandOccurrences();
+    let created = 0;
+    let failed = 0;
     try {
-      await createCall({
-        data: {
-          organizationId,
-          clientId,
-          serviceCode: code,
-          staffId,
-          startsAtIso: pickerToIso(startPicker),
-          endsAtIso: pickerToIso(endPicker),
-          locationId: effectiveLocationId,
-          isAwakeOvernight: awake,
-          status: "draft",
-          createdFrom: "manual",
-          overrideReason: override.trim() || undefined,
-        },
-      });
-      toast.success("Shift created");
-      onCreated?.();
-      onOpenChange(false);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Could not create shift");
+      for (const occ of occurrences) {
+        try {
+          await createCall({
+            data: {
+              organizationId,
+              clientId,
+              serviceCode: code,
+              staffId,
+              startsAtIso: occ.start.toISOString(),
+              endsAtIso: occ.end.toISOString(),
+              locationId: effectiveLocationId,
+              isAwakeOvernight: awake,
+              status: "draft",
+              createdFrom: "manual",
+              overrideReason: override.trim() || undefined,
+            },
+          });
+          created++;
+        } catch (err) {
+          failed++;
+          console.warn("recurrence occurrence failed", err);
+        }
+      }
+      if (created > 0) {
+        toast.success(occurrences.length === 1
+          ? "Shift created"
+          : `Created ${created} of ${occurrences.length} shifts${failed ? ` (${failed} skipped)` : ""}`);
+        onCreated?.();
+        onOpenChange(false);
+      } else {
+        toast.error("Could not create any shifts");
+      }
     } finally {
       setSubmitting(false);
     }

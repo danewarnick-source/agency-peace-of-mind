@@ -254,6 +254,9 @@ function SchedulePreviewPage() {
               onApplied={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
             />
           )}
+          {org?.organization_id && isAdmin && (
+            <button style={btn()} onClick={() => setRecurringOpen(true)}>Recurring patterns</button>
+          )}
           <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
           <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>

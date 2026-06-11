@@ -223,7 +223,14 @@ function SchedulePreviewPage() {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <HomePill active={isAll} label="All homes" onClick={() => setSiteId("__all__")} />
           {sites.map((s) => (
-            <HomePill key={s.id} active={siteId === s.id} label={s.name} gap={!!siteHasGap.get(s.id)} onClick={() => setSiteId(s.id)} />
+            <HomePill
+              key={s.id}
+              active={siteId === s.id}
+              label={s.name}
+              gap={!!siteHasGap.get(s.id)}
+              host={hostHomeNames.has(s.name.toLowerCase())}
+              onClick={() => setSiteId(s.id)}
+            />
           ))}
         </div>
         <div style={{ flex: 1 }} />
@@ -238,6 +245,7 @@ function SchedulePreviewPage() {
           <AllHomesBoard
             days={days} sites={sites} siteClients={siteClients} siteShifts={siteShifts}
             settings={settings} onPickSite={setSiteId}
+            hostHomeNames={hostHomeNames}
             onOpenDay={(sid, sname, d) => setTimelineCtx({ siteId: sid, siteName: sname, day: d })}
           />
         ) : currentSite ? (

@@ -131,20 +131,15 @@ export async function callBedrockChatCompletions(
     const status = err.$metadata?.httpStatusCode ?? 500;
     const name = err.name ?? "BedrockError";
     if (name === "AbortError") throw e;
-    if (status === 403 || /AccessDenied|UnrecognizedClient|InvalidSignature/i.test(name)) {
-      throw new BedrockError(
-        401,
-        "AWS Bedrock rejected the credentials or denied access to the configured model. Check AWS keys and model access in the Bedrock console.",
-      );
-    }
-    if (status === 429 || /Throttl/i.test(name)) {
-      throw new BedrockError(429, "AWS Bedrock throttled the request. Try again in a moment.");
-    }
-    throw new BedrockError(
-      status,
-      `AWS Bedrock error (${name}): ${err.message ?? "unknown"}`.slice(0, 400),
-    );
+    const region = process.env.AWS_REGION ?? "(unset)";
+    const detail = `Bedrock ${name} (${status}) for model ${modelId} in ${region}: ${err.message ?? "unknown"}`;
+    console.error("[bedrock]", detail);
+    let mapped = status || 500;
+    if (status === 403 || /AccessDenied|UnrecognizedClient|InvalidSignature/i.test(name)) mapped = 401;
+    else if (status === 429 || /Throttl/i.test(name)) mapped = 429;
+    throw new BedrockError(mapped, detail.slice(0, 600));
   }
+
 
   const blocks = out.output?.message?.content ?? [];
   const text = blocks

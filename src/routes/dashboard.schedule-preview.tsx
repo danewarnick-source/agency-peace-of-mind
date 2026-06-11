@@ -53,6 +53,8 @@ function SchedulePreviewPage() {
   const { data: org, isLoading: orgLoading } = useCurrentOrg();
   const role = org?.role;
   const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
+  const queryClient = useQueryClient();
+
 
   const [settings, setSettings] = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);

@@ -311,6 +311,20 @@ function SchedulePreviewPage() {
       <RequestsPanel weekStart={weekStart} staff={data?.staff ?? []} />
 
       {org?.organization_id && (
+        <OpenShiftsPanel
+          organizationId={org.organization_id}
+          startIso={weekStart.toISOString()}
+          endIso={new Date(weekEnd.getTime() + 24 * 3600 * 1000).toISOString()}
+          mode="admin"
+          clientNames={new Map((data?.clients ?? []).map((c) => [c.id, `${c.first_name} ${c.last_name}`.trim()]))}
+          onJumpToShift={(id) => {
+            const shift = (data?.shifts ?? []).find((s) => s.id === id);
+            if (shift) openEditor({ shift });
+          }}
+        />
+      )}
+
+      {org?.organization_id && (
         <ActionNeededCard
           organizationId={org.organization_id}
           weekStart={weekStart}

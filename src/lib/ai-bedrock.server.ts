@@ -131,20 +131,15 @@ export async function callBedrockChatCompletions(
     const status = err.$metadata?.httpStatusCode ?? 500;
     const name = err.name ?? "BedrockError";
     if (name === "AbortError") throw e;
-    if (status === 403 || /AccessDenied|UnrecognizedClient|InvalidSignature/i.test(name)) {
-      throw new BedrockError(
-        401,
-        "AWS Bedrock rejected the credentials or denied access to the configured model. Check AWS keys and model access in the Bedrock console.",
-      );
-    }
-    if (status === 429 || /Throttl/i.test(name)) {
-      throw new BedrockError(429, "AWS Bedrock throttled the request. Try again in a moment.");
-    }
-    throw new BedrockError(
-      status,
-      `AWS Bedrock error (${name}): ${err.message ?? "unknown"}`.slice(0, 400),
-    );
+    const region = process.env.AWS_REGION ?? "(unset)";
+    const detail = `Bedrock ${name} (${status}) for model ${modelId} in ${region}: ${err.message ?? "unknown"}`;
+    console.error("[bedrock]", detail);
+    let mapped = status || 500;
+    if (status === 403 || /AccessDenied|UnrecognizedClient|InvalidSignature/i.test(name)) mapped = 401;
+    else if (status === 429 || /Throttl/i.test(name)) mapped = 429;
+    throw new BedrockError(mapped, detail.slice(0, 600));
   }
+
 
   const blocks = out.output?.message?.content ?? [];
   const text = blocks
@@ -426,16 +421,14 @@ export async function gatewayFetch(
     const err = e as { name?: string; $metadata?: { httpStatusCode?: number }; message?: string };
     const rawStatus = err.$metadata?.httpStatusCode ?? 0;
     const name = err.name ?? "BedrockError";
+    const region = process.env.AWS_REGION ?? "(unset)";
+    const modelIdSafe = (() => { try { return getModelId(); } catch { return "(unset)"; } })();
+    const detail = `Bedrock ${name} (${rawStatus || 500}) for model ${modelIdSafe} in ${region}: ${err.message ?? "unknown"}`;
+    console.error("[bedrock]", detail);
     let status = rawStatus || 500;
-    let msg = `AWS Bedrock error (${name}): ${err.message ?? "unknown"}`;
-    if (rawStatus === 403 || /AccessDenied|UnrecognizedClient|InvalidSignature/i.test(name)) {
-      status = 401;
-      msg =
-        "AWS Bedrock rejected the credentials or denied access to the configured model. Check AWS keys and model access in the Bedrock console.";
-    } else if (rawStatus === 429 || /Throttl/i.test(name)) {
-      status = 429;
-      msg = "AWS Bedrock throttled the request. Try again in a moment.";
-    }
+    if (rawStatus === 403 || /AccessDenied|UnrecognizedClient|InvalidSignature/i.test(name)) status = 401;
+    else if (rawStatus === 429 || /Throttl/i.test(name)) status = 429;
+    const msg = detail.slice(0, 600);
     const payload = { error: { message: msg, type: name, code: status } };
     return {
       ok: false,
@@ -444,6 +437,7 @@ export async function gatewayFetch(
       text: async () => msg,
     };
   }
+
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -496,16 +490,15 @@ export async function gatewayEmbeddingsFetch(
     const err = e as { name?: string; $metadata?: { httpStatusCode?: number }; message?: string };
     const rawStatus = err.$metadata?.httpStatusCode ?? 500;
     const name = err.name ?? "BedrockError";
+    const region = process.env.AWS_REGION ?? "(unset)";
+    const embedModelId =
+      process.env.BEDROCK_EMBEDDING_MODEL_ID || "amazon.titan-embed-text-v2:0";
+    const detail = `Bedrock ${name} (${rawStatus}) for embedding model ${embedModelId} in ${region}: ${err.message ?? "unknown"}`;
+    console.error("[bedrock-embed]", detail);
     let status = rawStatus;
-    let msg = `AWS Bedrock embedding error (${name}): ${err.message ?? "unknown"}`;
-    if (rawStatus === 403 || /AccessDenied/i.test(name)) {
-      status = 401;
-      msg =
-        "AWS Bedrock denied access to the embedding model. Enable model access for the Titan Text Embeddings v2 model in the AWS Bedrock console.";
-    } else if (rawStatus === 429 || /Throttl/i.test(name)) {
-      status = 429;
-      msg = "AWS Bedrock throttled the embedding request. Try again in a moment.";
-    }
+    if (rawStatus === 403 || /AccessDenied/i.test(name)) status = 401;
+    else if (rawStatus === 429 || /Throttl/i.test(name)) status = 429;
+    const msg = detail.slice(0, 600);
     const payload = { error: { message: msg, type: name, code: status } };
     return {
       ok: false,
@@ -514,4 +507,5 @@ export async function gatewayEmbeddingsFetch(
       text: async () => msg,
     };
   }
+
 }

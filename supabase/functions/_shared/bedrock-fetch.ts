@@ -206,16 +206,14 @@ export async function gatewayFetch(body: OpenAIChatBody): Promise<GatewayFetchRe
     const err = e as { name?: string; $metadata?: { httpStatusCode?: number }; message?: string };
     const rawStatus = err.$metadata?.httpStatusCode ?? 0;
     const name = err.name ?? "BedrockError";
+    const region = Deno.env.get("AWS_REGION") ?? "(unset)";
+    const modelId = Deno.env.get("BEDROCK_MODEL_ID") ?? "(unset)";
+    const detail = `Bedrock ${name} (${rawStatus || 500}) for model ${modelId} in ${region}: ${err.message ?? "unknown"}`;
+    console.error("[bedrock]", detail);
     let status = rawStatus || 500;
-    let msg = `AWS Bedrock error (${name}): ${err.message ?? "unknown"}`;
-    if (rawStatus === 403 || /AccessDenied|UnrecognizedClient|InvalidSignature/i.test(name)) {
-      status = 401;
-      msg =
-        "AWS Bedrock rejected the credentials or denied access to the configured model.";
-    } else if (rawStatus === 429 || /Throttl/i.test(name)) {
-      status = 429;
-      msg = "AWS Bedrock throttled the request. Try again in a moment.";
-    }
+    if (rawStatus === 403 || /AccessDenied|UnrecognizedClient|InvalidSignature/i.test(name)) status = 401;
+    else if (rawStatus === 429 || /Throttl/i.test(name)) status = 429;
+    const msg = detail.slice(0, 600);
     const payload = { error: { message: msg, type: name, code: status } };
     return {
       ok: false,
@@ -224,4 +222,5 @@ export async function gatewayFetch(body: OpenAIChatBody): Promise<GatewayFetchRe
       text: async () => msg,
     };
   }
+
 }

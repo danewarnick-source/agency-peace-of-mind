@@ -252,6 +252,7 @@ function SchedulePreviewPage() {
           onOpenChange={setCreateOpen}
           organizationId={org.organization_id}
           clients={(data?.clients ?? []).map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))}
+          onCreated={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
         />
       )}
 

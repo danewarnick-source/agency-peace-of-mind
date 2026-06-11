@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Home,
   Pill,
   PhoneOff,
   User,
@@ -15,6 +16,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { computeEntryUnits } from "@/lib/billing-units";
+import { monthlySupportHoursTarget } from "@/lib/scheduling/hhs-visit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -67,6 +69,9 @@ function ShiftOverviewPage() {
   const codeLabel = shift.code?.code ?? shift.job_code ?? "—";
   const isContinuous = shift.code?.kind === "continuous";
 
+  const visitCode = (shift.code?.code ?? shift.job_code ?? "").toUpperCase();
+  const isHhsSupportVisit = visitCode === "HHS";
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5 p-4 pb-24">
       <div className="flex items-center gap-2">
@@ -75,17 +80,72 @@ function ShiftOverviewPage() {
             <ArrowLeft className="h-4 w-4 mr-1" /> My Schedule
           </Link>
         </Button>
-        <Badge variant={isContinuous ? "secondary" : "default"} className="ml-auto font-mono">{codeLabel}</Badge>
+        <Badge variant={isContinuous ? "secondary" : "default"} className="ml-auto font-mono">
+          {isHhsSupportVisit ? "HHS Support Visit" : codeLabel}
+        </Badge>
         <Badge variant="outline" className="text-[10px] uppercase">{isContinuous ? "Continuous" : "Discrete"}</Badge>
       </div>
 
       <ClientProfileCard shift={shift} clientName={clientName} />
+      {isHhsSupportVisit && (
+        <HhsSupportHoursNote
+          organizationId={shift.organization_id}
+          clientId={shift.client_id}
+          clientFirstName={shift.client?.first_name ?? clientName}
+        />
+      )}
       <ActiveClockPanel shift={shift} userId={user?.id} />
       {isContinuous && <RhsOverviewPanel shift={shift} />}
       <ShiftReportPanel shift={shift} userId={user?.id} />
       <MarPanel shift={shift} userId={user?.id} />
       <CalloutPanel shift={shift} userId={user?.id} />
     </div>
+  );
+}
+
+/**
+ * For an HHS Support Visit: how this timed visit counts toward the client's
+ * per-PCPT Direct Support hours from the DSPD Worksheet. N is the weekly
+ * target (client_weekly_targets) converted to a monthly figure (×4.33, "≈").
+ */
+function HhsSupportHoursNote({
+  organizationId, clientId, clientFirstName,
+}: {
+  organizationId: string;
+  clientId: string;
+  clientFirstName: string;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["hhs-support-target", organizationId, clientId],
+    queryFn: async (): Promise<number | null> => {
+      const { data } = await supabase
+        .from("client_weekly_targets")
+        .select("target_hours_per_week")
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId)
+        .eq("service_code", "HHS")
+        .maybeSingle();
+      return (data?.target_hours_per_week as number | undefined) ?? null;
+    },
+  });
+
+  if (isLoading) return null;
+  const monthly = monthlySupportHoursTarget(data);
+
+  return (
+    <section className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100">
+      <Home className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+      <div className="min-w-0 text-xs leading-snug">
+        {monthly != null ? (
+          <p>
+            Counts toward <strong>{clientFirstName}</strong>'s required{" "}
+            <strong>≈ {monthly} support hrs/month</strong> (worksheet).
+          </p>
+        ) : (
+          <p>Support hours target not set — ask your admin.</p>
+        )}
+      </div>
+    </section>
   );
 }
 

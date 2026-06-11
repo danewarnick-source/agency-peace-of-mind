@@ -140,7 +140,7 @@ export function ShiftCreateDialog({
           staffId,
           startsAtIso: pickerToIso(startPicker),
           endsAtIso: pickerToIso(endPicker),
-          locationId: locationId ?? null,
+          locationId: effectiveLocationId,
           isAwakeOvernight: awake,
           status: "draft",
           createdFrom: "manual",

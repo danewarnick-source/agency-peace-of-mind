@@ -28,7 +28,7 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
     locationId: z.string().uuid().nullable().optional(),
     overtimeThresholdHours: z.number().int().optional(),
   }).parse(d))
-  .handler(async ({ data, context }): Promise<EligibilityResult[]> => {
+  .handler(async ({ data, context }): Promise<Array<EligibilityResult & { staffName: string }>> => {
     const { supabase } = context;
     const orgId = data.organizationId;
     const shiftStart = new Date(data.startsAtIso);
@@ -132,5 +132,6 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
       requiredClientTrainings,
       overtimeThresholdHours: data.overtimeThresholdHours ?? 40,
     });
-    return result;
+    const nameById = new Map(memberRows.map((r) => [r.id, r.full_name ?? "Staff"]));
+    return result.map((r) => ({ ...r, staffName: nameById.get(r.staffId) ?? "Staff" }));
   });

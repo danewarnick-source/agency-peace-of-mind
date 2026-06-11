@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { classesForCode, familyForCode, isDailyCode } from "@/lib/scheduling/code-colors";
 import { listShiftsInRange } from "@/lib/scheduling/shifts.functions";
+import { listCoverageRequirements } from "@/lib/scheduling/locations.functions";
 import { AddSegmentDialog, type ParentShiftInfo } from "@/components/scheduling/add-segment-dialog";
 
 interface Props {

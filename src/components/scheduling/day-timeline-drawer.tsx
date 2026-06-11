@@ -33,7 +33,16 @@ export function DayTimelineDrawer({
 }: Props) {
   const listCall = useServerFn(listShiftsInRange);
   const listReqsCall = useServerFn(listCoverageRequirements);
+  const listLocCall = useServerFn(listLocations);
   const [segParent, setSegParent] = useState<ParentShiftInfo | null>(null);
+  const [pickedLocId, setPickedLocId] = useState<string | null>(null);
+  const effectiveLocId = pickedLocId ?? locationId ?? null;
+
+  const locsQ = useQuery({
+    enabled: open,
+    queryKey: ["locations", organizationId],
+    queryFn: () => listLocCall({ data: { organizationId } }),
+  });
 
   const dayStartIso = useMemo(() => {
     if (!day) return null;

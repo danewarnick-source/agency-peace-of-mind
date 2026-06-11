@@ -162,6 +162,13 @@ export function DayTimelineDrawer({
           </div>
         </div>
       </SheetContent>
+      <AddSegmentDialog
+        open={!!segParent}
+        onOpenChange={(v) => { if (!v) setSegParent(null); }}
+        organizationId={organizationId}
+        parent={segParent}
+        onCreated={() => { setSegParent(null); shiftsQ.refetch(); }}
+      />
     </Sheet>
   );
 }

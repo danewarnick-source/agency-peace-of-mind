@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { classesForCode, familyForCode, isDailyCode } from "@/lib/scheduling/code-colors";
 import { listShiftsInRange } from "@/lib/scheduling/shifts.functions";
+import { listCoverageRequirements } from "@/lib/scheduling/locations.functions";
 import { AddSegmentDialog, type ParentShiftInfo } from "@/components/scheduling/add-segment-dialog";
 
 interface Props {
@@ -31,6 +32,7 @@ export function DayTimelineDrawer({
   open, onOpenChange, organizationId, day, locationId, locationName, onCreateClick, onShiftClick,
 }: Props) {
   const listCall = useServerFn(listShiftsInRange);
+  const listReqsCall = useServerFn(listCoverageRequirements);
   const [segParent, setSegParent] = useState<ParentShiftInfo | null>(null);
 
   const dayStartIso = useMemo(() => {
@@ -55,7 +57,50 @@ export function DayTimelineDrawer({
     }),
   });
 
+  const reqsQ = useQuery({
+    enabled: open && !!locationId,
+    queryKey: ["coverage-reqs", organizationId, locationId],
+    queryFn: () => listReqsCall({ data: { organizationId, locationId: locationId! } }),
+  });
+
   const dayStartMs = day ? new Date(day).setHours(0, 0, 0, 0) : 0;
+  const dow = day ? day.getDay() : -1;
+
+  // Compute uncovered minute bands (matched against requirements that apply today).
+  const gaps = useMemo(() => {
+    const reqs = (reqsQ.data ?? []).filter(
+      (r) => r.day_of_week === null || r.day_of_week === undefined || r.day_of_week === dow,
+    );
+    if (reqs.length === 0) return [] as Array<{ topPct: number; heightPct: number }>;
+    const minutes = new Array(24 * 60).fill(0);
+    for (const s of shiftsQ.data ?? []) {
+      if (!s.staff_id) continue;
+      const s0 = Math.max(new Date(s.starts_at).getTime(), dayStartMs);
+      const s1 = Math.min(new Date(s.ends_at).getTime(), dayStartMs + 86400000);
+      if (s1 <= s0) continue;
+      const m0 = Math.floor((s0 - dayStartMs) / 60000);
+      const m1 = Math.ceil((s1 - dayStartMs) / 60000);
+      for (let i = m0; i < m1; i++) minutes[i] += 1;
+    }
+    const required = new Array(24 * 60).fill(0);
+    for (const r of reqs) {
+      const [sh, sm] = r.start_time.split(":").map(Number);
+      const [eh, em] = r.end_time.split(":").map(Number);
+      const a = sh * 60 + sm;
+      const b = eh === 0 && em === 0 ? 24 * 60 : eh * 60 + em;
+      for (let i = a; i < b; i++) required[i] = Math.max(required[i], r.required_staff_count);
+    }
+    const out: Array<{ topPct: number; heightPct: number }> = [];
+    let i = 0;
+    while (i < 24 * 60) {
+      if (required[i] > minutes[i]) {
+        const start = i;
+        while (i < 24 * 60 && required[i] > minutes[i]) i++;
+        out.push({ topPct: (start / (24 * 60)) * 100, heightPct: ((i - start) / (24 * 60)) * 100 });
+      } else i++;
+    }
+    return out;
+  }, [reqsQ.data, shiftsQ.data, dayStartMs, dow]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -89,6 +134,21 @@ export function DayTimelineDrawer({
                 {h.toString().padStart(2, "0")}:00
               </span>
             </div>
+          ))}
+
+          {/* Uncovered requirement bands */}
+          {gaps.map((g, i) => (
+            <div
+              key={`gap-${i}`}
+              className="absolute left-12 right-2 bg-destructive/15 border-l-2 border-destructive pointer-events-none"
+              style={{
+                top: `${(g.topPct / 100) * HOUR_HEIGHT * 24}px`,
+                height: `${(g.heightPct / 100) * HOUR_HEIGHT * 24}px`,
+                backgroundImage:
+                  "repeating-linear-gradient(45deg, rgba(220,38,38,0.18) 0 4px, transparent 4px 8px)",
+              }}
+              title="Uncovered against coverage requirement"
+            />
           ))}
 
           {/* Shift blocks */}

@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
-  Outlet, createRootRouteWithContext, useRouter,
+  Outlet, createRootRouteWithContext, useRouter, useNavigate, useRouterState,
   HeadContent, Scripts,
 } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
-import { AuthProvider } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
 import { CelebrationProvider } from "@/components/celebrations/celebration-provider";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
@@ -110,6 +111,37 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Router-root enforcement of the forced-password-change flag: while
+ * profiles.must_change_password is set, an authenticated user is redirected
+ * to /reset-password from ANY other route (deep links included). The flag is
+ * cleared by the reset-password flow itself. Re-checked on every navigation
+ * so a stale value never traps or frees the user incorrectly.
+ */
+function MustChangePasswordGate() {
+  const { session } = useAuth();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid || pathname === "/reset-password") return;
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("must_change_password")
+      .eq("id", uid)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (data?.must_change_password) navigate({ to: "/reset-password" });
+      });
+    return () => { cancelled = true; };
+  }, [session?.user?.id, pathname, navigate]);
+
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -131,6 +163,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <MustChangePasswordGate />
         <CelebrationProvider>
           <GuidedTourProvider>
             <Outlet />

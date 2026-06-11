@@ -18,22 +18,52 @@ async function assertManager(actorId: string, orgId: string) {
   }
 }
 
-// Verify the TARGET employee actually belongs to the organization the caller
-// administers. Without this, the service-role writes below (which bypass RLS)
-// could touch a profile/user in a DIFFERENT org just by passing that user's id
-// — a cross-organization IDOR. We check for a membership row regardless of its
-// `active` flag on purpose: archiveEntity sets active=false, and deleteEntity may
-// run afterwards on an already-archived employee, so an active-only check would
-// break that legitimate flow. Existence of any row still proves same-org ownership.
-async function assertEmployeeInOrg(targetUserId: string, orgId: string) {
-  const { data } = await supabaseAdmin
+// Cross-org guard for every service-role write in this file. Verifies, BEFORE
+// any write happens, that
+//   (a) the CALLER has an ACTIVE membership in the organization they claim to
+//       act for, and
+//   (b) the TARGET actually belongs to that same organization (staff via
+//       organization_members; clients via clients.organization_id).
+// Without (b), the service-role writes below (which bypass RLS) could touch a
+// profile/user/client in a DIFFERENT org just by passing that record's id — a
+// cross-organization IDOR. The target-staff check accepts a membership row
+// regardless of its `active` flag on purpose: archiveEntity sets active=false,
+// and deleteEntity may run afterwards on an already-archived employee, so an
+// active-only check would break that legitimate flow. Existence of any row
+// still proves same-org ownership.
+async function assertCallerAndTargetInOrg(
+  actorId: string,
+  kind: "employee" | "client",
+  targetId: string,
+  orgId: string,
+) {
+  const { data: myOrgs } = await supabaseAdmin
     .from("organization_members")
-    .select("user_id")
-    .eq("user_id", targetUserId)
-    .eq("organization_id", orgId)
-    .maybeSingle();
-  if (!data) {
-    throw new Error("Forbidden: target employee does not belong to this organization");
+    .select("organization_id")
+    .eq("user_id", actorId)
+    .eq("active", true);
+  const mine = new Set((myOrgs ?? []).map((r) => r.organization_id));
+  if (!mine.has(orgId)) {
+    throw new Error("Not authorized for this organization");
+  }
+
+  if (kind === "employee") {
+    const { data } = await supabaseAdmin
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", targetId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (!data) throw new Error("Not authorized for this organization");
+  } else {
+    const { data } = await supabaseAdmin
+      .from("clients")
+      .select("organization_id")
+      .eq("id", targetId)
+      .maybeSingle();
+    if (!data || data.organization_id !== orgId) {
+      throw new Error("Not authorized for this organization");
+    }
   }
 }
 
@@ -67,11 +97,10 @@ export const archiveEntity = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    await assertCallerAndTargetInOrg(context.userId, data.kind, data.id, data.organizationId);
     await assertManager(context.userId, data.organizationId);
 
     if (data.kind === "employee") {
-      await assertEmployeeInOrg(data.id, data.organizationId);
-
       const blocker = await staffActiveBlockers(data.id, data.organizationId);
       if (blocker) throw new Error(blocker);
 
@@ -111,11 +140,10 @@ export const deleteEntity = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    await assertCallerAndTargetInOrg(context.userId, data.kind, data.id, data.organizationId);
     await assertManager(context.userId, data.organizationId);
 
     if (data.kind === "employee") {
-      await assertEmployeeInOrg(data.id, data.organizationId);
-
       const blocker = await staffActiveBlockers(data.id, data.organizationId);
       if (blocker) throw new Error(blocker);
 

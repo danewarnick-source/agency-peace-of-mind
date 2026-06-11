@@ -20,12 +20,11 @@ function CertificatePage() {
   const { data, isLoading } = useQuery({
     queryKey: ["certificate", code],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("certifications")
-        .select("verification_code, recipient_name, course_title, issued_at, expires_at")
-        .eq("verification_code", code)
-        .maybeSingle();
-      return data;
+      // certifications is org-scoped under RLS; public verification goes
+      // through the verify_certificate RPC, which exposes only the five
+      // certificate fields for an exact code match.
+      const { data } = await supabase.rpc("verify_certificate", { p_code: code });
+      return data?.[0] ?? null;
     },
   });
 

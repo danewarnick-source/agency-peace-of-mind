@@ -126,7 +126,8 @@ function parseModelJson(raw: string, label: string): unknown {
   if (match) {
     try { return JSON.parse(match[0]); } catch { /* fall through */ }
   }
-  console.error(`[${label}] non-JSON model output:`, raw.slice(0, 500));
+  // Model output can quote client/staff names from the schedule — never log it.
+  console.error(`[${label}] non-JSON model output (${raw.length} chars)`);
   const snippet = raw.trim().slice(0, 300).replace(/\s+/g, " ");
   throw new Error(`NECTAR returned an unexpected response: ${snippet || "(empty)"}`);
 }

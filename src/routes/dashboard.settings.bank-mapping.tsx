@@ -185,8 +185,8 @@ function BankMappingPage() {
         });
         if (error) throw error;
         posted++;
-        // Simulated QuickBooks Online push
-        console.info("[QBO Bridge] Deposit posted", { client_id: map.client_id, amount: feed.amount, memo: feed.memo });
+        // Simulated QuickBooks Online push (IDs only — never log amounts/memos)
+        console.info("[QBO Bridge] Deposit posted", { client_id: map.client_id });
       }
       return { posted };
     },

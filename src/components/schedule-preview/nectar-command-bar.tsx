@@ -98,14 +98,29 @@ export function NectarCommandBar({
         : "No staff are loaded for this week — NECTAR needs at least one staff member to draft a shift.";
 
   const ask = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (overrideSentence?: string) => {
       if (emptyContext) throw new Error(emptyReason);
-      const result = await propose({ data: { ...context, sentence } });
-      return result as NectarProposal;
+      const s = (overrideSentence ?? sentence).trim();
+      const result = await propose({ data: { ...context, sentence: s } });
+      return { result: result as NectarProposal, askedWith: s };
     },
-    onSuccess: (p) => setProposal(p),
+    onSuccess: ({ result, askedWith }) => {
+      setProposal(result);
+      setAskedSentence(askedWith);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const answerAsk = (label: string) => {
+    const base = askedSentence || sentence;
+    if (!base.trim()) return;
+    ask.mutate(`${base}\n\nAnswer: ${label}`);
+  };
+
+  const replyWithText = () => {
+    if (askedSentence) setSentence(askedSentence);
+    setProposal(null);
+  };
 
   const importMut = useMutation({
     mutationFn: async () => {

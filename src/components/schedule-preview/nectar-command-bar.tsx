@@ -302,6 +302,13 @@ export function NectarCommandBar({
       />
     </div>
   );
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function _unused(){}
+        pending={importMut.isPending}
+      />
+    </div>
+  );
 }
 
 function ProposalReview({

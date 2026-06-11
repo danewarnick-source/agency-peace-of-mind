@@ -502,6 +502,8 @@ function SchedulePage() {
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const { settings } = useTimePaySettings();
   const { data: shifts, isLoading } = useMyScheduledShifts(view, anchor);
+  const { data: org } = useCurrentOrg();
+  const range = rangeFor(view, anchor);
 
   const goPrev = () => setAnchor((a) => shiftAnchor(view, a, -1));
   const goNext = () => setAnchor((a) => shiftAnchor(view, a, 1));

@@ -113,8 +113,8 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
     const a = shifts[i];
     if (a.status === "cancelled" || a.status === "declined") continue;
 
-    // staff inactive
-    const staff = ctx.staff[a.staff_id];
+    // staff inactive (open shifts have no staff yet — skip)
+    const staff = a.staff_id ? ctx.staff[a.staff_id] : undefined;
     if (staff && staff.active === false) {
       out.push({ shiftId: a.id, severity: "hard", code: "staff_inactive", message: "Staff is inactive." });
     }

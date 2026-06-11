@@ -299,3 +299,100 @@ const addBtn: React.CSSProperties = {
   marginTop: 10, width: "100%", border: `1px dashed ${SCHED.teal}`, background: "transparent",
   color: SCHED.teal, borderRadius: 9, padding: "10px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer",
 };
+
+/* ─────────────────────── Scheduling rules ─────────────────────── */
+
+function SchedulingRulesSection({ organizationId }: { organizationId: string }) {
+  const qc = useQueryClient();
+  const getFn = useServerFn(getRuleSettings);
+  const updateFn = useServerFn(updateRuleSettings);
+
+  const q = useQuery({
+    queryKey: ["scheduling-rule-settings", organizationId],
+    queryFn: () => getFn({ data: { organizationId } }),
+  });
+
+  const m = useMutation({
+    mutationFn: (vars: { ruleSettings: Record<string, RuleMode>; otThresholdHours: number }) =>
+      updateFn({ data: { organizationId, ...vars } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scheduling-rule-settings", organizationId] });
+      qc.invalidateQueries({ queryKey: ["schedule-conflicts"] });
+      toast.success("Scheduling rules updated");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to save"),
+  });
+
+  const rules = q.data?.ruleSettings ?? {};
+  const ot = q.data?.otThresholdHours ?? 40;
+
+  const setRule = (code: PolicyRuleCode, mode: RuleMode) => {
+    const next = { ...rules, [code]: mode };
+    m.mutate({ ruleSettings: next as Record<string, RuleMode>, otThresholdHours: ot });
+  };
+  const setOt = (n: number) => {
+    m.mutate({ ruleSettings: rules as Record<string, RuleMode>, otThresholdHours: n });
+  };
+
+  return (
+    <div>
+      <h4 style={sectH4}>Scheduling rules</h4>
+      <p style={sectSub}>
+        Choose how each policy is enforced. <b>Off</b> ignores it, <b>Warn</b> shows an alert,
+        <b> Block</b> prevents publishing.
+      </p>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: `1px solid ${SCHED.line}` }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <b style={{ fontWeight: 700, fontSize: 13, color: SCHED.ink }}>Overtime threshold</b>
+          <div style={{ marginTop: 2, fontSize: 12, color: SCHED.muted }}>Weekly hours that trigger the OT warning.</div>
+        </div>
+        <input
+          type="number"
+          min={0}
+          max={168}
+          value={ot}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (!Number.isNaN(n)) setOt(n);
+          }}
+          style={{ ...input, width: 72, textAlign: "right" }}
+          aria-label="OT threshold hours"
+        />
+        <span style={{ fontSize: 12, color: SCHED.muted }}>hrs</span>
+      </div>
+
+      {POLICY_RULES.map((rule) => {
+        const current = (rules[rule.code] ?? rule.default) as RuleMode;
+        return (
+          <div key={rule.code} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: `1px solid ${SCHED.line}` }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <b style={{ fontWeight: 700, fontSize: 13, color: SCHED.ink }}>{rule.label}</b>
+              <div style={{ marginTop: 2, fontSize: 12, color: SCHED.muted }}>{rule.description}</div>
+            </div>
+            <div style={{ display: "inline-flex", border: `1px solid ${SCHED.line}`, borderRadius: 8, overflow: "hidden", flex: "none" }}>
+              {(["off", "warn", "block"] as const).map((mode) => {
+                const on = current === mode;
+                const bg = on ? (mode === "block" ? "#fde2e2" : mode === "warn" ? "#fdecc8" : SCHED.tealBg) : "#fff";
+                const fg = on ? (mode === "block" ? "#8a1f1f" : mode === "warn" ? "#7a4a00" : "#0c5562") : SCHED.ink;
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => setRule(rule.code, mode)}
+                    style={{
+                      border: "none", background: bg, color: fg, padding: "6px 10px",
+                      fontSize: 11.5, fontWeight: 700, textTransform: "capitalize", cursor: "pointer",
+                      borderRight: mode !== "block" ? `1px solid ${SCHED.line}` : "none",
+                    }}
+                  >
+                    {mode}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

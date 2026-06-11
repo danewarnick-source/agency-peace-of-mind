@@ -253,9 +253,10 @@ function SchedulePreviewPage() {
       {org?.organization_id && (
         <ShiftCreateDialog
           open={createOpen}
-          onOpenChange={setCreateOpen}
+          onOpenChange={(v) => { setCreateOpen(v); if (!v) setCreateInitialDay(null); }}
           organizationId={org.organization_id}
           clients={(data?.clients ?? []).map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))}
+          initialDay={createInitialDay}
           onCreated={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
         />
       )}
@@ -267,7 +268,7 @@ function SchedulePreviewPage() {
           organizationId={org.organization_id}
           day={timelineCtx?.day ?? null}
           locationName={timelineCtx?.siteName}
-          onCreateClick={(d) => { setTimelineCtx(null); setCreateOpen(true); void d; }}
+          onCreateClick={(d) => { setTimelineCtx(null); setCreateInitialDay(d); setCreateOpen(true); }}
           onShiftClick={(id) => {
             const shift = (data?.shifts ?? []).find((s) => s.id === id);
             if (shift) { setTimelineCtx(null); openEditor({ shift }); }

@@ -441,7 +441,18 @@ export function ShiftCreateDialog({
 
         {step === "staff" && (
           <div className="space-y-2">
-            <Label>Eligible staff</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>Eligible staff</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCreateOpen}
+                disabled={submitting || !clientId || !code}
+                title="Post this as an open shift — staff can claim it"
+              >
+                Post as open shift
+              </Button>
+            </div>
             {rankQ.isLoading ? (
               <div className="p-4 text-sm text-muted-foreground">Ranking staff…</div>
             ) : (

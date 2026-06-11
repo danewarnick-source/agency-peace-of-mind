@@ -1,42 +1,59 @@
-# Phase 2 — Conflict Engine, Publish/Accept, Settings Rework
+# Phase 3 — Open Shifts, Swaps, Time-Off, Templates
 
-Phase 1 is complete. Phase 2 ships in three batches; each typechecks independently and lands sequentially because all three touch `dashboard.schedule-preview.tsx` and the create dialog.
+Four batches, each independently shippable. Reuses existing tables (`shift_swap_requests`, `time_off_requests`, `shift_templates`) and extends `scheduled_shifts.status`.
 
-## Batch A — Conflict engine
+## Batch A — Open shifts & claim workflow
+- `scheduled_shifts.status` accepts `'open'` (no staff assigned). `ShiftCreateDialog` adds "Leave unassigned (open shift)" toggle.
+- New server fns in `src/lib/scheduling/open-shifts.functions.ts`:
+  - `listOpenShifts(range)` — open shifts in window, joined with eligibility (matching cert, no conflict for the caller).
+  - `claimOpenShift({ shiftId })` — staff self-claims; sets `staff_id`, status → `'pending'` (admin review).
+  - `approveClaim({ shiftId, approve })` — admin confirms claim → `'accepted'`, or reverts to `'open'`.
+- Board: "Open shifts" card lists posted opens with **Assign** action; deep-links to editor.
+- Staff agenda: new "Open shifts" section above Today with **Claim** button. Conflict engine filters out shifts the staffer can't legally take.
 
-- New `src/lib/scheduling/conflicts.ts`: pure `evaluateShifts(shifts, rules, context)` returning `{shiftId, severity: 'hard'|'policy'|'warn', code, message}[]`.
-- HARD rules: same-staff overlap (excluding parent/segment pairing), same client+service-code double-book, staff inactive, segment outside parent, daily code on segment.
-- POLICY rules (Off/Warn/Block via `rule_settings` JSON): expired cert, missing client-specific training, staff <21 on HHS, 2:1 ratio (second staff same client+time), >16h continuous, <8h rest, projected week >threshold, DSI >6h, SLH/SLN overnight without `is_awake_overnight`.
-- WARN rule: client weekly target ≥120% met.
-- Migration: add `rule_settings jsonb DEFAULT '{}'` and `ot_threshold_hours numeric DEFAULT 40` to `org_shift_behavior_settings`.
-- New server fn `evaluateRange` (returns conflicts for range) and `getRuleSettings`/`updateRuleSettings`.
-- UI: add `ConflictBadge` on `ShiftCard` (red dot HARD, amber POLICY-Block, amber shield POLICY-Warn). Toolbar "Conflicts (N)" button → popover list, deep-link to shift. Inline section in `ShiftCreateDialog` before Save; block-severity disables Save unless admin types an override reason → stored on `scheduled_shifts.override_reason`.
+## Batch B — Swap requests
+- Reuses `shift_swap_requests` (existing). Server fns `src/lib/scheduling/swaps.functions.ts`:
+  - `requestSwap({ shiftId, withStaffId?, reason })` — find eligible partners (same code, no conflict); create request.
+  - `respondToSwap({ requestId, accept })` — partner accepts → admin queue; admin `approveSwap` swaps `staff_id` atomically.
+- Staff agenda: "Request swap" on any accepted shift → picker of eligible coworkers.
+- Board "Action needed" card already created in Phase 2 — extend to list pending swaps with approve/deny.
 
-## Batch B — Publish / Accept workflow
+## Batch C — Time-off requests & blackout
+- Reuses `time_off_requests`. Server fns `src/lib/scheduling/time-off.functions.ts`:
+  - `requestTimeOff({ startsAt, endsAt, reason })`
+  - `decideTimeOff({ requestId, approve, note })`
+  - `listApprovedTimeOff(range)` — used by conflict engine.
+- Conflict engine: new HARD rule `staff_on_approved_pto` when shift overlaps approved time-off.
+- Staff agenda: "Request time off" button → dialog. Shows pending/approved list.
+- Admin "Action needed": pending PTO rows with approve/deny + optional note.
 
-- `ShiftCreateDialog`: default `status='draft'`. Board card actions: Publish single + toolbar "Publish All Drafts" → summary modal "Publishing X shifts across Y staff · Z conflicts remain" → confirm calls `publishShifts`.
-- New `src/lib/scheduling/notifications.functions.ts` writing to existing `notifications` table (one per staff per publish).
-- `dashboard.schedule.tsx` (staff view): mobile-first agenda — Today section + week list; published cards show client/code/time/location + Accept / Decline (decline requires reason). New `respondToShift` server fn sets `accepted`/`declined` + stores decline reason in `notes`.
-- New "Action needed" card on board (replaces "Needs your approval"): lists declines + swap requests + open-shift claims; clicking deep-links to shift.
-
-## Batch C — Settings drawer rework
-
-- New route `src/routes/dashboard.scheduling.settings.tsx` (drawer/page from Board's Settings button).
-- "Color shifts by" → defaults to **Service code** (option: Staff).
-- Rename "Your shift types" → "Shift time templates"; ensure only time/name/color (already mostly correct from Phase 1 seed).
-- "Scheduling rules" list: every POLICY rule rendered as a row with Off/Warn/Block segmented control + plain-English description; OT threshold numeric input. Persists via `updateRuleSettings`.
-- Reachable from Board toolbar + a "Coverage requirements" link (re-uses Phase 1 `CoverageRequirementsDialog`) and "Weekly targets" link.
+## Batch D — Templates & copy-week
+- Reuses `shift_templates` (already keyed to org). New `src/lib/scheduling/week-templates.functions.ts`:
+  - `saveWeekAsTemplate({ weekStartIso, name })` — captures every shift in the visible week into a template payload (jsonb on `shift_templates.template_data`).
+  - `applyWeekTemplate({ templateId, targetWeekStartIso })` — materializes shifts as drafts, shifted to the target week, preserving staff/client/code/time.
+  - `copyPreviousWeek({ targetWeekStartIso })` — convenience: reads previous week, applies as drafts to target.
+- Board toolbar: "Copy from…" menu → Previous week / Save template / Apply template.
+- All new shifts land as `'draft'`, then run through Phase 2 publish flow.
 
 ## Files
 
-**New**: `src/lib/scheduling/conflicts.ts`, `src/lib/scheduling/conflicts.functions.ts`, `src/lib/scheduling/notifications.functions.ts`, `src/components/scheduling/conflicts-panel.tsx`, `src/components/scheduling/publish-modal.tsx`, `src/components/scheduling/action-needed-card.tsx`, `src/routes/dashboard.scheduling.settings.tsx`.
+**New**:
+- `src/lib/scheduling/open-shifts.functions.ts`
+- `src/lib/scheduling/swaps.functions.ts`
+- `src/lib/scheduling/time-off.functions.ts`
+- `src/lib/scheduling/week-templates.functions.ts`
+- `src/components/scheduling/open-shifts-panel.tsx`
+- `src/components/scheduling/swap-request-dialog.tsx`
+- `src/components/scheduling/time-off-dialog.tsx`
+- `src/components/scheduling/copy-week-menu.tsx`
 
-**Edited**: `src/lib/scheduling/shifts.functions.ts` (respondToShift), `src/components/scheduling/shift-create-dialog.tsx`, `src/components/scheduling/shift-card.tsx`, `src/routes/dashboard.schedule-preview.tsx`, `src/routes/dashboard.schedule.tsx`.
+**Edited**:
+- `src/lib/scheduling/conflicts.ts` (PTO hard rule)
+- `src/components/scheduling/shift-create-dialog.tsx` (open-shift toggle)
+- `src/components/scheduling/action-needed-card.tsx` (swap + PTO rows)
+- `src/routes/dashboard.schedule-preview.tsx` (open-shifts panel + copy-week menu)
+- `src/routes/dashboard.schedule.tsx` (claim / swap / PTO actions)
 
-**Migration**: rule_settings jsonb + ot_threshold_hours on `org_shift_behavior_settings`.
+**Migration**: extend `scheduled_shifts.status` allowed values (no schema change needed if `text`); add `claimed_by` column? — not needed, `staff_id` + `'pending'` status conveys it.
 
-Starting Batch A now.
-
----
-
-**Phase 2 complete.** Batch C shipped: Scheduling rules section (Off/Warn/Block per policy + OT threshold) added to the existing settings drawer, "Your shift types" → "Shift time templates", Color shifts by label updated to "Service code".
+Starting Batch A now. Say "next" to advance through B → C → D.

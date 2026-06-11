@@ -239,6 +239,7 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
   const byStaff = new Map<string, Shift[]>();
   for (const s of shifts) {
     if (s.status === "cancelled" || s.status === "declined") continue;
+    if (!s.staff_id) continue;
     const arr = byStaff.get(s.staff_id) ?? [];
     arr.push(s); byStaff.set(s.staff_id, arr);
   }

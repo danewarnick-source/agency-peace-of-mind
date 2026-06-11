@@ -140,7 +140,7 @@ function ShiftTypesSection({
 
   return (
     <div>
-      <h4 style={sectH4}>Your shift types</h4>
+      <h4 style={sectH4}>Shift time templates</h4>
       <p style={sectSub}>
         Fully customizable — rename, change the times, recolor, or add your own. These are what
         you pick from when adding a shift.

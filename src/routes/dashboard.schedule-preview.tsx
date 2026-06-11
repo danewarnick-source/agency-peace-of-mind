@@ -412,6 +412,18 @@ function SchedulePreviewPage() {
           organizationId={org.organization_id}
         />
       )}
+
+      {org?.organization_id && (
+        <RecurringPatternsDialog
+          open={recurringOpen}
+          onOpenChange={setRecurringOpen}
+          organizationId={org.organization_id}
+          weekStart={weekStart}
+          clients={(data?.clients ?? []).map((c: ClientRow) => ({ id: c.id, name: (c as any).name ?? (c as any).display_name ?? "" }))}
+          staff={(data?.staff ?? []).map((s: StaffRow) => ({ id: s.id, name: (s as any).name ?? (s as any).display_name ?? "" }))}
+          onChanged={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
+        />
+      )}
     </Shell>
   );
 }

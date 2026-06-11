@@ -121,11 +121,13 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
       out.push({ shiftId: a.id, severity: "hard", code: "staff_inactive", message: "Staff is inactive." });
     }
 
-    // approved time-off overlap (HARD)
+    // approved time-off overlap (HARD). Strict inequality: a shift that
+    // starts exactly when the PTO ends (or vice-versa) is back-to-back,
+    // not an overlap.
     if (a.staff_id && staff?.ptoRanges?.length) {
       const sMs = new Date(a.starts_at).getTime();
       const eMs = new Date(a.ends_at).getTime();
-      const hit = staff.ptoRanges.some(([ps, pe]) => sMs <= pe && eMs >= ps);
+      const hit = staff.ptoRanges.some(([ps, pe]) => sMs < pe && eMs > ps);
       if (hit) {
         out.push({ shiftId: a.id, severity: "hard", code: "staff_on_approved_pto",
           message: "Staff has approved time off during this shift." });

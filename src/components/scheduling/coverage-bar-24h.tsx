@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { classesForCode } from "@/lib/scheduling/code-colors";
+import { coverageCountMinutes, requiredMinutes, uncoveredBands } from "@/lib/scheduling/coverage-count";
 
 export interface CoverageShift {
   id: string;
@@ -9,6 +10,8 @@ export interface CoverageShift {
   staff_id: string | null;
   service_code?: string | null;
   job_code?: string | null;
+  /** 1:1 segments (set) subtract their staff from home coverage. */
+  parent_shift_id?: string | null;
 }
 
 export interface CoverageRequirement {
@@ -52,38 +55,14 @@ export function CoverageBar24h({ day, shifts, requirements = [], className }: Pr
       .filter(Boolean) as Array<{ id: string; left: number; width: number; cls: ReturnType<typeof classesForCode>; open: boolean }>;
   }, [shifts, dayStart, dayEnd]);
 
-  // Gap segments: minute-by-minute coverage vs requirement.
+  // Gap segments: minute-by-minute coverage vs requirement. Segments
+  // subtract their staff from home coverage (see coverage-count.ts).
   const gaps = useMemo(() => {
     if (requirements.length === 0) return [] as Array<{ left: number; width: number }>;
-    const minutes = new Array(24 * 60).fill(0);
-    for (const s of shifts) {
-      if (!s.staff_id) continue;
-      const s0 = Math.max(new Date(s.starts_at).getTime(), dayStart);
-      const s1 = Math.min(new Date(s.ends_at).getTime(), dayEnd);
-      if (s1 <= s0) continue;
-      const m0 = Math.floor((s0 - dayStart) / 60000);
-      const m1 = Math.ceil((s1 - dayStart) / 60000);
-      for (let i = m0; i < m1; i++) minutes[i] += 1;
-    }
-    const required = new Array(24 * 60).fill(0);
-    for (const r of requirements) {
-      const [sh, sm] = r.start_time.split(":").map(Number);
-      const [eh, em] = r.end_time.split(":").map(Number);
-      const a = sh * 60 + sm;
-      const b = (eh === 0 && em === 0 ? 24 * 60 : eh * 60 + em);
-      for (let i = a; i < b; i++) required[i] = Math.max(required[i], r.required_staff_count);
-    }
-    const out: Array<{ left: number; width: number }> = [];
-    let i = 0;
-    while (i < 24 * 60) {
-      if (required[i] > minutes[i]) {
-        const start = i;
-        while (i < 24 * 60 && required[i] > minutes[i]) i++;
-        out.push({ left: (start / (24 * 60)) * 100, width: ((i - start) / (24 * 60)) * 100 });
-      } else i++;
-    }
-    return out;
-  }, [shifts, requirements, dayStart, dayEnd]);
+    const minutes = coverageCountMinutes(dayStart, shifts);
+    const required = requiredMinutes(requirements);
+    return uncoveredBands(minutes, required);
+  }, [shifts, requirements, dayStart]);
 
   const hasGap = gaps.length > 0;
 

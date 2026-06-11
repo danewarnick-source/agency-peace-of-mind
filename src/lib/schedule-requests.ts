@@ -254,6 +254,8 @@ export function staffHasTimeOffOverlap(
   if (!ranges) return false;
   const a = new Date(startsAtIso).getTime();
   const b = new Date(endsAtIso).getTime();
-  for (const [s, e] of ranges) if (a <= e && b >= s) return true;
+  // Strict inequality: a shift that starts exactly when the time-off ends
+  // (or ends exactly when it starts) is back-to-back, not an overlap.
+  for (const [s, e] of ranges) if (a < e && b > s) return true;
   return false;
 }

@@ -739,6 +739,7 @@ function CoverageBadge({ day, shifts }: { day: Date; shifts: ShiftRow[] }) {
           ends_at: s.ends_at,
           staff_id: s.staff_id,
           job_code: s.job_code,
+          parent_shift_id: s.parent_shift_id,
         }))}
       />
     </div>

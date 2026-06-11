@@ -6,8 +6,12 @@ import { toast } from "sonner";
 import { Lock } from "lucide-react";
 import { CoverageBar24h } from "@/components/scheduling/coverage-bar-24h";
 import { publishShiftsWithNotify } from "@/lib/scheduling/workflow.functions";
-import { listLocations } from "@/lib/scheduling/locations.functions";
+import { listLocations, listCoverageRequirements } from "@/lib/scheduling/locations.functions";
+import { listClientWeeklyTargets } from "@/lib/scheduling/targets.functions";
 import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { Sparkles } from "lucide-react";
+import { classesForCode, familyForCode } from "@/lib/scheduling/code-colors";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
 import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
 import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
@@ -111,6 +115,90 @@ function SchedulePreviewPage() {
     return set;
   }, [locationsQ.data]);
 
+  // Coverage requirements for every location, keyed by lower-cased location
+  // name (locations mirror teams by name) — drives the residential micro bars.
+  const listReqsCall = useServerFn(listCoverageRequirements);
+  const reqsAllQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["coverage-reqs-all", org?.organization_id],
+    queryFn: () => listReqsCall({ data: { organizationId: org!.organization_id } }),
+  });
+  const reqsBySiteName = useMemo(() => {
+    const nameById = new Map<string, string>();
+    for (const l of locationsQ.data ?? []) nameById.set(l.id, String(l.name ?? "").toLowerCase());
+    const m = new Map<string, Array<{ day_of_week: number | null; start_time: string; end_time: string; required_staff_count: number }>>();
+    for (const r of reqsAllQ.data ?? []) {
+      const key = nameById.get(r.location_id);
+      if (!key) continue;
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push({
+        day_of_week: r.day_of_week ?? null,
+        start_time: r.start_time,
+        end_time: r.end_time,
+        required_staff_count: r.required_staff_count,
+      });
+    }
+    return m;
+  }, [reqsAllQ.data, locationsQ.data]);
+
+  // Weekly hour targets per (client, code) — drives the 1:1 and host-home meters.
+  const listTargetsCall = useServerFn(listClientWeeklyTargets);
+  const targetsQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["client-weekly-targets", org?.organization_id],
+    queryFn: () => listTargetsCall({ data: { organizationId: org!.organization_id } }),
+  });
+  const targetsByClient = useMemo(() => {
+    const m = new Map<string, Array<{ service_code: string; target_hours_per_week: number }>>();
+    for (const t of targetsQ.data ?? []) {
+      if (!m.has(t.client_id)) m.set(t.client_id, []);
+      m.get(t.client_id)!.push({
+        service_code: String(t.service_code ?? "").toUpperCase(),
+        target_hours_per_week: Number(t.target_hours_per_week ?? 0),
+      });
+    }
+    return m;
+  }, [targetsQ.data]);
+
+  // Host-home day signals for the visible week: which (client, date) pairs
+  // have a daily note and a confirmed overnight (attendance Present).
+  const weekStartDate = weekStart.toISOString().slice(0, 10);
+  const weekEndDate = useMemo(() => {
+    const d = new Date(weekStart); d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  }, [weekStart]);
+  const hostSignalsQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["host-day-signals", org?.organization_id, weekStartDate],
+    queryFn: async () => {
+      const [notes, attendance] = await Promise.all([
+        supabase
+          .from("daily_logs")
+          .select("client_id, log_date")
+          .eq("organization_id", org!.organization_id)
+          .gte("log_date", weekStartDate)
+          .lt("log_date", weekEndDate),
+        supabase
+          .from("hhs_monthly_attendance")
+          .select("client_id, record_date, presence_status")
+          .eq("organization_id", org!.organization_id)
+          .gte("record_date", weekStartDate)
+          .lt("record_date", weekEndDate),
+      ]);
+      const noteDays = new Set<string>();
+      for (const r of notes.data ?? []) {
+        if (r.client_id && r.log_date) noteDays.add(`${r.client_id}|${r.log_date}`);
+      }
+      const overnightDays = new Set<string>();
+      for (const r of attendance.data ?? []) {
+        if (r.client_id && r.record_date && String(r.presence_status).toLowerCase() === "present") {
+          overnightDays.add(`${r.client_id}|${r.record_date}`);
+        }
+      }
+      return { noteDays, overnightDays };
+    },
+  });
+
   // Phase 2: evaluate conflicts across the visible week. The result powers
   // the toolbar Conflicts panel + per-shift badges. Re-runs whenever the
   // week shifts or shifts data invalidates.
@@ -129,6 +217,14 @@ function SchedulePreviewPage() {
     },
   });
   const conflicts = conflictsQ.data ?? [];
+  // Shift ids with a hard/blocking conflict — drives the red border on cards.
+  const conflictShiftIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of conflicts) {
+      if (c.severity === "hard" || c.severity === "policy_block") s.add(c.shiftId);
+    }
+    return s;
+  }, [conflicts]);
   const shiftLabelById = useMemo(() => {
     const m = new Map<string, string>();
     const cMap = new Map((data?.clients ?? []).map((c) => [c.id, `${c.first_name} ${c.last_name}`.trim()]));
@@ -311,6 +407,10 @@ function SchedulePreviewPage() {
             days={days} sites={sites} siteClients={siteClients} siteShifts={siteShifts}
             settings={settings} onPickSite={setSiteId}
             hostHomeNames={hostHomeNames}
+            reqsBySiteName={reqsBySiteName}
+            targetsByClient={targetsByClient}
+            noteDays={hostSignalsQ.data?.noteDays}
+            overnightDays={hostSignalsQ.data?.overnightDays}
             onOpenDay={(sid, sname, d) => setTimelineCtx({ siteId: sid, siteName: sname, day: d })}
           />
         ) : currentSite ? (
@@ -319,6 +419,7 @@ function SchedulePreviewPage() {
             siteId={currentSite.id} siteName={currentSite.name} days={days}
             clients={siteClients.get(currentSite.id) ?? []} shifts={siteShifts.get(currentSite.id) ?? []}
             staff={data?.staff ?? []} view={view} settings={settings} onOpenEditor={openEditor}
+            conflictShiftIds={conflictShiftIds}
           />
         ) : (
           <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>No sites or 1-on-1 clients yet.</div>
@@ -525,8 +626,17 @@ function ViewSeg({ value, onChange, disabled }: { value: ViewMode; onChange: (v:
 }
 
 // ── All-homes status board ────────────────────────────────────────────
+type ReqRow = { day_of_week: number | null; start_time: string; end_time: string; required_staff_count: number };
+
+/** Tri-state status dot for the host-home day cells. */
+function HostDot({ state, label }: { state: "done" | "partial" | "none"; label: string }) {
+  const bg = state === "done" ? "#15a06a" : state === "partial" ? "#f59324" : "#d7dbe6";
+  return <span title={`${label}: ${state === "done" ? "done" : state === "partial" ? "partial" : "not yet"}`} style={{ ...dot, background: bg }} />;
+}
+
 function AllHomesBoard({
   days, sites, siteClients, siteShifts, settings, onPickSite, onOpenDay, hostHomeNames,
+  reqsBySiteName, targetsByClient, noteDays, overnightDays,
 }: {
   days: Date[];
   sites: { id: string; name: string }[];
@@ -536,14 +646,35 @@ function AllHomesBoard({
   onPickSite: (id: string) => void;
   onOpenDay?: (siteId: string, siteName: string, day: Date) => void;
   hostHomeNames?: Set<string>;
+  reqsBySiteName?: Map<string, ReqRow[]>;
+  targetsByClient?: Map<string, Array<{ service_code: string; target_hours_per_week: number }>>;
+  noteDays?: Set<string>;
+  overnightDays?: Set<string>;
 }) {
   if (sites.length === 0) return <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>No sites yet.</div>;
+
+  const isoDay = (d: Date) => {
+    const x = new Date(d); x.setHours(12); // noon avoids TZ edge on toISOString
+    return x.toISOString().slice(0, 10);
+  };
+  // Scheduled hours per (client, code) this week — feeds the weekly meters.
+  const scheduledByClientCode = new Map<string, number>();
+  for (const shifts of siteShifts.values()) {
+    for (const sh of shifts) {
+      const code = (sh.service_code ?? sh.job_code ?? "").toUpperCase();
+      if (!sh.client_id || !code) continue;
+      const hrs = Math.max(0, (new Date(sh.ends_at).getTime() - new Date(sh.starts_at).getTime()) / 3600000);
+      const k = `${sh.client_id}|${code}`;
+      scheduledByClientCode.set(k, (scheduledByClientCode.get(k) ?? 0) + hrs);
+    }
+  }
+
   return (
     <>
       <table style={grid}>
         <thead>
           <tr>
-            <th style={{ ...gTh, ...gThLeft, width: 150 }}>Home</th>
+            <th style={{ ...gTh, ...gThLeft, width: 170 }}>Home</th>
             {days.map((d, i) => <th key={i} style={gTh}>{DAY_LABELS[d.getDay()]} {d.getDate()}</th>)}
           </tr>
         </thead>
@@ -553,15 +684,40 @@ function AllHomesBoard({
             const shifts = siteShifts.get(s.id) ?? [];
             const type = inferSiteType(s.id, clients, shifts);
             const isHost = !!hostHomeNames?.has(s.name.toLowerCase());
-            // Weekly DS hours scheduled for this home (used by the host-home meter).
+            const isOneOnOne = s.id === UNASSIGNED_SITE_ID;
+            const siteReqs = reqsBySiteName?.get(s.name.toLowerCase()) ?? [];
+
+            // Weekly Direct-Support meter for host homes: agency visits
+            // (DSI/SEI/DSG/DSP/EPR) scheduled vs the clients' weekly targets.
+            const DS_CODES = ["DSI", "SEI", "DSG", "DSP", "EPR"];
             const dsHours = shifts.reduce((acc, sh) => {
-              const code = (sh.job_code ?? "").toUpperCase();
-              if (!["DSI", "DSG", "DSP", "EPR"].includes(code)) return acc;
+              const code = (sh.service_code ?? sh.job_code ?? "").toUpperCase();
+              if (!DS_CODES.includes(code)) return acc;
               return acc + Math.max(0, (new Date(sh.ends_at).getTime() - new Date(sh.starts_at).getTime()) / 3600000);
             }, 0);
-            // Placeholder weekly DS target until per-client targets land in
-            // this view: 25h/week per client is the worksheet baseline.
-            const dsTarget = Math.max(0, clients.length * 25);
+            const dsTarget = clients.reduce((acc, c) => {
+              for (const t of targetsByClient?.get(c.id) ?? []) {
+                if (DS_CODES.includes(t.service_code)) acc += t.target_hours_per_week;
+              }
+              return acc;
+            }, 0);
+
+            // 1:1 rows: weekly target meters per client+code (top few).
+            const oneOnOneMeters: Array<{ key: string; code: string; scheduled: number; target: number; name: string }> = [];
+            if (isOneOnOne) {
+              for (const c of clients) {
+                for (const t of targetsByClient?.get(c.id) ?? []) {
+                  oneOnOneMeters.push({
+                    key: `${c.id}|${t.service_code}`,
+                    code: t.service_code,
+                    scheduled: scheduledByClientCode.get(`${c.id}|${t.service_code}`) ?? 0,
+                    target: t.target_hours_per_week,
+                    name: c.first_name,
+                  });
+                }
+              }
+            }
+
             return (
               <tr key={s.id} style={{ cursor: "pointer" }} onClick={() => onPickSite(s.id)} className="sched-drill">
                 <td style={rowHead}>
@@ -580,14 +736,23 @@ function AllHomesBoard({
                     </small>
                   )}
                   {isHost && dsTarget > 0 && (
-                    <div style={{ marginTop: 6, maxWidth: 130 }}>
+                    <div style={{ marginTop: 6, maxWidth: 140 }}>
                       <WeeklyTargetMeter
-                        serviceCode="DSI"
+                        serviceCode="DS"
                         scheduledHours={dsHours}
                         targetHours={dsTarget}
                         compact
                       />
                     </div>
+                  )}
+                  {isOneOnOne && oneOnOneMeters.slice(0, 4).map((m) => (
+                    <div key={m.key} style={{ marginTop: 6, maxWidth: 140 }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: SCHED.muted, marginBottom: 1 }}>{m.name}</div>
+                      <WeeklyTargetMeter serviceCode={m.code} scheduledHours={m.scheduled} targetHours={m.target} compact />
+                    </div>
+                  ))}
+                  {isOneOnOne && oneOnOneMeters.length > 4 && (
+                    <small style={rowHeadSmall}>+{oneOnOneMeters.length - 4} more targets</small>
                   )}
                 </td>
                 {days.map((d, i) => {
@@ -596,20 +761,52 @@ function AllHomesBoard({
                   const setCnt = de.length - open;
                   let content: React.ReactNode;
                   if (isHost) {
-                    // Three status dots: daily-note-done, overnight-confirmed,
-                    // agency-visit-hours > 0. Real data is wired in Phase 2;
-                    // for now show a faded triple-dot indicator. Host homes
-                    // NEVER show a red gap, by design.
+                    // Three status dots: daily note done / overnight confirmed /
+                    // agency visit scheduled. Host homes NEVER show a red gap —
+                    // hosts don't clock; their artifacts are notes + attendance.
+                    const dk = isoDay(d);
+                    const states = (check: (cid: string) => boolean): "done" | "partial" | "none" => {
+                      if (clients.length === 0) return "none";
+                      const n = clients.filter((c) => check(c.id)).length;
+                      return n === clients.length ? "done" : n > 0 ? "partial" : "none";
+                    };
+                    const noteState = states((cid) => !!noteDays?.has(`${cid}|${dk}`));
+                    const overnightState = states((cid) => !!overnightDays?.has(`${cid}|${dk}`));
+                    const visitState: "done" | "none" = de.length > 0 ? "done" : "none";
                     content = (
                       <div style={{ ...statusBase, gap: 4, justifyContent: "center" }}>
-                        <span title="Daily note" style={{ ...dot, background: "#cbd5e1" }} />
-                        <span title="Overnight confirmed" style={{ ...dot, background: "#cbd5e1" }} />
-                        <span title="Agency visit hours" style={{ ...dot, background: "#cbd5e1" }} />
+                        <HostDot state={noteState} label="Daily note" />
+                        <HostDot state={overnightState} label="Overnight confirmed" />
+                        <HostDot state={visitState} label="Agency visit scheduled" />
+                      </div>
+                    );
+                  } else if (type === "residential") {
+                    // 24h micro coverage bar: covered intervals colored by code
+                    // family, gaps vs the location's requirements red-striped,
+                    // over-coverage green-striped.
+                    const dayReqs = siteReqs.filter(
+                      (r) => r.day_of_week === null || r.day_of_week === d.getDay(),
+                    );
+                    content = (
+                      <div style={{ padding: "4px 2px" }}>
+                        <CoverageBar24h
+                          micro
+                          day={d}
+                          shifts={de.map((sh) => ({
+                            id: sh.id,
+                            starts_at: sh.starts_at,
+                            ends_at: sh.ends_at,
+                            staff_id: sh.staff_id,
+                            service_code: sh.service_code,
+                            job_code: sh.job_code,
+                            parent_shift_id: sh.parent_shift_id,
+                          }))}
+                          requirements={dayReqs}
+                        />
                       </div>
                     );
                   } else if (de.length === 0) content = <div style={{ ...statusBase, color: "#c4c8d4" }}>—</div>;
                   else if (open > 0) content = <div style={{ ...statusBase, ...statusOpen }}><span style={dot} />{open} open</div>;
-                  else if (type === "residential") content = <div style={{ ...statusBase, ...statusCov }}>✓ 24h</div>;
                   else content = <div style={{ ...statusBase, ...statusCov }}><span style={dot} />{setCnt} set</div>;
                   return (
                     <td
@@ -628,7 +825,7 @@ function AllHomesBoard({
         </tbody>
       </table>
       <div style={hint}>
-        Each cell shows coverage status. Host homes show daily-note / overnight / agency-visit dots and a weekly DS-hours meter — never a red gap. Click a home to open its full week.
+        Residential rows show a 24h coverage bar per day (red stripes = below requirement, green stripes = above). Host homes show daily-note / overnight / agency-visit dots and a weekly DS-hours meter — never a red gap. Click a day cell for the timeline; click a home name for its full week.
       </div>
     </>
   );
@@ -636,7 +833,7 @@ function AllHomesBoard({
 
 // ── Single-home week grid ─────────────────────────────────────────────
 function SiteWeekGrid({
-  siteId, siteName, days, clients, shifts, staff, view, settings, onOpenEditor,
+  siteId, siteName, days, clients, shifts, staff, view, settings, onOpenEditor, conflictShiftIds,
 }: {
   siteId: string;
   siteName: string;
@@ -647,6 +844,7 @@ function SiteWeekGrid({
   view: ViewMode;
   settings: Settings;
   onOpenEditor: (ctx: EditorContext) => void;
+  conflictShiftIds?: Set<string>;
 }) {
   const type = inferSiteType(siteId, clients, shifts);
   const staffById = new Map(staff.map((s) => [s.id, s]));
@@ -709,6 +907,7 @@ function SiteWeekGrid({
                       <ShiftChip
                         key={s.id} shift={s} view={view} settings={settings}
                         staffName={staffName(s.staff_id)} clientName={clientName(s.client_id)}
+                        hasConflict={conflictShiftIds?.has(s.id)}
                         onClick={() => onOpenEditor({ shift: s })}
                       />
                     ))}
@@ -746,8 +945,29 @@ function CoverageBadge({ day, shifts }: { day: Date; shifts: ShiftRow[] }) {
   );
 }
 
+// Service-code family → accent hex for the inline-styled board.
+// (Residential teal · Supported Living blue · Day Supports green ·
+//  Employment purple · Respite pink — mirrors code-colors.ts.)
+const FAMILY_HEX: Record<ReturnType<typeof familyForCode>, string> = {
+  residential: "#0d9488",
+  supported_living: "#0284c7",
+  day_supports: "#16a34a",
+  employment: "#7c3aed",
+  respite: "#db2777",
+  other: "#64748b",
+};
+
+function firstName(full: string): string {
+  return (full ?? "").trim().split(/\s+/)[0] || full;
+}
+
+function durationLabel(startsAt: string, endsAt: string): string {
+  const h = Math.max(0, (new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 3600000);
+  return Number.isInteger(h) ? `${h}h` : `${h.toFixed(1)}h`;
+}
+
 function ShiftChip({
-  shift, view, settings, staffName, clientName, onClick,
+  shift, view, settings, staffName, clientName, onClick, hasConflict,
 }: {
   shift: ShiftRow;
   view: ViewMode;
@@ -755,36 +975,74 @@ function ShiftChip({
   staffName: string;
   clientName: string;
   onClick: () => void;
+  hasConflict?: boolean;
 }) {
   const compact = settings.density === "compact";
   const isOpen = !shift.staff_id;
   const label = shiftTypeLabel(shift);
+  const code = (shift.service_code ?? shift.job_code ?? "").toUpperCase();
+  const isSegment = !!shift.parent_shift_id;
+  const isDraft = shift.status === "draft" || (!shift.published && shift.status !== "published");
+  const fromNectar = (shift.created_from ?? "").toLowerCase().startsWith("nectar");
+  const timeStr = `${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)}`;
+  const dur = durationLabel(shift.starts_at, shift.ends_at);
 
   if (isOpen) {
     return (
-      <button className="sched-chip" onClick={onClick} style={{ ...chipBase, ...(compact ? chipCompact : null), background: SCHED.gapBg, borderColor: "#f3c9c6", color: SCHED.gap, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-        <span>{label} · open</span>
+      <button className="sched-chip" onClick={onClick} style={{ ...chipBase, ...(compact ? chipCompact : null), background: SCHED.gapBg, borderColor: "#f3c9c6", color: SCHED.gap, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, ...(hasConflict ? { border: "2px solid #dc2626" } : null) }}>
+        <span>{code || label} · open</span>
         <span style={{ background: SCHED.gap, color: "#fff", borderRadius: 6, fontSize: 9.5, padding: "2px 6px", fontWeight: 700 }}>Assign</span>
       </button>
     );
   }
 
-  const hex = settings.colorBy === "staff" && shift.staff_id ? staffHex(shift.staff_id) : shiftAccentHex(shift);
-  let top: string;
-  let sub: string;
-  if (view === "staff") { top = label; sub = settings.showTimes ? `${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)}` : ""; }
-  else if (view === "client") { top = staffName; sub = `${label}${settings.showTimes ? ` · ${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)}` : ""}`; }
-  else { top = label; sub = `${clientName}${settings.showTimes ? ` · ${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)}` : ""}`; }
+  const hex = settings.colorBy === "staff" && shift.staff_id
+    ? staffHex(shift.staff_id)
+    : (FAMILY_HEX[familyForCode(code)] ?? shiftAccentHex(shift));
+
+  // Who-line: staff first name, plus the client's first name on 1:1 work
+  // (anything that isn't whole-house coverage). In client view the row IS the
+  // client, so the staff name carries the cell.
+  const showClient = clientName && clientName !== "House" && view !== "client";
+  const who = view === "client"
+    ? firstName(staffName)
+    : showClient
+      ? `${firstName(staffName)} → ${firstName(clientName)}`
+      : firstName(staffName);
+
+  const border = hasConflict
+    ? "2px solid #dc2626"
+    : isDraft
+      ? `1.5px dashed ${hex}88`
+      : `1px solid ${hex}55`;
 
   return (
     <button
       className="sched-chip"
       onClick={onClick}
-      title={`${label} · ${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)} — click to edit`}
-      style={{ ...chipBase, ...(compact ? chipCompact : null), background: hex + "1a", borderColor: hex + "55", color: hex, opacity: shift.published ? 1 : 0.8 }}
+      title={`${label} · ${timeStr} (${dur})${isDraft ? " · draft" : ""}${hasConflict ? " · has conflict" : ""}${fromNectar ? " · NECTAR-suggested" : ""} — click to edit`}
+      style={{
+        ...chipBase, ...(compact ? chipCompact : null),
+        background: hex + "14", color: hex, border,
+        opacity: isDraft ? 0.85 : 1,
+      }}
     >
-      <span>{top}</span>
-      {sub && <small style={{ display: "block", fontWeight: 500, opacity: 0.82, fontSize: compact ? 9.5 : 10 }}>{sub}</small>}
+      <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+        <span style={{
+          background: hex, color: "#fff", borderRadius: 5, fontSize: compact ? 8.5 : 9,
+          fontWeight: 800, letterSpacing: ".03em", padding: "1.5px 5px", flexShrink: 0,
+        }}>
+          {code || "—"}{isSegment ? " · 1:1" : ""}
+        </span>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{who}</span>
+        {fromNectar && <Sparkles aria-label="NECTAR-suggested" style={{ width: 11, height: 11, flexShrink: 0, color: "#d97a1c" }} />}
+      </span>
+      {settings.showTimes && (
+        <small style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 500, opacity: 0.85, fontSize: compact ? 9.5 : 10 }}>
+          {timeStr}
+          <span style={{ background: hex + "22", borderRadius: 4, padding: "0.5px 4px", fontWeight: 700 }}>{dur}</span>
+        </small>
+      )}
     </button>
   );
 }

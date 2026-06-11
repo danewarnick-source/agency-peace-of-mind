@@ -18,6 +18,8 @@ export type ShiftRow = {
   recurrence_end_date: string | null;
   /** Set on 1:1 segments nested inside a base shift. */
   parent_shift_id: string | null;
+  service_code: string | null;
+  created_from: string | null;
 };
 export type ClientRow = { id: string; first_name: string; last_name: string; team_id: string | null; job_code: string[] };
 export type TeamRow = { id: string; team_name: string };
@@ -38,7 +40,7 @@ export function useSchedulePreview(weekStart: Date) {
       const [shiftsRes, clientsRes, teamsRes, membersRes] = await Promise.all([
         supabase
           .from("scheduled_shifts")
-          .select("id, staff_id, client_id, job_code, shift_type, starts_at, ends_at, status, published, is_recurring, recurrence_rule, recurrence_end_date, parent_shift_id")
+          .select("id, staff_id, client_id, job_code, shift_type, starts_at, ends_at, status, published, is_recurring, recurrence_rule, recurrence_end_date, parent_shift_id, service_code, created_from")
           .eq("organization_id", orgId!)
           .gte("starts_at", weekStart.toISOString())
           .lt("starts_at", weekEnd.toISOString()),

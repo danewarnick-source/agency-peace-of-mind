@@ -25,14 +25,17 @@ interface Props {
   shifts: CoverageShift[];
   requirements?: CoverageRequirement[];
   className?: string;
+  /** Tiny variant for All-homes week cells: thin bar + one-line label. */
+  micro?: boolean;
 }
 
 /**
  * 24-hour coverage bar (00:00 → 24:00) for a single day at a single location.
- * Renders each shift as a colored band by service-code family, and overlays
- * gaps where staffing count falls below the requirement for that window.
+ * Renders each shift as a colored band by service-code family, overlays
+ * red-striped gaps where staffing falls below the requirement and
+ * green-striped bands where it exceeds it (over-coverage).
  */
-export function CoverageBar24h({ day, shifts, requirements = [], className }: Props) {
+export function CoverageBar24h({ day, shifts, requirements = [], className, micro }: Props) {
   const dayStart = useMemo(() => {
     const d = new Date(day);
     d.setHours(0, 0, 0, 0);
@@ -42,6 +45,7 @@ export function CoverageBar24h({ day, shifts, requirements = [], className }: Pr
 
   const bands = useMemo(() => {
     return shifts
+      .filter((s) => !s.parent_shift_id) // segments don't add home coverage
       .map((s) => {
         const s0 = Math.max(new Date(s.starts_at).getTime(), dayStart);
         const s1 = Math.min(new Date(s.ends_at).getTime(), dayEnd);
@@ -55,20 +59,39 @@ export function CoverageBar24h({ day, shifts, requirements = [], className }: Pr
       .filter(Boolean) as Array<{ id: string; left: number; width: number; cls: ReturnType<typeof classesForCode>; open: boolean }>;
   }, [shifts, dayStart, dayEnd]);
 
-  // Gap segments: minute-by-minute coverage vs requirement. Segments
-  // subtract their staff from home coverage (see coverage-count.ts).
-  const gaps = useMemo(() => {
-    if (requirements.length === 0) return [] as Array<{ left: number; width: number }>;
+  // Minute-by-minute coverage vs requirement (segments subtract their staff).
+  const { gaps, overs } = useMemo(() => {
+    if (requirements.length === 0) return { gaps: [], overs: [] } as {
+      gaps: Array<{ left: number; width: number }>;
+      overs: Array<{ left: number; width: number }>;
+    };
     const minutes = coverageCountMinutes(dayStart, shifts);
     const required = requiredMinutes(requirements);
-    return uncoveredBands(minutes, required);
+    const gaps = uncoveredBands(minutes, required);
+    // Over-coverage: staffing above a non-zero requirement.
+    const overs: Array<{ left: number; width: number }> = [];
+    let i = 0;
+    const n = 24 * 60;
+    while (i < n) {
+      if (required[i] > 0 && minutes[i] > required[i]) {
+        const start = i;
+        while (i < n && required[i] > 0 && minutes[i] > required[i]) i++;
+        overs.push({ left: (start / n) * 100, width: ((i - start) / n) * 100 });
+      } else i++;
+    }
+    return { gaps, overs };
   }, [shifts, requirements, dayStart]);
 
   const hasGap = gaps.length > 0;
+  const hasOver = overs.length > 0;
+  const staffedCount = useMemo(
+    () => new Set(shifts.filter((s) => s.staff_id && !s.parent_shift_id).map((s) => s.staff_id)).size,
+    [shifts],
+  );
 
   return (
     <div className={cn("w-full", className)}>
-      <div className="relative h-3 w-full rounded-md bg-muted/50 overflow-hidden">
+      <div className={cn("relative w-full rounded-md bg-muted/50 overflow-hidden", micro ? "h-2" : "h-3")}>
         {bands.map((b) => (
           <div
             key={b.id}
@@ -78,6 +101,19 @@ export function CoverageBar24h({ day, shifts, requirements = [], className }: Pr
             )}
             style={{ left: `${b.left}%`, width: `${b.width}%` }}
             title={b.open ? "Open / unassigned" : undefined}
+          />
+        ))}
+        {overs.map((o, i) => (
+          <div
+            key={`over-${i}`}
+            className="absolute top-0 h-full"
+            style={{
+              left: `${o.left}%`,
+              width: `${o.width}%`,
+              backgroundImage:
+                "repeating-linear-gradient(45deg, rgba(16,185,129,0.55) 0 3px, transparent 3px 6px)",
+            }}
+            title="Over-coverage (staffing above requirement)"
           />
         ))}
         {gaps.map((g, i) => (
@@ -94,17 +130,30 @@ export function CoverageBar24h({ day, shifts, requirements = [], className }: Pr
           />
         ))}
       </div>
-      <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-muted-foreground tabular-nums">
-        <span>0</span>
-        <span>6</span>
-        <span>12</span>
-        <span>18</span>
-        <span>24</span>
-      </div>
-      {requirements.length > 0 && (
-        <div className={cn("mt-1 text-[11px] font-semibold", hasGap ? "text-destructive" : "text-emerald-600")}>
-          {hasGap ? "⚠ Coverage gap" : "✓ Requirement met"}
+      {micro ? (
+        <div
+          className={cn(
+            "mt-0.5 text-[9px] font-semibold leading-none tabular-nums",
+            hasGap ? "text-destructive" : "text-muted-foreground",
+          )}
+        >
+          {hasGap ? "gap" : hasOver ? "over" : staffedCount > 0 ? `${staffedCount} staff` : "—"}
         </div>
+      ) : (
+        <>
+          <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-muted-foreground tabular-nums">
+            <span>0</span>
+            <span>6</span>
+            <span>12</span>
+            <span>18</span>
+            <span>24</span>
+          </div>
+          {requirements.length > 0 && (
+            <div className={cn("mt-1 text-[11px] font-semibold", hasGap ? "text-destructive" : "text-emerald-600")}>
+              {hasGap ? "⚠ Coverage gap" : hasOver ? "✓ Met (over-staffed in places)" : "✓ Requirement met"}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

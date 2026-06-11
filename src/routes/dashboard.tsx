@@ -346,6 +346,18 @@ function DashboardLayout() {
               </div>
             </div>
 
+            <div className="hidden flex-1 justify-center px-4 md:flex">
+              {!isHiveExecView && (
+                <NectarSearchBar
+                  nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
+                  isAdminCapable={isAdminCapable && effectiveView === "admin"}
+                  variant="desktop"
+                  askRoute="/dashboard/help"
+                />
+              )}
+            </div>
+
+
             <div className="flex items-center gap-2">
               <button
                 type="button"

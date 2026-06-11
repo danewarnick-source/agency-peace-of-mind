@@ -222,7 +222,7 @@ export function NectarCommandBar({
           className="nbar-input"
           value={sentence}
           onChange={(e) => setSentence(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && sentence.trim()) ask.mutate(); }}
+          onKeyDown={(e) => { if (e.key === "Enter" && sentence.trim()) ask.mutate(undefined); }}
           placeholder='Ask NECTAR — “cover Maple this week”, “Shandi off Thu–Sat”, “fill Oak’s Wed overnight”'
           disabled={ask.isPending}
           style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#fff", fontSize: 14, fontFamily: "inherit", minWidth: 0 }}

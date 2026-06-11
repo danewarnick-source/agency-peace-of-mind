@@ -89,3 +89,40 @@ Tasks 0–8 complete, merged to `main`. SQL handoffs pending (see below).
 - New `coverage-count.ts`: base shifts +1, segments −1 (only when their parent is in the set and same staff), clamped ≥0; both CoverageBar24h and the day drawer consume it (d).
 - PTO checks (engine + editor advisory) switched to strict inequality for consistency with (a).
 - Swap-partner, auto-assign, eligibility overlap math already strict — verified, untouched.
+
+---
+
+# Mobile experience pass (2026-06-11, branch `claude/mobile-pass`)
+
+Presentation/navigation only — no business logic, queries, or desktop (md+)
+layouts changed. Commits: `fc9d77c` dialogs→bottom sheets · `fa6d40c` scheduler
+mobile Day view · `9f04397` staff agenda polish · `e3bf631` global hygiene ·
+`574dd33` PWA.
+
+## Phone verification checklist (test at 375px / a real phone)
+
+**Admin scheduler (`/dashboard/schedule-preview`)**
+1. On a phone you see the Day view: date strip + location chips + cards — the desktop week grid (and its crushed SUN/MON/TUE header) never appears. On a desktop/tablet ≥768px the old board is pixel-identical.
+2. Swipe the date strip sideways; today has an amber dot; tapping a day loads that day (tapping into next week refetches that week).
+3. Location chips (All / Maple House / 1-on-1) filter the cards; host homes are tagged "· host".
+4. "Needs your approval" sits near the top — approving/denying a time-off or swap request is one tap. Open shifts (when any exist) show one-tap Approve/Deny for claims.
+5. Coverage strip: Maple House shows the mini 24h bar (red stripes where staffing is below the rules); a host home shows the three status dots; tapping a row opens the day timeline.
+6. Each shift card shows code chip (family color), Staff → Client first names, time + duration badge, and a status chip; drafts have dashed borders; conflicts a red border. Tapping a card opens the editor as a BOTTOM SHEET, not a centered modal.
+7. Tap the floating + → the client → code → time → staff stepper runs full-screen per step; Start/End pickers are stacked; Back/Next are full-width thumb buttons; finish creating a shift end-to-end on the phone.
+8. Nothing scrolls horizontally at 375px except the date strip / chip rows.
+
+**Staff agenda (`/dashboard/schedule`, staff view)**
+9. Today's agenda loads first; "Open shifts you're qualified for" appears at the top when one exists (Claim is one tap).
+10. A pending shift card shows full-width Accept / Decline thumb buttons (48px); accepting works; tapping an accepted hourly shift deep-links into the client's clock-in tab.
+11. No horizontal scroll anywhere on the page at 375px.
+
+**Global hygiene**
+12. Open any dialog on a phone (e.g. Request time off, shift editor) → it slides up as a bottom sheet with a 44px close target; on desktop it's still the centered modal.
+13. Billing Overview, 520 grid, Service Code Registry, Service Catalog: tables scroll sideways inside their container and the first column stays pinned while you scroll.
+14. Admin header on a phone: tap the amber search icon → the NECTAR ask bar expands full-width on a navy strip; search works; tap again to collapse.
+15. Hamburger menu opens the sidebar sheet; tapping a nav link navigates AND closes it.
+
+**PWA**
+16. Visit the deployed app in mobile Chrome/Safari → "Add to Home Screen" offers "Hive" with the hex icon.
+17. Launch from the home screen → opens standalone (no browser chrome), navy splash, and stays standalone through login.
+18. Airplane mode → relaunch: the shell still opens (offline fallback). Data needs a connection — by design nothing from the API/PHI is ever cached (verify in DevTools → Application → Cache Storage: only `hive-shell-v1` / `hive-assets-v1` with HTML, icons, and /assets/* files).

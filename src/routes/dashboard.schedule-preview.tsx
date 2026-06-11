@@ -314,7 +314,7 @@ function ViewSeg({ value, onChange, disabled }: { value: ViewMode; onChange: (v:
 
 // ── All-homes status board ────────────────────────────────────────────
 function AllHomesBoard({
-  days, sites, siteClients, siteShifts, settings, onPickSite,
+  days, sites, siteClients, siteShifts, settings, onPickSite, onOpenDay,
 }: {
   days: Date[];
   sites: { id: string; name: string }[];
@@ -322,6 +322,7 @@ function AllHomesBoard({
   siteShifts: Map<string, ShiftRow[]>;
   settings: Settings;
   onPickSite: (id: string) => void;
+  onOpenDay?: (siteId: string, siteName: string, day: Date) => void;
 }) {
   if (sites.length === 0) return <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>No sites yet.</div>;
   return (
@@ -355,7 +356,16 @@ function AllHomesBoard({
                   else if (open > 0) content = <div style={{ ...statusBase, ...statusOpen }}><span style={dot} />{open} open</div>;
                   else if (type === "residential") content = <div style={{ ...statusBase, ...statusCov }}>✓ 24h</div>;
                   else content = <div style={{ ...statusBase, ...statusCov }}><span style={dot} />{setCnt} set</div>;
-                  return <td key={i} style={gTd}>{content}</td>;
+                  return (
+                    <td
+                      key={i}
+                      style={{ ...gTd, cursor: "pointer" }}
+                      onClick={(e) => { e.stopPropagation(); onOpenDay?.(s.id, s.name, d); }}
+                      title="Open day timeline"
+                    >
+                      {content}
+                    </td>
+                  );
                 })}
               </tr>
             );

@@ -125,7 +125,7 @@ function SchedulePreviewPage() {
   const shiftLabelById = useMemo(() => {
     const m = new Map<string, string>();
     const cMap = new Map((data?.clients ?? []).map((c) => [c.id, `${c.first_name} ${c.last_name}`.trim()]));
-    const sMap = new Map((data?.staff ?? []).map((p) => [p.id, p.full_name ?? "Staff"]));
+    const sMap = new Map((data?.staff ?? []).map((p) => [p.id, p.name ?? "Staff"]));
     for (const sh of data?.shifts ?? []) {
       const d = new Date(sh.starts_at);
       const day = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });

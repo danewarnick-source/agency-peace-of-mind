@@ -79,7 +79,7 @@ export const evaluateRange = createServerFn({ method: "POST" })
     if (data.locationId) q = q.eq("location_id", data.locationId);
     const { data: shifts, error } = await q;
     if (error) throw error;
-    const shiftRows = (shifts ?? []) as ConflictContext["staff"] extends never ? never : Parameters<typeof evaluateShifts>[0];
+    const shiftRows = (shifts ?? []) as Parameters<typeof evaluateShifts>[0];
 
     // 2) rule settings
     const { data: cfg } = await supabase

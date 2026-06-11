@@ -32,7 +32,8 @@ export const respondToShift = createServerFn({ method: "POST" })
       patch.notes = `${prefix}Declined: ${data.declineReason}`;
     }
     const { error: uErr } = await supabase
-      .from("scheduled_shifts").update(patch).eq("id", data.shiftId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("scheduled_shifts").update(patch as any).eq("id", data.shiftId);
     if (uErr) throw uErr;
 
     if (data.response === "declined") {

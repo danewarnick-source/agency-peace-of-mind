@@ -429,6 +429,16 @@ function SchedulePreviewPage() {
           onChanged={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
         />
       )}
+
+      {org?.organization_id && (
+        <AutoAssignDrawer
+          open={autoAssignOpen}
+          onOpenChange={setAutoAssignOpen}
+          organizationId={org.organization_id}
+          weekStart={weekStart}
+          onApplied={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
+        />
+      )}
     </Shell>
   );
 }

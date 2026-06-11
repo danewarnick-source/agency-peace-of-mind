@@ -231,7 +231,7 @@ export function NectarCommandBar({
           Examples
         </button>
         <button
-          onClick={() => ask.mutate()}
+          onClick={() => ask.mutate(undefined)}
           disabled={ask.isPending || !sentence.trim()}
           style={{ background: SCHED.gold, color: SCHED.navy, border: "none", borderRadius: 9, padding: "8px 15px", fontWeight: 700, fontSize: 13, flex: "none", cursor: "pointer", opacity: ask.isPending || !sentence.trim() ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}
         >

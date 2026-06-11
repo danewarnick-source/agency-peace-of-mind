@@ -225,38 +225,6 @@ function SchedulePreviewPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
-          <PublishDraftsButton
-            shifts={data?.shifts ?? []}
-            weekStart={weekStart}
-            onPublished={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
-          />
-          <button style={btn()} onClick={() => setTargetsOpen(true)}>Weekly targets</button>
-          <button style={btn()} onClick={() => setLocationsOpen(true)}>Locations</button>
-          <button style={btn()} onClick={() => setCoverageOpen(true)}>Coverage rules</button>
-          <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
-          <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
-          <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>
-        </div>
-      </div>
-
-      {/* ── NECTAR command bar (logic reused; styled to match) ────────── */}
-      <NectarCommandBar
-        weekStart={weekStart}
-        clients={data?.clients ?? []}
-        staff={data?.staff ?? []}
-        teams={data?.teams ?? []}
-        shifts={data?.shifts ?? []}
-      />
-
-      {/* ── Controls bar (rounded top, attached to board) ─────────────── */}
-      <div style={controlsBar}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <button style={arrowBtn} onClick={goPrev} aria-label="Previous week">‹</button>
-          <b style={{ fontSize: 14, whiteSpace: "nowrap" }}>{weekLabel}</b>
-          <button style={arrowBtn} onClick={goNext} aria-label="Next week">›</button>
-          <button style={{ ...arrowBtn, width: "auto", padding: "0 10px", fontSize: 12.5, fontWeight: 600 }} onClick={goToday}>Today</button>
-        </div>
-        <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
           <ConflictsPanel
             conflicts={conflicts}
             shiftLabel={(id) => shiftLabelById.get(id) ?? id.slice(0, 8)}

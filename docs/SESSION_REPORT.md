@@ -1,0 +1,86 @@
+# Session Report — Claude Code work order (2026-06-11)
+
+Branch: `claude/busy-cray-w323d6` · all 11 commits typecheck + build green.
+Tasks 0–8 complete. One SQL handoff is pending (locations cleanup).
+
+## Commits (oldest → newest)
+
+| Commit | What it does |
+|---|---|
+| `982d504` Task 0 | CLAUDE.md project brain at repo root |
+| `5f9070e` Task 1 | EVV registry (evvLock=true for exactly ACA, CHA, COM, HSQ, PAC, RP2, RP3, SLH, SLN, CMP, CMS; SEI/RHS/RL6/LPS now non-EVV; +CMP, CMS, ELS, SJD, SJP, SJR), daily codes = {HHS, RHS, PPS, DSG, RL6, RP4, RP5, SED}, `computeEntryUnits()`, stale local daily-code copies repointed |
+| `753ee5c` fix | smart-import page read search params from the parent route (latent type error) |
+| `62e296b` Task 2 | lifecycle cross-org guard, must_change_password enforced at router root, /fix-admin deleted, certificate page → `verify_certificate` RPC, PHI console logging removed |
+| `fbf2ea5` fix | all organization_members↔profiles (and evv_timesheets→profiles) embeds replaced with two queries joined in JS — these failed live (no FK): CE roster, behaviorist picker, swap partners, NECTAR people search, company-overview celebrations, client staff-assignment tab, command-center timesheet queues + open-shifts panel |
+| `765c9cc` Task 3 | nine daily-rate readers now read `hhs_daily_records_v`, billable=true only; "N blocked days" chips (Billing Overview + staff pay-period card) with record_date + blocked_reason tooltips |
+| `1d75466` Task 4 | per-entry quarter-hour math everywhere (accrual.ts + inline loops), `billed_units` written on all four clock-out paths, amber "no worksheet rate on file" badge, Form 520 remaining = full-authorization-window consumption |
+| `de1559d` Task 5 | read-only `/dashboard/settings/service-codes` registry, grouped by category, linked from Settings |
+| `c25d158` Task 6 | teams→locations sync on home create/edit, eligibility host lookup fixed, SQL handoff written |
+| `72457cf` Task 7 | strict-inequality PTO checks; new `coverage-count.ts` — segments subtract their staff from home coverage; both coverage surfaces use it |
+| `83cd31d` Task 8 | scheduler visual layer (micro coverage bars, host-home dots + DS meter, 1:1 target meters, redesigned shift cards, horizontal drag-and-drop day timeline) |
+
+## SQL handoffs pending (docs/SQL_HANDOFF.md)
+
+1. **Locations cleanup** — run block 1b (verify) first; if it already says
+   `Maple House [residential]` skip 1a. Otherwise run 1a then 1b.
+   Note: 1a also wipes `home_designations` (per the work order). The Homes &
+   Teams "care team" designation picker reads that table, so its label list
+   will be empty afterwards — flagging so it's not a surprise. Scheduling
+   eligibility no longer depends on it (host staff now resolve via the team).
+
+## Things for you to double-check (couldn't verify without the DB / state docs)
+
+- **Labels for the six new codes** in `src/lib/evv-codes.ts`: CMP ("Companion
+  Supports – Personal"), CMS ("…– Shared"), SJD/SJP/SJR ("Supported Job
+  Development/Placement/Retention"), ELS ("Employment/Life Skills (Bridge)").
+  EVV flags and behavior are per the work order; the display NAMES are my best
+  guess — correct them in that one file if the contract says otherwise.
+- **Variable-rate codes** now = HHS, RHS, DSI, SEI (was DSI, SEI) per the
+  CLAUDE.md worksheet-rate rule — drives the amber "no worksheet rate" badge.
+- The work order said the bs-config-card embed was already fixed; on this
+  branch's base it wasn't, so I fixed it (and every other instance) here.
+
+## Click-by-click verification checklist
+
+**Auth & security**
+1. Settings → set a test user's `must_change_password` (or invite flow) → log in as them → every URL (deep link too) should bounce to /reset-password until the password is changed.
+2. Visit `/fix-admin` → 404.
+3. Open a certificate link `/certificate/<code>` logged OUT → certificate renders (now via RPC).
+4. As an admin: archive + delete a test employee in your own org → still works.
+
+**Broken-list fixes (embed repairs — these were empty before)**
+5. Settings → CE hours roster: staff now listed.
+6. Client → Behavior Support card: behaviorist dropdown now has people.
+7. Command Center: Pending/Approved/Rejected EVV tabs show staff names; ">16h open shifts" panel populates.
+8. NECTAR search bar: searching a staff name returns them.
+
+**Billing (Tasks 3–4)**
+9. Billing Overview: muted "N blocked days" chip appears when a daily record is non-billable; hover lists date + reason. Daily "Used" only counts billable days.
+10. Staff (host-home) pay card: Host Home line counts only billable days; blocked days listed under the subtotal.
+11. Clock in/out on any code → the new evv_timesheets row has `billed_units` = duration rounded to nearest 15 min (check via SQL or admin).
+12. Form 520: Remaining column shows "used / authorized" subtitle and reflects the WHOLE authorization window even when viewing one month.
+13. Client billing page → a code card for HHS/RHS/DSI/SEI with rate 0 shows the amber "no worksheet rate on file" badge instead of $0.
+
+**Service-code registry (Task 5)**
+14. Settings → "Service Code Registry" card (admin or manager) → table grouped by category with EVV Yes/No, rate source, default rate, cadence, caps, asleep-billable; search filters it.
+
+**Locations (Task 6, after SQL handoff)**
+15. Scheduler → Locations: only real homes (Maple House), no role names.
+16. Homes & Teams → add a test home → it appears in Scheduler → Locations with the right type; rename it → location renames.
+
+**Scheduler (Tasks 7–8)**
+17. All homes view: residential rows show per-day 24h micro bars (red stripes only where staffing < coverage rules; green stripes where above). Host-home rows show 3 dots/day + weekly DS meter; never red.
+18. Create two back-to-back shifts (one ends 15:00, next starts 15:00, same staff) → NO overlap conflict.
+19. Add a 1:1 segment (DSI) inside a base shift → no conflict; try a daily code or times outside the parent → blocked/hard conflict.
+20. With a 1-staff coverage requirement and a segment running, the coverage bar should show a red gap during the segment window (staff excluded from count).
+21. Shift cards: code chip colored by family, "Staff → Client" names, time + duration badge, dashed border on drafts, red border when conflicted, sparkle on NECTAR-created shifts.
+22. Click a day cell → bottom drawer: horizontal 24h axis, staff swimlanes, required band (red stripes where uncovered). Drag a block sideways → snaps to 15 min and saves; tap a block → editor opens. Check on a phone (375px): timeline scrolls sideways.
+
+## Task 7 code-review notes (no test runner in repo, so logic verified by review)
+
+- `overlaps()` in conflicts.ts uses strict `<` both sides → end==start is not an overlap (a).
+- Segment↔parent pairs skip `staff_overlap`; rest-rule also skips the pair (b).
+- `daily_on_segment` + `segment_outside_parent` are hard conflicts in the engine AND rejected at write time in `createShift` (c).
+- New `coverage-count.ts`: base shifts +1, segments −1 (only when their parent is in the set and same staff), clamped ≥0; both CoverageBar24h and the day drawer consume it (d).
+- PTO checks (engine + editor advisory) switched to strict inequality for consistency with (a).
+- Swap-partner, auto-assign, eligibility overlap math already strict — verified, untouched.

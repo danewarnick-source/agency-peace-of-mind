@@ -10,6 +10,7 @@ import { listLocations } from "@/lib/scheduling/locations.functions";
 import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
 import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
+import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
 import { WeeklyTargetMeter } from "@/components/scheduling/weekly-target-meter";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {

@@ -134,3 +134,48 @@ create policy "users write own ui dismissals"
 
 **What you'll see:** "Success". After this runs, dismissing the amber "How host
 homes (HHS) work" banner keeps it gone for that user across reloads/devices.
+
+---
+
+## 5. HHS monthly attendance certifications (HHS clarity pass, 2026-06-11)
+
+Month-end sign-off for an HHS client's attendance roll-up. Org-scoped, stores
+the signer + timestamp + a snapshot of the month's counts. Until this table
+exists, the HHS hub's "Certify month" button is disabled with a "Pending
+database update" tooltip and the Monthly Attendance tab still renders.
+
+```sql
+create table if not exists public.hhs_monthly_certifications (
+  id              uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  client_id       uuid not null references public.clients(id) on delete cascade,
+  month           date not null,            -- first of the certified month (YYYY-MM-01)
+  present_days    integer not null default 0,
+  away_days       integer not null default 0,
+  blocked_days    integer not null default 0,
+  certified_by    uuid not null references auth.users(id),
+  certified_at    timestamptz not null default now(),
+  unique (organization_id, client_id, month)
+);
+
+grant select, insert, update, delete on public.hhs_monthly_certifications to authenticated;
+grant all on public.hhs_monthly_certifications to service_role;
+
+alter table public.hhs_monthly_certifications enable row level security;
+
+-- Org members may read their org's certifications.
+create policy "org members read hhs certifications"
+  on public.hhs_monthly_certifications for select to authenticated
+  using (public.is_org_member(organization_id, auth.uid()));
+
+-- Only admins/managers may write (matches the in-app gate).
+create policy "org managers write hhs certifications"
+  on public.hhs_monthly_certifications for all to authenticated
+  using (public.is_org_admin_or_manager(organization_id, auth.uid()))
+  with check (public.is_org_admin_or_manager(organization_id, auth.uid()));
+```
+
+**What you'll see:** "Success". The HHS hub → Monthly Attendance → "Certify
+month" button becomes enabled for admins/managers; certifying stores the
+snapshot and the tab then shows "Certified by … on … · N present / N away /
+N unbillable". Uncertified past months show an amber "Needs certification" chip.

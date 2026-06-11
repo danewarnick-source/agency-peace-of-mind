@@ -345,6 +345,7 @@ Hard rules:
 - Pick a job_code only from that client's schedulable_codes. If the code in the row is not in the list, put the row in "unmatched".
 - Times must be full ISO 8601 with the local offset. Resolve dates from columns like "date", "shift_date", or combined "start"/"end".
 - Skip the header row and any blank lines.
+- If you must return "ask", also set "reply_type": "yes_no" for binary, "options" with 2–5 short labels for concrete choices, or "text" / omit for free-form.
 - Return JSON ONLY.`;
 
     const user = JSON.stringify({

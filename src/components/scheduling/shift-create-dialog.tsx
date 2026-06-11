@@ -240,7 +240,7 @@ export function ShiftCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-md:h-dvh max-md:max-h-dvh max-md:rounded-none max-md:content-start">
         <DialogHeader>
           <DialogTitle>New shift</DialogTitle>
           <DialogDescription>
@@ -272,7 +272,7 @@ export function ShiftCreateDialog({
                   key={c.id}
                   onClick={() => setClientId(c.id)}
                   className={cn(
-                    "block w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors",
+                    "block w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors max-md:flex max-md:min-h-11 max-md:items-center",
                     clientId === c.id && "bg-primary/10 font-semibold",
                   )}
                 >
@@ -303,7 +303,7 @@ export function ShiftCreateDialog({
                       key={row.id}
                       onClick={() => setCode(c)}
                       className={cn(
-                        "rounded-md border p-2 text-left text-sm transition-colors",
+                        "rounded-md border p-2 text-left text-sm transition-colors max-md:min-h-14",
                         on ? `${fc.border} ${fc.bgSoft} ring-2 ${fc.ring}` : "border-border hover:bg-muted",
                       )}
                     >
@@ -324,7 +324,7 @@ export function ShiftCreateDialog({
 
         {step === "time" && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 max-md:grid-cols-1">
               <div>
                 <Label>Start</Label>
                 <Input type="datetime-local" value={startPicker} onChange={(e) => setStartPicker(e.target.value)} />
@@ -463,7 +463,7 @@ export function ShiftCreateDialog({
                     onClick={() => setStaffId(r.staffId)}
                     disabled={r.blocked}
                     className={cn(
-                      "block w-full text-left px-3 py-2 text-sm transition-colors",
+                      "block w-full text-left px-3 py-2 text-sm transition-colors max-md:min-h-12",
                       staffId === r.staffId && "bg-primary/10",
                       r.blocked ? "opacity-50 cursor-not-allowed" : "hover:bg-muted",
                     )}
@@ -499,7 +499,7 @@ export function ShiftCreateDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 max-md:sticky max-md:bottom-0 max-md:-mx-6 max-md:mt-auto max-md:border-t max-md:bg-background max-md:px-6 max-md:py-3 max-md:[&_button]:min-h-12 max-md:[&_button]:flex-1">
           {step !== "client" && (
             <Button
               variant="outline"

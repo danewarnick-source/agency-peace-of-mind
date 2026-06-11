@@ -10,7 +10,7 @@ import { listLocations, listCoverageRequirements } from "@/lib/scheduling/locati
 import { listClientWeeklyTargets } from "@/lib/scheduling/targets.functions";
 import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles } from "lucide-react";
+import { Sparkles, CheckCircle2, XCircle, AlertTriangle, CalendarCheck2, Settings as SettingsIcon } from "lucide-react";
 import { classesForCode, familyForCode } from "@/lib/scheduling/code-colors";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
 import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
@@ -87,6 +87,8 @@ function SchedulePreviewPage() {
   const [recurringOpen, setRecurringOpen] = useState(false);
   const [autoAssignOpen, setAutoAssignOpen] = useState(false);
   const [timelineCtx, setTimelineCtx] = useState<{ siteId: string; siteName: string; day: Date } | null>(null);
+  // Mobile Day view (below md): selected day drives which week is fetched.
+  const [mobileDay, setMobileDay] = useState<Date>(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
   const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
   useEffect(() => { setView(settings.defaultView); }, [settings.defaultView]);
@@ -311,6 +313,15 @@ function SchedulePreviewPage() {
   const goNext = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); };
   const goToday = () => setWeekStart(startOfWeek(new Date()));
 
+  // Selecting a day on the mobile strip also moves the fetched week so the
+  // existing week-scoped queries cover it (no data-layer changes).
+  const selectMobileDay = (d: Date) => {
+    const day = new Date(d); day.setHours(0, 0, 0, 0);
+    setMobileDay(day);
+    const ws = startOfWeek(day);
+    if (ws.getTime() !== weekStart.getTime()) setWeekStart(ws);
+  };
+
   const isAll = siteId === "__all__";
   const currentSite = sites.find((s) => s.id === siteId);
   const weekEnd = days[6];
@@ -319,6 +330,46 @@ function SchedulePreviewPage() {
 
   return (
     <Shell>
+      {/* ── Mobile Day view (below md only) ───────────────────────────── */}
+      <div className="md:hidden">
+        <MobileDayBoard
+          day={mobileDay}
+          onSelectDay={selectMobileDay}
+          sites={sites}
+          siteId={siteId}
+          onPickSite={setSiteId}
+          siteClients={siteClients}
+          siteShifts={siteShifts}
+          allShifts={data?.shifts ?? []}
+          staff={data?.staff ?? []}
+          clients={data?.clients ?? []}
+          isLoading={isLoading}
+          conflictShiftIds={conflictShiftIds}
+          hostHomeNames={hostHomeNames}
+          reqsBySiteName={reqsBySiteName}
+          noteDays={hostSignalsQ.data?.noteDays}
+          overnightDays={hostSignalsQ.data?.overnightDays}
+          weekStart={weekStart}
+          weekEndIso={new Date(weekEnd.getTime() + 24 * 3600 * 1000).toISOString()}
+          organizationId={org?.organization_id}
+          onOpenEditor={openEditor}
+          onOpenTimeline={(sid, sname) => setTimelineCtx({ siteId: sid, siteName: sname, day: mobileDay })}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+        {/* Floating create button — launches the existing client→code→time→staff flow. */}
+        <button
+          type="button"
+          aria-label="New shift"
+          onClick={() => { setCreateInitialDay(mobileDay); setCreateOpen(true); }}
+          className="fixed bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full text-2xl font-bold text-white shadow-lg active:scale-95"
+          style={{ background: SCHED.navy }}
+        >
+          +
+        </button>
+      </div>
+
+      {/* ── Desktop board (md+) — unchanged ───────────────────────────── */}
+      <div className="hidden md:block">
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
         <div>
@@ -459,6 +510,7 @@ function SchedulePreviewPage() {
       <p style={{ marginTop: 14, color: SCHED.muted, fontSize: 12.5, textAlign: "center" }}>
         Site type inferred from shift codes (HHS, RHS, DSG, RL6, RP3–5 = residential). Clients with no team are grouped as “1-on-1 Services”.
       </p>
+      </div>{/* end desktop-only block */}
 
       <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} onChange={setSettings} organizationId={org?.organization_id} />
 
@@ -623,6 +675,356 @@ function ViewSeg({ value, onChange, disabled }: { value: ViewMode; onChange: (v:
       })}
     </div>
   );
+}
+
+// ── Mobile Day view (below md) ────────────────────────────────────────
+// Replaces the desktop week grid on phones: a swipeable date strip,
+// location chips, the day's shifts as stacked cards, pinned approvals /
+// open shifts, and a compact coverage strip. Presentation only — it reads
+// the exact same week-scoped data as the desktop board.
+function MobileDayBoard({
+  day, onSelectDay, sites, siteId, onPickSite, siteShifts, siteClients, allShifts, staff, clients,
+  isLoading, conflictShiftIds, hostHomeNames, reqsBySiteName, noteDays, overnightDays,
+  weekStart, weekEndIso, organizationId, onOpenEditor, onOpenTimeline, onOpenSettings,
+}: {
+  day: Date;
+  onSelectDay: (d: Date) => void;
+  sites: { id: string; name: string }[];
+  siteId: string;
+  onPickSite: (id: string) => void;
+  siteShifts: Map<string, ShiftRow[]>;
+  siteClients: Map<string, ClientRow[]>;
+  allShifts: ShiftRow[];
+  staff: StaffRow[];
+  clients: ClientRow[];
+  isLoading: boolean;
+  conflictShiftIds: Set<string>;
+  hostHomeNames: Set<string>;
+  reqsBySiteName: Map<string, ReqRow[]>;
+  noteDays?: Set<string>;
+  overnightDays?: Set<string>;
+  weekStart: Date;
+  weekEndIso: string;
+  organizationId?: string;
+  onOpenEditor: (ctx: EditorContext) => void;
+  onOpenTimeline: (siteId: string, siteName: string) => void;
+  onOpenSettings: () => void;
+}) {
+  const staffNameById = useMemo(() => new Map(staff.map((s) => [s.id, s.name ?? "Staff"])), [staff]);
+  const clientNameById = useMemo(
+    () => new Map(clients.map((c) => [c.id, `${c.first_name} ${c.last_name}`.trim()])),
+    [clients],
+  );
+
+  // 14-day strip: 3 days back through 10 ahead, today highlighted.
+  const strip = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(today); d.setDate(d.getDate() - 3 + i); return d;
+    });
+  }, []);
+  const todayMs = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }, []);
+
+  const isAll = siteId === "__all__";
+  const dayShifts = useMemo(() => {
+    const pool = isAll ? allShifts : (siteShifts.get(siteId) ?? []);
+    return pool
+      .filter((s) => sameDay(new Date(s.starts_at), day))
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  }, [isAll, allShifts, siteShifts, siteId, day]);
+
+  // Coverage strip: real homes only (1-on-1 pseudo-site excluded), honoring
+  // the active location chip.
+  const coverageSites = sites.filter((s) => s.id !== UNASSIGNED_SITE_ID && (isAll || s.id === siteId));
+  const dk = (() => { const x = new Date(day); x.setHours(12); return x.toISOString().slice(0, 10); })();
+
+  return (
+    <div className="space-y-3 pb-24">
+      {/* Compact header */}
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-extrabold tracking-tight" style={{ color: SCHED.ink }}>Scheduler</h1>
+          <p className="text-xs font-medium" style={{ color: SCHED.muted }}>
+            {day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onSelectDay(new Date())}
+            className="min-h-11 rounded-lg border bg-white px-3 text-xs font-semibold"
+            style={{ borderColor: SCHED.line, color: SCHED.ink }}
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            aria-label="Scheduler settings"
+            onClick={onOpenSettings}
+            className="grid h-11 w-11 place-items-center rounded-lg border bg-white"
+            style={{ borderColor: SCHED.line, color: SCHED.ink }}
+          >
+            <SettingsIcon className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Date strip — horizontally scrollable, tap to select */}
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: "none" }}>
+        {strip.map((d) => {
+          const selected = sameDay(d, day);
+          const isToday = d.getTime() === todayMs;
+          return (
+            <button
+              key={d.toISOString()}
+              type="button"
+              onClick={() => onSelectDay(d)}
+              className="flex min-h-14 min-w-12 shrink-0 flex-col items-center justify-center rounded-xl border px-1"
+              style={{
+                background: selected ? SCHED.navy : "#fff",
+                borderColor: selected ? SCHED.navy : SCHED.line,
+                color: selected ? "#fff" : SCHED.ink,
+              }}
+            >
+              <span className="text-[10px] font-bold uppercase tracking-wide opacity-75">
+                {DAY_LABELS[d.getDay()]}
+              </span>
+              <span className="text-base font-extrabold tabular-nums leading-tight">{d.getDate()}</span>
+              <span
+                className="mt-0.5 h-1 w-1 rounded-full"
+                style={{ background: isToday ? "#f59324" : "transparent" }}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Location chips */}
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: "none" }}>
+        <button
+          type="button"
+          onClick={() => onPickSite("__all__")}
+          className="min-h-11 shrink-0 rounded-full border px-3.5 text-xs font-semibold"
+          style={{
+            background: isAll ? SCHED.navy : "#fff",
+            borderColor: isAll ? SCHED.navy : SCHED.line,
+            color: isAll ? "#fff" : SCHED.ink,
+          }}
+        >
+          All
+        </button>
+        {sites.map((s) => {
+          const on = siteId === s.id;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onPickSite(s.id)}
+              className="min-h-11 shrink-0 rounded-full border px-3.5 text-xs font-semibold"
+              style={{
+                background: on ? SCHED.navy : "#fff",
+                borderColor: on ? SCHED.navy : SCHED.line,
+                color: on ? "#fff" : SCHED.ink,
+              }}
+            >
+              {s.id === UNASSIGNED_SITE_ID ? "1-on-1" : s.name}
+              {hostHomeNames.has(s.name.toLowerCase()) && <span className="ml-1 opacity-70">· host</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Pinned: needs-approval + open shifts (one-tap actions live inside) */}
+      <div className="[&_button]:min-h-11">
+        <RequestsPanel weekStart={weekStart} staff={staff} />
+        {organizationId && (
+          <OpenShiftsPanel
+            organizationId={organizationId}
+            startIso={weekStart.toISOString()}
+            endIso={weekEndIso}
+            mode="admin"
+            clientNames={clientNameById}
+            onJumpToShift={(id) => {
+              const shift = allShifts.find((s) => s.id === id);
+              if (shift) onOpenEditor({ shift });
+            }}
+          />
+        )}
+      </div>
+
+      {/* Coverage strip for the selected day */}
+      {coverageSites.length > 0 && (
+        <div className="rounded-xl border bg-white p-3" style={{ borderColor: SCHED.line }}>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide" style={{ color: SCHED.muted }}>
+            Coverage · {day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+          </p>
+          <div className="space-y-2.5">
+            {coverageSites.map((s) => {
+              const isHost = hostHomeNames.has(s.name.toLowerCase());
+              const shifts = (siteShifts.get(s.id) ?? []).filter((sh) => sameDay(new Date(sh.starts_at), day));
+              const homeClients = siteClients.get(s.id) ?? [];
+              if (isHost) {
+                const state = (check: (cid: string) => boolean): "done" | "partial" | "none" => {
+                  if (homeClients.length === 0) return "none";
+                  const n = homeClients.filter((c) => check(c.id)).length;
+                  return n === homeClients.length ? "done" : n > 0 ? "partial" : "none";
+                };
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => onOpenTimeline(s.id, s.name)}
+                    className="flex min-h-11 w-full items-center justify-between gap-2 text-left"
+                  >
+                    <span className="truncate text-xs font-semibold" style={{ color: SCHED.ink }}>
+                      {s.name} <span className="font-normal opacity-60">· host</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <HostDot state={state((cid) => !!noteDays?.has(`${cid}|${dk}`))} label="Daily note" />
+                      <HostDot state={state((cid) => !!overnightDays?.has(`${cid}|${dk}`))} label="Overnight confirmed" />
+                      <HostDot state={shifts.length > 0 ? "done" : "none"} label="Agency visit scheduled" />
+                    </span>
+                  </button>
+                );
+              }
+              const dayReqs = (reqsBySiteName.get(s.name.toLowerCase()) ?? []).filter(
+                (r) => r.day_of_week === null || r.day_of_week === day.getDay(),
+              );
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onOpenTimeline(s.id, s.name)}
+                  className="block min-h-11 w-full text-left"
+                >
+                  <span className="mb-1 block truncate text-xs font-semibold" style={{ color: SCHED.ink }}>{s.name}</span>
+                  <CoverageBar24h
+                    micro
+                    day={day}
+                    shifts={shifts.map((sh) => ({
+                      id: sh.id, starts_at: sh.starts_at, ends_at: sh.ends_at,
+                      staff_id: sh.staff_id, service_code: sh.service_code,
+                      job_code: sh.job_code, parent_shift_id: sh.parent_shift_id,
+                    }))}
+                    requirements={dayReqs}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* The day's shifts as stacked cards */}
+      <div className="space-y-2">
+        <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: SCHED.muted }}>
+          {dayShifts.length === 0 ? "No shifts" : `${dayShifts.length} shift${dayShifts.length === 1 ? "" : "s"}`} this day
+        </p>
+        {isLoading ? (
+          <div className="rounded-xl border bg-white p-6 text-center text-sm" style={{ borderColor: SCHED.line, color: SCHED.muted }}>
+            Loading schedule…
+          </div>
+        ) : dayShifts.length === 0 ? (
+          <div className="rounded-xl border border-dashed bg-white p-6 text-center text-sm" style={{ borderColor: SCHED.line, color: SCHED.muted }}>
+            Nothing scheduled — tap + to add a shift.
+          </div>
+        ) : (
+          dayShifts.map((s) => (
+            <MobileShiftCard
+              key={s.id}
+              shift={s}
+              staffName={staffNameById.get(s.staff_id ?? "") ?? "Open"}
+              clientName={clientNameById.get(s.client_id ?? "") ?? ""}
+              hasConflict={conflictShiftIds.has(s.id)}
+              onClick={() => onOpenEditor({ shift: s })}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MobileShiftCard({
+  shift, staffName, clientName, hasConflict, onClick,
+}: {
+  shift: ShiftRow;
+  staffName: string;
+  clientName: string;
+  hasConflict: boolean;
+  onClick: () => void;
+}) {
+  const code = (shift.service_code ?? shift.job_code ?? "").toUpperCase();
+  const hex = FAMILY_HEX[familyForCode(code)] ?? "#64748b";
+  const isOpen = !shift.staff_id;
+  const status = isOpen
+    ? "open"
+    : shift.status === "accepted" ? "accepted"
+    : shift.status === "declined" ? "declined"
+    : shift.status === "draft" || !shift.published ? "draft"
+    : "published";
+  const isSegment = !!shift.parent_shift_id;
+  const fromNectar = (shift.created_from ?? "").toLowerCase().startsWith("nectar");
+  const timeStr = `${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)}`;
+
+  const statusBits: Record<string, { icon: React.ReactNode; label: string; cls: string }> = {
+    open:      { icon: <AlertTriangle className="h-3.5 w-3.5" />, label: "Open",      cls: "bg-red-50 text-red-700" },
+    draft:     { icon: <CalendarCheck2 className="h-3.5 w-3.5 opacity-50" />, label: "Draft", cls: "bg-slate-100 text-slate-600" },
+    published: { icon: <CalendarCheck2 className="h-3.5 w-3.5" />, label: "Published", cls: "bg-sky-50 text-sky-700" },
+    accepted:  { icon: <CheckCircle2 className="h-3.5 w-3.5" />,  label: "Accepted",  cls: "bg-emerald-50 text-emerald-700" },
+    declined:  { icon: <XCircle className="h-3.5 w-3.5" />,       label: "Declined",  cls: "bg-red-50 text-red-700" },
+  };
+  const bit = statusBits[status];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="block w-full rounded-xl border bg-white p-3 text-left shadow-sm active:scale-[0.99]"
+      style={{
+        borderColor: hasConflict ? "#dc2626" : SCHED.line,
+        borderWidth: hasConflict ? 2 : 1,
+        borderStyle: status === "draft" && !hasConflict ? "dashed" : "solid",
+        minHeight: 64,
+      }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          <span
+            className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-white"
+            style={{ background: hex }}
+          >
+            {code || "—"}{isSegment ? " · 1:1" : ""}
+          </span>
+          <span className="truncate text-sm font-semibold" style={{ color: SCHED.ink }}>
+            {isOpen ? "Open shift" : firstName(staffName)}
+            {clientName && <span className="font-normal" style={{ color: SCHED.muted }}> → {firstName(clientName)}</span>}
+          </span>
+          {fromNectar && <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: "#d97a1c" }} />}
+        </span>
+        <span className={cn2("flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold", bit.cls)}>
+          {bit.icon}{bit.label}
+        </span>
+      </div>
+      <div className="mt-1.5 flex items-center gap-2 text-xs tabular-nums" style={{ color: SCHED.muted }}>
+        {timeStr}
+        <span className="rounded px-1.5 py-0.5 text-[10px] font-bold" style={{ background: hex + "1a", color: hex }}>
+          {durationLabel(shift.starts_at, shift.ends_at)}
+        </span>
+        {hasConflict && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600">
+            <AlertTriangle className="h-3 w-3" /> conflict
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+// Tiny class joiner for the mobile card (avoids importing cn into this
+// inline-styled page for one use).
+function cn2(...parts: Array<string | false | undefined>) {
+  return parts.filter(Boolean).join(" ");
 }
 
 // ── All-homes status board ────────────────────────────────────────────

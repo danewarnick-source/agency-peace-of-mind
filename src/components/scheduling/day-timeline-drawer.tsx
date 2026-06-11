@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { classesForCode, familyForCode, isDailyCode } from "@/lib/scheduling/code-colors";
 import { listShiftsInRange } from "@/lib/scheduling/shifts.functions";
-import { listCoverageRequirements } from "@/lib/scheduling/locations.functions";
+import { listCoverageRequirements, listLocations } from "@/lib/scheduling/locations.functions";
 import { AddSegmentDialog, type ParentShiftInfo } from "@/components/scheduling/add-segment-dialog";
 
 interface Props {
@@ -33,7 +33,16 @@ export function DayTimelineDrawer({
 }: Props) {
   const listCall = useServerFn(listShiftsInRange);
   const listReqsCall = useServerFn(listCoverageRequirements);
+  const listLocCall = useServerFn(listLocations);
   const [segParent, setSegParent] = useState<ParentShiftInfo | null>(null);
+  const [pickedLocId, setPickedLocId] = useState<string | null>(null);
+  const effectiveLocId = pickedLocId ?? locationId ?? null;
+
+  const locsQ = useQuery({
+    enabled: open,
+    queryKey: ["locations", organizationId],
+    queryFn: () => listLocCall({ data: { organizationId } }),
+  });
 
   const dayStartIso = useMemo(() => {
     if (!day) return null;
@@ -46,21 +55,21 @@ export function DayTimelineDrawer({
 
   const shiftsQ = useQuery({
     enabled: open && !!dayStartIso && !!dayEndIso,
-    queryKey: ["day-timeline", organizationId, dayStartIso, dayEndIso, locationId],
+    queryKey: ["day-timeline", organizationId, dayStartIso, dayEndIso, effectiveLocId],
     queryFn: () => listCall({
       data: {
         organizationId,
         startIso: dayStartIso!,
         endIso: dayEndIso!,
-        locationId: locationId ?? undefined,
+        locationId: effectiveLocId ?? undefined,
       },
     }),
   });
 
   const reqsQ = useQuery({
-    enabled: open && !!locationId,
-    queryKey: ["coverage-reqs", organizationId, locationId],
-    queryFn: () => listReqsCall({ data: { organizationId, locationId: locationId! } }),
+    enabled: open && !!effectiveLocId,
+    queryKey: ["coverage-reqs", organizationId, effectiveLocId],
+    queryFn: () => listReqsCall({ data: { organizationId, locationId: effectiveLocId! } }),
   });
 
   const dayStartMs = day ? new Date(day).setHours(0, 0, 0, 0) : 0;
@@ -114,8 +123,32 @@ export function DayTimelineDrawer({
           </SheetDescription>
         </SheetHeader>
 
+        <div className="mt-3 mb-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Location</div>
+          <div className="flex flex-wrap gap-1">
+            <button
+              onClick={() => setPickedLocId(null)}
+              className={`min-h-[36px] rounded-md border px-2 text-xs font-semibold transition-colors ${effectiveLocId === null ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+            >
+              All
+            </button>
+            {(locsQ.data ?? []).filter((l) => l.active !== false).map((l) => {
+              const on = effectiveLocId === l.id;
+              return (
+                <button
+                  key={l.id}
+                  onClick={() => setPickedLocId(l.id)}
+                  className={`min-h-[36px] rounded-md border px-2 text-xs font-semibold transition-colors ${on ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                >
+                  {l.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {day && (
-          <div className="mt-4 mb-3">
+          <div className="mt-3 mb-3">
             <Button size="sm" className="w-full" onClick={() => onCreateClick?.(day)}>
               + Add shift on this day
             </Button>

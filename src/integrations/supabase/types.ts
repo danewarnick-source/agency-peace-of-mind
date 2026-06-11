@@ -2970,6 +2970,7 @@ export type Database = {
           ai_trigger_reasons: string[] | null
           approved_at: string | null
           approved_by: string | null
+          billed_units: number | null
           client_id: string
           clock_in_timestamp: string
           clock_out_timestamp: string | null
@@ -3026,6 +3027,7 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           approved_at?: string | null
           approved_by?: string | null
+          billed_units?: number | null
           client_id: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
@@ -3082,6 +3084,7 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           approved_at?: string | null
           approved_by?: string | null
+          billed_units?: number | null
           client_id?: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
@@ -7821,50 +7824,71 @@ export type Database = {
       }
       service_codes: {
         Row: {
+          allowed_on_segment: boolean
+          asleep_billable: boolean
           carve_out: boolean
           category: string
           code: string
           created_at: string
+          default_rate: number | null
           id: string
           is_active: boolean
           is_living_arrangement: boolean
+          max_daily_hours: number | null
+          max_weekly_hours: number | null
           name: string | null
           organization_id: string
+          rate_source: string
           requires_evv: boolean
           requires_schedule: boolean
           scheduling_behavior: string
+          summary_cadence: string
           unit: string
           updated_at: string
         }
         Insert: {
+          allowed_on_segment?: boolean
+          asleep_billable?: boolean
           carve_out?: boolean
           category: string
           code: string
           created_at?: string
+          default_rate?: number | null
           id?: string
           is_active?: boolean
           is_living_arrangement?: boolean
+          max_daily_hours?: number | null
+          max_weekly_hours?: number | null
           name?: string | null
           organization_id: string
+          rate_source?: string
           requires_evv?: boolean
           requires_schedule?: boolean
           scheduling_behavior: string
+          summary_cadence?: string
           unit: string
           updated_at?: string
         }
         Update: {
+          allowed_on_segment?: boolean
+          asleep_billable?: boolean
           carve_out?: boolean
           category?: string
           code?: string
           created_at?: string
+          default_rate?: number | null
           id?: string
           is_active?: boolean
           is_living_arrangement?: boolean
+          max_daily_hours?: number | null
+          max_weekly_hours?: number | null
           name?: string | null
           organization_id?: string
+          rate_source?: string
           requires_evv?: boolean
           requires_schedule?: boolean
           scheduling_behavior?: string
+          summary_cadence?: string
           unit?: string
           updated_at?: string
         }
@@ -10096,6 +10120,18 @@ export type Database = {
           is_group_home_assignment?: boolean | null
           organization_id?: string | null
           tenant_id?: string | null
+        }
+        Relationships: []
+      }
+      hhs_daily_records_v: {
+        Row: {
+          billable: boolean | null
+          blocked_reason: string | null
+          client_id: string | null
+          organization_id: string | null
+          rate_per_unit: number | null
+          record_date: string | null
+          service_code: string | null
         }
         Relationships: []
       }

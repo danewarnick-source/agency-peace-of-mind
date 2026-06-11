@@ -144,14 +144,17 @@ export const decideClaim = createServerFn({ method: "POST" })
 
     try {
       await supabase.from("notifications").insert({
-        user_id: claimant,
+        recipient_user_id: claimant,
+        recipient_role: "employee",
         organization_id: shift.organization_id,
         type: data.approve ? "shift_claim_approved" : "shift_claim_denied",
         title: data.approve ? "Claim approved" : "Claim denied",
         body: data.approve
           ? `Your claim for ${shift.service_code ?? "the open shift"} on ${new Date(shift.starts_at).toLocaleDateString()} was approved.`
           : `Your claim for ${shift.service_code ?? "the open shift"} was not approved.`,
-        link: `/dashboard/schedule`,
+        link_to: `/dashboard/schedule`,
+        related_id: data.shiftId,
+        related_type: "scheduled_shift",
       });
     } catch { /* best-effort */ }
 

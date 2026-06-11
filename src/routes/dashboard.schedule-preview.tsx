@@ -5,10 +5,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Lock } from "lucide-react";
 import { CoverageBar24h } from "@/components/scheduling/coverage-bar-24h";
-import { publishShifts } from "@/lib/scheduling/shifts.functions";
+import { publishShiftsWithNotify } from "@/lib/scheduling/workflow.functions";
 import { listLocations } from "@/lib/scheduling/locations.functions";
 import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
+import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
 import { WeeklyTargetMeter } from "@/components/scheduling/weekly-target-meter";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
@@ -236,6 +237,7 @@ function SchedulePreviewPage() {
           <PublishDraftsButton
             shifts={data?.shifts ?? []}
             weekStart={weekStart}
+            conflictsCount={conflicts.filter(c => c.severity === "hard" || c.severity === "policy_block").length}
             onPublished={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
           />
           <button style={btn()} onClick={() => setTargetsOpen(true)}>Weekly targets</button>
@@ -306,6 +308,19 @@ function SchedulePreviewPage() {
 
       {/* ── Week strip (requests) ─────────────────────────────────────── */}
       <RequestsPanel weekStart={weekStart} staff={data?.staff ?? []} />
+
+      {org?.organization_id && (
+        <ActionNeededCard
+          organizationId={org.organization_id}
+          weekStart={weekStart}
+          staffNames={new Map((data?.staff ?? []).map((p) => [p.id, p.name ?? "Staff"]))}
+          clientNames={new Map((data?.clients ?? []).map((c) => [c.id, `${c.first_name} ${c.last_name}`.trim()]))}
+          onJumpToShift={(id) => {
+            const shift = (data?.shifts ?? []).find((s) => s.id === id);
+            if (shift) openEditor({ shift });
+          }}
+        />
+      )}
 
       <p style={{ marginTop: 14, color: SCHED.muted, fontSize: 12.5, textAlign: "center" }}>
         Site type inferred from shift codes (HHS, RHS, DSG, RL6, RP3–5 = residential). Clients with no team are grouped as “1-on-1 Services”.
@@ -758,31 +773,37 @@ const dot: React.CSSProperties = { width: 7, height: 7, borderRadius: "50%", bac
 const hint: React.CSSProperties = { color: SCHED.muted, fontSize: 12, padding: "10px 14px", borderTop: `1px solid ${SCHED.line}`, background: "#fbfbfe" };
 
 function PublishDraftsButton({
-  shifts, weekStart, onPublished,
+  shifts, weekStart, onPublished, conflictsCount,
 }: {
   shifts: ShiftRow[];
   weekStart: Date;
   onPublished?: () => void;
+  conflictsCount?: number;
 }) {
-  const publish = useServerFn(publishShifts);
+  const publish = useServerFn(publishShiftsWithNotify);
   const [busy, setBusy] = useState(false);
   const weekEnd = useMemo(() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); return d; }, [weekStart]);
-  const draftIds = useMemo(() => shifts
-    .filter((s) => {
-      if (s.published) return false;
-      const t = new Date(s.starts_at).getTime();
-      return t >= weekStart.getTime() && t < weekEnd.getTime();
-    })
-    .map((s) => s.id), [shifts, weekStart, weekEnd]);
+  const draftRows = useMemo(() => shifts.filter((s) => {
+    if (s.published) return false;
+    const t = new Date(s.starts_at).getTime();
+    return t >= weekStart.getTime() && t < weekEnd.getTime();
+  }), [shifts, weekStart, weekEnd]);
+  const draftIds = useMemo(() => draftRows.map((s) => s.id), [draftRows]);
+  const staffCount = useMemo(() => new Set(draftRows.map((s) => s.staff_id).filter(Boolean)).size, [draftRows]);
 
   const count = draftIds.length;
   const disabled = busy || count === 0;
   const handleClick = async () => {
     if (count === 0) return;
+    const conflictLine = conflictsCount ? `\n\n⚠ ${conflictsCount} conflict${conflictsCount === 1 ? "" : "s"} remain in this week.` : "";
+    const proceed = window.confirm(
+      `Publish ${count} shift${count === 1 ? "" : "s"} across ${staffCount} staff?${conflictLine}\n\nEach staff member will be notified to accept or decline.`,
+    );
+    if (!proceed) return;
     setBusy(true);
     try {
-      await publish({ data: { ids: draftIds } });
-      toast.success(`Published ${count} shift${count === 1 ? "" : "s"}`);
+      const res = await publish({ data: { ids: draftIds } });
+      toast.success(`Published ${count} shift${count === 1 ? "" : "s"} · notified ${res.notified} staff`);
       onPublished?.();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Publish failed");

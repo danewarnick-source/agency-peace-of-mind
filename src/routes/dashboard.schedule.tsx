@@ -11,10 +11,12 @@ import {
   User,
   ArrowRight,
 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
+import { respondToShift } from "@/lib/scheduling/workflow.functions";
 import { useGeneralShift } from "@/hooks/use-general-shift";
 import { fmtElapsed } from "@/components/staff-mobile/general-time-clock";
 import { Button } from "@/components/ui/button";
@@ -303,53 +305,49 @@ type DeclineMeta = {
 function AcceptDeclineBar({ shiftIds, meta }: { shiftIds: string[] | string; meta?: DeclineMeta }) {
   const ids = Array.isArray(shiftIds) ? shiftIds : [shiftIds];
   const qc = useQueryClient();
-  const { user } = useAuth();
-  const { data: org } = useCurrentOrg();
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
-  const update = async (status: "accepted" | "declined") => {
+  const respond = useServerFn(respondToShift);
+
+  const accept = async () => {
     if (ids.length === 0) return;
-    setBusy(status === "accepted" ? "accept" : "decline");
-    const { error } = await (supabase as any).from("scheduled_shifts").update({ status }).in("id", ids);
-    if (!error && status === "declined" && meta && org?.organization_id) {
-      try {
-        // Best-effort staff display name for the admin notification.
-        let staffName = (user?.user_metadata as any)?.full_name as string | undefined;
-        if (!staffName && user?.id) {
-          const { data: prof } = await (supabase as any)
-            .from("profiles").select("first_name, last_name").eq("id", user.id).maybeSingle();
-          if (prof) staffName = `${prof.first_name ?? ""} ${prof.last_name ?? ""}`.trim();
-        }
-        if (!staffName) staffName = user?.email ?? "A staff member";
-        const dayLabel = new Date(meta.startISO).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-        const time = fmtTimeRange(meta.startISO, meta.endISO);
-        const band = bandLabel(meta.startISO);
-        const clients = meta.clientNames.join(", ");
-        const groupSuffix = meta.clientNames.length > 1 ? ` (1:${meta.clientNames.length} group)` : "";
-        await (supabase as any).from("notifications").insert({
-          organization_id: org.organization_id,
-          recipient_role: "admin",
-          type: "open_shift_warning",
-          urgency: "urgent",
-          title: `${staffName} declined ${meta.homeName} · ${band} ${time}`,
-          body: `${dayLabel} · ${clients}${groupSuffix} — needs re-cover.`,
-          link_to: "/dashboard/scheduling?tab=builder",
-          related_id: ids[0],
-          related_type: "shift_decline",
-        });
-      } catch { /* advisory only — never block the staff action */ }
-    }
-    setBusy(null);
-    if (error) { toast.error(error.message ?? "Could not update shift."); return; }
-    toast.success(status === "accepted" ? "Shift accepted." : "Shift declined — admin will be notified.");
-    qc.invalidateQueries({ queryKey: ["my-scheduled-shifts"] });
-    qc.invalidateQueries({ queryKey: ["builder-data"] });
+    setBusy("accept");
+    try {
+      for (const id of ids) await respond({ data: { shiftId: id, response: "accepted" } });
+      toast.success("Shift accepted.");
+      qc.invalidateQueries({ queryKey: ["my-scheduled-shifts"] });
+      qc.invalidateQueries({ queryKey: ["builder-data"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not accept.");
+    } finally { setBusy(null); }
   };
+
+  const decline = async () => {
+    if (ids.length === 0) return;
+    const reason = window.prompt("Why are you declining? (a short reason is required)")?.trim();
+    if (!reason) { toast.error("A reason is required to decline."); return; }
+    setBusy("decline");
+    try {
+      for (const id of ids) await respond({ data: { shiftId: id, response: "declined", declineReason: reason } });
+      // best-effort context line for admin notification body (already created server-side)
+      if (meta) {
+        const dayLabel = new Date(meta.startISO).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        toast.success(`Declined ${meta.homeName} · ${dayLabel} — admin notified.`);
+      } else {
+        toast.success("Shift declined — admin will be notified.");
+      }
+      qc.invalidateQueries({ queryKey: ["my-scheduled-shifts"] });
+      qc.invalidateQueries({ queryKey: ["builder-data"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not decline.");
+    } finally { setBusy(null); }
+  };
+
   return (
     <div className="flex gap-2">
-      <Button size="sm" variant="outline" className="flex-1 min-h-[44px]" disabled={!!busy} onClick={() => update("declined")}>
+      <Button size="sm" variant="outline" className="flex-1 min-h-[44px]" disabled={!!busy} onClick={decline}>
         {busy === "decline" ? "…" : "Decline"}
       </Button>
-      <Button size="sm" className="flex-1 min-h-[44px]" disabled={!!busy} onClick={() => update("accepted")}>
+      <Button size="sm" className="flex-1 min-h-[44px]" disabled={!!busy} onClick={accept}>
         {busy === "accept" ? "…" : "Accept"}
       </Button>
     </div>

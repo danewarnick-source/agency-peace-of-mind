@@ -9,6 +9,7 @@ import { publishShiftsWithNotify, getActionNeeded } from "@/lib/scheduling/workf
 import { listLocations } from "@/lib/scheduling/locations.functions";
 import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
+import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
 import { WeeklyTargetMeter } from "@/components/scheduling/weekly-target-meter";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
@@ -307,6 +308,19 @@ function SchedulePreviewPage() {
 
       {/* ── Week strip (requests) ─────────────────────────────────────── */}
       <RequestsPanel weekStart={weekStart} staff={data?.staff ?? []} />
+
+      {org?.organization_id && (
+        <ActionNeededCard
+          organizationId={org.organization_id}
+          weekStart={weekStart}
+          staffNames={new Map((data?.staff ?? []).map((p) => [p.id, p.name ?? "Staff"]))}
+          clientNames={new Map((data?.clients ?? []).map((c) => [c.id, `${c.first_name} ${c.last_name}`.trim()]))}
+          onJumpToShift={(id) => {
+            const shift = (data?.shifts ?? []).find((s) => s.id === id);
+            if (shift) openEditor({ shift });
+          }}
+        />
+      )}
 
       <p style={{ marginTop: 14, color: SCHED.muted, fontSize: 12.5, textAlign: "center" }}>
         Site type inferred from shift codes (HHS, RHS, DSG, RL6, RP3–5 = residential). Clients with no team are grouped as “1-on-1 Services”.

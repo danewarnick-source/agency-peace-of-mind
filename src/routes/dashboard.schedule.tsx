@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
 import { respondToShift } from "@/lib/scheduling/workflow.functions";
+import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
 import { useGeneralShift } from "@/hooks/use-general-shift";
 import { fmtElapsed } from "@/components/staff-mobile/general-time-clock";
 import { Button } from "@/components/ui/button";

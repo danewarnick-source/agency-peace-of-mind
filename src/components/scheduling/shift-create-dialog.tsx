@@ -13,6 +13,7 @@ import { classesForCode, familyForCode, isDailyCode, maxRecommendedHours, minSta
 import { listClientAuthorizedCodes } from "@/lib/scheduling/client-codes.functions";
 import { rankStaffForShift } from "@/lib/scheduling/eligibility.functions";
 import { createShift } from "@/lib/scheduling/shifts.functions";
+import { listLocations } from "@/lib/scheduling/locations.functions";
 
 type Step = "client" | "code" | "time" | "staff";
 
@@ -51,6 +52,7 @@ export function ShiftCreateDialog({
   const [startPicker, setStartPicker] = useState<string>("");
   const [endPicker, setEndPicker] = useState<string>("");
   const [awake, setAwake] = useState(false);
+  const [pickedLocationId, setPickedLocationId] = useState<string | null>(null);
   const [staffId, setStaffId] = useState<string | null>(null);
   const [override, setOverride] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -64,17 +66,19 @@ export function ShiftCreateDialog({
       setStaffId(null);
       setOverride("");
       setAwake(false);
+      setPickedLocationId(locationId ?? null);
       const base = initialDay ? new Date(initialDay) : new Date();
       base.setHours(9, 0, 0, 0);
       const end = new Date(base); end.setHours(base.getHours() + 4);
       setStartPicker(toLocalIso(base));
       setEndPicker(toLocalIso(end));
     }
-  }, [open, initialClientId, initialDay]);
+  }, [open, initialClientId, initialDay, locationId]);
 
   const createCall = useServerFn(createShift);
   const rankCall = useServerFn(rankStaffForShift);
   const listCodesCall = useServerFn(listClientAuthorizedCodes);
+  const listLocCall = useServerFn(listLocations);
 
   const codesQ = useQuery({
     enabled: open && !!clientId,
@@ -82,9 +86,17 @@ export function ShiftCreateDialog({
     queryFn: () => listCodesCall({ data: { organizationId, clientId: clientId! } }),
   });
 
+  const locsQ = useQuery({
+    enabled: open,
+    queryKey: ["locations", organizationId],
+    queryFn: () => listLocCall({ data: { organizationId } }),
+  });
+
+  const effectiveLocationId = pickedLocationId ?? locationId ?? null;
+
   const rankQ = useQuery({
     enabled: open && step === "staff" && !!clientId && !!code && !!startPicker && !!endPicker,
-    queryKey: ["rank-staff", organizationId, clientId, code, startPicker, endPicker, locationId],
+    queryKey: ["rank-staff", organizationId, clientId, code, startPicker, endPicker, effectiveLocationId],
     queryFn: () => rankCall({
       data: {
         organizationId,
@@ -92,7 +104,7 @@ export function ShiftCreateDialog({
         serviceCode: code!,
         startsAtIso: pickerToIso(startPicker),
         endsAtIso: pickerToIso(endPicker),
-        locationId: locationId ?? null,
+        locationId: effectiveLocationId,
       },
     }),
   });
@@ -128,7 +140,7 @@ export function ShiftCreateDialog({
           staffId,
           startsAtIso: pickerToIso(startPicker),
           endsAtIso: pickerToIso(endPicker),
-          locationId: locationId ?? null,
+          locationId: effectiveLocationId,
           isAwakeOvernight: awake,
           status: "draft",
           createdFrom: "manual",
@@ -263,6 +275,41 @@ export function ShiftCreateDialog({
                 HHS requires staff aged ≥{minStaffAgeForCode(code)}. Host home staff are excluded from the picker.
               </div>
             )}
+            <div>
+              <Label className="text-xs">Location</Label>
+              <div className="flex flex-wrap gap-1 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setPickedLocationId(null)}
+                  className={cn(
+                    "min-h-[36px] rounded-md border px-2 text-xs font-semibold",
+                    effectiveLocationId === null ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
+                  )}
+                >
+                  None
+                </button>
+                {(locsQ.data ?? []).filter((l) => l.active !== false).map((l) => {
+                  const on = effectiveLocationId === l.id;
+                  return (
+                    <button
+                      type="button"
+                      key={l.id}
+                      onClick={() => setPickedLocationId(l.id)}
+                      className={cn(
+                        "min-h-[36px] rounded-md border px-2 text-xs font-semibold",
+                        on ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {l.name}
+                      {l.type === "host_home" && <span className="ml-1 opacity-60">(host)</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                Picking a host home location excludes its host staff from the picker.
+              </div>
+            </div>
           </div>
         )}
 

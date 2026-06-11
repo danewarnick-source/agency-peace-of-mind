@@ -81,8 +81,14 @@ export type ProposedAction =
     };
 
 export type Unmatched = { line: string; reason: string };
+export type AskReplyOption = { id: string; label: string };
 export type NectarProposal =
-  | { kind: "ask"; question: string }
+  | {
+      kind: "ask";
+      question: string;
+      reply_type?: "yes_no" | "options" | "text";
+      options?: AskReplyOption[];
+    }
   | { kind: "ok"; actions: ProposedAction[]; unmatched: Unmatched[]; summary: string };
 
 // ─── Shared gateway call (AWS Bedrock / Claude via Converse API) ───────────

@@ -108,6 +108,7 @@ export function NectarCommandBar({
 
   const importMut = useMutation({
     mutationFn: async () => {
+      if (emptyContext) throw new Error(emptyReason);
       const result = await proposeImport({ data: { ...context, raw_text: importText } });
       return result as NectarProposal;
     },

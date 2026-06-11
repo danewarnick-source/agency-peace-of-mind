@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { Lock } from "lucide-react";
 import { CoverageBar24h } from "@/components/scheduling/coverage-bar-24h";
+import { publishShifts } from "@/lib/scheduling/shifts.functions";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
   useSchedulePreview,
@@ -49,6 +53,8 @@ function SchedulePreviewPage() {
   const { data: org, isLoading: orgLoading } = useCurrentOrg();
   const role = org?.role;
   const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
+  const queryClient = useQueryClient();
+
 
   const [settings, setSettings] = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -159,6 +165,11 @@ function SchedulePreviewPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
+          <PublishDraftsButton
+            shifts={data?.shifts ?? []}
+            weekStart={weekStart}
+            onPublished={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
+          />
           <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
           <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>
@@ -583,3 +594,62 @@ const statusCov: React.CSSProperties = { background: SCHED.okBg, color: "#0e6a45
 const statusOpen: React.CSSProperties = { background: SCHED.gapBg, color: SCHED.gap };
 const dot: React.CSSProperties = { width: 7, height: 7, borderRadius: "50%", background: "currentColor" };
 const hint: React.CSSProperties = { color: SCHED.muted, fontSize: 12, padding: "10px 14px", borderTop: `1px solid ${SCHED.line}`, background: "#fbfbfe" };
+
+function PublishDraftsButton({
+  shifts, weekStart, onPublished,
+}: {
+  shifts: ShiftRow[];
+  weekStart: Date;
+  onPublished?: () => void;
+}) {
+  const publish = useServerFn(publishShifts);
+  const [busy, setBusy] = useState(false);
+  const weekEnd = useMemo(() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); return d; }, [weekStart]);
+  const draftIds = useMemo(() => shifts
+    .filter((s) => {
+      if (s.published) return false;
+      const t = new Date(s.starts_at).getTime();
+      return t >= weekStart.getTime() && t < weekEnd.getTime();
+    })
+    .map((s) => s.id), [shifts, weekStart, weekEnd]);
+
+  const count = draftIds.length;
+  const disabled = busy || count === 0;
+  const handleClick = async () => {
+    if (count === 0) return;
+    setBusy(true);
+    try {
+      await publish({ data: { ids: draftIds } });
+      toast.success(`Published ${count} shift${count === 1 ? "" : "s"}`);
+      onPublished?.();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Publish failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      style={{
+        border: `1px solid ${SCHED.line}`,
+        background: count > 0 ? "#fef3c7" : "#fff",
+        color: count > 0 ? "#92400e" : SCHED.muted,
+        padding: "9px 14px",
+        borderRadius: 10,
+        fontWeight: 600,
+        fontSize: 13,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
+      }}
+      onClick={handleClick}
+      disabled={disabled}
+      title={count === 0 ? "No draft shifts to publish" : `Publish ${count} draft shift${count === 1 ? "" : "s"} for this week`}
+    >
+      {busy ? "Publishing…" : count > 0 ? `Publish ${count} draft${count === 1 ? "" : "s"}` : "All published"}
+    </button>
+  );
+}

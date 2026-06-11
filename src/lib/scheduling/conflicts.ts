@@ -58,9 +58,11 @@ export type ConflictContext = {
     dob?: string | null;
     expiredCertCodes?: string[];        // service codes the staff is NOT cert-current for
     missingTrainingClientIds?: string[];
+    ptoRanges?: Array<[number, number]>; // approved time-off ranges (ms epochs)
   }>;
   weeklyTargetPctByClientCode?: Record<string, number>; // key = `${clientId}|${code}` → e.g. 1.3 = 130%
 };
+
 
 export type Conflict = {
   shiftId: string;
@@ -118,6 +120,18 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
     if (staff && staff.active === false) {
       out.push({ shiftId: a.id, severity: "hard", code: "staff_inactive", message: "Staff is inactive." });
     }
+
+    // approved time-off overlap (HARD)
+    if (a.staff_id && staff?.ptoRanges?.length) {
+      const sMs = new Date(a.starts_at).getTime();
+      const eMs = new Date(a.ends_at).getTime();
+      const hit = staff.ptoRanges.some(([ps, pe]) => sMs <= pe && eMs >= ps);
+      if (hit) {
+        out.push({ shiftId: a.id, severity: "hard", code: "staff_on_approved_pto",
+          message: "Staff has approved time off during this shift." });
+      }
+    }
+
 
     // segment-specific
     if (a.parent_shift_id) {

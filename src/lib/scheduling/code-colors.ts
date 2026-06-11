@@ -88,3 +88,18 @@ export const FAMILY_CLASSES: Record<CodeFamily, {
 export function classesForCode(code?: string | null) {
   return FAMILY_CLASSES[familyForCode(code)];
 }
+
+// Semantic CSS variable names per family (defined in src/styles.css).
+// Use via `style={{ color: \`var(${cssVarForCode(code)})\` }}` when Tailwind
+// classes aren't expressive enough (e.g. coverage-bar gradient stops).
+export const FAMILY_VARS: Record<CodeFamily, string> = {
+  residential: "--sched-residential",
+  supported_living: "--sched-supported-living",
+  day_supports: "--sched-day-supports",
+  employment: "--sched-employment",
+  respite: "--sched-respite",
+  other: "--sched-other",
+};
+export function cssVarForCode(code?: string | null): string {
+  return FAMILY_VARS[familyForCode(code)];
+}

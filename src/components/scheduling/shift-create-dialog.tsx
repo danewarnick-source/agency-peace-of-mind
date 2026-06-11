@@ -82,6 +82,40 @@ export function ShiftCreateDialog({
   }, [open, initialClientId, initialDay, locationId]);
 
   const createCall = useServerFn(createShift);
+  const postOpenCall = useServerFn(postOpenShift);
+
+  async function handleCreateOpen() {
+    if (!clientId || !code) return;
+    setSubmitting(true);
+    const occurrences = expandOccurrences();
+    let created = 0;
+    try {
+      for (const occ of occurrences) {
+        try {
+          await postOpenCall({
+            data: {
+              organizationId,
+              clientId,
+              serviceCode: code,
+              startsAtIso: occ.start.toISOString(),
+              endsAtIso: occ.end.toISOString(),
+              locationId: effectiveLocationId ?? undefined,
+            },
+          });
+          created++;
+        } catch (err) { console.warn(err); }
+      }
+      if (created > 0) {
+        toast.success(`Posted ${created} open shift${created === 1 ? "" : "s"}`);
+        onCreated?.();
+        onOpenChange(false);
+      } else {
+        toast.error("Could not post open shift");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
   const rankCall = useServerFn(rankStaffForShift);
   const listCodesCall = useServerFn(listClientAuthorizedCodes);
   const listLocCall = useServerFn(listLocations);

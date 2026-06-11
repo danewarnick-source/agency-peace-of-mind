@@ -17,7 +17,6 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ManagerRouteImport } from './routes/manager'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as FixAdminRouteImport } from './routes/fix-admin'
 import { Route as EmployeeRouteImport } from './routes/employee'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
@@ -180,11 +179,6 @@ const LoginRoute = LoginRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FixAdminRoute = FixAdminRouteImport.update({
-  id: '/fix-admin',
-  path: '/fix-admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmployeeRoute = EmployeeRouteImport.update({
@@ -855,7 +849,6 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/employee': typeof EmployeeRoute
-  '/fix-admin': typeof FixAdminRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
@@ -988,7 +981,6 @@ export interface FileRoutesByTo {
   '/auditor': typeof AuditorRoute
   '/contact': typeof ContactRoute
   '/employee': typeof EmployeeRoute
-  '/fix-admin': typeof FixAdminRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
@@ -1118,7 +1110,6 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/employee': typeof EmployeeRoute
-  '/fix-admin': typeof FixAdminRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
@@ -1254,7 +1245,6 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/employee'
-    | '/fix-admin'
     | '/forgot-password'
     | '/login'
     | '/manager'
@@ -1387,7 +1377,6 @@ export interface FileRouteTypes {
     | '/auditor'
     | '/contact'
     | '/employee'
-    | '/fix-admin'
     | '/forgot-password'
     | '/login'
     | '/manager'
@@ -1516,7 +1505,6 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/employee'
-    | '/fix-admin'
     | '/forgot-password'
     | '/login'
     | '/manager'
@@ -1651,7 +1639,6 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   EmployeeRoute: typeof EmployeeRoute
-  FixAdminRoute: typeof FixAdminRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   ManagerRoute: typeof ManagerRoute
@@ -1722,13 +1709,6 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/fix-admin': {
-      id: '/fix-admin'
-      path: '/fix-admin'
-      fullPath: '/fix-admin'
-      preLoaderRoute: typeof FixAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/employee': {
@@ -2961,7 +2941,6 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRouteWithChildren,
   EmployeeRoute: EmployeeRoute,
-  FixAdminRoute: FixAdminRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   ManagerRoute: ManagerRoute,

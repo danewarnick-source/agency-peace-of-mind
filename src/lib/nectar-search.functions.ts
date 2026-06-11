@@ -44,6 +44,8 @@ export const searchOrgEntities = createServerFn({ method: "POST" })
 
     const like = `%${data.query}%`;
 
+    // No FK organization_members→profiles, so the staff search is two
+    // queries joined in JS: members first, then name-matched profiles.
     const [clientsRes, membersRes] = await Promise.all([
       (supabase as any)
         .from("clients")
@@ -53,15 +55,22 @@ export const searchOrgEntities = createServerFn({ method: "POST" })
         .limit(8),
       (supabase as any)
         .from("organization_members")
-        .select("user_id, role, active, profiles:profiles!inner(id, full_name, email, first_name, last_name)")
+        .select("user_id, role, active")
         .eq("organization_id", data.organizationId)
-        .eq("active", true)
-        .or(
-          `full_name.ilike.${like},email.ilike.${like},first_name.ilike.${like},last_name.ilike.${like}`,
-          { foreignTable: "profiles" },
-        )
-        .limit(8),
+        .eq("active", true),
     ]);
+
+    type BareMemberRow = { user_id: string; role: string | null };
+    const bareMembers = (membersRes?.data ?? []) as BareMemberRow[];
+    const roleByUserId = new Map(bareMembers.map((m) => [m.user_id, m.role]));
+    const profilesRes = bareMembers.length
+      ? await (supabase as any)
+          .from("profiles")
+          .select("id, full_name, email, first_name, last_name")
+          .in("id", bareMembers.map((m) => m.user_id))
+          .or(`full_name.ilike.${like},email.ilike.${like},first_name.ilike.${like},last_name.ilike.${like}`)
+          .limit(8)
+      : { data: [] };
 
     const clients: NectarSearchEntity[] = ((clientsRes?.data ?? []) as Array<{
       id: string; first_name: string | null; last_name: string | null; account_status: string | null;
@@ -73,21 +82,15 @@ export const searchOrgEntities = createServerFn({ method: "POST" })
       }))
       .slice(0, 5);
 
-    type MemberRow = {
-      user_id: string;
-      role: string | null;
-      profiles: { id: string; full_name: string | null; email: string | null; first_name: string | null; last_name: string | null } | null;
-    };
-    const staff: NectarSearchEntity[] = ((membersRes?.data ?? []) as MemberRow[])
-      .filter((m) => m.profiles)
-      .map((m) => {
-        const p = m.profiles!;
+    type ProfileHit = { id: string; full_name: string | null; email: string | null; first_name: string | null; last_name: string | null };
+    const staff: NectarSearchEntity[] = ((profilesRes?.data ?? []) as ProfileHit[])
+      .map((p) => {
         const name =
           p.full_name?.trim() ||
           [p.first_name, p.last_name].filter(Boolean).join(" ") ||
           p.email ||
           "(unnamed staff)";
-        return { id: p.id, name, subtitle: m.role ?? null };
+        return { id: p.id, name, subtitle: roleByUserId.get(p.id) ?? null };
       })
       .slice(0, 5);
 

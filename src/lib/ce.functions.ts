@@ -857,27 +857,38 @@ export const getOrgCeRoster = createServerFn({ method: "GET" })
       .maybeSingle();
     const goalHours = Number((setQ.data as { annual_goal_hours: number } | null)?.annual_goal_hours ?? 12);
 
-    // Pull active staff in this org via organization_members + profiles join.
+    // Pull active staff in this org. organization_members has NO FK to
+    // profiles (both key off auth.users.id), so a PostgREST embed fails —
+    // always two queries joined in JS.
     const membersQ = await supabase
       .from("organization_members")
-      .select("user_id, role, profiles:user_id(id, first_name, last_name, email, hire_date, start_date, end_date)")
+      .select("user_id, role")
       .eq("organization_id", orgId)
       .eq("active", true);
+    const memberRows = (membersQ.data as { user_id: string; role: string }[] | null) ?? [];
 
-    type MemRow = {
-      user_id: string;
-      role: string;
-      profiles: {
-        id: string;
-        first_name: string | null;
-        last_name: string | null;
-        email: string | null;
-        hire_date: string | null;
-        start_date: string | null;
-        end_date: string | null;
-      } | null;
+    type ProfileRow = {
+      id: string;
+      first_name: string | null;
+      last_name: string | null;
+      email: string | null;
+      hire_date: string | null;
+      start_date: string | null;
+      end_date: string | null;
     };
-    const members = ((membersQ.data as MemRow[] | null) ?? []).filter((m) => m.profiles);
+    const memberIds = memberRows.map((m) => m.user_id);
+    const profilesQ = memberIds.length
+      ? await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, email, hire_date, start_date, end_date")
+          .in("id", memberIds)
+      : { data: [] as ProfileRow[] };
+    const profById = new Map(((profilesQ.data as ProfileRow[] | null) ?? []).map((p) => [p.id, p]));
+
+    type MemRow = { user_id: string; role: string; profiles: ProfileRow | null };
+    const members: MemRow[] = memberRows
+      .map((m) => ({ ...m, profiles: profById.get(m.user_id) ?? null }))
+      .filter((m) => m.profiles);
 
     // Pull all ledger rows for this org in one shot, then bucket by staff.
     const ledQ = await supabase

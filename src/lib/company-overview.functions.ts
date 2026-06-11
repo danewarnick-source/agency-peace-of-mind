@@ -229,28 +229,38 @@ export const getCompanyOverview = createServerFn({ method: "POST" })
     // --- Celebrations ---
     const celebrations: Celebration[] = [];
 
+    // Shared staff-name lookup for the celebration queries below. There is no
+    // FK organization_members→profiles (or evv_timesheets/certifications→
+    // profiles), so PostgREST embeds fail — two queries joined in JS.
+    const { data: activeMembers } = await sb
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", orgId)
+      .eq("active", true);
+    const activeMemberIds = ((activeMembers ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
+    const { data: memberProfiles } = activeMemberIds.length
+      ? await sb.from("profiles").select("id, full_name, hire_date").in("id", activeMemberIds)
+      : { data: [] as Array<{ id: string; full_name: string | null; hire_date: string | null }> };
+    const profileById = new Map(
+      ((memberProfiles ?? []) as Array<{ id: string; full_name: string | null; hire_date: string | null }>)
+        .map((p) => [p.id, p]),
+    );
+    const staffName = (id: string | null | undefined) =>
+      (id ? profileById.get(id)?.full_name : null) ?? null;
+
     // Work anniversaries this month (employees with hire_date whose month matches now)
     await safe(async () => {
-      const { data: members } = await sb
-        .from("organization_members")
-        .select("user_id, hire_date, profiles:user_id(full_name)")
-        .eq("organization_id", orgId)
-        .eq("active", true)
-        .not("hire_date", "is", null);
       const month = now.getUTCMonth();
       const year = now.getUTCFullYear();
-      for (const m of (members ?? []) as Array<{
-        hire_date: string | null;
-        profiles: { full_name: string | null } | null;
-      }>) {
-        if (!m.hire_date) continue;
-        const d = new Date(m.hire_date);
+      for (const p of profileById.values()) {
+        if (!p.hire_date) continue;
+        const d = new Date(p.hire_date);
         if (d.getUTCMonth() !== month) continue;
         const years = year - d.getUTCFullYear();
         if (years < 1) continue;
         celebrations.push({
           kind: "anniversary",
-          title: `${m.profiles?.full_name ?? "Team member"} — ${years} yr${years === 1 ? "" : "s"} this month`,
+          title: `${p.full_name ?? "Team member"} — ${years} yr${years === 1 ? "" : "s"} this month`,
           detail: "Work anniversary",
         });
       }
@@ -260,7 +270,7 @@ export const getCompanyOverview = createServerFn({ method: "POST" })
     await safe(async () => {
       const { data: certs } = await sb
         .from("external_certifications")
-        .select("cert_name, cert_type, reviewed_at, profiles:user_id(full_name)")
+        .select("cert_name, cert_type, reviewed_at, user_id")
         .eq("organization_id", orgId)
         .eq("status", "approved")
         .gte("reviewed_at", last30)
@@ -269,11 +279,11 @@ export const getCompanyOverview = createServerFn({ method: "POST" })
       for (const c of (certs ?? []) as Array<{
         cert_name: string | null;
         cert_type: string;
-        profiles: { full_name: string | null } | null;
+        user_id: string | null;
       }>) {
         celebrations.push({
           kind: "training",
-          title: `${c.profiles?.full_name ?? "A staff member"} completed ${c.cert_name ?? c.cert_type}`,
+          title: `${staffName(c.user_id) ?? "A staff member"} completed ${c.cert_name ?? c.cert_type}`,
           detail: "Certification approved",
         });
       }
@@ -283,17 +293,16 @@ export const getCompanyOverview = createServerFn({ method: "POST" })
     await safe(async () => {
       const { data: punches } = await sb
         .from("evv_timesheets")
-        .select("staff_id, is_out_of_bounds, profiles:staff_id(full_name)")
+        .select("staff_id, is_out_of_bounds")
         .eq("organization_id", orgId)
         .gte("clock_in_timestamp", last30);
       const byStaff = new Map<string, { name: string; clean: number; total: number }>();
       for (const p of (punches ?? []) as Array<{
         staff_id: string;
         is_out_of_bounds: boolean | null;
-        profiles: { full_name: string | null } | null;
       }>) {
         const cur = byStaff.get(p.staff_id) ?? {
-          name: p.profiles?.full_name ?? "A staff member",
+          name: staffName(p.staff_id) ?? "A staff member",
           clean: 0,
           total: 0,
         };

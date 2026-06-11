@@ -1946,15 +1946,21 @@ function StaffAssignmentTab({ clientId, orgId }: { clientId: string; orgId: stri
     enabled: !!orgId,
     queryKey: ["sched-staff", orgId],
     queryFn: async (): Promise<StaffMember[]> => {
+      // No FK organization_members→profiles: two queries, join in JS.
       const { data, error } = await (supabase as any)
         .from("organization_members")
-        .select("profiles:user_id (id, full_name, email)")
+        .select("user_id")
         .eq("organization_id", orgId)
         .eq("active", true);
       if (error) throw error;
-      return ((data ?? []) as any[])
-        .map((r: any) => r.profiles)
-        .filter((p: any): p is StaffMember => !!p?.id);
+      const ids = ((data ?? []) as any[]).map((r: any) => r.user_id).filter(Boolean);
+      if (!ids.length) return [];
+      const { data: profiles, error: pErr } = await (supabase as any)
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", ids);
+      if (pErr) throw pErr;
+      return ((profiles ?? []) as any[]).filter((p: any): p is StaffMember => !!p?.id);
     },
   });
 

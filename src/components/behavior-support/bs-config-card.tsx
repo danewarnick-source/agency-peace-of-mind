@@ -48,15 +48,22 @@ export function BehaviorSupportConfigCard({
   const { data: behaviorists = [] } = useQuery<Behaviorist[]>({
     queryKey: ["org-behaviorists", organizationId],
     queryFn: async () => {
+      // No FK organization_members→profiles: two queries, join in JS.
       const { data: members, error } = await supabase
         .from("organization_members")
-        .select("user_id, profiles:profiles(id, full_name, email, bc_role)")
+        .select("user_id")
         .eq("organization_id", organizationId)
         .eq("active", true);
       if (error) throw error;
+      const ids = (members ?? []).map((m) => m.user_id);
+      if (!ids.length) return [];
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, bc_role")
+        .in("id", ids);
+      if (pErr) throw pErr;
       const out: Behaviorist[] = [];
-      for (const m of members ?? []) {
-        const p = (m as any).profiles;
+      for (const p of profiles ?? []) {
         if (p?.bc_role) out.push({ id: p.id, full_name: p.full_name, email: p.email, bc_role: p.bc_role });
       }
       return out;

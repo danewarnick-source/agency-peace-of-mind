@@ -142,6 +142,21 @@ function clientName(r: { clients: { first_name: string; last_name: string } | nu
 function staffName(r: { profiles: { full_name: string | null; email: string | null } | null }): string {
   return r.profiles?.full_name ?? r.profiles?.email ?? "—";
 }
+/**
+ * evv_timesheets has no FK to profiles, so PostgREST can't embed the staff
+ * profile. Fetch the profiles for the rows' staff_ids in one query and graft
+ * them on under the same `profiles` key the render helpers expect.
+ */
+async function attachStaffProfiles<T extends { staff_id: string | null }>(
+  rows: T[],
+): Promise<(T & { profiles: { full_name: string | null; email: string | null } | null })[]> {
+  const ids = [...new Set(rows.map((r) => r.staff_id).filter((v): v is string => !!v))];
+  const { data } = ids.length
+    ? await supabase.from("profiles").select("id, full_name, email").in("id", ids)
+    : { data: [] as { id: string; full_name: string | null; email: string | null }[] };
+  const byId = new Map((data ?? []).map((p) => [p.id, { full_name: p.full_name, email: p.email }]));
+  return rows.map((r) => ({ ...r, profiles: r.staff_id ? byId.get(r.staff_id) ?? null : null }));
+}
 function fmtGps(
   coords: { latitude: number | null; longitude: number | null; accuracy_meters: number | null } | null
 ): string {
@@ -860,6 +875,8 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     refetchInterval: 60_000,
   });
 
+  // evv_timesheets has NO FK to profiles (staff_id keys off auth.users.id),
+  // so staff names are joined in JS after the fetch — never via embed.
   const tsSelect = `id, client_id, staff_id, service_type_code,
     clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out,
     status, ai_compliance_status, ai_compliance_feedback, ai_coaching_iterations,
@@ -867,8 +884,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     gps_in_coordinates, gps_out_coordinates,
     shift_note_text, goals_completed, submitted_late, denial_reason,
     approved_at, approved_by,
-    clients:client_id (first_name, last_name, physical_address),
-    profiles:staff_id (full_name, email)`;
+    clients:client_id (first_name, last_name, physical_address)`;
 
   const { data: pendingTimesheets = [], isLoading: tsLoading } = useQuery({
     enabled: !!orgId,
@@ -880,7 +896,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
         .in("status", ["Pending", "Flagged"])
         .order("clock_in_timestamp", { ascending: false }).limit(200);
       if (error) throw error;
-      return (data ?? []) as unknown as Timesheet[];
+      return (await attachStaffProfiles((data ?? []) as unknown as { staff_id: string | null }[])) as unknown as Timesheet[];
     },
   });
 
@@ -893,7 +909,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
         .eq("organization_id", orgId).eq("status", "Approved")
         .order("clock_in_timestamp", { ascending: false }).limit(300);
       if (error) throw error;
-      return (data ?? []) as unknown as Timesheet[];
+      return (await attachStaffProfiles((data ?? []) as unknown as { staff_id: string | null }[])) as unknown as Timesheet[];
     },
   });
 
@@ -926,7 +942,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
         .eq("organization_id", orgId).eq("status", "Rejected")
         .order("clock_in_timestamp", { ascending: false }).limit(100);
       if (error) throw error;
-      return (data ?? []) as unknown as Timesheet[];
+      return (await attachStaffProfiles((data ?? []) as unknown as { staff_id: string | null }[])) as unknown as Timesheet[];
     },
   });
 
@@ -965,13 +981,12 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
       const { data, error } = await supabase
         .from("evv_timesheets")
         .select(`id, client_id, staff_id, service_type_code, clock_in_timestamp,
-          clients:client_id (first_name, last_name),
-          profiles:staff_id (full_name, email)`)
+          clients:client_id (first_name, last_name)`)
         .eq("organization_id", orgId).eq("status", "Active")
         .is("clock_out_timestamp", null).lt("clock_in_timestamp", cutoff)
         .order("clock_in_timestamp", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as unknown as OpenShift[];
+      return (await attachStaffProfiles((data ?? []) as unknown as { staff_id: string | null }[])) as unknown as OpenShift[];
     },
     refetchInterval: 300_000,
   });

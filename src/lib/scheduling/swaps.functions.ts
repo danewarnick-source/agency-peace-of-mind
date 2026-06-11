@@ -70,12 +70,18 @@ export const listEligibleSwapPartners = createServerFn({ method: "POST" })
       .eq("id", data.shiftId).maybeSingle();
     if (!shift) return [];
 
-    // All active members in the org other than current user
+    // All active members in the org other than current user.
+    // No FK organization_members→profiles: two queries, join in JS.
     const { data: members } = await supabase
       .from("organization_members")
-      .select("user_id, active, profiles:profiles!inner(id, first_name, last_name)")
+      .select("user_id, active")
       .eq("organization_id", shift.organization_id)
       .eq("active", true);
+    const memberIds = (members ?? []).map((m: any) => m.user_id);
+    const { data: profiles } = memberIds.length
+      ? await supabase.from("profiles").select("id, first_name, last_name").in("id", memberIds)
+      : { data: [] as { id: string; first_name: string | null; last_name: string | null }[] };
+    const profById = new Map((profiles ?? []).map((p: any) => [p.id, p]));
 
     // Staff with overlapping shifts → ineligible
     const { data: overlapping } = await supabase
@@ -88,10 +94,13 @@ export const listEligibleSwapPartners = createServerFn({ method: "POST" })
 
     return (members ?? [])
       .filter((m: any) => m.user_id !== userId && !blocked.has(m.user_id))
-      .map((m: any) => ({
-        staffId: m.user_id,
-        name: `${m.profiles?.first_name ?? ""} ${m.profiles?.last_name ?? ""}`.trim() || "Staff",
-      }));
+      .map((m: any) => {
+        const p = profById.get(m.user_id) as { first_name?: string | null; last_name?: string | null } | undefined;
+        return {
+          staffId: m.user_id,
+          name: `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim() || "Staff",
+        };
+      });
   });
 
 export const respondToSwap = createServerFn({ method: "POST" })

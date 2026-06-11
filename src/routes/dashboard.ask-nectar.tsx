@@ -3,6 +3,7 @@ import { AskNectarStaff } from "@/components/staff-mobile/ask-nectar-staff";
 
 interface AskNectarSearch {
   clientId?: string;
+  q?: string;
 }
 
 export const Route = createFileRoute("/dashboard/ask-nectar")({
@@ -12,6 +13,9 @@ export const Route = createFileRoute("/dashboard/ask-nectar")({
       typeof search.clientId === "string" && /^[0-9a-f-]{36}$/i.test(search.clientId)
         ? search.clientId
         : undefined,
+    q: typeof search.q === "string" && search.q.trim().length > 0
+      ? search.q.slice(0, 1000)
+      : undefined,
   }),
   component: AskNectarStaffPage,
 });

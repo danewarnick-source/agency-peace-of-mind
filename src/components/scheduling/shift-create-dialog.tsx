@@ -13,6 +13,7 @@ import { classesForCode, familyForCode, isDailyCode, maxRecommendedHours, minSta
 import { listClientAuthorizedCodes } from "@/lib/scheduling/client-codes.functions";
 import { rankStaffForShift } from "@/lib/scheduling/eligibility.functions";
 import { createShift } from "@/lib/scheduling/shifts.functions";
+import { postOpenShift } from "@/lib/scheduling/open-shifts.functions";
 import { listLocations } from "@/lib/scheduling/locations.functions";
 
 type Step = "client" | "code" | "time" | "staff";

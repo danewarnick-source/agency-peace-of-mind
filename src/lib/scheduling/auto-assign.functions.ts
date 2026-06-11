@@ -48,17 +48,29 @@ export const autoAssignRange = createServerFn({ method: "POST" })
     if (oErr) throw oErr;
     if (!openShifts?.length) return { proposals: [] as Proposal[], applied: 0 };
 
-    // 2) active members
+    // 2) active members (two-step; no FK between organization_members and profiles)
     const { data: members } = await sb
       .from("organization_members")
-      .select("user_id, active, profiles:profiles!inner(id, full_name, date_of_birth)")
+      .select("user_id, active")
       .eq("organization_id", orgId).eq("active", true);
-    const memberRows = (members ?? []).map((m: any) => ({
-      id: m.profiles?.id as string,
-      full_name: (m.profiles?.full_name as string | null) ?? null,
-      date_of_birth: (m.profiles?.date_of_birth as string | null) ?? null,
-      active: true,
-    })).filter((r: any) => r.id);
+    const userIds = (members ?? []).map((m: any) => m.user_id).filter(Boolean);
+    let profMap = new Map<string, any>();
+    if (userIds.length) {
+      const { data: profs } = await sb
+        .from("profiles")
+        .select("id, full_name, date_of_birth")
+        .in("id", userIds);
+      profMap = new Map((profs ?? []).map((p: any) => [p.id, p]));
+    }
+    const memberRows = (members ?? []).map((m: any) => {
+      const p = profMap.get(m.user_id);
+      return {
+        id: m.user_id as string,
+        full_name: (p?.full_name as string | null) ?? null,
+        date_of_birth: (p?.date_of_birth as string | null) ?? null,
+        active: true,
+      };
+    }).filter((r: any) => r.id);
     if (!memberRows.length) return { proposals: [], applied: 0 };
     const staffIds = memberRows.map((r: any) => r.id);
     const nameById = new Map<string, string>(memberRows.map((r: any) => [r.id as string, (r.full_name ?? "Staff") as string]));

@@ -237,6 +237,17 @@ function SchedulePreviewPage() {
           clients={(data?.clients ?? []).map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))}
         />
       )}
+
+      {org?.organization_id && (
+        <DayTimelineDrawer
+          open={!!timelineCtx}
+          onOpenChange={(v) => { if (!v) setTimelineCtx(null); }}
+          organizationId={org.organization_id}
+          day={timelineCtx?.day ?? null}
+          locationName={timelineCtx?.siteName}
+          onCreateClick={(d) => { setTimelineCtx(null); setCreateOpen(true); void d; }}
+        />
+      )}
     </Shell>
   );
 }

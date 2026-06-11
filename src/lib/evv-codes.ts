@@ -18,8 +18,8 @@ export const EVV_SERVICE_CODES: ReadonlyArray<ServiceCodeDef> = [
   // EVV-MANDATED CODES (SOW §1.12 — geofence + UEVV transmission)
   { code: "ACA", label: "ACA — Provider Based Attendant Care", evvLock: true },
   { code: "CHA", label: "CHA — Chore Services – Provider", evvLock: true },
-  { code: "CMP", label: "CMP — Companion Supports – Personal", evvLock: true },
-  { code: "CMS", label: "CMS — Companion Supports – Shared", evvLock: true },
+  { code: "CMP", label: "CMP — Caregiver Compensation – Parent/Guardian (Supported Living Natural)", evvLock: true },
+  { code: "CMS", label: "CMS — Caregiver Compensation – Spouse (Supported Living Natural)", evvLock: true },
   { code: "COM", label: "COM — Companion Services – Provider", evvLock: true },
   { code: "HSQ", label: "HSQ — Homemaker Services Provider", evvLock: true },
   { code: "PAC", label: "PAC — Personal Assistance – Provider", evvLock: true },
@@ -35,7 +35,7 @@ export const EVV_SERVICE_CODES: ReadonlyArray<ServiceCodeDef> = [
   { code: "DSG", label: "DSG — Day Supports Group (Daily)", evvLock: false },
   { code: "DSP", label: "DSP — Day Supports Group (Hourly)", evvLock: false },
   { code: "DSI", label: "DSI — Day Supports Individual", evvLock: false },
-  { code: "ELS", label: "ELS — Employment/Life Skills (Bridge)", evvLock: false },
+  { code: "ELS", label: "ELS — Extended Living Supports", evvLock: false },
   { code: "EPR", label: "EPR — Employment Preparation Services", evvLock: false },
   { code: "HHS", label: "HHS — Host Home Supports", evvLock: false },
   { code: "LPS", label: "LPS — Peer Support Services, Individual", evvLock: false },
@@ -56,8 +56,8 @@ export const EVV_SERVICE_CODES: ReadonlyArray<ServiceCodeDef> = [
   { code: "SEE", label: "SEE — Supported Employment Enterprise", evvLock: false },
   { code: "SEI", label: "SEI — Supported Employment for an Individual", evvLock: false },
   { code: "SJD", label: "SJD — Supported Job Development", evvLock: false },
-  { code: "SJP", label: "SJP — Supported Job Placement", evvLock: false },
-  { code: "SJR", label: "SJR — Supported Job Retention", evvLock: false },
+  { code: "SJP", label: "SJP — Initial Job Placement Milestone", evvLock: false },
+  { code: "SJR", label: "SJR — Job Retention Milestone", evvLock: false },
   { code: "TFB", label: "TFB — Family & Individual Training", evvLock: false },
 ];
 

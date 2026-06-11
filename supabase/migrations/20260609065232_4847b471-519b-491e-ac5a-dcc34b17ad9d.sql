@@ -65,7 +65,7 @@ BEGIN
     (_org,'DSG','Day Supports - Group','Day Supports','day_employment',                 true, false,false, true, 'day'),
     (_org,'DSI','Day Supports - Individual','Day Supports','day_employment',            true, false,false, true, 'quarter_hour'),
     (_org,'SEI','Supported Employment - Individual','Supported Employment','day_employment', true, false,false, true,'quarter_hour'),
-    (_org,'ELS','Employment/Life Skills (Bridge)','Residential','day_employment',       true, false,false, false,'quarter_hour'),
+    (_org,'ELS','Extended Living Supports','Residential','day_employment',       true, false,false, false,'quarter_hour'),
     (_org,'RP2','Respite - Facility (no R&B)','Respite','respite',                       true, true, false, false,'session'),
     (_org,'RP3','Respite - Exceptional (no R&B)','Respite','respite',                    true, true, false, false,'session'),
     (_org,'RP4','Respite - Daily/Overnight (R&B)','Respite','respite',                   true, false,false, false,'day'),

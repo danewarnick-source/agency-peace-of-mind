@@ -5,7 +5,7 @@ HIVE is a multi-tenant compliance platform for Utah DSPD (disability services) p
 - TanStack Start + React + Supabase (LOVABLE CLOUD: no service keys, no direct DB access — all SQL goes to the human via docs/SQL_HANDOFF.md). Lovable.dev co-edits this repo via GitHub sync: small atomic commits, build green before push, one writer at a time.
 - supabase/migrations/ may NOT match the live DB. Confirm schema via SQL handoff queries before relying on it.
 - NEVER PostgREST-embed organization_members↔profiles (no FK; both key off auth.users.id) — two queries, join in JS.
-- RLS: every org-data table is org-scoped via is_org_member/is_org_admin_or_manager helpers; never USING(true) on org/PHI data. `teams` = homes (team_name/setting/address). `home_designations` is legacy/empty — don't seed or rely on it.
+- RLS: every org-data table is org-scoped via is_org_member/is_org_admin_or_manager helpers; never USING(true) on org/PHI data. `teams` = homes (team_name/setting/address). `home_designations` holds the Homes & Teams CARE-TEAM role labels (DSP/House Manager/Lead/Supervisor) — that's its legitimate data; never delete it, and never treat its rows as locations/homes.
 
 ## DSPD domain rules (encoded product truths — do not "simplify" these away)
 - Atomic shift = client + service code + staff + time window. A client may only be scheduled/billed for codes with an active authorization row in client_billing_codes (the "1056"). No authorization → no shift, no billing.

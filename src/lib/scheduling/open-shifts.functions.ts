@@ -99,23 +99,18 @@ export const claimOpenShift = createServerFn({ method: "POST" })
       .eq("id", data.shiftId);
     if (uErr) throw uErr;
 
-    // Notify admins (best-effort)
+    // Notify admins (best-effort): role-targeted notification
     try {
-      const { data: admins } = await supabase
-        .from("organization_members")
-        .select("user_id")
-        .eq("organization_id", shift.organization_id)
-        .in("role", ["admin", "manager", "owner"]);
-      if (admins?.length) {
-        await supabase.from("notifications").insert(admins.map((a: { user_id: string }) => ({
-          user_id: a.user_id,
-          organization_id: shift.organization_id,
-          type: "shift_claim_request",
-          title: "Open shift claimed",
-          body: `A staff member requested to claim ${shift.service_code ?? "an open shift"} on ${new Date(shift.starts_at).toLocaleDateString()}.`,
-          link: `/dashboard/schedule-preview?shift=${data.shiftId}`,
-        })));
-      }
+      await supabase.from("notifications").insert({
+        organization_id: shift.organization_id,
+        recipient_role: "admin",
+        type: "shift_claim_request",
+        title: "Open shift claimed",
+        body: `A staff member requested to claim ${shift.service_code ?? "an open shift"} on ${new Date(shift.starts_at).toLocaleDateString()}.`,
+        link_to: `/dashboard/schedule-preview?shift=${data.shiftId}`,
+        related_id: data.shiftId,
+        related_type: "scheduled_shift",
+      });
     } catch { /* best-effort */ }
 
     return { ok: true };

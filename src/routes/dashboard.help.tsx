@@ -73,6 +73,19 @@ function HelpPage() {
 
   useEffect(() => { setRecent(loadRecent()); }, []);
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // Auto-send a question routed in from the global NECTAR search bar
+  // (e.g. /dashboard/help?q=…). Fires once, then clears the search param.
+  const { q: initialQ } = useSearch({ from: "/dashboard/help" });
+  const initialFired = useRef(false);
+  useEffect(() => {
+    if (initialFired.current) return;
+    if (!initialQ || !org?.organization_id) return;
+    initialFired.current = true;
+    send(initialQ);
+    navigate({ to: "/dashboard/help", search: {}, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQ, org?.organization_id]);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);

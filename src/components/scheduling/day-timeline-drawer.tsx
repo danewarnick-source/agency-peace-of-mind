@@ -55,21 +55,21 @@ export function DayTimelineDrawer({
 
   const shiftsQ = useQuery({
     enabled: open && !!dayStartIso && !!dayEndIso,
-    queryKey: ["day-timeline", organizationId, dayStartIso, dayEndIso, locationId],
+    queryKey: ["day-timeline", organizationId, dayStartIso, dayEndIso, effectiveLocId],
     queryFn: () => listCall({
       data: {
         organizationId,
         startIso: dayStartIso!,
         endIso: dayEndIso!,
-        locationId: locationId ?? undefined,
+        locationId: effectiveLocId ?? undefined,
       },
     }),
   });
 
   const reqsQ = useQuery({
-    enabled: open && !!locationId,
-    queryKey: ["coverage-reqs", organizationId, locationId],
-    queryFn: () => listReqsCall({ data: { organizationId, locationId: locationId! } }),
+    enabled: open && !!effectiveLocId,
+    queryKey: ["coverage-reqs", organizationId, effectiveLocId],
+    queryFn: () => listReqsCall({ data: { organizationId, locationId: effectiveLocId! } }),
   });
 
   const dayStartMs = day ? new Date(day).setHours(0, 0, 0, 0) : 0;

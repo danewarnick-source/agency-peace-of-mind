@@ -153,7 +153,15 @@ const RawEdit = z.object({
   reason: z.string().optional().default(""),
 });
 const RawAction = z.union([RawCreate, RawReassign, RawEdit]);
-const Ask = z.object({ kind: z.literal("ask"), question: z.string().min(1).max(400) });
+const Ask = z.object({
+  kind: z.literal("ask"),
+  question: z.string().min(1).max(400),
+  reply_type: z.enum(["yes_no", "options", "text"]).optional(),
+  options: z
+    .array(z.object({ id: z.string().min(1).max(40), label: z.string().min(1).max(80) }))
+    .max(5)
+    .optional(),
+});
 const Ok = z.object({
   kind: z.literal("ok"),
   actions: z.array(RawAction).max(200),

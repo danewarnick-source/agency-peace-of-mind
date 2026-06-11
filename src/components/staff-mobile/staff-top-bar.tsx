@@ -50,11 +50,20 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
         minHeight: "calc(3.5rem + env(safe-area-inset-top))",
       }}
     >
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] shadow-[0_0_0_1px_rgba(244,169,58,0.08)_inset]">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] shadow-[0_0_0_1px_rgba(244,169,58,0.08)_inset]">
           <Hexagon className="h-4 w-4 text-[oklch(var(--accent-2))]" strokeWidth={2.5} />
         </span>
         <h1 className="truncate text-base font-semibold tracking-tight">{title}</h1>
+      </div>
+
+      <div className="mx-2 hidden min-w-0 flex-[2] sm:block">
+        <NectarSearchBar
+          nav={[]}
+          isAdminCapable={false}
+          variant="mobile"
+          askRoute="/dashboard/ask-nectar"
+        />
       </div>
 
       <Sheet open={open} onOpenChange={setOpen}>

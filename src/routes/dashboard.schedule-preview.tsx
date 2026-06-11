@@ -236,6 +236,7 @@ function SchedulePreviewPage() {
           <PublishDraftsButton
             shifts={data?.shifts ?? []}
             weekStart={weekStart}
+            conflictsCount={conflicts.filter(c => c.severity === "hard" || c.severity === "policy_block").length}
             onPublished={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
           />
           <button style={btn()} onClick={() => setTargetsOpen(true)}>Weekly targets</button>

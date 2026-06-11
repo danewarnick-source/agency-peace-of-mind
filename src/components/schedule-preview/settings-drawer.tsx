@@ -60,7 +60,7 @@ export function SettingsDrawer({
           <div style={fieldLabel}>Color shifts by</div>
           <Choice<ColorBy>
             value={settings.colorBy}
-            options={[["shift_type", "Shift type"], ["staff", "Staff member"]]}
+            options={[["shift_type", "Service code"], ["staff", "Staff member"]]}
             onChange={(v) => onChange({ colorBy: v })}
           />
 
@@ -76,6 +76,13 @@ export function SettingsDrawer({
           shiftTypes={settings.shiftTypes}
           onChange={(shiftTypes) => onChange({ shiftTypes })}
         />
+
+        {organizationId && (
+          <>
+            <Divider />
+            <SchedulingRulesSection organizationId={organizationId} />
+          </>
+        )}
 
         <Divider />
 

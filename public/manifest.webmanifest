@@ -1,16 +1,32 @@
 {
-  "name": "HIVE Staff",
-  "short_name": "HIVE",
-  "description": "HIVE Staff portal — caseload, time clock, daily logs, and trainings.",
+  "name": "Hive",
+  "short_name": "Hive",
+  "description": "HIVE \u2014 DSPD compliance, scheduling, EVV, and daily documentation.",
   "start_url": "/dashboard",
-  "scope": "/dashboard",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#0d112b",
   "background_color": "#0d112b",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "/dashboard"
 }

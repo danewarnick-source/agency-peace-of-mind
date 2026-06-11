@@ -160,6 +160,14 @@ function RootComponent() {
     };
   }, []);
 
+  // PWA: register the offline-shell service worker (production only).
+  // sw.js caches the app shell + hashed static assets — never API data.
+  useEffect(() => {
+    if (typeof window === "undefined" || !import.meta.env.PROD) return;
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => { /* non-fatal */ });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

@@ -13,6 +13,7 @@ import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
 import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
 import { CopyWeekMenu } from "@/components/scheduling/copy-week-menu";
 import { RecurringPatternsDialog } from "@/components/scheduling/recurring-patterns-dialog";
+import { AutoAssignDrawer } from "@/components/scheduling/auto-assign-drawer";
 import { WeeklyTargetMeter } from "@/components/scheduling/weekly-target-meter";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {

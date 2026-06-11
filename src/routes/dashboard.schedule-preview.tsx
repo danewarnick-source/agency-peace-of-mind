@@ -7,6 +7,8 @@ import { Lock } from "lucide-react";
 import { CoverageBar24h } from "@/components/scheduling/coverage-bar-24h";
 import { publishShifts } from "@/lib/scheduling/shifts.functions";
 import { listLocations } from "@/lib/scheduling/locations.functions";
+import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
+import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
 import { WeeklyTargetMeter } from "@/components/scheduling/weekly-target-meter";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
@@ -86,6 +88,7 @@ function SchedulePreviewPage() {
   const { data, isLoading } = useSchedulePreview(weekStart);
   const { data: requests } = useOrgScheduleRequests();
   const listLocCall = useServerFn(listLocations);
+  const evalRangeCall = useServerFn(evaluateRange);
   const locationsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["locations", org?.organization_id],
@@ -100,6 +103,39 @@ function SchedulePreviewPage() {
     }
     return set;
   }, [locationsQ.data]);
+
+  // Phase 2: evaluate conflicts across the visible week. The result powers
+  // the toolbar Conflicts panel + per-shift badges. Re-runs whenever the
+  // week shifts or shifts data invalidates.
+  const conflictsQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["sched-conflicts", org?.organization_id, weekStart.toISOString(), data?.shifts?.length],
+    queryFn: () => {
+      const end = new Date(weekStart); end.setDate(end.getDate() + 7);
+      return evalRangeCall({
+        data: {
+          organizationId: org!.organization_id,
+          startIso: weekStart.toISOString(),
+          endIso: end.toISOString(),
+        },
+      });
+    },
+  });
+  const conflicts = conflictsQ.data ?? [];
+  const shiftLabelById = useMemo(() => {
+    const m = new Map<string, string>();
+    const cMap = new Map((data?.clients ?? []).map((c) => [c.id, `${c.first_name} ${c.last_name}`.trim()]));
+    const sMap = new Map((data?.staff ?? []).map((p) => [p.id, p.name ?? "Staff"]));
+    for (const sh of data?.shifts ?? []) {
+      const d = new Date(sh.starts_at);
+      const day = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+      const t = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      const who = sh.staff_id ? sMap.get(sh.staff_id) ?? "Staff" : "Open";
+      const cli = sh.client_id ? cMap.get(sh.client_id) ?? "" : "";
+      m.set(sh.id, `${day} ${t} · ${who}${cli ? " · " + cli : ""}`);
+    }
+    return m;
+  }, [data]);
   const approvedTimeOff = useMemo(
     () => buildApprovedTimeOffIndex(requests?.timeOff ?? []),
     [requests?.timeOff],
@@ -189,6 +225,14 @@ function SchedulePreviewPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
+          <ConflictsPanel
+            conflicts={conflicts}
+            shiftLabel={(id) => shiftLabelById.get(id) ?? id.slice(0, 8)}
+            onJumpToShift={(id) => {
+              const shift = (data?.shifts ?? []).find((s) => s.id === id);
+              if (shift) openEditor({ shift });
+            }}
+          />
           <PublishDraftsButton
             shifts={data?.shifts ?? []}
             weekStart={weekStart}

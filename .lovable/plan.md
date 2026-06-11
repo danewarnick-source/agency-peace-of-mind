@@ -1,44 +1,38 @@
-# Finish Phase 1 — Scheduler Overhaul
+# Phase 2 — Conflict Engine, Publish/Accept, Settings Rework
 
-Phase 1 is ~85% done. The shell, server functions, day timeline, create dialog, segment dialog, locations CRUD, coverage requirements, and weekly targets are all in place. To declare Phase 1 done per the original acceptance checks, three batches remain. I'd like to ship them sequentially because each touches `dashboard.schedule-preview.tsx` and they conflict if interleaved.
+Phase 1 is complete. Phase 2 ships in three batches; each typechecks independently and lands sequentially because all three touch `dashboard.schedule-preview.tsx` and the create dialog.
 
-## Batch A — Locations-driven tabs + host-home row
+## Batch A — Conflict engine
 
-Replace "site = team" plumbing on the All-Homes board with the real `locations` table so the LocationsDialog actually drives the board.
+- New `src/lib/scheduling/conflicts.ts`: pure `evaluateShifts(shifts, rules, context)` returning `{shiftId, severity: 'hard'|'policy'|'warn', code, message}[]`.
+- HARD rules: same-staff overlap (excluding parent/segment pairing), same client+service-code double-book, staff inactive, segment outside parent, daily code on segment.
+- POLICY rules (Off/Warn/Block via `rule_settings` JSON): expired cert, missing client-specific training, staff <21 on HHS, 2:1 ratio (second staff same client+time), >16h continuous, <8h rest, projected week >threshold, DSI >6h, SLH/SLN overnight without `is_awake_overnight`.
+- WARN rule: client weekly target ≥120% met.
+- Migration: add `rule_settings jsonb DEFAULT '{}'` and `ot_threshold_hours numeric DEFAULT 40` to `org_shift_behavior_settings`.
+- New server fn `evaluateRange` (returns conflicts for range) and `getRuleSettings`/`updateRuleSettings`.
+- UI: add `ConflictBadge` on `ShiftCard` (red dot HARD, amber POLICY-Block, amber shield POLICY-Warn). Toolbar "Conflicts (N)" button → popover list, deep-link to shift. Inline section in `ShiftCreateDialog` before Save; block-severity disables Save unless admin types an override reason → stored on `scheduled_shifts.override_reason`.
 
-- Add a `useLocations` query alongside `useSchedulePreview`.
-- `LocationTabs`: All Locations | each `locations` row | 1-on-1 / Community. Keep the existing team chips as a secondary filter inside a single location.
-- `AllHomesBoard`:
-  - Residential rows → existing `CoverageBar24h` (already wired).
-  - **Host home rows** → 3 status dots (daily note done / overnight confirmed / agency visit hrs > 0) + weekly DS-hours meter via `WeeklyTargetMeter`. Never red.
-  - **1:1 / community rows** → weekly target meter per code (uses `client_weekly_targets` + scheduled hours).
-- Pass `locationId` (not `siteId`) into `DayTimelineDrawer` and `ShiftCreateDialog`.
+## Batch B — Publish / Accept workflow
 
-## Batch B — ShiftCard variants + semantic CSS tokens
+- `ShiftCreateDialog`: default `status='draft'`. Board card actions: Publish single + toolbar "Publish All Drafts" → summary modal "Publishing X shifts across Y staff · Z conflicts remain" → confirm calls `publishShifts`.
+- New `src/lib/scheduling/notifications.functions.ts` writing to existing `notifications` table (one per staff per publish).
+- `dashboard.schedule.tsx` (staff view): mobile-first agenda — Today section + week list; published cards show client/code/time/location + Accept / Decline (decline requires reason). New `respondToShift` server fn sets `accepted`/`declined` + stores decline reason in `notes`.
+- New "Action needed" card on board (replaces "Needs your approval"): lists declines + swap requests + open-shift claims; clicking deep-links to shift.
 
-- Add `--sched-residential / --sched-supported-living / --sched-day-supports / --sched-employment / --sched-respite / --sched-other` HSL tokens to `src/styles.css` (both light + dark blocks), and export a parallel `FAMILY_VARS` map from `code-colors.ts`.
-- New `ShiftCard` component (`src/components/scheduling/shift-card.tsx`):
-  - dashed border if `status='draft'`
-  - red border if `conflict` (overlap)
-  - amber shield if `warnings>0`
-  - sparkle if `created_from='nectar'`
-  - inset render when `parent_shift_id` is set
-- Swap the existing inline chip render in `SiteWeekGrid` and `DayTimelineDrawer` to use `ShiftCard`.
+## Batch C — Settings drawer rework
 
-## Batch C — Recurrence + staff view status read
+- New route `src/routes/dashboard.scheduling.settings.tsx` (drawer/page from Board's Settings button).
+- "Color shifts by" → defaults to **Service code** (option: Staff).
+- Rename "Your shift types" → "Shift time templates"; ensure only time/name/color (already mostly correct from Phase 1 seed).
+- "Scheduling rules" list: every POLICY rule rendered as a row with Off/Warn/Block segmented control + plain-English description; OT threshold numeric input. Persists via `updateRuleSettings`.
+- Reachable from Board toolbar + a "Coverage requirements" link (re-uses Phase 1 `CoverageRequirementsDialog`) and "Weekly targets" link.
 
-- `ShiftCreateDialog`: add a recurrence section (weekday checkboxes + end-on date) that, on create, calls `createShift` once per expanded date.
-- `dashboard.schedule.tsx` (staff view): broaden the status filter to read the widened set (`draft|published|accepted|declined|open|cancelled`) — staff sees `published|accepted|declined` only.
-- Re-run Phase 1 acceptance checks #1–#6.
+## Files
 
-## Technical details
+**New**: `src/lib/scheduling/conflicts.ts`, `src/lib/scheduling/conflicts.functions.ts`, `src/lib/scheduling/notifications.functions.ts`, `src/components/scheduling/conflicts-panel.tsx`, `src/components/scheduling/publish-modal.tsx`, `src/components/scheduling/action-needed-card.tsx`, `src/routes/dashboard.scheduling.settings.tsx`.
 
-- New file: `src/components/scheduling/shift-card.tsx`.
-- Edited: `src/routes/dashboard.schedule-preview.tsx`, `src/lib/scheduling/code-colors.ts`, `src/styles.css`, `src/components/scheduling/day-timeline-drawer.tsx`, `src/components/scheduling/shift-create-dialog.tsx`, `src/routes/dashboard.schedule.tsx`.
-- New hook: `src/hooks/use-host-home-status.ts` (3-dot data: daily logs / overnight confirms / agency visit hrs).
-- No new tables or migrations.
-- Each batch is ~150–300 LOC and typechecks independently.
+**Edited**: `src/lib/scheduling/shifts.functions.ts` (respondToShift), `src/components/scheduling/shift-create-dialog.tsx`, `src/components/scheduling/shift-card.tsx`, `src/routes/dashboard.schedule-preview.tsx`, `src/routes/dashboard.schedule.tsx`.
 
-## What I need from you
+**Migration**: rule_settings jsonb + ot_threshold_hours on `org_shift_behavior_settings`.
 
-Approve and say which batch first (default: A → B → C). Or call out anything you want dropped or reordered.
+Starting Batch A now.

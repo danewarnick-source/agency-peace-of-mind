@@ -6577,18 +6577,24 @@ export type Database = {
         Row: {
           enabled: boolean
           organization_id: string
+          ot_threshold_hours: number
+          rule_settings: Json
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           enabled?: boolean
           organization_id: string
+          ot_threshold_hours?: number
+          rule_settings?: Json
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           enabled?: boolean
           organization_id?: string
+          ot_threshold_hours?: number
+          rule_settings?: Json
           updated_at?: string
           updated_by?: string | null
         }
@@ -10369,6 +10375,16 @@ export type Database = {
         Returns: undefined
       }
       user_org_ids: { Args: { _user: string }; Returns: string[] }
+      verify_certificate: {
+        Args: { p_code: string }
+        Returns: {
+          course_title: string
+          expires_at: string
+          issued_at: string
+          recipient_name: string
+          verification_code: string
+        }[]
+      }
       verify_certification: {
         Args: { _code: string }
         Returns: {

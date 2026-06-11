@@ -123,8 +123,32 @@ export function DayTimelineDrawer({
           </SheetDescription>
         </SheetHeader>
 
+        <div className="mt-3 mb-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Location</div>
+          <div className="flex flex-wrap gap-1">
+            <button
+              onClick={() => setPickedLocId(null)}
+              className={`min-h-[36px] rounded-md border px-2 text-xs font-semibold transition-colors ${effectiveLocId === null ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+            >
+              All
+            </button>
+            {(locsQ.data ?? []).filter((l) => l.active !== false).map((l) => {
+              const on = effectiveLocId === l.id;
+              return (
+                <button
+                  key={l.id}
+                  onClick={() => setPickedLocId(l.id)}
+                  className={`min-h-[36px] rounded-md border px-2 text-xs font-semibold transition-colors ${on ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                >
+                  {l.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {day && (
-          <div className="mt-4 mb-3">
+          <div className="mt-3 mb-3">
             <Button size="sm" className="w-full" onClick={() => onCreateClick?.(day)}>
               + Add shift on this day
             </Button>

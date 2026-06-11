@@ -76,6 +76,9 @@ export type ProposedAction =
   | {
       op: "edit";
       shift_id: string;
+      client_name: string;
+      staff_name: string;
+      current: { starts_at: string; ends_at: string; job_code: string | null };
       patch: { starts_at?: string; ends_at?: string; job_code?: string };
       reason: string;
     };

@@ -6577,18 +6577,24 @@ export type Database = {
         Row: {
           enabled: boolean
           organization_id: string
+          ot_threshold_hours: number
+          rule_settings: Json
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           enabled?: boolean
           organization_id: string
+          ot_threshold_hours?: number
+          rule_settings?: Json
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           enabled?: boolean
           organization_id?: string
+          ot_threshold_hours?: number
+          rule_settings?: Json
           updated_at?: string
           updated_by?: string | null
         }

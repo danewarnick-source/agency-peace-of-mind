@@ -97,7 +97,7 @@ async function readDocText(file: File): Promise<string> {
 }
 
 function SmartImportPage() {
-  const search = useSearch({ from: "/dashboard/smart-import" });
+  const search = Route.useSearch();
   const navigate = useNavigate();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();

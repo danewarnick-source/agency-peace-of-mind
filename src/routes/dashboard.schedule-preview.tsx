@@ -24,6 +24,7 @@ import { useOrgScheduleRequests, buildApprovedTimeOffIndex } from "@/lib/schedul
 import { SettingsDrawer } from "@/components/schedule-preview/settings-drawer";
 import { ShiftCreateDialog } from "@/components/scheduling/shift-create-dialog";
 import { DayTimelineDrawer } from "@/components/scheduling/day-timeline-drawer";
+import { WeeklyTargetsDialog } from "@/components/scheduling/weekly-targets-dialog";
 import {
   SCHED, font, type Settings, useSettings, type ViewMode,
   shiftAccentHex, shiftTypeLabel, fmtTime, DAY_LABELS,

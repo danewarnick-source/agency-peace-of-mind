@@ -91,8 +91,8 @@ export const autoAssignRange = createServerFn({ method: "POST" })
     const clientIds = Array.from(new Set(openShifts.map((s: any) => s.client_id)));
     const { data: clients } = await sb
       .from("clients").select("id, first_name, last_name").in("id", clientIds);
-    const clientName = new Map((clients ?? []).map((c: any) =>
-      [c.id, `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || "Client"]));
+    const clientName = new Map<string, string>((clients ?? []).map((c: any) =>
+      [c.id as string, (`${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || "Client") as string]));
 
     const { data: assigns } = await sb
       .from("staff_assignments").select("staff_id, client_id")

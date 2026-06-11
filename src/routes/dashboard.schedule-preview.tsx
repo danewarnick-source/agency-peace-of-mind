@@ -24,6 +24,7 @@ import { useOrgScheduleRequests, buildApprovedTimeOffIndex } from "@/lib/schedul
 import { SettingsDrawer } from "@/components/schedule-preview/settings-drawer";
 import { ShiftCreateDialog } from "@/components/scheduling/shift-create-dialog";
 import { DayTimelineDrawer } from "@/components/scheduling/day-timeline-drawer";
+import { WeeklyTargetsDialog } from "@/components/scheduling/weekly-targets-dialog";
 import {
   SCHED, font, type Settings, useSettings, type ViewMode,
   shiftAccentHex, shiftTypeLabel, fmtTime, DAY_LABELS,
@@ -64,6 +65,7 @@ function SchedulePreviewPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorCtx, setEditorCtx] = useState<EditorContext | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [targetsOpen, setTargetsOpen] = useState(false);
   const [timelineCtx, setTimelineCtx] = useState<{ siteId: string; siteName: string; day: Date } | null>(null);
   const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
@@ -170,6 +172,7 @@ function SchedulePreviewPage() {
             weekStart={weekStart}
             onPublished={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
           />
+          <button style={btn()} onClick={() => setTargetsOpen(true)}>Weekly targets</button>
           <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
           <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>
@@ -261,6 +264,15 @@ function SchedulePreviewPage() {
             const shift = (data?.shifts ?? []).find((s) => s.id === id);
             if (shift) { setTimelineCtx(null); openEditor({ shift }); }
           }}
+        />
+      )}
+
+      {org?.organization_id && (
+        <WeeklyTargetsDialog
+          open={targetsOpen}
+          onOpenChange={setTargetsOpen}
+          organizationId={org.organization_id}
+          clients={(data?.clients ?? []).map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))}
         />
       )}
     </Shell>

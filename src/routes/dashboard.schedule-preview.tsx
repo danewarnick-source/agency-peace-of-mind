@@ -12,6 +12,7 @@ import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
 import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
 import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
 import { CopyWeekMenu } from "@/components/scheduling/copy-week-menu";
+import { RecurringPatternsDialog } from "@/components/scheduling/recurring-patterns-dialog";
 import { WeeklyTargetMeter } from "@/components/scheduling/weekly-target-meter";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
@@ -78,6 +79,7 @@ function SchedulePreviewPage() {
   const [targetsOpen, setTargetsOpen] = useState(false);
   const [coverageOpen, setCoverageOpen] = useState(false);
   const [locationsOpen, setLocationsOpen] = useState(false);
+  const [recurringOpen, setRecurringOpen] = useState(false);
   const [timelineCtx, setTimelineCtx] = useState<{ siteId: string; siteName: string; day: Date } | null>(null);
   const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
@@ -252,6 +254,9 @@ function SchedulePreviewPage() {
               onApplied={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
             />
           )}
+          {org?.organization_id && isAdmin && (
+            <button style={btn()} onClick={() => setRecurringOpen(true)}>Recurring patterns</button>
+          )}
           <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
           <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>
@@ -405,6 +410,18 @@ function SchedulePreviewPage() {
           open={locationsOpen}
           onOpenChange={setLocationsOpen}
           organizationId={org.organization_id}
+        />
+      )}
+
+      {org?.organization_id && (
+        <RecurringPatternsDialog
+          open={recurringOpen}
+          onOpenChange={setRecurringOpen}
+          organizationId={org.organization_id}
+          weekStart={weekStart}
+          clients={(data?.clients ?? []).map((c: ClientRow) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))}
+          staff={(data?.staff ?? []).map((s: StaffRow) => ({ id: s.id, name: s.name }))}
+          onChanged={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
         />
       )}
     </Shell>

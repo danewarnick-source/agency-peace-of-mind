@@ -247,6 +247,14 @@
   --sidebar-accent-foreground: oklch(0.97 0.008 247);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.78 0.158 70);
+
+  /* ===== Scheduler service-code families (Phase 1) ===== */
+  --sched-residential:       oklch(0.62 0.13 195);   /* teal */
+  --sched-supported-living:  oklch(0.62 0.16 245);   /* sky */
+  --sched-day-supports:      oklch(0.68 0.16 155);   /* emerald */
+  --sched-employment:        oklch(0.58 0.20 295);   /* violet */
+  --sched-respite:           oklch(0.70 0.18 350);   /* pink */
+  --sched-other:             oklch(0.60 0.02 250);   /* slate */
 }
 
 .dark {

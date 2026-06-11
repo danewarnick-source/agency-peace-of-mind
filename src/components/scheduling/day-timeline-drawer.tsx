@@ -32,6 +32,7 @@ export function DayTimelineDrawer({
   open, onOpenChange, organizationId, day, locationId, locationName, onCreateClick, onShiftClick,
 }: Props) {
   const listCall = useServerFn(listShiftsInRange);
+  const listReqsCall = useServerFn(listCoverageRequirements);
   const [segParent, setSegParent] = useState<ParentShiftInfo | null>(null);
 
   const dayStartIso = useMemo(() => {

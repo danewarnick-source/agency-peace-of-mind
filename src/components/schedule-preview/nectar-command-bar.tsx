@@ -88,8 +88,17 @@ export function NectarCommandBar({
     };
   }, [weekStart, clients, staff, teams, shifts]);
 
+  const emptyContext = clients.length === 0 || staff.length === 0;
+  const emptyReason =
+    clients.length === 0 && staff.length === 0
+      ? "No clients or staff are loaded for this week — NECTAR has nothing to schedule against."
+      : clients.length === 0
+        ? "No clients are loaded for this week — NECTAR needs at least one client to draft a shift."
+        : "No staff are loaded for this week — NECTAR needs at least one staff member to draft a shift.";
+
   const ask = useMutation({
     mutationFn: async () => {
+      if (emptyContext) throw new Error(emptyReason);
       const result = await propose({ data: { ...context, sentence } });
       return result as NectarProposal;
     },

@@ -21,6 +21,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
+import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { ListChecks } from "lucide-react";
 import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
 import { useQuery } from "@tanstack/react-query";

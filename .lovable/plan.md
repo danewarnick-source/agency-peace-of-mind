@@ -1,42 +1,32 @@
-# NECTAR clarification: quick-reply buttons
+# Humanize NECTAR "Edit shift" rows
 
-Today when NECTAR can't act it returns `{ kind: "ask", question }` and the schedule preview just shows the question with a dismiss (X) button — the user has to re-type their whole request to answer. We'll let NECTAR offer **Yes/No** or **a short list of choices**, and let the user click one to send the answer back without retyping.
+Today, when NECTAR proposes an `edit` to an existing shift, the draft row shows `Edit shift fccb4c70` — the raw shift ID — and the patch as `start → Wed Jun 10, 3:00 PM`. The other two action types (`create`, `reassign`) already show staff and client names. We'll bring `edit` up to the same standard.
 
 ## UX
 
-In the amber "NECTAR needs more info" card under the command bar:
+The draft row for an edit will read:
 
-- If the question is a yes/no, show **Yes** and **No** buttons (Yes = teal, No = outline).
-- If NECTAR offers options (e.g. "Wednesday June 10", "Wednesday June 17", "Cancel the shift"), show each as a button.
-- Always include a small **"Reply with text…"** affordance that focuses the command bar with the original sentence pre-filled, plus the existing X to dismiss.
-- Clicking a button re-runs the NECTAR draft with the original sentence + the user's answer appended (e.g. `…\n\nAnswer: Yes` or `…\n\nAnswer: Move to Wednesday June 10`). NECTAR then returns either a draft (`kind: "ok"`) the user reviews as today, or another `ask` if it needs more.
+- **Title**: `Edit: Dane → Brandon Johnson · Thu Jun 11` (staff → client · current day)
+- **Diff line**: only the fields actually changing, before → after, e.g.
+  - `Start: Thu 3:00 PM → Wed 3:00 PM`
+  - `End: Thu 7:00 PM → Wed 7:00 PM`
+  - `Code: SLN → DSI`
 
-Nothing else in the flow changes — proposals are still advisory and require Approve & apply.
+No more raw `fccb4c70` ID.
 
 ## Technical
 
-Files touched:
+- **`src/lib/nectar-schedule-actions.functions.ts`**
+  - Extend the `edit` variant of `ProposedAction` with `client_name`, `staff_name`, and `current: { starts_at: string; ends_at: string; job_code: string | null }`.
+  - In `validateAndResolve`, when building an `edit` action, look up the shift in `shiftById`, then resolve `client_name` via `clientById` and `staff_name` via `staffById` (both already constructed at the top of the function). Populate `current` from the shift row.
 
-- `src/lib/nectar-schedule-actions.functions.ts`
-  - Extend the `ask` variant of `NectarProposal`:
-    ```ts
-    { kind: "ask"; question: string;
-      reply_type?: "yes_no" | "options" | "text";
-      options?: { id: string; label: string }[] }
-    ```
-  - Update the Zod schema (`Ask`) and both LLM prompt blocks to instruct the model: when the answer is binary use `reply_type:"yes_no"`; when there are 2–5 concrete choices use `reply_type:"options"` with short labels; otherwise omit (defaults to free text). Validate `options.length ≤ 5`.
-  - `proposeSchedulingActions` already accepts a free-form `sentence`. No signature change — the client just sends the augmented sentence.
+- **`src/components/schedule-preview/nectar-command-bar.tsx`** (`ActionRow`)
+  - Replace the `Edit shift {a.shift_id.slice(0, 8)}` title with `Edit: {a.staff_name} → {a.client_name} · {fmtWhen(a.current.starts_at)}` (date portion only).
+  - For the diff, render each changed field on its own line as `Start: <old> → <new>`, `End: <old> → <new>`, `Code: <old> → <new>`, using `fmtWhen` for times. Omit fields that aren't in the patch.
 
-- `src/components/schedule-preview/nectar-command-bar.tsx`
-  - Track the original sentence that produced the current `proposal` (`askedSentence`).
-  - In `ProposalReview` (the `kind === "ask"` branch), render Yes/No or option buttons based on `proposal.reply_type`/`options`. Each button calls a new `answerAsk(label)` that runs the same `propose` mutation with `sentence = askedSentence + "\n\nAnswer: " + label`, then replaces the current proposal with the new result.
-  - Add a "Reply with text" link that copies `askedSentence` back into the command input and clears the proposal.
-  - Disable buttons while the follow-up request is pending; show a small spinner.
-
-- No DB changes, no new server functions, no migration. Purely an additive field on the existing RPC response plus prompt tweaks.
+No DB changes, no migration, no new server functions.
 
 ## Out of scope
 
-- Persisting the question/answer conversation history (still single-turn re-prompts).
-- Applying the user's choice directly without re-running NECTAR (we want the engine to re-plan with the new info so guardrails still run).
-- Same pattern for other NECTAR surfaces (chat bar, document review) — only the schedule-preview command bar is in scope this turn.
+- Showing the diff inline on the schedule grid before approval.
+- Same treatment for the `reassign` op's missing time/client context — already readable today.

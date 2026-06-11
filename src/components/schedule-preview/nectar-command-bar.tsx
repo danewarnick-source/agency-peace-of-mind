@@ -434,11 +434,20 @@ function ActionRow({ a }: { a: ProposedAction }) {
         )}
         {a.op === "edit" && (
           <>
-            <div className="font-medium">Edit shift {a.shift_id.slice(0, 8)}</div>
-            <div className="opacity-70">
-              {a.patch.starts_at && `start → ${fmtWhen(a.patch.starts_at)} `}
-              {a.patch.ends_at && `end → ${fmtWhen(a.patch.ends_at)} `}
-              {a.patch.job_code && `code → ${a.patch.job_code}`}
+            <div className="font-medium">
+              Edit: {a.staff_name} → {a.client_name}
+              <span className="opacity-60"> · {fmtWhen(a.current.starts_at).split(",")[0]}</span>
+            </div>
+            <div className="opacity-70 space-y-0.5">
+              {a.patch.starts_at && (
+                <div>Start: {fmtWhen(a.current.starts_at)} → {fmtWhen(a.patch.starts_at)}</div>
+              )}
+              {a.patch.ends_at && (
+                <div>End: {fmtWhen(a.current.ends_at)} → {fmtWhen(a.patch.ends_at)}</div>
+              )}
+              {a.patch.job_code && (
+                <div>Code: {a.current.job_code ?? "—"} → {a.patch.job_code}</div>
+              )}
             </div>
           </>
         )}

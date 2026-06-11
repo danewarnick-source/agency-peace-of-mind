@@ -345,10 +345,10 @@ function AcceptDeclineBar({ shiftIds, meta }: { shiftIds: string[] | string; met
 
   return (
     <div className="flex gap-2">
-      <Button size="sm" variant="outline" className="flex-1 min-h-[44px]" disabled={!!busy} onClick={decline}>
+      <Button size="sm" variant="outline" className="flex-1 min-h-[44px] max-md:min-h-12 max-md:text-base" disabled={!!busy} onClick={decline}>
         {busy === "decline" ? "…" : "Decline"}
       </Button>
-      <Button size="sm" className="flex-1 min-h-[44px]" disabled={!!busy} onClick={accept}>
+      <Button size="sm" className="flex-1 min-h-[44px] max-md:min-h-12 max-md:text-base" disabled={!!busy} onClick={accept}>
         {busy === "accept" ? "…" : "Accept"}
       </Button>
     </div>

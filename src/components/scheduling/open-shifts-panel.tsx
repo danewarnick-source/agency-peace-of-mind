@@ -60,7 +60,9 @@ export function OpenShiftsPanel({
     <div className="rounded-xl border bg-card p-3">
       <div className="mb-2 flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-amber-500" />
-        <h3 className="text-sm font-semibold">Open shifts ({rows.length})</h3>
+        <h3 className="text-sm font-semibold">
+          {mode === "staff" ? "Open shifts you're qualified for" : "Open shifts"} ({rows.length})
+        </h3>
       </div>
       <ul className="space-y-1.5">
         {rows.map((s) => {

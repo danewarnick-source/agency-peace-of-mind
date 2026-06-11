@@ -94,18 +94,20 @@ export const evaluateRange = createServerFn({ method: "POST" })
     if (staffIds.length) {
       const { data: members } = await supabase
         .from("organization_members")
-        .select("user_id, active, profiles:profiles!inner(id, date_of_birth)")
+        .select("user_id, active")
         .eq("organization_id", data.organizationId)
         .in("user_id", staffIds);
-      for (const m of members ?? []) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const p = (m as any).profiles;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const id = (p?.id ?? (m as any).user_id) as string;
-        staffCtx[id] = {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          active: !!(m as any).active,
-          dob: p?.date_of_birth ?? null,
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, date_of_birth")
+        .in("id", staffIds);
+      const dobById = new Map<string, string | null>(
+        (profs ?? []).map((p: any) => [p.id as string, (p.date_of_birth ?? null) as string | null]),
+      );
+      for (const m of (members ?? []) as Array<{ user_id: string; active: boolean }>) {
+        staffCtx[m.user_id] = {
+          active: !!m.active,
+          dob: dobById.get(m.user_id) ?? null,
         };
       }
     }

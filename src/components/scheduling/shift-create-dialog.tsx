@@ -70,6 +70,8 @@ export function ShiftCreateDialog({
       setOverride("");
       setAwake(false);
       setPickedLocationId(locationId ?? null);
+      setRecurDays(new Set());
+      setRecurUntil("");
       const base = initialDay ? new Date(initialDay) : new Date();
       base.setHours(9, 0, 0, 0);
       const end = new Date(base); end.setHours(base.getHours() + 4);

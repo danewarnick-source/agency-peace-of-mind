@@ -1,12 +1,13 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { classesForCode, familyForCode } from "@/lib/scheduling/code-colors";
+import { classesForCode, familyForCode, isDailyCode } from "@/lib/scheduling/code-colors";
 import { listShiftsInRange } from "@/lib/scheduling/shifts.functions";
+import { AddSegmentDialog, type ParentShiftInfo } from "@/components/scheduling/add-segment-dialog";
 
 interface Props {
   open: boolean;
@@ -30,6 +31,7 @@ export function DayTimelineDrawer({
   open, onOpenChange, organizationId, day, locationId, locationName, onCreateClick, onShiftClick,
 }: Props) {
   const listCall = useServerFn(listShiftsInRange);
+  const [segParent, setSegParent] = useState<ParentShiftInfo | null>(null);
 
   const dayStartIso = useMemo(() => {
     if (!day) return null;
@@ -97,28 +99,58 @@ export function DayTimelineDrawer({
               const top = ((s0 - dayStartMs) / 3600000) * HOUR_HEIGHT;
               const height = Math.max(20, ((s1 - s0) / 3600000) * HOUR_HEIGHT);
               const cls = classesForCode(s.service_code ?? s.job_code);
-              const open = !s.staff_id;
+              const isOpen = !s.staff_id;
               const code = (s.service_code ?? s.job_code ?? "—").toString();
+              const isSegment = !!s.parent_shift_id;
+              const canAddSegment = !isOpen && !isSegment && !isDailyCode(code) && !!s.client_id;
               return (
-                <button
+                <div
                   key={s.id}
-                  onClick={() => onShiftClick?.(s.id)}
                   className={cn(
-                    "absolute left-0 right-0 rounded-md border-l-4 px-2 py-1 text-left text-[11px] font-semibold transition-colors hover:brightness-95 min-h-[44px]",
-                    open ? "bg-destructive/10 border-destructive text-destructive" : `${cls.bgSoft} ${cls.border} ${cls.text}`,
+                    "absolute left-0 right-0 rounded-md border-l-4 px-2 py-1 text-[11px] font-semibold transition-colors min-h-[44px]",
+                    isSegment && "ml-3",
+                    isOpen ? "bg-destructive/10 border-destructive text-destructive" : `${cls.bgSoft} ${cls.border} ${cls.text}`,
                   )}
                   style={{ top, height }}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span>{code}</span>
-                    <Badge variant="outline" className="text-[9px] capitalize">{familyForCode(code).replace("_", " ")}</Badge>
-                  </div>
-                  <div className="text-[10px] font-medium opacity-80">
-                    {new Date(s.starts_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}–
-                    {new Date(s.ends_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                    {open && " · open"}
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => onShiftClick?.(s.id)}
+                    className="block w-full text-left hover:brightness-95"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{code}{isSegment && " · seg"}</span>
+                      <Badge variant="outline" className="text-[9px] capitalize">{familyForCode(code).replace("_", " ")}</Badge>
+                    </div>
+                    <div className="text-[10px] font-medium opacity-80">
+                      {new Date(s.starts_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}–
+                      {new Date(s.ends_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                      {isOpen && " · open"}
+                    </div>
+                  </button>
+                  {canAddSegment && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSegParent({
+                          id: s.id,
+                          client_id: s.client_id!,
+                          staff_id: s.staff_id,
+                          starts_at: s.starts_at,
+                          ends_at: s.ends_at,
+                          location_id: s.location_id ?? null,
+                          service_code: s.service_code,
+                          job_code: s.job_code,
+                        });
+                      }}
+                      className="absolute right-1 bottom-1 rounded bg-background/80 border border-border px-1.5 py-0.5 text-[10px] font-semibold hover:bg-background"
+                      title="Add 1:1 segment inside this shift"
+                    >
+                      + seg
+                    </button>
+                  )}
+                </div>
               );
             })}
             {shiftsQ.isLoading && (
@@ -130,6 +162,13 @@ export function DayTimelineDrawer({
           </div>
         </div>
       </SheetContent>
+      <AddSegmentDialog
+        open={!!segParent}
+        onOpenChange={(v) => { if (!v) setSegParent(null); }}
+        organizationId={organizationId}
+        parent={segParent}
+        onCreated={() => { setSegParent(null); shiftsQ.refetch(); }}
+      />
     </Sheet>
   );
 }

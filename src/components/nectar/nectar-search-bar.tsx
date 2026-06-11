@@ -130,7 +130,7 @@ export function NectarSearchBar({
         out.push({
           kind: "staff",
           id: `staff:${s.id}`,
-          label: s.label ?? s.name,
+          label: s.name,
           sublabel: s.subtitle ? `Staff · ${s.subtitle}` : "Staff",
           onSelect: () => {
             setOpen(false);

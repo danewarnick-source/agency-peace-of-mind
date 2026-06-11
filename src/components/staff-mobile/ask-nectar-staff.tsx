@@ -124,6 +124,17 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
     requestAnimationFrame(() => taRef.current?.focus());
   };
 
+  // Auto-send an initial question (e.g. from the global NECTAR search bar) once
+  // the org is loaded, only once per mount.
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (firedRef.current) return;
+    if (!initialQuestion || !organizationId) return;
+    firedRef.current = true;
+    send(initialQuestion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuestion, organizationId]);
+
   const isEmpty = messages.length === 0;
 
   const composerMount = container;

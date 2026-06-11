@@ -248,7 +248,17 @@ function validateAndResolve(
       if (Object.keys(patch).length === 0) {
         dropped.push({ line: JSON.stringify(a), reason: "Edit has no changes" }); continue;
       }
-      out.push({ op: "edit", shift_id: sh.id, patch, reason: a.reason || "" });
+      const c = clientById.get(sh.client_id);
+      const s = staffById.get(sh.staff_id);
+      out.push({
+        op: "edit",
+        shift_id: sh.id,
+        client_name: c?.name ?? "Client",
+        staff_name: s?.name ?? "Staff",
+        current: { starts_at: sh.starts_at, ends_at: sh.ends_at, job_code: sh.job_code },
+        patch,
+        reason: a.reason || "",
+      });
     }
   }
 

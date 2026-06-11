@@ -60,6 +60,7 @@ export function NectarCommandBar({
 
   const [sentence, setSentence] = useState("");
   const [proposal, setProposal] = useState<NectarProposal | null>(null);
+  const [askedSentence, setAskedSentence] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [showExamples, setShowExamples] = useState(false);

@@ -81,6 +81,7 @@ function SchedulePreviewPage() {
   const [coverageOpen, setCoverageOpen] = useState(false);
   const [locationsOpen, setLocationsOpen] = useState(false);
   const [recurringOpen, setRecurringOpen] = useState(false);
+  const [autoAssignOpen, setAutoAssignOpen] = useState(false);
   const [timelineCtx, setTimelineCtx] = useState<{ siteId: string; siteName: string; day: Date } | null>(null);
   const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 

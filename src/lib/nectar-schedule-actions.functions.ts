@@ -81,8 +81,14 @@ export type ProposedAction =
     };
 
 export type Unmatched = { line: string; reason: string };
+export type AskReplyOption = { id: string; label: string };
 export type NectarProposal =
-  | { kind: "ask"; question: string }
+  | {
+      kind: "ask";
+      question: string;
+      reply_type?: "yes_no" | "options" | "text";
+      options?: AskReplyOption[];
+    }
   | { kind: "ok"; actions: ProposedAction[]; unmatched: Unmatched[]; summary: string };
 
 // ─── Shared gateway call (AWS Bedrock / Claude via Converse API) ───────────
@@ -147,7 +153,15 @@ const RawEdit = z.object({
   reason: z.string().optional().default(""),
 });
 const RawAction = z.union([RawCreate, RawReassign, RawEdit]);
-const Ask = z.object({ kind: z.literal("ask"), question: z.string().min(1).max(400) });
+const Ask = z.object({
+  kind: z.literal("ask"),
+  question: z.string().min(1).max(400),
+  reply_type: z.enum(["yes_no", "options", "text"]).optional(),
+  options: z
+    .array(z.object({ id: z.string().min(1).max(40), label: z.string().min(1).max(80) }))
+    .max(5)
+    .optional(),
+});
 const Ok = z.object({
   kind: z.literal("ok"),
   actions: z.array(RawAction).max(200),
@@ -261,7 +275,7 @@ the manager approves or discards it.
 
 Return strict JSON, ONE of:
 
-1) { "kind": "ask", "question": "<one short specific question>" }
+1) { "kind": "ask", "question": "<one short specific question>", "reply_type": "yes_no" | "options" | "text", "options"?: [{ "id": "...", "label": "..." }] }
 2) {
      "kind": "ok",
      "actions": [
@@ -280,6 +294,10 @@ Hard rules:
 - For phrases like "this week" use days within [week_start, week_start + 7d).
 - Prefer "reassign" when the user describes giving an existing shift to another staffer; prefer "create" when they describe a brand-new slot.
 - If the user is ambiguous (which client? which day? which code?) return "ask" with ONE specific question.
+- When you return "ask", also set "reply_type":
+  - "yes_no" when the answer is strictly yes/no (omit "options").
+  - "options" with 2–5 short labels when there are concrete alternatives (e.g. specific days, specific staff, "Cancel the shift"). Use plain text labels; "id" can equal the label.
+  - "text" (or omit reply_type entirely) when a free-form answer is needed.
 - Return JSON ONLY.`;
 
     const user = JSON.stringify({
@@ -312,7 +330,7 @@ confidently match, put them in "unmatched" with a short reason.
 
 Return strict JSON, ONE of:
 
-1) { "kind": "ask", "question": "<one short specific question>" }
+1) { "kind": "ask", "question": "<one short specific question>", "reply_type": "yes_no" | "options" | "text", "options"?: [{ "id": "...", "label": "..." }] }
 2) {
      "kind": "ok",
      "actions": [
@@ -327,6 +345,7 @@ Hard rules:
 - Pick a job_code only from that client's schedulable_codes. If the code in the row is not in the list, put the row in "unmatched".
 - Times must be full ISO 8601 with the local offset. Resolve dates from columns like "date", "shift_date", or combined "start"/"end".
 - Skip the header row and any blank lines.
+- If you must return "ask", also set "reply_type": "yes_no" for binary, "options" with 2–5 short labels for concrete choices, or "text" / omit for free-form.
 - Return JSON ONLY.`;
 
     const user = JSON.stringify({

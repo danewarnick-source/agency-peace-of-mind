@@ -356,6 +356,51 @@ export function ShiftCreateDialog({
                 Picking a host home location excludes its host staff from the picker.
               </div>
             </div>
+
+            <div className="rounded-md border p-2 space-y-2">
+              <Label className="text-xs">Repeat weekly (optional)</Label>
+              <div className="flex flex-wrap gap-1">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, idx) => {
+                  const on = recurDays.has(idx);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        const next = new Set(recurDays);
+                        if (on) next.delete(idx); else next.add(idx);
+                        setRecurDays(next);
+                      }}
+                      className={cn(
+                        "min-w-[44px] min-h-[36px] rounded-md border px-2 text-xs font-semibold",
+                        on ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 gap-2 items-end">
+                <div>
+                  <Label className="text-[11px]">Until (inclusive)</Label>
+                  <Input
+                    type="date"
+                    value={recurUntil}
+                    onChange={(e) => setRecurUntil(e.target.value)}
+                    min={startPicker.slice(0, 10)}
+                  />
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {recurDays.size === 0 || !recurUntil
+                    ? "One-off — pick weekdays + an end date to repeat."
+                    : (() => {
+                      const n = expandOccurrences().length;
+                      return `${n} shift${n === 1 ? "" : "s"} will be created.`;
+                    })()}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

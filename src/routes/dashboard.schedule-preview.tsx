@@ -159,6 +159,11 @@ function SchedulePreviewPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
+          <PublishDraftsButton
+            shifts={data?.shifts ?? []}
+            weekStart={weekStart}
+            onPublished={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
+          />
           <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
           <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>

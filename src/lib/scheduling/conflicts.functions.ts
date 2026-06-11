@@ -89,7 +89,7 @@ export const evaluateRange = createServerFn({ method: "POST" })
       .maybeSingle();
 
     // 3) staff DOBs + active flags
-    const staffIds = Array.from(new Set(shiftRows.map(s => s.staff_id))).filter(Boolean);
+    const staffIds = Array.from(new Set(shiftRows.map(s => s.staff_id).filter((x): x is string => !!x)));
     const staffCtx: ConflictContext["staff"] = {};
     if (staffIds.length) {
       const { data: members } = await supabase

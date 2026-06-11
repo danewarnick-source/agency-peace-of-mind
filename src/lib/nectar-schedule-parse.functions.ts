@@ -122,10 +122,7 @@ Rules:
       throw e;
     }
 
-    let parsed: unknown;
-    try { parsed = JSON.parse(raw); } catch {
-      return { kind: "ask", question: "I didn't catch that — try: 'Schedule Dane with Johnny every Mon/Wed/Fri 10a–3p'." };
-    }
+    const parsed = parseModelJson(raw, "nectar-parse-sentence");
 
     const Ask = z.object({ kind: z.literal("ask"), question: z.string().min(1).max(300) });
     const Ok = z.object({

@@ -278,6 +278,14 @@ function SchedulePreviewPage() {
           clients={(data?.clients ?? []).map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))}
         />
       )}
+
+      {org?.organization_id && (
+        <CoverageRequirementsDialog
+          open={coverageOpen}
+          onOpenChange={setCoverageOpen}
+          organizationId={org.organization_id}
+        />
+      )}
     </Shell>
   );
 }

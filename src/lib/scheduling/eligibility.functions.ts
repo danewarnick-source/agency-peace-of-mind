@@ -73,6 +73,7 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
     const byStaffShifts = new Map<string, Array<{ id: string; starts_at: string; ends_at: string }>>();
     for (const s of weekShifts ?? []) {
       if (s.parent_shift_id) continue;
+      if (!s.staff_id) continue;
       const arr = byStaffShifts.get(s.staff_id) ?? [];
       arr.push({ id: s.id, starts_at: s.starts_at, ends_at: s.ends_at });
       byStaffShifts.set(s.staff_id, arr);

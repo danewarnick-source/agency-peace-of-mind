@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Lock } from "lucide-react";
 import { CoverageBar24h } from "@/components/scheduling/coverage-bar-24h";
-import { publishShifts } from "@/lib/scheduling/shifts.functions";
+import { publishShiftsWithNotify, getActionNeeded } from "@/lib/scheduling/workflow.functions";
 import { listLocations } from "@/lib/scheduling/locations.functions";
 import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
@@ -758,31 +758,37 @@ const dot: React.CSSProperties = { width: 7, height: 7, borderRadius: "50%", bac
 const hint: React.CSSProperties = { color: SCHED.muted, fontSize: 12, padding: "10px 14px", borderTop: `1px solid ${SCHED.line}`, background: "#fbfbfe" };
 
 function PublishDraftsButton({
-  shifts, weekStart, onPublished,
+  shifts, weekStart, onPublished, conflictsCount,
 }: {
   shifts: ShiftRow[];
   weekStart: Date;
   onPublished?: () => void;
+  conflictsCount?: number;
 }) {
-  const publish = useServerFn(publishShifts);
+  const publish = useServerFn(publishShiftsWithNotify);
   const [busy, setBusy] = useState(false);
   const weekEnd = useMemo(() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); return d; }, [weekStart]);
-  const draftIds = useMemo(() => shifts
-    .filter((s) => {
-      if (s.published) return false;
-      const t = new Date(s.starts_at).getTime();
-      return t >= weekStart.getTime() && t < weekEnd.getTime();
-    })
-    .map((s) => s.id), [shifts, weekStart, weekEnd]);
+  const draftRows = useMemo(() => shifts.filter((s) => {
+    if (s.published) return false;
+    const t = new Date(s.starts_at).getTime();
+    return t >= weekStart.getTime() && t < weekEnd.getTime();
+  }), [shifts, weekStart, weekEnd]);
+  const draftIds = useMemo(() => draftRows.map((s) => s.id), [draftRows]);
+  const staffCount = useMemo(() => new Set(draftRows.map((s) => s.staff_id).filter(Boolean)).size, [draftRows]);
 
   const count = draftIds.length;
   const disabled = busy || count === 0;
   const handleClick = async () => {
     if (count === 0) return;
+    const conflictLine = conflictsCount ? `\n\n⚠ ${conflictsCount} conflict${conflictsCount === 1 ? "" : "s"} remain in this week.` : "";
+    const proceed = window.confirm(
+      `Publish ${count} shift${count === 1 ? "" : "s"} across ${staffCount} staff?${conflictLine}\n\nEach staff member will be notified to accept or decline.`,
+    );
+    if (!proceed) return;
     setBusy(true);
     try {
-      await publish({ data: { ids: draftIds } });
-      toast.success(`Published ${count} shift${count === 1 ? "" : "s"}`);
+      const res = await publish({ data: { ids: draftIds } });
+      toast.success(`Published ${count} shift${count === 1 ? "" : "s"} · notified ${res.notified} staff`);
       onPublished?.();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Publish failed");

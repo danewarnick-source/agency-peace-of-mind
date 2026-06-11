@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Lock } from "lucide-react";
 import { CoverageBar24h } from "@/components/scheduling/coverage-bar-24h";
-import { publishShiftsWithNotify, getActionNeeded } from "@/lib/scheduling/workflow.functions";
+import { publishShiftsWithNotify } from "@/lib/scheduling/workflow.functions";
 import { listLocations } from "@/lib/scheduling/locations.functions";
 import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";

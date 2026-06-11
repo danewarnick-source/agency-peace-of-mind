@@ -290,6 +290,14 @@ function SchedulePreviewPage() {
           organizationId={org.organization_id}
         />
       )}
+
+      {org?.organization_id && (
+        <LocationsDialog
+          open={locationsOpen}
+          onOpenChange={setLocationsOpen}
+          organizationId={org.organization_id}
+        />
+      )}
     </Shell>
   );
 }

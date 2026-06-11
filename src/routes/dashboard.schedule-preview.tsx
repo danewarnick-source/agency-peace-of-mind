@@ -10,8 +10,10 @@ import { listLocations, listCoverageRequirements } from "@/lib/scheduling/locati
 import { listClientWeeklyTargets } from "@/lib/scheduling/targets.functions";
 import { evaluateRange } from "@/lib/scheduling/conflicts.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, CheckCircle2, XCircle, AlertTriangle, CalendarCheck2, Settings as SettingsIcon } from "lucide-react";
+import { Sparkles, CheckCircle2, XCircle, AlertTriangle, CalendarCheck2, Settings as SettingsIcon, Info } from "lucide-react";
 import { classesForCode, familyForCode } from "@/lib/scheduling/code-colors";
+import { hhsVisitLabel, hostHomeRowLabel, HHS_VISIT_TOOLTIP } from "@/lib/scheduling/hhs-visit";
+import { HhsInfoTooltip } from "@/components/scheduling/hhs-info-tooltip";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
 import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
 import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
@@ -328,6 +330,15 @@ function SchedulePreviewPage() {
   const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${weekEnd.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
   const orgName = org?.organization_name ?? "Your agency";
 
+  // A host home is one client living with a host family — label it by the
+  // client ("Jane D. — Host Home (HHS)"), not the bare location name.
+  const isHostSite = (s: { id: string; name: string }) => hostHomeNames.has(s.name.toLowerCase());
+  const siteDisplayLabel = (s: { id: string; name: string }) => {
+    if (!isHostSite(s)) return s.name;
+    const c = (siteClients.get(s.id) ?? [])[0];
+    return c ? hostHomeRowLabel(c.first_name, c.last_name) : hostHomeRowLabel(null, null);
+  };
+
   return (
     <Shell>
       {/* ── Mobile Day view (below md only) ───────────────────────────── */}
@@ -438,9 +449,9 @@ function SchedulePreviewPage() {
             <HomePill
               key={s.id}
               active={siteId === s.id}
-              label={s.name}
+              label={siteDisplayLabel(s)}
               gap={!!siteHasGap.get(s.id)}
-              host={hostHomeNames.has(s.name.toLowerCase())}
+              host={false}
               onClick={() => setSiteId(s.id)}
             />
           ))}
@@ -471,6 +482,7 @@ function SchedulePreviewPage() {
             clients={siteClients.get(currentSite.id) ?? []} shifts={siteShifts.get(currentSite.id) ?? []}
             staff={data?.staff ?? []} view={view} settings={settings} onOpenEditor={openEditor}
             conflictShiftIds={conflictShiftIds}
+            isHostHome={hostHomeNames.has(currentSite.name.toLowerCase())}
           />
         ) : (
           <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>No sites or 1-on-1 clients yet.</div>
@@ -733,6 +745,21 @@ function MobileDayBoard({
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   }, [isAll, allShifts, siteShifts, siteId, day]);
 
+  // Clients who live in a host home → their visit cards get HHS labels even
+  // in the All view where a card has no site context.
+  const hostClientIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of sites) {
+      if (!hostHomeNames.has(s.name.toLowerCase())) continue;
+      for (const c of siteClients.get(s.id) ?? []) set.add(c.id);
+    }
+    return set;
+  }, [sites, siteClients, hostHomeNames]);
+  const hostLabel = (s: { id: string; name: string }) => {
+    const c = (siteClients.get(s.id) ?? [])[0];
+    return c ? hostHomeRowLabel(c.first_name, c.last_name) : hostHomeRowLabel(null, null);
+  };
+
   // Coverage strip: real homes only (1-on-1 pseudo-site excluded), honoring
   // the active location chip.
   const coverageSites = sites.filter((s) => s.id !== UNASSIGNED_SITE_ID && (isAll || s.id === siteId));
@@ -827,8 +854,11 @@ function MobileDayBoard({
                 color: on ? "#fff" : SCHED.ink,
               }}
             >
-              {s.id === UNASSIGNED_SITE_ID ? "1-on-1" : s.name}
-              {hostHomeNames.has(s.name.toLowerCase()) && <span className="ml-1 opacity-70">· host</span>}
+              {s.id === UNASSIGNED_SITE_ID
+                ? "1-on-1"
+                : hostHomeNames.has(s.name.toLowerCase())
+                  ? hostLabel(s)
+                  : s.name}
             </button>
           );
         })}
@@ -877,7 +907,7 @@ function MobileDayBoard({
                     className="flex min-h-11 w-full items-center justify-between gap-2 text-left"
                   >
                     <span className="truncate text-xs font-semibold" style={{ color: SCHED.ink }}>
-                      {s.name} <span className="font-normal opacity-60">· host</span>
+                      {hostLabel(s)}
                     </span>
                     <span className="flex shrink-0 items-center gap-1.5">
                       <HostDot state={state((cid) => !!noteDays?.has(`${cid}|${dk}`))} label="Daily note" />
@@ -936,6 +966,7 @@ function MobileDayBoard({
               staffName={staffNameById.get(s.staff_id ?? "") ?? "Open"}
               clientName={clientNameById.get(s.client_id ?? "") ?? ""}
               hasConflict={conflictShiftIds.has(s.id)}
+              isHostHome={!!s.client_id && hostClientIds.has(s.client_id)}
               onClick={() => onOpenEditor({ shift: s })}
             />
           ))
@@ -946,15 +977,17 @@ function MobileDayBoard({
 }
 
 function MobileShiftCard({
-  shift, staffName, clientName, hasConflict, onClick,
+  shift, staffName, clientName, hasConflict, onClick, isHostHome,
 }: {
   shift: ShiftRow;
   staffName: string;
   clientName: string;
   hasConflict: boolean;
   onClick: () => void;
+  isHostHome?: boolean;
 }) {
   const code = (shift.service_code ?? shift.job_code ?? "").toUpperCase();
+  const visitLabel = hhsVisitLabel(code, isHostHome);
   const hex = FAMILY_HEX[familyForCode(code)] ?? "#64748b";
   const isOpen = !shift.staff_id;
   const status = isOpen
@@ -980,6 +1013,7 @@ function MobileShiftCard({
     <button
       type="button"
       onClick={onClick}
+      title={visitLabel ? HHS_VISIT_TOOLTIP : undefined}
       className="block w-full rounded-xl border bg-white p-3 text-left shadow-sm active:scale-[0.99]"
       style={{
         borderColor: hasConflict ? "#dc2626" : SCHED.line,
@@ -997,9 +1031,12 @@ function MobileShiftCard({
             {code || "—"}{isSegment ? " · 1:1" : ""}
           </span>
           <span className="truncate text-sm font-semibold" style={{ color: SCHED.ink }}>
-            {isOpen ? "Open shift" : firstName(staffName)}
-            {clientName && <span className="font-normal" style={{ color: SCHED.muted }}> → {firstName(clientName)}</span>}
+            {visitLabel ?? (isOpen ? "Open shift" : firstName(staffName))}
+            {visitLabel
+              ? (!isOpen && <span className="font-normal" style={{ color: SCHED.muted }}> · {firstName(staffName)}</span>)
+              : (clientName && <span className="font-normal" style={{ color: SCHED.muted }}> → {firstName(clientName)}</span>)}
           </span>
+          {visitLabel && <Info className="h-3.5 w-3.5 shrink-0" style={{ color: SCHED.muted }} aria-label="HHS visit info" />}
           {fromNectar && <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: "#d97a1c" }} />}
         </span>
         <span className={cn2("flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold", bit.cls)}>
@@ -1124,13 +1161,9 @@ function AllHomesBoard({
               <tr key={s.id} style={{ cursor: "pointer" }} onClick={() => onPickSite(s.id)} className="sched-drill">
                 <td style={rowHead}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {s.name}
-                    {isHost && (
-                      <span style={{
-                        fontSize: 9, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase",
-                        padding: "1px 4px", borderRadius: 4, background: "#eef2ff", color: "#4f46e5",
-                      }}>HOST</span>
-                    )}
+                    {isHost
+                      ? hostHomeRowLabel(clients[0]?.first_name, clients[0]?.last_name)
+                      : s.name}
                   </div>
                   {settings.showResidentCount && (
                     <small style={rowHeadSmall}>
@@ -1235,7 +1268,7 @@ function AllHomesBoard({
 
 // ── Single-home week grid ─────────────────────────────────────────────
 function SiteWeekGrid({
-  siteId, siteName, days, clients, shifts, staff, view, settings, onOpenEditor, conflictShiftIds,
+  siteId, siteName, days, clients, shifts, staff, view, settings, onOpenEditor, conflictShiftIds, isHostHome,
 }: {
   siteId: string;
   siteName: string;
@@ -1247,6 +1280,7 @@ function SiteWeekGrid({
   settings: Settings;
   onOpenEditor: (ctx: EditorContext) => void;
   conflictShiftIds?: Set<string>;
+  isHostHome?: boolean;
 }) {
   const type = inferSiteType(siteId, clients, shifts);
   const staffById = new Map(staff.map((s) => [s.id, s]));
@@ -1310,6 +1344,7 @@ function SiteWeekGrid({
                         key={s.id} shift={s} view={view} settings={settings}
                         staffName={staffName(s.staff_id)} clientName={clientName(s.client_id)}
                         hasConflict={conflictShiftIds?.has(s.id)}
+                        isHostHome={isHostHome}
                         onClick={() => onOpenEditor({ shift: s })}
                       />
                     ))}
@@ -1369,7 +1404,7 @@ function durationLabel(startsAt: string, endsAt: string): string {
 }
 
 function ShiftChip({
-  shift, view, settings, staffName, clientName, onClick, hasConflict,
+  shift, view, settings, staffName, clientName, onClick, hasConflict, isHostHome,
 }: {
   shift: ShiftRow;
   view: ViewMode;
@@ -1378,11 +1413,14 @@ function ShiftChip({
   clientName: string;
   onClick: () => void;
   hasConflict?: boolean;
+  isHostHome?: boolean;
 }) {
   const compact = settings.density === "compact";
   const isOpen = !shift.staff_id;
-  const label = shiftTypeLabel(shift);
   const code = (shift.service_code ?? shift.job_code ?? "").toUpperCase();
+  // Host-home visits get a purpose-based label, never bare "HHS".
+  const visitLabel = hhsVisitLabel(code, isHostHome);
+  const label = visitLabel ?? shiftTypeLabel(shift);
   const isSegment = !!shift.parent_shift_id;
   const isDraft = shift.status === "draft" || (!shift.published && shift.status !== "published");
   const fromNectar = (shift.created_from ?? "").toLowerCase().startsWith("nectar");
@@ -1406,11 +1444,13 @@ function ShiftChip({
   // (anything that isn't whole-house coverage). In client view the row IS the
   // client, so the staff name carries the cell.
   const showClient = clientName && clientName !== "House" && view !== "client";
-  const who = view === "client"
-    ? firstName(staffName)
-    : showClient
-      ? `${firstName(staffName)} → ${firstName(clientName)}`
-      : firstName(staffName);
+  const who = visitLabel
+    ? `${visitLabel}${showClient ? ` · ${firstName(clientName)}` : ""}`
+    : view === "client"
+      ? firstName(staffName)
+      : showClient
+        ? `${firstName(staffName)} → ${firstName(clientName)}`
+        : firstName(staffName);
 
   const border = hasConflict
     ? "2px solid #dc2626"
@@ -1422,7 +1462,9 @@ function ShiftChip({
     <button
       className="sched-chip"
       onClick={onClick}
-      title={`${label} · ${timeStr} (${dur})${isDraft ? " · draft" : ""}${hasConflict ? " · has conflict" : ""}${fromNectar ? " · NECTAR-suggested" : ""} — click to edit`}
+      title={visitLabel
+        ? `${label} · ${timeStr} (${dur}) — ${HHS_VISIT_TOOLTIP}`
+        : `${label} · ${timeStr} (${dur})${isDraft ? " · draft" : ""}${hasConflict ? " · has conflict" : ""}${fromNectar ? " · NECTAR-suggested" : ""} — click to edit`}
       style={{
         ...chipBase, ...(compact ? chipCompact : null),
         background: hex + "14", color: hex, border,
@@ -1437,6 +1479,7 @@ function ShiftChip({
           {code || "—"}{isSegment ? " · 1:1" : ""}
         </span>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{who}</span>
+        {visitLabel && <Info aria-label="HHS visit info" style={{ width: 11, height: 11, flexShrink: 0, opacity: 0.7 }} />}
         {fromNectar && <Sparkles aria-label="NECTAR-suggested" style={{ width: 11, height: 11, flexShrink: 0, color: "#d97a1c" }} />}
       </span>
       {settings.showTimes && (

@@ -32,6 +32,8 @@ import { isDailyServiceCode } from "@/lib/service-billing";
 import { RequestTimeOffDialog } from "@/components/schedule-preview/request-time-off-dialog";
 import { RequestSwapDialog } from "@/components/schedule-preview/request-swap-dialog";
 import { CalendarOff, ArrowLeftRight } from "lucide-react";
+import { hhsVisitLabel, hostHomeRowLabel } from "@/lib/scheduling/hhs-visit";
+import { HhsInfoTooltip } from "@/components/scheduling/hhs-info-tooltip";
 
 export const Route = createFileRoute("/dashboard/schedule")({
   head: () => ({ meta: [{ title: "My Schedule — HIVE" }] }),
@@ -46,7 +48,10 @@ type ScheduledShift = {
   id: string;
   client_id: string;
   client_name: string;
+  client_first_name: string | null;
+  client_last_name: string | null;
   home_name: string | null;
+  is_host_home: boolean;
   job_code: string | null;
   starts_at: string;
   ends_at: string;
@@ -149,7 +154,7 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
       const { data, error } = await supabase
         .from("scheduled_shifts")
         .select(
-          "id, client_id, job_code, starts_at, ends_at, status, published, clients:client_id(first_name, last_name, team_id, teams:team_id(team_name))",
+          "id, client_id, job_code, starts_at, ends_at, status, published, clients:client_id(first_name, last_name, team_id, teams:team_id(team_name, setting))",
         )
         .eq("staff_id", user!.id)
         .eq("organization_id", org!.organization_id)
@@ -164,7 +169,10 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
         client_name: r.clients
           ? `${r.clients.first_name ?? ""} ${r.clients.last_name ?? ""}`.trim()
           : "Client",
+        client_first_name: r.clients?.first_name ?? null,
+        client_last_name: r.clients?.last_name ?? null,
         home_name: r.clients?.teams?.team_name ?? null,
+        is_host_home: /host/i.test(String(r.clients?.teams?.setting ?? "")),
         job_code: r.job_code,
         starts_at: r.starts_at,
         ends_at: r.ends_at,
@@ -179,7 +187,8 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
 function ShiftCard({ s }: { s: ScheduledShift }) {
   const daily = isDaily(s.job_code);
   const code = s.job_code ?? "";
-  const codeLabel = code || "Service TBD";
+  const visitLabel = hhsVisitLabel(code, s.is_host_home);
+  const codeLabel = visitLabel ?? (code || "Service TBD");
   const initials =
     s.client_name
       .split(" ")
@@ -208,11 +217,14 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              {s.home_name && (
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{s.home_name}</p>
+              {(s.is_host_home || s.home_name) && (
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {s.is_host_home ? hostHomeRowLabel(s.client_first_name, s.client_last_name) : s.home_name}
+                </p>
               )}
-              <h3 className="break-words text-base font-semibold leading-snug text-foreground">
+              <h3 className="flex items-center gap-1 break-words text-base font-semibold leading-snug text-foreground">
                 {s.client_name}
+                {visitLabel && <HhsInfoTooltip className="text-muted-foreground" />}
               </h3>
             </div>
             <span

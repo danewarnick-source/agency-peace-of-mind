@@ -113,6 +113,9 @@ export type Settings = {
   allowMultipleStaff: boolean;
   requireMatchingCert: boolean;
   overtimeWarning: boolean;
+  /** Host homes are hidden by default; only shown when on, or when a visit
+   *  is scheduled in the visible range. */
+  showHostHomes: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -126,6 +129,7 @@ export const DEFAULT_SETTINGS: Settings = {
   allowMultipleStaff: true,
   requireMatchingCert: true,
   overtimeWarning: true,
+  showHostHomes: false,
 };
 
 const SETTINGS_KEY = "hive.schedulePreview.settings";

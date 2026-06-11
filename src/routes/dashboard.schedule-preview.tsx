@@ -335,6 +335,13 @@ function SchedulePreviewPage() {
   // client ("Jane D. — Host Home (HHS)"), not the bare location name.
   const isHostSite = (s: { id: string; name: string }) => hostHomeNames.has(s.name.toLowerCase());
   const hasHostHomes = sites.some(isHostSite);
+  // Task 2: host homes are hidden by default. A host site shows only when the
+  // "Show host homes" toggle is on, OR it has a visit scheduled this week, OR
+  // it is the site the user is currently viewing.
+  const hostSiteVisible = (s: { id: string; name: string }) =>
+    settings.showHostHomes || (siteShifts.get(s.id)?.length ?? 0) > 0 || s.id === siteId;
+  const visibleSites = sites.filter((s) => !isHostSite(s) || hostSiteVisible(s));
+  const setShowHostHomes = (v: boolean) => setSettings({ showHostHomes: v });
   const siteDisplayLabel = (s: { id: string; name: string }) => {
     if (!isHostSite(s)) return s.name;
     const c = (siteClients.get(s.id) ?? [])[0];
@@ -350,6 +357,9 @@ function SchedulePreviewPage() {
           day={mobileDay}
           onSelectDay={selectMobileDay}
           sites={sites}
+          visibleSites={visibleSites}
+          showHostHomes={settings.showHostHomes}
+          onToggleHostHomes={hasHostHomes ? () => setShowHostHomes(!settings.showHostHomes) : undefined}
           siteId={siteId}
           onPickSite={setSiteId}
           siteClients={siteClients}
@@ -450,7 +460,7 @@ function SchedulePreviewPage() {
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <HomePill active={isAll} label="All homes" onClick={() => setSiteId("__all__")} />
-          {sites.map((s) => (
+          {visibleSites.map((s) => (
             <HomePill
               key={s.id}
               active={siteId === s.id}
@@ -462,6 +472,21 @@ function SchedulePreviewPage() {
           ))}
         </div>
         <div style={{ flex: 1 }} />
+        {hasHostHomes && (
+          <button
+            type="button"
+            onClick={() => setShowHostHomes(!settings.showHostHomes)}
+            title="Host homes are hidden unless they have a visit scheduled this week"
+            style={{
+              border: `1px solid ${settings.showHostHomes ? SCHED.navy : SCHED.line}`,
+              background: settings.showHostHomes ? SCHED.navy : "#fff",
+              color: settings.showHostHomes ? "#fff" : SCHED.ink,
+              borderRadius: 9, padding: "7px 11px", fontWeight: 600, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            {settings.showHostHomes ? "✓ " : ""}Show host homes
+          </button>
+        )}
         <ViewSeg value={view} onChange={setView} disabled={isAll} />
       </div>
 
@@ -471,7 +496,7 @@ function SchedulePreviewPage() {
           <div style={{ padding: 40, textAlign: "center", color: SCHED.muted, fontSize: 13 }}>Loading schedule…</div>
         ) : isAll ? (
           <AllHomesBoard
-            days={days} sites={sites} siteClients={siteClients} siteShifts={siteShifts}
+            days={days} sites={visibleSites} siteClients={siteClients} siteShifts={siteShifts}
             settings={settings} onPickSite={setSiteId}
             hostHomeNames={hostHomeNames}
             reqsBySiteName={reqsBySiteName}
@@ -700,13 +725,17 @@ function ViewSeg({ value, onChange, disabled }: { value: ViewMode; onChange: (v:
 // open shifts, and a compact coverage strip. Presentation only — it reads
 // the exact same week-scoped data as the desktop board.
 function MobileDayBoard({
-  day, onSelectDay, sites, siteId, onPickSite, siteShifts, siteClients, allShifts, staff, clients,
+  day, onSelectDay, sites, visibleSites, showHostHomes, onToggleHostHomes,
+  siteId, onPickSite, siteShifts, siteClients, allShifts, staff, clients,
   isLoading, conflictShiftIds, hostHomeNames, reqsBySiteName, noteDays, overnightDays,
   weekStart, weekEndIso, organizationId, onOpenEditor, onOpenTimeline, onOpenSettings,
 }: {
   day: Date;
   onSelectDay: (d: Date) => void;
   sites: { id: string; name: string }[];
+  visibleSites: { id: string; name: string }[];
+  showHostHomes: boolean;
+  onToggleHostHomes?: () => void;
   siteId: string;
   onPickSite: (id: string) => void;
   siteShifts: Map<string, ShiftRow[]>;
@@ -766,8 +795,8 @@ function MobileDayBoard({
   };
 
   // Coverage strip: real homes only (1-on-1 pseudo-site excluded), honoring
-  // the active location chip.
-  const coverageSites = sites.filter((s) => s.id !== UNASSIGNED_SITE_ID && (isAll || s.id === siteId));
+  // the active location chip — host homes obey the "Show host homes" toggle.
+  const coverageSites = visibleSites.filter((s) => s.id !== UNASSIGNED_SITE_ID && (isAll || s.id === siteId));
   const dk = (() => { const x = new Date(day); x.setHours(12); return x.toISOString().slice(0, 10); })();
 
   return (
@@ -845,7 +874,7 @@ function MobileDayBoard({
         >
           All
         </button>
-        {sites.map((s) => {
+        {visibleSites.map((s) => {
           const on = siteId === s.id;
           return (
             <button
@@ -867,6 +896,20 @@ function MobileDayBoard({
             </button>
           );
         })}
+        {onToggleHostHomes && (
+          <button
+            type="button"
+            onClick={onToggleHostHomes}
+            className="min-h-11 shrink-0 rounded-full border border-dashed px-3.5 text-xs font-semibold"
+            style={{
+              background: showHostHomes ? SCHED.navy : "#fff",
+              borderColor: showHostHomes ? SCHED.navy : SCHED.line,
+              color: showHostHomes ? "#fff" : SCHED.muted,
+            }}
+          >
+            {showHostHomes ? "✓ Host homes" : "Show host homes"}
+          </button>
+        )}
       </div>
 
       {/* Pinned: needs-approval + open shifts (one-tap actions live inside) */}

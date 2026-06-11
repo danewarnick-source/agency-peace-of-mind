@@ -52,6 +52,7 @@ export function ShiftCreateDialog({
   const [startPicker, setStartPicker] = useState<string>("");
   const [endPicker, setEndPicker] = useState<string>("");
   const [awake, setAwake] = useState(false);
+  const [pickedLocationId, setPickedLocationId] = useState<string | null>(null);
   const [staffId, setStaffId] = useState<string | null>(null);
   const [override, setOverride] = useState("");
   const [submitting, setSubmitting] = useState(false);

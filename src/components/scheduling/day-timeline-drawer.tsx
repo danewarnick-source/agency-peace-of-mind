@@ -31,6 +31,7 @@ export function DayTimelineDrawer({
   open, onOpenChange, organizationId, day, locationId, locationName, onCreateClick, onShiftClick,
 }: Props) {
   const listCall = useServerFn(listShiftsInRange);
+  const [segParent, setSegParent] = useState<ParentShiftInfo | null>(null);
 
   const dayStartIso = useMemo(() => {
     if (!day) return null;

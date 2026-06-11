@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Copy, Download, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Lock, FileSearch,
 } from "lucide-react";
-import { fmtHours } from "@/lib/billing-units";
+import { fmtHours, computeEntryUnits } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { aggregateHourlyUnits, aggregateDailyDays } from "@/lib/accrual";
 import { RequireRole } from "@/components/rbac-guard";
@@ -56,6 +56,10 @@ type Row = {
   // Internal — not part of the 520 column set
   _key: string;
   _client_id: string;
+  /** Annual authorization for the code (internal display). */
+  _annual_units: number;
+  /** Units consumed across the FULL authorization window (internal display). */
+  _consumed_units: number;
 };
 
 type DraftWarning = {
@@ -126,6 +130,41 @@ function Billing520Page() {
     },
   });
 
+  // Usage across each code's FULL authorization window (since the earliest
+  // service_start_date), independent of the displayed billing period —
+  // remaining units must reflect the whole authorization, not just this month.
+  const earliestAuthStart = useMemo(() => {
+    const ds = (codes ?? [])
+      .map((c) => c.service_start_date)
+      .filter((d): d is string => !!d)
+      .sort();
+    return ds[0] ?? `${new Date().getFullYear()}-01-01`;
+  }, [codes]);
+
+  const authUsageQ = useQuery({
+    enabled: !!org?.organization_id && !!codes,
+    queryKey: ["520-auth-usage", org?.organization_id, earliestAuthStart],
+    queryFn: async () => {
+      const [ts, dl] = await Promise.all([
+        supabase
+          .from("evv_timesheets")
+          .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+          .eq("organization_id", org!.organization_id)
+          .gte("clock_in_timestamp", `${earliestAuthStart}T00:00:00Z`)
+          .not("clock_out_timestamp", "is", null),
+        supabase
+          .from("hhs_daily_records_v")
+          .select("client_id, record_date, service_code, billable")
+          .eq("organization_id", org!.organization_id)
+          .eq("billable", true)
+          .gte("record_date", earliestAuthStart),
+      ]);
+      if (ts.error) throw ts.error;
+      if (dl.error) throw dl.error;
+      return { ts: ts.data ?? [], dl: dl.data ?? [] };
+    },
+  });
+
   const clientsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["520-clients", org?.organization_id],
@@ -178,6 +217,43 @@ function Billing520Page() {
       },
     );
 
+    // Consumption across each code's FULL authorization window (for the
+    // Remaining column) — period-independent.
+    const authTs = (authUsageQ.data?.ts ?? []) as Array<{
+      client_id: string; service_type_code: string | null;
+      clock_in_timestamp: string; clock_out_timestamp: string | null;
+    }>;
+    const authDl = (authUsageQ.data?.dl ?? []) as Array<{
+      client_id: string | null; record_date: string | null; service_code: string | null;
+    }>;
+    const consumedFor = (b: (typeof codes)[number]): number => {
+      const winStart = b.service_start_date ? new Date(b.service_start_date) : null;
+      const winEnd = b.service_end_date ? new Date(b.service_end_date) : null;
+      if (isDailyServiceCode(b.service_code)) {
+        const days = new Set<string>();
+        for (const r of authDl) {
+          if (r.client_id !== b.client_id || !r.record_date) continue;
+          if (r.service_code && r.service_code !== b.service_code) continue;
+          const d = new Date(`${r.record_date}T00:00:00`);
+          if (winStart && d < winStart) continue;
+          if (winEnd && d > winEnd) continue;
+          days.add(r.record_date);
+        }
+        return days.size;
+      }
+      let units = 0;
+      for (const r of authTs) {
+        if (r.client_id !== b.client_id || !r.clock_out_timestamp) continue;
+        if (r.service_type_code !== b.service_code) continue;
+        const inT = new Date(r.clock_in_timestamp);
+        if (winStart && inT < winStart) continue;
+        if (winEnd && inT > winEnd) continue;
+        // Per-entry rounding; the bucket sums entry units, never re-rounds.
+        units += computeEntryUnits(r.clock_in_timestamp, r.clock_out_timestamp);
+      }
+      return units;
+    };
+
     const out: Row[] = [];
     let line = 1;
     for (const b of codes) {
@@ -191,7 +267,9 @@ function Billing520Page() {
       } else {
         units = unitsByKey.get(`${b.client_id}|${b.service_code}`) ?? 0;
       }
-      const remaining = Math.max(0, (b.annual_unit_authorization ?? 0) - units);
+      const annual = b.annual_unit_authorization ?? 0;
+      const consumed = consumedFor(b);
+      const remaining = Math.max(0, annual - consumed);
       out.push({
         line_number: line++,
         provider_approver_email: b.provider_approver_email ?? "",
@@ -208,10 +286,12 @@ function Billing520Page() {
         monthly_max_units: b.monthly_max_units ?? "",
         _key: `${b.client_id}|${b.service_code}`,
         _client_id: b.client_id,
+        _annual_units: annual,
+        _consumed_units: consumed,
       });
     }
     return out;
-  }, [codes, clientsQ.data, tsQ.data, dailyQ.data, periodStartStr, periodEndStr]);
+  }, [codes, clientsQ.data, tsQ.data, dailyQ.data, authUsageQ.data, periodStartStr, periodEndStr]);
 
   // ─── Warning generation (HIVE-surfaced audit checks) ──────────────────────
   const draftWarnings = useMemo<DraftWarning[]>(() => {
@@ -656,7 +736,12 @@ function Billing520Page() {
                 <td className="px-3 py-2">{r.service_start_date}</td>
                 <td className="px-3 py-2">{r.service_end_date}</td>
                 <td className="px-3 py-2 tabular-nums font-semibold">{r.units}</td>
-                <td className="px-3 py-2 tabular-nums">{r.remaining_units}</td>
+                <td className="px-3 py-2 tabular-nums">
+                  {r.remaining_units}
+                  <span className="block text-[10px] leading-tight text-muted-foreground">
+                    {r._consumed_units} used / {r._annual_units} authorized
+                  </span>
+                </td>
                 <td className="px-3 py-2">{r.sce}</td>
                 <td className="px-3 py-2 tabular-nums">{r.monthly_max_units}</td>
               </tr>

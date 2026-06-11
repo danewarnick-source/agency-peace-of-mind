@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
 import { useAllClientBillingCodes, type ClientBillingCode } from "./use-client-billing-codes";
-import { hoursToUnits, unitsToHours, UNITS_PER_HOUR } from "@/lib/billing-units";
+import { computeEntryUnits, unitsToHours, UNITS_PER_HOUR } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 
 /**
@@ -93,6 +93,7 @@ export function useClientBudget(clientId: string | undefined) {
         // Sum usage strictly within the code's period.
         let used_hours = 0;
         let used_days = 0;
+        let used_entry_units = 0;
         if (is_daily) {
           const dates = new Set<string>();
           for (const r of (dlRows ?? []) as Array<{ record_date: string | null; service_code: string | null }>) {
@@ -117,11 +118,15 @@ export function useClientBudget(clientId: string | undefined) {
             if (period_end && inT > period_end) continue;
             const hrs =
               (new Date(r.clock_out_timestamp).getTime() - inT.getTime()) / 3_600_000;
-            if (hrs > 0 && isFinite(hrs)) used_hours += hrs;
+            if (hrs > 0 && isFinite(hrs)) {
+              used_hours += hrs;
+              // Per-entry rounding; the bucket sums entry units, never re-rounds.
+              used_entry_units += computeEntryUnits(r.clock_in_timestamp, r.clock_out_timestamp);
+            }
           }
         }
 
-        const used_units = is_daily ? used_days : hoursToUnits(used_hours);
+        const used_units = is_daily ? used_days : used_entry_units;
         const annual = code.annual_unit_authorization ?? 0;
         const remaining_units = Math.max(0, annual - used_units);
         const remaining_hours = is_daily

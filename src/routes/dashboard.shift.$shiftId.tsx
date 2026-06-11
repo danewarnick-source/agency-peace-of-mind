@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { computeEntryUnits } from "@/lib/billing-units";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -184,10 +185,13 @@ function ActiveClockPanel({ shift, userId }: { shift: Shift; userId?: string }) 
   const clockOut = useMutation({
     mutationFn: async () => {
       if (!activePunch) return;
+      const outIso = new Date().toISOString();
       const { error } = await (supabase as any).from("evv_timesheets").update({
-        clock_out_timestamp: new Date().toISOString(),
+        clock_out_timestamp: outIso,
         gps_out_coordinates: { lat: 0, lng: 0, advisory: true },
         status: "Pending",
+        // Per-entry quarter-hour units (round-to-NEAREST); raw timestamps untouched.
+        billed_units: computeEntryUnits((activePunch as any).clock_in_timestamp, outIso),
       }).eq("id", (activePunch as any).id);
       if (error) throw error;
     },

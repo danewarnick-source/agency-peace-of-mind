@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { ChevronRight, AlertTriangle, CheckCircle2, CalendarX2 } from "lucide-react";
-import { fmtHours, fmtUnits, unitsToHours, hoursToUnits } from "@/lib/billing-units";
+import { fmtHours, fmtUnits, unitsToHours, computeEntryUnits } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -115,18 +115,15 @@ function BillingOverviewPage() {
           }
           used = set.size;
         } else {
-          let hrs = 0;
           for (const r of tsRows) {
             if (r.client_id !== c.id || !r.clock_out_timestamp) continue;
             if (r.service_type_code !== code.service_code) continue;
             const inT = new Date(r.clock_in_timestamp);
             if (periodStart && inT < periodStart) continue;
             if (periodEnd && inT > periodEnd) continue;
-            const h =
-              (new Date(r.clock_out_timestamp).getTime() - inT.getTime()) / 3_600_000;
-            if (h > 0 && isFinite(h)) hrs += h;
+            // Per-entry rounding; the bucket sums entry units, never re-rounds.
+            used += computeEntryUnits(r.clock_in_timestamp, r.clock_out_timestamp);
           }
-          used = hoursToUnits(hrs);
         }
         totalUsed += used;
         if (annual > 0 && used / annual >= 0.9) flagged += 1;

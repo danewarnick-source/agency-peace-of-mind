@@ -501,6 +501,11 @@ function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Bu
               Variable rate · client-specific
             </Badge>
           )}
+          {isVariable && rateNum <= 0 && (
+            <Badge variant="outline" className="gap-1 border-amber-500/60 bg-amber-500/15 text-[10px] font-semibold text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="h-3 w-3" /> No worksheet rate on file
+            </Badge>
+          )}
           {exhausted && (
             <Badge variant="destructive" className="gap-1 text-[10px]">
               <AlertTriangle className="h-3 w-3" /> Authorization exhausted
@@ -548,14 +553,26 @@ function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Bu
           )}
         </Stat>
         <Stat label="Total billed">
-          <span className="font-mono text-sm font-bold tabular-nums text-amber-700 dark:text-amber-300">
-            {fmtMoney(totalBilled)}
-          </span>
+          {isVariable && rateNum <= 0 ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="h-3 w-3" /> no worksheet rate on file
+            </span>
+          ) : (
+            <span className="font-mono text-sm font-bold tabular-nums text-amber-700 dark:text-amber-300">
+              {fmtMoney(totalBilled)}
+            </span>
+          )}
         </Stat>
         <Stat label="Remaining budget">
-          <span className="font-mono text-sm font-bold tabular-nums text-amber-700 dark:text-amber-300">
-            {fmtMoney(remainingBudget)}
-          </span>
+          {isVariable && rateNum <= 0 ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="h-3 w-3" /> no worksheet rate on file
+            </span>
+          ) : (
+            <span className="font-mono text-sm font-bold tabular-nums text-amber-700 dark:text-amber-300">
+              {fmtMoney(remainingBudget)}
+            </span>
+          )}
         </Stat>
       </div>
 

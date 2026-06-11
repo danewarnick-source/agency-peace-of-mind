@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { hoursToUnits } from "@/lib/billing-units";
+import { computeEntryUnits } from "@/lib/billing-units";
 
 const roundHours = (h: number): number => Math.round(h * 10) / 10;
 import { isDailyServiceCode } from "@/lib/service-billing";
@@ -303,9 +303,12 @@ export const askNectarReport = createServerFn({ method: "POST" })
           in: new Date(row.clock_in_timestamp).toLocaleTimeString(),
           out: row.clock_out_timestamp ? new Date(row.clock_out_timestamp).toLocaleTimeString() : "—",
           hours: roundHours(hours),
-          units: isDailyServiceCode(row.service_type_code) ? 1 : hoursToUnits(hours),
+          units: isDailyServiceCode(row.service_type_code)
+            ? 1
+            : computeEntryUnits(row.clock_in_timestamp, row.clock_out_timestamp),
         }));
       const totalHours = withHours.reduce((s, r) => s + r.hours, 0);
+      const totalUnits = dataRows.reduce((s, r) => s + Number(r.units ?? 0), 0);
       return {
         plan,
         title: `Shifts ${startDate!.toLocaleDateString()} – ${endDate!.toLocaleDateString()}`,
@@ -314,7 +317,7 @@ export const askNectarReport = createServerFn({ method: "POST" })
         totals: {
           date: "TOTAL",
           hours: roundHours(totalHours),
-          units: hoursToUnits(totalHours),
+          units: totalUnits,
         },
       };
     }
@@ -326,12 +329,16 @@ export const askNectarReport = createServerFn({ method: "POST" })
         ? (r: TsRow) => r.staff_id
         : (r: TsRow) => r.service_type_code;
 
-    const groups = new Map<string, { hours: number; sample: TsRow }>();
+    const groups = new Map<string, { hours: number; units: number; sample: TsRow }>();
     for (const { row, hours } of withHours) {
       const k = groupKey(row);
+      // Per-entry rounding; group buckets sum entry units, never re-round.
+      const entryUnits = isDailyServiceCode(row.service_type_code)
+        ? 1
+        : computeEntryUnits(row.clock_in_timestamp, row.clock_out_timestamp);
       const cur = groups.get(k);
-      if (cur) cur.hours += hours;
-      else groups.set(k, { hours, sample: row });
+      if (cur) { cur.hours += hours; cur.units += entryUnits; }
+      else groups.set(k, { hours, units: entryUnits, sample: row });
     }
 
     const labelHeader = plan.intent === "hours_by_client"
@@ -349,12 +356,13 @@ export const askNectarReport = createServerFn({ method: "POST" })
         return {
           label,
           hours: roundHours(v.hours),
-          units: hoursToUnits(v.hours),
+          units: v.units,
         };
       })
       .sort((a, b) => (b.hours as number) - (a.hours as number));
 
     const totalHours = withHours.reduce((s, r) => s + r.hours, 0);
+    const totalUnits = [...groups.values()].reduce((s, g) => s + g.units, 0);
 
     return {
       plan,
@@ -368,7 +376,7 @@ export const askNectarReport = createServerFn({ method: "POST" })
       totals: {
         label: "TOTAL",
         hours: roundHours(totalHours),
-        units: hoursToUnits(totalHours),
+        units: totalUnits,
       },
     };
   });
@@ -459,17 +467,15 @@ async function runBudgetStatus(
       }
       used = set.size;
     } else {
-      let hrs = 0;
       for (const r of tsRows) {
         if (r.client_id !== code.client_id || !r.clock_out_timestamp) continue;
         if (r.service_type_code !== code.service_code) continue;
         const inT = new Date(r.clock_in_timestamp);
         if (periodStart && inT < periodStart) continue;
         if (periodEnd && inT > periodEnd) continue;
-        const h = (new Date(r.clock_out_timestamp).getTime() - inT.getTime()) / 3_600_000;
-        if (h > 0 && isFinite(h)) hrs += h;
+        // Per-entry rounding; the bucket sums entry units, never re-rounds.
+        used += computeEntryUnits(r.clock_in_timestamp, r.clock_out_timestamp);
       }
-      used = hoursToUnits(hrs);
     }
     const annual = code.annual_unit_authorization ?? 0;
     const remaining = Math.max(0, annual - used);

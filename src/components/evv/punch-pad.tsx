@@ -21,6 +21,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from "@/lib/evv-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
+import { computeEntryUnits } from "@/lib/billing-units";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
 import { draftShiftNote, draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
@@ -1060,6 +1061,8 @@ export function PunchPad({
       goals_completed:      selectedGoals,
       raw_clock_out:        clockOut,
       rounded_clock_out:    roundToQuarterHourISO(clockOut),
+      // Per-entry quarter-hour units (round-to-NEAREST); raw timestamps stay untouched.
+      billed_units:         computeEntryUnits(active.clock_in_timestamp, clockOut),
     };
     if (nectarUsed) {
       update.nectar_drafted = true;

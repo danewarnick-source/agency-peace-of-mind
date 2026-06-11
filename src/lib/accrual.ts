@@ -6,25 +6,25 @@
  *   - src/routes/dashboard.billing.form520.tsx (rows useMemo)
  *
  * IMPORTANT — this module owns ONLY the grouping/aggregation pattern.
- * Per-row primitives (hours → units, daily-code detection) stay in their
+ * Per-row primitives (entry → units, daily-code detection) stay in their
  * existing single-source modules:
- *   - hoursToUnits          → @/lib/billing-units  (15-minute units)
- *   - isDailyServiceCode    → @/lib/service-billing
+ *   - computeEntryUnits      → @/lib/billing-units  (15-minute units)
+ *   - isDailyServiceCode     → @/lib/service-billing
  *
  * Dollar math (units × rate, days × rate) stays in callers — these helpers
  * intentionally stop at units / day-sets so they can be reused by any caller
  * regardless of bucketing dimension or downstream shaping.
  *
- * The behavior here MUST stay byte-identical to the prior inline loops:
+ * UNIT MATH (Medicaid quarter-hour rule):
+ *   • each ENTRY rounds to the NEAREST quarter hour — computeEntryUnits()
+ *   • buckets SUM the per-entry units — a summed total is NEVER re-rounded
+ *   • raw timestamps are never altered
  *   • skip timesheets whose service_type_code passes isDailyServiceCode()
- *   • skip timesheets missing clock_out_timestamp
- *   • hrs = (out - in) / 3_600_000
- *   • skip when !isFinite(hrs) || hrs <= 0
- *   • sum hrs per bucket, then units = hoursToUnits(sum)
+ *   • skip timesheets missing clock_out_timestamp or with invalid/zero spans
  *   • daily: distinct record_date per bucket → units = set.size
  */
 
-import { hoursToUnits } from "@/lib/billing-units";
+import { computeEntryUnits } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 
 export type TimesheetRow = {
@@ -48,14 +48,15 @@ export type DailyRecordRow = {
  * dimension — e.g. `(client|code)` for a single period, or
  * `(month|client|code)` for a 12-month rollup.
  *
- * Returns a Map of bucketKey → units (already passed through hoursToUnits on
- * the SUM of hours, matching the prior inline behavior).
+ * Returns a Map of bucketKey → units. Units are computed PER ENTRY via
+ * computeEntryUnits (round-to-nearest quarter hour) and SUMMED into the
+ * bucket — never sum-hours-then-round.
  */
 export function aggregateHourlyUnits(
   timesheets: ReadonlyArray<TimesheetRow>,
   bucketKeyFn: (row: TimesheetRow, hours: number, startDate: Date) => string | null,
 ): Map<string, number> {
-  const hoursByKey = new Map<string, number>();
+  const unitsByKey = new Map<string, number>();
   for (const t of timesheets) {
     if (!t.service_type_code || !t.clock_out_timestamp) continue;
     if (isDailyServiceCode(t.service_type_code)) continue;
@@ -65,11 +66,8 @@ export function aggregateHourlyUnits(
     if (!isFinite(hrs) || hrs <= 0) continue;
     const key = bucketKeyFn(t, hrs, start);
     if (key === null) continue;
-    hoursByKey.set(key, (hoursByKey.get(key) ?? 0) + hrs);
-  }
-  const unitsByKey = new Map<string, number>();
-  for (const [k, hrs] of hoursByKey) {
-    unitsByKey.set(k, hoursToUnits(hrs));
+    const units = computeEntryUnits(t.clock_in_timestamp, t.clock_out_timestamp);
+    unitsByKey.set(key, (unitsByKey.get(key) ?? 0) + units);
   }
   return unitsByKey;
 }

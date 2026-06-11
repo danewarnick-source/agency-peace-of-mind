@@ -12,7 +12,7 @@ import { useMobileShellContainer } from "@/components/staff-mobile/mobile-shell-
 
 type CapBehavior = "warn" | "acknowledge" | "auto_clock_out";
 import { isDailyServiceCode } from "@/lib/service-billing";
-import { unitsToHours, fmtHours } from "@/lib/billing-units";
+import { unitsToHours, fmtHours, computeEntryUnits } from "@/lib/billing-units";
 
 /**
  * Threshold engine: while a staff member is clocked in, watches the
@@ -80,9 +80,14 @@ export function CapThresholdModal() {
         if (!busy) {
           setBusy(true);
           (async () => {
+            const outIso = new Date().toISOString();
             const { error } = await supabase
               .from("evv_timesheets")
-              .update({ clock_out_timestamp: new Date().toISOString() })
+              .update({
+                clock_out_timestamp: outIso,
+                // Per-entry quarter-hour units (round-to-NEAREST); raw timestamps untouched.
+                billed_units: computeEntryUnits(active.clock_in_timestamp, outIso),
+              })
               .eq("id", active.id);
             setBusy(false);
             if (error) toast.error("Auto clock-out failed: " + error.message);

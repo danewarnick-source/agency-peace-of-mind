@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { computeEntryUnits } from "@/lib/billing-units";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,9 +107,14 @@ export function TimesheetsReconcile() {
   });
 
   const updatePunch = useMutation({
-    mutationFn: async (input: { id: string; clock_out_timestamp: string }) => {
+    mutationFn: async (input: { id: string; clock_in_timestamp: string; clock_out_timestamp: string }) => {
       const { error } = await supabase.from("evv_timesheets")
-        .update({ clock_out_timestamp: input.clock_out_timestamp, is_edited_by_admin: true })
+        .update({
+          clock_out_timestamp: input.clock_out_timestamp,
+          is_edited_by_admin: true,
+          // Per-entry quarter-hour units (round-to-NEAREST); raw timestamps untouched.
+          billed_units: computeEntryUnits(input.clock_in_timestamp, input.clock_out_timestamp),
+        })
         .eq("id", input.id);
       if (error) throw error;
     },
@@ -597,7 +603,11 @@ export function TimesheetsReconcile() {
       <ResolvePunchDialog
         punch={editPunch}
         onClose={() => setEditPunch(null)}
-        onSave={(iso) => editPunch && updatePunch.mutate({ id: editPunch.id, clock_out_timestamp: iso })}
+        onSave={(iso) => editPunch && updatePunch.mutate({
+          id: editPunch.id,
+          clock_in_timestamp: editPunch.clock_in_timestamp,
+          clock_out_timestamp: iso,
+        })}
         busy={updatePunch.isPending}
       />
     </div>

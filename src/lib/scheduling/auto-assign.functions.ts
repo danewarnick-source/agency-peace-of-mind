@@ -61,7 +61,7 @@ export const autoAssignRange = createServerFn({ method: "POST" })
     })).filter((r: any) => r.id);
     if (!memberRows.length) return { proposals: [], applied: 0 };
     const staffIds = memberRows.map((r: any) => r.id);
-    const nameById = new Map(memberRows.map((r: any) => [r.id, r.full_name ?? "Staff"]));
+    const nameById = new Map<string, string>(memberRows.map((r: any) => [r.id as string, (r.full_name ?? "Staff") as string]));
 
     // Calendar week window (use first shift's week)
     const first = new Date(openShifts[0].starts_at);

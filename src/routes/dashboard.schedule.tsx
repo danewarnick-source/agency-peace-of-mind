@@ -34,6 +34,7 @@ import { RequestSwapDialog } from "@/components/schedule-preview/request-swap-di
 import { CalendarOff, ArrowLeftRight } from "lucide-react";
 import { hhsVisitLabel, hostHomeRowLabel } from "@/lib/scheduling/hhs-visit";
 import { HhsInfoTooltip } from "@/components/scheduling/hhs-info-tooltip";
+import { HhsExplainerBanner } from "@/components/scheduling/hhs-explainer-banner";
 
 export const Route = createFileRoute("/dashboard/schedule")({
   head: () => ({ meta: [{ title: "My Schedule — HIVE" }] }),
@@ -522,6 +523,8 @@ function SchedulePage() {
   const goNext = () => setAnchor((a) => shiftAnchor(view, a, 1));
   const goToday = () => setAnchor(new Date());
 
+  const hasHhsVisit = (shifts ?? []).some((s) => !!hhsVisitLabel(s.job_code, s.is_host_home));
+
   return (
     <div className="mx-auto w-full max-w-xl space-y-5">
       <StaffPageHeader
@@ -530,6 +533,8 @@ function SchedulePage() {
         title="My Schedule"
         subtitle="Tap a shift to open the client's Hub and clock in. EVV is enforced inside the Hub."
       />
+
+      {hasHhsVisit && <HhsExplainerBanner />}
 
       <div className="flex justify-end">
         <RequestTimeOffDialog

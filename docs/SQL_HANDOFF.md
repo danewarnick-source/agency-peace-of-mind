@@ -97,3 +97,40 @@ update public.service_codes set name = 'Extended Living Supports' where code = '
 
 **What you'll see:** "Success" (one row per organization). Settings → Service
 Code Registry → ELS now reads "Extended Living Supports".
+
+---
+
+## 4. One-time UI-hint dismissals (HHS clarity pass, 2026-06-11)
+
+Per-user, localStorage-free dismissal of one-time hints (currently the HHS
+host-home explainer banner). Mirrors the existing `user_celebration_mute`
+pattern: a tiny table keyed off the auth user, user-owned RLS. The banner
+self-hides in-session if this table is missing, so it is safe to run later —
+but until it exists, a dismissal won't survive a page reload.
+
+```sql
+create table if not exists public.user_ui_dismissals (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  pref_key    text not null,
+  dismissed_at timestamptz not null default now(),
+  unique (user_id, pref_key)
+);
+
+grant select, insert, update, delete on public.user_ui_dismissals to authenticated;
+grant all on public.user_ui_dismissals to service_role;
+
+alter table public.user_ui_dismissals enable row level security;
+
+create policy "users read own ui dismissals"
+  on public.user_ui_dismissals for select to authenticated
+  using (user_id = auth.uid());
+
+create policy "users write own ui dismissals"
+  on public.user_ui_dismissals for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+```
+
+**What you'll see:** "Success". After this runs, dismissing the amber "How host
+homes (HHS) work" banner keeps it gone for that user across reloads/devices.

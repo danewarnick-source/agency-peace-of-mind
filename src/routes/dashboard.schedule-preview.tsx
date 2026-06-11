@@ -14,6 +14,7 @@ import { Sparkles, CheckCircle2, XCircle, AlertTriangle, CalendarCheck2, Setting
 import { classesForCode, familyForCode } from "@/lib/scheduling/code-colors";
 import { hhsVisitLabel, hostHomeRowLabel, HHS_VISIT_TOOLTIP } from "@/lib/scheduling/hhs-visit";
 import { HhsInfoTooltip } from "@/components/scheduling/hhs-info-tooltip";
+import { HhsExplainerBanner } from "@/components/scheduling/hhs-explainer-banner";
 import { ConflictsPanel } from "@/components/scheduling/conflicts-panel";
 import { ActionNeededCard } from "@/components/scheduling/action-needed-card";
 import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
@@ -333,6 +334,7 @@ function SchedulePreviewPage() {
   // A host home is one client living with a host family — label it by the
   // client ("Jane D. — Host Home (HHS)"), not the bare location name.
   const isHostSite = (s: { id: string; name: string }) => hostHomeNames.has(s.name.toLowerCase());
+  const hasHostHomes = sites.some(isHostSite);
   const siteDisplayLabel = (s: { id: string; name: string }) => {
     if (!isHostSite(s)) return s.name;
     const c = (siteClients.get(s.id) ?? [])[0];
@@ -343,6 +345,7 @@ function SchedulePreviewPage() {
     <Shell>
       {/* ── Mobile Day view (below md only) ───────────────────────────── */}
       <div className="md:hidden">
+        {hasHostHomes && <HhsExplainerBanner className="mb-3" />}
         <MobileDayBoard
           day={mobileDay}
           onSelectDay={selectMobileDay}
@@ -434,6 +437,8 @@ function SchedulePreviewPage() {
         teams={data?.teams ?? []}
         shifts={data?.shifts ?? []}
       />
+
+      {hasHostHomes && <HhsExplainerBanner className="mb-3" />}
 
       {/* ── Controls bar (rounded top, attached to board) ─────────────── */}
       <div style={controlsBar}>

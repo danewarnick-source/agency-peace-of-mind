@@ -15,6 +15,8 @@ import { rankStaffForShift } from "@/lib/scheduling/eligibility.functions";
 import { createShift } from "@/lib/scheduling/shifts.functions";
 import { postOpenShift } from "@/lib/scheduling/open-shifts.functions";
 import { listLocations } from "@/lib/scheduling/locations.functions";
+import { hhsVisitLabel } from "@/lib/scheduling/hhs-visit";
+import { HhsInfoTooltip } from "@/components/scheduling/hhs-info-tooltip";
 
 type Step = "client" | "code" | "time" | "staff";
 
@@ -133,6 +135,13 @@ export function ShiftCreateDialog({
   });
 
   const effectiveLocationId = pickedLocationId ?? locationId ?? null;
+
+  // A host-home client is one with HHS authorized — their agency visits
+  // (HHS support + respite) are the only thing scheduled at the home.
+  const clientIsHostHome = useMemo(
+    () => (codesQ.data ?? []).some((r: { service_code?: string | null }) => (r.service_code ?? "").toUpperCase() === "HHS"),
+    [codesQ.data],
+  );
 
   const rankQ = useQuery({
     enabled: open && step === "staff" && !!clientId && !!code && !!startPicker && !!endPicker,
@@ -285,7 +294,16 @@ export function ShiftCreateDialog({
 
         {step === "code" && (
           <div className="space-y-2">
-            <Label>Service code</Label>
+            <div className="flex items-center gap-1.5">
+              <Label>Service code</Label>
+              {clientIsHostHome && <HhsInfoTooltip className="text-muted-foreground" />}
+            </div>
+            {clientIsHostHome && (
+              <p className="text-[11px] text-muted-foreground">
+                This client lives with a host family. Pick the visit's purpose —
+                HHS (the client's Direct Support hours) or a respite code (for the host family).
+              </p>
+            )}
             {codesQ.isLoading ? (
               <div className="p-4 text-sm text-muted-foreground">Loading authorized codes…</div>
             ) : !codesQ.data || codesQ.data.length === 0 ? (
@@ -298,6 +316,7 @@ export function ShiftCreateDialog({
                   const c = row.service_code;
                   const fc = classesForCode(c);
                   const on = code === c;
+                  const visit = hhsVisitLabel(c, clientIsHostHome);
                   return (
                     <button
                       key={row.id}
@@ -313,7 +332,9 @@ export function ShiftCreateDialog({
                           {isDailyCode(c) ? "daily" : "hourly"}
                         </Badge>
                       </div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5 capitalize">{familyForCode(c).replace("_", " ")}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5 capitalize">
+                        {visit ?? familyForCode(c).replace("_", " ")}
+                      </div>
                     </button>
                   );
                 })}

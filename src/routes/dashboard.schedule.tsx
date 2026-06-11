@@ -271,7 +271,10 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
     </Link>
   );
 
-  if (s.status === "pending" && s.published) {
+  // Treat both legacy "pending" and the widened "published" status as
+  // awaiting-acceptance. "draft" and "cancelled" never reach this view
+  // (filtered by the fetch query), and "open" shifts have no staff_id.
+  if ((s.status === "pending" || s.status === "published") && s.published) {
     return (
       <div className="space-y-2">
         {linkWrap}

@@ -420,7 +420,7 @@ function SchedulePreviewPage() {
           organizationId={org.organization_id}
           weekStart={weekStart}
           clients={(data?.clients ?? []).map((c: ClientRow) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))}
-          staff={(data?.staff ?? []).map((s: StaffRow) => ({ id: s.id, name: (s as any).name ?? (s as any).display_name ?? "" }))}
+          staff={(data?.staff ?? []).map((s: StaffRow) => ({ id: s.id, name: s.name }))}
           onChanged={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
         />
       )}

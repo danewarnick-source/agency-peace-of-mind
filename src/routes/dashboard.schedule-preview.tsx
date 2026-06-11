@@ -19,6 +19,7 @@ import { NectarCommandBar } from "@/components/schedule-preview/nectar-command-b
 import { useOrgScheduleRequests, buildApprovedTimeOffIndex } from "@/lib/schedule-requests";
 import { SettingsDrawer } from "@/components/schedule-preview/settings-drawer";
 import { ShiftCreateDialog } from "@/components/scheduling/shift-create-dialog";
+import { DayTimelineDrawer } from "@/components/scheduling/day-timeline-drawer";
 import {
   SCHED, font, type Settings, useSettings, type ViewMode,
   shiftAccentHex, shiftTypeLabel, fmtTime, DAY_LABELS,
@@ -57,6 +58,7 @@ function SchedulePreviewPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorCtx, setEditorCtx] = useState<EditorContext | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [timelineCtx, setTimelineCtx] = useState<{ siteId: string; siteName: string; day: Date } | null>(null);
   const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
   useEffect(() => { setView(settings.defaultView); }, [settings.defaultView]);
@@ -198,6 +200,7 @@ function SchedulePreviewPage() {
           <AllHomesBoard
             days={days} sites={sites} siteClients={siteClients} siteShifts={siteShifts}
             settings={settings} onPickSite={setSiteId}
+            onOpenDay={(sid, sname, d) => setTimelineCtx({ siteId: sid, siteName: sname, day: d })}
           />
         ) : currentSite ? (
           <SiteWeekGrid

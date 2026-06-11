@@ -27,8 +27,10 @@ export type NectarPayPeriod = {
   end_iso: string;
   /** Hours worked on hourly service codes (completed shifts only). */
   hourly_hours: number;
-  /** Distinct completed daily-log days in the period. */
+  /** Distinct BILLABLE daily-record days in the period (per hhs_daily_records_v). */
   daily_days: number;
+  /** Days this staff logged that are NOT billable per hhs_daily_records_v. */
+  blocked_daily_days: Array<{ client_id: string; record_date: string; blocked_reason: string }>;
   /** Completed non-client (General Time Clock) hours in the period. */
   general_hours: number;
   hourly_earnings: number;
@@ -134,12 +136,15 @@ export function useNectarPayPeriod() {
       }
 
       let daily_days = 0;
+      const blocked_daily_days: NectarPayPeriod["blocked_daily_days"] = [];
       if (has_daily_assignment) {
         const startDate = start.toISOString().slice(0, 10);
         const endDate = end.toISOString().slice(0, 10);
-        // Daily/HHS service days now live in daily_logs (record_date -> log_date,
-        // provider_id -> user_id). hhs_daily_records is orphaned. Aliases keep the
-        // distinct-day pay math below unchanged.
+        // The staff member's own daily logs establish WHICH days they worked;
+        // hhs_daily_records_v (org/client/date grain — no author column) is
+        // the authority on whether each day is BILLABLE (attendance Present +
+        // daily note). Only billable days count toward daily pay; the rest
+        // surface as blocked days with the view's blocked_reason.
         const { data: dlRows, error: dlErr } = await supabase
           .from("daily_logs")
           .select("record_date:log_date, client_id")
@@ -164,7 +169,44 @@ export function useNectarPayPeriod() {
           }
           dayKeys.add(`${r.client_id}|${r.record_date}`);
         }
-        daily_days = dayKeys.size;
+
+        if (dayKeys.size > 0) {
+          const clientIds = [...new Set([...dayKeys].map((k) => k.split("|")[0]))];
+          const { data: vRows, error: vErr } = await supabase
+            .from("hhs_daily_records_v")
+            .select("client_id, record_date, billable, blocked_reason")
+            .in("client_id", clientIds)
+            .gte("record_date", startDate)
+            .lte("record_date", endDate);
+          if (vErr) throw vErr;
+          const verdictByKey = new Map<string, { billable: boolean; reason: string | null }>();
+          for (const v of (vRows ?? []) as Array<{
+            client_id: string | null; record_date: string | null;
+            billable: boolean | null; blocked_reason: string | null;
+          }>) {
+            if (!v.client_id || !v.record_date) continue;
+            const k = `${v.client_id}|${v.record_date}`;
+            const prev = verdictByKey.get(k);
+            // Any billable row for the day makes the day billable.
+            if (!prev || (!prev.billable && v.billable)) {
+              verdictByKey.set(k, { billable: !!v.billable, reason: v.blocked_reason });
+            }
+          }
+          for (const k of dayKeys) {
+            const [client_id, record_date] = k.split("|");
+            const verdict = verdictByKey.get(k);
+            if (verdict?.billable) {
+              daily_days += 1;
+            } else {
+              blocked_daily_days.push({
+                client_id,
+                record_date,
+                blocked_reason: verdict?.reason ?? "No daily record generated for this day",
+              });
+            }
+          }
+          blocked_daily_days.sort((a, b) => a.record_date.localeCompare(b.record_date));
+        }
       }
 
       const hourly_rate =
@@ -219,6 +261,7 @@ export function useNectarPayPeriod() {
         end_iso: end.toISOString(),
         hourly_hours,
         daily_days,
+        blocked_daily_days,
         general_hours,
         hourly_earnings,
         daily_earnings,

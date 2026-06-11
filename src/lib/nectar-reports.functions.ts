@@ -416,14 +416,14 @@ async function runBudgetStatus(
       .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
       .eq("organization_id", orgId)
       .gte("clock_in_timestamp", earliestStart.toISOString()),
-    // Daily/HHS service days now live in daily_logs (record_date -> log_date);
-    // hhs_daily_records is orphaned. Alias keeps the per-code day counting unchanged
-    // (same mapping as the billing surfaces in PR #5).
+    // Daily-rate days come from the hhs_daily_records_v view; only
+    // billable rows (attendance Present + daily note) count as used units.
     supabase
-      .from("daily_logs")
-      .select("client_id, record_date:log_date")
+      .from("hhs_daily_records_v")
+      .select("client_id, record_date, service_code, billable")
       .eq("organization_id", orgId)
-      .gte("log_date", earliestStart.toISOString().slice(0, 10)),
+      .eq("billable", true)
+      .gte("record_date", earliestStart.toISOString().slice(0, 10)),
   ]);
   if (tsRes.error) throw tsRes.error;
   if (dlRes.error) throw dlRes.error;
@@ -431,7 +431,7 @@ async function runBudgetStatus(
     client_id: string; service_type_code: string | null;
     clock_in_timestamp: string; clock_out_timestamp: string | null;
   }>;
-  const dlRows = (dlRes.data ?? []) as Array<{ client_id: string; record_date: string }>;
+  const dlRows = (dlRes.data ?? []) as Array<{ client_id: string; record_date: string; service_code: string | null }>;
 
   const filtered = codes.filter((code) => {
     if (plan.service_code && code.service_code !== plan.service_code) return false;
@@ -450,6 +450,8 @@ async function runBudgetStatus(
       const set = new Set<string>();
       for (const r of dlRows) {
         if (r.client_id !== code.client_id || !r.record_date) continue;
+        // View rows carry the service code — attribute days to the exact code.
+        if (r.service_code && r.service_code !== code.service_code) continue;
         const d = new Date(r.record_date + "T00:00:00");
         if (periodStart && d < periodStart) continue;
         if (periodEnd && d > periodEnd) continue;

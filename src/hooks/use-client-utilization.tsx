@@ -98,34 +98,45 @@ export function useClientUtilization() {
         if (r.staff_id === user!.id) row.my_hours += hrs;
       }
 
-      // Daily-billed completed days this month — all staff in org
-      // Daily/HHS service days now live in daily_logs (record_date -> log_date,
-      // provider_id -> user_id). hhs_daily_records is orphaned. daily_logs has no
-      // service_code, so we attribute days to whatever daily code(s) the client has
-      // authorized at render time. Aliases keep the aggregation below unchanged.
-      const { data: dlRows, error: dlErr } = await supabase
-        .from("daily_logs")
-        .select("client_id, provider_id:user_id, record_date:log_date")
-        .eq("organization_id", org!.organization_id)
-        .gte("log_date", month.start.toISOString().slice(0, 10))
-        .lte("log_date", month.end.toISOString().slice(0, 10));
-      if (dlErr) throw dlErr;
-      // Aggregate distinct dates per client; we tag them under a synthetic
-      // "*DAILY*" bucket and the caller maps that onto each daily code.
+      // Daily-billed completed days this month — all staff in org. Billable
+      // days come from the hhs_daily_records_v view (billable = attendance
+      // Present + daily note). The view has no author column, so "my" days
+      // are the staff member's own daily_logs days intersected with the
+      // billable view days.
+      const monthStart = month.start.toISOString().slice(0, 10);
+      const monthEnd = month.end.toISOString().slice(0, 10);
+      const [{ data: vRows, error: vErr }, { data: myLogRows, error: myErr }] = await Promise.all([
+        supabase
+          .from("hhs_daily_records_v")
+          .select("client_id, record_date, billable")
+          .eq("organization_id", org!.organization_id)
+          .eq("billable", true)
+          .gte("record_date", monthStart)
+          .lte("record_date", monthEnd),
+        supabase
+          .from("daily_logs")
+          .select("client_id, record_date:log_date")
+          .eq("organization_id", org!.organization_id)
+          .eq("user_id", user!.id)
+          .gte("log_date", monthStart)
+          .lte("log_date", monthEnd),
+      ]);
+      if (vErr) throw vErr;
+      if (myErr) throw myErr;
+      // Aggregate distinct billable dates per client; we tag them under a
+      // synthetic "*DAILY*" bucket and the caller maps that onto each daily code.
       const allDays = new Map<string, Set<string>>();
-      const myDays = new Map<string, Set<string>>();
-      for (const r of (dlRows ?? []) as Array<{
-        client_id: string;
-        provider_id: string | null;
-        record_date: string;
-      }>) {
-        if (!r.record_date) continue;
+      for (const r of (vRows ?? []) as Array<{ client_id: string | null; record_date: string | null }>) {
+        if (!r.client_id || !r.record_date) continue;
         if (!allDays.has(r.client_id)) allDays.set(r.client_id, new Set());
         allDays.get(r.client_id)!.add(r.record_date);
-        if (r.provider_id === user!.id) {
-          if (!myDays.has(r.client_id)) myDays.set(r.client_id, new Set());
-          myDays.get(r.client_id)!.add(r.record_date);
-        }
+      }
+      const myDays = new Map<string, Set<string>>();
+      for (const r of (myLogRows ?? []) as Array<{ client_id: string; record_date: string }>) {
+        if (!r.record_date) continue;
+        if (!allDays.get(r.client_id)?.has(r.record_date)) continue; // billable days only
+        if (!myDays.has(r.client_id)) myDays.set(r.client_id, new Set());
+        myDays.get(r.client_id)!.add(r.record_date);
       }
       for (const [cid, dates] of allDays) {
         const row = touch(cid, "*DAILY*");

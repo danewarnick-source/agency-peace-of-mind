@@ -79,13 +79,14 @@ export function useNectarAlerts(settings: NectarAlertSettings = DEFAULT_NECTAR_A
           .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
           .eq("organization_id", org!.organization_id)
           .gte("clock_in_timestamp", yearStart),
-        // Daily/HHS service days now live in daily_logs (record_date -> log_date);
-        // hhs_daily_records is orphaned. Alias keeps the budget-pace math unchanged.
+        // Daily-rate days come from the hhs_daily_records_v view; only
+        // billable rows (attendance Present + daily note) count toward budget pace.
         supabase
-          .from("daily_logs")
-          .select("client_id, record_date:log_date")
+          .from("hhs_daily_records_v")
+          .select("client_id, record_date, service_code, billable")
           .eq("organization_id", org!.organization_id)
-          .gte("log_date", yearStart.slice(0, 10)),
+          .eq("billable", true)
+          .gte("record_date", yearStart.slice(0, 10)),
       ]);
       if (tsRes.error) throw tsRes.error;
       if (dlRes.error) throw dlRes.error;
@@ -102,7 +103,7 @@ export function useNectarAlerts(settings: NectarAlertSettings = DEFAULT_NECTAR_A
       clock_in_timestamp: string;
       clock_out_timestamp: string | null;
     }>;
-    const dlRows = (usageQ.data?.dl ?? []) as Array<{ client_id: string; record_date: string }>;
+    const dlRows = (usageQ.data?.dl ?? []) as Array<{ client_id: string; record_date: string; service_code: string | null }>;
     const clientNameById = new Map(
       clientsQ.data.map((c) => [c.id, `${c.last_name}, ${c.first_name}`]),
     );
@@ -125,6 +126,8 @@ export function useNectarAlerts(settings: NectarAlertSettings = DEFAULT_NECTAR_A
         const set = new Set<string>();
         for (const r of dlRows) {
           if (r.client_id !== code.client_id || !r.record_date) continue;
+          // View rows carry the service code — attribute days to the exact code.
+          if (r.service_code && r.service_code !== code.service_code) continue;
           const d = new Date(r.record_date + "T00:00:00");
           if (d < periodStart || d > periodEnd) continue;
           set.add(r.record_date);

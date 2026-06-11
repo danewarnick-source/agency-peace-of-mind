@@ -112,14 +112,15 @@ function Billing520Page() {
     enabled: !!org?.organization_id,
     queryKey: ["520-daily", org?.organization_id, periodStart.toISOString()],
     queryFn: async () => {
-      // Daily/HHS service days now live in daily_logs (record_date -> log_date);
-      // hhs_daily_records is orphaned. Alias keeps aggregateDailyDays() unchanged.
+      // Daily-rate days come from the hhs_daily_records_v view; only
+      // billable rows (attendance Present + daily note) may be billed.
       const { data, error } = await supabase
-        .from("daily_logs")
-        .select("client_id, record_date:log_date")
+        .from("hhs_daily_records_v")
+        .select("client_id, record_date, service_code, billable")
         .eq("organization_id", org!.organization_id)
-        .gte("log_date", periodStartStr)
-        .lte("log_date", periodEndStr);
+        .eq("billable", true)
+        .gte("record_date", periodStartStr)
+        .lte("record_date", periodEndStr);
       if (error) throw error;
       return data ?? [];
     },
@@ -167,10 +168,14 @@ function Billing520Page() {
       (r) => `${r.client_id}|${r.service_type_code}`,
     );
 
-    // Daily distinct days per client via shared aggregator
+    // Daily distinct days per (client|code) via shared aggregator — the view
+    // carries the service code, so days land on the exact authorized code.
     const daysByClient = aggregateDailyDays(
       (dailyQ.data ?? []) as Parameters<typeof aggregateDailyDays>[0],
-      (r) => r.client_id,
+      (r) => {
+        const code = (r as { service_code?: string | null }).service_code;
+        return code ? `${r.client_id}|${code}` : r.client_id;
+      },
     );
 
     const out: Row[] = [];
@@ -180,7 +185,9 @@ function Billing520Page() {
       if (!client) continue;
       let units = 0;
       if (isDailyServiceCode(b.service_code)) {
-        units = daysByClient.get(b.client_id)?.size ?? 0;
+        units =
+          (daysByClient.get(`${b.client_id}|${b.service_code}`)?.size ?? 0) +
+          (daysByClient.get(b.client_id)?.size ?? 0);
       } else {
         units = unitsByKey.get(`${b.client_id}|${b.service_code}`) ?? 0;
       }

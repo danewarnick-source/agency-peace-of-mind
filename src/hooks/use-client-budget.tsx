@@ -74,14 +74,15 @@ export function useClientBudget(clientId: string | undefined) {
         .gte("clock_in_timestamp", earliestStart.toISOString());
       if (tsErr) throw tsErr;
 
-      // Daily/HHS service days now live in daily_logs (record_date -> log_date);
-      // hhs_daily_records is orphaned. Alias keeps the day-counting below unchanged.
+      // Daily-rate days come from the hhs_daily_records_v view; only
+      // billable rows (attendance Present + daily note) consume budget.
       const { data: dlRows, error: dlErr } = await supabase
-        .from("daily_logs")
-        .select("record_date:log_date")
+        .from("hhs_daily_records_v")
+        .select("record_date, service_code, billable")
         .eq("organization_id", org!.organization_id)
         .eq("client_id", clientId!)
-        .gte("log_date", earliestStart.toISOString().slice(0, 10));
+        .eq("billable", true)
+        .gte("record_date", earliestStart.toISOString().slice(0, 10));
       if (dlErr) throw dlErr;
 
       return codes.map((code): CodeBudget => {
@@ -94,8 +95,10 @@ export function useClientBudget(clientId: string | undefined) {
         let used_days = 0;
         if (is_daily) {
           const dates = new Set<string>();
-          for (const r of (dlRows ?? []) as Array<{ record_date: string }>) {
+          for (const r of (dlRows ?? []) as Array<{ record_date: string | null; service_code: string | null }>) {
             if (!r.record_date) continue;
+            // View rows carry the service code — attribute days to the exact code.
+            if (r.service_code && r.service_code !== code.service_code) continue;
             const d = new Date(r.record_date + "T00:00:00");
             if (d < period_start) continue;
             if (period_end && d > period_end) continue;

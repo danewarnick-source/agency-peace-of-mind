@@ -116,14 +116,16 @@ function ReadinessBarInner() {
           .eq("organization_id", orgId!)
           .gte("clock_in_timestamp", periodStartISO)
           .not("clock_out_timestamp", "is", null),
-        // Daily/HHS narrative days now live in daily_logs (record_date -> log_date);
-        // hhs_daily_records is orphaned. Attendance below is a separate signal.
+        // Billable daily-rate days come from the hhs_daily_records_v view
+        // (billable = attendance Present + daily note). Attendance below is a
+        // separate signal.
         supabase
-          .from("daily_logs")
-          .select("client_id, record_date:log_date")
+          .from("hhs_daily_records_v")
+          .select("client_id, record_date, billable")
           .eq("organization_id", orgId!)
-          .gte("log_date", periodStartDate)
-          .lte("log_date", periodEndDate),
+          .eq("billable", true)
+          .gte("record_date", periodStartDate)
+          .lte("record_date", periodEndDate),
         supabase
           .from("hhs_monthly_attendance")
           .select("client_id, record_date")
@@ -202,7 +204,7 @@ function ReadinessBarInner() {
               service_code: code.service_code,
               category: "daily_logs",
               severity: "blocker",
-              message: `No daily logs recorded for ${code.service_code} this period.`,
+              message: `No billable daily-record days for ${code.service_code} this period.`,
               link: { to: "/dashboard/hhs-hub/$clientId", params: { clientId: c.id } },
             });
           }

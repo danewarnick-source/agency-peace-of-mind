@@ -3,8 +3,9 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays, Briefcase, ShieldAlert, BookOpen,
+  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays, Briefcase, ShieldAlert, BookOpen, CalendarX2,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   useNectarPayPeriod, useLivePayPeriod,
 } from "@/hooks/use-nectar-pay-period";
@@ -60,6 +61,7 @@ export function NectarPayPeriodCard() {
 
   const hasHourly = data?.has_hourly_assignment ?? true;
   const hasDaily = data?.has_daily_assignment ?? false;
+  const blockedDays = data?.blocked_daily_days ?? [];
   const logs = hasDaily ? (data?.outstanding_daily_logs ?? 0) : 0;
   const attn = hasDaily ? (data?.incomplete_attendance_days ?? 0) : 0;
   const todo = logs + attn;
@@ -152,6 +154,29 @@ export function NectarPayPeriodCard() {
                     {fmtUSD(dailyPay)}
                   </span>
                 </div>
+                {blockedDays.length > 0 && (
+                  <div className="border-t border-white/10 px-3 py-2">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex cursor-default items-center gap-1.5 text-[11px] text-white/60">
+                            <CalendarX2 className="h-3.5 w-3.5" />
+                            {blockedDays.length} blocked day{blockedDays.length === 1 ? "" : "s"} (not billable)
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="mb-1 font-medium">Blocked days</p>
+                          <ul className="max-h-40 space-y-0.5 overflow-y-auto text-xs">
+                            {blockedDays.slice(0, 20).map((b, i) => (
+                              <li key={i}>{b.record_date} — {b.blocked_reason}</li>
+                            ))}
+                            {blockedDays.length > 20 && <li>…and {blockedDays.length - 20} more</li>}
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
               </>
             )}
 

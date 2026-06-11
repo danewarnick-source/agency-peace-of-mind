@@ -126,7 +126,7 @@ function ServiceCodeRegistryPage() {
               </span>
             </h2>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] text-sm">
+              <table className="w-full min-w-[1080px] text-sm max-md:[&_th:first-child]:sticky max-md:[&_th:first-child]:left-0 max-md:[&_th:first-child]:z-10 max-md:[&_th:first-child]:bg-card max-md:[&_td:first-child]:sticky max-md:[&_td:first-child]:left-0 max-md:[&_td:first-child]:bg-card">
                 <thead className="text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2">Code</th>

@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -103,6 +103,7 @@ function DashboardLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [taskCenterOpen, setTaskCenterOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
 
 
@@ -358,6 +359,17 @@ function DashboardLayout() {
 
 
             <div className="flex items-center gap-2">
+              {!isHiveExecView && (
+                <button
+                  type="button"
+                  aria-label={mobileSearchOpen ? "Close NECTAR search" : "Open NECTAR search"}
+                  aria-expanded={mobileSearchOpen}
+                  onClick={() => setMobileSearchOpen((v) => !v)}
+                  className="grid h-11 w-11 place-items-center rounded-md border border-[#fed7aa] bg-[#fff7ed] text-[#9a3412] hover:bg-[#ffedd5] md:hidden"
+                >
+                  <Search className="h-4 w-4" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setTaskCenterOpen(true)}
@@ -373,6 +385,18 @@ function DashboardLayout() {
               </Button>
             </div>
           </header>
+          {/* Collapsed-by-default NECTAR ask bar on phones — expands from the
+              header icon; the desktop inline bar is unchanged. */}
+          {mobileSearchOpen && !isHiveExecView && (
+            <div className="border-b border-border bg-[#0d112b] px-4 py-2 md:hidden">
+              <NectarSearchBar
+                nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
+                isAdminCapable={isAdminCapable && effectiveView === "admin"}
+                variant="mobile"
+                askRoute="/dashboard/help"
+              />
+            </div>
+          )}
           <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
           {!isHiveExecView && !isStatePreview && <DemoOrgBanner />}
 

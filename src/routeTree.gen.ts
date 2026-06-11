@@ -87,6 +87,7 @@ import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard
 import { Route as DashboardSmartImportHistoryRouteImport } from './routes/dashboard.smart-import.history'
 import { Route as DashboardShiftShiftIdRouteImport } from './routes/dashboard.shift.$shiftId'
 import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashboard.settings.team-access'
+import { Route as DashboardSettingsServiceCodesRouteImport } from './routes/dashboard.settings.service-codes'
 import { Route as DashboardSettingsServiceCatalogRouteImport } from './routes/dashboard.settings.service-catalog'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardSettingsAutomationRulesRouteImport } from './routes/dashboard.settings.automation-rules'
@@ -542,6 +543,12 @@ const DashboardSettingsTeamAccessRoute =
     path: '/team-access',
     getParentRoute: () => DashboardSettingsRoute,
   } as any)
+const DashboardSettingsServiceCodesRoute =
+  DashboardSettingsServiceCodesRouteImport.update({
+    id: '/service-codes',
+    path: '/service-codes',
+    getParentRoute: () => DashboardSettingsRoute,
+  } as any)
 const DashboardSettingsServiceCatalogRoute =
   DashboardSettingsServiceCatalogRouteImport.update({
     id: '/service-catalog',
@@ -948,6 +955,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
+  '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
   '/dashboard/smart-import/history': typeof DashboardSmartImportHistoryRoute
@@ -1075,6 +1083,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
+  '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
   '/dashboard/smart-import/history': typeof DashboardSmartImportHistoryRoute
@@ -1209,6 +1218,7 @@ export interface FileRoutesById {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
+  '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
   '/dashboard/settings/team-access': typeof DashboardSettingsTeamAccessRoute
   '/dashboard/shift/$shiftId': typeof DashboardShiftShiftIdRoute
   '/dashboard/smart-import/history': typeof DashboardSmartImportHistoryRoute
@@ -1344,6 +1354,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/service-catalog'
+    | '/dashboard/settings/service-codes'
     | '/dashboard/settings/team-access'
     | '/dashboard/shift/$shiftId'
     | '/dashboard/smart-import/history'
@@ -1471,6 +1482,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/service-catalog'
+    | '/dashboard/settings/service-codes'
     | '/dashboard/settings/team-access'
     | '/dashboard/shift/$shiftId'
     | '/dashboard/smart-import/history'
@@ -1604,6 +1616,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/service-catalog'
+    | '/dashboard/settings/service-codes'
     | '/dashboard/settings/team-access'
     | '/dashboard/shift/$shiftId'
     | '/dashboard/smart-import/history'
@@ -2201,6 +2214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsTeamAccessRouteImport
       parentRoute: typeof DashboardSettingsRoute
     }
+    '/dashboard/settings/service-codes': {
+      id: '/dashboard/settings/service-codes'
+      path: '/service-codes'
+      fullPath: '/dashboard/settings/service-codes'
+      preLoaderRoute: typeof DashboardSettingsServiceCodesRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
     '/dashboard/settings/service-catalog': {
       id: '/dashboard/settings/service-catalog'
       path: '/service-catalog'
@@ -2719,6 +2739,7 @@ interface DashboardSettingsRouteChildren {
   DashboardSettingsAutomationRulesRoute: typeof DashboardSettingsAutomationRulesRoute
   DashboardSettingsBankMappingRoute: typeof DashboardSettingsBankMappingRoute
   DashboardSettingsServiceCatalogRoute: typeof DashboardSettingsServiceCatalogRoute
+  DashboardSettingsServiceCodesRoute: typeof DashboardSettingsServiceCodesRoute
   DashboardSettingsTeamAccessRoute: typeof DashboardSettingsTeamAccessRoute
 }
 
@@ -2726,6 +2747,7 @@ const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
   DashboardSettingsAutomationRulesRoute: DashboardSettingsAutomationRulesRoute,
   DashboardSettingsBankMappingRoute: DashboardSettingsBankMappingRoute,
   DashboardSettingsServiceCatalogRoute: DashboardSettingsServiceCatalogRoute,
+  DashboardSettingsServiceCodesRoute: DashboardSettingsServiceCodesRoute,
   DashboardSettingsTeamAccessRoute: DashboardSettingsTeamAccessRoute,
 }
 

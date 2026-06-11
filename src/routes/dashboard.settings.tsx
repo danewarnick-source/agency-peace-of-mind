@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks } from "lucide-react";
+import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck } from "lucide-react";
 import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 import { CelebrationSettings } from "@/components/celebrations/celebration-settings";
@@ -121,6 +121,21 @@ function SettingsPage() {
               <div>
                 <h2 className="text-base font-semibold">Automation Rules</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Control what NECTAR sets up automatically when it imports a document. Toggle, edit, or add rules — nothing is created without your review.</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </div>
+        </Link>
+      )}
+
+      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+        <Link to="/dashboard/settings/service-codes" className="group lg:col-span-2">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
+            <div className="flex items-start gap-4">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><BookOpenCheck className="h-5 w-5" /></div>
+              <div>
+                <h2 className="text-base font-semibold">Service Code Registry</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Read-only reference for every service code — EVV mandate, rate source, default rate, summary cadence, daily/weekly caps, and overnight (asleep) billability — grouped by category.</p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />

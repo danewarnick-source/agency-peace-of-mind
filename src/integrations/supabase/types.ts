@@ -7617,6 +7617,72 @@ export type Database = {
           },
         ]
       }
+      recurring_shift_patterns: {
+        Row: {
+          active: boolean
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          crosses_midnight: boolean
+          effective_from: string
+          effective_until: string | null
+          end_time_local: string
+          id: string
+          location_id: string | null
+          name: string | null
+          notes: string | null
+          organization_id: string
+          rotation_group_id: string | null
+          service_code_id: string | null
+          staff_id: string | null
+          start_time_local: string
+          updated_at: string
+          weekday_mask: number
+        }
+        Insert: {
+          active?: boolean
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          crosses_midnight?: boolean
+          effective_from?: string
+          effective_until?: string | null
+          end_time_local: string
+          id?: string
+          location_id?: string | null
+          name?: string | null
+          notes?: string | null
+          organization_id: string
+          rotation_group_id?: string | null
+          service_code_id?: string | null
+          staff_id?: string | null
+          start_time_local: string
+          updated_at?: string
+          weekday_mask?: number
+        }
+        Update: {
+          active?: boolean
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          crosses_midnight?: boolean
+          effective_from?: string
+          effective_until?: string | null
+          end_time_local?: string
+          id?: string
+          location_id?: string | null
+          name?: string | null
+          notes?: string | null
+          organization_id?: string
+          rotation_group_id?: string | null
+          service_code_id?: string | null
+          staff_id?: string | null
+          start_time_local?: string
+          updated_at?: string
+          weekday_mask?: number
+        }
+        Relationships: []
+      }
       respite_stays: {
         Row: {
           created_at: string
@@ -8804,6 +8870,65 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      staff_rotation_group_members: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          sort_order: number
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          sort_order?: number
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          sort_order?: number
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_rotation_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "staff_rotation_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_rotation_groups: {
+        Row: {
+          created_at: string
+          id: string
+          last_assigned_staff_id: string | null
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_assigned_staff_id?: string | null
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_assigned_staff_id?: string | null
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       staff_training_hours_entries: {
         Row: {

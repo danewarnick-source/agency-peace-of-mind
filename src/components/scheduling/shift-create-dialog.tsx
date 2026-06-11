@@ -289,16 +289,16 @@ export function ShiftCreateDialog({
                       <div className="flex items-center gap-1">
                         {r.blocked && <Badge variant="destructive" className="text-[10px]">blocked</Badge>}
                         {!r.blocked && r.warnings.length > 0 && <Badge variant="secondary" className="text-[10px]">{r.warnings.length} warn</Badge>}
-                        <Badge variant="outline" className="text-[10px] tabular-nums">{r.score}</Badge>
+                        <Badge variant="outline" className="text-[10px] tabular-nums">{Math.round(r.rank * 100)}</Badge>
                       </div>
                     </div>
-                    {(r.warnings.length > 0 || r.reasons.length > 0) && (
+                    {(r.warnings.length > 0 || r.blockers.length > 0) && (
                       <div className="mt-1 text-[11px] text-muted-foreground space-x-1">
-                        {r.warnings.map((w, i) => (
-                          <span key={i} className="inline-block">⚠ {w}</span>
+                        {r.warnings.map((w: string, i: number) => (
+                          <span key={`w${i}`} className="inline-block">⚠ {w}</span>
                         ))}
-                        {r.reasons.slice(0, 1).map((w, i) => (
-                          <span key={i} className="inline-block">· {w}</span>
+                        {r.blockers.slice(0, 1).map((w: string, i: number) => (
+                          <span key={`b${i}`} className="inline-block">· {w}</span>
                         ))}
                       </div>
                     )}

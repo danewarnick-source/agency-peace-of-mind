@@ -56,6 +56,9 @@ export function ShiftCreateDialog({
   const [staffId, setStaffId] = useState<string | null>(null);
   const [override, setOverride] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Recurrence: weekday checkboxes (0=Sun..6=Sat) + end-on (inclusive) date.
+  const [recurDays, setRecurDays] = useState<Set<number>>(new Set());
+  const [recurUntil, setRecurUntil] = useState<string>("");
 
   // Reset on open
   useEffect(() => {

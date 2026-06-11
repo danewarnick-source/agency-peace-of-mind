@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Lock } from "lucide-react";
+import { CoverageBar24h } from "@/components/scheduling/coverage-bar-24h";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
   useSchedulePreview,
   startOfWeek,
-  dayCoverageMinutes,
+  // dayCoverageMinutes removed — superseded by CoverageBar24h
   inferSiteType,
   UNASSIGNED_SITE_ID,
   type ShiftRow,
@@ -460,11 +461,19 @@ function SiteWeekGrid({
 }
 
 function CoverageBadge({ day, shifts }: { day: Date; shifts: ShiftRow[] }) {
-  const mins = dayCoverageMinutes(day, shifts);
-  const ok = mins >= 24 * 60 - 1 && shifts.every((s) => s.staff_id);
+  // Use the new 24h coverage bar visualization (Phase 1 DSPD overhaul).
   return (
-    <div style={{ fontSize: 10, fontWeight: 800, borderRadius: 6, padding: "2px 6px", marginBottom: 5, textAlign: "center", ...(ok ? { background: SCHED.okBg, color: "#0e6a45" } : { background: SCHED.warnBg, color: SCHED.warn }) }}>
-      {ok ? "✓ 24h covered" : "⚠ gap in 24h"}
+    <div style={{ marginBottom: 6 }}>
+      <CoverageBar24h
+        day={day}
+        shifts={shifts.map((s) => ({
+          id: s.id,
+          starts_at: s.starts_at,
+          ends_at: s.ends_at,
+          staff_id: s.staff_id,
+          job_code: s.job_code,
+        }))}
+      />
     </div>
   );
 }

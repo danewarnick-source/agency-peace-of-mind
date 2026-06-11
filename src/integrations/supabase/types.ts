@@ -2282,6 +2282,54 @@ export type Database = {
           },
         ]
       }
+      client_weekly_targets: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          organization_id: string
+          service_code: string
+          source: string
+          target_hours_per_week: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          service_code: string
+          source?: string
+          target_hours_per_week: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          service_code?: string
+          source?: string
+          target_hours_per_week?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_weekly_targets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_weekly_targets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           account_status: string
@@ -5506,6 +5554,117 @@ export type Database = {
           },
         ]
       }
+      location_coverage_requirements: {
+        Row: {
+          awake_required: boolean
+          created_at: string
+          day_of_week: number | null
+          end_time: string
+          id: string
+          location_id: string
+          notes: string | null
+          organization_id: string
+          required_staff_count: number
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          awake_required?: boolean
+          created_at?: string
+          day_of_week?: number | null
+          end_time: string
+          id?: string
+          location_id: string
+          notes?: string | null
+          organization_id: string
+          required_staff_count?: number
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          awake_required?: boolean
+          created_at?: string
+          day_of_week?: number | null
+          end_time?: string
+          id?: string
+          location_id?: string
+          notes?: string | null
+          organization_id?: string
+          required_staff_count?: number
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_coverage_requirements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_coverage_requirements_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locations: {
+        Row: {
+          active: boolean
+          address: string | null
+          created_at: string
+          id: string
+          legacy_home_designation_id: string | null
+          name: string
+          organization_id: string
+          sort: number
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          created_at?: string
+          id?: string
+          legacy_home_designation_id?: string | null
+          name: string
+          organization_id: string
+          sort?: number
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          created_at?: string
+          id?: string
+          legacy_home_designation_id?: string | null
+          name?: string
+          organization_id?: string
+          sort?: number
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_legacy_home_designation_id_fkey"
+            columns: ["legacy_home_designation_id"]
+            isOneToOne: false
+            referencedRelation: "home_designations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_progress: {
         Row: {
           assignment_id: string
@@ -7522,19 +7681,26 @@ export type Database = {
       }
       scheduled_shifts: {
         Row: {
+          callout_reason: string | null
           client_id: string
           code_id: string | null
           created_at: string
           created_by: string | null
+          created_from: string | null
           ends_at: string
           id: string
+          is_awake_overnight: boolean | null
           is_recurring: boolean
           job_code: string | null
+          location_id: string | null
           notes: string | null
           organization_id: string
+          override_reason: string | null
+          parent_shift_id: string | null
           published: boolean
           recurrence_end_date: string | null
           recurrence_rule: string | null
+          service_code: string | null
           shift_type: string
           staff_id: string
           starts_at: string
@@ -7542,19 +7708,26 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          callout_reason?: string | null
           client_id: string
           code_id?: string | null
           created_at?: string
           created_by?: string | null
+          created_from?: string | null
           ends_at: string
           id?: string
+          is_awake_overnight?: boolean | null
           is_recurring?: boolean
           job_code?: string | null
+          location_id?: string | null
           notes?: string | null
           organization_id: string
+          override_reason?: string | null
+          parent_shift_id?: string | null
           published?: boolean
           recurrence_end_date?: string | null
           recurrence_rule?: string | null
+          service_code?: string | null
           shift_type?: string
           staff_id: string
           starts_at: string
@@ -7562,19 +7735,26 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          callout_reason?: string | null
           client_id?: string
           code_id?: string | null
           created_at?: string
           created_by?: string | null
+          created_from?: string | null
           ends_at?: string
           id?: string
+          is_awake_overnight?: boolean | null
           is_recurring?: boolean
           job_code?: string | null
+          location_id?: string | null
           notes?: string | null
           organization_id?: string
+          override_reason?: string | null
+          parent_shift_id?: string | null
           published?: boolean
           recurrence_end_date?: string | null
           recurrence_rule?: string | null
+          service_code?: string | null
           shift_type?: string
           staff_id?: string
           starts_at?: string
@@ -7597,10 +7777,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "scheduled_shifts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "scheduled_shifts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_shifts_parent_shift_id_fkey"
+            columns: ["parent_shift_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_shifts"
             referencedColumns: ["id"]
           },
           {
@@ -8228,6 +8422,7 @@ export type Database = {
       shift_templates: {
         Row: {
           active: boolean
+          color: string | null
           created_at: string
           end_time: string
           id: string
@@ -8240,6 +8435,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          color?: string | null
           created_at?: string
           end_time: string
           id?: string
@@ -8252,6 +8448,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          color?: string | null
           created_at?: string
           end_time?: string
           id?: string

@@ -378,7 +378,7 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
       : groupStatus === "declined"
         ? "bg-destructive/10 text-destructive"
         : "bg-muted text-muted-foreground";
-  const pendingIds = shifts.filter((s) => s.status === "pending" && s.published).map((s) => s.id);
+  const pendingIds = shifts.filter((s) => (s.status === "pending" || s.status === "published") && s.published).map((s) => s.id);
   return (
     <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">

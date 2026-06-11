@@ -68,7 +68,7 @@ export function ActionNeededCard({ organizationId, weekStart, staffNames, client
                 <span className="min-w-0 flex-1">
                   <span className="font-semibold">Declined</span> · {d.service_code ?? "—"} · {fmtWhen(d.starts_at)}
                   <span className="block text-[11px] text-muted-foreground">
-                    {staffNames?.get(d.staff_id) ?? "Staff"} · {clientNames?.get(d.client_id) ?? "Client"}
+                    {(d.staff_id ? staffNames?.get(d.staff_id) : null) ?? "Staff"} · {clientNames?.get(d.client_id) ?? "Client"}
                     {d.notes ? ` — ${d.notes.split("\n").slice(-1)[0]}` : ""}
                   </span>
                 </span>

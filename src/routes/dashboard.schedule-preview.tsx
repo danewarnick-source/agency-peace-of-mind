@@ -257,7 +257,10 @@ function SchedulePreviewPage() {
             />
           )}
           {org?.organization_id && isAdmin && (
-            <button style={btn()} onClick={() => setRecurringOpen(true)}>Recurring patterns</button>
+            <>
+              <button style={btn()} onClick={() => setRecurringOpen(true)}>Recurring patterns</button>
+              <button style={btn()} onClick={() => setAutoAssignOpen(true)}>Auto-assign</button>
+            </>
           )}
           <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>

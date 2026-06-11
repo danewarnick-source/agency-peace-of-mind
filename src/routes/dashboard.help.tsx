@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -11,6 +11,11 @@ import { NectarAnswer } from "@/components/nectar/nectar-answer";
 
 export const Route = createFileRoute("/dashboard/help")({
   head: () => ({ meta: [{ title: "Need help? — NECTAR" }] }),
+  validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+    q: typeof search.q === "string" && search.q.trim().length > 0
+      ? search.q.slice(0, 1000)
+      : undefined,
+  }),
   component: HelpPage,
 });
 
@@ -68,6 +73,19 @@ function HelpPage() {
 
   useEffect(() => { setRecent(loadRecent()); }, []);
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // Auto-send a question routed in from the global NECTAR search bar
+  // (e.g. /dashboard/help?q=…). Fires once, then clears the search param.
+  const { q: initialQ } = useSearch({ from: "/dashboard/help" });
+  const initialFired = useRef(false);
+  useEffect(() => {
+    if (initialFired.current) return;
+    if (!initialQ || !org?.organization_id) return;
+    initialFired.current = true;
+    send(initialQ);
+    navigate({ to: "/dashboard/help", search: {}, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQ, org?.organization_id]);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);

@@ -36,6 +36,8 @@ export interface AskNectarStaffProps {
   clientId?: string;
   /** Compact heading variant for embedding into sheets. */
   compact?: boolean;
+  /** Auto-send this question once on mount. */
+  initialQuestion?: string;
 }
 
 /**
@@ -45,7 +47,7 @@ export interface AskNectarStaffProps {
  * just renders the conversation. No DB persistence: each session is in
  * React state only.
  */
-export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProps) {
+export function AskNectarStaff({ clientId, compact = false, initialQuestion }: AskNectarStaffProps) {
   const ask = useServerFn(askNectarStaff);
   const { data: org } = useCurrentOrg();
   const organizationId = org?.organization_id;
@@ -121,6 +123,17 @@ export function AskNectarStaff({ clientId, compact = false }: AskNectarStaffProp
     mutation.mutate(text);
     requestAnimationFrame(() => taRef.current?.focus());
   };
+
+  // Auto-send an initial question (e.g. from the global NECTAR search bar) once
+  // the org is loaded, only once per mount.
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (firedRef.current) return;
+    if (!initialQuestion || !organizationId) return;
+    firedRef.current = true;
+    send(initialQuestion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuestion, organizationId]);
 
   const isEmpty = messages.length === 0;
 

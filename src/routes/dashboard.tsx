@@ -21,6 +21,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
+import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { ListChecks } from "lucide-react";
 import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
 import { useQuery } from "@tanstack/react-query";
@@ -345,6 +346,18 @@ function DashboardLayout() {
                 </p>
               </div>
             </div>
+
+            <div className="hidden flex-1 justify-center px-4 md:flex">
+              {!isHiveExecView && (
+                <NectarSearchBar
+                  nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
+                  isAdminCapable={isAdminCapable && effectiveView === "admin"}
+                  variant="desktop"
+                  askRoute="/dashboard/help"
+                />
+              )}
+            </div>
+
 
             <div className="flex items-center gap-2">
               <button

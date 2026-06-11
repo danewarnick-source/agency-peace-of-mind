@@ -15,6 +15,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { usePortalView } from "@/hooks/use-portal-view";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { toast } from "sonner";
+import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 
 export function StaffTopBar({ title, framed = false }: { title: string; framed?: boolean }) {
   const { user } = useAuth();
@@ -38,8 +39,8 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
   const headerCls = framed
-    ? "relative z-30 flex shrink-0 items-center justify-between border-b border-white/10 px-3 text-white"
-    : "sticky top-0 z-30 flex items-center justify-between border-b border-white/10 px-3 text-white md:hidden";
+    ? "relative z-30 flex shrink-0 flex-col border-b border-white/10 px-3 text-white"
+    : "sticky top-0 z-30 flex flex-col border-b border-white/10 px-3 text-white md:hidden";
 
   return (
     <header
@@ -47,64 +48,74 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
       style={{
         backgroundImage: "var(--gradient-navy)",
         paddingTop: "env(safe-area-inset-top)",
-        minHeight: "calc(3.5rem + env(safe-area-inset-top))",
       }}
     >
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] shadow-[0_0_0_1px_rgba(244,169,58,0.08)_inset]">
-          <Hexagon className="h-4 w-4 text-[oklch(var(--accent-2))]" strokeWidth={2.5} />
-        </span>
-        <h1 className="truncate text-base font-semibold tracking-tight">{title}</h1>
+      <div className="flex h-14 items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] shadow-[0_0_0_1px_rgba(244,169,58,0.08)_inset]">
+            <Hexagon className="h-4 w-4 text-[oklch(var(--accent-2))]" strokeWidth={2.5} />
+          </span>
+          <h1 className="truncate text-base font-semibold tracking-tight">{title}</h1>
+        </div>
+
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <button
+              aria-label="Open profile menu"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-white active:scale-95"
+            >
+              <User className="h-4 w-4" />
+            </button>
+          </SheetTrigger>
+          <SheetContent
+            side="bottom"
+            className="rounded-t-2xl border-t border-white/10 bg-[#141a3d] p-5 text-white [&>button]:text-white"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
+          >
+            <SheetHeader className="text-left">
+              <SheetTitle className="text-white">{displayName}</SheetTitle>
+              <SheetDescription className="text-white/80">
+                {(org?.organization_name ?? "Workspace") + " · " + ROLE_LABEL[role]}
+              </SheetDescription>
+            </SheetHeader>
+
+            {isAdminCapable && (
+              <div className="mt-5">
+                <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/80">
+                  Portal View
+                </label>
+                <Select value={view} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile")}>
+                  <SelectTrigger className="h-12 w-full border-white/15 bg-white/[0.06] text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="staff">Staff View</SelectItem>
+                    <SelectItem value="admin">Admin View</SelectItem>
+                    <SelectItem value="staff_mobile">Staff Mobile (Preview)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <Button
+              onClick={signOut}
+              variant="ghost"
+              className="mt-5 h-12 w-full justify-start border border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+            >
+              <LogOut className="mr-2 h-4 w-4" /> Sign out
+            </Button>
+          </SheetContent>
+        </Sheet>
       </div>
 
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <button
-            aria-label="Open profile menu"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-white active:scale-95"
-          >
-            <User className="h-4 w-4" />
-          </button>
-        </SheetTrigger>
-        <SheetContent
-          side="bottom"
-          className="rounded-t-2xl border-t border-white/10 bg-[#141a3d] p-5 text-white [&>button]:text-white"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
-        >
-          <SheetHeader className="text-left">
-            <SheetTitle className="text-white">{displayName}</SheetTitle>
-            <SheetDescription className="text-white/80">
-              {(org?.organization_name ?? "Workspace") + " · " + ROLE_LABEL[role]}
-            </SheetDescription>
-          </SheetHeader>
-
-          {isAdminCapable && (
-            <div className="mt-5">
-              <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/80">
-                Portal View
-              </label>
-              <Select value={view} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile")}>
-                <SelectTrigger className="h-12 w-full border-white/15 bg-white/[0.06] text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="staff">Staff View</SelectItem>
-                  <SelectItem value="admin">Admin View</SelectItem>
-                  <SelectItem value="staff_mobile">Staff Mobile (Preview)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <Button
-            onClick={signOut}
-            variant="ghost"
-            className="mt-5 h-12 w-full justify-start border border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-          >
-            <LogOut className="mr-2 h-4 w-4" /> Sign out
-          </Button>
-        </SheetContent>
-      </Sheet>
+      <div className="pb-2">
+        <NectarSearchBar
+          nav={[]}
+          isAdminCapable={isAdminCapable}
+          variant="mobile"
+          askRoute="/dashboard/ask-nectar"
+        />
+      </div>
     </header>
   );
 }

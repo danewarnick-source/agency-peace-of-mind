@@ -39,7 +39,7 @@ export const POLICY_RULES: Array<{
 
 export type Shift = {
   id: string;
-  staff_id: string;
+  staff_id: string | null;
   client_id: string;
   service_code: string | null;
   starts_at: string;

@@ -20,6 +20,7 @@ import {
   type ProposedAction,
 } from "@/lib/nectar-schedule-actions.functions";
 import { saveShift } from "@/lib/schedule-preview-mutations";
+import { isDailyServiceCode } from "@/lib/service-billing";
 import type { ClientRow, StaffRow, TeamRow, ShiftRow } from "@/hooks/use-schedule-preview";
 import { SCHED } from "./sched-ui";
 
@@ -149,8 +150,7 @@ export function NectarCommandBar({
               staff_id: a.staff_id,
               client_id: a.client_id,
               job_code: a.job_code,
-              shift_type: ["HHS","RHS","DSG","RL6","RP3","RP4","RP5"].includes(a.job_code)
-                ? "daily_host_home" : "hourly",
+              shift_type: isDailyServiceCode(a.job_code) ? "daily_host_home" : "hourly",
               starts_at: a.starts_at,
               ends_at: a.ends_at,
               notes: a.reason || null,
@@ -185,8 +185,7 @@ export function NectarCommandBar({
               staff_id: cur.staff_id!,
               client_id: cur.client_id!,
               job_code: job,
-              shift_type: ["HHS","RHS","DSG","RL6","RP3","RP4","RP5"].includes(job)
-                ? "daily_host_home" : "hourly",
+              shift_type: isDailyServiceCode(job) ? "daily_host_home" : "hourly",
               starts_at: a.patch.starts_at ?? cur.starts_at,
               ends_at: a.patch.ends_at ?? cur.ends_at,
               notes: null,

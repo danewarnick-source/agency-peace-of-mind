@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { User, Search, Clock, Home, Info, ChevronDown, CalendarCheck2 } from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 import { ClientCapBars } from "@/components/staff-mobile/client-cap-bars";
+import { billingUnitLabel, isDailyServiceCode } from "@/lib/service-billing";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
@@ -33,9 +34,8 @@ function useTick(enabled: boolean) {
   }, [enabled]);
 }
 
-const DAILY_CODES = new Set(["HHS", "RHS", "DSG", "RL6", "RP3", "RP4", "RP5"]);
-const isDaily = (code: string) => DAILY_CODES.has(code);
-const billingLabel = (code: string) => (isDaily(code) ? "Daily" : "Hourly");
+const isDaily = (code: string) => isDailyServiceCode(code);
+const billingLabel = (code: string) => billingUnitLabel(code);
 
 /** Expanded client detail — preserves the existing service chips, burn-down, and CTA buttons. */
 function ClientDetail({

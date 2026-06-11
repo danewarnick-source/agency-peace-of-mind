@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
+import { DAILY_SERVICE_CODES, isDailyServiceCode } from "@/lib/service-billing";
 
 export type ShiftRow = {
   id: string;
@@ -91,9 +92,10 @@ export function useSchedulePreview(weekStart: Date) {
   });
 }
 
-// Same residential/daily codes used by the existing scheduler and pay router.
-export const DAILY_CODES = new Set(["HHS", "RHS", "DSG", "RL6", "RP3", "RP4", "RP5"]);
-export const isDaily = (code: string | null | undefined) => !!code && DAILY_CODES.has(code);
+// Daily-rate codes — re-exported from the single source of truth
+// (src/lib/service-billing.ts) so the scheduler and pay router agree.
+export const DAILY_CODES = DAILY_SERVICE_CODES;
+export const isDaily = (code: string | null | undefined) => isDailyServiceCode(code);
 
 export type SiteType = "residential" | "day";
 

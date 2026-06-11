@@ -2,6 +2,7 @@
 // Used everywhere a shift is rendered (cards, coverage bars, chips, NECTAR suggestions).
 // Colors live as Tailwind class tokens so dark mode + theming behave; we never
 // hardcode hex values into components.
+import { isDailyServiceCode } from "@/lib/service-billing";
 
 export type CodeFamily =
   | "residential"
@@ -30,12 +31,12 @@ export function familyForCode(code?: string | null): CodeFamily {
 }
 
 // Hourly vs daily-unit distinction (used by Add 1:1 Segment and conflict engine).
-const DAILY_CODES = new Set(["HHS", "RHS", "DSG", "RP4", "RP5"]);
+// Delegates to the single source of truth in src/lib/service-billing.ts.
 export function isDailyCode(code?: string | null) {
-  return !!code && DAILY_CODES.has(code.toUpperCase());
+  return !!code && isDailyServiceCode(code.toUpperCase());
 }
 export function isHourlyCode(code?: string | null) {
-  return !!code && !DAILY_CODES.has(code.toUpperCase());
+  return !!code && !isDailyServiceCode(code.toUpperCase());
 }
 
 // Required age threshold per code (HHS staff must be ≥21).

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/collapsible";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { GeneralTimeClock } from "@/components/staff-mobile/general-time-clock";
+import { isDailyServiceCode } from "@/lib/service-billing";
 import { RequestTimeOffDialog } from "@/components/schedule-preview/request-time-off-dialog";
 import { RequestSwapDialog } from "@/components/schedule-preview/request-swap-dialog";
 import { CalendarOff, ArrowLeftRight } from "lucide-react";
@@ -38,9 +39,8 @@ export const Route = createFileRoute("/dashboard/schedule")({
 });
 
 // Same daily-vs-hourly split used in staff-client-grid.tsx so the schedule
-// routes shifts into the correct service Hub.
-const DAILY_CODES = new Set(["HHS", "RHS", "DSG", "RL6", "RP3", "RP4", "RP5"]);
-const isDaily = (code: string | null | undefined) => !!code && DAILY_CODES.has(code);
+// routes shifts into the correct service Hub (source of truth: service-billing.ts).
+const isDaily = (code: string | null | undefined) => isDailyServiceCode(code);
 
 type ScheduledShift = {
   id: string;

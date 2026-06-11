@@ -282,10 +282,7 @@ Rules:
       throw e;
     }
 
-    let parsed: unknown;
-    try { parsed = JSON.parse(raw); } catch {
-      return { kind: "ask", question: "I didn't catch that — try: 'Cover the Maple house overnight Mon–Fri with Sarah'." };
-    }
+    const parsed = parseModelJson(raw, "nectar-parse-coverage");
 
     const Ask = z.object({ kind: z.literal("ask"), question: z.string().min(1).max(300) });
     const Pick = z.object({

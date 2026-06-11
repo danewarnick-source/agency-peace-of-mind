@@ -275,6 +275,41 @@ export function ShiftCreateDialog({
                 HHS requires staff aged ≥{minStaffAgeForCode(code)}. Host home staff are excluded from the picker.
               </div>
             )}
+            <div>
+              <Label className="text-xs">Location</Label>
+              <div className="flex flex-wrap gap-1 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setPickedLocationId(null)}
+                  className={cn(
+                    "min-h-[36px] rounded-md border px-2 text-xs font-semibold",
+                    effectiveLocationId === null ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
+                  )}
+                >
+                  None
+                </button>
+                {(locsQ.data ?? []).filter((l) => l.active !== false).map((l) => {
+                  const on = effectiveLocationId === l.id;
+                  return (
+                    <button
+                      type="button"
+                      key={l.id}
+                      onClick={() => setPickedLocationId(l.id)}
+                      className={cn(
+                        "min-h-[36px] rounded-md border px-2 text-xs font-semibold",
+                        on ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {l.name}
+                      {l.type === "host_home" && <span className="ml-1 opacity-60">(host)</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                Picking a host home location excludes its host staff from the picker.
+              </div>
+            </div>
           </div>
         )}
 

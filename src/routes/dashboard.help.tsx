@@ -11,6 +11,11 @@ import { NectarAnswer } from "@/components/nectar/nectar-answer";
 
 export const Route = createFileRoute("/dashboard/help")({
   head: () => ({ meta: [{ title: "Need help? — NECTAR" }] }),
+  validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+    q: typeof search.q === "string" && search.q.trim().length > 0
+      ? search.q.slice(0, 1000)
+      : undefined,
+  }),
   component: HelpPage,
 });
 

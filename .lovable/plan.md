@@ -1,61 +1,49 @@
-## Problem
+## What's actually happening
 
-The http2 transport bug is fixed — we are now actually reaching AWS Bedrock, and AWS is returning a **real 403** (`AccessDeniedException`, `UnrecognizedClientException`, or `InvalidSignatureException`). Our adapter currently collapses all of those into one generic message: *"AWS Bedrock rejected the credentials or denied access to the configured model."* That message is true but useless — it does not tell us which of the three root causes is actually firing:
+The message you're seeing — **"I didn't catch that — try: 'Cover Maple house overnight Mon–Fri with Sarah'."** — is not NECTAR saying it doesn't understand. It's the catch branch when `JSON.parse(rawAIResponse)` throws.
 
-1. **Model access not granted** in the AWS Bedrock console for `us.anthropic.claude-sonnet-4-6` (Anthropic Sonnet 4.x family must be explicitly enabled per account/region).
-2. **Wrong region** — `us.*` is a cross-region inference profile and only resolves in US Bedrock regions (`us-east-1`, `us-east-2`, `us-west-2`). Any other `AWS_REGION` value returns 403.
-3. **Bad credentials / missing IAM permission** — `AWS_ACCESS_KEY_ID` doesn't belong to the same account where model access was granted, or its IAM policy is missing `bedrock:InvokeModel`.
+In `src/lib/nectar-schedule-actions.functions.ts` (line 283) and `src/lib/nectar-schedule-parse.functions.ts` (line 111), when Bedrock returns content that isn't pure JSON (e.g. wrapped in ```json fences, or prefixed with "Sure, here's the JSON: ..."), the code silently swallows the parse error and returns this generic "ask" message. So you can't tell whether the issue is:
 
-Guessing wrong wastes a round-trip. The fix is to expose AWS's own error name + message in our thrown error so the next "Draft it" click tells us exactly which one it is.
+- Claude wrapped the JSON in markdown fences (very common with Sonnet, even when told not to),
+- Claude returned prose explaining it can't see any clients/staff,
+- The context object we sent it actually IS empty (no clients/staff/teams on this org/week),
+- Or something else.
 
-## Plan
+The Bedrock call itself succeeded — we never got to the improved error reporting we added last turn, because the failure is on the JSON parse, not on the AWS call.
 
-### 1. Improve error reporting in `src/lib/ai-bedrock.server.ts`
+## Fix
 
-In the catch block around the `InvokeModelCommand` call, read the AWS SDK error fields that are already present on the thrown object:
+### 1. Harden the JSON extraction (both files)
 
-- `err.name` — e.g. `AccessDeniedException`, `ValidationException`, `ResourceNotFoundException`, `ThrottlingException`, `UnrecognizedClientException`, `InvalidSignatureException`.
-- `err.$metadata?.httpStatusCode` — 400/403/404/429.
-- `err.message` — AWS's human-readable detail (often includes the offending model ID or "You don't have access to the model with the specified model ID").
+Wrap the parse in a helper that:
+1. Strips ```json / ``` code fences.
+2. Falls back to extracting the first `{ ... }` block via regex.
+3. If still unparseable, **throws** an Error containing the first ~300 chars of the raw model output — so the toast shows what Claude actually said instead of a canned line.
 
-Throw a new `Error` whose message is shaped like:
+### 2. Detect empty context and short-circuit before calling the AI
 
-```
-Bedrock {name} ({httpStatusCode}) for model {modelId} in {region}: {message}
-```
+In `NectarCommandBar`, if `clients.length === 0` or `staff.length === 0` for the current week, show an inline hint ("No clients/staff loaded for this week — NECTAR has nothing to schedule against") instead of round-tripping to Bedrock. This is the most likely root cause of the model returning prose instead of structured actions: with empty IDs there's nothing valid it can produce.
 
-Keep the existing buckets (401/403 → credentials/access; 429 → throttle; empty body → empty) but include the raw AWS name + message inside each bucket's thrown error. Still loud-fail — no silent fallback.
+### 3. Log the raw model output on the server
 
-Also log once to the server console (`console.error`) with the same string, so it shows up in Server Logs even if the UI only renders a short toast.
+Add `console.error("[nectar-schedule] non-JSON model output:", raw.slice(0, 500))` in the catch path so we can confirm in server-function logs what Claude is actually returning. No PII risk — it's the model's own text.
 
-### 2. Mirror the same change in `supabase/functions/_shared/bedrock-fetch.ts`
+### Files touched
 
-The Deno edge mirror parses the Bedrock REST response itself. When the response status is non-2xx, read the JSON body's `__type` and `message` (Bedrock's standard error envelope), and throw a string in the same `Bedrock {type} ({status}) for model {modelId} in {region}: {message}` shape. This keeps the two adapters symmetrical.
+- `src/lib/nectar-schedule-actions.functions.ts` — replace the two `JSON.parse(raw)` try/catch blocks (proposeSchedulingActions + proposeScheduleImport) with the hardened helper; log raw on failure.
+- `src/lib/nectar-schedule-parse.functions.ts` — same hardening at line 110-112.
+- `src/components/schedule-preview/nectar-command-bar.tsx` — pre-flight check for empty `clients`/`staff` with a friendly inline message; don't fire the mutation.
 
-### 3. No other changes
+### What this does NOT change
 
-- No prompt, model, call-site, or UI changes.
-- No new dependencies.
-- The 19 server-function files and the 2 edge functions that already route through these adapters automatically inherit the better error.
+- No prompt changes, no model changes, no Bedrock config changes.
+- The validateAndResolve path (which already returns "ask" with a more specific question when the AI returns a valid-but-empty JSON object) is untouched.
 
-## What you'll see after this ships
+## Expected outcome
 
-Click **Draft it** once more. The red toast (and Server Logs) will then say one of, e.g.:
+After this ships, clicking "Draft it" will either:
+- Succeed (if Claude is just adding fences),
+- Show the actual model output snippet in the toast (so we can see exactly what it said), or
+- Show "No clients/staff loaded — nothing to schedule against" before the call even happens.
 
-- `Bedrock AccessDeniedException (403) for model us.anthropic.claude-sonnet-4-6 in us-east-1: You don't have access to the model with the specified model ID.` → enable model access in the Bedrock console (Model access → request access for Anthropic Claude Sonnet 4.x).
-- `Bedrock ValidationException (400) ... inference profile ... not found in region eu-west-1` → change `AWS_REGION` secret to `us-east-1` / `us-east-2` / `us-west-2`.
-- `Bedrock UnrecognizedClientException (403) ... The security token included in the request is invalid` → rotate / fix `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` secrets.
-- `Bedrock ResourceNotFoundException (404) ... model ... not found` → the model ID string itself is wrong; update the `BEDROCK_MODEL_ID` secret to a real ID (e.g. `us.anthropic.claude-sonnet-4-5-20250929-v1:0`).
-
-Once we see which of those it is, the fix is a single secret update (no code change) — and I can guide you through it in one message.
-
-## Files touched
-
-- `src/lib/ai-bedrock.server.ts` — richer error in catch block
-- `supabase/functions/_shared/bedrock-fetch.ts` — same shape for Deno edge functions
-
-## Technical notes
-
-- AWS SDK for JS v3 always attaches `$metadata` and `name` to thrown service errors — no extra parsing library needed.
-- The `us.` prefix on a Bedrock model ID denotes a cross-region inference profile; it is not a typo and does not need to be stripped.
-- We are not changing the **loud-failure contract** — every bucket still throws; nothing falls back to fake data or another provider.
+That's the diagnostic info we need to know whether the next fix is a prompt tweak, a context-loading fix, or something else.

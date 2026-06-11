@@ -36,3 +36,7 @@ Phase 1 is complete. Phase 2 ships in three batches; each typechecks independent
 **Migration**: rule_settings jsonb + ot_threshold_hours on `org_shift_behavior_settings`.
 
 Starting Batch A now.
+
+---
+
+**Phase 2 complete.** Batch C shipped: Scheduling rules section (Off/Warn/Block per policy + OT threshold) added to the existing settings drawer, "Your shift types" → "Shift time templates", Color shifts by label updated to "Service code".

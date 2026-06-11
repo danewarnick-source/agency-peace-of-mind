@@ -326,7 +326,7 @@ function SchedulePreviewPage() {
         Site type inferred from shift codes (HHS, RHS, DSG, RL6, RP3–5 = residential). Clients with no team are grouped as “1-on-1 Services”.
       </p>
 
-      <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} onChange={setSettings} />
+      <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} onChange={setSettings} organizationId={org?.organization_id} />
 
       <ShiftEditorDialog
         open={editorOpen} onOpenChange={setEditorOpen} ctx={editorCtx}

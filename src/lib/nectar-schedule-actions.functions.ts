@@ -330,7 +330,7 @@ confidently match, put them in "unmatched" with a short reason.
 
 Return strict JSON, ONE of:
 
-1) { "kind": "ask", "question": "<one short specific question>" }
+1) { "kind": "ask", "question": "<one short specific question>", "reply_type": "yes_no" | "options" | "text", "options"?: [{ "id": "...", "label": "..." }] }
 2) {
      "kind": "ok",
      "actions": [

@@ -83,6 +83,21 @@ function SchedulePreviewPage() {
 
   const { data, isLoading } = useSchedulePreview(weekStart);
   const { data: requests } = useOrgScheduleRequests();
+  const listLocCall = useServerFn(listLocations);
+  const locationsQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["locations", org?.organization_id],
+    queryFn: () => listLocCall({ data: { organizationId: org!.organization_id } }),
+  });
+  // host-home names (lowercased) — used to give the All-Homes board a
+  // distinct row variant and to tag the home pills.
+  const hostHomeNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of locationsQ.data ?? []) {
+      if (l.type === "host_home" && l.active !== false) set.add(String(l.name ?? "").toLowerCase());
+    }
+    return set;
+  }, [locationsQ.data]);
   const approvedTimeOff = useMemo(
     () => buildApprovedTimeOffIndex(requests?.timeOff ?? []),
     [requests?.timeOff],

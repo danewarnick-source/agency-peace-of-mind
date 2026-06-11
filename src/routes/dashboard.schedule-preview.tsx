@@ -175,6 +175,7 @@ function SchedulePreviewPage() {
             onPublished={() => queryClient.invalidateQueries({ queryKey: ["schedule-preview"] })}
           />
           <button style={btn()} onClick={() => setTargetsOpen(true)}>Weekly targets</button>
+          <button style={btn()} onClick={() => setCoverageOpen(true)}>Coverage rules</button>
           <button style={{ ...btn(), background: SCHED.navy, color: "#fff", borderColor: SCHED.navy }} onClick={() => setCreateOpen(true)}>+ New shift</button>
           <Link to="/dashboard/homes" style={btn()}>Homes &amp; Teams</Link>
           <button style={btn()} onClick={() => setSettingsOpen(true)}><span style={{ fontSize: 15 }}>⚙</span> Settings</button>

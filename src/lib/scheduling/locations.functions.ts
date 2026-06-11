@@ -1,8 +1,66 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { locationTypeForTeam } from "@/lib/scheduling/location-type";
 
 const LocationTypeZ = z.enum(["residential", "host_home", "day_site", "community"]);
+
+/**
+ * `teams` is the source of truth for homes. Whenever a home is created or
+ * edited in Homes & Teams, mirror it into `locations` (name = team_name,
+ * type mapped from setting/team_type, address carried over) so the
+ * scheduler's Locations panel and coverage requirements always list real
+ * homes — never staff-role labels or hand-typed strays.
+ */
+export const syncTeamToLocation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { organizationId: string; teamId: string; previousName?: string }) =>
+    z.object({
+      organizationId: z.string().uuid(),
+      teamId: z.string().uuid(),
+      previousName: z.string().optional(),
+    }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: team, error: tErr } = await context.supabase
+      .from("teams")
+      .select("id, organization_id, team_name, setting, team_type, address, active")
+      .eq("id", data.teamId)
+      .eq("organization_id", data.organizationId)
+      .maybeSingle();
+    if (tErr) throw tErr;
+    if (!team) throw new Error("Team not found in this organization");
+
+    const desired = {
+      organization_id: data.organizationId,
+      name: team.team_name as string,
+      type: locationTypeForTeam(team.setting as string | null, (team as { team_type?: string | null }).team_type),
+      address: (team as { address?: string | null }).address ?? null,
+      active: (team as { active?: boolean | null }).active ?? true,
+    };
+
+    // Match the existing locations row by current name, falling back to the
+    // pre-rename name. locations has no (org, name) unique constraint, so we
+    // resolve by lookup rather than upsert.
+    const namesToTry = [desired.name, ...(data.previousName ? [data.previousName] : [])];
+    for (const name of namesToTry) {
+      const { data: existing } = await context.supabase
+        .from("locations")
+        .select("id")
+        .eq("organization_id", data.organizationId)
+        .eq("name", name)
+        .maybeSingle();
+      if (existing) {
+        const { data: row, error } = await context.supabase
+          .from("locations").update(desired).eq("id", existing.id).select("*").single();
+        if (error) throw error;
+        return row;
+      }
+    }
+    const { data: row, error } = await context.supabase
+      .from("locations").insert(desired).select("*").single();
+    if (error) throw error;
+    return row;
+  });
 
 export const listLocations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

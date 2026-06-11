@@ -100,19 +100,29 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
       .eq("client_id", data.clientId);
     const assignedSet = new Set((assigns ?? []).map((a: any) => a.staff_id));
 
-    // 4) host staff for this location (host_home)
+    // 4) host staff for this location (host_home). Locations mirror teams
+    // (name = team_name), so resolve the home's team and read its care-team
+    // rows — never the legacy home_designations role labels.
     let hostSet = new Set<string>();
     if (data.locationId) {
       const { data: loc } = await supabase
         .from("locations")
-        .select("id, type, legacy_home_designation_id")
+        .select("id, name, type")
         .eq("id", data.locationId).maybeSingle();
-      if (loc?.type === "host_home" && loc.legacy_home_designation_id) {
-        const { data: hosts } = await supabase
-          .from("home_staff_designations")
-          .select("user_id")
-          .eq("designation_id", loc.legacy_home_designation_id);
-        hostSet = new Set((hosts ?? []).map((h: any) => h.user_id));
+      if (loc?.type === "host_home" && loc.name) {
+        const { data: team } = await supabase
+          .from("teams")
+          .select("id")
+          .eq("organization_id", orgId)
+          .eq("team_name", loc.name)
+          .maybeSingle();
+        if (team?.id) {
+          const { data: hosts } = await supabase
+            .from("home_staff_designations")
+            .select("staff_id")
+            .eq("team_id", team.id);
+          hostSet = new Set((hosts ?? []).map((h: any) => h.staff_id));
+        }
       }
     }
 

@@ -66,17 +66,19 @@ export function ShiftCreateDialog({
       setStaffId(null);
       setOverride("");
       setAwake(false);
+      setPickedLocationId(locationId ?? null);
       const base = initialDay ? new Date(initialDay) : new Date();
       base.setHours(9, 0, 0, 0);
       const end = new Date(base); end.setHours(base.getHours() + 4);
       setStartPicker(toLocalIso(base));
       setEndPicker(toLocalIso(end));
     }
-  }, [open, initialClientId, initialDay]);
+  }, [open, initialClientId, initialDay, locationId]);
 
   const createCall = useServerFn(createShift);
   const rankCall = useServerFn(rankStaffForShift);
   const listCodesCall = useServerFn(listClientAuthorizedCodes);
+  const listLocCall = useServerFn(listLocations);
 
   const codesQ = useQuery({
     enabled: open && !!clientId,
@@ -84,9 +86,17 @@ export function ShiftCreateDialog({
     queryFn: () => listCodesCall({ data: { organizationId, clientId: clientId! } }),
   });
 
+  const locsQ = useQuery({
+    enabled: open,
+    queryKey: ["locations", organizationId],
+    queryFn: () => listLocCall({ data: { organizationId } }),
+  });
+
+  const effectiveLocationId = pickedLocationId ?? locationId ?? null;
+
   const rankQ = useQuery({
     enabled: open && step === "staff" && !!clientId && !!code && !!startPicker && !!endPicker,
-    queryKey: ["rank-staff", organizationId, clientId, code, startPicker, endPicker, locationId],
+    queryKey: ["rank-staff", organizationId, clientId, code, startPicker, endPicker, effectiveLocationId],
     queryFn: () => rankCall({
       data: {
         organizationId,
@@ -94,7 +104,7 @@ export function ShiftCreateDialog({
         serviceCode: code!,
         startsAtIso: pickerToIso(startPicker),
         endsAtIso: pickerToIso(endPicker),
-        locationId: locationId ?? null,
+        locationId: effectiveLocationId,
       },
     }),
   });

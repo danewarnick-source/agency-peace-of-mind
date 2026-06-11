@@ -42,19 +42,32 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
     const weekEnd = new Date(weekStart);
     weekEnd.setUTCDate(weekStart.getUTCDate() + 7);
 
-    // 1) active org members
+    // 1) active org members → profile fields (two-step; no FK between organization_members and profiles)
     const { data: members, error: mErr } = await supabase
       .from("organization_members")
-      .select("user_id, active, profiles:profiles!inner(id, full_name, date_of_birth)")
+      .select("user_id, active")
       .eq("organization_id", orgId)
       .eq("active", true);
     if (mErr) throw mErr;
-    const memberRows = (members ?? []).map((m: any) => ({
-      id: m.profiles?.id as string,
-      full_name: (m.profiles?.full_name as string | null) ?? null,
-      date_of_birth: (m.profiles?.date_of_birth as string | null) ?? null,
-      active: !!m.active,
-    })).filter((r) => r.id);
+    const userIds = (members ?? []).map((m: any) => m.user_id).filter(Boolean);
+    let profilesById = new Map<string, { id: string; full_name: string | null; date_of_birth: string | null }>();
+    if (userIds.length) {
+      const { data: profs, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, full_name, date_of_birth")
+        .in("id", userIds);
+      if (pErr) throw pErr;
+      profilesById = new Map((profs ?? []).map((p: any) => [p.id, p]));
+    }
+    const memberRows = (members ?? []).map((m: any) => {
+      const p = profilesById.get(m.user_id);
+      return {
+        id: m.user_id as string,
+        full_name: (p?.full_name as string | null) ?? null,
+        date_of_birth: (p?.date_of_birth as string | null) ?? null,
+        active: !!m.active,
+      };
+    }).filter((r) => r.id);
 
     if (memberRows.length === 0) return [];
 

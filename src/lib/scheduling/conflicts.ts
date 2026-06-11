@@ -176,6 +176,7 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
   // ---- POLICY rules per-shift ----
   for (const s of shifts) {
     if (s.status === "cancelled" || s.status === "declined") continue;
+    if (!s.staff_id) continue; // open shift — staff-specific rules don't apply
     const staff = ctx.staff[s.staff_id];
     const dur = hoursBetween(s.starts_at, s.ends_at);
     const code = (s.service_code ?? "").toUpperCase();

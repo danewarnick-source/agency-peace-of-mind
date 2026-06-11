@@ -112,7 +112,10 @@ export const updateShift = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), patch: z.record(z.unknown()) }).parse(d))
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase
-      .from("scheduled_shifts").update(data.patch).eq("id", data.id).select("*").single();
+      .from("scheduled_shifts")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .update(data.patch as any)
+      .eq("id", data.id).select("*").single();
     if (error) throw error;
     return row;
   });

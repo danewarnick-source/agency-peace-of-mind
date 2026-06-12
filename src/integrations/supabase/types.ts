@@ -10932,6 +10932,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_permission: {
+        Args: { _org_id: string; _perm: string; _user_id: string }
+        Returns: boolean
+      }
       hybrid_search_timesheets: {
         Args: {
           _org: string

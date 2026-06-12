@@ -252,14 +252,6 @@ export function ReferralsPage() {
                             </div>
                           </div>
                         )}
-                              type="button"
-                              className="text-[11px] text-muted-foreground hover:text-foreground"
-                              onClick={() => setDetailId(r.id)}
-                            >
-                              Activity →
-                            </button>
-                          </div>
-                        )}
                         {r.stage === "decision" && r.decision_outcome && (
                           <div className="mt-2 text-[11px] text-muted-foreground">
                             Outcome:{" "}

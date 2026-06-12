@@ -2524,6 +2524,65 @@ export type Database = {
         }
         Relationships: []
       }
+      contractor_monthly_pay: {
+        Row: {
+          additional_pay: number
+          created_at: string
+          id: string
+          month: number
+          net_pay: number
+          notes: string | null
+          organization_id: string
+          staff_id: string
+          tax_federal: number
+          tax_fica: number
+          tax_state: number
+          updated_at: string
+          updated_by: string | null
+          year: number
+        }
+        Insert: {
+          additional_pay?: number
+          created_at?: string
+          id?: string
+          month: number
+          net_pay?: number
+          notes?: string | null
+          organization_id: string
+          staff_id: string
+          tax_federal?: number
+          tax_fica?: number
+          tax_state?: number
+          updated_at?: string
+          updated_by?: string | null
+          year: number
+        }
+        Update: {
+          additional_pay?: number
+          created_at?: string
+          id?: string
+          month?: number
+          net_pay?: number
+          notes?: string | null
+          organization_id?: string
+          staff_id?: string
+          tax_federal?: number
+          tax_fica?: number
+          tax_state?: number
+          updated_at?: string
+          updated_by?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contractor_monthly_pay_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_assignments: {
         Row: {
           assigned_by: string | null

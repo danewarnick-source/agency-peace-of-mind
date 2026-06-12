@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { RequireRole } from "@/components/rbac-guard";
-import { Receipt, Users, FileSpreadsheet, Upload, CreditCard, Sparkles, Grid3x3, Home } from "lucide-react";
+import { Receipt, Users, FileSpreadsheet, Upload, CreditCard, Sparkles, Grid3x3, Home, HardHat } from "lucide-react";
 import { NectarBillingReadinessBar } from "@/components/billing/nectar-billing-readiness-bar";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Permission } from "@/lib/rbac";
@@ -18,6 +18,7 @@ const TABS: Array<{ to: string; label: string; icon: typeof Users; exact?: boole
   { to: "/dashboard/billing", label: "Overview", icon: Users, exact: true },
   { to: "/dashboard/billing/monthly-grid", label: "Monthly Grid", icon: Grid3x3 },
   { to: "/dashboard/billing/host-home", label: "Host Home", icon: Home },
+  { to: "/dashboard/billing/contractors", label: "Contractors", icon: HardHat },
   { to: "/dashboard/billing/nectar", label: "NECTAR", icon: Sparkles },
   { to: "/dashboard/billing/form520", label: "520 Form", icon: FileSpreadsheet },
   { to: "/dashboard/billing/imports", label: "Imports / Authorizations", icon: Upload },

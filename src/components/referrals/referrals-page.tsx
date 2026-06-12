@@ -123,13 +123,34 @@ export function ReferralsPage() {
         </div>
         {orgId && (
           <div className="flex flex-wrap gap-2">
+            <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setView("active")}
+                className={`rounded px-3 py-1 ${view === "active" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("archived")}
+                className={`rounded px-3 py-1 ${view === "archived" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Archived
+              </button>
+            </div>
             <ProviderInterestOutlineButton organizationId={orgId} />
             <NewReferralDialog organizationId={orgId} />
           </div>
         )}
       </div>
 
+      {view === "archived" && orgId ? (
+        <ArchivedReferralsList organizationId={orgId} />
+      ) : (
+        <>
       <PipelineStatsBar stats={stats.data} />
+
 
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

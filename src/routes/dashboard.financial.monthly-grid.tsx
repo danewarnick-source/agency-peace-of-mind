@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
 import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { fmtHours, fmtUSD, fmtUnits, unitsToHours, computeEntryUnits, UNITS_PER_HOUR } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, Users2, GraduationCap, Info, Briefcase } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { BillingDetailDialog } from "@/components/financial/billing-detail-dialog";
 
 export const Route = createFileRoute("/dashboard/financial/monthly-grid")({
   head: () => ({ meta: [{ title: "Monthly Grid — HIVE" }] }),

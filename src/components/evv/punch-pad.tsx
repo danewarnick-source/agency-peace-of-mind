@@ -149,8 +149,10 @@ export function PunchPad({
   // Single watchPosition — no redundant getCurrentPosition call.
   // Two-stage: high-accuracy watch, then low-accuracy fallback after 4 s.
   const [livePos, setLivePos] = useState<{ lat: number; lng: number; acc: number } | null>(null);
+  const livePosRef = useRef<{ lat: number; lng: number; acc: number } | null>(null);
   const [hardwareDenied, setHardwareDenied] = useState(false);
   const [gpsAcquiring, setGpsAcquiring] = useState(true);
+  const [awaitingGps, setAwaitingGps] = useState(false);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
@@ -168,7 +170,9 @@ export function PunchPad({
       gotFix = true;
       setHardwareDenied(false);
       setGpsAcquiring(false);
-      setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
+      const next = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+      livePosRef.current = next;
+      setLivePos(next);
     };
     const onErr = (err: GeolocationPositionError) => {
       if (cancelled) return;
@@ -263,6 +267,7 @@ export function PunchPad({
   const [baselineChecked, setBaselineChecked]   = useState(false);
   const [narrative, setNarrative]               = useState("");
   const [showNarrativeError, setShowNarrativeError] = useState(false);
+  const [longShiftAck, setLongShiftAck]         = useState(false);
 
   // ── NECTAR Documentation Coach state ────────────────────────────────────────────
   const [aiBusy, setAiBusy]               = useState(false);
@@ -730,7 +735,12 @@ export function PunchPad({
   const nectarConfirmOk    = !nectarUsed || draftConfirmed;
   const behaviorError      = behaviorEnabled ? validateBehaviorAnswers(behaviorAnswers) : null;
   const behaviorOk         = behaviorError === null;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && !busy;
+  const liveDurationMs = active
+    ? Math.max(0, now - new Date(active.clock_in_timestamp).getTime())
+    : 0;
+  const isLongShift = liveDurationMs > 16 * 60 * 60 * 1000;
+  const longShiftOk = !isLongShift || longShiftAck;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && !busy;
 
 
   function openCompliance() {
@@ -754,6 +764,7 @@ export function PunchPad({
     setDismissingKey(null);
     setDismissReasonDraft("");
     setBehaviorAnswers(emptyBehaviorAnswers);
+    setLongShiftAck(false);
     stopRecording();
     setShowCompliance(true);
   }
@@ -1038,7 +1049,7 @@ export function PunchPad({
 
 
   async function finalizeClockOut(args: {
-    pos: { lat: number; lng: number; acc: number };
+    pos: { lat: number; lng: number; acc: number } | null;
     outsideReason?: string;
     aiStatus?: "Verified" | "Flagged" | "Exception";
     aiFeedback?: string;
@@ -1054,7 +1065,9 @@ export function PunchPad({
     const clockOut = new Date().toISOString();
     const update: Record<string, unknown> = {
       clock_out_timestamp:  clockOut,
-      gps_out_coordinates:  { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc },
+      gps_out_coordinates:  args.pos
+        ? { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc }
+        : { latitude: null, longitude: null, accuracy_meters: null },
       status:               "Pending",
       timezone_setting:     "America/Denver",
       shift_note_text:      narrative.trim(),
@@ -1243,15 +1256,30 @@ export function PunchPad({
 
     setBusy(true);
     try {
-      if (hardwareDenied) {
-        toast.error("Location access blocked. Open device Settings, enable location for this browser, then try again.");
-        return;
+      const isEvv = isEvvLockedCode(active.service_type_code);
+
+      // Sequence GPS acquisition: never block a non-EVV clock-out on a fix.
+      let pos = livePosRef.current ?? livePos;
+      if (!pos && isEvv) {
+        if (hardwareDenied) {
+          toast.error("Location access blocked. Check that location permission is enabled, then try again.");
+          return;
+        }
+        setAwaitingGps(true);
+        try {
+          const deadline = Date.now() + 15_000;
+          while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 250));
+            if (livePosRef.current) { pos = livePosRef.current; break; }
+          }
+        } finally {
+          setAwaitingGps(false);
+        }
+        if (!pos) {
+          toast.error("Couldn't get a location fix. Check that location permission is enabled, then try again.");
+          return;
+        }
       }
-      if (!livePos) {
-        toast.error("Still acquiring GPS — please wait a moment and try again.");
-        return;
-      }
-      const pos = livePos;
 
       // Symmetric geofence check on clock-out — EVV-locked codes only.
       const refClient = lockedClient ?? (() => {
@@ -1269,7 +1297,8 @@ export function PunchPad({
       const radius = refClient?.geofenceRadiusFeet ?? 1000;
 
       if (
-        isEvvLockedCode(active.service_type_code) &&
+        pos &&
+        isEvv &&
         typeof lat === "number" && typeof lng === "number" &&
         isFinite(lat) && isFinite(lng)
       ) {
@@ -2396,6 +2425,46 @@ export function PunchPad({
 
             <div className="shrink-0 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
               <div className="flex flex-col gap-2">
+                {isLongShift && (
+                  <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-100">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div className="space-y-2">
+                        <p>
+                          This shift shows <span className="font-mono font-semibold">{elapsed}</span>. If you forgot to clock out, don't submit — tell your supervisor so the times can be corrected. Submitting confirms these times are accurate.
+                        </p>
+                        <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 cursor-pointer accent-amber-600"
+                            checked={longShiftAck}
+                            onChange={(e) => setLongShiftAck(e.target.checked)}
+                          />
+                          These times are accurate
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center justify-end text-[11px]">
+                  {hardwareDenied ? (
+                    <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-800 dark:text-amber-200">
+                      ⚠️ Location blocked — check device permission
+                    </span>
+                  ) : awaitingGps ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Getting location…
+                    </span>
+                  ) : livePos ? (
+                    <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-800 dark:text-emerald-200">
+                      📍 Location ready ✓
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-muted-foreground">
+                      📍 Acquiring location…
+                    </span>
+                  )}
+                </div>
                 <div
                   className="w-full"
                   onMouseEnter={() => { if (!narrativeOk) setShowNarrativeError(true); }}
@@ -2410,6 +2479,8 @@ export function PunchPad({
                     {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {aiBusy
                       ? "🧠 NECTAR Coach reviewing your note…"
+                      : awaitingGps
+                      ? "Getting location…"
                       : aiCoach?.status === "Flagged"
                       ? "🔁 Re-Check with NECTAR Coach"
                       : "💾 Submit Final Timesheet"}

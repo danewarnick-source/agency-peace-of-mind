@@ -23,7 +23,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle, CheckCircle2, Skull, Clock, Phone, FileCheck2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Skull, Clock, Phone, FileCheck2, MessageSquare } from "lucide-react";
+import { LogScRequestDialog, RespondScRequestDialog } from "./sc-request-dialogs";
+import { IncidentTrendsStrip, type TrendFilter } from "./incident-trends-strip";
 
 type Incident = {
   id: string;
@@ -49,6 +51,16 @@ type Incident = {
   followup_notes: string | null;
   created_at: string;
   clients: { first_name: string; last_name: string } | null;
+};
+
+type ScRequest = {
+  id: string;
+  incident_id: string;
+  requested_at: string;
+  request_summary: string;
+  responded_at: string | null;
+  response_summary: string | null;
+  responded_by: string | null;
 };
 
 // 5 business days from a discovery timestamp (skip Sat/Sun).

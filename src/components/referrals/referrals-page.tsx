@@ -152,7 +152,11 @@ export function ReferralsPage() {
                         className="rounded-md border border-border bg-background p-3 text-sm"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
+                          <button
+                            type="button"
+                            className="min-w-0 flex-1 text-left"
+                            onClick={() => setDetailId(r.id)}
+                          >
                             <div className="truncate font-medium">
                               {r.first_name}
                               {r.age != null && (
@@ -166,12 +170,17 @@ export function ReferralsPage() {
                                 {loc}
                               </div>
                             )}
+                          </button>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <ReferralStageBadge
+                              stage={(r.stage ?? "new") as ReferralStage}
+                            />
+                            {r.due_date && (
+                              <Badge variant="outline" className="text-[10px]">
+                                Due {r.due_date}
+                              </Badge>
+                            )}
                           </div>
-                          {r.due_date && (
-                            <Badge variant="outline" className="shrink-0">
-                              Due {r.due_date}
-                            </Badge>
-                          )}
                         </div>
                         {sc && (
                           <div className="mt-1 truncate text-xs text-muted-foreground">
@@ -188,6 +197,31 @@ export function ReferralsPage() {
                             ))}
                           </div>
                         )}
+                        {orgId && (
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <StageAdvancer
+                              organizationId={orgId}
+                              referralId={r.id}
+                              currentStage={(r.stage ?? "new") as ReferralStage}
+                            />
+                            <button
+                              type="button"
+                              className="text-[11px] text-muted-foreground hover:text-foreground"
+                              onClick={() => setDetailId(r.id)}
+                            >
+                              Activity →
+                            </button>
+                          </div>
+                        )}
+                        {r.stage === "decision" && r.decision_outcome && (
+                          <div className="mt-2 text-[11px] text-muted-foreground">
+                            Outcome:{" "}
+                            <span className="font-medium">
+                              {r.decision_outcome}
+                            </span>
+                            {r.decision_reason ? ` — ${r.decision_reason}` : ""}
+                          </div>
+                        )}
                       </li>
                     );
                   })}
@@ -197,6 +231,15 @@ export function ReferralsPage() {
           );
         })}
       </div>
+
+      {orgId && (
+        <ReferralDetailDialog
+          organizationId={orgId}
+          referralId={detailId}
+          open={!!detailId}
+          onOpenChange={(o) => !o && setDetailId(null)}
+        />
+      )}
     </div>
   );
 }

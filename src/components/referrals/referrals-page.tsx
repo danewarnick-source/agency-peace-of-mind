@@ -241,6 +241,11 @@ export function ReferralsPage() {
                             <ReferralStageBadge
                               stage={(r.stage ?? "new") as ReferralStage}
                             />
+                            {r.source === "email" && (
+                              <Badge className="bg-amber-100 text-[10px] text-amber-900 hover:bg-amber-100">
+                                Auto-ingested — review
+                              </Badge>
+                            )}
                             {r.due_date && (
                               <Badge variant="outline" className="text-[10px]">
                                 Due {r.due_date}
@@ -271,6 +276,12 @@ export function ReferralsPage() {
                               currentStage={(r.stage ?? "new") as ReferralStage}
                             />
                             <div className="flex items-center gap-3">
+                              {r.source === "email" && (
+                                <DiscardIngestedButton
+                                  organizationId={orgId}
+                                  referralId={r.id}
+                                />
+                              )}
                               <ArchiveReferralButton organizationId={orgId} referralId={r.id} />
                               <button
                                 type="button"

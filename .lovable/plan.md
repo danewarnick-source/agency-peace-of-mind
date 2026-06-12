@@ -1,11 +1,11 @@
-1. Confirm whether the failing screen is the static share preview artifact rather than the live editor preview.
-2. Capture and report the exact preview error text verbatim, along with where it appears.
-3. Review only build-related project files that can affect preview generation: package scripts, lockfiles, Vite config, Wrangler config, and Lovable project metadata.
-4. If evidence points to a tooling/config issue, apply the smallest possible config-only fix without touching application code, routes, components, lib files, or recent feature commits.
-5. Rebuild/verify the preview path after the config-only fix and report the result.
-6. If the failure instead traces to application code, stop and report only the file and exact error message for source-team follow-up.
+1. Reset the preview entry away from the webhook route `/api/public/hooks/nectar-schedules` and back to a user-facing route such as `/login`, `/admin`, or `/dashboard`.
+2. Verify whether the portal loads normally once the preview starts on an app route instead of a public hook endpoint.
+3. Reproduce the `Invariant failed` runtime error on the actual portal route and capture the exact route/component responsible.
+4. Inspect the portal entry chain only: `src/routes/admin.tsx`, `src/lib/role-entry.tsx`, auth/bootstrap redirects, and any route navigation logic involved in entering HIVE.
+5. If the issue is preview/session routing only, apply the smallest route/preview-safe fix so the editor opens into the portal again.
+6. If the issue is real app code, identify the exact file and error source before any broader changes.
 
 Technical details
-- Evidence so far: the live editor preview URL loads, while the share preview URL shows the placeholder message.
-- Current repo review found no obvious preview-config break in `package.json`, `vite.config.ts`, `wrangler.jsonc`, or `.lovable/project.json`.
-- Because plan mode forbids edits/build steps, the next phase would be a minimal implementation pass only if a true tooling fault is established.
+- Current session replay shows the preview opening at `https://id-preview--.../api/public/hooks/nectar-schedules`, which is a webhook endpoint, not the HIVE portal.
+- The portal routes still exist in the codebase: `/login`, `/admin`, and `/dashboard`.
+- Separate signal present: a client runtime error `Invariant failed` in the preview bundle, which likely needs to be traced from the portal entry path after the preview is pointed at the correct route.

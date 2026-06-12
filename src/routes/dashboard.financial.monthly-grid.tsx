@@ -378,110 +378,112 @@ function MonthlyGridPage() {
         </div>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
-        <div className="space-y-4">
-          <GridSection
-            title="Direct Support"
-            subtitle="Hourly + per-visit codes (SLN, SLH, DSI, SEI, CHA, COM, etc.)"
-            rows={directRows}
-            asOf={asOf}
-          />
-          <GridSection
-            title="RHS"
-            subtitle="Residential daily-rate code (RHS)"
-            rows={rhsRows}
-            asOf={asOf}
-          />
-          <GridSection
-            title="Host Home"
-            subtitle="Daily-rate host-home codes (HHS, PPS)"
-            rows={hostRows}
-            asOf={asOf}
-          />
-
-          <section className="rounded-2xl border border-dashed border-border bg-card p-4 shadow-sm">
-            <header className="mb-3 flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-display text-base font-semibold">Admin / Training hours</h3>
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
-                Non-billable
-              </span>
-            </header>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Employer time from <code>general_shifts</code> (admin, training, meetings, travel). These hours are <strong>never</strong> added to billing totals.
-            </p>
-            {generalShiftHours.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No admin / training time logged this month.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/40 text-left uppercase text-muted-foreground">
-                    <tr>
-                      <th className="px-2 py-1.5">Staff</th>
-                      <th className="px-2 py-1.5 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {generalShiftHours.map((s) => (
-                      <tr key={s.userId} className="border-t border-border">
-                        <td className="px-2 py-1.5 font-medium">
-                          {s.name}
-                          <div className="mt-0.5 flex flex-wrap gap-1">
-                            {s.categories.map(([cat, h]) => (
-                              <span key={cat} className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                {cat} · {fmtHours(h)}h
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{fmtHours(s.total)}h</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-muted/40">
-                    <tr>
-                      <td className="px-2 py-1.5 font-semibold uppercase text-muted-foreground">Section total</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums font-bold">
-                        {fmtHours(generalShiftHours.reduce((sum, s) => sum + s.total, 0))}h
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </section>
-        </div>
-
-        <aside className="space-y-3">
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <h3 className="font-display text-sm font-semibold">Total by code · {monthLabel}</h3>
-            <p className="mb-3 text-xs text-muted-foreground">Auto-derived from EVV (read-only).</p>
-            {rollup.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No EVV activity this month.</p>
-            ) : (
-              <ul className="space-y-1.5 text-xs">
-                {rollup.map(([code, v]) => (
-                  <li key={code} className="flex items-center justify-between gap-2 border-b border-dashed border-border/60 pb-1.5 last:border-0">
-                    <span className="font-mono font-semibold">{code}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {fmtUnits(v.units)} u
-                      {v.hours > 0 && ` · ${fmtHours(v.hours)} h`}
-                    </span>
-                    <span className="tabular-nums font-semibold">{fmtUSD(v.toBill)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="rounded-2xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-            <div className="mb-1 flex items-center gap-1 font-semibold text-foreground">
-              <Info className="h-3.5 w-3.5" /> About this grid
+      {/* Horizontal totals pill */}
+      <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-xs font-semibold text-muted-foreground shrink-0">Total by code · {monthLabel}</span>
+          {rollup.length === 0 ? (
+            <span className="text-xs text-muted-foreground">No EVV activity this month.</span>
+          ) : (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {rollup.map(([code, v]) => (
+                <span key={code} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs">
+                  <span className="font-mono font-semibold">{code}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {fmtUnits(v.units)} u
+                    {v.hours > 0 && ` · ${fmtHours(v.hours)} h`}
+                  </span>
+                  <span className="tabular-nums font-semibold">{fmtUSD(v.toBill)}</span>
+                </span>
+              ))}
             </div>
-            Units = <code>computeEntryUnits</code> summed per EVV entry (quarter-hour codes) or
-            billable days from <code>hhs_daily_records_v</code> (daily codes). Rates resolve via
-            <code> get_rate_as_of</code>. EVV tables are read-only here.
-          </div>
-        </aside>
+          )}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted/40">
+                  <Info className="h-3 w-3" /> About this grid
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-sm text-xs">
+                Units = computeEntryUnits summed per EVV entry (quarter-hour codes) or billable days from hhs_daily_records_v (daily codes). Rates resolve via get_rate_as_of. EVV tables are read-only here.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <GridSection
+          title="Direct Support"
+          subtitle="Hourly + per-visit codes (SLN, SLH, DSI, SEI, CHA, COM, etc.)"
+          rows={directRows}
+          asOf={asOf}
+        />
+        <GridSection
+          title="RHS"
+          subtitle="Residential daily-rate code (RHS)"
+          rows={rhsRows}
+          asOf={asOf}
+        />
+        <GridSection
+          title="Host Home"
+          subtitle="Daily-rate host-home codes (HHS, PPS)"
+          rows={hostRows}
+          asOf={asOf}
+        />
+
+        <section className="rounded-2xl border border-dashed border-border bg-card p-4 shadow-sm">
+          <header className="mb-3 flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-display text-base font-semibold">Admin / Training hours</h3>
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+              Non-billable
+            </span>
+          </header>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Employer time from <code>general_shifts</code> (admin, training, meetings, travel). These hours are <strong>never</strong> added to billing totals.
+          </p>
+          {generalShiftHours.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No admin / training time logged this month.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/40 text-left uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-1.5">Staff</th>
+                    <th className="px-2 py-1.5 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {generalShiftHours.map((s) => (
+                    <tr key={s.userId} className="border-t border-border">
+                      <td className="px-2 py-1.5 font-medium">
+                        {s.name}
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {s.categories.map(([cat, h]) => (
+                            <span key={cat} className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                              {cat} · {fmtHours(h)}h
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{fmtHours(s.total)}h</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-muted/40">
+                  <tr>
+                    <td className="px-2 py-1.5 font-semibold uppercase text-muted-foreground">Section total</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums font-bold">
+                      {fmtHours(generalShiftHours.reduce((sum, s) => sum + s.total, 0))}h
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

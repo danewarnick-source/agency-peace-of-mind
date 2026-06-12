@@ -95,7 +95,7 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
         .eq("organization_id", organizationId),
       supabase
         .from("evv_timesheets")
-        .select("organization_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+        .select("organization_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, review_status, corrected_clock_in, corrected_clock_out")
         .eq("organization_id", organizationId)
         .gte("clock_in_timestamp", `${yearStart}T00:00:00Z`)
         .lt("clock_in_timestamp", `${yearEndExclusive}T00:00:00Z`)

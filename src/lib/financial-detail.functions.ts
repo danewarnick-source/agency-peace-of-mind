@@ -389,16 +389,18 @@ export const getMonthlyGridShiftDetail = createServerFn({ method: "POST" })
       if (t.client_id !== data.clientId) continue;
       if (t.service_type_code !== data.serviceCode) continue;
       if (!t.clock_out_timestamp) continue;
-      const u = computeEntryUnits(t.clock_in_timestamp, t.clock_out_timestamp);
+      const eff = effectiveBillingTimes(t);
+      if (!eff) continue;
+      const u = computeEntryUnits(eff.in, eff.out);
       if (u <= 0) continue;
       totalUnits += u;
       shifts.push({
         shiftId: t.id,
         staffId: t.staff_id,
         staffName: t.staff_id ? staffNames.get(t.staff_id) ?? t.staff_id.slice(0, 8) : "—",
-        date: t.clock_in_timestamp.slice(0, 10),
-        clockIn: t.clock_in_timestamp,
-        clockOut: t.clock_out_timestamp,
+        date: eff.in.slice(0, 10),
+        clockIn: eff.in,
+        clockOut: eff.out,
         hours: Math.round((u / UNITS_PER_HOUR) * 100) / 100,
         units: u,
         amount: Math.round(u * rate * 100) / 100,

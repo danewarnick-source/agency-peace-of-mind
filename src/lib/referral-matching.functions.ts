@@ -128,11 +128,12 @@ function mentionsAny(hay: string, needles: string[]): boolean {
   return needles.some((n) => hay.includes(n));
 }
 
-// Score location 0–10 + reason.
+// Score location 0–10 + reason. Returns scored=false when referral has
+// no city AND no county (UNKNOWN) — caller will exclude from the blend.
 function scoreLocation(
   r: Referral,
   outline: Outline,
-): { score: number; reasons: MatchReason[] } {
+): { score: number; reasons: MatchReason[]; scored: boolean } {
   const reasons: MatchReason[] = [];
   const city = norm(r.location_city);
   const county = norm(r.location_county);
@@ -147,7 +148,17 @@ function scoreLocation(
         "unspecified"
       } is fine.`,
     });
-    return { score: 10, reasons };
+    return { score: 10, reasons, scored: true };
+  }
+
+  // Provider has a location preference, but referral has no location at all.
+  if (!city && !county) {
+    reasons.push({
+      category: "location",
+      severity: "neutral",
+      text: "Location unknown on referral — not scored.",
+    });
+    return { score: 0, reasons, scored: false };
   }
 
   if (outline.location_mode === "county") {
@@ -157,7 +168,7 @@ function scoreLocation(
         severity: "positive",
         text: `Location: ${r.location_county} matches your county preference (full).`,
       });
-      return { score: 10, reasons };
+      return { score: 10, reasons, scored: true };
     }
     reasons.push({
       category: "location",
@@ -166,7 +177,7 @@ function scoreLocation(
         r.location_county || r.location_city || "referral"
       } is outside your county preferences (${(outline.location_values ?? []).join(", ") || "none"}).`,
     });
-    return { score: 3, reasons };
+    return { score: 3, reasons, scored: true };
   }
 
   // city mode
@@ -176,7 +187,7 @@ function scoreLocation(
       severity: "positive",
       text: `Location: ${r.location_city} is a preferred city (full match).`,
     });
-    return { score: 10, reasons };
+    return { score: 10, reasons, scored: true };
   }
   if (county && values.some((v) => v.includes(county))) {
     reasons.push({
@@ -184,7 +195,7 @@ function scoreLocation(
       severity: "neutral",
       text: `Location: ${r.location_city || r.location_county} shares county with your preferences (partial).`,
     });
-    return { score: 6, reasons };
+    return { score: 6, reasons, scored: true };
   }
   reasons.push({
     category: "location",
@@ -193,8 +204,9 @@ function scoreLocation(
       r.location_city || r.location_county || "referral"
     } is outside your preferred cities.`,
   });
-  return { score: 2, reasons };
+  return { score: 2, reasons, scored: true };
 }
+
 
 // Score one host vs referral. Returns 0–10 + reasons.
 function scoreHost(

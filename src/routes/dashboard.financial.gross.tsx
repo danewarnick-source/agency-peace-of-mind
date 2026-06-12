@@ -36,6 +36,7 @@ type CtrPay = { year: number; month: number; net_pay: number; additional_pay: nu
 
 function GrossPage() {
   const { data: org } = useCurrentOrg();
+  const { prefixLabel } = useOrgDisplayName();
   const today = new Date();
   const [startYear, setStartYear] = useState(today.getFullYear() - 2);
   const [endYear, setEndYear] = useState(today.getFullYear() + 1);

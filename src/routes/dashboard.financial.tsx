@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { RequireRole } from "@/components/rbac-guard";
-import { LineChart, TrendingUp } from "lucide-react";
+import { TrendingUp, Grid3x3, Home, HardHat, TableProperties, BarChart3, PieChart, LineChart } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/financial")({
   head: () => ({ meta: [{ title: "Financial — HIVE" }] }),
@@ -11,11 +11,17 @@ export const Route = createFileRoute("/dashboard/financial")({
   ),
 });
 
-const TABS: Array<{ to: string; label: string; disabled?: boolean }> = [
-  { to: "/dashboard/financial/revenue", label: "Revenue" },
+const TABS: Array<{ to: string; label: string; icon: typeof Grid3x3; disabled?: boolean }> = [
+  { to: "/dashboard/financial/revenue", label: "Revenue", icon: LineChart },
+  { to: "/dashboard/billing/monthly-grid", label: "Monthly Grid", icon: Grid3x3 },
+  { to: "/dashboard/billing/host-home", label: "Host Home", icon: Home },
+  { to: "/dashboard/billing/contractors", label: "Contractors", icon: HardHat },
+  { to: "/dashboard/billing/totals", label: "Totals", icon: TableProperties },
+  { to: "/dashboard/billing/gross", label: "TNS Gross", icon: BarChart3 },
+  { to: "/dashboard/billing/distributions", label: "Distributions", icon: PieChart },
   // Placeholders — not built yet (see prompt: View 1 only)
-  { to: "#", label: "Profitability", disabled: true },
-  { to: "#", label: "Cash Flow", disabled: true },
+  { to: "#", label: "Profitability", icon: LineChart, disabled: true },
+  { to: "#", label: "Cash Flow", icon: LineChart, disabled: true },
 ];
 
 function FinancialLayout() {
@@ -39,6 +45,7 @@ function FinancialLayout() {
       <nav className="flex flex-wrap gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
         {TABS.map((t) => {
           const active = !t.disabled && pathname.startsWith(t.to);
+          const Icon = t.icon;
           if (t.disabled) {
             return (
               <span
@@ -46,7 +53,7 @@ function FinancialLayout() {
                 className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground/60"
                 title="Coming soon"
               >
-                <LineChart className="h-4 w-4" /> {t.label}
+                <Icon className="h-4 w-4" /> {t.label}
                 <span className="ml-1 rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
                   Soon
                 </span>
@@ -63,7 +70,7 @@ function FinancialLayout() {
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
-              <LineChart className="h-4 w-4" /> {t.label}
+              <Icon className="h-4 w-4" /> {t.label}
             </Link>
           );
         })}

@@ -1,9 +1,10 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { RequireRole } from "@/components/rbac-guard";
-import { Receipt, Users, FileSpreadsheet, Upload, CreditCard, Sparkles, Grid3x3, Home, HardHat, TableProperties, BarChart3, PieChart } from "lucide-react";
+import { Receipt, Users, FileSpreadsheet, Upload, CreditCard, Sparkles } from "lucide-react";
 import { NectarBillingReadinessBar } from "@/components/billing/nectar-billing-readiness-bar";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Permission } from "@/lib/rbac";
+
 
 export const Route = createFileRoute("/dashboard/billing")({
   head: () => ({ meta: [{ title: "Billing — HIVE" }] }),
@@ -16,12 +17,6 @@ export const Route = createFileRoute("/dashboard/billing")({
 
 const TABS: Array<{ to: string; label: string; icon: typeof Users; exact?: boolean; perm?: Permission }> = [
   { to: "/dashboard/billing", label: "Overview", icon: Users, exact: true },
-  { to: "/dashboard/billing/monthly-grid", label: "Monthly Grid", icon: Grid3x3 },
-  { to: "/dashboard/billing/host-home", label: "Host Home", icon: Home },
-  { to: "/dashboard/billing/contractors", label: "Contractors", icon: HardHat },
-  { to: "/dashboard/billing/totals", label: "Totals", icon: TableProperties },
-  { to: "/dashboard/billing/gross", label: "TNS Gross", icon: BarChart3 },
-  { to: "/dashboard/billing/distributions", label: "Distributions", icon: PieChart },
   { to: "/dashboard/billing/nectar", label: "NECTAR", icon: Sparkles },
   { to: "/dashboard/billing/form520", label: "520 Form", icon: FileSpreadsheet },
   { to: "/dashboard/billing/imports", label: "Imports / Authorizations", icon: Upload },

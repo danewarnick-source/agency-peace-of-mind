@@ -32,7 +32,7 @@ function BillingLayout() {
   const visibleTabs = TABS.filter((t) => !t.perm || can(t.perm));
 
   return (
-    <div className="space-y-4">
+    <div className="finance-dense space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

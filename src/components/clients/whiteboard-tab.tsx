@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
+import { ClientDischargeDialog } from "./client-discharge-dialog";
 import {
   getWhiteboardSnapshot,
   type WhiteboardCategory,

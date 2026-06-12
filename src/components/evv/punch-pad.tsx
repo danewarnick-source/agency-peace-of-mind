@@ -1201,6 +1201,10 @@ export function PunchPad({
       toast.error(`Behavior observations: ${behaviorError}`);
       return;
     }
+    if (!triggersResolved) {
+      toast.error("Resolve the NECTAR trigger(s) in your note before submitting.");
+      return;
+    }
 
     // NECTAR Completeness Check (Infusion only). Without infusion, basic field
     // validation above is sufficient — the cross-checks are the locked layer.

@@ -44,10 +44,8 @@ function TotalsPage() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
 
-  const yearStartIso = new Date(year, 0, 1).toISOString();
-  const yearEndIso = new Date(year + 1, 0, 1).toISOString();
-  const yearStartDate = `${year}-01-01`;
-  const yearEndDate = `${year + 1}-01-01`;
+
+
 
   // Server-fn wrappers (gated by view_financial_totals server-side)
   const fnTps = useServerFn(getTotalsTps);

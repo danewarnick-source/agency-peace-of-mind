@@ -518,6 +518,7 @@ function GridSection({
   const cellBase = "px-3 py-2 border-r border-border/30 last:border-r-0";
   const [active, setActive] = useState<{ clientId: string; clientName: string; code: string } | null>(null);
   return (
+    <>
     <section className="rounded-2xl border border-border bg-card shadow-sm">
       <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
         <div>

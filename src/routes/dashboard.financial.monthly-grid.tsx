@@ -420,18 +420,30 @@ function MonthlyGridPage() {
           subtitle="Hourly + per-visit codes (SLN, SLH, DSI, SEI, CHA, COM, etc.)"
           rows={directRows}
           asOf={asOf}
+          organizationId={org?.organization_id}
+          year={month.y}
+          month={month.m + 1}
+          providerName={providerName}
         />
         <GridSection
           title="RHS"
           subtitle="Residential daily-rate code (RHS)"
           rows={rhsRows}
           asOf={asOf}
+          organizationId={org?.organization_id}
+          year={month.y}
+          month={month.m + 1}
+          providerName={providerName}
         />
         <GridSection
           title="Host Home"
           subtitle="Daily-rate host-home codes (HHS, PPS)"
           rows={hostRows}
           asOf={asOf}
+          organizationId={org?.organization_id}
+          year={month.y}
+          month={month.m + 1}
+          providerName={providerName}
         />
 
         <section className="rounded-2xl border border-dashed border-border bg-card p-4 shadow-sm">

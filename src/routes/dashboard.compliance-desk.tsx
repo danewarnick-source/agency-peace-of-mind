@@ -158,6 +158,18 @@ type Row = {
   reconciliation_review_notes: string | null;
   reconciliation_reviewed_by: string | null;
   reconciliation_reviewed_at: string | null;
+  // ── Review-by-exception (Timeclock pass) ────────────────────────────────
+  review_status: string | null;
+  attested_accurate: boolean | null;
+  corrected_clock_in: string | null;
+  corrected_clock_out: string | null;
+  edit_reason: string | null;
+  edited_by: string | null;
+  edited_at: string | null;
+  incident_flag: boolean | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
   clients: { first_name: string; last_name: string; physical_address: string | null } | null;
   staff: { full_name: string | null; email: string | null } | null;
 };

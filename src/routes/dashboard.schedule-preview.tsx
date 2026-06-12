@@ -602,6 +602,8 @@ function SchedulePreviewPage() {
             settings={settings} onPickSite={setSiteId}
             hostHomeNames={hostHomeNames}
             reqsBySiteName={reqsBySiteName}
+            computedReqByDayBySiteName={computedReqByDayBySiteName}
+            twoToOneBySiteName={twoToOneBySiteName}
             targetsByClient={targetsByClient}
             noteDays={hostSignalsQ.data?.noteDays}
             overnightDays={hostSignalsQ.data?.overnightDays}

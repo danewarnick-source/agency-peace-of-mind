@@ -440,6 +440,21 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           )}
         </div>
 
+        {/* Nectar deterministic trigger prompt — runs on-device, blocks submit. */}
+        <NoteTriggerPrompt
+          text={note}
+          clientId={client.id}
+          date={today()}
+          onOpenForm={(kind) => {
+            navigate({
+              to: ".",
+              search: { tab: kind === "incident" ? "incident" : "prn" },
+              replace: true,
+            });
+          }}
+          onAllResolved={setTriggersResolved}
+        />
+
         {/* NECTAR Coach */}
         {(aiBusy || coach) && (
           <div className={`rounded-lg border-2 px-4 py-3 ${coach?.status === "Verified" ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
@@ -478,6 +493,12 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
             </button>
           </div>
         </div>
+
+        {/* Final attestation — required, parity with punch-pad clock-out form. */}
+        <label className="flex items-start gap-2 rounded-md border bg-muted/30 p-2 text-xs">
+          <Checkbox checked={finalAttest} onCheckedChange={(c) => setFinalAttest(!!c)} />
+          <span>I attest this note accurately reflects today's support.</span>
+        </label>
 
         {/* Action buttons */}
         <div className="space-y-2"

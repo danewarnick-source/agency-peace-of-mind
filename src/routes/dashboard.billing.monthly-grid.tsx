@@ -15,11 +15,10 @@ export const Route = createFileRoute("/dashboard/billing/monthly-grid")({
   component: MonthlyGridPage,
 });
 
-// Host-home / host-family residential codes group separately; everything else
-// = Direct Support. Matches the spec's two-section grouping.
 const HOST_HOME_CODES = new Set(["HHS", "PPS"]);
 
 type ClientRow = { id: string; first_name: string; last_name: string };
+type StaffBreakdown = { staff_id: string; name: string; units: number; hours: number };
 
 type GridRow = {
   client: ClientRow;
@@ -31,6 +30,8 @@ type GridRow = {
   used_units: number;
   remaining_units: number;
   monthly_max: number | null;
+  month_units: number;
+  staff: StaffBreakdown[];
 };
 
 function MonthlyGridPage() {
@@ -41,6 +42,8 @@ function MonthlyGridPage() {
   const monthStart = useMemo(() => new Date(month.y, month.m, 1), [month]);
   const monthEnd = useMemo(() => new Date(month.y, month.m + 1, 0), [month]);
   const asOf = monthStart.toISOString().slice(0, 10);
+  const monthEndIso = new Date(month.y, month.m + 1, 1).toISOString();
+  const monthStartIso = monthStart.toISOString();
   const monthLabel = monthStart.toLocaleString(undefined, { month: "long", year: "numeric" });
 
   const { data: codes } = useAllClientBillingCodes();
@@ -61,6 +64,7 @@ function MonthlyGridPage() {
   });
 
   // YTD usage for "Remaining Units" — same shape the overview uses.
+  // READ-ONLY against evv_timesheets / hhs_daily_records_v.
   const usageQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["mg-usage", org?.organization_id, month.y],
@@ -68,7 +72,7 @@ function MonthlyGridPage() {
       const yearStart = new Date(month.y, 0, 1).toISOString();
       const [tsRes, dlRes] = await Promise.all([
         supabase.from("evv_timesheets")
-          .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+          .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, staff_id")
           .eq("organization_id", org!.organization_id)
           .gte("clock_in_timestamp", yearStart),
         supabase.from("hhs_daily_records_v")
@@ -83,11 +87,43 @@ function MonthlyGridPage() {
     },
   });
 
-  // Bulk rate lookup for the selected month: for each (client, code) that has
-  // any history, call get_rate_as_of. Cheaper alternative for the DEMO grid:
-  // read all rate_history rows in one query and resolve client-side, matching
-  // the SQL function's logic (current row's window first, then most-recent
-  // superseded history row whose window contains the date).
+  // Profiles for staff name lookup (staff_id → display name).
+  const staffIds = useMemo(() => {
+    const set = new Set<string>();
+    const ts = (usageQ.data?.ts ?? []) as Array<{ staff_id: string | null }>;
+    for (const r of ts) if (r.staff_id) set.add(r.staff_id);
+    return [...set];
+  }, [usageQ.data]);
+
+  const profilesQ = useQuery({
+    enabled: staffIds.length > 0,
+    queryKey: ["mg-profiles", staffIds.sort().join(",")],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, first_name, last_name, full_name" as any)
+        .in("id", staffIds);
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{
+        id: string; first_name: string | null; last_name: string | null; full_name: string | null;
+      }>;
+    },
+  });
+
+  const staffNameOf = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of profilesQ.data ?? []) {
+      const n =
+        (p.first_name || p.last_name)
+          ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
+          : (p.full_name ?? p.id.slice(0, 8));
+      map.set(p.id, n);
+    }
+    return map;
+  }, [profilesQ.data]);
+
+  // Rate history for as-of resolution.
   const historyQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["mg-rate-history", org?.organization_id],
@@ -107,27 +143,25 @@ function MonthlyGridPage() {
     },
   });
 
-  // Manual units this step (replaced by EVV auto-fill in step 3).
-  const [manualUnits, setManualUnits] = useState<Record<string, number>>({});
-  const keyOf = (clientId: string, code: string) => `${clientId}::${code}`;
-
   const allRows: GridRow[] = useMemo(() => {
     if (!codes || !clientsQ.data) return [];
     const ts = (usageQ.data?.ts ?? []) as Array<{
       client_id: string; service_type_code: string | null;
-      clock_in_timestamp: string; clock_out_timestamp: string | null;
+      clock_in_timestamp: string; clock_out_timestamp: string | null; staff_id: string | null;
     }>;
     const dl = (usageQ.data?.dl ?? []) as Array<{
       client_id: string; record_date: string; service_code: string | null;
     }>;
     const history = historyQ.data ?? [];
+    const monthStartMs = monthStart.getTime();
+    const monthEndMs = new Date(monthEndIso).getTime();
 
     return clientsQ.data.flatMap((c) =>
       codes.filter((b) => b.client_id === c.id).map((code): GridRow => {
         const isDaily = isDailyServiceCode(code.service_code);
         const yearStart = new Date(month.y, 0, 1);
 
-        // YTD used.
+        // YTD used (unchanged: drives Remaining-YTD).
         let used = 0;
         if (isDaily) {
           const set = new Set<string>();
@@ -149,8 +183,42 @@ function MonthlyGridPage() {
           }
         }
 
-        // Rate as of selected month: current row if its window contains asOf,
-        // else most-recent superseded history row whose window contains asOf.
+        // MONTH auto-fill: units for the selected month + staff breakdown.
+        let monthUnits = 0;
+        const staffMap = new Map<string, number>(); // staff_id -> units
+        if (isDaily) {
+          // Daily codes: billable days in month from hhs_daily_records_v.
+          // No staff breakdown (host parents don't clock).
+          const set = new Set<string>();
+          for (const r of dl) {
+            if (r.client_id !== c.id) continue;
+            if (r.service_code && r.service_code !== code.service_code) continue;
+            const d = r.record_date;
+            if (d < asOf || d > monthEnd.toISOString().slice(0, 10)) continue;
+            set.add(d);
+          }
+          monthUnits = set.size;
+        } else {
+          for (const r of ts) {
+            if (r.client_id !== c.id || !r.clock_out_timestamp) continue;
+            if (r.service_type_code !== code.service_code) continue;
+            const inMs = new Date(r.clock_in_timestamp).getTime();
+            if (inMs < monthStartMs || inMs >= monthEndMs) continue;
+            const u = computeEntryUnits(r.clock_in_timestamp, r.clock_out_timestamp);
+            monthUnits += u;
+            if (r.staff_id) staffMap.set(r.staff_id, (staffMap.get(r.staff_id) ?? 0) + u);
+          }
+        }
+        const staff: StaffBreakdown[] = [...staffMap.entries()]
+          .map(([staff_id, units]) => ({
+            staff_id,
+            name: staffNameOf.get(staff_id) ?? staff_id.slice(0, 8),
+            units,
+            hours: units / UNITS_PER_HOUR,
+          }))
+          .sort((a, b) => b.units - a.units);
+
+        // Rate resolution (unchanged).
         const inWindow = (s: string | null, e: string | null) =>
           (!s || s <= asOf) && (!e || e >= asOf);
         let rate = Number(code.rate_per_unit ?? 0);
@@ -175,29 +243,31 @@ function MonthlyGridPage() {
           used_units: used,
           remaining_units: Math.max(0, annual - used),
           monthly_max: code.monthly_max_units ?? null,
+          month_units: monthUnits,
+          staff,
         };
       }),
     );
-  }, [codes, clientsQ.data, usageQ.data, historyQ.data, month.y, asOf]);
+  }, [codes, clientsQ.data, usageQ.data, historyQ.data, staffNameOf, month.y, asOf, monthEnd, monthStart, monthEndIso]);
 
   const directRows = allRows.filter((r) => !HOST_HOME_CODES.has(r.code.service_code));
   const hostRows = allRows.filter((r) => HOST_HOME_CODES.has(r.code.service_code));
 
-  // Side rollup: total hours by code (manual units → hours for now).
+  // Side rollup: derived from auto month_units.
   const rollup = useMemo(() => {
     const map = new Map<string, { units: number; hours: number; toBill: number }>();
     for (const r of allRows) {
-      const u = manualUnits[keyOf(r.client.id, r.code.service_code)] ?? 0;
-      const hours = r.isDaily ? u * 24 : u / UNITS_PER_HOUR; // daily units = days; hours decorative
+      const u = r.month_units;
+      const hours = r.isDaily ? 0 : u / UNITS_PER_HOUR;
       const prev = map.get(r.code.service_code) ?? { units: 0, hours: 0, toBill: 0 };
       map.set(r.code.service_code, {
         units: prev.units + u,
-        hours: prev.hours + (r.isDaily ? 0 : hours),
+        hours: prev.hours + hours,
         toBill: prev.toBill + u * r.rate,
       });
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [allRows, manualUnits]);
+  }, [allRows]);
 
   const stepMonth = (delta: number) => {
     const d = new Date(month.y, month.m + delta, 1);
@@ -211,7 +281,7 @@ function MonthlyGridPage() {
           <h2 className="font-display text-lg font-bold">Monthly Billables Grid</h2>
           <p className="text-xs text-muted-foreground">
             Tab A · Client × billing code for the month · units × rate = To Bill.
-            EVV auto-fill ships in the next step — for now, units are manual.
+            Units + staff hours auto-filled from EVV (read-only).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -236,18 +306,12 @@ function MonthlyGridPage() {
             title="Direct Support"
             subtitle="Hourly + per-visit codes (SLN, SLH, DSI, SEI, RHS, CHA, COM, etc.)"
             rows={directRows}
-            manualUnits={manualUnits}
-            setManualUnits={setManualUnits}
-            keyOf={keyOf}
             asOf={asOf}
           />
           <GridSection
             title="Host Home"
             subtitle="Daily-rate residential codes (HHS, PPS)"
             rows={hostRows}
-            manualUnits={manualUnits}
-            setManualUnits={setManualUnits}
-            keyOf={keyOf}
             asOf={asOf}
           />
 
@@ -264,13 +328,12 @@ function MonthlyGridPage() {
           </section>
         </div>
 
-        {/* Side panel */}
         <aside className="space-y-3">
           <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
             <h3 className="font-display text-sm font-semibold">Total by code · {monthLabel}</h3>
-            <p className="mb-3 text-xs text-muted-foreground">Derived from units entered above.</p>
+            <p className="mb-3 text-xs text-muted-foreground">Auto-derived from EVV (read-only).</p>
             {rollup.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No authorized codes yet.</p>
+              <p className="text-xs text-muted-foreground">No EVV activity this month.</p>
             ) : (
               <ul className="space-y-1.5 text-xs">
                 {rollup.map(([code, v]) => (
@@ -290,9 +353,9 @@ function MonthlyGridPage() {
             <div className="mb-1 flex items-center gap-1 font-semibold text-foreground">
               <Info className="h-3.5 w-3.5" /> About this grid
             </div>
-            Rates use <code>get_rate_as_of</code>: current rate if the month falls in its effective window,
-            otherwise the most recent superseded version from rate history. Units are manual this step;
-            EVV-derived units arrive in the next increment.
+            Units = <code>computeEntryUnits</code> summed per EVV entry (quarter-hour codes) or
+            billable days from <code>hhs_daily_records_v</code> (daily codes). Rates resolve via
+            <code> get_rate_as_of</code>. EVV tables are read-only here.
           </div>
         </aside>
       </div>
@@ -301,14 +364,11 @@ function MonthlyGridPage() {
 }
 
 function GridSection({
-  title, subtitle, rows, manualUnits, setManualUnits, keyOf, asOf,
+  title, subtitle, rows, asOf,
 }: {
   title: string;
   subtitle: string;
   rows: GridRow[];
-  manualUnits: Record<string, number>;
-  setManualUnits: React.Dispatch<React.SetStateAction<Record<string, number>>>;
-  keyOf: (clientId: string, code: string) => string;
   asOf: string;
 }) {
   return (
@@ -329,7 +389,7 @@ function GridSection({
               <th className="px-3 py-2">Client</th>
               <th className="px-3 py-2">Code</th>
               <th className="px-3 py-2 text-right">Rate</th>
-              <th className="px-3 py-2 text-right">Units</th>
+              <th className="px-3 py-2 text-right">Units (AUTO)</th>
               <th className="px-3 py-2 text-right">To Bill</th>
               <th className="px-3 py-2 text-right">Monthly Max</th>
               <th className="px-3 py-2 text-right">Remaining (YTD)</th>
@@ -340,11 +400,11 @@ function GridSection({
             {rows.length === 0 ? (
               <tr><td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">No authorized codes in this section.</td></tr>
             ) : rows.map((r) => {
-              const k = keyOf(r.client.id, r.code.service_code);
-              const u = manualUnits[k] ?? 0;
+              const u = r.month_units;
               const toBill = u * r.rate;
+              const overMax = r.monthly_max != null && u > r.monthly_max;
               return (
-                <tr key={k} className="border-t border-border hover:bg-muted/30">
+                <tr key={`${r.client.id}::${r.code.service_code}`} className="border-t border-border hover:bg-muted/30">
                   <td className="px-3 py-2 font-medium">{r.client.last_name}, {r.client.first_name}</td>
                   <td className="px-3 py-2 font-mono font-semibold">
                     {r.code.service_code}
@@ -365,15 +425,21 @@ function GridSection({
                     </TooltipProvider>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <input
-                      type="number"
-                      min={0}
-                      step={r.isDaily ? 1 : 1}
-                      value={u || ""}
-                      onChange={(e) => setManualUnits((p) => ({ ...p, [k]: Number(e.target.value) || 0 }))}
-                      placeholder="0"
-                      className="h-8 w-20 rounded-md border border-border bg-background px-2 text-right tabular-nums text-sm"
-                    />
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={`inline-flex items-center gap-1 rounded-md border border-dashed border-border bg-muted/30 px-2 py-1 font-mono tabular-nums text-sm ${overMax ? "text-[#b45309] font-bold" : ""}`}>
+                            {fmtUnits(u)}
+                            {!r.isDaily && u > 0 && (
+                              <span className="text-[10px] text-muted-foreground">· {fmtHours(u / UNITS_PER_HOUR)}h</span>
+                            )}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-xs">
+                          {r.isDaily ? "Billable days (hhs_daily_records_v)" : "Sum of per-entry computeEntryUnits"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </td>
                   <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
                     {fmtUSD(toBill)}
@@ -388,7 +454,7 @@ function GridSection({
                     </span>
                   </td>
                   <td className="px-3 py-2">
-                    <StaffCell />
+                    <StaffCell staff={r.staff} />
                   </td>
                 </tr>
               );
@@ -400,21 +466,37 @@ function GridSection({
   );
 }
 
-function StaffCell() {
+function StaffCell({ staff }: { staff: StaffBreakdown[] }) {
   const [open, setOpen] = useState(false);
-  // Variable-width contributors model — populated in step 3 from EVV. For now,
-  // the row is empty but the collapsible shape is in place.
-  const count = 0;
-  const hours = 0;
+  const totalHours = staff.reduce((s, x) => s + x.hours, 0);
+  if (staff.length === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-dashed border-border bg-background px-2 py-1 text-xs text-muted-foreground">
+        <Users2 className="h-3.5 w-3.5" /> 0 staff
+      </span>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={() => setOpen((o) => !o)}
-      className="inline-flex items-center gap-1 rounded-md border border-dashed border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-muted/40"
-    >
-      <Users2 className="h-3.5 w-3.5" />
-      {count} staff · {fmtHours(hours)}h
-      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs hover:bg-muted/40"
+      >
+        <Users2 className="h-3.5 w-3.5" />
+        {staff.length} staff · {fmtHours(totalHours)}h
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <ul className="absolute right-0 z-10 mt-1 min-w-[14rem] rounded-md border border-border bg-popover p-2 text-xs shadow-md">
+          {staff.map((s) => (
+            <li key={s.staff_id} className="flex items-center justify-between gap-3 px-1 py-0.5">
+              <span className="truncate">{s.name}</span>
+              <span className="tabular-nums text-muted-foreground">{fmtHours(s.hours)}h</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

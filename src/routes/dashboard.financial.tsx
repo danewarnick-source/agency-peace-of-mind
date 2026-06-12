@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { RequireRole } from "@/components/rbac-guard";
-import { TrendingUp, Grid3x3, Home, HardHat, TableProperties, BarChart3, PieChart, LineChart } from "lucide-react";
+import { TrendingUp, Grid3x3, Home, HardHat, TableProperties, BarChart3, PieChart, LineChart, Users2 } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Permission } from "@/lib/rbac";
 
@@ -19,6 +19,7 @@ const TABS: Array<{ to: string; label: string; icon: typeof Grid3x3; disabled?: 
   { to: "/dashboard/financial/host-home", label: "Host Home", icon: Home },
   { to: "/dashboard/financial/rhs", label: "RHS", icon: Home, perm: "view_financial_rhs" },
   { to: "/dashboard/financial/contractors", label: "Contractors", icon: HardHat },
+  { to: "/dashboard/financial/employees", label: "Employees", icon: Users2, perm: "view_financial_employees" },
   { to: "/dashboard/financial/totals", label: "Totals", icon: TableProperties },
   { to: "/dashboard/financial/gross", label: "TNS Gross", icon: BarChart3, perm: "view_financial_tns_gross" },
   { to: "/dashboard/financial/distributions", label: "Distributions", icon: PieChart },

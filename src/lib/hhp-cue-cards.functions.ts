@@ -22,6 +22,7 @@ import {
   requirePermission,
   requireAnyPermission,
 } from "@/lib/require-permission";
+import type { Json } from "@/integrations/supabase/types";
 
 const orgOnly = z.object({ organization_id: z.string().uuid() });
 

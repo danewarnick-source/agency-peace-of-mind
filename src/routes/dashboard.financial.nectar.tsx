@@ -178,6 +178,8 @@ function NectarFinancialPage() {
 }
 
 function ReportCard({ report }: { report: NectarFinReport }) {
+  const { prefixLabel } = useOrgDisplayName();
+  const labelFor = (s: NectarFinSource) => sourceLabel(s, prefixLabel("Gross"));
   const printRef = useMemo(() => `nectar-report-${Math.random().toString(36).slice(2)}`, []);
   const allowed = report.sources.filter((s) => s.allowed);
   const declined = report.sources.filter((s) => !s.allowed);

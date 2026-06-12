@@ -3925,6 +3925,232 @@ export type Database = {
           },
         ]
       }
+      gmail_connections: {
+        Row: {
+          access_token: string | null
+          connected_at: string
+          connected_by: string | null
+          created_at: string
+          disconnected_at: string | null
+          google_email: string
+          google_sub: string | null
+          id: string
+          last_error: string | null
+          last_history_id: string | null
+          last_polled_at: string | null
+          organization_id: string
+          refresh_token: string | null
+          scopes: string[]
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          connected_at?: string
+          connected_by?: string | null
+          created_at?: string
+          disconnected_at?: string | null
+          google_email: string
+          google_sub?: string | null
+          id?: string
+          last_error?: string | null
+          last_history_id?: string | null
+          last_polled_at?: string | null
+          organization_id: string
+          refresh_token?: string | null
+          scopes?: string[]
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          connected_at?: string
+          connected_by?: string | null
+          created_at?: string
+          disconnected_at?: string | null
+          google_email?: string
+          google_sub?: string | null
+          id?: string
+          last_error?: string | null
+          last_history_id?: string | null
+          last_polled_at?: string | null
+          organization_id?: string
+          refresh_token?: string | null
+          scopes?: string[]
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_connections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmail_ingested_messages: {
+        Row: {
+          error_message: string | null
+          from_email: string | null
+          gmail_message_id: string
+          gmail_thread_id: string | null
+          id: string
+          ingested_at: string
+          internal_date: string | null
+          organization_id: string
+          outcome: string
+          referral_id: string | null
+          subject: string | null
+        }
+        Insert: {
+          error_message?: string | null
+          from_email?: string | null
+          gmail_message_id: string
+          gmail_thread_id?: string | null
+          id?: string
+          ingested_at?: string
+          internal_date?: string | null
+          organization_id: string
+          outcome?: string
+          referral_id?: string | null
+          subject?: string | null
+        }
+        Update: {
+          error_message?: string | null
+          from_email?: string | null
+          gmail_message_id?: string
+          gmail_thread_id?: string | null
+          id?: string
+          ingested_at?: string
+          internal_date?: string | null
+          organization_id?: string
+          outcome?: string
+          referral_id?: string | null
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_ingested_messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gmail_ingested_messages_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmail_ingestion_audit: {
+        Row: {
+          action: string
+          actor_kind: string
+          actor_user_id: string | null
+          created_at: string
+          detail: Json
+          gmail_message_id: string | null
+          id: string
+          organization_id: string
+          referral_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_kind: string
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          gmail_message_id?: string | null
+          id?: string
+          organization_id: string
+          referral_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_kind?: string
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          gmail_message_id?: string | null
+          id?: string
+          organization_id?: string
+          referral_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_ingestion_audit_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gmail_ingestion_audit_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmail_ingestion_rules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          id: string
+          label_query: string | null
+          organization_id: string
+          rule_name: string
+          sender_domains: string[]
+          sender_emails: string[]
+          subject_contains: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          id?: string
+          label_query?: string | null
+          organization_id: string
+          rule_name: string
+          sender_domains?: string[]
+          sender_emails?: string[]
+          subject_contains?: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          id?: string
+          label_query?: string | null
+          organization_id?: string
+          rule_name?: string
+          sender_domains?: string[]
+          sender_emails?: string[]
+          subject_contains?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_ingestion_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hhp_cue_cards: {
         Row: {
           address: string | null
@@ -8561,6 +8787,8 @@ export type Database = {
           archive_reason: string | null
           archived_at: string
           decision_outcome: string | null
+          discarded: boolean
+          gmail_message_id: string | null
           id: string
           organization_id: string
           purged_at: string
@@ -8570,6 +8798,8 @@ export type Database = {
           archive_reason?: string | null
           archived_at: string
           decision_outcome?: string | null
+          discarded?: boolean
+          gmail_message_id?: string | null
           id?: string
           organization_id: string
           purged_at?: string
@@ -8579,6 +8809,8 @@ export type Database = {
           archive_reason?: string | null
           archived_at?: string
           decision_outcome?: string | null
+          discarded?: boolean
+          gmail_message_id?: string | null
           id?: string
           organization_id?: string
           purged_at?: string
@@ -8610,6 +8842,9 @@ export type Database = {
           description: string | null
           disability_level: string | null
           disability_types: string[]
+          discard_reason: string | null
+          discarded_at: string | null
+          discarded_by: string | null
           due_date: string | null
           first_name: string
           gender: string | null
@@ -8643,6 +8878,9 @@ export type Database = {
           description?: string | null
           disability_level?: string | null
           disability_types?: string[]
+          discard_reason?: string | null
+          discarded_at?: string | null
+          discarded_by?: string | null
           due_date?: string | null
           first_name: string
           gender?: string | null
@@ -8676,6 +8914,9 @@ export type Database = {
           description?: string | null
           disability_level?: string | null
           disability_types?: string[]
+          discard_reason?: string | null
+          discarded_at?: string | null
+          discarded_by?: string | null
           due_date?: string | null
           first_name?: string
           gender?: string | null

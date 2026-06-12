@@ -99,7 +99,7 @@ export const listReferrals = createServerFn({ method: "GET" })
     const { data: rows, error } = await supabase
       .from("referrals")
       .select(
-        "id, first_name, age, gender, location_city, location_county, disability_types, disability_level, requested_codes, budget_note, need_level, description, category, source, support_coordinator_id, due_date, status, created_at",
+        "id, first_name, age, gender, location_city, location_county, disability_types, disability_level, requested_codes, budget_note, need_level, description, category, source, support_coordinator_id, due_date, status, stage, stage_entered_at, decision_outcome, decision_reason, created_at",
       )
       .eq("organization_id", data.organization_id)
       .neq("status", "archived")

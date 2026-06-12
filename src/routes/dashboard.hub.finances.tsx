@@ -1,11 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Receipt, TrendingUp, ArrowRight, ArrowUpRight, ArrowDownRight, Lock } from "lucide-react";
+import {
+  Receipt,
+  TrendingUp,
+  ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
+  Lock,
+  AlertTriangle,
+  CheckCircle2,
+  FileText,
+  CalendarClock,
+} from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getBilledRevenueByYear } from "@/lib/financial-revenue.functions";
 import { getTotalsLedger } from "@/lib/financial-totals.functions";
+import { getBillingSnapshot } from "@/lib/financial-hub.functions";
 
 /**
  * Finances hub landing. Billing and Financial each own their own nested
@@ -35,13 +47,10 @@ function FinancesHub() {
 
   // Billing card is admin/manager (matches Billing section RequireRole).
   const canSeeBilling = role === "admin" || role === "manager" || role === "super_admin";
-  // Financial card snapshot mirrors the Financial tab gates. The Gross tab
-  // is the primary entry; use its permission for the numeric preview.
+  // Financial card snapshot mirrors the Financial tab gates.
   const canSeeFinancialNumbers = can("view_financial_tns_gross");
 
-  // The billed-revenue server-fn requires admin org membership. Managers
-  // pass the Billing gate but can't load $ totals → they see a clean
-  // "Open Billing" card without sensitive figures.
+  // The billed-revenue server-fn requires admin org membership.
   const canReadBilledRevenue = role === "admin" || role === "super_admin";
 
   const now = new Date();
@@ -51,6 +60,7 @@ function FinancesHub() {
 
   const billedFn = useServerFn(getBilledRevenueByYear);
   const ledgerFn = useServerFn(getTotalsLedger);
+  const billingSnapshotFn = useServerFn(getBillingSnapshot);
 
   const billedQ = useQuery({
     enabled: !!orgId && canReadBilledRevenue,
@@ -66,29 +76,42 @@ function FinancesHub() {
     staleTime: 60_000,
   });
 
-  // Billing snapshot: this period billed + YTD billed.
+  const billingSnapshotQ = useQuery({
+    enabled: !!orgId && canReadBilledRevenue,
+    queryKey: ["hub-finances-billing-snapshot", orgId],
+    queryFn: () => billingSnapshotFn({ data: { organizationId: orgId! } }),
+    staleTime: 60_000,
+  });
+
+  // ─── Financial snapshot values ──────────────────────────────────────
   const months = billedQ.data?.months ?? [];
   const billedThisMonth = months[monthIdx]?.billed ?? 0;
-  const billedYTD = months.slice(0, monthIdx + 1).reduce((s, m) => s + (m.billed ?? 0), 0);
+  const billedLastMonth = monthIdx > 0 ? months[monthIdx - 1]?.billed ?? 0 : 0;
+  const trendPct =
+    billedLastMonth > 0
+      ? ((billedThisMonth - billedLastMonth) / billedLastMonth) * 100
+      : null;
 
-  // Financial snapshot: gross billed (same source) + net received this month + trend.
   const receivedRows = ledgerQ.data ?? [];
   const receivedThisMonth = receivedRows
     .filter((r) => r.category === "received" && r.period_month === monthIdx + 1)
     .reduce((s, r) => s + Number(r.amount ?? 0), 0);
-  const billedLastMonth = monthIdx > 0 ? months[monthIdx - 1]?.billed ?? 0 : 0;
-  const trendPct =
-    billedLastMonth > 0 ? ((billedThisMonth - billedLastMonth) / billedLastMonth) * 100 : null;
+  const outstanding = billedThisMonth - receivedThisMonth;
+
+  // ─── Billing snapshot values ───────────────────────────────────────
+  const snap = billingSnapshotQ.data;
 
   return (
     <div className="flex min-h-full flex-col">
       <div className="mb-6">
         <h2 className="text-xl font-semibold tracking-tight">Finances</h2>
-        <p className="text-sm text-muted-foreground">Billing and financial overview · {periodLabel}</p>
+        <p className="text-sm text-muted-foreground">
+          Billing and financial overview · {periodLabel}
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {/* ─── Billing card ─────────────────────────────────────────────── */}
+        {/* ─── Billing card ─────────────────────────────────────────── */}
         <div className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
           <div className="flex items-start justify-between">
             <Receipt className="h-6 w-6 text-[#137182]" />
@@ -105,14 +128,37 @@ function FinancesHub() {
               <p className="text-xs text-muted-foreground">
                 Open Billing to view claim readiness and per-client billing.
               </p>
-            ) : billedQ.isLoading ? (
+            ) : billingSnapshotQ.isLoading || billedQ.isLoading ? (
               <SnapshotSkeleton rows={2} />
-            ) : billedQ.error ? (
+            ) : billingSnapshotQ.error || billedQ.error ? (
               <p className="text-xs text-muted-foreground">Snapshot unavailable.</p>
             ) : (
               <dl className="grid grid-cols-2 gap-3">
-                <Stat label={`Billed · ${MONTH_NAMES[monthIdx]}`} value={fmtCurrency(billedThisMonth)} />
-                <Stat label={`Billed YTD · ${year}`} value={fmtCurrency(billedYTD)} />
+                <Stat
+                  label="Active authorizations"
+                  value={String(snap?.activeCodes ?? 0)}
+                  icon={<FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+                />
+                <Stat
+                  label="Billing blockers"
+                  value={String(snap?.blockers ?? 0)}
+                  icon={
+                    (snap?.blockers ?? 0) > 0 ? (
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                    ) : (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    )
+                  }
+                  variant={(snap?.blockers ?? 0) > 0 ? "warning" : "success"}
+                />
+                {(snap?.expiringSoon ?? 0) > 0 && (
+                  <div className="col-span-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-300/40 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-700">
+                      <CalendarClock className="h-3 w-3" />
+                      {snap!.expiringSoon} authorization{snap!.expiringSoon === 1 ? "" : "s"} expiring within 30 days
+                    </span>
+                  </div>
+                )}
               </dl>
             )}
           </div>
@@ -127,7 +173,7 @@ function FinancesHub() {
           )}
         </div>
 
-        {/* ─── Financial card ───────────────────────────────────────────── */}
+        {/* ─── Financial card ────────────────────────────────────────── */}
         <div className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
           <div className="flex items-start justify-between">
             <TrendingUp className="h-6 w-6 text-[#137182]" />
@@ -146,11 +192,7 @@ function FinancesHub() {
               <dl className="grid grid-cols-2 gap-3">
                 <Stat
                   label={`Gross billed · ${MONTH_NAMES[monthIdx]}`}
-                  value={
-                    canReadBilledRevenue
-                      ? fmtCurrency(billedThisMonth)
-                      : "—"
-                  }
+                  value={canReadBilledRevenue ? fmtCurrency(billedThisMonth) : "—"}
                   trend={
                     canReadBilledRevenue && trendPct !== null ? (
                       <TrendBadge pct={trendPct} />
@@ -158,13 +200,26 @@ function FinancesHub() {
                   }
                 />
                 <Stat
-                  label="Net received"
+                  label="Outstanding"
                   value={
-                    receivedThisMonth > 0
-                      ? fmtCurrency(receivedThisMonth)
-                      : "Pending"
+                    canReadBilledRevenue
+                      ? outstanding > 0
+                        ? fmtCurrency(outstanding)
+                        : receivedThisMonth > 0
+                          ? fmtCurrency(0)
+                          : "Pending"
+                      : "—"
                   }
-                  hint={receivedThisMonth > 0 ? null : "Not yet imported"}
+                  hint={
+                    canReadBilledRevenue
+                      ? receivedThisMonth > 0
+                        ? `Net received: ${fmtCurrency(receivedThisMonth)}`
+                        : "Not yet imported"
+                      : null
+                  }
+                  variant={
+                    canReadBilledRevenue && outstanding > 0 ? "warning" : undefined
+                  }
                 />
               </dl>
             )}
@@ -187,15 +242,27 @@ function Stat({
   value,
   trend,
   hint,
+  icon,
+  variant,
 }: {
   label: string;
   value: string;
   trend?: React.ReactNode;
   hint?: string | null;
+  icon?: React.ReactNode;
+  variant?: "warning" | "success";
 }) {
+  const borderClass =
+    variant === "warning"
+      ? "border-amber-300/40 bg-amber-500/[0.04]"
+      : variant === "success"
+        ? "border-emerald-300/40 bg-emerald-500/[0.04]"
+        : "border-border/60 bg-background/40";
+
   return (
-    <div className="rounded-lg border border-border/60 bg-background/40 p-3">
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className={`rounded-lg border p-3 ${borderClass}`}>
+      <dt className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {icon}
         {label}
       </dt>
       <dd className="mt-1 flex items-baseline gap-2">

@@ -78,6 +78,8 @@ type Timesheet = {
   shift_note_text: string | null; goals_completed: string[] | null;
   submitted_late: boolean; denial_reason: string | null;
   approved_at: string | null; approved_by: string | null;
+  edit_reason?: string | null;
+  review_status?: string | null;
   clients: { first_name: string; last_name: string; physical_address: string | null } | null;
   profiles: { full_name: string | null; email: string | null } | null;
 };

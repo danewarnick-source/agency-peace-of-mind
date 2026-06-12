@@ -74,7 +74,7 @@ async function loadMonthData(
       .eq("organization_id", organizationId),
     supabase
       .from("evv_timesheets")
-      .select("id, client_id, staff_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+      .select("id, client_id, staff_id, service_type_code, clock_in_timestamp, clock_out_timestamp, review_status, corrected_clock_in, corrected_clock_out")
       .eq("organization_id", organizationId)
       .gte("clock_in_timestamp", `${startIso}T00:00:00Z`)
       .lt("clock_in_timestamp", `${endExclusiveIso}T00:00:00Z`)

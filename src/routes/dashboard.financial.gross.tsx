@@ -1,17 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, BarChart3, Info } from "lucide-react";
 import { computeEntryUnits, fmtUSD } from "@/lib/billing-units";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RequirePermission } from "@/components/rbac-guard";
+import {
+  getGrossCbc,
+  getGrossEvv,
+  getGrossHhs,
+  getGrossCtr,
+  getGrossLedger,
+} from "@/lib/financial-gross.functions";
 
 export const Route = createFileRoute("/dashboard/financial/gross")({
   head: () => ({ meta: [{ title: "TNS Gross — HIVE" }] }),
-  component: GrossPage,
+  component: () => (
+    <RequirePermission perm="view_financial_tns_gross">
+      <GrossPage />
+    </RequirePermission>
+  ),
 });
+
 
 const HHS_CODES = new Set(["HHS"]);
 
@@ -27,22 +40,21 @@ function GrossPage() {
   const [startYear, setStartYear] = useState(today.getFullYear() - 2);
   const [endYear, setEndYear] = useState(today.getFullYear() + 1);
 
-  const rangeStartIso = new Date(startYear, 0, 1).toISOString();
-  const rangeEndIso = new Date(endYear + 1, 0, 1).toISOString();
-  const rangeStartDate = `${startYear}-01-01`;
-  const rangeEndDate = `${endYear + 1}-01-01`;
+  const cbcFn = useServerFn(getGrossCbc);
+  const evvFn = useServerFn(getGrossEvv);
+  const hhsFn = useServerFn(getGrossHhs);
+  const ctrFn = useServerFn(getGrossCtr);
+  const ledgerFn = useServerFn(getGrossLedger);
 
   // Client billing code rates
   const cbcQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["gross-cbc", org?.organization_id],
     queryFn: async (): Promise<Cbc[]> => {
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select("client_id, service_code, rate_per_unit")
-        .eq("organization_id", org!.organization_id);
-      if (error) throw error;
-      return (data ?? []) as Cbc[];
+      const rows = await cbcFn({
+        data: { organizationId: org!.organization_id, startYear, endYear },
+      });
+      return rows as Cbc[];
     },
   });
 
@@ -51,14 +63,10 @@ function GrossPage() {
     enabled: !!org?.organization_id,
     queryKey: ["gross-evv", org?.organization_id, startYear, endYear],
     queryFn: async (): Promise<Ts[]> => {
-      const { data, error } = await supabase
-        .from("evv_timesheets")
-        .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
-        .eq("organization_id", org!.organization_id)
-        .gte("clock_in_timestamp", rangeStartIso)
-        .lt("clock_in_timestamp", rangeEndIso);
-      if (error) throw error;
-      return (data ?? []) as Ts[];
+      const rows = await evvFn({
+        data: { organizationId: org!.organization_id, startYear, endYear },
+      });
+      return rows as Ts[];
     },
   });
 
@@ -67,15 +75,10 @@ function GrossPage() {
     enabled: !!org?.organization_id,
     queryKey: ["gross-hhs", org?.organization_id, startYear, endYear],
     queryFn: async (): Promise<HhsDay[]> => {
-      const { data, error } = await supabase
-        .from("hhs_daily_records_v")
-        .select("client_id, record_date, billable, service_code")
-        .eq("organization_id", org!.organization_id)
-        .eq("service_code", "HHS")
-        .gte("record_date", rangeStartDate)
-        .lt("record_date", rangeEndDate);
-      if (error) throw error;
-      return ((data ?? []) as Array<HhsDay & { service_code: string }>).filter((r) => r.billable);
+      const rows = await hhsFn({
+        data: { organizationId: org!.organization_id, startYear, endYear },
+      });
+      return rows as HhsDay[];
     },
   });
 
@@ -84,14 +87,10 @@ function GrossPage() {
     enabled: !!org?.organization_id,
     queryKey: ["gross-ctr", org?.organization_id, startYear, endYear],
     queryFn: async (): Promise<CtrPay[]> => {
-      const { data, error } = await supabase
-        .from("contractor_monthly_pay" as never)
-        .select("year, month, net_pay, additional_pay")
-        .eq("organization_id", org!.organization_id)
-        .gte("year", startYear)
-        .lte("year", endYear);
-      if (error) throw error;
-      return (data ?? []) as unknown as CtrPay[];
+      const rows = await ctrFn({
+        data: { organizationId: org!.organization_id, startYear, endYear },
+      });
+      return rows as CtrPay[];
     },
   });
 
@@ -100,17 +99,13 @@ function GrossPage() {
     enabled: !!org?.organization_id,
     queryKey: ["gross-ledger", org?.organization_id, startYear, endYear],
     queryFn: async (): Promise<LedgerRow[]> => {
-      const { data, error } = await supabase
-        .from("provider_ledger_entries")
-        .select("period_year, period_month, category, label, amount")
-        .eq("organization_id", org!.organization_id)
-        .gte("period_year", startYear)
-        .lte("period_year", endYear)
-        .in("category", ["received", "payroll_tax"]);
-      if (error) throw error;
-      return (data ?? []) as LedgerRow[];
+      const rows = await ledgerFn({
+        data: { organizationId: org!.organization_id, startYear, endYear },
+      });
+      return rows as LedgerRow[];
     },
   });
+
 
   const rateMap = useMemo(() => {
     const m: Record<string, number> = {};

@@ -39,7 +39,9 @@ export const ALL_PERMISSIONS = [
   "view_certifications",
   "view_platform_metrics",
   "manage_all_orgs",
+  "view_financial_tns_gross",
 ] as const;
+
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
 
@@ -65,7 +67,9 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   view_certifications: "View certifications",
   view_platform_metrics: "View platform metrics",
   manage_all_orgs: "Manage all organizations",
+  view_financial_tns_gross: "View Financial — TNS Gross",
 };
+
 
 /** Default permission matrix used to seed org-specific overrides. */
 export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
@@ -77,7 +81,9 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
     "export_reports", "view_analytics", "view_team_reports",
     "manage_billing", "view_billing", "manage_organization",
     "view_own_training", "view_certifications",
+    "view_financial_tns_gross",
   ],
+
   manager: [
     "invite_users", "assign_training", "view_team_reports", "approve_external_certs",
     "upload_external_certs", "view_analytics", "view_own_training", "view_certifications",

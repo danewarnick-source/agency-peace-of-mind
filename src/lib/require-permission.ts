@@ -30,6 +30,26 @@ export async function requirePermission(
   if (data !== true) throw new Error(`Forbidden: missing permission ${perm}`);
 }
 
+export async function requireAnyPermission(
+  supabase: AnySupabase,
+  userId: string,
+  organizationId: string,
+  perms: string[],
+): Promise<void> {
+  await requireOrgMembership(supabase, userId, organizationId, "employee");
+  for (const perm of perms) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any).rpc("has_permission", {
+      _user_id: userId,
+      _org_id: organizationId,
+      _perm: perm,
+    });
+    if (error) throw new Error("Permission check failed");
+    if (data === true) return;
+  }
+  throw new Error(`Forbidden: missing one of [${perms.join(", ")}]`);
+}
+
 export async function requireRoleAtLeast(
   supabase: AnySupabase,
   userId: string,

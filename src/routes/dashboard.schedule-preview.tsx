@@ -1091,6 +1091,8 @@ function MobileDayBoard({
                       job_code: sh.job_code, parent_shift_id: sh.parent_shift_id,
                     }))}
                     requirements={dayReqs}
+                    computedRequiredMinutes={computedReqByDayBySiteName?.get(s.name.toLowerCase())?.get((() => { const x = new Date(day); x.setHours(12); return x.toISOString().slice(0, 10); })())}
+                    tooltipNote={twoToOneBySiteName?.has(s.name.toLowerCase()) ? "2:1 ratio requires an approved rights modification (SOW §1.33)." : undefined}
                   />
                 </button>
               );

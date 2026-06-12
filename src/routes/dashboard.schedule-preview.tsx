@@ -1229,7 +1229,7 @@ function HostDot({ state, label }: { state: "done" | "partial" | "none"; label: 
 
 function AllHomesBoard({
   days, sites, siteClients, siteShifts, settings, onPickSite, onOpenDay, hostHomeNames,
-  reqsBySiteName, targetsByClient, noteDays, overnightDays,
+  reqsBySiteName, computedReqByDayBySiteName, twoToOneBySiteName, targetsByClient, noteDays, overnightDays,
 }: {
   days: Date[];
   sites: { id: string; name: string }[];
@@ -1240,6 +1240,8 @@ function AllHomesBoard({
   onOpenDay?: (siteId: string, siteName: string, day: Date) => void;
   hostHomeNames?: Set<string>;
   reqsBySiteName?: Map<string, ReqRow[]>;
+  computedReqByDayBySiteName?: Map<string, Map<string, number[]>>;
+  twoToOneBySiteName?: Set<string>;
   targetsByClient?: Map<string, Array<{ service_code: string; target_hours_per_week: number }>>;
   noteDays?: Set<string>;
   overnightDays?: Set<string>;

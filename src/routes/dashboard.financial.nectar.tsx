@@ -59,6 +59,8 @@ const SUGGESTIONS = [
 
 function NectarFinancialPage() {
   const { data: org } = useCurrentOrg();
+  const { prefixLabel } = useOrgDisplayName();
+  const labelFor = (s: NectarFinSource) => sourceLabel(s, prefixLabel("Gross"));
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [question, setQuestion] = useState("");

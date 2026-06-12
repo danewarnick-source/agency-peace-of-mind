@@ -24,6 +24,7 @@ import {
   Calendar, Pen, RefreshCcw, Printer, Sparkles, ArrowRight,
   Home, FolderArchive, Pill,
 } from "lucide-react";
+import { isEvvLockedCode } from "@/lib/evv-codes";
 import { toast } from "sonner";
 import { AddonLock } from "@/components/nectar/addon-lock";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";

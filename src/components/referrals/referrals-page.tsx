@@ -41,6 +41,7 @@ import {
   StageAdvancer,
 } from "./referral-pipeline";
 import { ProviderInterestOutlineButton } from "./provider-interest-outline";
+import { MatchScorePanel } from "./match-score-panel";
 
 type Category = "direct_support" | "rhs" | "hhs";
 const CATEGORIES: { key: Category; label: string }[] = [
@@ -226,6 +227,14 @@ export function ReferralsPage() {
                               {r.decision_outcome}
                             </span>
                             {r.decision_reason ? ` — ${r.decision_reason}` : ""}
+                          </div>
+                        )}
+                        {orgId && (
+                          <div className="mt-2">
+                            <MatchScorePanel
+                              organizationId={orgId}
+                              referralId={r.id}
+                            />
                           </div>
                         )}
                       </li>

@@ -24,6 +24,15 @@ interface Props {
   day: Date;
   shifts: CoverageShift[];
   requirements?: CoverageRequirement[];
+  /**
+   * Per-minute required-staff array (length 1440) computed from resident
+   * ratios — Utah DSPD SOW §1.33. When provided, the effective requirement
+   * is element-wise max(computed, manual). The manual `requirements` only
+   * RAISE the bar; they never override the ratio-derived baseline.
+   */
+  computedRequiredMinutes?: number[];
+  /** Extra line appended to the bar tooltip (e.g. the 2:1 rights-mod warning). */
+  tooltipNote?: string;
   className?: string;
   /** Tiny variant for All-homes week cells: thin bar + one-line label. */
   micro?: boolean;

@@ -64,6 +64,7 @@ const MONTH_LABELS = [
 function RevenuePage() {
   const { data: org } = useCurrentOrg();
   const organizationId = org?.organization_id;
+  const providerName = useOrgDisplayName().displayName;
   const nowYear = new Date().getFullYear();
   const nowMonth = new Date().getMonth() + 1;
   const [year, setYear] = useState<number>(nowYear);

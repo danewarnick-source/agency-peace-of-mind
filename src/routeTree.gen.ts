@@ -91,6 +91,7 @@ import { Route as DashboardSettingsSubscriptionRouteImport } from './routes/dash
 import { Route as DashboardSettingsServiceCodesRouteImport } from './routes/dashboard.settings.service-codes'
 import { Route as DashboardSettingsServiceCatalogRouteImport } from './routes/dashboard.settings.service-catalog'
 import { Route as DashboardSettingsRetentionRouteImport } from './routes/dashboard.settings.retention'
+import { Route as DashboardSettingsGmailRouteImport } from './routes/dashboard.settings.gmail'
 import { Route as DashboardSettingsEmailRouteImport } from './routes/dashboard.settings.email'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardSettingsAutomationRulesRouteImport } from './routes/dashboard.settings.automation-rules'
@@ -159,7 +160,9 @@ import { Route as DashboardCoursesPersonModuleAssignmentIdRouteImport } from './
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
 import { Route as ApiPublicHooksSmartImportRemindersRouteImport } from './routes/api/public/hooks/smart-import-reminders'
 import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
+import { Route as ApiPublicHooksGmailIngestRouteImport } from './routes/api/public/hooks/gmail-ingest'
 import { Route as DashboardHiveExecStatesStateCodeOnboardingRouteImport } from './routes/dashboard.hive-exec.states.$stateCode.onboarding'
+import { Route as ApiPublicOauthGmailCallbackRouteImport } from './routes/api/public/oauth/gmail/callback'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
@@ -586,6 +589,11 @@ const DashboardSettingsRetentionRoute =
     path: '/retention',
     getParentRoute: () => DashboardSettingsRoute,
   } as any)
+const DashboardSettingsGmailRoute = DashboardSettingsGmailRouteImport.update({
+  id: '/gmail',
+  path: '/gmail',
+  getParentRoute: () => DashboardSettingsRoute,
+} as any)
 const DashboardSettingsEmailRoute = DashboardSettingsEmailRouteImport.update({
   id: '/email',
   path: '/email',
@@ -970,11 +978,23 @@ const ApiPublicHooksNectarSchedulesRoute =
     path: '/api/public/hooks/nectar-schedules',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksGmailIngestRoute =
+  ApiPublicHooksGmailIngestRouteImport.update({
+    id: '/api/public/hooks/gmail-ingest',
+    path: '/api/public/hooks/gmail-ingest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DashboardHiveExecStatesStateCodeOnboardingRoute =
   DashboardHiveExecStatesStateCodeOnboardingRouteImport.update({
     id: '/onboarding',
     path: '/onboarding',
     getParentRoute: () => DashboardHiveExecStatesStateCodeRoute,
+  } as any)
+const ApiPublicOauthGmailCallbackRoute =
+  ApiPublicOauthGmailCallbackRouteImport.update({
+    id: '/api/public/oauth/gmail/callback',
+    path: '/api/public/oauth/gmail/callback',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -1099,6 +1119,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
+  '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
@@ -1117,6 +1138,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
+  '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -1128,6 +1150,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
   '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
+  '/api/public/oauth/gmail/callback': typeof ApiPublicOauthGmailCallbackRoute
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
 export interface FileRoutesByTo {
@@ -1246,6 +1269,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
+  '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
@@ -1264,6 +1288,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
   '/dashboard/smart-import': typeof DashboardSmartImportIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
+  '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -1275,6 +1300,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
   '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
+  '/api/public/oauth/gmail/callback': typeof ApiPublicOauthGmailCallbackRoute
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
 export interface FileRoutesById {
@@ -1400,6 +1426,7 @@ export interface FileRoutesById {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
+  '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
@@ -1418,6 +1445,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
+  '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
@@ -1429,6 +1457,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
   '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
+  '/api/public/oauth/gmail/callback': typeof ApiPublicOauthGmailCallbackRoute
   '/dashboard/hive-exec/states/$stateCode/onboarding': typeof DashboardHiveExecStatesStateCodeOnboardingRoute
 }
 export interface FileRouteTypes {
@@ -1555,6 +1584,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/email'
+    | '/dashboard/settings/gmail'
     | '/dashboard/settings/retention'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
@@ -1573,6 +1603,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/'
     | '/dashboard/smart-import/'
     | '/dashboard/training/'
+    | '/api/public/hooks/gmail-ingest'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
     | '/dashboard/courses/$courseId/edit'
@@ -1584,6 +1615,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/states/$stateCode'
     | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
+    | '/api/public/oauth/gmail/callback'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1702,6 +1734,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/email'
+    | '/dashboard/settings/gmail'
     | '/dashboard/settings/retention'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
@@ -1720,6 +1753,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec'
     | '/dashboard/smart-import'
     | '/dashboard/training'
+    | '/api/public/hooks/gmail-ingest'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
     | '/dashboard/courses/$courseId/edit'
@@ -1731,6 +1765,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/states/$stateCode'
     | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
+    | '/api/public/oauth/gmail/callback'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   id:
     | '__root__'
@@ -1855,6 +1890,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/email'
+    | '/dashboard/settings/gmail'
     | '/dashboard/settings/retention'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
@@ -1873,6 +1909,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/'
     | '/dashboard/smart-import/'
     | '/dashboard/training/'
+    | '/api/public/hooks/gmail-ingest'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
     | '/dashboard/courses/$courseId/edit'
@@ -1884,6 +1921,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/states/$stateCode'
     | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
+    | '/api/public/oauth/gmail/callback'
     | '/dashboard/hive-exec/states/$stateCode/onboarding'
   fileRoutesById: FileRoutesById
 }
@@ -1904,8 +1942,10 @@ export interface RootRouteChildren {
   UnauthorizedRoute: typeof UnauthorizedRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
+  ApiPublicHooksGmailIngestRoute: typeof ApiPublicHooksGmailIngestRoute
   ApiPublicHooksNectarSchedulesRoute: typeof ApiPublicHooksNectarSchedulesRoute
   ApiPublicHooksSmartImportRemindersRoute: typeof ApiPublicHooksSmartImportRemindersRoute
+  ApiPublicOauthGmailCallbackRoute: typeof ApiPublicOauthGmailCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2484,6 +2524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsRetentionRouteImport
       parentRoute: typeof DashboardSettingsRoute
     }
+    '/dashboard/settings/gmail': {
+      id: '/dashboard/settings/gmail'
+      path: '/gmail'
+      fullPath: '/dashboard/settings/gmail'
+      preLoaderRoute: typeof DashboardSettingsGmailRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
     '/dashboard/settings/email': {
       id: '/dashboard/settings/email'
       path: '/email'
@@ -2960,12 +3007,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksNectarSchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/gmail-ingest': {
+      id: '/api/public/hooks/gmail-ingest'
+      path: '/api/public/hooks/gmail-ingest'
+      fullPath: '/api/public/hooks/gmail-ingest'
+      preLoaderRoute: typeof ApiPublicHooksGmailIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/hive-exec/states/$stateCode/onboarding': {
       id: '/dashboard/hive-exec/states/$stateCode/onboarding'
       path: '/onboarding'
       fullPath: '/dashboard/hive-exec/states/$stateCode/onboarding'
       preLoaderRoute: typeof DashboardHiveExecStatesStateCodeOnboardingRouteImport
       parentRoute: typeof DashboardHiveExecStatesStateCodeRoute
+    }
+    '/api/public/oauth/gmail/callback': {
+      id: '/api/public/oauth/gmail/callback'
+      path: '/api/public/oauth/gmail/callback'
+      fullPath: '/api/public/oauth/gmail/callback'
+      preLoaderRoute: typeof ApiPublicOauthGmailCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -3155,6 +3216,7 @@ interface DashboardSettingsRouteChildren {
   DashboardSettingsAutomationRulesRoute: typeof DashboardSettingsAutomationRulesRoute
   DashboardSettingsBankMappingRoute: typeof DashboardSettingsBankMappingRoute
   DashboardSettingsEmailRoute: typeof DashboardSettingsEmailRoute
+  DashboardSettingsGmailRoute: typeof DashboardSettingsGmailRoute
   DashboardSettingsRetentionRoute: typeof DashboardSettingsRetentionRoute
   DashboardSettingsServiceCatalogRoute: typeof DashboardSettingsServiceCatalogRoute
   DashboardSettingsServiceCodesRoute: typeof DashboardSettingsServiceCodesRoute
@@ -3166,6 +3228,7 @@ const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
   DashboardSettingsAutomationRulesRoute: DashboardSettingsAutomationRulesRoute,
   DashboardSettingsBankMappingRoute: DashboardSettingsBankMappingRoute,
   DashboardSettingsEmailRoute: DashboardSettingsEmailRoute,
+  DashboardSettingsGmailRoute: DashboardSettingsGmailRoute,
   DashboardSettingsRetentionRoute: DashboardSettingsRetentionRoute,
   DashboardSettingsServiceCatalogRoute: DashboardSettingsServiceCatalogRoute,
   DashboardSettingsServiceCodesRoute: DashboardSettingsServiceCodesRoute,
@@ -3395,9 +3458,11 @@ const rootRouteChildren: RootRouteChildren = {
   UnauthorizedRoute: UnauthorizedRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
+  ApiPublicHooksGmailIngestRoute: ApiPublicHooksGmailIngestRoute,
   ApiPublicHooksNectarSchedulesRoute: ApiPublicHooksNectarSchedulesRoute,
   ApiPublicHooksSmartImportRemindersRoute:
     ApiPublicHooksSmartImportRemindersRoute,
+  ApiPublicOauthGmailCallbackRoute: ApiPublicOauthGmailCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

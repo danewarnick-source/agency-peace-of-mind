@@ -267,6 +267,7 @@ export function PunchPad({
   const [baselineChecked, setBaselineChecked]   = useState(false);
   const [narrative, setNarrative]               = useState("");
   const [showNarrativeError, setShowNarrativeError] = useState(false);
+  const [longShiftAck, setLongShiftAck]         = useState(false);
 
   // ── NECTAR Documentation Coach state ────────────────────────────────────────────
   const [aiBusy, setAiBusy]               = useState(false);

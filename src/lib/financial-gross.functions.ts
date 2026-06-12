@@ -123,3 +123,74 @@ export const getGrossLedger = createServerFn({ method: "POST" })
     if (error) throw error;
     return (rows ?? []) as GrossLedgerRow[];
   });
+
+// Tracking-start detection: earliest real financial activity for the org across
+// EVV, HHS billable days, contractor monthly pay, and provider ledger entries.
+// Floored to the start of its year. Returns null if the org has no data.
+const StartInput = z.object({ organizationId: z.string().uuid() });
+
+export type GrossTrackingStart = {
+  earliestDate: string | null; // ISO yyyy-mm-dd of MIN activity, or null
+  earliestYear: number | null;
+  earliestMonth: number | null; // 1-12
+};
+
+export const getGrossTrackingStart = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => StartInput.parse(i))
+  .handler(async ({ data, context }): Promise<GrossTrackingStart> => {
+    await gate(context, data.organizationId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const candidates: Date[] = [];
+
+    const [evv, hhs, ctr, led] = await Promise.all([
+      sb
+        .from("evv_timesheets")
+        .select("clock_in_timestamp")
+        .eq("organization_id", data.organizationId)
+        .order("clock_in_timestamp", { ascending: true })
+        .limit(1),
+      sb
+        .from("hhs_daily_records_v")
+        .select("record_date")
+        .eq("organization_id", data.organizationId)
+        .eq("billable", true)
+        .order("record_date", { ascending: true })
+        .limit(1),
+      sb
+        .from("contractor_monthly_pay")
+        .select("year, month")
+        .eq("organization_id", data.organizationId)
+        .order("year", { ascending: true })
+        .order("month", { ascending: true })
+        .limit(1),
+      sb
+        .from("provider_ledger_entries")
+        .select("period_year, period_month")
+        .eq("organization_id", data.organizationId)
+        .order("period_year", { ascending: true })
+        .order("period_month", { ascending: true })
+        .limit(1),
+    ]);
+
+    const evvRow = evv.data?.[0];
+    if (evvRow?.clock_in_timestamp) candidates.push(new Date(evvRow.clock_in_timestamp));
+    const hhsRow = hhs.data?.[0];
+    if (hhsRow?.record_date) candidates.push(new Date(`${hhsRow.record_date}T00:00:00`));
+    const ctrRow = ctr.data?.[0];
+    if (ctrRow?.year && ctrRow?.month) candidates.push(new Date(ctrRow.year, ctrRow.month - 1, 1));
+    const ledRow = led.data?.[0];
+    if (ledRow?.period_year && ledRow?.period_month)
+      candidates.push(new Date(ledRow.period_year, ledRow.period_month - 1, 1));
+
+    if (candidates.length === 0) {
+      return { earliestDate: null, earliestYear: null, earliestMonth: null };
+    }
+    const min = new Date(Math.min(...candidates.map((d) => d.getTime())));
+    const y = min.getFullYear();
+    const m = min.getMonth() + 1;
+    const iso = `${y}-${String(m).padStart(2, "0")}-01`;
+    return { earliestDate: iso, earliestYear: y, earliestMonth: m };
+  });
+

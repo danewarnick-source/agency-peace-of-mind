@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
@@ -14,6 +14,7 @@ import {
   getGrossHhs,
   getGrossCtr,
   getGrossLedger,
+  getGrossTrackingStart,
 } from "@/lib/financial-gross.functions";
 
 export const Route = createFileRoute("/dashboard/financial/gross")({
@@ -38,14 +39,40 @@ function GrossPage() {
   const { data: org } = useCurrentOrg();
   const { prefixLabel } = useOrgDisplayName();
   const today = new Date();
-  const [startYear, setStartYear] = useState(today.getFullYear() - 2);
-  const [endYear, setEndYear] = useState(today.getFullYear() + 1);
+  const currentYear = today.getFullYear();
+  const [startYear, setStartYear] = useState(currentYear - 2);
+  const [endYear, setEndYear] = useState(currentYear + 1);
 
   const cbcFn = useServerFn(getGrossCbc);
   const evvFn = useServerFn(getGrossEvv);
   const hhsFn = useServerFn(getGrossHhs);
   const ctrFn = useServerFn(getGrossCtr);
   const ledgerFn = useServerFn(getGrossLedger);
+  const startFn = useServerFn(getGrossTrackingStart);
+
+  // Per-org auto-detected financial tracking start (cached once per org).
+  const trackQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["gross-tracking-start", org?.organization_id],
+    queryFn: () => startFn({ data: { organizationId: org!.organization_id } }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const trackingStartYear = trackQ.data?.earliestYear ?? null;
+  const hasAnyData = trackingStartYear !== null;
+
+  // Once we know the floor, clamp the window so we never render pre-tracking rows.
+  // If the org has no data at all, collapse to just the current year.
+  useEffect(() => {
+    if (trackQ.data === undefined) return;
+    if (!hasAnyData) {
+      setStartYear(currentYear);
+      setEndYear(currentYear);
+      return;
+    }
+    setStartYear((y) => (y < trackingStartYear! ? trackingStartYear! : y));
+    setEndYear((y) => (y < trackingStartYear! ? trackingStartYear! : y));
+  }, [trackQ.data, hasAnyData, trackingStartYear, currentYear]);
+
 
   // Client billing code rates
   const cbcQ = useQuery({
@@ -263,16 +290,41 @@ function GrossPage() {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={() => { setStartYear((y) => y - 1); setEndYear((y) => y - 1); }}><ChevronLeft className="h-4 w-4" /></Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={trackingStartYear !== null && startYear <= trackingStartYear}
+                onClick={() => {
+                  const floor = trackingStartYear ?? -Infinity;
+                  if (startYear - 1 < floor) return;
+                  setStartYear((y) => y - 1);
+                  setEndYear((y) => y - 1);
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
               <span className="min-w-[64px] text-center text-sm font-medium">{startYear}</span>
               <Button variant="outline" size="sm" onClick={() => { setStartYear((y) => y + 1); setEndYear((y) => y + 1); }}><ChevronRight className="h-4 w-4" /></Button>
             </div>
             <span className="text-sm text-muted-foreground">to</span>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={() => setEndYear((y) => y - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={endYear <= startYear}
+                onClick={() => setEndYear((y) => Math.max(startYear, y - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
               <span className="min-w-[64px] text-center text-sm font-medium">{endYear}</span>
               <Button variant="outline" size="sm" onClick={() => setEndYear((y) => y + 1)}><ChevronRight className="h-4 w-4" /></Button>
             </div>
+            {trackingStartYear !== null && (
+              <span className="text-xs text-muted-foreground">Tracking began {trackingStartYear}</span>
+            )}
+            {!hasAnyData && !trackQ.isLoading && (
+              <span className="text-xs text-muted-foreground">No financial activity yet</span>
+            )}
           </div>
         </div>
 

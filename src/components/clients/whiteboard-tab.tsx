@@ -410,16 +410,19 @@ export function ClientWhiteboardTab() {
               category="direct_support"
               referrals={byCategory.direct_support.refs}
               clients={byCategory.direct_support.clients}
+              organizationId={organizationId!}
             />
             <CategoryLane
               category="rhs"
               referrals={byCategory.rhs.refs}
               clients={byCategory.rhs.clients}
+              organizationId={organizationId!}
             />
             <CategoryLane
               category="hhs"
               referrals={byCategory.hhs.refs}
               clients={byCategory.hhs.clients}
+              organizationId={organizationId!}
             />
           </div>
 

@@ -112,7 +112,12 @@ export function ReferralsPage() {
             in later increments.
           </p>
         </div>
-        {orgId && <NewReferralDialog organizationId={orgId} />}
+        {orgId && (
+          <div className="flex flex-wrap gap-2">
+            <ProviderInterestOutlineButton organizationId={orgId} />
+            <NewReferralDialog organizationId={orgId} />
+          </div>
+        )}
       </div>
 
       <PipelineStatsBar stats={stats.data} />

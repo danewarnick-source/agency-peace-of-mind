@@ -764,6 +764,7 @@ export function PunchPad({
     setDismissingKey(null);
     setDismissReasonDraft("");
     setBehaviorAnswers(emptyBehaviorAnswers);
+    setLongShiftAck(false);
     stopRecording();
     setShowCompliance(true);
   }

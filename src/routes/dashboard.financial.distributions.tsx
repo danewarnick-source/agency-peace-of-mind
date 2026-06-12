@@ -36,7 +36,7 @@ import {
 export const Route = createFileRoute("/dashboard/financial/distributions")({
   head: () => ({ meta: [{ title: "Distributions — HIVE" }] }),
   component: () => (
-    <RequireRole roles={["admin", "manager", "super_admin"]}>
+    <RequireRole roles={["admin", "super_admin"]}>
       <DistributionsPage />
     </RequireRole>
   ),

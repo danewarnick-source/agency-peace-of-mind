@@ -338,7 +338,9 @@ function HostsPanel({
 }
 
 export function ClientWhiteboardTab() {
-  const { organizationId } = useOrgContext();
+  const { data: org } = useCurrentOrg();
+  const organizationId = org?.organization_id;
+
   const fetchFn = useServerFn(getWhiteboardSnapshot);
   const q = useQuery({
     queryKey: ["whiteboard-snapshot", organizationId],

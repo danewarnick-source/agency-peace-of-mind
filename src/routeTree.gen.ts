@@ -121,6 +121,7 @@ import { Route as DashboardCoursesCeRouteImport } from './routes/dashboard.cours
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
 import { Route as DashboardClientTrainingClientIdRouteImport } from './routes/dashboard.client-training.$clientId'
 import { Route as DashboardClientIntakeClientIdRouteImport } from './routes/dashboard.client-intake.$clientId'
+import { Route as DashboardBillingTotalsRouteImport } from './routes/dashboard.billing.totals'
 import { Route as DashboardBillingSubscriptionRouteImport } from './routes/dashboard.billing.subscription'
 import { Route as DashboardBillingNectarRouteImport } from './routes/dashboard.billing.nectar'
 import { Route as DashboardBillingMonthlyGridRouteImport } from './routes/dashboard.billing.monthly-grid'
@@ -736,6 +737,11 @@ const DashboardClientIntakeClientIdRoute =
     path: '/client-intake/$clientId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardBillingTotalsRoute = DashboardBillingTotalsRouteImport.update({
+  id: '/totals',
+  path: '/totals',
+  getParentRoute: () => DashboardBillingRoute,
+} as any)
 const DashboardBillingSubscriptionRoute =
   DashboardBillingSubscriptionRouteImport.update({
     id: '/subscription',
@@ -946,6 +952,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing/monthly-grid': typeof DashboardBillingMonthlyGridRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/billing/subscription': typeof DashboardBillingSubscriptionRoute
+  '/dashboard/billing/totals': typeof DashboardBillingTotalsRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
   '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
@@ -1077,6 +1084,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing/monthly-grid': typeof DashboardBillingMonthlyGridRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/billing/subscription': typeof DashboardBillingSubscriptionRoute
+  '/dashboard/billing/totals': typeof DashboardBillingTotalsRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
   '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
@@ -1215,6 +1223,7 @@ export interface FileRoutesById {
   '/dashboard/billing/monthly-grid': typeof DashboardBillingMonthlyGridRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/billing/subscription': typeof DashboardBillingSubscriptionRoute
+  '/dashboard/billing/totals': typeof DashboardBillingTotalsRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
   '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
@@ -1354,6 +1363,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/monthly-grid'
     | '/dashboard/billing/nectar'
     | '/dashboard/billing/subscription'
+    | '/dashboard/billing/totals'
     | '/dashboard/client-intake/$clientId'
     | '/dashboard/client-training/$clientId'
     | '/dashboard/courses/$courseId'
@@ -1485,6 +1495,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/monthly-grid'
     | '/dashboard/billing/nectar'
     | '/dashboard/billing/subscription'
+    | '/dashboard/billing/totals'
     | '/dashboard/client-intake/$clientId'
     | '/dashboard/client-training/$clientId'
     | '/dashboard/courses/$courseId'
@@ -1622,6 +1633,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/monthly-grid'
     | '/dashboard/billing/nectar'
     | '/dashboard/billing/subscription'
+    | '/dashboard/billing/totals'
     | '/dashboard/client-intake/$clientId'
     | '/dashboard/client-training/$clientId'
     | '/dashboard/courses/$courseId'
@@ -2491,6 +2503,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardClientIntakeClientIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/billing/totals': {
+      id: '/dashboard/billing/totals'
+      path: '/totals'
+      fullPath: '/dashboard/billing/totals'
+      preLoaderRoute: typeof DashboardBillingTotalsRouteImport
+      parentRoute: typeof DashboardBillingRoute
+    }
     '/dashboard/billing/subscription': {
       id: '/dashboard/billing/subscription'
       path: '/subscription'
@@ -2664,6 +2683,7 @@ interface DashboardBillingRouteChildren {
   DashboardBillingMonthlyGridRoute: typeof DashboardBillingMonthlyGridRoute
   DashboardBillingNectarRoute: typeof DashboardBillingNectarRoute
   DashboardBillingSubscriptionRoute: typeof DashboardBillingSubscriptionRoute
+  DashboardBillingTotalsRoute: typeof DashboardBillingTotalsRoute
   DashboardBillingIndexRoute: typeof DashboardBillingIndexRoute
 }
 
@@ -2676,6 +2696,7 @@ const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
   DashboardBillingMonthlyGridRoute: DashboardBillingMonthlyGridRoute,
   DashboardBillingNectarRoute: DashboardBillingNectarRoute,
   DashboardBillingSubscriptionRoute: DashboardBillingSubscriptionRoute,
+  DashboardBillingTotalsRoute: DashboardBillingTotalsRoute,
   DashboardBillingIndexRoute: DashboardBillingIndexRoute,
 }
 

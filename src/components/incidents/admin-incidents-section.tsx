@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -308,18 +308,33 @@ function IncidentCard({
   );
 }
 
-export function AdminIncidentsSection() {
+export function AdminIncidentsSection({
+  initialClientId,
+  initialView,
+}: {
+  initialClientId?: string | null;
+  initialView?: "queue" | "log";
+} = {}) {
   const qc = useQueryClient();
   const listFn = useServerFn(listIncidents);
   const initFn = useServerFn(markUpiInitiated);
   const actorsFn = useServerFn(getIncidentActors);
 
-  const [view, setView] = useState<"queue" | "log">("queue");
-  const [status, setStatus] = useState<"open" | "closed" | "all">("open");
+  const [view, setView] = useState<"queue" | "log">(initialView ?? "queue");
+  const [status, setStatus] = useState<"open" | "closed" | "all">("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [filterClient, setFilterClient] = useState<string>("all");
+  const [filterClient, setFilterClient] = useState<string>(initialClientId ?? "all");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
+
+  // Re-sync when caller hands us a new prefilter (e.g. Residential tab deep-link).
+  useEffect(() => {
+    if (initialClientId) {
+      setFilterClient(initialClientId);
+      setView(initialView ?? "log");
+      setStatus("all");
+    }
+  }, [initialClientId, initialView]);
 
   const { data: caseload = [] } = useCaseload();
   const { data, isLoading } = useQuery({

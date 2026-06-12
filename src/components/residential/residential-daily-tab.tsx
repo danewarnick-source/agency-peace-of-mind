@@ -51,7 +51,13 @@ function thisMonth(): string {
  * exception rollup, monthly cert / quarterly summary status row, and the
  * "Audit pull" that hands a date-range bundle to the existing audit packet.
  */
-export function ResidentialDailyTab() {
+export function ResidentialDailyTab({
+  onOpenIncidents,
+}: {
+  /** Optional deep-link: residential incident chip → admin Incidents tab,
+   *  prefiltered to this client. Compliance Desk wires this up. */
+  onOpenIncidents?: (clientId: string) => void;
+} = {}) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
   const [month, setMonth] = useState<string>(thisMonth());
@@ -321,19 +327,34 @@ export function ResidentialDailyTab() {
                         <Badge key={c} variant="outline" className="text-[10px] font-mono">{c}</Badge>
                       ))}
                       {row.fatalityThisMonth && (
-                        <Badge className="bg-rose-600 text-[10px] text-white hover:bg-rose-600">
-                          §1.26 Fatality
-                        </Badge>
+                        <button
+                          type="button"
+                          onClick={() => onOpenIncidents?.(row.id)}
+                          className="rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400"
+                          aria-label="Open fatality incident in the Incidents log"
+                        >
+                          <Badge className="bg-rose-600 text-[10px] text-white hover:bg-rose-700">
+                            §1.26 Fatality
+                          </Badge>
+                        </button>
                       )}
                       {row.incidentsOpen + row.incidentsClosed > 0 ? (
-                        <Badge
-                          variant={row.incidentsOpen > 0 ? "destructive" : "outline"}
-                          className="text-[10px]"
+                        <button
+                          type="button"
+                          onClick={() => onOpenIncidents?.(row.id)}
+                          className="rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          aria-label="Open this client's incidents in the log"
+                          title="Open in Incidents log"
                         >
-                          {row.incidentsOpen > 0
-                            ? `${row.incidentsOpen} open IR${row.incidentsOpen === 1 ? "" : "s"}`
-                            : `${row.incidentsClosed} IR${row.incidentsClosed === 1 ? "" : "s"} closed`}
-                        </Badge>
+                          <Badge
+                            variant={row.incidentsOpen > 0 ? "destructive" : "outline"}
+                            className="cursor-pointer text-[10px]"
+                          >
+                            {row.incidentsOpen > 0
+                              ? `${row.incidentsOpen} open IR${row.incidentsOpen === 1 ? "" : "s"}`
+                              : `${row.incidentsClosed} IR${row.incidentsClosed === 1 ? "" : "s"} closed`}
+                          </Badge>
+                        </button>
                       ) : (
                         <Badge variant="outline" className="text-[10px] text-muted-foreground">
                           0 incidents

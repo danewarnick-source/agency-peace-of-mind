@@ -401,6 +401,7 @@ function ComplianceDeskPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const [sub, setSub] = useState<"pending" | "needs-review" | "incidents" | "reconcile" | "evv-archive" | "non-evv-archive" | "residential">("pending");
+  const [incidentPrefilterClient, setIncidentPrefilterClient] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState<Row | null>(null);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);
@@ -794,7 +795,10 @@ function ComplianceDeskPage() {
           rejecting={reviewReject.isPending}
         />
       ) : sub === "incidents" ? (
-        <AdminIncidentsSection />
+        <AdminIncidentsSection
+          initialClientId={incidentPrefilterClient}
+          initialView={incidentPrefilterClient ? "log" : "queue"}
+        />
       ) : sub === "reconcile" ? (
         <ReconcileTable
           rows={reconcileQ.data ?? []}
@@ -803,7 +807,12 @@ function ComplianceDeskPage() {
           onReview={setReviewRow}
         />
       ) : sub === "residential" ? (
-        <ResidentialDailyTab />
+        <ResidentialDailyTab
+          onOpenIncidents={(clientId) => {
+            setIncidentPrefilterClient(clientId);
+            setSub("incidents");
+          }}
+        />
       ) : sub === "evv-archive" ? (
         <ArchiveTable
           variant="evv"

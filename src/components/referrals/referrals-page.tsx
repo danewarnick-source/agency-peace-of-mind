@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,16 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Plus, UserPlus, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  Plus,
+  UserPlus,
+  Archive as ArchiveIcon,
+  RotateCcw,
+  Upload,
+  Sparkles,
+  FileText,
+} from "lucide-react";
 import {
   createReferral,
   createSupportCoordinator,
@@ -39,6 +49,12 @@ import {
   restoreReferral,
   listArchivedReferrals,
 } from "@/lib/retention.functions";
+import {
+  recordReferralDocument,
+  parseReferralDocument,
+  attachDraftDocumentsToReferral,
+  type ReferralPrefill,
+} from "@/lib/referral-docs.functions";
 import {
   PipelineStatsBar,
   ReferralDetailDialog,
@@ -55,6 +71,7 @@ const CATEGORIES: { key: Category; label: string }[] = [
   { key: "rhs", label: "RHS" },
   { key: "hhs", label: "HHS" },
 ];
+
 
 function splitList(s: string): string[] {
   return s

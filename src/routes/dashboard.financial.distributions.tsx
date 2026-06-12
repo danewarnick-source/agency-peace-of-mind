@@ -16,7 +16,7 @@ import { computeEntryUnits, fmtUSD } from "@/lib/billing-units";
 import { toast } from "sonner";
 import { RequireRole } from "@/components/rbac-guard";
 
-export const Route = createFileRoute("/dashboard/billing/distributions")({
+export const Route = createFileRoute("/dashboard/financial/distributions")({
   head: () => ({ meta: [{ title: "Distributions — HIVE" }] }),
   component: () => (
     <RequireRole roles={["admin", "manager", "super_admin"]}>

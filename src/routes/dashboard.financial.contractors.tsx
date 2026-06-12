@@ -11,7 +11,7 @@ import { computeEntryUnits, unitsToHours, fmtHours, fmtUSD } from "@/lib/billing
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/billing/contractors")({
+export const Route = createFileRoute("/dashboard/financial/contractors")({
   head: () => ({ meta: [{ title: "Contractors — HIVE" }] }),
   component: ContractorsPage,
 });

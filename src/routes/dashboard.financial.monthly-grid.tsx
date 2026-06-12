@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, Users2, GraduationCap, Info, Briefcase } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export const Route = createFileRoute("/dashboard/billing/monthly-grid")({
+export const Route = createFileRoute("/dashboard/financial/monthly-grid")({
   head: () => ({ meta: [{ title: "Monthly Grid — HIVE" }] }),
   component: MonthlyGridPage,
 });

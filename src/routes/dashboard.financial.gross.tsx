@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, BarChart3, Info } from "lucide-react";
 import { computeEntryUnits, fmtUSD } from "@/lib/billing-units";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export const Route = createFileRoute("/dashboard/billing/gross")({
+export const Route = createFileRoute("/dashboard/financial/gross")({
   head: () => ({ meta: [{ title: "TNS Gross — HIVE" }] }),
   component: GrossPage,
 });

@@ -11,7 +11,7 @@ import { computePeriodBounds, type PaySchedule } from "@/lib/pay-periods";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/billing/totals")({
+export const Route = createFileRoute("/dashboard/financial/totals")({
   head: () => ({ meta: [{ title: "Totals — HIVE" }] }),
   component: TotalsPage,
 });

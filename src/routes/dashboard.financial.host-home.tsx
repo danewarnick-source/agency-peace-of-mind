@@ -10,7 +10,7 @@ import { fmtUSD } from "@/lib/billing-units";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/billing/host-home")({
+export const Route = createFileRoute("/dashboard/financial/host-home")({
   head: () => ({ meta: [{ title: "Host Home — HIVE" }] }),
   component: HostHomePage,
 });

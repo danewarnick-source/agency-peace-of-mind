@@ -171,6 +171,25 @@ export function ResidentialDailyTab() {
     },
   });
 
+  // §1.27 incident counts for the month — feeds the per-client "Incidents"
+  // chip and matches the admin Incidents queue / log filters exactly.
+  const incidentsQ = useQuery({
+    enabled: clientIds.length > 0,
+    queryKey: ["res-incidents", orgId, start, end, clientIds.join(",")],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("incident_reports")
+        .select("id, client_id, discovered_at, status, is_fatality")
+        .eq("organization_id", orgId)
+        .gte("discovered_at", `${start}T00:00:00Z`)
+        .lte("discovered_at", `${end}T23:59:59Z`)
+        .in("client_id", clientIds);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; client_id: string; discovered_at: string; status: string | null; is_fatality: boolean | null }>;
+    },
+  });
+
   const summary = useMemo(() => {
     type Row = {
       id: string;
@@ -182,6 +201,9 @@ export function ResidentialDailyTab() {
       missingDays: number;
       supportHoursDelivered: number;
       supervisionContacts: number;
+      incidentsOpen: number;
+      incidentsClosed: number;
+      fatalityThisMonth: boolean;
     };
     const map = new Map<string, Row>();
     for (const c of clients) {
@@ -195,6 +217,9 @@ export function ResidentialDailyTab() {
         missingDays: 0,
         supportHoursDelivered: 0,
         supervisionContacts: 0,
+        incidentsOpen: 0,
+        incidentsClosed: 0,
+        fatalityThisMonth: false,
       });
     }
     for (const r of dailyRows) {
@@ -220,8 +245,15 @@ export function ResidentialDailyTab() {
       const row = map.get(s.client_id);
       if (row) row.supervisionContacts += 1;
     }
+    for (const ir of incidentsQ.data ?? []) {
+      const row = map.get(ir.client_id);
+      if (!row) continue;
+      if (ir.status === "closed") row.incidentsClosed += 1;
+      else row.incidentsOpen += 1;
+      if (ir.is_fatality) row.fatalityThisMonth = true;
+    }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [clients, dailyRows, punchQ.data, supervisionQ.data]);
+  }, [clients, dailyRows, punchQ.data, supervisionQ.data, incidentsQ.data]);
 
   // Amber under 75% with <1 week left; red when month closed under target.
   const now = new Date();
@@ -284,10 +316,29 @@ export function ResidentialDailyTab() {
                 <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
                   <div>
                     <CardTitle className="text-sm">{row.name}</CardTitle>
-                    <div className="mt-1 flex flex-wrap gap-1">
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
                       {row.codes.map((c) => (
                         <Badge key={c} variant="outline" className="text-[10px] font-mono">{c}</Badge>
                       ))}
+                      {row.fatalityThisMonth && (
+                        <Badge className="bg-rose-600 text-[10px] text-white hover:bg-rose-600">
+                          §1.26 Fatality
+                        </Badge>
+                      )}
+                      {row.incidentsOpen + row.incidentsClosed > 0 ? (
+                        <Badge
+                          variant={row.incidentsOpen > 0 ? "destructive" : "outline"}
+                          className="text-[10px]"
+                        >
+                          {row.incidentsOpen > 0
+                            ? `${row.incidentsOpen} open IR${row.incidentsOpen === 1 ? "" : "s"}`
+                            : `${row.incidentsClosed} IR${row.incidentsClosed === 1 ? "" : "s"} closed`}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                          0 incidents
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">

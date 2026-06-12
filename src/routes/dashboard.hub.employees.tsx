@@ -1,31 +1,46 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { HubShell } from "@/components/admin-hubs/hub-shell";
+import { HubShell, type HubTab } from "@/components/admin-hubs/hub-shell";
 import { RequirePermission } from "@/components/rbac-guard";
+import { usePermissions } from "@/hooks/use-permissions";
 import { EmployeesPage } from "./dashboard.employees.index";
 import { HrAdminPage } from "./dashboard.hr-admin";
+import { HostsPage } from "@/components/hosts/hosts-page";
 
-const search = z.object({ tab: z.enum(["roster", "compliance"]).optional() });
+const search = z.object({
+  tab: z.enum(["roster", "hosts", "compliance"]).optional(),
+});
+
+function EmployeesHub() {
+  const { can } = usePermissions();
+  const tabs: HubTab[] = [
+    { key: "roster", label: "Roster", render: () => <EmployeesPage /> },
+  ];
+  if (can("view_referrals") || can("manage_referrals")) {
+    tabs.push({
+      key: "hosts",
+      label: "Hosts",
+      render: () => (
+        <RequirePermission perm="view_referrals">
+          <HostsPage />
+        </RequirePermission>
+      ),
+    });
+  }
+  tabs.push({
+    key: "compliance",
+    label: "Compliance",
+    render: () => (
+      <RequirePermission perm="manage_users">
+        <HrAdminPage />
+      </RequirePermission>
+    ),
+  });
+  return <HubShell title="Employees" basePath="/dashboard/hub/employees" tabs={tabs} />;
+}
 
 export const Route = createFileRoute("/dashboard/hub/employees")({
   head: () => ({ meta: [{ title: "Employees — HIVE" }] }),
   validateSearch: (s) => search.parse(s),
-  component: () => (
-    <HubShell
-      title="Employees"
-      basePath="/dashboard/hub/employees"
-      tabs={[
-        { key: "roster", label: "Roster", render: () => <EmployeesPage /> },
-        {
-          key: "compliance",
-          label: "Compliance",
-          render: () => (
-            <RequirePermission perm="manage_users">
-              <HrAdminPage />
-            </RequirePermission>
-          ),
-        },
-      ]}
-    />
-  ),
+  component: EmployeesHub,
 });

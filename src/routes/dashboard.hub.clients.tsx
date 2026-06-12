@@ -9,10 +9,12 @@ import { TeamsPage } from "./dashboard.teams";
 import { PbaLedgerPage } from "./dashboard.pba-ledger";
 import { ClientLoansPage } from "./dashboard.client-loans";
 import { ReferralsPage } from "@/components/referrals/referrals-page";
+import { ClientWhiteboardTab } from "@/components/clients/whiteboard-tab";
 
 const search = z.object({
-  tab: z.enum(["directory", "referrals", "teams", "funds"]).optional(),
+  tab: z.enum(["directory", "whiteboard", "referrals", "teams", "funds"]).optional(),
 });
+
 
 function ClientsHub() {
   const { can } = usePermissions();
@@ -20,6 +22,15 @@ function ClientsHub() {
     { key: "directory", label: "Directory", render: () => <ClientsPage /> },
   ];
   if (can("view_referrals") || can("manage_referrals")) {
+    tabs.push({
+      key: "whiteboard",
+      label: "Whiteboard",
+      render: () => (
+        <RequirePermission perm="view_referrals">
+          <ClientWhiteboardTab />
+        </RequirePermission>
+      ),
+    });
     tabs.push({
       key: "referrals",
       label: "Referrals",
@@ -31,6 +42,7 @@ function ClientsHub() {
     });
   }
   tabs.push(
+
     {
       key: "teams",
       label: "Teams & homes",

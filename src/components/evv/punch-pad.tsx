@@ -36,6 +36,7 @@ import {
 import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
 import { getPendingTrackingForms } from "@/lib/forms.functions";
 import { PendingTrackingFormsDialog, type PendingForm } from "@/components/evv/pending-tracking-forms-dialog";
+import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
 
 
 

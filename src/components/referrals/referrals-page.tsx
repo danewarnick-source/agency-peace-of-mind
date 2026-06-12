@@ -29,9 +29,17 @@ import {
   createReferral,
   createSupportCoordinator,
   findPossibleDuplicateReferral,
+  getReferralPipelineStats,
   listReferrals,
   listSupportCoordinators,
+  type ReferralStage,
 } from "@/lib/referrals.functions";
+import {
+  PipelineStatsBar,
+  ReferralDetailDialog,
+  ReferralStageBadge,
+  StageAdvancer,
+} from "./referral-pipeline";
 
 type Category = "direct_support" | "rhs" | "hhs";
 const CATEGORIES: { key: Category; label: string }[] = [

@@ -862,6 +862,7 @@ export const recomputeReferralMatchScore = createServerFn({ method: "POST" })
         best_host_ids: computed.best_host_ids,
         weights: computed.weights,
         reasons: computed.reasons,
+        scored_components: computed.scored_components,
         computed_at: computed.computed_at,
       },
       { onConflict: "referral_id" },
@@ -869,3 +870,4 @@ export const recomputeReferralMatchScore = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return computed;
   });
+

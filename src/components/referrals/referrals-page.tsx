@@ -56,6 +56,10 @@ import {
   type ReferralPrefill,
 } from "@/lib/referral-docs.functions";
 import {
+  discardReferral,
+  archiveAutoIngestedReferral,
+} from "@/lib/gmail.functions";
+import {
   PipelineStatsBar,
   ReferralDetailDialog,
   ReferralStageBadge,
@@ -237,6 +241,11 @@ export function ReferralsPage() {
                             <ReferralStageBadge
                               stage={(r.stage ?? "new") as ReferralStage}
                             />
+                            {r.source === "email" && (
+                              <Badge className="bg-amber-100 text-[10px] text-amber-900 hover:bg-amber-100">
+                                Auto-ingested — review
+                              </Badge>
+                            )}
                             {r.due_date && (
                               <Badge variant="outline" className="text-[10px]">
                                 Due {r.due_date}
@@ -267,7 +276,20 @@ export function ReferralsPage() {
                               currentStage={(r.stage ?? "new") as ReferralStage}
                             />
                             <div className="flex items-center gap-3">
-                              <ArchiveReferralButton organizationId={orgId} referralId={r.id} />
+                              {r.source === "email" && (
+                                <DiscardIngestedButton
+                                  organizationId={orgId}
+                                  referralId={r.id}
+                                />
+                              )}
+                              {r.source === "email" ? (
+                                <ArchiveAutoIngestedButton
+                                  organizationId={orgId}
+                                  referralId={r.id}
+                                />
+                              ) : (
+                                <ArchiveReferralButton organizationId={orgId} referralId={r.id} />
+                              )}
                               <button
                                 type="button"
                                 className="text-[11px] text-muted-foreground hover:text-foreground"
@@ -1170,5 +1192,112 @@ export function ArchiveReferralButton({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DiscardIngestedButton({
+  organizationId,
+  referralId,
+}: {
+  organizationId: string;
+  referralId: string;
+}) {
+  const qc = useQueryClient();
+  const discardFn = useServerFn(discardReferral);
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const m = useMutation({
+    mutationFn: () =>
+      discardFn({
+        data: {
+          organization_id: organizationId,
+          referral_id: referralId,
+          reason: reason.trim() || undefined,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Auto-ingested referral discarded (purges in 7 days)");
+      qc.invalidateQueries({ queryKey: ["referrals", organizationId] });
+      setOpen(false);
+      setReason("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="text-[11px] text-muted-foreground hover:text-destructive"
+          title="Discard — soft delete, recoverable for 7 days"
+        >
+          Discard
+        </button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Discard auto-ingested referral</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Use this for emails the parser shouldn't have picked up (spam, off-topic,
+          not actually a referral). Soft-deleted now, purged after 7 days. A minimal
+          tombstone is kept for audit.
+        </p>
+        <div className="grid gap-2">
+          <Label htmlFor="discard-reason">Reason (optional)</Label>
+          <Textarea
+            id="discard-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. not a referral, duplicate thread…"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            variant="destructive"
+            onClick={() => m.mutate()}
+            disabled={m.isPending}
+          >
+            Discard
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ArchiveAutoIngestedButton({
+  organizationId,
+  referralId,
+}: {
+  organizationId: string;
+  referralId: string;
+}) {
+  const qc = useQueryClient();
+  const archiveFn = useServerFn(archiveAutoIngestedReferral);
+  const m = useMutation({
+    mutationFn: () =>
+      archiveFn({
+        data: { organization_id: organizationId, referral_id: referralId },
+      }),
+    onSuccess: () => {
+      toast.success("Archived (purges in 30 days)");
+      qc.invalidateQueries({ queryKey: ["referrals", organizationId] });
+      qc.invalidateQueries({ queryKey: ["referrals-archived", organizationId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <button
+      type="button"
+      className="text-[11px] text-muted-foreground hover:text-foreground"
+      onClick={() => m.mutate()}
+      disabled={m.isPending}
+      title="Archive — recoverable for 30 days, then purged"
+    >
+      <ArchiveIcon className="mr-1 inline h-3 w-3" />
+      Archive
+    </button>
   );
 }

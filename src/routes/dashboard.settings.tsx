@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck, CreditCard, Mail } from "lucide-react";
+import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck, CreditCard, Mail, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 import { CelebrationSettings } from "@/components/celebrations/celebration-settings";
@@ -215,6 +215,21 @@ function SettingsPage() {
               <div>
                 <h2 className="text-base font-semibold">Referral retention</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Configure how long referrals stay active after their due date before being archived, and the grace period before purge. Archive is recoverable; a tombstone is kept after purge for audit.</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </div>
+        </Link>
+      )}
+
+      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+        <Link to="/dashboard/settings/gmail" className="group lg:col-span-2">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
+            <div className="flex items-start gap-4">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><Inbox className="h-5 w-5" /></div>
+              <div>
+                <h2 className="text-base font-semibold">Gmail referral ingestion</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Connect a provider Gmail inbox (read-only) so matching referral emails auto-parse into reviewable drafts every 5 minutes. Configure sender / subject rules and review the PHI ingestion audit log.</p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />

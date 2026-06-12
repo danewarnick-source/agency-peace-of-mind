@@ -1395,6 +1395,8 @@ function AllHomesBoard({
                             parent_shift_id: sh.parent_shift_id,
                           }))}
                           requirements={dayReqs}
+                          computedRequiredMinutes={computedReqByDayBySiteName?.get(s.name.toLowerCase())?.get(isoDay(d))}
+                          tooltipNote={twoToOneBySiteName?.has(s.name.toLowerCase()) ? "2:1 ratio requires an approved rights modification (SOW §1.33)." : undefined}
                         />
                       </div>
                     );

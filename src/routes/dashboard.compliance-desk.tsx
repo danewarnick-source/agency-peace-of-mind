@@ -795,7 +795,10 @@ function ComplianceDeskPage() {
           rejecting={reviewReject.isPending}
         />
       ) : sub === "incidents" ? (
-        <AdminIncidentsSection />
+        <AdminIncidentsSection
+          initialClientId={incidentPrefilterClient}
+          initialView={incidentPrefilterClient ? "log" : "queue"}
+        />
       ) : sub === "reconcile" ? (
         <ReconcileTable
           rows={reconcileQ.data ?? []}
@@ -804,7 +807,12 @@ function ComplianceDeskPage() {
           onReview={setReviewRow}
         />
       ) : sub === "residential" ? (
-        <ResidentialDailyTab />
+        <ResidentialDailyTab
+          onOpenIncidents={(clientId) => {
+            setIncidentPrefilterClient(clientId);
+            setSub("incidents");
+          }}
+        />
       ) : sub === "evv-archive" ? (
         <ArchiveTable
           variant="evv"

@@ -497,6 +497,7 @@ function GridSection({
   rows: GridRow[];
   asOf: string;
 }) {
+  const cellBase = "px-3 py-2 border-r border-border/30 last:border-r-0";
   return (
     <section className="rounded-2xl border border-border bg-card shadow-sm">
       <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -512,14 +513,14 @@ function GridSection({
         <table className="w-full min-w-[1000px] text-sm">
           <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-3 py-2">Client</th>
-              <th className="px-3 py-2">Code</th>
-              <th className="px-3 py-2 text-right">Rate</th>
-              <th className="px-3 py-2 text-right">Units (AUTO)</th>
-              <th className="px-3 py-2 text-right">To Bill</th>
-              <th className="px-3 py-2 text-right">Monthly Max</th>
-              <th className="px-3 py-2 text-right">Remaining (YTD)</th>
-              <th className="px-3 py-2">Staff · hours</th>
+              <th className={`${cellBase}`}>Client</th>
+              <th className={`${cellBase}`}>Code</th>
+              <th className={`${cellBase} text-right`}>Rate</th>
+              <th className={`${cellBase} text-right`}>Units (AUTO)</th>
+              <th className={`${cellBase} text-right`}>To Bill</th>
+              <th className={`${cellBase} text-right`}>Monthly Max</th>
+              <th className={`${cellBase} text-right`}>Remaining (YTD)</th>
+              <th className={`${cellBase}`}>Staff · hours</th>
             </tr>
           </thead>
           <tbody>
@@ -531,14 +532,14 @@ function GridSection({
               const overMax = r.monthly_max != null && u > r.monthly_max;
               return (
                 <tr key={`${r.client.id}::${r.code.service_code}`} className="border-t border-border hover:bg-muted/30">
-                  <td className="px-3 py-2 font-medium">{r.client.last_name}, {r.client.first_name}</td>
-                  <td className="px-3 py-2 font-mono font-semibold">
+                  <td className={`${cellBase} font-medium`}>{r.client.last_name}, {r.client.first_name}</td>
+                  <td className={`${cellBase} font-mono font-semibold`}>
                     {r.code.service_code}
                     <span className={`ml-1 rounded px-1 py-0.5 text-[10px] font-bold ${r.isDaily ? "bg-[#fde9c8] text-[#7a4308]" : "bg-[#e1efff] text-[#11498e]"}`}>
                       {r.isDaily ? "DAILY" : "Q"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td className={`${cellBase} text-right tabular-nums`}>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -550,7 +551,7 @@ function GridSection({
                       </Tooltip>
                     </TooltipProvider>
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className={`${cellBase} text-right`}>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -567,19 +568,19 @@ function GridSection({
                       </Tooltip>
                     </TooltipProvider>
                   </td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
+                  <td className={`${cellBase} text-right font-mono font-semibold tabular-nums`}>
                     {fmtUSD(toBill)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                  <td className={`${cellBase} text-right tabular-nums text-muted-foreground`}>
                     {r.monthly_max != null ? fmtUnits(r.monthly_max) : "—"}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td className={`${cellBase} text-right tabular-nums`}>
                     <span className={r.annual > 0 && r.used_units / r.annual >= 0.9 ? "font-semibold text-[#b45309]" : ""}>
                       {fmtUnits(r.remaining_units)} u
                       {!r.isDaily && <span className="ml-1 text-xs text-muted-foreground">· {fmtHours(unitsToHours(r.remaining_units))} h</span>}
                     </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className={`${cellBase}`}>
                     <StaffCell staff={r.staff} />
                   </td>
                 </tr>

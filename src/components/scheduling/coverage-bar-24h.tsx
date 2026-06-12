@@ -105,9 +105,13 @@ export function CoverageBar24h({ day, shifts, requirements = [], computedRequire
     [shifts],
   );
 
+  const baseTip = hasGap ? "Coverage gap vs required staffing" : hasRequirement ? "Meets ratio-computed requirement" : "";
+  const titleAttr = [baseTip, tooltipNote].filter(Boolean).join(" — ") || undefined;
+
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full", className)} title={titleAttr}>
       <div className={cn("relative w-full rounded-md bg-muted/50 overflow-hidden", micro ? "h-2" : "h-3")}>
+
         {bands.map((b) => (
           <div
             key={b.id}

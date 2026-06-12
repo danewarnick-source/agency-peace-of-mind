@@ -157,8 +157,17 @@ function RulesCard({ organizationId }: { organizationId: string }) {
     subject_contains: "",
   });
 
+  type RulePayload = {
+    organization_id: string;
+    id?: string;
+    rule_name: string;
+    sender_domains: string[];
+    sender_emails: string[];
+    subject_contains: string[];
+    enabled: boolean;
+  };
   const upsert = useMutation({
-    mutationFn: (payload: Parameters<typeof upsertFn>[0]["data"]) => upsertFn({ data: payload }),
+    mutationFn: (payload: RulePayload) => upsertFn({ data: payload }),
     onSuccess: () => {
       toast.success("Rule saved");
       qc.invalidateQueries({ queryKey: ["gmail-rules", organizationId] });

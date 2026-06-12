@@ -1,17 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, BarChart3, Info } from "lucide-react";
 import { computeEntryUnits, fmtUSD } from "@/lib/billing-units";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RequirePermission } from "@/components/rbac-guard";
+import {
+  getGrossCbc,
+  getGrossEvv,
+  getGrossHhs,
+  getGrossCtr,
+  getGrossLedger,
+} from "@/lib/financial-gross.functions";
 
 export const Route = createFileRoute("/dashboard/financial/gross")({
   head: () => ({ meta: [{ title: "TNS Gross — HIVE" }] }),
-  component: GrossPage,
+  component: () => (
+    <RequirePermission perm="view_financial_tns_gross">
+      <GrossPage />
+    </RequirePermission>
+  ),
 });
+
 
 const HHS_CODES = new Set(["HHS"]);
 

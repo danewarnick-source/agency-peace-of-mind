@@ -521,3 +521,179 @@ function MessageCenter() {
     </div>
   );
 }
+
+// ─── Sent messages view ──────────────────────────────────────────────────
+
+function formatSentDate(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function SentMessagesView() {
+  const listSent = useServerFn(listSentExecMessages);
+  const q = useQuery({
+    queryKey: ["exec-sent-messages"],
+    queryFn: () => listSent(),
+  });
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const rows: SentMessageRow[] = q.data ?? [];
+  const open = useMemo(
+    () => rows.find((r) => r.message_id === openId) ?? null,
+    [rows, openId],
+  );
+
+  if (q.isLoading) {
+    return (
+      <NectarCard className="p-6 text-sm text-muted-foreground">
+        Loading sent messages…
+      </NectarCard>
+    );
+  }
+  if (q.isError) {
+    return (
+      <NectarCard className="p-6 text-sm text-destructive">
+        {q.error instanceof Error ? q.error.message : "Failed to load sent messages."}
+      </NectarCard>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <NectarCard className="p-10 text-center text-sm text-muted-foreground">
+        <Mail className="mx-auto mb-2 h-6 w-6 opacity-60" />
+        You haven't sent any messages yet.
+      </NectarCard>
+    );
+  }
+
+  if (open) {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setOpenId(null)}
+          className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          ← Back to Sent
+        </button>
+        <NectarCard className="p-6">
+          <h2 className="font-display text-xl font-bold text-[#0f1b3d]">{open.subject}</h2>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Sent {formatSentDate(open.created_at)}
+            <span className="mx-1.5">·</span>
+            {open.recipient_count} recipient{open.recipient_count === 1 ? "" : "s"}
+            <span className="mx-1.5">·</span>
+            Read by {open.read_count} of {open.recipient_count} org{open.recipient_count === 1 ? "" : "s"}
+            <span className="mx-1.5">·</span>
+            {open.attachment_count} attachment{open.attachment_count === 1 ? "" : "s"}
+          </div>
+          <div className="mt-5 whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-3 text-sm leading-relaxed text-foreground">
+            {open.body || <span className="italic text-muted-foreground">(no body)</span>}
+          </div>
+          <div className="mt-6 border-t border-border pt-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Recipient organizations ({open.recipient_count})
+            </div>
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Organization</th>
+                    <th className="px-3 py-2 font-semibold">Read</th>
+                    <th className="px-3 py-2 font-semibold">Read at</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {open.recipients.map((r) => (
+                    <tr key={r.organization_id} className="border-t border-border">
+                      <td className="px-3 py-2">
+                        <span className="font-medium text-[#0f1b3d]">{r.organization_name}</span>
+                        {r.is_demo && (
+                          <span className="ml-2 inline-flex items-center rounded-full border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+                            Demo
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {r.read_at ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700">
+                            <Eye className="h-3.5 w-3.5" /> Read
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            <EyeOff className="h-3.5 w-3.5" /> Unread
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {r.read_at ? formatSentDate(r.read_at) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </NectarCard>
+      </div>
+    );
+  }
+
+  return (
+    <NectarCard className="overflow-hidden p-0">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2 font-semibold">Subject</th>
+              <th className="px-4 py-2 font-semibold">Sent</th>
+              <th className="px-4 py-2 font-semibold">Recipients</th>
+              <th className="px-4 py-2 font-semibold">Read status</th>
+              <th className="px-4 py-2 font-semibold">Files</th>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((m) => (
+              <tr
+                key={m.message_id}
+                onClick={() => setOpenId(m.message_id)}
+                className="cursor-pointer border-t border-border hover:bg-muted/40"
+              >
+                <td className="px-4 py-3 font-medium text-[#0f1b3d]">{m.subject}</td>
+                <td className="px-4 py-3 text-muted-foreground">{formatSentDate(m.created_at)}</td>
+                <td className="px-4 py-3 text-muted-foreground">{m.recipient_count}</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  Read by {m.read_count} of {m.recipient_count} org{m.recipient_count === 1 ? "" : "s"}
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {m.attachment_count > 0 ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Paperclip className="h-3.5 w-3.5" /> {m.attachment_count}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenId(m.message_id);
+                    }}
+                    className="inline-flex min-h-[36px] items-center rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-muted"
+                  >
+                    View
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </NectarCard>
+  );
+}

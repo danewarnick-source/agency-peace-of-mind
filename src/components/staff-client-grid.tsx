@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { User, Search, Clock, Home, Info, ChevronDown, CalendarCheck2 } from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 import { ClientCapBars } from "@/components/staff-mobile/client-cap-bars";
-import { billingUnitLabel, isClockableServiceCode } from "@/lib/service-billing";
+import { billingUnitLabel, isClockableServiceCode, isDailyServiceCode } from "@/lib/service-billing";
+import { isEvvLockedCode } from "@/lib/evv-codes";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;

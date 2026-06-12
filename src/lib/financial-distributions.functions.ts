@@ -33,7 +33,7 @@ export type DistPlan = {
   plan_type: "profit_share" | "investor" | "ownership";
   retention_pct: number;
   expense_selection: Record<string, boolean>;
-  formula_json: unknown | null;
+  formula_json: any | null;
   nectar_summary: string | null;
   status: "draft" | "approved";
   is_active: boolean;

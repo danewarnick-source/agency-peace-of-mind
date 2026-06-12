@@ -7108,6 +7108,47 @@ export type Database = {
           },
         ]
       }
+      org_referral_retention_settings: {
+        Row: {
+          archive_days_after_due: number
+          auto_archive_enabled: boolean
+          created_at: string
+          id: string
+          organization_id: string
+          purge_grace_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          archive_days_after_due?: number
+          auto_archive_enabled?: boolean
+          created_at?: string
+          id?: string
+          organization_id: string
+          purge_grace_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          archive_days_after_due?: number
+          auto_archive_enabled?: boolean
+          created_at?: string
+          id?: string
+          organization_id?: string
+          purge_grace_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_referral_retention_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_shift_behavior_settings: {
         Row: {
           enabled: boolean
@@ -8410,9 +8451,50 @@ export type Database = {
           },
         ]
       }
+      referral_purge_tombstones: {
+        Row: {
+          archive_reason: string | null
+          archived_at: string
+          decision_outcome: string | null
+          id: string
+          organization_id: string
+          purged_at: string
+          referral_id: string
+        }
+        Insert: {
+          archive_reason?: string | null
+          archived_at: string
+          decision_outcome?: string | null
+          id?: string
+          organization_id: string
+          purged_at?: string
+          referral_id: string
+        }
+        Update: {
+          archive_reason?: string | null
+          archived_at?: string
+          decision_outcome?: string | null
+          id?: string
+          organization_id?: string
+          purged_at?: string
+          referral_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_purge_tombstones_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referrals: {
         Row: {
           age: number | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           budget_note: string | null
           category: string
           created_at: string
@@ -8431,6 +8513,7 @@ export type Database = {
           location_county: string | null
           need_level: string | null
           organization_id: string
+          purge_after: string | null
           requested_codes: string[]
           source: string
           stage: string
@@ -8441,6 +8524,9 @@ export type Database = {
         }
         Insert: {
           age?: number | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           budget_note?: string | null
           category: string
           created_at?: string
@@ -8459,6 +8545,7 @@ export type Database = {
           location_county?: string | null
           need_level?: string | null
           organization_id: string
+          purge_after?: string | null
           requested_codes?: string[]
           source?: string
           stage?: string
@@ -8469,6 +8556,9 @@ export type Database = {
         }
         Update: {
           age?: number | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           budget_note?: string | null
           category?: string
           created_at?: string
@@ -8487,6 +8577,7 @@ export type Database = {
           location_county?: string | null
           need_level?: string | null
           organization_id?: string
+          purge_after?: string | null
           requested_codes?: string[]
           source?: string
           stage?: string
@@ -11276,6 +11367,10 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: string }
+      archive_eligible_referrals: {
+        Args: { _organization_id: string }
+        Returns: number
+      }
       can_access_import_job: { Args: { _job_id: string }; Returns: boolean }
       can_view_client_intake: {
         Args: { _client: string; _org: string; _viewer: string }
@@ -11523,6 +11618,10 @@ export type Database = {
           p_reporter_name: string
         }
         Returns: undefined
+      }
+      purge_aged_referrals: {
+        Args: { _organization_id: string }
+        Returns: number
       }
       restore_my_admin_role: { Args: never; Returns: undefined }
       seed_standard_service_codes: {

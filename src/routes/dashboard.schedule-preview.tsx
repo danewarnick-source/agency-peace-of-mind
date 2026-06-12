@@ -146,6 +146,26 @@ function SchedulePreviewPage() {
     return m;
   }, [reqsAllQ.data, locationsQ.data]);
 
+  // Ratio-computed residential coverage (Utah DSPD SOW §1.33) — per-day,
+  // per-home required-staff minute arrays derived from each resident's
+  // client_ratios row + away-windows (their own DSI/SEI shifts and 1:1
+  // segments where a staff has them out of the home). Manual overrides
+  // (location_coverage_requirements) only RAISE the bar via max-merging
+  // inside CoverageBar24h.
+  const ratiosAllQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["client-ratios-all", org?.organization_id],
+    queryFn: async () => {
+      const { data: rows, error } = await supabase
+        .from("client_ratios")
+        .select("client_id, ratio_staff, ratio_clients, effective_start, effective_end, setting")
+        .eq("organization_id", org!.organization_id)
+        .eq("setting", "residential");
+      if (error) throw error;
+      return rows ?? [];
+    },
+  });
+
   // Weekly hour targets per (client, code) — drives the 1:1 and host-home meters.
   const listTargetsCall = useServerFn(listClientWeeklyTargets);
   const targetsQ = useQuery({

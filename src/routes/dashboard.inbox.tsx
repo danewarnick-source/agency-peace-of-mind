@@ -35,6 +35,83 @@ function formatDate(iso: string): string {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+function AttachmentPreview({ a }: { a: InboxAttachment }) {
+  const url = a.signed_url!;
+  const mime = (a.mime_type || "").toLowerCase();
+  const name = (a.filename || "").toLowerCase();
+  const isPdf = mime === "application/pdf" || name.endsWith(".pdf");
+  const isImage = mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg|bmp)$/.test(name);
+  const isText =
+    mime.startsWith("text/") ||
+    mime === "application/json" ||
+    mime === "text/csv" ||
+    /\.(txt|csv|json|md|log)$/.test(name);
+
+  const [text, setText] = useState<string | null>(null);
+  const [textErr, setTextErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isText) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const size = Number(res.headers.get("content-length") || 0);
+        if (size && size > 512 * 1024) {
+          setTextErr("File too large to preview inline.");
+          return;
+        }
+        const t = await res.text();
+        if (!cancelled) setText(t.slice(0, 512 * 1024));
+      } catch (e) {
+        if (!cancelled) setTextErr(e instanceof Error ? e.message : "Preview failed");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [url, isText]);
+
+  if (isPdf) {
+    return (
+      <iframe
+        src={url}
+        title={a.filename}
+        className="mt-3 h-[600px] w-full rounded-md border border-border bg-background"
+      />
+    );
+  }
+  if (isImage) {
+    return (
+      <img
+        src={url}
+        alt={a.filename}
+        className="mt-3 max-h-[600px] w-auto max-w-full rounded-md border border-border bg-background"
+      />
+    );
+  }
+  if (isText) {
+    if (textErr) {
+      return (
+        <div className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5" /> {textErr} Use Download instead.
+        </div>
+      );
+    }
+    return (
+      <pre className="mt-3 max-h-[480px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-xs">
+        {text ?? "Loading preview…"}
+      </pre>
+    );
+  }
+  return (
+    <div className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <Info className="h-3.5 w-3.5" /> Inline preview not supported. Use Download.
+    </div>
+  );
+}
+
 function InboxPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? null;

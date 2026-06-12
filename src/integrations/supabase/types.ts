@@ -3203,15 +3203,22 @@ export type Database = {
           ai_trigger_reasons: string[] | null
           approved_at: string | null
           approved_by: string | null
+          attested_accurate: boolean
+          attested_at: string | null
           billed_units: number | null
           client_id: string
           clock_in_timestamp: string
           clock_out_timestamp: string | null
+          corrected_clock_in: string | null
+          corrected_clock_out: string | null
           created_at: string
           denial_reason: string | null
           denied_at: string | null
           denied_by: string | null
           edit_audit_history_log: Json
+          edit_reason: string | null
+          edited_at: string | null
+          edited_by: string | null
           edited_by_admin_name: string | null
           followup_form_types: string[] | null
           geofence_variance_justification: string | null
@@ -3220,6 +3227,7 @@ export type Database = {
           gps_out_coordinates: Json | null
           gps_validated: boolean
           id: string
+          incident_flag: boolean
           is_edited_by_admin: boolean
           is_out_of_bounds: boolean
           late_submission_reason: string | null
@@ -3238,6 +3246,10 @@ export type Database = {
           reconciliation_reviewed_by: string | null
           reconciliation_status: string | null
           requires_followup_form: boolean
+          review_note: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           rounded_clock_in: string | null
           rounded_clock_out: string | null
           service_type_code: string
@@ -3260,15 +3272,22 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           approved_at?: string | null
           approved_by?: string | null
+          attested_accurate?: boolean
+          attested_at?: string | null
           billed_units?: number | null
           client_id: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
+          corrected_clock_in?: string | null
+          corrected_clock_out?: string | null
           created_at?: string
           denial_reason?: string | null
           denied_at?: string | null
           denied_by?: string | null
           edit_audit_history_log?: Json
+          edit_reason?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
           edited_by_admin_name?: string | null
           followup_form_types?: string[] | null
           geofence_variance_justification?: string | null
@@ -3277,6 +3296,7 @@ export type Database = {
           gps_out_coordinates?: Json | null
           gps_validated?: boolean
           id?: string
+          incident_flag?: boolean
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
           late_submission_reason?: string | null
@@ -3295,6 +3315,10 @@ export type Database = {
           reconciliation_reviewed_by?: string | null
           reconciliation_status?: string | null
           requires_followup_form?: boolean
+          review_note?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           rounded_clock_in?: string | null
           rounded_clock_out?: string | null
           service_type_code: string
@@ -3317,15 +3341,22 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           approved_at?: string | null
           approved_by?: string | null
+          attested_accurate?: boolean
+          attested_at?: string | null
           billed_units?: number | null
           client_id?: string
           clock_in_timestamp?: string
           clock_out_timestamp?: string | null
+          corrected_clock_in?: string | null
+          corrected_clock_out?: string | null
           created_at?: string
           denial_reason?: string | null
           denied_at?: string | null
           denied_by?: string | null
           edit_audit_history_log?: Json
+          edit_reason?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
           edited_by_admin_name?: string | null
           followup_form_types?: string[] | null
           geofence_variance_justification?: string | null
@@ -3334,6 +3365,7 @@ export type Database = {
           gps_out_coordinates?: Json | null
           gps_validated?: boolean
           id?: string
+          incident_flag?: boolean
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
           late_submission_reason?: string | null
@@ -3352,6 +3384,10 @@ export type Database = {
           reconciliation_reviewed_by?: string | null
           reconciliation_status?: string | null
           requires_followup_form?: boolean
+          review_note?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           rounded_clock_in?: string | null
           rounded_clock_out?: string | null
           service_type_code?: string

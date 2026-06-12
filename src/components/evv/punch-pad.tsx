@@ -269,6 +269,24 @@ export function PunchPad({
   const [showNarrativeError, setShowNarrativeError] = useState(false);
   const [longShiftAck, setLongShiftAck]         = useState(false);
 
+  // ── Review-by-exception (Timeclock pass) ────────────────────────────────────
+  // Variance + attestation + incident + "forgot to clock out" correction. None
+  // of these mutate raw clock_in/out timestamps; corrections go to the new
+  // corrected_clock_in/out + edit_reason fields and the row is routed to
+  // supervisor review (review_status='needs_review') instead of billing.
+  const [incidentFlag, setIncidentFlag] = useState(false);
+  const [attestAccurate, setAttestAccurate] = useState(false);
+  const [scheduledMinutes, setScheduledMinutes] = useState<number | null>(null);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotIn, setForgotIn] = useState<string>("");   // datetime-local
+  const [forgotOut, setForgotOut] = useState<string>(""); // datetime-local
+  const [forgotReason, setForgotReason] = useState("");
+  const [correction, setCorrection] = useState<null | {
+    inIso: string;
+    outIso: string;
+    reason: string;
+  }>(null);
+
   // ── NECTAR Documentation Coach state ────────────────────────────────────────────
   const [aiBusy, setAiBusy]               = useState(false);
   const [aiCoach, setAiCoach]             = useState<CoachResult | null>(null);

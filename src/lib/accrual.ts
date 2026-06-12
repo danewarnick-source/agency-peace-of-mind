@@ -24,7 +24,7 @@
  *   • daily: distinct record_date per bucket → units = set.size
  */
 
-import { computeEntryUnits } from "@/lib/billing-units";
+import { computeEntryUnits, effectiveBillingTimes, isBillableForReview } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 
 export type TimesheetRow = {
@@ -32,6 +32,12 @@ export type TimesheetRow = {
   service_type_code: string | null;
   clock_in_timestamp: string;
   clock_out_timestamp: string | null;
+  // Review-by-exception (Timeclock pass). Optional for callers that haven't
+  // selected the columns yet — readers should add them to keep payroll/billing
+  // honest about corrections and exclusions.
+  review_status?: string | null;
+  corrected_clock_in?: string | null;
+  corrected_clock_out?: string | null;
 };
 
 export type DailyRecordRow = {
@@ -51,6 +57,10 @@ export type DailyRecordRow = {
  * Returns a Map of bucketKey → units. Units are computed PER ENTRY via
  * computeEntryUnits (round-to-nearest quarter hour) and SUMMED into the
  * bucket — never sum-hours-then-round.
+ *
+ * Review-by-exception: rows with review_status in ('needs_review','rejected')
+ * are skipped entirely. Rows with review_status='approved' AND
+ * corrected_clock_in/out present bill on the corrected times.
  */
 export function aggregateHourlyUnits(
   timesheets: ReadonlyArray<TimesheetRow>,
@@ -60,13 +70,16 @@ export function aggregateHourlyUnits(
   for (const t of timesheets) {
     if (!t.service_type_code || !t.clock_out_timestamp) continue;
     if (isDailyServiceCode(t.service_type_code)) continue;
-    const start = new Date(t.clock_in_timestamp);
-    const end = new Date(t.clock_out_timestamp);
+    if (!isBillableForReview(t)) continue;
+    const eff = effectiveBillingTimes(t);
+    if (!eff) continue;
+    const start = new Date(eff.in);
+    const end = new Date(eff.out);
     const hrs = (end.getTime() - start.getTime()) / 3_600_000;
     if (!isFinite(hrs) || hrs <= 0) continue;
     const key = bucketKeyFn(t, hrs, start);
     if (key === null) continue;
-    const units = computeEntryUnits(t.clock_in_timestamp, t.clock_out_timestamp);
+    const units = computeEntryUnits(eff.in, eff.out);
     unitsByKey.set(key, (unitsByKey.get(key) ?? 0) + units);
   }
   return unitsByKey;

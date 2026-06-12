@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { isDailyServiceCode } from "@/lib/service-billing";
-import { computeEntryUnits, UNITS_PER_HOUR } from "@/lib/billing-units";
+import { computeEntryUnits, UNITS_PER_HOUR, effectiveBillingTimes } from "@/lib/billing-units";
 
 /**
  * Financial — Per-client / per-shift billing DETAIL feed.
@@ -34,6 +34,9 @@ type TimesheetRow = {
   service_type_code: string | null;
   clock_in_timestamp: string;
   clock_out_timestamp: string | null;
+  review_status: string | null;
+  corrected_clock_in: string | null;
+  corrected_clock_out: string | null;
 };
 type DailyRow = {
   client_id: string;
@@ -71,7 +74,7 @@ async function loadMonthData(
       .eq("organization_id", organizationId),
     supabase
       .from("evv_timesheets")
-      .select("id, client_id, staff_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+      .select("id, client_id, staff_id, service_type_code, clock_in_timestamp, clock_out_timestamp, review_status, corrected_clock_in, corrected_clock_out")
       .eq("organization_id", organizationId)
       .gte("clock_in_timestamp", `${startIso}T00:00:00Z`)
       .lt("clock_in_timestamp", `${endExclusiveIso}T00:00:00Z`)
@@ -121,7 +124,9 @@ export const getRevenueClientPills = createServerFn({ method: "POST" })
 
     for (const t of timesheets) {
       if (!t.clock_out_timestamp || !t.service_type_code) continue;
-      const u = computeEntryUnits(t.clock_in_timestamp, t.clock_out_timestamp);
+      const eff = effectiveBillingTimes(t);
+      if (!eff) continue;
+      const u = computeEntryUnits(eff.in, eff.out);
       const rate = rateBy.get(`${t.client_id}|${t.service_type_code}`) ?? 0;
       if (!rate) continue;
       billedByClient.set(t.client_id, (billedByClient.get(t.client_id) ?? 0) + u * rate);
@@ -269,16 +274,18 @@ export const getRevenueClientDetail = createServerFn({ method: "POST" })
           if (t.client_id !== data.clientId) continue;
           if (t.service_type_code !== cc.service_code) continue;
           if (!t.clock_out_timestamp) continue;
-          const u = computeEntryUnits(t.clock_in_timestamp, t.clock_out_timestamp);
+          const eff = effectiveBillingTimes(t);
+          if (!eff) continue;
+          const u = computeEntryUnits(eff.in, eff.out);
           if (u <= 0) continue;
           totalUnits += u;
           shifts.push({
             shiftId: t.id,
             staffId: t.staff_id,
             staffName: t.staff_id ? staffNames.get(t.staff_id) ?? t.staff_id.slice(0, 8) : "—",
-            date: t.clock_in_timestamp.slice(0, 10),
-            clockIn: t.clock_in_timestamp,
-            clockOut: t.clock_out_timestamp,
+            date: eff.in.slice(0, 10),
+            clockIn: eff.in,
+            clockOut: eff.out,
             hours: Math.round((u / UNITS_PER_HOUR) * 100) / 100,
             units: u,
             amount: Math.round(u * rate * 100) / 100,
@@ -382,16 +389,18 @@ export const getMonthlyGridShiftDetail = createServerFn({ method: "POST" })
       if (t.client_id !== data.clientId) continue;
       if (t.service_type_code !== data.serviceCode) continue;
       if (!t.clock_out_timestamp) continue;
-      const u = computeEntryUnits(t.clock_in_timestamp, t.clock_out_timestamp);
+      const eff = effectiveBillingTimes(t);
+      if (!eff) continue;
+      const u = computeEntryUnits(eff.in, eff.out);
       if (u <= 0) continue;
       totalUnits += u;
       shifts.push({
         shiftId: t.id,
         staffId: t.staff_id,
         staffName: t.staff_id ? staffNames.get(t.staff_id) ?? t.staff_id.slice(0, 8) : "—",
-        date: t.clock_in_timestamp.slice(0, 10),
-        clockIn: t.clock_in_timestamp,
-        clockOut: t.clock_out_timestamp,
+        date: eff.in.slice(0, 10),
+        clockIn: eff.in,
+        clockOut: eff.out,
         hours: Math.round((u / UNITS_PER_HOUR) * 100) / 100,
         units: u,
         amount: Math.round(u * rate * 100) / 100,

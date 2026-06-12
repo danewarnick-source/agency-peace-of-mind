@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/select";
 import { fmtUSD } from "@/lib/billing-units";
 import {
+  ChevronDown,
+  ChevronRight,
   Info,
   Lock,
   Pencil,
@@ -42,8 +44,10 @@ import {
   UserPen,
 } from "lucide-react";
 import { YourInputsSection } from "@/components/financial/your-inputs-section";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
 import { toast } from "sonner";
+import { getRevenueClientPills } from "@/lib/financial-detail.functions";
+import { BillingDetailDialog } from "@/components/financial/billing-detail-dialog";
 
 export const Route = createFileRoute("/dashboard/financial/revenue")({
   head: () => ({ meta: [{ title: "Revenue — Financial — HIVE" }] }),

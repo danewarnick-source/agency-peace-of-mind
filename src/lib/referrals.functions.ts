@@ -219,16 +219,15 @@ export const updateReferralStage = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
 
-    const patch: Record<string, unknown> = { stage: data.stage };
-    if (data.stage === "decision") {
-      if (!data.decision_outcome) {
-        throw new Error("Decision outcome (placed/passed) is required");
-      }
-      patch.decision_outcome = data.decision_outcome;
-      patch.decision_reason = data.decision_reason || null;
-    } else {
-      patch.decision_outcome = null;
-      patch.decision_reason = null;
+    const patch = {
+      stage: data.stage,
+      decision_outcome:
+        data.stage === "decision" ? (data.decision_outcome ?? null) : null,
+      decision_reason:
+        data.stage === "decision" ? (data.decision_reason || null) : null,
+    };
+    if (data.stage === "decision" && !data.decision_outcome) {
+      throw new Error("Decision outcome (placed/passed) is required");
     }
 
     const { error } = await supabase

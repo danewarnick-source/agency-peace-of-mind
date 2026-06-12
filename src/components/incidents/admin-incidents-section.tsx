@@ -578,6 +578,8 @@ export function AdminIncidentsSection({
         </Card>
       )}
 
+      {view === "log" && <IncidentTrendsStrip rangeFrom={from} rangeTo={to} onPick={onTrendPick} />}
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading incidents…</p>
       ) : !sorted.length ? (
@@ -588,10 +590,13 @@ export function AdminIncidentsSection({
             <IncidentCard
               key={ir.id}
               ir={ir}
+              scRequests={scByIncident.get(ir.id) ?? []}
               actors={actorMap}
               onInitiate={(id) => initiate.mutate(id)}
               onNotify={setGuardianId}
               onComplete={setCompleteId}
+              onLogSc={setLogScFor}
+              onRespondSc={setRespondScFor}
               initPending={initiate.isPending}
             />
           ))}
@@ -600,6 +605,8 @@ export function AdminIncidentsSection({
 
       <GuardianDialog incidentId={guardianId} onClose={() => setGuardianId(null)} />
       <CompleteDialog incidentId={completeId} onClose={() => setCompleteId(null)} />
+      <LogScRequestDialog incidentId={logScFor} onClose={() => setLogScFor(null)} />
+      <RespondScRequestDialog scRequestId={respondScFor} onClose={() => setRespondScFor(null)} />
     </div>
   );
 }

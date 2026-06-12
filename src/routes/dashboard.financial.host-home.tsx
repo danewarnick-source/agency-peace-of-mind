@@ -44,9 +44,6 @@ function HostHomePage() {
   const [month, setMonth] = useState({ y: today.getFullYear(), m: today.getMonth() });
 
   const monthStart = useMemo(() => new Date(month.y, month.m, 1), [month]);
-  const monthEndExclusive = useMemo(() => new Date(month.y, month.m + 1, 1), [month]);
-  const monthStartIso = monthStart.toISOString().slice(0, 10);
-  const monthEndIso = monthEndExclusive.toISOString().slice(0, 10);
   const monthLabel = monthStart.toLocaleString(undefined, { month: "long", year: "numeric" });
 
   // Server-fn wrappers (gated by view_financial_host_home server-side)

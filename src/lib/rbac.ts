@@ -87,6 +87,7 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
     "view_own_training", "view_certifications",
     "view_financial_tns_gross",
     "view_financial_rhs",
+    "view_financial_employees",
   ],
 
   manager: [

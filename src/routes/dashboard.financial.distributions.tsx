@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,22 @@ import { Plus, Trash2, Copy, Sparkles, Info, ShieldCheck, AlertTriangle, Save } 
 import { computeEntryUnits, fmtUSD } from "@/lib/billing-units";
 import { toast } from "sonner";
 import { RequireRole } from "@/components/rbac-guard";
+import {
+  getDistPlans,
+  getDistParticipants,
+  getDistCbc,
+  getDistEvv,
+  getDistHhs,
+  getDistCtr,
+  getDistLedger,
+  createDistPlan,
+  updateDistPlan,
+  deleteDistPlan,
+  duplicateDistPlan,
+  addDistParticipant,
+  updateDistParticipant,
+  deleteDistParticipant,
+} from "@/lib/financial-distributions.functions";
 
 export const Route = createFileRoute("/dashboard/financial/distributions")({
   head: () => ({ meta: [{ title: "Distributions — HIVE" }] }),

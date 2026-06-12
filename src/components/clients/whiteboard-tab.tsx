@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
+import { ClientDischargeDialog } from "./client-discharge-dialog";
 import {
   getWhiteboardSnapshot,
   type WhiteboardCategory,
@@ -109,7 +110,7 @@ function ReferralRow({ r }: { r: WhiteboardReferral }) {
   );
 }
 
-function ClientRow({ c }: { c: WhiteboardClient }) {
+function ClientRow({ c, organizationId }: { c: WhiteboardClient; organizationId: string }) {
   return (
     <div className="flex items-start justify-between gap-2 rounded-md border border-dashed border-border bg-muted/30 px-2 py-1.5 text-xs">
       <div className="min-w-0 flex-1">
@@ -138,12 +139,20 @@ function ClientRow({ c }: { c: WhiteboardClient }) {
             : ""}
         </div>
       </div>
-      <span
-        className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-900"
-        title="Moving a placed client is not casual — SOW discharge workflow applies."
-      >
-        rematch ⇒ discharge workflow
-      </span>
+      <ClientDischargeDialog
+        organizationId={organizationId}
+        clientId={c.id}
+        clientName={`${c.first_name} ${c.last_name}`}
+        trigger={
+          <button
+            type="button"
+            className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-900 hover:bg-amber-100"
+            title="Open the SOW §1.22 discharge workflow"
+          >
+            rematch ⇒ discharge workflow
+          </button>
+        }
+      />
     </div>
   );
 }

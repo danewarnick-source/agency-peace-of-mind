@@ -8078,6 +8078,73 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_activities: {
+        Row: {
+          activity_type: string
+          body: string | null
+          channel: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          occurred_at: string
+          organization_id: string
+          referral_id: string
+          stage_from: string | null
+          stage_to: string | null
+          supersedes_id: string | null
+        }
+        Insert: {
+          activity_type: string
+          body?: string | null
+          channel?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          occurred_at?: string
+          organization_id: string
+          referral_id: string
+          stage_from?: string | null
+          stage_to?: string | null
+          supersedes_id?: string | null
+        }
+        Update: {
+          activity_type?: string
+          body?: string | null
+          channel?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          occurred_at?: string
+          organization_id?: string
+          referral_id?: string
+          stage_from?: string | null
+          stage_to?: string | null
+          supersedes_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_activities_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_activities_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "referral_activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referrals: {
         Row: {
           age: number | null
@@ -8086,6 +8153,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           date_of_birth: string | null
+          decision_outcome: string | null
+          decision_reason: string | null
           description: string | null
           disability_level: string | null
           disability_types: string[]
@@ -8099,6 +8168,8 @@ export type Database = {
           organization_id: string
           requested_codes: string[]
           source: string
+          stage: string
+          stage_entered_at: string
           status: string
           support_coordinator_id: string | null
           updated_at: string
@@ -8110,6 +8181,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          decision_outcome?: string | null
+          decision_reason?: string | null
           description?: string | null
           disability_level?: string | null
           disability_types?: string[]
@@ -8123,6 +8196,8 @@ export type Database = {
           organization_id: string
           requested_codes?: string[]
           source?: string
+          stage?: string
+          stage_entered_at?: string
           status?: string
           support_coordinator_id?: string | null
           updated_at?: string
@@ -8134,6 +8209,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          decision_outcome?: string | null
+          decision_reason?: string | null
           description?: string | null
           disability_level?: string | null
           disability_types?: string[]
@@ -8147,6 +8224,8 @@ export type Database = {
           organization_id?: string
           requested_codes?: string[]
           source?: string
+          stage?: string
+          stage_entered_at?: string
           status?: string
           support_coordinator_id?: string | null
           updated_at?: string
@@ -11074,6 +11153,10 @@ export type Database = {
           source_kind: string
           unit_type: string
         }[]
+      }
+      get_referral_pipeline_stats: {
+        Args: { _organization_id: string }
+        Returns: Json
       }
       get_staff_pii: {
         Args: { _org: string; _staff: string }

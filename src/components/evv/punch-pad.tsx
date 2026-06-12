@@ -170,7 +170,9 @@ export function PunchPad({
       gotFix = true;
       setHardwareDenied(false);
       setGpsAcquiring(false);
-      setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy });
+      const next = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+      livePosRef.current = next;
+      setLivePos(next);
     };
     const onErr = (err: GeolocationPositionError) => {
       if (cancelled) return;

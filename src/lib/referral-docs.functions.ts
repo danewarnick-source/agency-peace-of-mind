@@ -5,9 +5,11 @@
  * and saves through the existing createReferral path. We NEVER auto-create.
  */
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requirePermission, requireAnyPermission } from "@/lib/require-permission";
+
 
 const orgOnly = z.object({ organization_id: z.string().uuid() });
 

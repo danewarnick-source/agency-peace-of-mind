@@ -169,6 +169,7 @@ function useHealthMetrics(orgId: string): { metrics: HealthMetrics | null; isLoa
   const { data, isLoading } = useQuery({
     queryKey: ["agency-health", orgId],
     queryFn: () => fetchFn({ data: { organizationId: orgId } }),
+    enabled: !!orgId,
   });
   const metrics = useMemo<HealthMetrics | null>(() => {
     if (!data) return null;

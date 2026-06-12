@@ -29,6 +29,7 @@ import {
 import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode } from "@/lib/evv-codes";
 import { searchTimesheetsByVector, backfillTimesheetEmbeddings } from "@/lib/vector-search.functions";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
+import { AdminIncidentsSection } from "@/components/incidents/admin-incidents-section";
 import { Home as HomeIcon } from "lucide-react";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
@@ -399,7 +400,7 @@ async function hydrateStaff(list: Row[]) {
 function ComplianceDeskPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
-  const [sub, setSub] = useState<"pending" | "needs-review" | "reconcile" | "evv-archive" | "non-evv-archive" | "residential">("pending");
+  const [sub, setSub] = useState<"pending" | "needs-review" | "incidents" | "reconcile" | "evv-archive" | "non-evv-archive" | "residential">("pending");
   const [mapOpen, setMapOpen] = useState<Row | null>(null);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);
@@ -721,6 +722,7 @@ function ComplianceDeskPage() {
           {[
             { id: "pending" as const, label: "Pending Review", Icon: Inbox, count: undefined as number | undefined },
             { id: "needs-review" as const, label: "Needs Review", Icon: AlertTriangle, count: needsReviewCount },
+            { id: "incidents" as const, label: "Incidents", Icon: Flag, count: undefined },
             { id: "reconcile" as const, label: "EVV Reconciliation", Icon: AlertCircle, count: reconcilePendingCount },
             { id: "residential" as const, label: "Residential / Daily", Icon: HomeIcon, count: undefined },
             { id: "evv-archive" as const, label: "State EVV Archive", Icon: FolderArchive, count: undefined },
@@ -791,6 +793,8 @@ function ComplianceDeskPage() {
           approving={reviewApprove.isPending}
           rejecting={reviewReject.isPending}
         />
+      ) : sub === "incidents" ? (
+        <AdminIncidentsSection />
       ) : sub === "reconcile" ? (
         <ReconcileTable
           rows={reconcileQ.data ?? []}

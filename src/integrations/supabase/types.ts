@@ -6087,12 +6087,19 @@ export type Database = {
           ai_trigger_reasons: string[] | null
           amendment_reason: string | null
           aps_notified: boolean | null
+          category: string | null
           client_id: string
           created_at: string
+          description: string | null
+          discovered_at: string | null
           family_name: string | null
           family_notified: boolean | null
           family_notified_at: string | null
           filed_at: string
+          followup_notes: string | null
+          guardian_notified_at: string | null
+          guardian_notified_by: string | null
+          guardian_notified_method: string | null
           id: string
           immediate_actions: string
           incident_address: string | null
@@ -6102,9 +6109,14 @@ export type Database = {
           incident_time: string
           incident_types: string[]
           incident_zip: string | null
+          injuries: string | null
+          is_abuse_neglect: boolean
+          is_fatality: boolean
           law_enforcement_called: boolean | null
+          location: string | null
           location_detail: string | null
           location_type: string | null
+          medical_attention: string | null
           medical_attention_required: boolean | null
           medical_facility: string | null
           medical_outcome: string | null
@@ -6112,8 +6124,11 @@ export type Database = {
           narrative_after: string
           narrative_before: string
           narrative_during: string
+          occurred_at: string | null
           organization_id: string
           other_individuals: Json | null
+          people_involved: string | null
+          prevention_strategies: string | null
           report_number: string
           reported_by: string
           reporter_title: string | null
@@ -6131,6 +6146,10 @@ export type Database = {
           triggered_by_note_id: string | null
           triggered_by_note_type: string | null
           updated_at: string
+          upi_completed_at: string | null
+          upi_completed_by: string | null
+          upi_initiated_at: string | null
+          upi_initiated_by: string | null
           witnesses: Json | null
         }
         Insert: {
@@ -6138,12 +6157,19 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           amendment_reason?: string | null
           aps_notified?: boolean | null
+          category?: string | null
           client_id: string
           created_at?: string
+          description?: string | null
+          discovered_at?: string | null
           family_name?: string | null
           family_notified?: boolean | null
           family_notified_at?: string | null
           filed_at?: string
+          followup_notes?: string | null
+          guardian_notified_at?: string | null
+          guardian_notified_by?: string | null
+          guardian_notified_method?: string | null
           id?: string
           immediate_actions?: string
           incident_address?: string | null
@@ -6153,9 +6179,14 @@ export type Database = {
           incident_time: string
           incident_types?: string[]
           incident_zip?: string | null
+          injuries?: string | null
+          is_abuse_neglect?: boolean
+          is_fatality?: boolean
           law_enforcement_called?: boolean | null
+          location?: string | null
           location_detail?: string | null
           location_type?: string | null
+          medical_attention?: string | null
           medical_attention_required?: boolean | null
           medical_facility?: string | null
           medical_outcome?: string | null
@@ -6163,8 +6194,11 @@ export type Database = {
           narrative_after?: string
           narrative_before?: string
           narrative_during?: string
+          occurred_at?: string | null
           organization_id: string
           other_individuals?: Json | null
+          people_involved?: string | null
+          prevention_strategies?: string | null
           report_number: string
           reported_by: string
           reporter_title?: string | null
@@ -6182,6 +6216,10 @@ export type Database = {
           triggered_by_note_id?: string | null
           triggered_by_note_type?: string | null
           updated_at?: string
+          upi_completed_at?: string | null
+          upi_completed_by?: string | null
+          upi_initiated_at?: string | null
+          upi_initiated_by?: string | null
           witnesses?: Json | null
         }
         Update: {
@@ -6189,12 +6227,19 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           amendment_reason?: string | null
           aps_notified?: boolean | null
+          category?: string | null
           client_id?: string
           created_at?: string
+          description?: string | null
+          discovered_at?: string | null
           family_name?: string | null
           family_notified?: boolean | null
           family_notified_at?: string | null
           filed_at?: string
+          followup_notes?: string | null
+          guardian_notified_at?: string | null
+          guardian_notified_by?: string | null
+          guardian_notified_method?: string | null
           id?: string
           immediate_actions?: string
           incident_address?: string | null
@@ -6204,9 +6249,14 @@ export type Database = {
           incident_time?: string
           incident_types?: string[]
           incident_zip?: string | null
+          injuries?: string | null
+          is_abuse_neglect?: boolean
+          is_fatality?: boolean
           law_enforcement_called?: boolean | null
+          location?: string | null
           location_detail?: string | null
           location_type?: string | null
+          medical_attention?: string | null
           medical_attention_required?: boolean | null
           medical_facility?: string | null
           medical_outcome?: string | null
@@ -6214,8 +6264,11 @@ export type Database = {
           narrative_after?: string
           narrative_before?: string
           narrative_during?: string
+          occurred_at?: string | null
           organization_id?: string
           other_individuals?: Json | null
+          people_involved?: string | null
+          prevention_strategies?: string | null
           report_number?: string
           reported_by?: string
           reporter_title?: string | null
@@ -6233,6 +6286,10 @@ export type Database = {
           triggered_by_note_id?: string | null
           triggered_by_note_type?: string | null
           updated_at?: string
+          upi_completed_at?: string | null
+          upi_completed_by?: string | null
+          upi_initiated_at?: string | null
+          upi_initiated_by?: string | null
           witnesses?: Json | null
         }
         Relationships: [

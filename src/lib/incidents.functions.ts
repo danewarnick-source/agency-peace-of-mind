@@ -154,7 +154,9 @@ export const listIncidents = createServerFn({ method: "GET" })
       .order("discovered_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(data.limit);
-    if (data.status === "open") q = q.neq("status", "closed");
+    // For the "open queue" view we widen the SQL to include closed incidents
+    // too — the caller layers the "open SC request" re-surface rule client-side
+    // so a closed incident with an outstanding SC request still appears.
     if (data.status === "closed") q = q.eq("status", "closed");
     if (data.client_id) q = q.eq("client_id", data.client_id);
     if (data.category) q = q.eq("category", data.category);
@@ -163,8 +165,121 @@ export const listIncidents = createServerFn({ method: "GET" })
 
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return { incidents: rows ?? [] };
+
+    // Always include the SC requests for the returned incidents so the
+    // queue can re-surface a closed incident with an outstanding request.
+    const ids = (rows ?? []).map((r: { id: string }) => r.id);
+    let scRows: Array<{
+      id: string;
+      incident_id: string;
+      requested_at: string;
+      request_summary: string;
+      responded_at: string | null;
+      response_summary: string | null;
+      responded_by: string | null;
+    }> = [];
+    if (ids.length) {
+      const { data: scs, error: scErr } = await supabase
+        .from("incident_sc_requests")
+        .select("id, incident_id, requested_at, request_summary, responded_at, response_summary, responded_by")
+        .eq("organization_id", m.organization_id)
+        .in("incident_id", ids)
+        .order("requested_at", { ascending: false });
+      if (scErr) throw new Error(scErr.message);
+      scRows = (scs ?? []) as typeof scRows;
+    }
+    return { incidents: rows ?? [], sc_requests: scRows };
   });
+
+const logScInput = z.object({
+  incident_id: z.string().uuid(),
+  request_summary: z.string().min(3).max(4000),
+  requested_at: z.string().datetime().optional(),
+});
+
+export const logScRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => logScInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await requireManager(supabase, userId);
+    // Confirm the incident belongs to this org.
+    const { data: ir, error: irErr } = await supabase
+      .from("incident_reports")
+      .select("id, organization_id")
+      .eq("id", data.incident_id)
+      .maybeSingle();
+    if (irErr) throw new Error(irErr.message);
+    if (!ir || ir.organization_id !== m.organization_id) {
+      throw new Error("Incident not found.");
+    }
+    const { data: ins, error } = await supabase
+      .from("incident_sc_requests")
+      .insert({
+        organization_id: m.organization_id,
+        incident_id: data.incident_id,
+        requested_at: data.requested_at ?? new Date().toISOString(),
+        request_summary: data.request_summary.trim(),
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return ins as { id: string };
+  });
+
+export const respondScRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      id: z.string().uuid(),
+      response_summary: z.string().min(3).max(4000),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    await requireManager(supabase, userId);
+    const { error } = await supabase
+      .from("incident_sc_requests")
+      .update({
+        responded_at: new Date().toISOString(),
+        responded_by: userId,
+        response_summary: data.response_summary.trim(),
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Trends feed: monthly counts, category breakdown, per-client counts.
+ *  Reads incident_reports directly; no aggregate tables. */
+export const incidentTrends = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      from: z.string().datetime().optional().nullable(),
+      to: z.string().datetime().optional().nullable(),
+    }).parse(d ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await requireManager(supabase, userId);
+
+    // Trailing-6-month window for the bar chart (always); the caller-supplied
+    // [from..to] only filters the per-client table.
+    const now = new Date();
+    const sixMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1));
+
+    const { data: rows, error } = await supabase
+      .from("incident_reports")
+      .select("id, client_id, discovered_at, category, created_at, clients:client_id(first_name,last_name)")
+      .eq("organization_id", m.organization_id)
+      .gte("discovered_at", sixMonthStart.toISOString())
+      .limit(5000);
+    if (error) throw new Error(error.message);
+
+    return { rows: rows ?? [] };
+  });
+
 
 async function requireManager(supabase: AnySupabase, userId: string) {
   const m = await getMembership(supabase, userId);

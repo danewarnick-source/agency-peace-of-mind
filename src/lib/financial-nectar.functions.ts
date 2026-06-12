@@ -48,7 +48,7 @@ export type NectarFinSourceResult = {
   allowed: boolean;
   decline_reason?: string;
   /** Yearly rollup, only present when allowed. */
-  data?: Record<string, number | string | null | Array<Record<string, unknown>>>;
+  data?: Record<string, number | string | null | any[]>;
 };
 
 export type NectarFinReport = {
@@ -377,7 +377,7 @@ async function loadDistributions(ctx: Ctx, organizationId: string) {
     // Participant names + percentages are returned only when admin/super_admin
     // gate already passed (this loader is only called after gateAdmin). Manager
     // calls never reach here because the gate threw above.
-    active_participants: participants as unknown as Array<Record<string, unknown>>,
+    active_participants: participants as unknown as any[],
   };
 }
 

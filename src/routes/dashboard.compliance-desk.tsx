@@ -718,6 +718,7 @@ function ComplianceDeskPage() {
         <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1 shadow-soft">
           {[
             { id: "pending" as const, label: "Pending Review", Icon: Inbox, count: undefined as number | undefined },
+            { id: "needs-review" as const, label: "Needs Review", Icon: AlertTriangle, count: needsReviewCount },
             { id: "reconcile" as const, label: "EVV Reconciliation", Icon: AlertCircle, count: reconcilePendingCount },
             { id: "evv-archive" as const, label: "State EVV Archive", Icon: FolderArchive, count: undefined },
             { id: "non-evv-archive" as const, label: "Internal / Non-EVV Archive", Icon: Briefcase, count: undefined },

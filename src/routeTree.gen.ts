@@ -112,6 +112,7 @@ import { Route as DashboardHiveExecApprovalsRouteImport } from './routes/dashboa
 import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
 import { Route as DashboardFinancialTotalsRouteImport } from './routes/dashboard.financial.totals'
+import { Route as DashboardFinancialRhsRouteImport } from './routes/dashboard.financial.rhs'
 import { Route as DashboardFinancialRevenueRouteImport } from './routes/dashboard.financial.revenue'
 import { Route as DashboardFinancialMonthlyGridRouteImport } from './routes/dashboard.financial.monthly-grid'
 import { Route as DashboardFinancialHostHomeRouteImport } from './routes/dashboard.financial.host-home'
@@ -695,6 +696,11 @@ const DashboardFinancialTotalsRoute =
     path: '/totals',
     getParentRoute: () => DashboardFinancialRoute,
   } as any)
+const DashboardFinancialRhsRoute = DashboardFinancialRhsRouteImport.update({
+  id: '/rhs',
+  path: '/rhs',
+  getParentRoute: () => DashboardFinancialRoute,
+} as any)
 const DashboardFinancialRevenueRoute =
   DashboardFinancialRevenueRouteImport.update({
     id: '/revenue',
@@ -1024,6 +1030,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/financial/host-home': typeof DashboardFinancialHostHomeRoute
   '/dashboard/financial/monthly-grid': typeof DashboardFinancialMonthlyGridRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
+  '/dashboard/financial/rhs': typeof DashboardFinancialRhsRoute
   '/dashboard/financial/totals': typeof DashboardFinancialTotalsRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
@@ -1164,6 +1171,7 @@ export interface FileRoutesByTo {
   '/dashboard/financial/host-home': typeof DashboardFinancialHostHomeRoute
   '/dashboard/financial/monthly-grid': typeof DashboardFinancialMonthlyGridRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
+  '/dashboard/financial/rhs': typeof DashboardFinancialRhsRoute
   '/dashboard/financial/totals': typeof DashboardFinancialTotalsRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
@@ -1311,6 +1319,7 @@ export interface FileRoutesById {
   '/dashboard/financial/host-home': typeof DashboardFinancialHostHomeRoute
   '/dashboard/financial/monthly-grid': typeof DashboardFinancialMonthlyGridRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
+  '/dashboard/financial/rhs': typeof DashboardFinancialRhsRoute
   '/dashboard/financial/totals': typeof DashboardFinancialTotalsRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
@@ -1459,6 +1468,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/host-home'
     | '/dashboard/financial/monthly-grid'
     | '/dashboard/financial/revenue'
+    | '/dashboard/financial/rhs'
     | '/dashboard/financial/totals'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
@@ -1599,6 +1609,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/host-home'
     | '/dashboard/financial/monthly-grid'
     | '/dashboard/financial/revenue'
+    | '/dashboard/financial/rhs'
     | '/dashboard/financial/totals'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
@@ -1745,6 +1756,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/host-home'
     | '/dashboard/financial/monthly-grid'
     | '/dashboard/financial/revenue'
+    | '/dashboard/financial/rhs'
     | '/dashboard/financial/totals'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
@@ -2542,6 +2554,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardFinancialTotalsRouteImport
       parentRoute: typeof DashboardFinancialRoute
     }
+    '/dashboard/financial/rhs': {
+      id: '/dashboard/financial/rhs'
+      path: '/rhs'
+      fullPath: '/dashboard/financial/rhs'
+      preLoaderRoute: typeof DashboardFinancialRhsRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
     '/dashboard/financial/revenue': {
       id: '/dashboard/financial/revenue'
       path: '/revenue'
@@ -2872,6 +2891,7 @@ interface DashboardFinancialRouteChildren {
   DashboardFinancialHostHomeRoute: typeof DashboardFinancialHostHomeRoute
   DashboardFinancialMonthlyGridRoute: typeof DashboardFinancialMonthlyGridRoute
   DashboardFinancialRevenueRoute: typeof DashboardFinancialRevenueRoute
+  DashboardFinancialRhsRoute: typeof DashboardFinancialRhsRoute
   DashboardFinancialTotalsRoute: typeof DashboardFinancialTotalsRoute
   DashboardFinancialIndexRoute: typeof DashboardFinancialIndexRoute
 }
@@ -2883,6 +2903,7 @@ const DashboardFinancialRouteChildren: DashboardFinancialRouteChildren = {
   DashboardFinancialHostHomeRoute: DashboardFinancialHostHomeRoute,
   DashboardFinancialMonthlyGridRoute: DashboardFinancialMonthlyGridRoute,
   DashboardFinancialRevenueRoute: DashboardFinancialRevenueRoute,
+  DashboardFinancialRhsRoute: DashboardFinancialRhsRoute,
   DashboardFinancialTotalsRoute: DashboardFinancialTotalsRoute,
   DashboardFinancialIndexRoute: DashboardFinancialIndexRoute,
 }

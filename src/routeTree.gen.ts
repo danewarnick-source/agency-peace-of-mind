@@ -114,6 +114,7 @@ import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.
 import { Route as DashboardFinancialTotalsRouteImport } from './routes/dashboard.financial.totals'
 import { Route as DashboardFinancialRhsRouteImport } from './routes/dashboard.financial.rhs'
 import { Route as DashboardFinancialRevenueRouteImport } from './routes/dashboard.financial.revenue'
+import { Route as DashboardFinancialNectarRouteImport } from './routes/dashboard.financial.nectar'
 import { Route as DashboardFinancialMonthlyGridRouteImport } from './routes/dashboard.financial.monthly-grid'
 import { Route as DashboardFinancialHostHomeRouteImport } from './routes/dashboard.financial.host-home'
 import { Route as DashboardFinancialGrossRouteImport } from './routes/dashboard.financial.gross'
@@ -708,6 +709,12 @@ const DashboardFinancialRevenueRoute =
     path: '/revenue',
     getParentRoute: () => DashboardFinancialRoute,
   } as any)
+const DashboardFinancialNectarRoute =
+  DashboardFinancialNectarRouteImport.update({
+    id: '/nectar',
+    path: '/nectar',
+    getParentRoute: () => DashboardFinancialRoute,
+  } as any)
 const DashboardFinancialMonthlyGridRoute =
   DashboardFinancialMonthlyGridRouteImport.update({
     id: '/monthly-grid',
@@ -1037,6 +1044,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/financial/gross': typeof DashboardFinancialGrossRoute
   '/dashboard/financial/host-home': typeof DashboardFinancialHostHomeRoute
   '/dashboard/financial/monthly-grid': typeof DashboardFinancialMonthlyGridRoute
+  '/dashboard/financial/nectar': typeof DashboardFinancialNectarRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/financial/rhs': typeof DashboardFinancialRhsRoute
   '/dashboard/financial/totals': typeof DashboardFinancialTotalsRoute
@@ -1179,6 +1187,7 @@ export interface FileRoutesByTo {
   '/dashboard/financial/gross': typeof DashboardFinancialGrossRoute
   '/dashboard/financial/host-home': typeof DashboardFinancialHostHomeRoute
   '/dashboard/financial/monthly-grid': typeof DashboardFinancialMonthlyGridRoute
+  '/dashboard/financial/nectar': typeof DashboardFinancialNectarRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/financial/rhs': typeof DashboardFinancialRhsRoute
   '/dashboard/financial/totals': typeof DashboardFinancialTotalsRoute
@@ -1328,6 +1337,7 @@ export interface FileRoutesById {
   '/dashboard/financial/gross': typeof DashboardFinancialGrossRoute
   '/dashboard/financial/host-home': typeof DashboardFinancialHostHomeRoute
   '/dashboard/financial/monthly-grid': typeof DashboardFinancialMonthlyGridRoute
+  '/dashboard/financial/nectar': typeof DashboardFinancialNectarRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
   '/dashboard/financial/rhs': typeof DashboardFinancialRhsRoute
   '/dashboard/financial/totals': typeof DashboardFinancialTotalsRoute
@@ -1478,6 +1488,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/gross'
     | '/dashboard/financial/host-home'
     | '/dashboard/financial/monthly-grid'
+    | '/dashboard/financial/nectar'
     | '/dashboard/financial/revenue'
     | '/dashboard/financial/rhs'
     | '/dashboard/financial/totals'
@@ -1620,6 +1631,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/gross'
     | '/dashboard/financial/host-home'
     | '/dashboard/financial/monthly-grid'
+    | '/dashboard/financial/nectar'
     | '/dashboard/financial/revenue'
     | '/dashboard/financial/rhs'
     | '/dashboard/financial/totals'
@@ -1768,6 +1780,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/gross'
     | '/dashboard/financial/host-home'
     | '/dashboard/financial/monthly-grid'
+    | '/dashboard/financial/nectar'
     | '/dashboard/financial/revenue'
     | '/dashboard/financial/rhs'
     | '/dashboard/financial/totals'
@@ -2581,6 +2594,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardFinancialRevenueRouteImport
       parentRoute: typeof DashboardFinancialRoute
     }
+    '/dashboard/financial/nectar': {
+      id: '/dashboard/financial/nectar'
+      path: '/nectar'
+      fullPath: '/dashboard/financial/nectar'
+      preLoaderRoute: typeof DashboardFinancialNectarRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
     '/dashboard/financial/monthly-grid': {
       id: '/dashboard/financial/monthly-grid'
       path: '/monthly-grid'
@@ -2911,6 +2931,7 @@ interface DashboardFinancialRouteChildren {
   DashboardFinancialGrossRoute: typeof DashboardFinancialGrossRoute
   DashboardFinancialHostHomeRoute: typeof DashboardFinancialHostHomeRoute
   DashboardFinancialMonthlyGridRoute: typeof DashboardFinancialMonthlyGridRoute
+  DashboardFinancialNectarRoute: typeof DashboardFinancialNectarRoute
   DashboardFinancialRevenueRoute: typeof DashboardFinancialRevenueRoute
   DashboardFinancialRhsRoute: typeof DashboardFinancialRhsRoute
   DashboardFinancialTotalsRoute: typeof DashboardFinancialTotalsRoute
@@ -2924,6 +2945,7 @@ const DashboardFinancialRouteChildren: DashboardFinancialRouteChildren = {
   DashboardFinancialGrossRoute: DashboardFinancialGrossRoute,
   DashboardFinancialHostHomeRoute: DashboardFinancialHostHomeRoute,
   DashboardFinancialMonthlyGridRoute: DashboardFinancialMonthlyGridRoute,
+  DashboardFinancialNectarRoute: DashboardFinancialNectarRoute,
   DashboardFinancialRevenueRoute: DashboardFinancialRevenueRoute,
   DashboardFinancialRhsRoute: DashboardFinancialRhsRoute,
   DashboardFinancialTotalsRoute: DashboardFinancialTotalsRoute,

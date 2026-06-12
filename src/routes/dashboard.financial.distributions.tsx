@@ -465,12 +465,21 @@ function DistributionsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
+                  onClick={async () => {
                     // Mark active (and deactivate others)
                     const others = (plansQ.data ?? []).filter((p) => p.is_active && p.id !== selectedPlan.id);
-                    Promise.all(others.map((p) => (supabase.from("distribution_plans" as never) as any).update({ is_active: false }).eq("id", p.id))).then(() => {
-                      updatePlan.mutate({ id: selectedPlan.id, is_active: !selectedPlan.is_active });
-                    });
+                    await Promise.all(
+                      others.map((p) =>
+                        fnUpdatePlan({
+                          data: {
+                            organizationId: org!.organization_id,
+                            id: p.id,
+                            patch: { is_active: false },
+                          },
+                        }),
+                      ),
+                    );
+                    updatePlan.mutate({ id: selectedPlan.id, is_active: !selectedPlan.is_active });
                   }}
                 >
                   {selectedPlan.is_active ? "Deactivate" : "Set Active"}

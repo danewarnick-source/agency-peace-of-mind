@@ -40,6 +40,7 @@ import {
   ReferralStageBadge,
   StageAdvancer,
 } from "./referral-pipeline";
+import { ProviderInterestOutlineButton } from "./provider-interest-outline";
 
 type Category = "direct_support" | "rhs" | "hhs";
 const CATEGORIES: { key: Category; label: string }[] = [

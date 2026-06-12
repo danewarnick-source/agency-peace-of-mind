@@ -24,6 +24,7 @@ import {
   Calendar, Pen, RefreshCcw, Printer, Sparkles, ArrowRight,
   Home, FolderArchive, Pill,
 } from "lucide-react";
+import { isEvvLockedCode } from "@/lib/evv-codes";
 import { toast } from "sonner";
 import { AddonLock } from "@/components/nectar/addon-lock";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
@@ -77,6 +78,8 @@ type Timesheet = {
   shift_note_text: string | null; goals_completed: string[] | null;
   submitted_late: boolean; denial_reason: string | null;
   approved_at: string | null; approved_by: string | null;
+  edit_reason?: string | null;
+  review_status?: string | null;
   clients: { first_name: string; last_name: string; physical_address: string | null } | null;
   profiles: { full_name: string | null; email: string | null } | null;
 };
@@ -883,7 +886,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     is_out_of_bounds, outside_geofence_reason,
     gps_in_coordinates, gps_out_coordinates,
     shift_note_text, goals_completed, submitted_late, denial_reason,
-    approved_at, approved_by,
+    approved_at, approved_by, edit_reason, review_status,
     clients:client_id (first_name, last_name, physical_address)`;
 
   const { data: pendingTimesheets = [], isLoading: tsLoading } = useQuery({
@@ -1439,46 +1442,56 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
             </section>
           )}
 
-          {/* Pending timesheets */}
+          {/* Pending timesheets — split EVV-locked (SOW §1.12) vs internal/non-EVV */}
           {(pendingFilter === "all" || pendingFilter === "timesheets") && filterBySearch(pendingTimesheets).length > 0 && (
-            <section>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5" /> EVV Timesheets ({filterBySearch(pendingTimesheets).length})
-              </h3>
-              <div className="space-y-2">
-                {filterBySearch(pendingTimesheets).map((t) => {
-                  const { approve, deny } = makeTsMutations(t.id);
-                  return (
-                    <ExpandableRow key={t.id} id={t.id}
-                      summary={
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <p className="font-semibold text-sm">{staffName(t)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {clientName(t)} · {t.service_type_code} · {fmtDate(t.clock_in_timestamp)} · {shiftDuration(t.clock_in_timestamp, t.clock_out_timestamp)}
-                            </p>
-                          </div>
-                          <div className="flex gap-1.5">
-                            {t.is_out_of_bounds && <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-500/15 dark:text-rose-200">OOB</Badge>}
-                            {t.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">NECTAR Exception</Badge>}
-                            {t.submitted_late && <Badge className="bg-blue-100 text-blue-800 text-[10px]">Late</Badge>}
-                            <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-500/15 dark:text-amber-200">Pending</Badge>
-                          </div>
-                        </div>
-                      }>
-                      <TimesheetDetail row={t}
-                        onApprove={() => withLoading(t.id, "approve", approve)}
-                        onDeny={() => withLoading(t.id, "deny", deny)}
-                        approving={!!loadingIds[`${t.id}-approve`]}
-                        denying={!!loadingIds[`${t.id}-deny`]}
-                        denialReason={denialReasons[t.id] ?? ""}
-                        setDenialReason={(v) => setDenial(t.id, v)}
-                      />
-                    </ExpandableRow>
-                  );
-                })}
-              </div>
-            </section>
+            <>
+              {([
+                { key: "evv", label: "Pending EVV Shifts", rows: filterBySearch(pendingTimesheets).filter((t) => isEvvLockedCode(t.service_type_code)) },
+                { key: "internal", label: "Internal (non-EVV) pending", rows: filterBySearch(pendingTimesheets).filter((t) => !isEvvLockedCode(t.service_type_code)) },
+              ] as const).map((group) => group.rows.length === 0 ? null : (
+                <section key={group.key}>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" /> {group.label} ({group.rows.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {group.rows.map((t) => {
+                      const { approve, deny } = makeTsMutations(t.id);
+                      return (
+                        <ExpandableRow key={t.id} id={t.id}
+                          summary={
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-sm">{staffName(t)}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {clientName(t)} · {t.service_type_code} · {fmtDate(t.clock_in_timestamp)} · {shiftDuration(t.clock_in_timestamp, t.clock_out_timestamp)}
+                                </p>
+                                {t.edit_reason && (
+                                  <p className="mt-0.5 text-[11px] italic text-amber-700 dark:text-amber-300">✎ {t.edit_reason}</p>
+                                )}
+                              </div>
+                              <div className="flex gap-1.5">
+                                {t.is_out_of_bounds && <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-500/15 dark:text-rose-200">OOB</Badge>}
+                                {t.ai_compliance_status === "Exception" && <Badge className="bg-amber-100 text-amber-800 text-[10px]">NECTAR Exception</Badge>}
+                                {t.submitted_late && <Badge className="bg-blue-100 text-blue-800 text-[10px]">Late</Badge>}
+                                <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-500/15 dark:text-amber-200">Pending</Badge>
+                              </div>
+                            </div>
+                          }>
+                          <TimesheetDetail row={t}
+                            onApprove={() => withLoading(t.id, "approve", approve)}
+                            onDeny={() => withLoading(t.id, "deny", deny)}
+                            approving={!!loadingIds[`${t.id}-approve`]}
+                            denying={!!loadingIds[`${t.id}-deny`]}
+                            denialReason={denialReasons[t.id] ?? ""}
+                            setDenialReason={(v) => setDenial(t.id, v)}
+                          />
+                        </ExpandableRow>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </>
           )}
 
           {/* Pending daily logs */}

@@ -158,6 +158,18 @@ type Row = {
   reconciliation_review_notes: string | null;
   reconciliation_reviewed_by: string | null;
   reconciliation_reviewed_at: string | null;
+  // ── Review-by-exception (Timeclock pass) ────────────────────────────────
+  review_status: string | null;
+  attested_accurate: boolean | null;
+  corrected_clock_in: string | null;
+  corrected_clock_out: string | null;
+  edit_reason: string | null;
+  edited_by: string | null;
+  edited_at: string | null;
+  incident_flag: boolean | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
   clients: { first_name: string; last_name: string; physical_address: string | null } | null;
   staff: { full_name: string | null; email: string | null } | null;
 };
@@ -363,7 +375,7 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
 
 
 
-const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, clients(first_name,last_name,physical_address)";
+const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, review_status, attested_accurate, corrected_clock_in, corrected_clock_out, edit_reason, edited_by, edited_at, incident_flag, reviewed_by, reviewed_at, review_note, clients(first_name,last_name,physical_address)";
 
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));
@@ -385,7 +397,7 @@ async function hydrateStaff(list: Row[]) {
 function ComplianceDeskPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
-  const [sub, setSub] = useState<"pending" | "reconcile" | "evv-archive" | "non-evv-archive">("pending");
+  const [sub, setSub] = useState<"pending" | "needs-review" | "reconcile" | "evv-archive" | "non-evv-archive">("pending");
   const [mapOpen, setMapOpen] = useState<Row | null>(null);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);
@@ -449,6 +461,30 @@ function ComplianceDeskPage() {
   });
   const reconcilePendingCount = (reconcileQ.data ?? []).filter((r) => r.reconciliation_status === "pending").length;
 
+  // ── Supervisor review queue ──────────────────────────────────────────────
+  // Surfaces every evv_timesheets row where the punch-pad's correction flow
+  // sent the shift to `review_status='needs_review'` (incident_flag, ≥16h
+  // shifts, or staff used the "forgot to clock out" correction). Approving
+  // sets review_status='approved' (corrected times then become effective
+  // for billing via effectiveBillingTimes). Rejecting requires a note and
+  // sends the shift back to the caregiver as 'rejected' (excluded from
+  // billable units until they resubmit).
+  const needsReviewQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["evv-needs-review", org?.organization_id],
+    queryFn: async (): Promise<Row[]> => {
+      const { data, error } = await supabase
+        .from("evv_timesheets")
+        .select(SELECT_COLS)
+        .eq("organization_id", org!.organization_id)
+        .eq("review_status", "needs_review")
+        .order("clock_in_timestamp", { ascending: false });
+      if (error) throw error;
+      return hydrateStaff((data ?? []) as unknown as Row[]);
+    },
+  });
+  const needsReviewCount = needsReviewQ.data?.length ?? 0;
+
   const vectorQ = useQuery({
     enabled: isSearching && !!org?.organization_id,
     queryKey: ["evv-hybrid-search", org?.organization_id, submitted?.query],
@@ -485,6 +521,54 @@ function ComplianceDeskPage() {
       toast.success("Shift approved.");
       qc.invalidateQueries({ queryKey: ["evv-pending"] });
       qc.invalidateQueries({ queryKey: ["evv-approved"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  // ── Review-by-exception actions ──────────────────────────────────────────
+  const { user: reviewUser } = useAuth();
+  const reviewApprove = useMutation({
+    mutationFn: async (payload: { id: string; note?: string }) => {
+      const patch: Record<string, unknown> = {
+        review_status: "approved",
+        reviewed_by: reviewUser?.id ?? null,
+        reviewed_at: new Date().toISOString(),
+      };
+      if (payload.note && payload.note.trim()) patch.review_note = payload.note.trim();
+      const { error } = await supabase
+        .from("evv_timesheets")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update(patch as any)
+        .eq("id", payload.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Correction approved — corrected times now bill.");
+      qc.invalidateQueries({ queryKey: ["evv-needs-review"] });
+      qc.invalidateQueries({ queryKey: ["evv-pending"] });
+      qc.invalidateQueries({ queryKey: ["evv-approved"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const reviewReject = useMutation({
+    mutationFn: async (payload: { id: string; note: string }) => {
+      const note = payload.note.trim();
+      if (!note) throw new Error("A reviewer note is required to reject.");
+      const { error } = await supabase
+        .from("evv_timesheets")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({
+          review_status: "rejected",
+          reviewed_by: reviewUser?.id ?? null,
+          reviewed_at: new Date().toISOString(),
+          review_note: note,
+        } as any)
+        .eq("id", payload.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Returned to caregiver — they will see a resubmit prompt.");
+      qc.invalidateQueries({ queryKey: ["evv-needs-review"] });
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -634,6 +718,7 @@ function ComplianceDeskPage() {
         <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-1 shadow-soft">
           {[
             { id: "pending" as const, label: "Pending Review", Icon: Inbox, count: undefined as number | undefined },
+            { id: "needs-review" as const, label: "Needs Review", Icon: AlertTriangle, count: needsReviewCount },
             { id: "reconcile" as const, label: "EVV Reconciliation", Icon: AlertCircle, count: reconcilePendingCount },
             { id: "evv-archive" as const, label: "State EVV Archive", Icon: FolderArchive, count: undefined },
             { id: "non-evv-archive" as const, label: "Internal / Non-EVV Archive", Icon: Briefcase, count: undefined },
@@ -670,14 +755,38 @@ function ComplianceDeskPage() {
           approving={approve.isPending}
         />
       ) : sub === "pending" ? (
-        <PendingTable
-          rows={pendingQ.data ?? []}
-          loading={pendingQ.isLoading}
-          onMap={setMapOpen}
-          onEdit={setEditRow}
-          onApprove={(id) => approve.mutate(id)}
-          approving={approve.isPending}
-          onReason={setReasonRow}
+        <div className="space-y-4">
+          <PendingTable
+            title="Pending EVV Shifts"
+            description="EVV-locked codes (SOW §1.12 — geofence + UEVV transmission)."
+            rows={(pendingQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
+            loading={pendingQ.isLoading}
+            onMap={setMapOpen}
+            onEdit={setEditRow}
+            onApprove={(id) => approve.mutate(id)}
+            approving={approve.isPending}
+            onReason={setReasonRow}
+          />
+          <PendingTable
+            title="Internal (non-EVV) pending"
+            description="Time-capture only — payroll / service evidence, not transmitted to UEVV."
+            rows={(pendingQ.data ?? []).filter((r) => !isEvvLockedCode(r.service_type_code))}
+            loading={pendingQ.isLoading}
+            onMap={setMapOpen}
+            onEdit={setEditRow}
+            onApprove={(id) => approve.mutate(id)}
+            approving={approve.isPending}
+            onReason={setReasonRow}
+          />
+        </div>
+      ) : sub === "needs-review" ? (
+        <NeedsReviewTable
+          rows={needsReviewQ.data ?? []}
+          loading={needsReviewQ.isLoading}
+          onApprove={(id) => reviewApprove.mutate({ id })}
+          onReject={(id, note) => reviewReject.mutate({ id, note })}
+          approving={reviewApprove.isPending}
+          rejecting={reviewReject.isPending}
         />
       ) : sub === "reconcile" ? (
         <ReconcileTable
@@ -916,18 +1025,25 @@ function UnifiedSearchResults({
 
 function PendingTable({
   rows, loading, onMap, onEdit, onApprove, approving, onReason,
+  title = "Pending EVV Shifts",
+  description,
 }: {
   rows: Row[]; loading: boolean;
   onMap: (r: Row) => void; onEdit: (r: Row) => void;
   onApprove: (id: string) => void; approving: boolean;
   onReason: (r: Row) => void;
+  title?: string;
+  description?: string;
 }) {
   const exp = useRowExpansion();
   const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Pending EVV Shifts</h2>
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+          {description && <p className="mt-0.5 text-[11px] text-muted-foreground/80">{description}</p>}
+        </div>
         <div className="flex items-center gap-2">
           <ExpandControls exp={exp} ids={allIds} />
           <Badge variant="outline" className="font-mono text-[10px]">{rows.length} pending</Badge>
@@ -969,6 +1085,11 @@ function PendingTable({
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
                   <EditedByAdminBadge row={r} />
                   <FlagDot row={r} />
+                  {r.edit_reason && (
+                    <div className="mt-0.5 max-w-[260px] truncate text-[11px] font-normal italic text-amber-700 dark:text-amber-300" title={r.edit_reason}>
+                      ✎ {r.edit_reason}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</div>
@@ -1171,6 +1292,180 @@ function buildMasterLedgerCsv(rows: Row[]): string {
     ].join(",");
   });
   return [MASTER_LEDGER_HEADER, ...lines].join("\r\n");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Supervisor review queue — the EVV punch pad routes shifts here when the
+// "forgot to clock out" correction flow runs, an incident_flag is set, or
+// the raw duration is ≥16 hours. Approving makes the corrected_* times the
+// EFFECTIVE billing times via effectiveBillingTimes() in billing-units.ts.
+// Rejecting requires a note and returns the shift to the caregiver, who
+// sees a "correction rejected — resubmit" state on the punch pad.
+// ─────────────────────────────────────────────────────────────────────────────
+function fmtTs(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime())
+    ? d.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })
+    : "—";
+}
+function varianceMinutes(r: Row): number | null {
+  const rawIn = r.clock_in_timestamp ? new Date(r.clock_in_timestamp).getTime() : NaN;
+  const rawOut = r.clock_out_timestamp ? new Date(r.clock_out_timestamp).getTime() : NaN;
+  const corrIn = r.corrected_clock_in ? new Date(r.corrected_clock_in).getTime() : NaN;
+  const corrOut = r.corrected_clock_out ? new Date(r.corrected_clock_out).getTime() : NaN;
+  if (!Number.isFinite(rawIn) || !Number.isFinite(rawOut)) return null;
+  if (!Number.isFinite(corrIn) || !Number.isFinite(corrOut)) return null;
+  const rawMin = (rawOut - rawIn) / 60_000;
+  const corrMin = (corrOut - corrIn) / 60_000;
+  return Math.round(corrMin - rawMin);
+}
+
+function NeedsReviewRow({
+  row, onApprove, onReject, approving, rejecting,
+}: {
+  row: Row;
+  onApprove: (id: string) => void;
+  onReject: (id: string, note: string) => void;
+  approving: boolean;
+  rejecting: boolean;
+}) {
+  const [note, setNote] = useState("");
+  const [showReject, setShowReject] = useState(false);
+  const variance = varianceMinutes(row);
+  return (
+    <div className="space-y-3 rounded-lg border border-l-4 border-l-amber-500 bg-card p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-sm">
+            {row.staff?.full_name ?? row.staff?.email ?? "—"}
+            {" "}→{" "}
+            <span className="text-foreground">
+              {row.clients?.first_name} {row.clients?.last_name}
+            </span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <Badge variant="outline" className="font-mono text-[10px] mr-1.5">{row.service_type_code}</Badge>
+            {isEvvLockedCode(row.service_type_code) ? "EVV-locked" : "Non-EVV"}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {row.incident_flag && (
+            <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-500/15 dark:text-rose-200">
+              <Flag className="mr-1 h-3 w-3" /> Incident flagged
+            </Badge>
+          )}
+          {row.corrected_clock_in && (
+            <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-500/15 dark:text-amber-200">
+              Correction submitted
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Original (raw)</p>
+          <p className="mt-1 font-mono text-xs">In: {fmtTs(row.clock_in_timestamp)}</p>
+          <p className="font-mono text-xs">Out: {fmtTs(row.clock_out_timestamp)}</p>
+        </div>
+        <div className="rounded-lg border border-amber-400/50 bg-amber-50/40 p-2.5 dark:bg-amber-500/5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Corrected</p>
+          <p className="mt-1 font-mono text-xs">In: {fmtTs(row.corrected_clock_in)}</p>
+          <p className="font-mono text-xs">Out: {fmtTs(row.corrected_clock_out)}</p>
+          {variance !== null && (
+            <p className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+              Variance: {variance >= 0 ? "+" : ""}{variance} min
+            </p>
+          )}
+        </div>
+      </div>
+
+      {row.edit_reason && (
+        <div className="rounded-lg border border-border bg-card p-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Caregiver reason</p>
+          <p className="mt-1 text-xs leading-relaxed">{row.edit_reason}</p>
+        </div>
+      )}
+
+      {showReject ? (
+        <div className="space-y-2">
+          <Label className="text-xs">Reviewer note (required for reject)</Label>
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder="Why is this being returned? The caregiver will see this."
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { setShowReject(false); setNote(""); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={rejecting || note.trim().length === 0}
+              onClick={() => onReject(row.id, note)}
+            >
+              {rejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Return to caregiver"}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowReject(true)}>
+            <X className="mr-1 h-3.5 w-3.5" /> Reject
+          </Button>
+          <Button size="sm" disabled={approving} onClick={() => onApprove(row.id)}>
+            {approving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Check className="mr-1 h-3.5 w-3.5" /> Approve correction</>}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NeedsReviewTable({
+  rows, loading, onApprove, onReject, approving, rejecting,
+}: {
+  rows: Row[];
+  loading: boolean;
+  onApprove: (id: string) => void;
+  onReject: (id: string, note: string) => void;
+  approving: boolean;
+  rejecting: boolean;
+}) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Needs Review</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground/80">
+            Caregiver corrections, ≥16h shifts, and incident-flagged punches. Approve to make corrected times bill; reject to return for resubmission.
+          </p>
+        </div>
+        <Badge variant="outline" className="font-mono text-[10px]">{rows.length} awaiting review</Badge>
+      </div>
+      {loading ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">No corrections awaiting review.</p>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((r) => (
+            <NeedsReviewRow
+              key={r.id}
+              row={r}
+              onApprove={onApprove}
+              onReject={onReject}
+              approving={approving}
+              rejecting={rejecting}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function ArchiveTable({

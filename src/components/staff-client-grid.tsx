@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { User, Search, Clock, Home, Info, ChevronDown, CalendarCheck2 } from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 import { ClientCapBars } from "@/components/staff-mobile/client-cap-bars";
-import { billingUnitLabel, isDailyServiceCode } from "@/lib/service-billing";
+import { billingUnitLabel, isClockableServiceCode } from "@/lib/service-billing";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
@@ -34,7 +34,11 @@ function useTick(enabled: boolean) {
   }, [enabled]);
 }
 
-const isDaily = (code: string) => isDailyServiceCode(code);
+// `isDaily` here drives ROUTING (HHS hub vs. clock-in workspace), so it
+// must be true ONLY for codes that genuinely have no staff clock surface
+// (HHS host home, PPS parent-paid). RHS is daily-rate but residential
+// staff DO clock for payroll, so it routes to the workspace clock-in tab.
+const isDaily = (code: string) => !isClockableServiceCode(code);
 const billingLabel = (code: string) => billingUnitLabel(code);
 
 /** Expanded client detail — preserves the existing service chips, burn-down, and CTA buttons. */

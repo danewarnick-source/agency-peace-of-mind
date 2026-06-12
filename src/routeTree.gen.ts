@@ -131,6 +131,7 @@ import { Route as DashboardCoursesMindsmithRouteImport } from './routes/dashboar
 import { Route as DashboardCoursesCoreRouteImport } from './routes/dashboard.courses.core'
 import { Route as DashboardCoursesCeRouteImport } from './routes/dashboard.courses.ce'
 import { Route as DashboardCoursesCourseIdRouteImport } from './routes/dashboard.courses.$courseId'
+import { Route as DashboardClientsRhsBoardRouteImport } from './routes/dashboard.clients.rhs-board'
 import { Route as DashboardClientTrainingClientIdRouteImport } from './routes/dashboard.client-training.$clientId'
 import { Route as DashboardClientIntakeClientIdRouteImport } from './routes/dashboard.client-intake.$clientId'
 import { Route as DashboardBillingTotalsRouteImport } from './routes/dashboard.billing.totals'
@@ -808,6 +809,12 @@ const DashboardCoursesCourseIdRoute =
     path: '/courses/$courseId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardClientsRhsBoardRoute =
+  DashboardClientsRhsBoardRouteImport.update({
+    id: '/rhs-board',
+    path: '/rhs-board',
+    getParentRoute: () => DashboardClientsRoute,
+  } as any)
 const DashboardClientTrainingClientIdRoute =
   DashboardClientTrainingClientIdRouteImport.update({
     id: '/client-training/$clientId',
@@ -996,7 +1003,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
-  '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
@@ -1051,6 +1058,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing/totals': typeof DashboardBillingTotalsRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
   '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
+  '/dashboard/clients/rhs-board': typeof DashboardClientsRhsBoardRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/ce': typeof DashboardCoursesCeRoute
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
@@ -1146,7 +1154,7 @@ export interface FileRoutesByTo {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
-  '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
@@ -1197,6 +1205,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing/totals': typeof DashboardBillingTotalsRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
   '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
+  '/dashboard/clients/rhs-board': typeof DashboardClientsRhsBoardRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/ce': typeof DashboardCoursesCeRoute
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
@@ -1295,7 +1304,7 @@ export interface FileRoutesById {
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
-  '/dashboard/clients': typeof DashboardClientsRoute
+  '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
@@ -1350,6 +1359,7 @@ export interface FileRoutesById {
   '/dashboard/billing/totals': typeof DashboardBillingTotalsRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
   '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
+  '/dashboard/clients/rhs-board': typeof DashboardClientsRhsBoardRoute
   '/dashboard/courses/$courseId': typeof DashboardCoursesCourseIdRouteWithChildren
   '/dashboard/courses/ce': typeof DashboardCoursesCeRoute
   '/dashboard/courses/core': typeof DashboardCoursesCoreRoute
@@ -1504,6 +1514,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/totals'
     | '/dashboard/client-intake/$clientId'
     | '/dashboard/client-training/$clientId'
+    | '/dashboard/clients/rhs-board'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/ce'
     | '/dashboard/courses/core'
@@ -1650,6 +1661,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/totals'
     | '/dashboard/client-intake/$clientId'
     | '/dashboard/client-training/$clientId'
+    | '/dashboard/clients/rhs-board'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/ce'
     | '/dashboard/courses/core'
@@ -1802,6 +1814,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/totals'
     | '/dashboard/client-intake/$clientId'
     | '/dashboard/client-training/$clientId'
+    | '/dashboard/clients/rhs-board'
     | '/dashboard/courses/$courseId'
     | '/dashboard/courses/ce'
     | '/dashboard/courses/core'
@@ -2751,6 +2764,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/clients/rhs-board': {
+      id: '/dashboard/clients/rhs-board'
+      path: '/rhs-board'
+      fullPath: '/dashboard/clients/rhs-board'
+      preLoaderRoute: typeof DashboardClientsRhsBoardRouteImport
+      parentRoute: typeof DashboardClientsRoute
+    }
     '/dashboard/client-training/$clientId': {
       id: '/dashboard/client-training/$clientId'
       path: '/client-training/$clientId'
@@ -2983,6 +3003,17 @@ const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
 const DashboardBillingRouteWithChildren =
   DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
 
+interface DashboardClientsRouteChildren {
+  DashboardClientsRhsBoardRoute: typeof DashboardClientsRhsBoardRoute
+}
+
+const DashboardClientsRouteChildren: DashboardClientsRouteChildren = {
+  DashboardClientsRhsBoardRoute: DashboardClientsRhsBoardRoute,
+}
+
+const DashboardClientsRouteWithChildren =
+  DashboardClientsRoute._addFileChildren(DashboardClientsRouteChildren)
+
 interface DashboardFinancialRouteChildren {
   DashboardFinancialContractorsRoute: typeof DashboardFinancialContractorsRoute
   DashboardFinancialDistributionsRoute: typeof DashboardFinancialDistributionsRoute
@@ -3199,7 +3230,7 @@ interface DashboardRouteChildren {
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientBillingCodesRoute: typeof DashboardClientBillingCodesRoute
   DashboardClientLoansRoute: typeof DashboardClientLoansRoute
-  DashboardClientsRoute: typeof DashboardClientsRoute
+  DashboardClientsRoute: typeof DashboardClientsRouteWithChildren
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
@@ -3276,7 +3307,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientBillingCodesRoute: DashboardClientBillingCodesRoute,
   DashboardClientLoansRoute: DashboardClientLoansRoute,
-  DashboardClientsRoute: DashboardClientsRoute,
+  DashboardClientsRoute: DashboardClientsRouteWithChildren,
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,

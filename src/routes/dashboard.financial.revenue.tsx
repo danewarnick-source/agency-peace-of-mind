@@ -232,24 +232,17 @@ function RevenuePage() {
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.label} className="border-b border-border/60">
-                      <td className="px-3 py-2 font-medium">{r.label}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {fmtUSD(r.billed)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {receivedAvailable ? (
-                          <span className="tabular-nums text-muted-foreground">—</span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                            Pending — not yet imported
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        —
-                      </td>
-                    </tr>
+                    <RevenueRow
+                      key={r.label}
+                      label={r.label}
+                      billed={r.billed}
+                      month={r.month}
+                      year={year}
+                      organizationId={organizationId}
+                      providerName={providerName}
+                      receivedAvailable={receivedAvailable}
+                      canExpand={!isManualMode && r.month != null && !!organizationId}
+                    />
                   ))}
                 </tbody>
               </table>

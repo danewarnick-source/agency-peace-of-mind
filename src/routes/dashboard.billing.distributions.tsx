@@ -75,8 +75,7 @@ function DistributionsPage() {
     enabled: !!org?.organization_id,
     queryKey: ["dist-plans", org?.organization_id],
     queryFn: async (): Promise<Plan[]> => {
-      const { data, error } = await supabase
-        .from("distribution_plans" as never)
+      const { data, error } = await (supabase.from("distribution_plans" as never) as any)
         .select("*")
         .eq("organization_id", org!.organization_id)
         .order("created_at", { ascending: false });
@@ -95,8 +94,7 @@ function DistributionsPage() {
     enabled: !!selectedPlanId,
     queryKey: ["dist-parts", selectedPlanId],
     queryFn: async (): Promise<Participant[]> => {
-      const { data, error } = await supabase
-        .from("distribution_plan_participants" as never)
+      const { data, error } = await (supabase.from("distribution_plan_participants" as never) as any)
         .select("*")
         .eq("plan_id", selectedPlanId!)
         .order("sort_order", { ascending: true });
@@ -274,8 +272,7 @@ function DistributionsPage() {
   // ---------- Mutations ----------
   const createPlan = useMutation({
     mutationFn: async (vars: { name: string; plan_type: PlanType }) => {
-      const { data, error } = await supabase
-        .from("distribution_plans" as never)
+      const { data, error } = await (supabase.from("distribution_plans" as never) as any)
         .insert({
           organization_id: org!.organization_id,
           name: vars.name,
@@ -300,8 +297,7 @@ function DistributionsPage() {
   const updatePlan = useMutation({
     mutationFn: async (vars: Partial<Plan> & { id: string }) => {
       const { id, ...rest } = vars;
-      const { error } = await supabase
-        .from("distribution_plans" as never)
+      const { error } = await (supabase.from("distribution_plans" as never) as any)
         .update(rest as any)
         .eq("id", id);
       if (error) throw error;
@@ -327,8 +323,7 @@ function DistributionsPage() {
       const plan = plansQ.data?.find((p) => p.id === id);
       const parts = partsQ.data ?? [];
       if (!plan) throw new Error("Plan not found");
-      const { data: newPlan, error } = await supabase
-        .from("distribution_plans" as never)
+      const { data: newPlan, error } = await (supabase.from("distribution_plans" as never) as any)
         .insert({
           organization_id: plan.organization_id,
           name: `${plan.name} (copy)`,
@@ -353,7 +348,7 @@ function DistributionsPage() {
           notes: p.notes,
           sort_order: p.sort_order,
         }));
-        const { error: e2 } = await supabase.from("distribution_plan_participants" as never).insert(inserts as any);
+        const { error: e2 } = await (supabase.from("distribution_plan_participants" as never) as any).insert(inserts as any);
         if (e2) throw e2;
       }
       return newPlan as any;
@@ -369,7 +364,7 @@ function DistributionsPage() {
   const addParticipant = useMutation({
     mutationFn: async () => {
       const order = (partsQ.data?.length ?? 0);
-      const { error } = await supabase.from("distribution_plan_participants" as never).insert({
+      const { error } = await (supabase.from("distribution_plan_participants" as never) as any).insert({
         plan_id: selectedPlanId!,
         participant_name: "New participant",
         allocation_pct: 0,
@@ -383,7 +378,7 @@ function DistributionsPage() {
   const updateParticipant = useMutation({
     mutationFn: async (vars: Partial<Participant> & { id: string }) => {
       const { id, ...rest } = vars;
-      const { error } = await supabase.from("distribution_plan_participants" as never).update(rest as any).eq("id", id);
+      const { error } = await (supabase.from("distribution_plan_participants" as never) as any).update(rest as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-parts", selectedPlanId] }),
@@ -391,7 +386,7 @@ function DistributionsPage() {
 
   const deleteParticipant = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("distribution_plan_participants" as never).delete().eq("id", id);
+      const { error } = await (supabase.from("distribution_plan_participants" as never) as any).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-parts", selectedPlanId] }),

@@ -35,7 +35,7 @@ function FinancialLayout() {
   const visibleTabs = TABS.filter((t) => !t.perm || can(t.perm));
 
   return (
-    <div className="space-y-4">
+    <div className="finance-dense space-y-4">
 
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>

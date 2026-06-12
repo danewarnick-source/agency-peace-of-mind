@@ -360,3 +360,39 @@
 /* Safe-area helpers usable anywhere */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 .pt-safe { padding-top: env(safe-area-inset-top); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Finance dense mode — applied to both /dashboard/billing and
+   /dashboard/financial layouts. Styling/density only; never changes data.
+   ────────────────────────────────────────────────────────────────────── */
+.finance-dense { font-size: 0.8125rem; }
+.finance-dense h1 { font-size: 1.25rem; line-height: 1.75rem; }
+.finance-dense h2 { font-size: 0.95rem; line-height: 1.35rem; font-weight: 600; }
+.finance-dense h3 { font-size: 0.85rem; line-height: 1.25rem; font-weight: 600; }
+.finance-dense header p,
+.finance-dense .text-sm.text-muted-foreground,
+.finance-dense p.text-sm { font-size: 0.75rem; line-height: 1.05rem; }
+.finance-dense .space-y-4 > * + * { margin-top: 0.625rem; }
+.finance-dense .space-y-3 > * + * { margin-top: 0.5rem; }
+.finance-dense .space-y-6 > * + * { margin-top: 0.875rem; }
+.finance-dense .gap-4 { gap: 0.625rem; }
+.finance-dense .gap-3 { gap: 0.5rem; }
+.finance-dense .gap-6 { gap: 0.875rem; }
+.finance-dense .p-4 { padding: 0.625rem; }
+.finance-dense .p-6 { padding: 0.875rem; }
+.finance-dense .px-4 { padding-left: 0.625rem; padding-right: 0.625rem; }
+.finance-dense .py-4 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+.finance-dense .px-6 { padding-left: 0.875rem; padding-right: 0.875rem; }
+.finance-dense .py-6 { padding-top: 0.875rem; padding-bottom: 0.875rem; }
+.finance-dense table { font-size: 0.75rem; }
+.finance-dense table th,
+.finance-dense table td { padding: 0.3rem 0.5rem; }
+.finance-dense table thead th { font-size: 0.65rem; }
+.finance-dense .h-9 { height: 1.875rem; }
+.finance-dense .h-10 { height: 2rem; }
+.finance-dense input,
+.finance-dense select,
+.finance-dense .h-8 { height: 1.75rem; }
+.finance-dense input { font-size: 0.8125rem; }
+/* Ensure any wide table wrapper can scroll, never clips its side panel. */
+.finance-dense .overflow-x-auto { max-width: 100%; }

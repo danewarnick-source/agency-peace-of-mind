@@ -6087,10 +6087,14 @@ export type Database = {
           ai_trigger_reasons: string[] | null
           amendment_reason: string | null
           aps_notified: boolean | null
+          aps_notified_at: string | null
+          aps_notified_by: string | null
+          aps_reference: string | null
           category: string | null
           client_id: string
           created_at: string
           description: string | null
+          details: Json
           discovered_at: string | null
           family_name: string | null
           family_notified: boolean | null
@@ -6131,7 +6135,9 @@ export type Database = {
           prevention_strategies: string | null
           report_number: string
           reported_by: string
+          reported_to_reporter_by: string | null
           reporter_title: string | null
+          restraint_used: boolean
           staff_involved: Json | null
           staff_signature_url: string | null
           state_confirmation_number: string | null
@@ -6150,6 +6156,7 @@ export type Database = {
           upi_completed_by: string | null
           upi_initiated_at: string | null
           upi_initiated_by: string | null
+          witnessed_directly: boolean | null
           witnesses: Json | null
         }
         Insert: {
@@ -6157,10 +6164,14 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           amendment_reason?: string | null
           aps_notified?: boolean | null
+          aps_notified_at?: string | null
+          aps_notified_by?: string | null
+          aps_reference?: string | null
           category?: string | null
           client_id: string
           created_at?: string
           description?: string | null
+          details?: Json
           discovered_at?: string | null
           family_name?: string | null
           family_notified?: boolean | null
@@ -6201,7 +6212,9 @@ export type Database = {
           prevention_strategies?: string | null
           report_number: string
           reported_by: string
+          reported_to_reporter_by?: string | null
           reporter_title?: string | null
+          restraint_used?: boolean
           staff_involved?: Json | null
           staff_signature_url?: string | null
           state_confirmation_number?: string | null
@@ -6220,6 +6233,7 @@ export type Database = {
           upi_completed_by?: string | null
           upi_initiated_at?: string | null
           upi_initiated_by?: string | null
+          witnessed_directly?: boolean | null
           witnesses?: Json | null
         }
         Update: {
@@ -6227,10 +6241,14 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           amendment_reason?: string | null
           aps_notified?: boolean | null
+          aps_notified_at?: string | null
+          aps_notified_by?: string | null
+          aps_reference?: string | null
           category?: string | null
           client_id?: string
           created_at?: string
           description?: string | null
+          details?: Json
           discovered_at?: string | null
           family_name?: string | null
           family_notified?: boolean | null
@@ -6271,7 +6289,9 @@ export type Database = {
           prevention_strategies?: string | null
           report_number?: string
           reported_by?: string
+          reported_to_reporter_by?: string | null
           reporter_title?: string | null
+          restraint_used?: boolean
           staff_involved?: Json | null
           staff_signature_url?: string | null
           state_confirmation_number?: string | null
@@ -6290,6 +6310,7 @@ export type Database = {
           upi_completed_by?: string | null
           upi_initiated_at?: string | null
           upi_initiated_by?: string | null
+          witnessed_directly?: boolean | null
           witnesses?: Json | null
         }
         Relationships: [

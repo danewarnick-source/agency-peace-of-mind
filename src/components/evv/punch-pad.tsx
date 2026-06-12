@@ -37,6 +37,8 @@ import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
 import { getPendingTrackingForms } from "@/lib/forms.functions";
 import { PendingTrackingFormsDialog, type PendingForm } from "@/components/evv/pending-tracking-forms-dialog";
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
+import { IncidentReportDialog } from "@/components/incidents/incident-report-dialog";
+import { AlertTriangle as AlertTriangleIcon } from "lucide-react";
 
 
 

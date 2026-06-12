@@ -525,7 +525,53 @@ function ComplianceDeskPage() {
     onError: (e) => toast.error((e as Error).message),
   });
 
-  const submitAiSearch = () => {
+  // ── Review-by-exception actions ──────────────────────────────────────────
+  const { user: reviewUser } = useAuth();
+  const reviewApprove = useMutation({
+    mutationFn: async (payload: { id: string; note?: string }) => {
+      const patch: Record<string, unknown> = {
+        review_status: "approved",
+        reviewed_by: reviewUser?.id ?? null,
+        reviewed_at: new Date().toISOString(),
+      };
+      if (payload.note && payload.note.trim()) patch.review_note = payload.note.trim();
+      const { error } = await supabase
+        .from("evv_timesheets")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update(patch as any)
+        .eq("id", payload.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Correction approved — corrected times now bill.");
+      qc.invalidateQueries({ queryKey: ["evv-needs-review"] });
+      qc.invalidateQueries({ queryKey: ["evv-pending"] });
+      qc.invalidateQueries({ queryKey: ["evv-approved"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const reviewReject = useMutation({
+    mutationFn: async (payload: { id: string; note: string }) => {
+      const note = payload.note.trim();
+      if (!note) throw new Error("A reviewer note is required to reject.");
+      const { error } = await supabase
+        .from("evv_timesheets")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({
+          review_status: "rejected",
+          reviewed_by: reviewUser?.id ?? null,
+          reviewed_at: new Date().toISOString(),
+          review_note: note,
+        } as any)
+        .eq("id", payload.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Returned to caregiver — they will see a resubmit prompt.");
+      qc.invalidateQueries({ queryKey: ["evv-needs-review"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
     const q = aiInput.trim();
     if (q.length === 0) {
       toast.error("Type a question first.");

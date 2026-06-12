@@ -1042,7 +1042,7 @@ export function PunchPad({
 
 
   async function finalizeClockOut(args: {
-    pos: { lat: number; lng: number; acc: number };
+    pos: { lat: number; lng: number; acc: number } | null;
     outsideReason?: string;
     aiStatus?: "Verified" | "Flagged" | "Exception";
     aiFeedback?: string;
@@ -1058,7 +1058,9 @@ export function PunchPad({
     const clockOut = new Date().toISOString();
     const update: Record<string, unknown> = {
       clock_out_timestamp:  clockOut,
-      gps_out_coordinates:  { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc },
+      gps_out_coordinates:  args.pos
+        ? { latitude: args.pos.lat, longitude: args.pos.lng, accuracy_meters: args.pos.acc }
+        : { latitude: null, longitude: null, accuracy_meters: null },
       status:               "Pending",
       timezone_setting:     "America/Denver",
       shift_note_text:      narrative.trim(),

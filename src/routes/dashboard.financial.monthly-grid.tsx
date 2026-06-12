@@ -38,6 +38,7 @@ type GridRow = {
 
 function MonthlyGridPage() {
   const { data: org } = useCurrentOrg();
+  const providerName = useOrgDisplayName().displayName;
   const today = new Date();
   const [month, setMonth] = useState({ y: today.getFullYear(), m: today.getMonth() });
 

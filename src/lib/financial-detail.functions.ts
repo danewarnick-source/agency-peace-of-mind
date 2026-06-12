@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { isDailyServiceCode } from "@/lib/service-billing";
-import { computeEntryUnits, UNITS_PER_HOUR } from "@/lib/billing-units";
+import { computeEntryUnits, UNITS_PER_HOUR, effectiveBillingTimes } from "@/lib/billing-units";
 
 /**
  * Financial — Per-client / per-shift billing DETAIL feed.

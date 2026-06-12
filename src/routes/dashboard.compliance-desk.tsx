@@ -1289,6 +1289,180 @@ function buildMasterLedgerCsv(rows: Row[]): string {
   return [MASTER_LEDGER_HEADER, ...lines].join("\r\n");
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Supervisor review queue — the EVV punch pad routes shifts here when the
+// "forgot to clock out" correction flow runs, an incident_flag is set, or
+// the raw duration is ≥16 hours. Approving makes the corrected_* times the
+// EFFECTIVE billing times via effectiveBillingTimes() in billing-units.ts.
+// Rejecting requires a note and returns the shift to the caregiver, who
+// sees a "correction rejected — resubmit" state on the punch pad.
+// ─────────────────────────────────────────────────────────────────────────────
+function fmtTs(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime())
+    ? d.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })
+    : "—";
+}
+function varianceMinutes(r: Row): number | null {
+  const rawIn = r.clock_in_timestamp ? new Date(r.clock_in_timestamp).getTime() : NaN;
+  const rawOut = r.clock_out_timestamp ? new Date(r.clock_out_timestamp).getTime() : NaN;
+  const corrIn = r.corrected_clock_in ? new Date(r.corrected_clock_in).getTime() : NaN;
+  const corrOut = r.corrected_clock_out ? new Date(r.corrected_clock_out).getTime() : NaN;
+  if (!Number.isFinite(rawIn) || !Number.isFinite(rawOut)) return null;
+  if (!Number.isFinite(corrIn) || !Number.isFinite(corrOut)) return null;
+  const rawMin = (rawOut - rawIn) / 60_000;
+  const corrMin = (corrOut - corrIn) / 60_000;
+  return Math.round(corrMin - rawMin);
+}
+
+function NeedsReviewRow({
+  row, onApprove, onReject, approving, rejecting,
+}: {
+  row: Row;
+  onApprove: (id: string) => void;
+  onReject: (id: string, note: string) => void;
+  approving: boolean;
+  rejecting: boolean;
+}) {
+  const [note, setNote] = useState("");
+  const [showReject, setShowReject] = useState(false);
+  const variance = varianceMinutes(row);
+  return (
+    <Card className="space-y-3 border-l-4 border-l-amber-500 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-sm">
+            {row.staff?.full_name ?? row.staff?.email ?? "—"}
+            {" "}→{" "}
+            <span className="text-foreground">
+              {row.clients?.first_name} {row.clients?.last_name}
+            </span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <Badge variant="outline" className="font-mono text-[10px] mr-1.5">{row.service_type_code}</Badge>
+            {isEvvLockedCode(row.service_type_code) ? "EVV-locked" : "Non-EVV"}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {row.incident_flag && (
+            <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-500/15 dark:text-rose-200">
+              <Flag className="mr-1 h-3 w-3" /> Incident flagged
+            </Badge>
+          )}
+          {row.corrected_clock_in && (
+            <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-500/15 dark:text-amber-200">
+              Correction submitted
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Original (raw)</p>
+          <p className="mt-1 font-mono text-xs">In: {fmtTs(row.clock_in_timestamp)}</p>
+          <p className="font-mono text-xs">Out: {fmtTs(row.clock_out_timestamp)}</p>
+        </div>
+        <div className="rounded-lg border border-amber-400/50 bg-amber-50/40 p-2.5 dark:bg-amber-500/5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Corrected</p>
+          <p className="mt-1 font-mono text-xs">In: {fmtTs(row.corrected_clock_in)}</p>
+          <p className="font-mono text-xs">Out: {fmtTs(row.corrected_clock_out)}</p>
+          {variance !== null && (
+            <p className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+              Variance: {variance >= 0 ? "+" : ""}{variance} min
+            </p>
+          )}
+        </div>
+      </div>
+
+      {row.edit_reason && (
+        <div className="rounded-lg border border-border bg-card p-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Caregiver reason</p>
+          <p className="mt-1 text-xs leading-relaxed">{row.edit_reason}</p>
+        </div>
+      )}
+
+      {showReject ? (
+        <div className="space-y-2">
+          <Label className="text-xs">Reviewer note (required for reject)</Label>
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder="Why is this being returned? The caregiver will see this."
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { setShowReject(false); setNote(""); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={rejecting || note.trim().length === 0}
+              onClick={() => onReject(row.id, note)}
+            >
+              {rejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Return to caregiver"}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowReject(true)}>
+            <X className="mr-1 h-3.5 w-3.5" /> Reject
+          </Button>
+          <Button size="sm" disabled={approving} onClick={() => onApprove(row.id)}>
+            {approving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Check className="mr-1 h-3.5 w-3.5" /> Approve correction</>}
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function NeedsReviewTable({
+  rows, loading, onApprove, onReject, approving, rejecting,
+}: {
+  rows: Row[];
+  loading: boolean;
+  onApprove: (id: string) => void;
+  onReject: (id: string, note: string) => void;
+  approving: boolean;
+  rejecting: boolean;
+}) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Needs Review</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground/80">
+            Caregiver corrections, ≥16h shifts, and incident-flagged punches. Approve to make corrected times bill; reject to return for resubmission.
+          </p>
+        </div>
+        <Badge variant="outline" className="font-mono text-[10px]">{rows.length} awaiting review</Badge>
+      </div>
+      {loading ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">No corrections awaiting review.</p>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((r) => (
+            <NeedsReviewRow
+              key={r.id}
+              row={r}
+              onApprove={onApprove}
+              onReject={onReject}
+              approving={approving}
+              rejecting={rejecting}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ArchiveTable({
   rows, loading, onMap, onEdit, variant,
 }: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; onEdit: (r: Row) => void; variant: "evv" | "non-evv" }) {

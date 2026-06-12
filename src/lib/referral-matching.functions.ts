@@ -42,6 +42,13 @@ export type MatchReason = {
   text: string;
 };
 
+export type ScoredComponent =
+  | "location"
+  | "host_fit"
+  | "disability_fit"
+  | "need_fit"
+  | "code_overlap";
+
 export type ReferralMatchScore = {
   referral_id: string;
   organization_id: string;
@@ -54,8 +61,10 @@ export type ReferralMatchScore = {
   best_host_ids: string[];
   weights: Record<string, number>;
   reasons: MatchReason[];
+  scored_components: ScoredComponent[];
   computed_at: string;
 };
+
 
 type Referral = {
   id: string;

@@ -118,7 +118,7 @@ async function loadEvv(ctx: Ctx, organizationId: string, year: number) {
   const yearEndIso = new Date(year + 1, 0, 1).toISOString();
   const { data, error } = await ctx.supabase
     .from("evv_timesheets")
-    .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+    .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, review_status, corrected_clock_in, corrected_clock_out")
     .eq("organization_id", organizationId)
     .gte("clock_in_timestamp", yearStartIso)
     .lt("clock_in_timestamp", yearEndIso);
@@ -128,6 +128,9 @@ async function loadEvv(ctx: Ctx, organizationId: string, year: number) {
     service_type_code: string;
     clock_in_timestamp: string;
     clock_out_timestamp: string | null;
+    review_status: string | null;
+    corrected_clock_in: string | null;
+    corrected_clock_out: string | null;
   }>;
 }
 

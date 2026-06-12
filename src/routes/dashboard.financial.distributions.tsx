@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
@@ -15,11 +16,27 @@ import { Plus, Trash2, Copy, Sparkles, Info, ShieldCheck, AlertTriangle, Save } 
 import { computeEntryUnits, fmtUSD } from "@/lib/billing-units";
 import { toast } from "sonner";
 import { RequireRole } from "@/components/rbac-guard";
+import {
+  getDistPlans,
+  getDistParticipants,
+  getDistCbc,
+  getDistEvv,
+  getDistHhs,
+  getDistCtr,
+  getDistLedger,
+  createDistPlan,
+  updateDistPlan,
+  deleteDistPlan,
+  duplicateDistPlan,
+  addDistParticipant,
+  updateDistParticipant,
+  deleteDistParticipant,
+} from "@/lib/financial-distributions.functions";
 
 export const Route = createFileRoute("/dashboard/financial/distributions")({
   head: () => ({ meta: [{ title: "Distributions — HIVE" }] }),
   component: () => (
-    <RequireRole roles={["admin", "manager", "super_admin"]}>
+    <RequireRole roles={["admin", "super_admin"]}>
       <DistributionsPage />
     </RequireRole>
   ),
@@ -70,17 +87,29 @@ function DistributionsPage() {
   const [scopeIdx, setScopeIdx] = useState(today.getMonth()); // month: 0-11; quarter: 0-3
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
+  // ---------- Server fn bindings ----------
+  const fnGetPlans = useServerFn(getDistPlans);
+  const fnGetParts = useServerFn(getDistParticipants);
+  const fnGetCbc = useServerFn(getDistCbc);
+  const fnGetEvv = useServerFn(getDistEvv);
+  const fnGetHhs = useServerFn(getDistHhs);
+  const fnGetCtr = useServerFn(getDistCtr);
+  const fnGetLedger = useServerFn(getDistLedger);
+  const fnCreatePlan = useServerFn(createDistPlan);
+  const fnUpdatePlan = useServerFn(updateDistPlan);
+  const fnDeletePlan = useServerFn(deleteDistPlan);
+  const fnDuplicatePlan = useServerFn(duplicateDistPlan);
+  const fnAddParticipant = useServerFn(addDistParticipant);
+  const fnUpdateParticipant = useServerFn(updateDistParticipant);
+  const fnDeleteParticipant = useServerFn(deleteDistParticipant);
+
   // ---------- Plans ----------
   const plansQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-plans", org?.organization_id],
     queryFn: async (): Promise<Plan[]> => {
-      const { data, error } = await (supabase.from("distribution_plans" as never) as any)
-        .select("*")
-        .eq("organization_id", org!.organization_id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as Plan[];
+      const rows = await fnGetPlans({ data: { organizationId: org!.organization_id } });
+      return rows as unknown as Plan[];
     },
   });
 
@@ -91,96 +120,47 @@ function DistributionsPage() {
   }, [plansQ.data, selectedPlanId]);
 
   const partsQ = useQuery({
-    enabled: !!selectedPlanId,
+    enabled: !!selectedPlanId && !!org?.organization_id,
     queryKey: ["dist-parts", selectedPlanId],
     queryFn: async (): Promise<Participant[]> => {
-      const { data, error } = await (supabase.from("distribution_plan_participants" as never) as any)
-        .select("*")
-        .eq("plan_id", selectedPlanId!)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as unknown as Participant[];
+      const rows = await fnGetParts({
+        data: { organizationId: org!.organization_id, planId: selectedPlanId! },
+      });
+      return rows as unknown as Participant[];
     },
   });
 
   const selectedPlan = plansQ.data?.find((p) => p.id === selectedPlanId) ?? null;
 
   // ---------- Financial data (mirror of Totals tab) ----------
-  const yearStartIso = new Date(year, 0, 1).toISOString();
-  const yearEndIso = new Date(year + 1, 0, 1).toISOString();
-  const yearStartDate = `${year}-01-01`;
-  const yearEndDate = `${year + 1}-01-01`;
-
   const cbcQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-cbc", org?.organization_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select("client_id, service_code, rate_per_unit")
-        .eq("organization_id", org!.organization_id);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () => fnGetCbc({ data: { organizationId: org!.organization_id } }),
   });
 
   const evvQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-evv", org?.organization_id, year],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("evv_timesheets")
-        .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
-        .eq("organization_id", org!.organization_id)
-        .gte("clock_in_timestamp", yearStartIso)
-        .lt("clock_in_timestamp", yearEndIso);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () => fnGetEvv({ data: { organizationId: org!.organization_id, year } }),
   });
 
   const hhsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-hhs", org?.organization_id, year],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hhs_daily_records_v")
-        .select("client_id, record_date, billable, service_code")
-        .eq("organization_id", org!.organization_id)
-        .eq("service_code", "HHS")
-        .gte("record_date", yearStartDate)
-        .lt("record_date", yearEndDate);
-      if (error) throw error;
-      return (data ?? []).filter((r: any) => r.billable);
-    },
+    queryFn: async () => fnGetHhs({ data: { organizationId: org!.organization_id, year } }),
   });
 
   const ctrQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-ctr", org?.organization_id, year],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contractor_monthly_pay" as never)
-        .select("staff_id, year, month, net_pay, additional_pay, tax_federal, tax_state, tax_fica")
-        .eq("organization_id", org!.organization_id)
-        .eq("year", year);
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
+    queryFn: async () => fnGetCtr({ data: { organizationId: org!.organization_id, year } }),
   });
 
   const ledgerQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-ledger", org?.organization_id, year],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("provider_ledger_entries")
-        .select("period_year, period_month, category, label, amount")
-        .eq("organization_id", org!.organization_id)
-        .eq("period_year", year);
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
+    queryFn: async () => fnGetLedger({ data: { organizationId: org!.organization_id, year } }),
   });
 
   // Rate map
@@ -272,19 +252,13 @@ function DistributionsPage() {
   // ---------- Mutations ----------
   const createPlan = useMutation({
     mutationFn: async (vars: { name: string; plan_type: PlanType }) => {
-      const { data, error } = await (supabase.from("distribution_plans" as never) as any)
-        .insert({
-          organization_id: org!.organization_id,
+      return await fnCreatePlan({
+        data: {
+          organizationId: org!.organization_id,
           name: vars.name,
           plan_type: vars.plan_type,
-          retention_pct: 0,
-          status: "draft",
-          is_active: false,
-        } as any)
-        .select()
-        .single();
-      if (error) throw error;
-      return data as any;
+        },
+      });
     },
     onSuccess: (row: any) => {
       qc.invalidateQueries({ queryKey: ["dist-plans"] });
@@ -297,10 +271,13 @@ function DistributionsPage() {
   const updatePlan = useMutation({
     mutationFn: async (vars: Partial<Plan> & { id: string }) => {
       const { id, ...rest } = vars;
-      const { error } = await (supabase.from("distribution_plans" as never) as any)
-        .update(rest as any)
-        .eq("id", id);
-      if (error) throw error;
+      await fnUpdatePlan({
+        data: {
+          organizationId: org!.organization_id,
+          id,
+          patch: rest as any,
+        },
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-plans"] }),
     onError: (e: any) => toast.error(e.message),
@@ -308,50 +285,19 @@ function DistributionsPage() {
 
   const deletePlan = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("distribution_plans" as never) as any).delete().eq("id", id);
-      if (error) throw error;
+      await fnDeletePlan({ data: { organizationId: org!.organization_id, id } });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["dist-plans"] });
       setSelectedPlanId(null);
       toast.success("Plan deleted");
     },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const duplicatePlan = useMutation({
     mutationFn: async (id: string) => {
-      const plan = plansQ.data?.find((p) => p.id === id);
-      const parts = partsQ.data ?? [];
-      if (!plan) throw new Error("Plan not found");
-      const { data: newPlan, error } = await (supabase.from("distribution_plans" as never) as any)
-        .insert({
-          organization_id: plan.organization_id,
-          name: `${plan.name} (copy)`,
-          plan_type: plan.plan_type,
-          retention_pct: plan.retention_pct,
-          expense_selection: plan.expense_selection,
-          formula_json: plan.formula_json,
-          nectar_summary: plan.nectar_summary,
-          status: "draft",
-          is_active: false,
-        } as any)
-        .select()
-        .single();
-      if (error) throw error;
-      if (parts.length) {
-        const inserts = parts.map((p) => ({
-          plan_id: (newPlan as any).id,
-          participant_name: p.participant_name,
-          participant_user_id: p.participant_user_id,
-          allocation_pct: p.allocation_pct,
-          role_label: p.role_label,
-          notes: p.notes,
-          sort_order: p.sort_order,
-        }));
-        const { error: e2 } = await (supabase.from("distribution_plan_participants" as never) as any).insert(inserts as any);
-        if (e2) throw e2;
-      }
-      return newPlan as any;
+      return await fnDuplicatePlan({ data: { organizationId: org!.organization_id, id } });
     },
     onSuccess: (row: any) => {
       qc.invalidateQueries({ queryKey: ["dist-plans"] });
@@ -363,33 +309,40 @@ function DistributionsPage() {
 
   const addParticipant = useMutation({
     mutationFn: async () => {
-      const order = (partsQ.data?.length ?? 0);
-      const { error } = await (supabase.from("distribution_plan_participants" as never) as any).insert({
-        plan_id: selectedPlanId!,
-        participant_name: "New participant",
-        allocation_pct: 0,
-        sort_order: order,
-      } as any);
-      if (error) throw error;
+      const order = partsQ.data?.length ?? 0;
+      await fnAddParticipant({
+        data: {
+          organizationId: org!.organization_id,
+          planId: selectedPlanId!,
+          sort_order: order,
+        },
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-parts", selectedPlanId] }),
+    onError: (e: any) => toast.error(e.message),
   });
 
   const updateParticipant = useMutation({
     mutationFn: async (vars: Partial<Participant> & { id: string }) => {
       const { id, ...rest } = vars;
-      const { error } = await (supabase.from("distribution_plan_participants" as never) as any).update(rest as any).eq("id", id);
-      if (error) throw error;
+      await fnUpdateParticipant({
+        data: {
+          organizationId: org!.organization_id,
+          id,
+          patch: rest as any,
+        },
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-parts", selectedPlanId] }),
+    onError: (e: any) => toast.error(e.message),
   });
 
   const deleteParticipant = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("distribution_plan_participants" as never) as any).delete().eq("id", id);
-      if (error) throw error;
+      await fnDeleteParticipant({ data: { organizationId: org!.organization_id, id } });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-parts", selectedPlanId] }),
+    onError: (e: any) => toast.error(e.message),
   });
 
   // Local edit state for plan editor
@@ -512,12 +465,21 @@ function DistributionsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
+                  onClick={async () => {
                     // Mark active (and deactivate others)
                     const others = (plansQ.data ?? []).filter((p) => p.is_active && p.id !== selectedPlan.id);
-                    Promise.all(others.map((p) => (supabase.from("distribution_plans" as never) as any).update({ is_active: false }).eq("id", p.id))).then(() => {
-                      updatePlan.mutate({ id: selectedPlan.id, is_active: !selectedPlan.is_active });
-                    });
+                    await Promise.all(
+                      others.map((p) =>
+                        fnUpdatePlan({
+                          data: {
+                            organizationId: org!.organization_id,
+                            id: p.id,
+                            patch: { is_active: false },
+                          },
+                        }),
+                      ),
+                    );
+                    updatePlan.mutate({ id: selectedPlan.id, is_active: !selectedPlan.is_active });
                   }}
                 >
                   {selectedPlan.is_active ? "Deactivate" : "Set Active"}

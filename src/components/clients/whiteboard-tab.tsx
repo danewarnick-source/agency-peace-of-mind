@@ -23,7 +23,7 @@ import {
   type WhiteboardReferral,
   type WhiteboardSnapshot,
 } from "@/lib/whiteboard.functions";
-import { useOrgContext } from "@/hooks/use-org-context";
+import { useCurrentOrg } from "@/hooks/use-org";
 
 const CATEGORY_META: Record<
   WhiteboardCategory,

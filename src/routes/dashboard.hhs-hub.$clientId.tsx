@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { saveDailyRecord, saveEmarLog, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
 import { useClientFeature } from "@/lib/client-features";
+import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
 
 const hhsSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
@@ -220,6 +221,10 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
   const [interlock, setInterlock] = useState<{ kind: "incident" | "medical"; msg: string } | null>(null);
   const [showNarrativeError, setShowNarrativeError] = useState(false);
   const [success, setSuccess] = useState(false);
+  // Nectar deterministic trigger gating — default true (no triggers fired).
+  const [triggersResolved, setTriggersResolved] = useState(true);
+  // Final attestation — "I attest this note accurately reflects today's support".
+  const [finalAttest, setFinalAttest] = useState(false);
 
   // Signature canvas
   const canvasRef  = useRef<HTMLCanvasElement | null>(null);
@@ -296,7 +301,16 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
   async function handleSubmit(opts?: { exception?: boolean }) {
     if (!hasGoal) { toast.error("Select at least one PCSP goal."); return; }
     if (!narrativeOk) { setShowNarrativeError(true); return; }
+    if (!triggersResolved) {
+      toast.error("Resolve Nectar's note triggers before submitting.");
+      return;
+    }
+    if (!finalAttest) {
+      toast.error("Please attest the note accurately reflects today's support.");
+      return;
+    }
     if (!hasSigRef.current) { toast.error("Please sign the daily note before saving."); return; }
+
 
     const isException = !!opts?.exception;
     let verdict = coach;

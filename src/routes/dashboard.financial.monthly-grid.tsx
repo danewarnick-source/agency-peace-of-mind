@@ -619,6 +619,21 @@ function GridSection({
         </table>
       </div>
     </section>
+    {active && organizationId && (
+      <BillingDetailDialog
+        variant="grid-row"
+        open={!!active}
+        onOpenChange={(o) => !o && setActive(null)}
+        organizationId={organizationId}
+        year={year}
+        month={month}
+        providerName={providerName}
+        clientId={active.clientId}
+        clientName={active.clientName}
+        serviceCode={active.code}
+      />
+    )}
+    </>
   );
 }
 

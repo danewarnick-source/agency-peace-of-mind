@@ -371,11 +371,17 @@ export function ClientWhiteboardTab() {
     <div className="space-y-4">
       <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-        <div>
+        <div className="flex-1">
           <strong>Planning view — read-only.</strong> No changes are saved
-          here. Real placements happen in Teams / Homes. Drag-and-drop
-          rematch comes in the next increment.
+          here. Real placements happen in Teams / Homes.
         </div>
+        <Link
+          to="/dashboard/clients/rhs-board"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-400 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-200"
+        >
+          Open RHS planning board
+          <ArrowRight className="h-3 w-3" />
+        </Link>
       </div>
 
       {q.isLoading ? (

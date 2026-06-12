@@ -16,6 +16,7 @@ export const Route = createFileRoute("/dashboard/financial/monthly-grid")({
 });
 
 const HOST_HOME_CODES = new Set(["HHS", "PPS"]);
+const RHS_CODES = new Set(["RHS"]);
 
 type ClientRow = { id: string; first_name: string; last_name: string };
 type StaffBreakdown = { staff_id: string; name: string; units: number; hours: number };
@@ -326,7 +327,8 @@ function MonthlyGridPage() {
     );
   }, [codes, clientsQ.data, usageQ.data, historyQ.data, staffNameOf, month.y, asOf, monthEnd, monthStart, monthEndIso]);
 
-  const directRows = allRows.filter((r) => !HOST_HOME_CODES.has(r.code.service_code));
+  const directRows = allRows.filter((r) => !HOST_HOME_CODES.has(r.code.service_code) && !RHS_CODES.has(r.code.service_code));
+  const rhsRows = allRows.filter((r) => RHS_CODES.has(r.code.service_code));
   const hostRows = allRows.filter((r) => HOST_HOME_CODES.has(r.code.service_code));
 
   // Side rollup: derived from auto month_units.
@@ -380,13 +382,19 @@ function MonthlyGridPage() {
         <div className="space-y-4">
           <GridSection
             title="Direct Support"
-            subtitle="Hourly + per-visit codes (SLN, SLH, DSI, SEI, RHS, CHA, COM, etc.)"
+            subtitle="Hourly + per-visit codes (SLN, SLH, DSI, SEI, CHA, COM, etc.)"
             rows={directRows}
             asOf={asOf}
           />
           <GridSection
+            title="RHS"
+            subtitle="Residential daily-rate code (RHS)"
+            rows={rhsRows}
+            asOf={asOf}
+          />
+          <GridSection
             title="Host Home"
-            subtitle="Daily-rate residential codes (HHS, PPS)"
+            subtitle="Daily-rate host-home codes (HHS, PPS)"
             rows={hostRows}
             asOf={asOf}
           />

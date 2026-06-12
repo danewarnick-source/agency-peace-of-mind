@@ -174,8 +174,14 @@ export function ReferralsPage() {
 
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {CATEGORIES.map((cat) => {
-          const rows = grouped[cat.key] ?? [];
+        {([
+          ...CATEGORIES,
+          ...(grouped.unsorted.length > 0
+            ? ([{ key: "unsorted" as const, label: "Unsorted" }])
+            : []),
+        ]).map((cat) => {
+          const rows = (grouped as Record<string, typeof grouped.unsorted>)[cat.key] ?? [];
+
           return (
             <section
               key={cat.key}

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, BarChart3, Info } from "lucide-react";
 import { computeEntryUnits, fmtUSD } from "@/lib/billing-units";
@@ -17,7 +17,7 @@ import {
 } from "@/lib/financial-gross.functions";
 
 export const Route = createFileRoute("/dashboard/financial/gross")({
-  head: () => ({ meta: [{ title: "TNS Gross — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Gross — HIVE" }] }),
   component: () => (
     <RequirePermission perm="view_financial_tns_gross">
       <GrossPage />
@@ -254,7 +254,7 @@ function GrossPage() {
           <div className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />
             <div>
-              <h2 className="text-lg font-semibold">TNS Gross / Net</h2>
+              <h2 className="text-lg font-semibold">{prefixLabel("Gross / Net")}</h2>
               <p className="text-xs text-muted-foreground">
                 Multi-year quarterly rollup. 100% derived from monthly Totals — no inputs, no tables, no broken references.
               </p>

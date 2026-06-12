@@ -851,6 +851,8 @@ function MobileDayBoard({
   conflictShiftIds: Set<string>;
   hostHomeNames: Set<string>;
   reqsBySiteName: Map<string, ReqRow[]>;
+  computedReqByDayBySiteName?: Map<string, Map<string, number[]>>;
+  twoToOneBySiteName?: Set<string>;
   noteDays?: Set<string>;
   overnightDays?: Set<string>;
   weekStart: Date;

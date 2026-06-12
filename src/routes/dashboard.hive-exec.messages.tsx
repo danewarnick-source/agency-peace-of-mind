@@ -267,13 +267,7 @@ function MessageCenter() {
 
   return (
     <div className="space-y-4">
-      <NectarHeader
-        surface="navy"
-        eyebrow="HIVE Platform Operations"
-        title="Message Center"
-        description="Compose and send announcements or directives to one, several, or all companies on the platform."
-        right={<NectarBadge size="sm" label="EXEC ONLY" />}
-      />
+
 
       {lastSent && (
         <NectarCard className="p-4">

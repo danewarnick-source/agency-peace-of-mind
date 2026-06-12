@@ -401,6 +401,7 @@ function ComplianceDeskPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const [sub, setSub] = useState<"pending" | "needs-review" | "incidents" | "reconcile" | "evv-archive" | "non-evv-archive" | "residential">("pending");
+  const [incidentPrefilterClient, setIncidentPrefilterClient] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState<Row | null>(null);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);

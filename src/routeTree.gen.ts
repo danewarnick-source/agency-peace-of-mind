@@ -111,7 +111,13 @@ import { Route as DashboardHiveExecBaseTemplateRouteImport } from './routes/dash
 import { Route as DashboardHiveExecApprovalsRouteImport } from './routes/dashboard.hive-exec.approvals'
 import { Route as DashboardHiveExecOrgIdRouteImport } from './routes/dashboard.hive-exec.$orgId'
 import { Route as DashboardHhsHubClientIdRouteImport } from './routes/dashboard.hhs-hub.$clientId'
+import { Route as DashboardFinancialTotalsRouteImport } from './routes/dashboard.financial.totals'
 import { Route as DashboardFinancialRevenueRouteImport } from './routes/dashboard.financial.revenue'
+import { Route as DashboardFinancialMonthlyGridRouteImport } from './routes/dashboard.financial.monthly-grid'
+import { Route as DashboardFinancialHostHomeRouteImport } from './routes/dashboard.financial.host-home'
+import { Route as DashboardFinancialGrossRouteImport } from './routes/dashboard.financial.gross'
+import { Route as DashboardFinancialDistributionsRouteImport } from './routes/dashboard.financial.distributions'
+import { Route as DashboardFinancialContractorsRouteImport } from './routes/dashboard.financial.contractors'
 import { Route as DashboardEmployeesStaffIdRouteImport } from './routes/dashboard.employees.$staffId'
 import { Route as DashboardCoursesPersonRouteImport } from './routes/dashboard.courses.person'
 import { Route as DashboardCoursesOtherRouteImport } from './routes/dashboard.courses.other'
@@ -683,10 +689,45 @@ const DashboardHhsHubClientIdRoute = DashboardHhsHubClientIdRouteImport.update({
   path: '/hhs-hub/$clientId',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardFinancialTotalsRoute =
+  DashboardFinancialTotalsRouteImport.update({
+    id: '/totals',
+    path: '/totals',
+    getParentRoute: () => DashboardFinancialRoute,
+  } as any)
 const DashboardFinancialRevenueRoute =
   DashboardFinancialRevenueRouteImport.update({
     id: '/revenue',
     path: '/revenue',
+    getParentRoute: () => DashboardFinancialRoute,
+  } as any)
+const DashboardFinancialMonthlyGridRoute =
+  DashboardFinancialMonthlyGridRouteImport.update({
+    id: '/monthly-grid',
+    path: '/monthly-grid',
+    getParentRoute: () => DashboardFinancialRoute,
+  } as any)
+const DashboardFinancialHostHomeRoute =
+  DashboardFinancialHostHomeRouteImport.update({
+    id: '/host-home',
+    path: '/host-home',
+    getParentRoute: () => DashboardFinancialRoute,
+  } as any)
+const DashboardFinancialGrossRoute = DashboardFinancialGrossRouteImport.update({
+  id: '/gross',
+  path: '/gross',
+  getParentRoute: () => DashboardFinancialRoute,
+} as any)
+const DashboardFinancialDistributionsRoute =
+  DashboardFinancialDistributionsRouteImport.update({
+    id: '/distributions',
+    path: '/distributions',
+    getParentRoute: () => DashboardFinancialRoute,
+  } as any)
+const DashboardFinancialContractorsRoute =
+  DashboardFinancialContractorsRouteImport.update({
+    id: '/contractors',
+    path: '/contractors',
     getParentRoute: () => DashboardFinancialRoute,
   } as any)
 const DashboardEmployeesStaffIdRoute =
@@ -977,7 +1018,13 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
   '/dashboard/courses/person': typeof DashboardCoursesPersonRoute
   '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
+  '/dashboard/financial/contractors': typeof DashboardFinancialContractorsRoute
+  '/dashboard/financial/distributions': typeof DashboardFinancialDistributionsRoute
+  '/dashboard/financial/gross': typeof DashboardFinancialGrossRoute
+  '/dashboard/financial/host-home': typeof DashboardFinancialHostHomeRoute
+  '/dashboard/financial/monthly-grid': typeof DashboardFinancialMonthlyGridRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
+  '/dashboard/financial/totals': typeof DashboardFinancialTotalsRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
@@ -1111,7 +1158,13 @@ export interface FileRoutesByTo {
   '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
   '/dashboard/courses/person': typeof DashboardCoursesPersonRoute
   '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
+  '/dashboard/financial/contractors': typeof DashboardFinancialContractorsRoute
+  '/dashboard/financial/distributions': typeof DashboardFinancialDistributionsRoute
+  '/dashboard/financial/gross': typeof DashboardFinancialGrossRoute
+  '/dashboard/financial/host-home': typeof DashboardFinancialHostHomeRoute
+  '/dashboard/financial/monthly-grid': typeof DashboardFinancialMonthlyGridRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
+  '/dashboard/financial/totals': typeof DashboardFinancialTotalsRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
@@ -1252,7 +1305,13 @@ export interface FileRoutesById {
   '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
   '/dashboard/courses/person': typeof DashboardCoursesPersonRoute
   '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
+  '/dashboard/financial/contractors': typeof DashboardFinancialContractorsRoute
+  '/dashboard/financial/distributions': typeof DashboardFinancialDistributionsRoute
+  '/dashboard/financial/gross': typeof DashboardFinancialGrossRoute
+  '/dashboard/financial/host-home': typeof DashboardFinancialHostHomeRoute
+  '/dashboard/financial/monthly-grid': typeof DashboardFinancialMonthlyGridRoute
   '/dashboard/financial/revenue': typeof DashboardFinancialRevenueRoute
+  '/dashboard/financial/totals': typeof DashboardFinancialTotalsRoute
   '/dashboard/hhs-hub/$clientId': typeof DashboardHhsHubClientIdRoute
   '/dashboard/hive-exec/$orgId': typeof DashboardHiveExecOrgIdRoute
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
@@ -1394,7 +1453,13 @@ export interface FileRouteTypes {
     | '/dashboard/courses/other'
     | '/dashboard/courses/person'
     | '/dashboard/employees/$staffId'
+    | '/dashboard/financial/contractors'
+    | '/dashboard/financial/distributions'
+    | '/dashboard/financial/gross'
+    | '/dashboard/financial/host-home'
+    | '/dashboard/financial/monthly-grid'
     | '/dashboard/financial/revenue'
+    | '/dashboard/financial/totals'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/approvals'
@@ -1528,7 +1593,13 @@ export interface FileRouteTypes {
     | '/dashboard/courses/other'
     | '/dashboard/courses/person'
     | '/dashboard/employees/$staffId'
+    | '/dashboard/financial/contractors'
+    | '/dashboard/financial/distributions'
+    | '/dashboard/financial/gross'
+    | '/dashboard/financial/host-home'
+    | '/dashboard/financial/monthly-grid'
     | '/dashboard/financial/revenue'
+    | '/dashboard/financial/totals'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/approvals'
@@ -1668,7 +1739,13 @@ export interface FileRouteTypes {
     | '/dashboard/courses/other'
     | '/dashboard/courses/person'
     | '/dashboard/employees/$staffId'
+    | '/dashboard/financial/contractors'
+    | '/dashboard/financial/distributions'
+    | '/dashboard/financial/gross'
+    | '/dashboard/financial/host-home'
+    | '/dashboard/financial/monthly-grid'
     | '/dashboard/financial/revenue'
+    | '/dashboard/financial/totals'
     | '/dashboard/hhs-hub/$clientId'
     | '/dashboard/hive-exec/$orgId'
     | '/dashboard/hive-exec/approvals'
@@ -2458,11 +2535,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHhsHubClientIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/financial/totals': {
+      id: '/dashboard/financial/totals'
+      path: '/totals'
+      fullPath: '/dashboard/financial/totals'
+      preLoaderRoute: typeof DashboardFinancialTotalsRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
     '/dashboard/financial/revenue': {
       id: '/dashboard/financial/revenue'
       path: '/revenue'
       fullPath: '/dashboard/financial/revenue'
       preLoaderRoute: typeof DashboardFinancialRevenueRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
+    '/dashboard/financial/monthly-grid': {
+      id: '/dashboard/financial/monthly-grid'
+      path: '/monthly-grid'
+      fullPath: '/dashboard/financial/monthly-grid'
+      preLoaderRoute: typeof DashboardFinancialMonthlyGridRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
+    '/dashboard/financial/host-home': {
+      id: '/dashboard/financial/host-home'
+      path: '/host-home'
+      fullPath: '/dashboard/financial/host-home'
+      preLoaderRoute: typeof DashboardFinancialHostHomeRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
+    '/dashboard/financial/gross': {
+      id: '/dashboard/financial/gross'
+      path: '/gross'
+      fullPath: '/dashboard/financial/gross'
+      preLoaderRoute: typeof DashboardFinancialGrossRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
+    '/dashboard/financial/distributions': {
+      id: '/dashboard/financial/distributions'
+      path: '/distributions'
+      fullPath: '/dashboard/financial/distributions'
+      preLoaderRoute: typeof DashboardFinancialDistributionsRouteImport
+      parentRoute: typeof DashboardFinancialRoute
+    }
+    '/dashboard/financial/contractors': {
+      id: '/dashboard/financial/contractors'
+      path: '/contractors'
+      fullPath: '/dashboard/financial/contractors'
+      preLoaderRoute: typeof DashboardFinancialContractorsRouteImport
       parentRoute: typeof DashboardFinancialRoute
     }
     '/dashboard/employees/$staffId': {
@@ -2747,12 +2866,24 @@ const DashboardBillingRouteWithChildren =
   DashboardBillingRoute._addFileChildren(DashboardBillingRouteChildren)
 
 interface DashboardFinancialRouteChildren {
+  DashboardFinancialContractorsRoute: typeof DashboardFinancialContractorsRoute
+  DashboardFinancialDistributionsRoute: typeof DashboardFinancialDistributionsRoute
+  DashboardFinancialGrossRoute: typeof DashboardFinancialGrossRoute
+  DashboardFinancialHostHomeRoute: typeof DashboardFinancialHostHomeRoute
+  DashboardFinancialMonthlyGridRoute: typeof DashboardFinancialMonthlyGridRoute
   DashboardFinancialRevenueRoute: typeof DashboardFinancialRevenueRoute
+  DashboardFinancialTotalsRoute: typeof DashboardFinancialTotalsRoute
   DashboardFinancialIndexRoute: typeof DashboardFinancialIndexRoute
 }
 
 const DashboardFinancialRouteChildren: DashboardFinancialRouteChildren = {
+  DashboardFinancialContractorsRoute: DashboardFinancialContractorsRoute,
+  DashboardFinancialDistributionsRoute: DashboardFinancialDistributionsRoute,
+  DashboardFinancialGrossRoute: DashboardFinancialGrossRoute,
+  DashboardFinancialHostHomeRoute: DashboardFinancialHostHomeRoute,
+  DashboardFinancialMonthlyGridRoute: DashboardFinancialMonthlyGridRoute,
   DashboardFinancialRevenueRoute: DashboardFinancialRevenueRoute,
+  DashboardFinancialTotalsRoute: DashboardFinancialTotalsRoute,
   DashboardFinancialIndexRoute: DashboardFinancialIndexRoute,
 }
 

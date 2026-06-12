@@ -46,7 +46,7 @@ export type HhpCueCard = {
   address: string | null;
   location_city: string | null;
   location_county: string | null;
-  household_members: unknown;
+  household_members: unknown[] | Record<string, unknown> | null;
   pets: string | null;
   wheelchair_accessible: boolean;
   sign_language: boolean;

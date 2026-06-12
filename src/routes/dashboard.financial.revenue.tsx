@@ -101,6 +101,7 @@ function RevenuePage() {
       return months.map((m) => ({
         label: `${MONTH_LABELS[m.month - 1]} ${year}`,
         billed: m.billed,
+        month: m.month,
       }));
     }
     if (granularity === "quarterly") {
@@ -109,6 +110,7 @@ function RevenuePage() {
         return {
           label: `Q${qi + 1} ${year}`,
           billed: slice.reduce((s, x) => s + x.billed, 0),
+          month: null as number | null,
         };
       });
     }
@@ -116,6 +118,7 @@ function RevenuePage() {
       {
         label: `YTD ${year}`,
         billed: months.reduce((s, x) => s + x.billed, 0),
+        month: null as number | null,
       },
     ];
   }, [months, granularity, year]);

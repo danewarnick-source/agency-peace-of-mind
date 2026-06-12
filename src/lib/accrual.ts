@@ -22,6 +22,13 @@
  *   • skip timesheets whose service_type_code passes isDailyServiceCode()
  *   • skip timesheets missing clock_out_timestamp or with invalid/zero spans
  *   • daily: distinct record_date per bucket → units = set.size
+ *
+ * RHS BILLING FIREWALL: RHS is a daily-rate code, so the
+ * isDailyServiceCode skip in aggregateHourlyUnits is the firewall — RHS
+ * punches contribute ZERO billable units through this aggregator. They
+ * remain fully visible to payroll (financial-gross/financial-totals call
+ * computeEntryUnits directly to compute pay) and to coverage / evidence
+ * views. Daily-rate revenue comes only from hhs_daily_records_v.
  */
 
 import { computeEntryUnits, effectiveBillingTimes, isBillableForReview } from "@/lib/billing-units";

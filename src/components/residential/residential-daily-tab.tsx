@@ -245,8 +245,15 @@ export function ResidentialDailyTab() {
       const row = map.get(s.client_id);
       if (row) row.supervisionContacts += 1;
     }
+    for (const ir of incidentsQ.data ?? []) {
+      const row = map.get(ir.client_id);
+      if (!row) continue;
+      if (ir.status === "closed") row.incidentsClosed += 1;
+      else row.incidentsOpen += 1;
+      if (ir.is_fatality) row.fatalityThisMonth = true;
+    }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [clients, dailyRows, punchQ.data, supervisionQ.data]);
+  }, [clients, dailyRows, punchQ.data, supervisionQ.data, incidentsQ.data]);
 
   // Amber under 75% with <1 week left; red when month closed under target.
   const now = new Date();

@@ -5,3 +5,7 @@ verify_jwt = true
 
 [functions.format-training-content]
 verify_jwt = true
+
+[functions.parse-referral-doc]
+verify_jwt = true
+

@@ -382,13 +382,19 @@ function MonthlyGridPage() {
         <div className="space-y-4">
           <GridSection
             title="Direct Support"
-            subtitle="Hourly + per-visit codes (SLN, SLH, DSI, SEI, RHS, CHA, COM, etc.)"
+            subtitle="Hourly + per-visit codes (SLN, SLH, DSI, SEI, CHA, COM, etc.)"
             rows={directRows}
             asOf={asOf}
           />
           <GridSection
+            title="RHS"
+            subtitle="Residential daily-rate code (RHS)"
+            rows={rhsRows}
+            asOf={asOf}
+          />
+          <GridSection
             title="Host Home"
-            subtitle="Daily-rate residential codes (HHS, PPS)"
+            subtitle="Daily-rate host-home codes (HHS, PPS)"
             rows={hostRows}
             asOf={asOf}
           />

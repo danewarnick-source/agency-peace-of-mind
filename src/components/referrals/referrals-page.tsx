@@ -164,6 +164,7 @@ export function ReferralsPage() {
               </button>
             </div>
             <ProviderInterestOutlineButton organizationId={orgId} />
+            <CallCaptureDialog organizationId={orgId} />
             <NewReferralDialog organizationId={orgId} />
           </div>
         )}

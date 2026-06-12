@@ -34,8 +34,15 @@ function useTick(enabled: boolean) {
   }, [enabled]);
 }
 
-const isDaily = (code: string) => isDailyServiceCode(code);
+// `isDaily` here drives ROUTING (HHS hub vs. clock-in workspace), so it
+// must be true ONLY for codes that genuinely have no staff clock surface
+// (HHS host home, PPS parent-paid). RHS is daily-rate but residential
+// staff DO clock for payroll, so it routes to the workspace clock-in tab.
+const isDaily = (code: string) => !isClockableServiceCode(code);
 const billingLabel = (code: string) => billingUnitLabel(code);
+// Silence unused-import lint — `isDailyServiceCode` is re-exported elsewhere
+// in the project; keep the import group stable.
+void isDailyServiceCode;
 
 /** Expanded client detail — preserves the existing service chips, burn-down, and CTA buttons. */
 function ClientDetail({

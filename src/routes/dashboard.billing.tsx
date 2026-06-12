@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { RequireRole } from "@/components/rbac-guard";
-import { Receipt, Users, FileSpreadsheet, Upload, CreditCard, Sparkles } from "lucide-react";
+import { Receipt, Users, FileSpreadsheet, Upload, Sparkles } from "lucide-react";
 import { NectarBillingReadinessBar } from "@/components/billing/nectar-billing-readiness-bar";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Permission } from "@/lib/rbac";
@@ -20,10 +20,6 @@ const TABS: Array<{ to: string; label: string; icon: typeof Users; exact?: boole
   { to: "/dashboard/billing/nectar", label: "NECTAR", icon: Sparkles },
   { to: "/dashboard/billing/form520", label: "520 Form", icon: FileSpreadsheet },
   { to: "/dashboard/billing/imports", label: "Imports / Authorizations", icon: Upload },
-  // HIVE Subscription is managed by the Company Admin (manage_billing) — managers
-  // can see the rest of Billing but not the subscription tab. The route enforces
-  // the same permission, so the tab is only shown to those who can open it.
-  { to: "/dashboard/billing/subscription", label: "HIVE Subscription", icon: CreditCard, perm: "manage_billing" },
 ];
 
 function BillingLayout() {

@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck } from "lucide-react";
+import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 import { CelebrationSettings } from "@/components/celebrations/celebration-settings";
@@ -170,6 +170,21 @@ function SettingsPage() {
               <div>
                 <h2 className="text-base font-semibold">Service Catalog</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Edit scheduling and billing attributes for every service code your agency uses — category, scheduling behavior, EVV/schedule/carve-out flags, and unit. The scheduler and billing engine read from here.</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </div>
+        </Link>
+      )}
+
+      {(org?.role === "admin" || org?.role === "super_admin") && (
+        <Link to="/dashboard/settings/subscription" className="group lg:col-span-2">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
+            <div className="flex items-start gap-4">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><CreditCard className="h-5 w-5" /></div>
+              <div>
+                <h2 className="text-base font-semibold">HIVE Subscription</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Manage your HIVE plan and subscription details. Self-service is coming soon — for now, our team handles changes directly.</p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />

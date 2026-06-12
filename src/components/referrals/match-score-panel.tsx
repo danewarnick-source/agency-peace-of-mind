@@ -25,7 +25,16 @@ import {
   recomputeReferralMatchScore,
   type MatchReason,
   type ReferralMatchScore,
+  type ScoredComponent,
 } from "@/lib/referral-matching.functions";
+
+const ALL_COMPONENTS: ScoredComponent[] = [
+  "location",
+  "host_fit",
+  "disability_fit",
+  "need_fit",
+  "code_overlap",
+];
 
 function scoreTone(score: number): { bg: string; text: string; label: string } {
   if (score >= 8) return { bg: "bg-emerald-100", text: "text-emerald-900", label: "Strong" };
@@ -45,34 +54,39 @@ function SubScoreBar({
   label,
   value,
   weight,
+  scored,
 }: {
   label: string;
   value: number;
   weight?: number;
+  scored: boolean;
 }) {
-  const pct = Math.max(0, Math.min(100, (value / 10) * 100));
+  const pct = scored ? Math.max(0, Math.min(100, (value / 10) * 100)) : 0;
   return (
     <div className="space-y-0.5">
       <div className="flex items-center justify-between text-[11px]">
         <span className="text-muted-foreground">
           {label}
-          {weight != null && (
+          {weight != null && scored && (
             <span className="ml-1 text-[10px] text-muted-foreground/70">
               (w {weight.toFixed(2)})
             </span>
           )}
         </span>
-        <span className="font-mono font-medium">{value.toFixed(1)}</span>
+        <span className="font-mono font-medium">
+          {scored ? value.toFixed(1) : <span className="text-[10px] italic text-muted-foreground">unknown</span>}
+        </span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-muted">
         <div
-          className="h-1.5 rounded-full bg-primary/70"
-          style={{ width: `${pct}%` }}
+          className={`h-1.5 rounded-full ${scored ? "bg-primary/70" : "bg-muted-foreground/20"}`}
+          style={{ width: scored ? `${pct}%` : "100%" }}
         />
       </div>
     </div>
   );
 }
+
 
 export function MatchScoreBadge({
   score,

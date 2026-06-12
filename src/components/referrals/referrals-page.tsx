@@ -1266,3 +1266,38 @@ function DiscardIngestedButton({
     </Dialog>
   );
 }
+
+function ArchiveAutoIngestedButton({
+  organizationId,
+  referralId,
+}: {
+  organizationId: string;
+  referralId: string;
+}) {
+  const qc = useQueryClient();
+  const archiveFn = useServerFn(archiveAutoIngestedReferral);
+  const m = useMutation({
+    mutationFn: () =>
+      archiveFn({
+        data: { organization_id: organizationId, referral_id: referralId },
+      }),
+    onSuccess: () => {
+      toast.success("Archived (purges in 30 days)");
+      qc.invalidateQueries({ queryKey: ["referrals", organizationId] });
+      qc.invalidateQueries({ queryKey: ["referrals-archived", organizationId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <button
+      type="button"
+      className="text-[11px] text-muted-foreground hover:text-foreground"
+      onClick={() => m.mutate()}
+      disabled={m.isPending}
+      title="Archive — recoverable for 30 days, then purged"
+    >
+      <ArchiveIcon className="mr-1 inline h-3 w-3" />
+      Archive
+    </button>
+  );
+}

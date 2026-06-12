@@ -34,6 +34,9 @@ type TimesheetRow = {
   service_type_code: string | null;
   clock_in_timestamp: string;
   clock_out_timestamp: string | null;
+  review_status: string | null;
+  corrected_clock_in: string | null;
+  corrected_clock_out: string | null;
 };
 type DailyRow = {
   client_id: string;

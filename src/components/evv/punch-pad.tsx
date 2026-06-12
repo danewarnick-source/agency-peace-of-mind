@@ -735,7 +735,12 @@ export function PunchPad({
   const nectarConfirmOk    = !nectarUsed || draftConfirmed;
   const behaviorError      = behaviorEnabled ? validateBehaviorAnswers(behaviorAnswers) : null;
   const behaviorOk         = behaviorError === null;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && !busy;
+  const liveDurationMs = active
+    ? Math.max(0, now - new Date(active.clock_in_timestamp).getTime())
+    : 0;
+  const isLongShift = liveDurationMs > 16 * 60 * 60 * 1000;
+  const longShiftOk = !isLongShift || longShiftAck;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && !busy;
 
 
   function openCompliance() {

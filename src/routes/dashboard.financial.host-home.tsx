@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, Home, Info } from "lucide-react";
@@ -39,6 +39,7 @@ type MonthlyInputs = {
 
 function HostHomePage() {
   const { data: org } = useCurrentOrg();
+  const { prefixLabel } = useOrgDisplayName();
   const qc = useQueryClient();
   const today = new Date();
   const [month, setMonth] = useState({ y: today.getFullYear(), m: today.getMonth() });
@@ -212,7 +213,7 @@ function HostHomePage() {
             <div>
               <h2 className="text-lg font-semibold">Host Home — Monthly Economics</h2>
               <p className="text-xs text-muted-foreground">
-                Days × rates from EVV/daily logs and rate store. Activities & Room/Board are provider-entered. TNS margin = DSPD − Host − Activities (owner split is in Tab F).
+                Days × rates from EVV/daily logs and rate store. Activities & Room/Board are provider-entered. {prefixLabel("margin")} = DSPD − Host − Activities (owner split is in Tab F).
               </p>
             </div>
           </div>
@@ -236,7 +237,7 @@ function HostHomePage() {
                 <th className="px-3 py-2 text-right">Host $</th>
                 <th className="px-3 py-2 text-right">Activities</th>
                 <th className="px-3 py-2 text-right">Room & Board</th>
-                <th className="px-3 py-2 text-right">TNS margin</th>
+                <th className="px-3 py-2 text-right">{prefixLabel("margin")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

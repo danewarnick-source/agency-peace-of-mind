@@ -20,6 +20,9 @@ function SettingsPage() {
   const { data: org, refetch } = useCurrentOrg();
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
+  const [legalName, setLegalName] = useState("");
+  const [dbaName, setDbaName] = useState("");
+  const [displayAcronym, setDisplayAcronym] = useState("");
   const [busy, setBusy] = useState(false);
 
   if (pathname !== "/dashboard/settings") {
@@ -28,7 +31,12 @@ function SettingsPage() {
 
   useEffect(() => {
     if (user) setFullName(user.user_metadata?.full_name ?? "");
-    if (org) setOrgName(org.organization_name);
+    if (org) {
+      setOrgName(org.organization_name);
+      setLegalName(org.legal_name ?? "");
+      setDbaName(org.dba_name ?? "");
+      setDisplayAcronym(org.display_acronym ?? "");
+    }
   }, [user, org]);
 
   const saveProfile = async (e: React.FormEvent) => {
@@ -45,7 +53,15 @@ function SettingsPage() {
     e.preventDefault();
     if (!org) return;
     setBusy(true);
-    const { error } = await supabase.from("organizations").update({ name: orgName }).eq("id", org.organization_id);
+    const { error } = await supabase
+      .from("organizations")
+      .update({
+        name: orgName,
+        legal_name: legalName.trim() || null,
+        dba_name: dbaName.trim() || null,
+        display_acronym: displayAcronym.trim() || null,
+      })
+      .eq("id", org.organization_id);
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Organization updated");
@@ -67,9 +83,12 @@ function SettingsPage() {
       {org?.role === "admin" && (
         <form onSubmit={saveOrg} className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <h2 className="text-base font-semibold">Organization</h2>
-          <p className="text-sm text-muted-foreground">Visible to your whole team.</p>
+          <p className="text-sm text-muted-foreground">Visible to your whole team. Acronym is used in dashboard labels (e.g. column headers).</p>
           <div className="mt-5 grid gap-4">
             <div className="grid gap-2"><Label htmlFor="org_name">Organization name</Label><Input id="org_name" value={orgName} onChange={(e) => setOrgName(e.target.value)} required /></div>
+            <div className="grid gap-2"><Label htmlFor="legal_name">Legal name</Label><Input id="legal_name" value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="e.g. Acme Supports LLC" /></div>
+            <div className="grid gap-2"><Label htmlFor="dba_name">Doing-business-as (DBA)</Label><Input id="dba_name" value={dbaName} onChange={(e) => setDbaName(e.target.value)} placeholder="Optional" /></div>
+            <div className="grid gap-2"><Label htmlFor="display_acronym">Display acronym</Label><Input id="display_acronym" value={displayAcronym} onChange={(e) => setDisplayAcronym(e.target.value)} placeholder="e.g. ACME" maxLength={12} /></div>
             <Button type="submit" disabled={busy}>Save organization</Button>
           </div>
         </form>

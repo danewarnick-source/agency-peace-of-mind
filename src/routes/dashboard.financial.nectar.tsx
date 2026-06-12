@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
 import { RequireRole } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,17 +34,19 @@ export const Route = createFileRoute("/dashboard/financial/nectar")({
   ),
 });
 
-const SOURCE_LABEL: Record<NectarFinSource, string> = {
-  revenue: "Revenue",
-  monthly_grid: "Monthly Grid",
-  host_home: "Host Home",
-  rhs: "RHS",
-  contractors: "Contractors",
-  employees: "Employees",
-  totals: "Totals",
-  tns_gross: "TNS Gross",
-  distributions: "Distributions",
-};
+function sourceLabel(s: NectarFinSource, grossLabel: string): string {
+  switch (s) {
+    case "revenue": return "Revenue";
+    case "monthly_grid": return "Monthly Grid";
+    case "host_home": return "Host Home";
+    case "rhs": return "RHS";
+    case "contractors": return "Contractors";
+    case "employees": return "Employees";
+    case "totals": return "Totals";
+    case "tns_gross": return grossLabel;
+    case "distributions": return "Distributions";
+  }
+}
 
 const SUGGESTIONS = [
   "Summarize this year's revenue vs total payroll expenses.",
@@ -57,6 +59,8 @@ const SUGGESTIONS = [
 
 function NectarFinancialPage() {
   const { data: org } = useCurrentOrg();
+  const { prefixLabel } = useOrgDisplayName();
+  const labelFor = (s: NectarFinSource) => sourceLabel(s, prefixLabel("Gross"));
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [question, setQuestion] = useState("");
@@ -174,6 +178,8 @@ function NectarFinancialPage() {
 }
 
 function ReportCard({ report }: { report: NectarFinReport }) {
+  const { prefixLabel } = useOrgDisplayName();
+  const labelFor = (s: NectarFinSource) => sourceLabel(s, prefixLabel("Gross"));
   const printRef = useMemo(() => `nectar-report-${Math.random().toString(36).slice(2)}`, []);
   const allowed = report.sources.filter((s) => s.allowed);
   const declined = report.sources.filter((s) => !s.allowed);
@@ -270,7 +276,7 @@ function ReportCard({ report }: { report: NectarFinReport }) {
           <div className="flex flex-wrap gap-1.5">
             {declined.map((s) => (
               <Badge key={s.source} variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">
-                {SOURCE_LABEL[s.source]}
+                {labelFor(s.source)}
               </Badge>
             ))}
           </div>
@@ -286,7 +292,7 @@ function ReportCard({ report }: { report: NectarFinReport }) {
             <span className="font-semibold text-muted-foreground">Sources used:</span>
             {allowed.map((s) => (
               <Badge key={s.source} variant="secondary" className="text-[10px]">
-                {SOURCE_LABEL[s.source]}
+                {labelFor(s.source)}
               </Badge>
             ))}
           </div>
@@ -303,7 +309,7 @@ function ReportCard({ report }: { report: NectarFinReport }) {
                 {allowed.flatMap((s) =>
                   Object.entries(s.data ?? {}).map(([k, v]) => (
                     <tr key={`${s.source}-${k}`} className="border-t">
-                      <td className="px-2 py-1.5 font-medium">{SOURCE_LABEL[s.source]}</td>
+                      <td className="px-2 py-1.5 font-medium">{labelFor(s.source)}</td>
                       <td className="px-2 py-1.5 text-muted-foreground">{k}</td>
                       <td className="px-2 py-1.5 text-right font-mono">
                         {Array.isArray(v) ? JSON.stringify(v) : String(v ?? "—")}

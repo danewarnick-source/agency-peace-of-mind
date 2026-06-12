@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -204,6 +204,8 @@ export function AuditPage() {
 function NewPacketDialog({ orgId, onClose }: { orgId: string; onClose: (newId?: string) => void }) {
   const qc = useQueryClient();
   const produce = useServerFn(parseAndProduceAuditPacket);
+  const { displayName, legalName } = useOrgDisplayName();
+  const placeholderName = displayName || legalName || "Provider name";
   const [providerName, setProviderName] = useState("");
   const [fiscalYear, setFiscalYear] = useState(`FY${String(new Date().getFullYear() % 100).padStart(2, "0")}`);
   const [letterText, setLetterText] = useState("");
@@ -267,7 +269,7 @@ function NewPacketDialog({ orgId, onClose }: { orgId: string; onClose: (newId?: 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Provider name</Label>
-              <Input value={providerName} onChange={(e) => setProviderName(e.target.value)} placeholder="True North Supports" />
+              <Input value={providerName} onChange={(e) => setProviderName(e.target.value)} placeholder={placeholderName} />
             </div>
             <div>
               <Label className="text-xs">Fiscal year</Label>

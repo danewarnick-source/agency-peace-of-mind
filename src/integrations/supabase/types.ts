@@ -7162,8 +7162,11 @@ export type Database = {
           additional_state_codes: string[]
           created_at: string
           created_by: string | null
+          dba_name: string | null
+          display_acronym: string | null
           id: string
           is_demo: boolean
+          legal_name: string | null
           logo_url: string | null
           name: string
           slug: string
@@ -7174,8 +7177,11 @@ export type Database = {
           additional_state_codes?: string[]
           created_at?: string
           created_by?: string | null
+          dba_name?: string | null
+          display_acronym?: string | null
           id?: string
           is_demo?: boolean
+          legal_name?: string | null
           logo_url?: string | null
           name: string
           slug: string
@@ -7186,8 +7192,11 @@ export type Database = {
           additional_state_codes?: string[]
           created_at?: string
           created_by?: string | null
+          dba_name?: string | null
+          display_acronym?: string | null
           id?: string
           is_demo?: boolean
+          legal_name?: string | null
           logo_url?: string | null
           name?: string
           slug?: string

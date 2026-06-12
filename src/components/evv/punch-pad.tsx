@@ -149,8 +149,10 @@ export function PunchPad({
   // Single watchPosition — no redundant getCurrentPosition call.
   // Two-stage: high-accuracy watch, then low-accuracy fallback after 4 s.
   const [livePos, setLivePos] = useState<{ lat: number; lng: number; acc: number } | null>(null);
+  const livePosRef = useRef<{ lat: number; lng: number; acc: number } | null>(null);
   const [hardwareDenied, setHardwareDenied] = useState(false);
   const [gpsAcquiring, setGpsAcquiring] = useState(true);
+  const [awaitingGps, setAwaitingGps] = useState(false);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {

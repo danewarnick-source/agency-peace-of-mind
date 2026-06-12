@@ -550,7 +550,16 @@ function GridSection({
               const toBill = u * r.rate;
               const overMax = r.monthly_max != null && u > r.monthly_max;
               return (
-                <tr key={`${r.client.id}::${r.code.service_code}`} className="border-t border-border hover:bg-muted/30">
+                <tr
+                  key={`${r.client.id}::${r.code.service_code}`}
+                  className="cursor-pointer border-t border-border hover:bg-muted/30"
+                  onClick={() => setActive({
+                    clientId: r.client.id,
+                    clientName: `${r.client.last_name}, ${r.client.first_name}`,
+                    code: r.code.service_code,
+                  })}
+                  title="View shift detail"
+                >
                   <td className={`${cellBase} font-medium`}>{r.client.last_name}, {r.client.first_name}</td>
                   <td className={`${cellBase} font-mono font-semibold`}>
                     {r.code.service_code}

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Mail, Paperclip, Search, Send, X, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Mail, Paperclip, Search, Send, X, AlertTriangle, CheckCircle2, Inbox, Eye, EyeOff } from "lucide-react";
 import { RequireHiveExecutive } from "@/components/hive-executive-guard";
 import {
   NectarCard,
@@ -20,8 +20,11 @@ import {
   createExecMessage,
   recordExecMessageAttachment,
   discardExecMessage,
+  listSentExecMessages,
   type OrgForMessaging,
+  type SentMessageRow,
 } from "@/lib/exec-messages.functions";
+
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB per file
 const BUCKET = "message-attachments";

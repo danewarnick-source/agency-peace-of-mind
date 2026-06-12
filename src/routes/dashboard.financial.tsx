@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { RequireRole } from "@/components/rbac-guard";
-import { TrendingUp, Grid3x3, Home, HardHat, TableProperties, BarChart3, PieChart, LineChart } from "lucide-react";
+import { TrendingUp, Grid3x3, Home, HardHat, TableProperties, BarChart3, PieChart, LineChart, Users2 } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Permission } from "@/lib/rbac";
 

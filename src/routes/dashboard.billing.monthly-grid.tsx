@@ -99,7 +99,7 @@ function MonthlyGridPage() {
         .eq("organization_id", org!.organization_id)
         .order("superseded_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Array<{
+      return ((data ?? []) as unknown) as Array<{
         client_id: string; service_code: string; rate_per_unit: number;
         effective_start: string | null; effective_end: string | null;
         rate_source: string | null; superseded_at: string;
@@ -154,7 +154,7 @@ function MonthlyGridPage() {
         const inWindow = (s: string | null, e: string | null) =>
           (!s || s <= asOf) && (!e || e >= asOf);
         let rate = Number(code.rate_per_unit ?? 0);
-        let rateSource: string | null = code.rate_source ?? null;
+        let rateSource: string | null = (code as unknown as { rate_source?: string | null }).rate_source ?? null;
         const curWindowOK = inWindow(code.service_start_date, code.service_end_date);
         if (!curWindowOK) {
           const h = history.find((h) =>

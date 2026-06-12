@@ -3931,6 +3931,108 @@ export type Database = {
         }
         Relationships: []
       }
+      hhs_host_home_monthly: {
+        Row: {
+          activities_amount: number
+          client_id: string
+          created_at: string
+          id: string
+          month: number
+          notes: string | null
+          organization_id: string
+          room_and_board_amount: number
+          updated_at: string
+          updated_by: string | null
+          year: number
+        }
+        Insert: {
+          activities_amount?: number
+          client_id: string
+          created_at?: string
+          id?: string
+          month: number
+          notes?: string | null
+          organization_id: string
+          room_and_board_amount?: number
+          updated_at?: string
+          updated_by?: string | null
+          year: number
+        }
+        Update: {
+          activities_amount?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          month?: number
+          notes?: string | null
+          organization_id?: string
+          room_and_board_amount?: number
+          updated_at?: string
+          updated_by?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hhs_host_home_monthly_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hhs_host_home_monthly_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hhs_host_home_settings: {
+        Row: {
+          client_id: string
+          created_at: string
+          hhp_name: string | null
+          host_daily_rate: number
+          id: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          hhp_name?: string | null
+          host_daily_rate?: number
+          id?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          hhp_name?: string | null
+          host_daily_rate?: number
+          id?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hhs_host_home_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hhs_host_home_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hhs_incident_reports: {
         Row: {
           client_id: string

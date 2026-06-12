@@ -17,6 +17,7 @@ const TABS: Array<{ to: string; label: string; icon: typeof Grid3x3; disabled?: 
   { to: "/dashboard/financial/revenue", label: "Revenue", icon: LineChart },
   { to: "/dashboard/financial/monthly-grid", label: "Monthly Grid", icon: Grid3x3 },
   { to: "/dashboard/financial/host-home", label: "Host Home", icon: Home },
+  { to: "/dashboard/financial/rhs", label: "RHS", icon: Home, perm: "view_financial_rhs" },
   { to: "/dashboard/financial/contractors", label: "Contractors", icon: HardHat },
   { to: "/dashboard/financial/totals", label: "Totals", icon: TableProperties },
   { to: "/dashboard/financial/gross", label: "TNS Gross", icon: BarChart3, perm: "view_financial_tns_gross" },

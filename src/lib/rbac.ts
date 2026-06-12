@@ -40,6 +40,7 @@ export const ALL_PERMISSIONS = [
   "view_platform_metrics",
   "manage_all_orgs",
   "view_financial_tns_gross",
+  "view_financial_rhs",
 ] as const;
 
 
@@ -68,6 +69,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   view_platform_metrics: "View platform metrics",
   manage_all_orgs: "Manage all organizations",
   view_financial_tns_gross: "View Financial — TNS Gross",
+  view_financial_rhs: "View Financial — RHS",
 };
 
 
@@ -82,6 +84,7 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
     "manage_billing", "view_billing", "manage_organization",
     "view_own_training", "view_certifications",
     "view_financial_tns_gross",
+    "view_financial_rhs",
   ],
 
   manager: [

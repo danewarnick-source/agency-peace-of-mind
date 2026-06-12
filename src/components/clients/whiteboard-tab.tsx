@@ -221,7 +221,7 @@ function CategoryLane({
         ) : (
           <div className="space-y-1.5">
             {clients.map((c) => (
-              <ClientRow key={c.id} c={c} />
+              <ClientRow key={c.id} c={c} organizationId={organizationId} />
             ))}
           </div>
         )}

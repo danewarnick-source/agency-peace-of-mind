@@ -115,17 +115,20 @@ export function ReferralsPage() {
   }, [scs.data]);
 
   const grouped = useMemo(() => {
-    const out: Record<Category, NonNullable<typeof referrals.data>> = {
+    const out: Record<Category | "unsorted", NonNullable<typeof referrals.data>> = {
       direct_support: [],
       rhs: [],
       hhs: [],
+      unsorted: [],
     };
     (referrals.data ?? []).forEach((r) => {
-      const c = r.category as Category;
+      const c = (r.category ?? "unsorted") as Category | "unsorted";
       if (out[c]) out[c].push(r);
+      else out.unsorted.push(r);
     });
     return out;
   }, [referrals.data]);
+
 
   return (
     <div className="space-y-4">

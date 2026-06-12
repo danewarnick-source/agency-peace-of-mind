@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Home, Info } from "lucide-react";
 import { fmtUSD } from "@/lib/billing-units";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { RequirePermission } from "@/components/rbac-guard";
+import { getRhsCodes, getRhsClients, getRhsDays } from "@/lib/financial-rhs.functions";
 
 /**
  * Financial → RHS tab. Mirrors the Host Home tab structure but lean:
@@ -38,19 +39,15 @@ function RhsPage() {
   const monthEndIso = monthEndExclusive.toISOString().slice(0, 10);
   const monthLabel = monthStart.toLocaleString(undefined, { month: "long", year: "numeric" });
 
+  const fnCodes = useServerFn(getRhsCodes);
+  const fnClients = useServerFn(getRhsClients);
+  const fnDays = useServerFn(getRhsDays);
+
   // RHS authorizations (one row per client × RHS code) — drives client list + rate
   const rhsCodesQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["rhs-codes", org?.organization_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select("client_id, rate_per_unit")
-        .eq("organization_id", org!.organization_id)
-        .eq("service_code", "RHS");
-      if (error) throw error;
-      return (data ?? []) as Array<{ client_id: string; rate_per_unit: number }>;
-    },
+    queryFn: async () => fnCodes({ data: { organizationId: org!.organization_id } }),
   });
 
   const clientIds = useMemo(
@@ -61,36 +58,14 @@ function RhsPage() {
   const clientsQ = useQuery({
     enabled: !!org?.organization_id && clientIds.length > 0,
     queryKey: ["rhs-clients", org?.organization_id, clientIds.join(",")],
-    queryFn: async (): Promise<ClientLite[]> => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, first_name, last_name")
-        .in("id", clientIds)
-        .order("last_name");
-      if (error) throw error;
-      return (data ?? []) as ClientLite[];
-    },
+    queryFn: async (): Promise<ClientLite[]> => fnClients({ data: { organizationId: org!.organization_id, clientIds } }),
   });
 
   // Billable RHS days per client for this month — same view + billable logic as HHS
   const daysQ = useQuery({
     enabled: !!org?.organization_id && clientIds.length > 0,
     queryKey: ["rhs-days", org?.organization_id, month.y, month.m],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hhs_daily_records_v")
-        .select("client_id, record_date, billable, service_code")
-        .eq("organization_id", org!.organization_id)
-        .eq("service_code", "RHS")
-        .gte("record_date", monthStartIso)
-        .lt("record_date", monthEndIso);
-      if (error) throw error;
-      const counts: Record<string, number> = {};
-      for (const r of (data ?? []) as Array<{ client_id: string; billable: boolean }>) {
-        if (r.billable) counts[r.client_id] = (counts[r.client_id] ?? 0) + 1;
-      }
-      return counts;
-    },
+    queryFn: async () => fnDays({ data: { organizationId: org!.organization_id, monthStartIso, monthEndIso } }),
   });
 
   const rateByClient = useMemo(() => {

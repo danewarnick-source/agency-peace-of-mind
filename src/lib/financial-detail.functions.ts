@@ -124,7 +124,9 @@ export const getRevenueClientPills = createServerFn({ method: "POST" })
 
     for (const t of timesheets) {
       if (!t.clock_out_timestamp || !t.service_type_code) continue;
-      const u = computeEntryUnits(t.clock_in_timestamp, t.clock_out_timestamp);
+      const eff = effectiveBillingTimes(t);
+      if (!eff) continue;
+      const u = computeEntryUnits(eff.in, eff.out);
       const rate = rateBy.get(`${t.client_id}|${t.service_type_code}`) ?? 0;
       if (!rate) continue;
       billedByClient.set(t.client_id, (billedByClient.get(t.client_id) ?? 0) + u * rate);

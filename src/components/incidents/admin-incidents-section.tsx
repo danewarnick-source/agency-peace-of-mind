@@ -328,8 +328,7 @@ export function AdminIncidentsSection({
   const [to, setTo] = useState<string>("");
 
   // Re-sync when caller hands us a new prefilter (e.g. Residential tab deep-link).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useMemo(() => {
+  useEffect(() => {
     if (initialClientId) {
       setFilterClient(initialClientId);
       setView(initialView ?? "log");

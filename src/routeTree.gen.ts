@@ -129,6 +129,7 @@ import { Route as DashboardBillingImportsRouteImport } from './routes/dashboard.
 import { Route as DashboardBillingHostHomeRouteImport } from './routes/dashboard.billing.host-home'
 import { Route as DashboardBillingGrossRouteImport } from './routes/dashboard.billing.gross'
 import { Route as DashboardBillingForm520RouteImport } from './routes/dashboard.billing.form520'
+import { Route as DashboardBillingDistributionsRouteImport } from './routes/dashboard.billing.distributions'
 import { Route as DashboardBillingContractorsRouteImport } from './routes/dashboard.billing.contractors'
 import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard.billing.$clientId'
 import { Route as DashboardBehaviorSupportClientIdRouteImport } from './routes/dashboard.behavior-support.$clientId'
@@ -781,6 +782,12 @@ const DashboardBillingForm520Route = DashboardBillingForm520RouteImport.update({
   path: '/form520',
   getParentRoute: () => DashboardBillingRoute,
 } as any)
+const DashboardBillingDistributionsRoute =
+  DashboardBillingDistributionsRouteImport.update({
+    id: '/distributions',
+    path: '/distributions',
+    getParentRoute: () => DashboardBillingRoute,
+  } as any)
 const DashboardBillingContractorsRoute =
   DashboardBillingContractorsRouteImport.update({
     id: '/contractors',
@@ -952,6 +959,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/contractors': typeof DashboardBillingContractorsRoute
+  '/dashboard/billing/distributions': typeof DashboardBillingDistributionsRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
   '/dashboard/billing/gross': typeof DashboardBillingGrossRoute
   '/dashboard/billing/host-home': typeof DashboardBillingHostHomeRoute
@@ -1085,6 +1093,7 @@ export interface FileRoutesByTo {
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/contractors': typeof DashboardBillingContractorsRoute
+  '/dashboard/billing/distributions': typeof DashboardBillingDistributionsRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
   '/dashboard/billing/gross': typeof DashboardBillingGrossRoute
   '/dashboard/billing/host-home': typeof DashboardBillingHostHomeRoute
@@ -1225,6 +1234,7 @@ export interface FileRoutesById {
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/contractors': typeof DashboardBillingContractorsRoute
+  '/dashboard/billing/distributions': typeof DashboardBillingDistributionsRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
   '/dashboard/billing/gross': typeof DashboardBillingGrossRoute
   '/dashboard/billing/host-home': typeof DashboardBillingHostHomeRoute
@@ -1366,6 +1376,7 @@ export interface FileRouteTypes {
     | '/dashboard/behavior-support/$clientId'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/contractors'
+    | '/dashboard/billing/distributions'
     | '/dashboard/billing/form520'
     | '/dashboard/billing/gross'
     | '/dashboard/billing/host-home'
@@ -1499,6 +1510,7 @@ export interface FileRouteTypes {
     | '/dashboard/behavior-support/$clientId'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/contractors'
+    | '/dashboard/billing/distributions'
     | '/dashboard/billing/form520'
     | '/dashboard/billing/gross'
     | '/dashboard/billing/host-home'
@@ -1638,6 +1650,7 @@ export interface FileRouteTypes {
     | '/dashboard/behavior-support/$clientId'
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/contractors'
+    | '/dashboard/billing/distributions'
     | '/dashboard/billing/form520'
     | '/dashboard/billing/gross'
     | '/dashboard/billing/host-home'
@@ -2571,6 +2584,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBillingForm520RouteImport
       parentRoute: typeof DashboardBillingRoute
     }
+    '/dashboard/billing/distributions': {
+      id: '/dashboard/billing/distributions'
+      path: '/distributions'
+      fullPath: '/dashboard/billing/distributions'
+      preLoaderRoute: typeof DashboardBillingDistributionsRouteImport
+      parentRoute: typeof DashboardBillingRoute
+    }
     '/dashboard/billing/contractors': {
       id: '/dashboard/billing/contractors'
       path: '/contractors'
@@ -2696,6 +2716,7 @@ declare module '@tanstack/react-router' {
 interface DashboardBillingRouteChildren {
   DashboardBillingClientIdRoute: typeof DashboardBillingClientIdRoute
   DashboardBillingContractorsRoute: typeof DashboardBillingContractorsRoute
+  DashboardBillingDistributionsRoute: typeof DashboardBillingDistributionsRoute
   DashboardBillingForm520Route: typeof DashboardBillingForm520Route
   DashboardBillingGrossRoute: typeof DashboardBillingGrossRoute
   DashboardBillingHostHomeRoute: typeof DashboardBillingHostHomeRoute
@@ -2710,6 +2731,7 @@ interface DashboardBillingRouteChildren {
 const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
   DashboardBillingClientIdRoute: DashboardBillingClientIdRoute,
   DashboardBillingContractorsRoute: DashboardBillingContractorsRoute,
+  DashboardBillingDistributionsRoute: DashboardBillingDistributionsRoute,
   DashboardBillingForm520Route: DashboardBillingForm520Route,
   DashboardBillingGrossRoute: DashboardBillingGrossRoute,
   DashboardBillingHostHomeRoute: DashboardBillingHostHomeRoute,

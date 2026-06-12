@@ -312,7 +312,7 @@ function DistributionsPage() {
 
   const deletePlan = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("distribution_plans" as never).delete().eq("id", id);
+      const { error } = await (supabase.from("distribution_plans" as never) as any).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -520,7 +520,7 @@ function DistributionsPage() {
                   onClick={() => {
                     // Mark active (and deactivate others)
                     const others = (plansQ.data ?? []).filter((p) => p.is_active && p.id !== selectedPlan.id);
-                    Promise.all(others.map((p) => supabase.from("distribution_plans" as never).update({ is_active: false }).eq("id", p.id))).then(() => {
+                    Promise.all(others.map((p) => (supabase.from("distribution_plans" as never) as any).update({ is_active: false }).eq("id", p.id))).then(() => {
                       updatePlan.mutate({ id: selectedPlan.id, is_active: !selectedPlan.is_active });
                     });
                   }}

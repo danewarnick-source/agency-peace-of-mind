@@ -126,3 +126,47 @@ mobile Day view · `9f04397` staff agenda polish · `e3bf631` global hygiene ·
 16. Visit the deployed app in mobile Chrome/Safari → "Add to Home Screen" offers "Hive" with the hex icon.
 17. Launch from the home screen → opens standalone (no browser chrome), navy splash, and stays standalone through login.
 18. Airplane mode → relaunch: the shell still opens (offline fallback). Data needs a connection — by design nothing from the API/PHI is ever cached (verify in DevTools → Application → Cache Storage: only `hive-shell-v1` / `hive-assets-v1` with HTML, icons, and /assets/* files).
+
+---
+
+# HHS clarity pass (2026-06-11, branch `claude/hhs-clarity`)
+
+Presentation, naming, and one new read-model — billing math, conflict logic,
+and EVV behavior untouched (the daily attendance writer in `hhs.functions.ts`
+was not modified; the roll-up reads via a new `hhs-certifications.functions.ts`).
+Commits: `124eb43` HHS vocabulary + ⓘ · `1ac88a5` visit/row labels ·
+`a3b93e1` code-step ⓘ + explainer banner · `132045a` shift-detail hours note ·
+`e0162f8` hide host homes by default · `447066c` Monthly Attendance + certify.
+
+## SQL handoffs added (docs/SQL_HANDOFF.md)
+
+- **§4 `user_ui_dismissals`** — per-user banner dismissal persistence. Before
+  it runs, dismissing the explainer only lasts the session (no crash).
+- **§5 `hhs_monthly_certifications`** — month-end sign-off. Before it runs,
+  "Certify month" is disabled with a "Pending database update" tooltip.
+
+One judgment call: the work order says "an admin or the assigned program
+lead" certifies — no program-lead concept exists in the schema, so the gate
+is admin/manager (`requireOrgMembership(…, "manager")` + matching RLS).
+
+## Verification checklist
+
+**Labels & tooltips (Task 1)**
+1. Scheduler → a shift with code HHS shows "HHS Support Visit · <client first name>" (desktop chip) / "HHS Support Visit · <staff>" (mobile card) — never bare "HHS". A respite-code shift at a host home reads "HHS Respite".
+2. Each HHS visit card has an ⓘ (hover on desktop / long-press title on mobile) explaining the host family never clocks in.
+3. Host-home location pills, all-homes rows, mobile chips, and coverage rows read "<Client first name + last initial> — Host Home (HHS)" (e.g. "Jane D. — Host Home (HHS)").
+4. + New shift → pick the HHS client → code step shows the ⓘ + purpose hint; the HHS tile is captioned "HHS Support Visit", respite tiles "HHS Respite".
+5. Staff agenda: an assigned HHS visit card shows the host-home label line and the ⓘ beside the client name.
+6. Open an HHS visit's shift detail (staff): badge reads "HHS Support Visit"; a blue note reads "Counts toward <Client>'s required ≈ N support hrs/month (worksheet)" when a weekly HHS target exists (weekly ×4.33), else "Support hours target not set — ask your admin."
+7. Explainer banner: first visit to the scheduler (with host homes) or staff agenda (with an HHS visit) shows the amber "How host homes (HHS) work" banner. Dismiss it → it stays gone on both surfaces. Pre-§4 SQL it returns after a reload; post-§4 it stays dismissed across reloads/devices.
+
+**Host homes hidden by default (Task 2)**
+8. Scheduler with NO visits scheduled this week: the host home appears in neither the pills/chips, the all-homes rows, nor the coverage strip. Staff agenda still shows assigned visits.
+9. Toggle "Show host homes" (desktop controls bar / dashed chip in the mobile chip row) → host home appears; the preference survives a reload (persisted with the other scheduler settings); default is off.
+10. With the toggle off, schedule an agency visit at the host home this week → the home appears for that week automatically (and its status-dots row returns to the all-locations view).
+
+**Monthly Attendance (Task 3)**
+11. HHS hub → new "Monthly" tab: month grid shows green Present days (✓), amber Away days, red dots on unbillable days, grey no-entry days; the four count tiles match the seeded attendance, and unbillable days list their blocked_reason (from hhs_daily_records_v).
+12. ‹ › navigation works; future months are blocked; past uncertified months show the amber "Needs certification" chip.
+13. BEFORE running §5: "Certify month" is disabled and shows "Pending database update" on hover; the tab renders without errors.
+14. AFTER running §5: as admin/manager, "Certify month" works — the tab then shows "Certified by <name> on <date> · N present / N away / N unbillable", and re-loading shows the same. As plain staff the button is replaced by "Admin / manager signs off."

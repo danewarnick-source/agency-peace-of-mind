@@ -51,7 +51,13 @@ function thisMonth(): string {
  * exception rollup, monthly cert / quarterly summary status row, and the
  * "Audit pull" that hands a date-range bundle to the existing audit packet.
  */
-export function ResidentialDailyTab() {
+export function ResidentialDailyTab({
+  onOpenIncidents,
+}: {
+  /** Optional deep-link: residential incident chip → admin Incidents tab,
+   *  prefiltered to this client. Compliance Desk wires this up. */
+  onOpenIncidents?: (clientId: string) => void;
+} = {}) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
   const [month, setMonth] = useState<string>(thisMonth());

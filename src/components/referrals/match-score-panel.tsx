@@ -25,7 +25,16 @@ import {
   recomputeReferralMatchScore,
   type MatchReason,
   type ReferralMatchScore,
+  type ScoredComponent,
 } from "@/lib/referral-matching.functions";
+
+const ALL_COMPONENTS: ScoredComponent[] = [
+  "location",
+  "host_fit",
+  "disability_fit",
+  "need_fit",
+  "code_overlap",
+];
 
 function scoreTone(score: number): { bg: string; text: string; label: string } {
   if (score >= 8) return { bg: "bg-emerald-100", text: "text-emerald-900", label: "Strong" };
@@ -45,34 +54,39 @@ function SubScoreBar({
   label,
   value,
   weight,
+  scored,
 }: {
   label: string;
   value: number;
   weight?: number;
+  scored: boolean;
 }) {
-  const pct = Math.max(0, Math.min(100, (value / 10) * 100));
+  const pct = scored ? Math.max(0, Math.min(100, (value / 10) * 100)) : 0;
   return (
     <div className="space-y-0.5">
       <div className="flex items-center justify-between text-[11px]">
         <span className="text-muted-foreground">
           {label}
-          {weight != null && (
+          {weight != null && scored && (
             <span className="ml-1 text-[10px] text-muted-foreground/70">
               (w {weight.toFixed(2)})
             </span>
           )}
         </span>
-        <span className="font-mono font-medium">{value.toFixed(1)}</span>
+        <span className="font-mono font-medium">
+          {scored ? value.toFixed(1) : <span className="text-[10px] italic text-muted-foreground">unknown</span>}
+        </span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-muted">
         <div
-          className="h-1.5 rounded-full bg-primary/70"
-          style={{ width: `${pct}%` }}
+          className={`h-1.5 rounded-full ${scored ? "bg-primary/70" : "bg-muted-foreground/20"}`}
+          style={{ width: scored ? `${pct}%` : "100%" }}
         />
       </div>
     </div>
   );
 }
+
 
 export function MatchScoreBadge({
   score,
@@ -142,6 +156,14 @@ export function MatchScorePanel({
 
   const s: ReferralMatchScore | undefined = score.data;
 
+  const scoredSet = useMemo(
+    () => new Set<ScoredComponent>(s?.scored_components ?? []),
+    [s],
+  );
+  const scoredCount = scoredSet.size;
+  const totalCount = ALL_COMPONENTS.length;
+  const isInsufficient = scoredCount === 0;
+
   const sortedReasons = useMemo(() => {
     if (!s) return [] as MatchReason[];
     const order = { flag: 0, negative: 1, positive: 2, neutral: 3 } as const;
@@ -162,9 +184,18 @@ export function MatchScorePanel({
             <ChevronRight className="h-3.5 w-3.5" />
           )}
           NECTAR match
+          {s && (
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+              {scoredCount}/{totalCount} factors
+            </span>
+          )}
         </span>
         {score.isLoading ? (
           <span className="text-[11px] text-muted-foreground">computing…</span>
+        ) : isInsufficient ? (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] italic text-muted-foreground">
+            insufficient info
+          </span>
         ) : (
           <MatchScoreBadge score={s?.overall_score ?? null} />
         )}
@@ -180,34 +211,59 @@ export function MatchScorePanel({
             </p>
           ) : s ? (
             <>
+              <div
+                className={`rounded-md border px-2.5 py-1.5 text-[11px] ${
+                  isInsufficient
+                    ? "border-amber-300 bg-amber-50 text-amber-900"
+                    : scoredCount < totalCount
+                      ? "border-amber-200 bg-amber-50/60 text-amber-900"
+                      : "border-emerald-200 bg-emerald-50/60 text-emerald-900"
+                }`}
+              >
+                {isInsufficient ? (
+                  <>Not enough referral data to score — add details (location, need level, disability, codes) to compute a match.</>
+                ) : (
+                  <>
+                    Scored on <span className="font-semibold">{scoredCount} of {totalCount}</span> factors
+                    {scoredCount < totalCount && " — score based on limited info, treat as provisional."}
+                  </>
+                )}
+              </div>
+
               {/* Sub-scores */}
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <SubScoreBar
                   label="Location fit"
                   value={s.location_fit}
                   weight={s.weights.location}
+                  scored={scoredSet.has("location")}
                 />
                 <SubScoreBar
                   label="Host fit"
                   value={s.host_fit}
                   weight={s.weights.host_fit}
+                  scored={scoredSet.has("host_fit")}
                 />
                 <SubScoreBar
                   label="Disability fit"
                   value={s.disability_fit}
                   weight={s.weights.disability_fit}
+                  scored={scoredSet.has("disability_fit")}
                 />
                 <SubScoreBar
                   label="Need fit"
                   value={s.need_fit}
                   weight={s.weights.need_fit}
+                  scored={scoredSet.has("need_fit")}
                 />
                 <SubScoreBar
                   label="Code overlap"
                   value={s.code_overlap}
                   weight={s.weights.code_overlap}
+                  scored={scoredSet.has("code_overlap")}
                 />
               </div>
+
 
               {/* Best host ids */}
               {s.best_host_ids.length > 0 && (

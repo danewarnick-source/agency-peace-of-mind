@@ -42,6 +42,13 @@ export type MatchReason = {
   text: string;
 };
 
+export type ScoredComponent =
+  | "location"
+  | "host_fit"
+  | "disability_fit"
+  | "need_fit"
+  | "code_overlap";
+
 export type ReferralMatchScore = {
   referral_id: string;
   organization_id: string;
@@ -54,8 +61,10 @@ export type ReferralMatchScore = {
   best_host_ids: string[];
   weights: Record<string, number>;
   reasons: MatchReason[];
+  scored_components: ScoredComponent[];
   computed_at: string;
 };
+
 
 type Referral = {
   id: string;
@@ -119,11 +128,12 @@ function mentionsAny(hay: string, needles: string[]): boolean {
   return needles.some((n) => hay.includes(n));
 }
 
-// Score location 0–10 + reason.
+// Score location 0–10 + reason. Returns scored=false when referral has
+// no city AND no county (UNKNOWN) — caller will exclude from the blend.
 function scoreLocation(
   r: Referral,
   outline: Outline,
-): { score: number; reasons: MatchReason[] } {
+): { score: number; reasons: MatchReason[]; scored: boolean } {
   const reasons: MatchReason[] = [];
   const city = norm(r.location_city);
   const county = norm(r.location_county);
@@ -138,7 +148,17 @@ function scoreLocation(
         "unspecified"
       } is fine.`,
     });
-    return { score: 10, reasons };
+    return { score: 10, reasons, scored: true };
+  }
+
+  // Provider has a location preference, but referral has no location at all.
+  if (!city && !county) {
+    reasons.push({
+      category: "location",
+      severity: "neutral",
+      text: "Location unknown on referral — not scored.",
+    });
+    return { score: 0, reasons, scored: false };
   }
 
   if (outline.location_mode === "county") {
@@ -148,7 +168,7 @@ function scoreLocation(
         severity: "positive",
         text: `Location: ${r.location_county} matches your county preference (full).`,
       });
-      return { score: 10, reasons };
+      return { score: 10, reasons, scored: true };
     }
     reasons.push({
       category: "location",
@@ -157,7 +177,7 @@ function scoreLocation(
         r.location_county || r.location_city || "referral"
       } is outside your county preferences (${(outline.location_values ?? []).join(", ") || "none"}).`,
     });
-    return { score: 3, reasons };
+    return { score: 3, reasons, scored: true };
   }
 
   // city mode
@@ -167,7 +187,7 @@ function scoreLocation(
       severity: "positive",
       text: `Location: ${r.location_city} is a preferred city (full match).`,
     });
-    return { score: 10, reasons };
+    return { score: 10, reasons, scored: true };
   }
   if (county && values.some((v) => v.includes(county))) {
     reasons.push({
@@ -175,7 +195,7 @@ function scoreLocation(
       severity: "neutral",
       text: `Location: ${r.location_city || r.location_county} shares county with your preferences (partial).`,
     });
-    return { score: 6, reasons };
+    return { score: 6, reasons, scored: true };
   }
   reasons.push({
     category: "location",
@@ -184,8 +204,9 @@ function scoreLocation(
       r.location_city || r.location_county || "referral"
     } is outside your preferred cities.`,
   });
-  return { score: 2, reasons };
+  return { score: 2, reasons, scored: true };
 }
+
 
 // Score one host vs referral. Returns 0–10 + reasons.
 function scoreHost(
@@ -331,20 +352,42 @@ function scoreHost(
 function scoreHostFit(
   r: Referral,
   hosts: HostCard[],
-): { score: number; reasons: MatchReason[]; bestHostIds: string[] } {
+): { score: number; reasons: MatchReason[]; bestHostIds: string[]; scored: boolean } {
   if (hosts.length === 0) {
     return {
       score: 0,
       bestHostIds: [],
+      scored: false,
       reasons: [
         {
           category: "host",
-          severity: "negative",
-          text: "No available host home cards (ready / onboarding). Add a host to compute host fit.",
+          severity: "neutral",
+          text: "No available host home cards (ready / onboarding) — host fit not scored.",
         },
       ],
     };
   }
+
+  // If the referral has zero signal for any host scorer to act on, treat as
+  // UNKNOWN. Signals: need_level, county, or any keyword in the haystack.
+  const hay = refHaystack(r).trim();
+  const hasSignal =
+    !!norm(r.need_level) || !!norm(r.location_county) || hay.length > 0;
+  if (!hasSignal) {
+    return {
+      score: 0,
+      bestHostIds: [],
+      scored: false,
+      reasons: [
+        {
+          category: "host",
+          severity: "neutral",
+          text: "Host fit unknown — referral has no need / location / description signal to match against hosts.",
+        },
+      ],
+    };
+  }
+
   const scored = hosts.map((h) => ({ h, ...scoreHost(r, h) }));
   scored.sort((a, b) => b.score - a.score);
   const top = scored[0];
@@ -353,18 +396,34 @@ function scoreHostFit(
     score: top.score,
     bestHostIds: ties.map((t) => t.h.id),
     reasons: top.reasons,
+    scored: true,
   };
 }
 
 function scoreDisability(
   r: Referral,
   outline: Outline,
-): { score: number; reasons: MatchReason[] } {
+): { score: number; reasons: MatchReason[]; scored: boolean } {
   const reasons: MatchReason[] = [];
   const refTypes = normList(r.disability_types);
   const served = normList(outline.disability_types_served);
   const refLevel = norm(r.disability_level);
   const servedLevels = normList(outline.disability_levels_served);
+
+  // UNKNOWN: referral records neither type nor level — exclude from blend.
+  if (refTypes.length === 0 && !refLevel) {
+    return {
+      score: 0,
+      scored: false,
+      reasons: [
+        {
+          category: "disability",
+          severity: "neutral",
+          text: "Disability unknown on referral — not scored.",
+        },
+      ],
+    };
+  }
 
   if (served.length === 0) {
     reasons.push({
@@ -381,20 +440,27 @@ function scoreDisability(
         text: `Disability level "${r.disability_level}" outside served levels (${(outline.disability_levels_served ?? []).join(", ")}).`,
       });
     }
-    return { score: clamp10(s), reasons };
+    return { score: clamp10(s), reasons, scored: true };
   }
 
   if (refTypes.length === 0) {
-    return {
-      score: 7,
-      reasons: [
-        {
-          category: "disability",
-          severity: "neutral",
-          text: "Disability types not recorded on referral — cannot score precisely.",
-        },
-      ],
-    };
+    // Type missing but level present: score on level only.
+    let s = 7;
+    if (refLevel && servedLevels.length > 0 && !servedLevels.includes(refLevel)) {
+      s = 5;
+      reasons.push({
+        category: "disability",
+        severity: "negative",
+        text: `Disability level "${r.disability_level}" outside served levels (${(outline.disability_levels_served ?? []).join(", ")}).`,
+      });
+    } else {
+      reasons.push({
+        category: "disability",
+        severity: "neutral",
+        text: "Disability types not recorded on referral — scored on level only.",
+      });
+    }
+    return { score: clamp10(s), reasons, scored: true };
   }
 
   const matched = refTypes.filter((t) =>
@@ -425,18 +491,32 @@ function scoreDisability(
       text: `Disability level "${r.disability_level}" outside served levels (${(outline.disability_levels_served ?? []).join(", ")}).`,
     });
   }
-  return { score: s, reasons };
+  return { score: s, reasons, scored: true };
 }
 
 function scoreNeed(
   r: Referral,
   outline: Outline,
-): { score: number; reasons: MatchReason[] } {
+): { score: number; reasons: MatchReason[]; scored: boolean } {
   const served = normList(outline.need_levels_served);
   const refNeed = norm(r.need_level);
+  if (!refNeed) {
+    return {
+      score: 0,
+      scored: false,
+      reasons: [
+        {
+          category: "need",
+          severity: "neutral",
+          text: "Need level unknown on referral — not scored.",
+        },
+      ],
+    };
+  }
   if (served.length === 0) {
     return {
       score: 8,
+      scored: true,
       reasons: [
         {
           category: "need",
@@ -446,21 +526,10 @@ function scoreNeed(
       ],
     };
   }
-  if (!refNeed) {
-    return {
-      score: 6,
-      reasons: [
-        {
-          category: "need",
-          severity: "neutral",
-          text: "Need level not recorded on referral.",
-        },
-      ],
-    };
-  }
   if (served.includes(refNeed)) {
     return {
       score: 10,
+      scored: true,
       reasons: [
         {
           category: "need",
@@ -472,6 +541,7 @@ function scoreNeed(
   }
   return {
     score: 2,
+    scored: true,
     reasons: [
       {
         category: "need",
@@ -486,7 +556,7 @@ function scoreNeed(
 function scoreCodes(
   r: Referral,
   outline: Outline,
-): { score: number; reasons: MatchReason[] } {
+): { score: number; reasons: MatchReason[]; scored: boolean } {
   const reasons: MatchReason[] = [];
   const requested = normList(r.requested_codes);
   const held = new Set(normList(outline.codes_held));
@@ -494,9 +564,9 @@ function scoreCodes(
     reasons.push({
       category: "code",
       severity: "neutral",
-      text: "Codes: none requested on referral.",
+      text: "Requested codes unknown on referral — not scored.",
     });
-    return { score: 10, reasons };
+    return { score: 0, reasons, scored: false };
   }
   const matched = requested.filter((c) => held.has(c));
   const missing = requested.filter((c) => !held.has(c));
@@ -520,7 +590,7 @@ function scoreCodes(
         .join(", ")} (−${deduction}, outsourceable — never filtered out).`,
     });
   }
-  return { score, reasons };
+  return { score, reasons, scored: true };
 }
 
 function blendOverall(
@@ -531,8 +601,9 @@ function blendOverall(
     need_fit: number;
     code_overlap: number;
   },
+  scoredFlags: Record<ScoredComponent, boolean>,
   rawWeights: Record<string, number> | null | undefined,
-): { overall: number; weights: Record<string, number> } {
+): { overall: number | null; weights: Record<string, number> } {
   const w = {
     location:
       typeof rawWeights?.location === "number"
@@ -555,14 +626,21 @@ function blendOverall(
         ? rawWeights.code_overlap
         : DEFAULT_MATCH_WEIGHTS.code_overlap,
   };
-  const total = w.location + w.host_fit + w.disability_fit + w.need_fit + w.code_overlap || 1;
-  const sum =
-    w.location * parts.location_fit +
-    w.host_fit * parts.host_fit +
-    w.disability_fit * parts.disability_fit +
-    w.need_fit * parts.need_fit +
-    w.code_overlap * parts.code_overlap;
-  const overall = Math.max(1, Math.min(10, sum / total));
+
+  // Renormalize across only the components that were actually scored.
+  const contributions: Array<{ weight: number; value: number }> = [];
+  if (scoredFlags.location) contributions.push({ weight: w.location, value: parts.location_fit });
+  if (scoredFlags.host_fit) contributions.push({ weight: w.host_fit, value: parts.host_fit });
+  if (scoredFlags.disability_fit) contributions.push({ weight: w.disability_fit, value: parts.disability_fit });
+  if (scoredFlags.need_fit) contributions.push({ weight: w.need_fit, value: parts.need_fit });
+  if (scoredFlags.code_overlap) contributions.push({ weight: w.code_overlap, value: parts.code_overlap });
+
+  if (contributions.length === 0) {
+    return { overall: null, weights: w };
+  }
+  const totalW = contributions.reduce((a, c) => a + c.weight, 0) || 1;
+  const sum = contributions.reduce((a, c) => a + c.weight * c.value, 0);
+  const overall = Math.max(1, Math.min(10, sum / totalW));
   return { overall: Math.round(overall * 10) / 10, weights: w };
 }
 
@@ -596,12 +674,29 @@ export function computeMatch(
     code_overlap: code.score,
   };
 
-  const { overall, weights } = blendOverall(parts, effOutline.match_weights);
+  const scoredFlags: Record<ScoredComponent, boolean> = {
+    location: loc.scored,
+    host_fit: host.scored,
+    disability_fit: dis.scored,
+    need_fit: need.scored,
+    code_overlap: code.scored,
+  };
+
+  const scored_components = (Object.keys(scoredFlags) as ScoredComponent[]).filter(
+    (k) => scoredFlags[k],
+  );
+
+  const { overall, weights } = blendOverall(parts, scoredFlags, effOutline.match_weights);
+
+  // When nothing could be scored, fall back to a sentinel 1.0 so the
+  // NOT NULL column stays satisfied; UI uses scored_components to render
+  // an "insufficient info" state instead of the number.
+  const overallStored = overall ?? 1;
 
   return {
     referral_id: referral.id,
     organization_id: referral.organization_id,
-    overall_score: overall,
+    overall_score: overallStored,
     location_fit: parts.location_fit,
     host_fit: parts.host_fit,
     disability_fit: parts.disability_fit,
@@ -610,9 +705,11 @@ export function computeMatch(
     best_host_ids: host.bestHostIds,
     weights,
     reasons: [...loc.reasons, ...host.reasons, ...dis.reasons, ...need.reasons, ...code.reasons],
+    scored_components,
     computed_at: new Date().toISOString(),
   };
 }
+
 
 // ────────── Server fns ──────────
 
@@ -680,7 +777,7 @@ export const getReferralMatchScore = createServerFn({ method: "POST" })
     const { data: cached } = await supabase
       .from("referral_match_scores")
       .select(
-        "referral_id, organization_id, overall_score, location_fit, host_fit, disability_fit, need_fit, code_overlap, best_host_ids, weights, reasons, computed_at",
+        "referral_id, organization_id, overall_score, location_fit, host_fit, disability_fit, need_fit, code_overlap, best_host_ids, weights, reasons, scored_components, computed_at",
       )
       .eq("referral_id", data.referral_id)
       .eq("organization_id", data.organization_id)
@@ -694,6 +791,13 @@ export const getReferralMatchScore = createServerFn({ method: "POST" })
         disability_fit: Number(cached.disability_fit),
         need_fit: Number(cached.need_fit),
         code_overlap: Number(cached.code_overlap),
+        scored_components: (cached.scored_components ?? [
+          "location",
+          "host_fit",
+          "disability_fit",
+          "need_fit",
+          "code_overlap",
+        ]) as ScoredComponent[],
       } as ReferralMatchScore;
     }
 
@@ -721,10 +825,12 @@ export const getReferralMatchScore = createServerFn({ method: "POST" })
           best_host_ids: computed.best_host_ids,
           weights: computed.weights,
           reasons: computed.reasons,
+          scored_components: computed.scored_components,
           computed_at: computed.computed_at,
         },
         { onConflict: "referral_id" },
       );
+
 
     return computed;
   });
@@ -756,6 +862,7 @@ export const recomputeReferralMatchScore = createServerFn({ method: "POST" })
         best_host_ids: computed.best_host_ids,
         weights: computed.weights,
         reasons: computed.reasons,
+        scored_components: computed.scored_components,
         computed_at: computed.computed_at,
       },
       { onConflict: "referral_id" },
@@ -763,3 +870,4 @@ export const recomputeReferralMatchScore = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return computed;
   });
+

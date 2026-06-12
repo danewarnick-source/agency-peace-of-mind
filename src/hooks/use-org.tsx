@@ -10,6 +10,9 @@ export interface CurrentMembership {
   membership_id: string;
   organization_id: string;
   organization_name: string;
+  legal_name: string | null;
+  dba_name: string | null;
+  display_acronym: string | null;
   role: Role;
   job_title: string | null;
   is_demo: boolean;
@@ -39,24 +42,54 @@ function writeActiveOrgId(orgId: string | null) {
 async function fetchMemberships(userId: string): Promise<CurrentMembership[]> {
   const { data, error } = await supabase
     .from("organization_members")
-    .select("id, role, job_title, organization_id, organizations(name, is_demo)")
+    .select("id, role, job_title, organization_id, organizations(name, is_demo, legal_name, dba_name, display_acronym)")
     .eq("user_id", userId)
     .eq("active", true);
   if (error || !data?.length) return [];
   const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3, committee_member: 4 };
+  type OrgRow = { name: string; is_demo: boolean; legal_name: string | null; dba_name: string | null; display_acronym: string | null } | null;
   return [...data]
     .sort((a, b) => rank[a.role as Role] - rank[b.role as Role])
-    .map((m) => ({
-      membership_id: m.id,
-      organization_id: m.organization_id,
-      organization_name:
-        (m.organizations as { name: string; is_demo: boolean } | null)?.name ?? "Workspace",
-      role: m.role as Role,
-      job_title: m.job_title,
-      is_demo:
-        (m.organizations as { name: string; is_demo: boolean } | null)?.is_demo ?? false,
-    }));
+    .map((m) => {
+      const o = m.organizations as OrgRow;
+      return {
+        membership_id: m.id,
+        organization_id: m.organization_id,
+        organization_name: o?.name ?? "Workspace",
+        legal_name: o?.legal_name ?? null,
+        dba_name: o?.dba_name ?? null,
+        display_acronym: o?.display_acronym ?? null,
+        role: m.role as Role,
+        job_title: m.job_title,
+        is_demo: o?.is_demo ?? false,
+      };
+    });
 }
+
+/**
+ * Single source of truth for provider-name display.
+ * - acronym: short label for column headers / tab names. Empty string when unset
+ *   (callers should fall back to a neutral label, never a broken blank).
+ * - displayName: best human-friendly name (DBA > legal > org name).
+ * - legalName: full legal entity name (DBA > legal > org name fallback chain).
+ * - prefixLabel(suffix): convenience for tokenized labels like "TNS Gross".
+ *   Returns "<acronym> <suffix>" when acronym is set, else the bare suffix.
+ */
+export function useOrgDisplayName() {
+  const { data: org } = useCurrentOrg();
+  const acronym = (org?.display_acronym ?? "").trim();
+  const legalName = (org?.legal_name ?? "").trim() || org?.organization_name || "";
+  const dbaName = (org?.dba_name ?? "").trim();
+  const displayName = dbaName || legalName || org?.organization_name || "";
+  return {
+    acronym,
+    legalName,
+    dbaName,
+    displayName,
+    prefixLabel: (suffix: string) => (acronym ? `${acronym} ${suffix}` : suffix),
+  };
+}
+
 
 /**
  * Returns all active memberships for the signed-in user. Used by the org

@@ -471,6 +471,8 @@ function SchedulePreviewPage() {
           conflictShiftIds={conflictShiftIds}
           hostHomeNames={hostHomeNames}
           reqsBySiteName={reqsBySiteName}
+          computedReqByDayBySiteName={computedReqByDayBySiteName}
+          twoToOneBySiteName={twoToOneBySiteName}
           noteDays={hostSignalsQ.data?.noteDays}
           overnightDays={hostSignalsQ.data?.overnightDays}
           weekStart={weekStart}

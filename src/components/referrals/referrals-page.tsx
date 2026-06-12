@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,16 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Plus, UserPlus, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  Plus,
+  UserPlus,
+  Archive as ArchiveIcon,
+  RotateCcw,
+  Upload,
+  Sparkles,
+  FileText,
+} from "lucide-react";
 import {
   createReferral,
   createSupportCoordinator,
@@ -39,6 +49,12 @@ import {
   restoreReferral,
   listArchivedReferrals,
 } from "@/lib/retention.functions";
+import {
+  recordReferralDocument,
+  parseReferralDocument,
+  attachDraftDocumentsToReferral,
+  type ReferralPrefill,
+} from "@/lib/referral-docs.functions";
 import {
   PipelineStatsBar,
   ReferralDetailDialog,
@@ -55,6 +71,7 @@ const CATEGORIES: { key: Category; label: string }[] = [
   { key: "rhs", label: "RHS" },
   { key: "hhs", label: "HHS" },
 ];
+
 
 function splitList(s: string): string[] {
   return s
@@ -98,17 +115,20 @@ export function ReferralsPage() {
   }, [scs.data]);
 
   const grouped = useMemo(() => {
-    const out: Record<Category, NonNullable<typeof referrals.data>> = {
+    const out: Record<Category | "unsorted", NonNullable<typeof referrals.data>> = {
       direct_support: [],
       rhs: [],
       hhs: [],
+      unsorted: [],
     };
     (referrals.data ?? []).forEach((r) => {
-      const c = r.category as Category;
+      const c = (r.category ?? "unsorted") as Category | "unsorted";
       if (out[c]) out[c].push(r);
+      else out.unsorted.push(r);
     });
     return out;
   }, [referrals.data]);
+
 
   return (
     <div className="space-y-4">
@@ -154,8 +174,14 @@ export function ReferralsPage() {
 
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {CATEGORIES.map((cat) => {
-          const rows = grouped[cat.key] ?? [];
+        {([
+          ...CATEGORIES,
+          ...(grouped.unsorted.length > 0
+            ? ([{ key: "unsorted" as const, label: "Unsorted" }])
+            : []),
+        ]).map((cat) => {
+          const rows = (grouped as Record<string, typeof grouped.unsorted>)[cat.key] ?? [];
+
           return (
             <section
               key={cat.key}
@@ -305,6 +331,9 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
   const createScFn = useServerFn(createSupportCoordinator);
   const createRefFn = useServerFn(createReferral);
   const dupCheckFn = useServerFn(findPossibleDuplicateReferral);
+  const recordDocFn = useServerFn(recordReferralDocument);
+  const parseDocFn = useServerFn(parseReferralDocument);
+  const attachDocsFn = useServerFn(attachDraftDocumentsToReferral);
 
   const scs = useQuery({
     queryKey: ["support-coordinators", organizationId],
@@ -312,24 +341,40 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
     enabled: open,
   });
 
+  // draft key links uploaded docs before referral exists
+  const draftKeyRef = useRef<string>(
+    typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`,
+  );
+
   // form state
   const [firstName, setFirstName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
   const [city, setCity] = useState("");
   const [county, setCounty] = useState("");
-  const [category, setCategory] = useState<Category>("direct_support");
+  const [category, setCategory] = useState<Category | "">("");
   const [needLevel, setNeedLevel] = useState("");
   const [disabilityTypes, setDisabilityTypes] = useState("");
   const [disabilityLevel, setDisabilityLevel] = useState("");
   const [requestedCodes, setRequestedCodes] = useState("");
   const [budgetNote, setBudgetNote] = useState("");
   const [description, setDescription] = useState("");
+  const [notes, setNotes] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [scId, setScId] = useState<string>("");
   const [duplicates, setDuplicates] = useState<
     Awaited<ReturnType<typeof dupCheckFn>> | null
   >(null);
+
+  // upload / parse state
+  const [uploadedDocs, setUploadedDocs] = useState<
+    Array<{ id: string; name: string; mime: string | null }>
+  >([]);
+  const [pasteText, setPasteText] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [parseMsg, setParseMsg] = useState<string | null>(null);
+  const [autoFilled, setAutoFilled] = useState<Set<string>>(new Set());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // inline SC create
   const [showScForm, setShowScForm] = useState(false);
@@ -345,13 +390,14 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
     setGender("");
     setCity("");
     setCounty("");
-    setCategory("direct_support");
+    setCategory("");
     setNeedLevel("");
     setDisabilityTypes("");
     setDisabilityLevel("");
     setRequestedCodes("");
     setBudgetNote("");
     setDescription("");
+    setNotes("");
     setDueDate("");
     setScId("");
     setDuplicates(null);
@@ -361,6 +407,137 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
     setScEmail("");
     setScPhone("");
     setScRegion("");
+    setUploadedDocs([]);
+    setPasteText("");
+    setParseMsg(null);
+    setAutoFilled(new Set());
+    draftKeyRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}`;
+  };
+
+  // Apply prefill — only sets fields the user hasn't already touched (treat
+  // empty current value as "untouched"). Tracks which fields were auto-filled.
+  const applyPrefill = (p: ReferralPrefill) => {
+    const filled = new Set(autoFilled);
+    const set = (key: string, current: string, next?: string | number | null) => {
+      if (next == null || next === "") return null;
+      if (current.trim().length > 0) return null;
+      filled.add(key);
+      return String(next);
+    };
+    const arrSet = (key: string, current: string, next?: string[]) => {
+      if (!next || next.length === 0) return null;
+      if (current.trim().length > 0) return null;
+      filled.add(key);
+      return next.join(", ");
+    };
+    const fn = set("first_name", firstName, p.first_name);
+    if (fn != null) setFirstName(fn);
+    const a = set("age", age, p.age);
+    if (a != null) setAge(a);
+    const g = set("gender", gender, p.gender);
+    if (g != null) setGender(g);
+    const ci = set("location_city", city, p.location_city);
+    if (ci != null) setCity(ci);
+    const co = set("location_county", county, p.location_county);
+    if (co != null) setCounty(co);
+    const dl = set("disability_level", disabilityLevel, p.disability_level);
+    if (dl != null) setDisabilityLevel(dl);
+    const dt = arrSet("disability_types", disabilityTypes, p.disability_types);
+    if (dt != null) setDisabilityTypes(dt);
+    const rc = arrSet("requested_codes", requestedCodes, p.requested_codes);
+    if (rc != null) setRequestedCodes(rc);
+    const bn = set("budget_note", budgetNote, p.budget_note);
+    if (bn != null) setBudgetNote(bn);
+    const nl = set("need_level", needLevel, p.need_level);
+    if (nl != null) setNeedLevel(nl);
+    const ds = set("description", description, p.description);
+    if (ds != null) setDescription(ds);
+    const nt = set("notes", notes, p.notes);
+    if (nt != null) setNotes(nt);
+    const dd = set("due_date", dueDate, p.due_date);
+    if (dd != null) setDueDate(dd);
+    if (p.category && !category) {
+      filled.add("category");
+      setCategory(p.category);
+    }
+    setAutoFilled(filled);
+  };
+
+  const uploadAndParse = async (file: File) => {
+    setParseMsg(null);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200);
+      const path = `${organizationId}/draft-${draftKeyRef.current}/${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from("referral-documents")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (upErr) throw new Error(upErr.message);
+
+      const doc = await recordDocFn({
+        data: {
+          organization_id: organizationId,
+          storage_path: path,
+          file_name: file.name,
+          mime_type: file.type || null,
+          size_bytes: file.size,
+          draft_key: draftKeyRef.current,
+        },
+      });
+      setUploadedDocs((prev) => [...prev, { id: doc.id, name: doc.file_name, mime: doc.mime_type }]);
+
+      setParsing(true);
+      const res = await parseDocFn({
+        data: { organization_id: organizationId, document_id: doc.id },
+      });
+      if (res.ok) {
+        applyPrefill(res.fields);
+        const count = Object.keys(res.fields).filter(
+          (k) => res.fields[k as keyof ReferralPrefill] != null,
+        ).length;
+        setParseMsg(
+          count > 0
+            ? `NECTAR pre-filled ${count} field${count === 1 ? "" : "s"} — review and correct before saving.`
+            : "Doc stored. NECTAR couldn't extract structured fields — fill manually.",
+        );
+      } else {
+        setParseMsg(res.message);
+      }
+    } catch (e) {
+      setParseMsg((e as Error).message);
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const parsePastedText = async () => {
+    if (!pasteText.trim()) return;
+    setParseMsg(null);
+    setParsing(true);
+    try {
+      const res = await parseDocFn({
+        data: { organization_id: organizationId, text: pasteText },
+      });
+      if (res.ok) {
+        applyPrefill(res.fields);
+        const count = Object.keys(res.fields).filter(
+          (k) => res.fields[k as keyof ReferralPrefill] != null,
+        ).length;
+        setParseMsg(
+          count > 0
+            ? `NECTAR pre-filled ${count} field${count === 1 ? "" : "s"} from pasted text — review before saving.`
+            : "Couldn't extract structured fields. Use the notes field below.",
+        );
+      } else {
+        setParseMsg(res.message);
+      }
+    } catch (e) {
+      setParseMsg((e as Error).message);
+    } finally {
+      setParsing(false);
+    }
   };
 
   const createSc = useMutation({
@@ -402,8 +579,8 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
   };
 
   const create = useMutation({
-    mutationFn: () =>
-      createRefFn({
+    mutationFn: async () => {
+      const row = await createRefFn({
         data: {
           organization_id: organizationId,
           first_name: firstName.trim(),
@@ -418,12 +595,24 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           budget_note: budgetNote || null,
           need_level: needLevel || null,
           description: description || null,
-          category,
-          source: "manual_upload",
+          notes: notes || null,
+          category: (category || null) as Category | null,
+          source: uploadedDocs.length > 0 ? "manual_upload" : "manual_upload",
           support_coordinator_id: scId || null,
           due_date: dueDate || null,
         },
-      }),
+      });
+      if (row?.id && uploadedDocs.length > 0) {
+        await attachDocsFn({
+          data: {
+            organization_id: organizationId,
+            draft_key: draftKeyRef.current,
+            referral_id: row.id,
+          },
+        });
+      }
+      return row;
+    },
     onSuccess: () => {
       toast.success("Referral created");
       qc.invalidateQueries({ queryKey: ["referrals", organizationId] });
@@ -432,6 +621,14 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const isAuto = (k: string) => autoFilled.has(k);
+  const autoMark = (k: string) =>
+    isAuto(k) ? (
+      <Badge variant="secondary" className="ml-2 gap-1 text-[10px]">
+        <Sparkles className="h-3 w-3" /> auto-filled
+      </Badge>
+    ) : null;
 
   return (
     <Dialog
@@ -451,19 +648,108 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           <DialogTitle>New referral</DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {/* Upload + parse — NECTAR pre-fill */}
+        <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-semibold flex items-center gap-1">
+                <Sparkles className="h-4 w-4 text-primary" /> NECTAR pre-fill (optional)
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Upload a referral PDF/image or paste forwarded email text. NECTAR will
+                read it and pre-fill what it can — you review and correct before saving.
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf,text/*"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void uploadAndParse(f);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={parsing}
+              className="gap-1 shrink-0"
+            >
+              <Upload className="h-4 w-4" /> Upload doc
+            </Button>
+          </div>
+
+          <div>
+            <Label htmlFor="paste-text" className="text-xs">
+              …or paste forwarded email / referral text
+            </Label>
+            <Textarea
+              id="paste-text"
+              rows={3}
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder="Paste the body of a referral email here…"
+              className="text-xs"
+            />
+            <div className="mt-1 flex justify-end">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={!pasteText.trim() || parsing}
+                onClick={parsePastedText}
+                className="gap-1"
+              >
+                <Sparkles className="h-3 w-3" />
+                {parsing ? "Parsing…" : "Parse with NECTAR"}
+              </Button>
+            </div>
+          </div>
+
+          {uploadedDocs.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[11px] font-medium text-muted-foreground">
+                Linked documents:
+              </div>
+              <ul className="space-y-1">
+                {uploadedDocs.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex items-center gap-2 text-xs text-foreground"
+                  >
+                    <FileText className="h-3 w-3 text-muted-foreground" />
+                    <span className="truncate">{d.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {parseMsg && (
+            <p className="text-xs text-muted-foreground">{parseMsg}</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 mt-3">
           <div className="md:col-span-1">
-            <Label htmlFor="ref-first">First name *</Label>
+            <Label htmlFor="ref-first">
+              First name * {autoMark("first_name")}
+            </Label>
             <Input
               id="ref-first"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               onBlur={runDupCheck}
+              placeholder="At minimum, save with just a name"
             />
           </div>
           <div className="grid grid-cols-2 gap-3 md:col-span-1">
             <div>
-              <Label htmlFor="ref-age">Age</Label>
+              <Label htmlFor="ref-age">Age {autoMark("age")}</Label>
               <Input
                 id="ref-age"
                 type="number"
@@ -473,7 +759,7 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
               />
             </div>
             <div>
-              <Label htmlFor="ref-gender">Gender</Label>
+              <Label htmlFor="ref-gender">Gender {autoMark("gender")}</Label>
               <Input
                 id="ref-gender"
                 value={gender}
@@ -482,11 +768,32 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
             </div>
           </div>
 
+          {/* NOTES — prominent, every intake path */}
+          <div className="md:col-span-2 rounded-md border border-primary/30 bg-primary/5 p-3">
+            <Label htmlFor="ref-notes" className="text-sm font-semibold">
+              Notes {autoMark("notes")}
+            </Label>
+            <p className="mb-1 text-xs text-muted-foreground">
+              Notes from calls, emails, or any context that helps build this referral.
+              NECTAR will use this alongside the structured fields when matching.
+            </p>
+            <Textarea
+              id="ref-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Free-form — anything the SC mentioned, family preferences, scheduling constraints…"
+            />
+          </div>
+
           <div>
-            <Label>Category *</Label>
-            <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
+            <Label>Category {autoMark("category")}</Label>
+            <Select
+              value={category || undefined}
+              onValueChange={(v) => setCategory(v as Category)}
+            >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Unsorted (optional)" />
               </SelectTrigger>
               <SelectContent>
                 {CATEGORIES.map((c) => (
@@ -498,7 +805,7 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
             </Select>
           </div>
           <div>
-            <Label htmlFor="ref-due">Due date</Label>
+            <Label htmlFor="ref-due">Due date {autoMark("due_date")}</Label>
             <Input
               id="ref-due"
               type="date"
@@ -508,7 +815,7 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           </div>
 
           <div>
-            <Label htmlFor="ref-city">City</Label>
+            <Label htmlFor="ref-city">City {autoMark("location_city")}</Label>
             <Input
               id="ref-city"
               value={city}
@@ -516,7 +823,7 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
             />
           </div>
           <div>
-            <Label htmlFor="ref-county">County</Label>
+            <Label htmlFor="ref-county">County {autoMark("location_county")}</Label>
             <Input
               id="ref-county"
               value={county}
@@ -525,7 +832,7 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           </div>
 
           <div>
-            <Label htmlFor="ref-need">Need level</Label>
+            <Label htmlFor="ref-need">Need level {autoMark("need_level")}</Label>
             <Input
               id="ref-need"
               value={needLevel}
@@ -534,7 +841,9 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
             />
           </div>
           <div>
-            <Label htmlFor="ref-dlevel">Disability level</Label>
+            <Label htmlFor="ref-dlevel">
+              Disability level {autoMark("disability_level")}
+            </Label>
             <Input
               id="ref-dlevel"
               value={disabilityLevel}
@@ -544,7 +853,9 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           </div>
 
           <div className="md:col-span-2">
-            <Label htmlFor="ref-dtypes">Disability types</Label>
+            <Label htmlFor="ref-dtypes">
+              Disability types {autoMark("disability_types")}
+            </Label>
             <Input
               id="ref-dtypes"
               value={disabilityTypes}
@@ -554,7 +865,9 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           </div>
 
           <div className="md:col-span-2">
-            <Label htmlFor="ref-codes">Requested codes</Label>
+            <Label htmlFor="ref-codes">
+              Requested codes {autoMark("requested_codes")}
+            </Label>
             <Input
               id="ref-codes"
               value={requestedCodes}
@@ -564,7 +877,9 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           </div>
 
           <div className="md:col-span-2">
-            <Label htmlFor="ref-budget">Budget / funding note</Label>
+            <Label htmlFor="ref-budget">
+              Budget / funding note {autoMark("budget_note")}
+            </Label>
             <Input
               id="ref-budget"
               value={budgetNote}
@@ -671,7 +986,9 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           </div>
 
           <div className="md:col-span-2">
-            <Label htmlFor="ref-desc">Description</Label>
+            <Label htmlFor="ref-desc">
+              Description {autoMark("description")}
+            </Label>
             <Textarea
               id="ref-desc"
               value={description}
@@ -707,6 +1024,7 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           </Button>
         </DialogFooter>
       </DialogContent>
+
     </Dialog>
   );
 }

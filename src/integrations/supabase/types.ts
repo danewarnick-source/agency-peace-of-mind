@@ -8388,6 +8388,72 @@ export type Database = {
           },
         ]
       }
+      referral_documents: {
+        Row: {
+          created_at: string
+          draft_key: string | null
+          file_name: string
+          id: string
+          mime_type: string | null
+          organization_id: string
+          parse_error: string | null
+          parse_status: string
+          parsed_fields: Json | null
+          referral_id: string | null
+          size_bytes: number | null
+          storage_bucket: string
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          draft_key?: string | null
+          file_name: string
+          id?: string
+          mime_type?: string | null
+          organization_id: string
+          parse_error?: string | null
+          parse_status?: string
+          parsed_fields?: Json | null
+          referral_id?: string | null
+          size_bytes?: number | null
+          storage_bucket?: string
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          draft_key?: string | null
+          file_name?: string
+          id?: string
+          mime_type?: string | null
+          organization_id?: string
+          parse_error?: string | null
+          parse_status?: string
+          parsed_fields?: Json | null
+          referral_id?: string | null
+          size_bytes?: number | null
+          storage_bucket?: string
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_documents_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_match_scores: {
         Row: {
           best_host_ids: string[]
@@ -8496,7 +8562,7 @@ export type Database = {
           archived_at: string | null
           archived_by: string | null
           budget_note: string | null
-          category: string
+          category: string | null
           created_at: string
           created_by: string | null
           date_of_birth: string | null
@@ -8512,6 +8578,7 @@ export type Database = {
           location_city: string | null
           location_county: string | null
           need_level: string | null
+          notes: string | null
           organization_id: string
           purge_after: string | null
           requested_codes: string[]
@@ -8528,7 +8595,7 @@ export type Database = {
           archived_at?: string | null
           archived_by?: string | null
           budget_note?: string | null
-          category: string
+          category?: string | null
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
@@ -8544,6 +8611,7 @@ export type Database = {
           location_city?: string | null
           location_county?: string | null
           need_level?: string | null
+          notes?: string | null
           organization_id: string
           purge_after?: string | null
           requested_codes?: string[]
@@ -8560,7 +8628,7 @@ export type Database = {
           archived_at?: string | null
           archived_by?: string | null
           budget_note?: string | null
-          category?: string
+          category?: string | null
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
@@ -8576,6 +8644,7 @@ export type Database = {
           location_city?: string | null
           location_county?: string | null
           need_level?: string | null
+          notes?: string | null
           organization_id?: string
           purge_after?: string | null
           requested_codes?: string[]

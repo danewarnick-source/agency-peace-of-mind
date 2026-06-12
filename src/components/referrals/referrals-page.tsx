@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Plus, UserPlus } from "lucide-react";
+import { AlertTriangle, Plus, UserPlus, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
 import {
   createReferral,
   createSupportCoordinator,
@@ -35,6 +35,11 @@ import {
   type ReferralStage,
 } from "@/lib/referrals.functions";
 import {
+  archiveReferral,
+  restoreReferral,
+  listArchivedReferrals,
+} from "@/lib/retention.functions";
+import {
   PipelineStatsBar,
   ReferralDetailDialog,
   ReferralStageBadge,
@@ -42,6 +47,7 @@ import {
 } from "./referral-pipeline";
 import { ProviderInterestOutlineButton } from "./provider-interest-outline";
 import { MatchScorePanel } from "./match-score-panel";
+
 
 type Category = "direct_support" | "rhs" | "hhs";
 const CATEGORIES: { key: Category; label: string }[] = [

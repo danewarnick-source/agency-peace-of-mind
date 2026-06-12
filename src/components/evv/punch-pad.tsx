@@ -2425,6 +2425,46 @@ export function PunchPad({
 
             <div className="shrink-0 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
               <div className="flex flex-col gap-2">
+                {isLongShift && (
+                  <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-100">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div className="space-y-2">
+                        <p>
+                          This shift shows <span className="font-mono font-semibold">{elapsed}</span>. If you forgot to clock out, don't submit — tell your supervisor so the times can be corrected. Submitting confirms these times are accurate.
+                        </p>
+                        <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 cursor-pointer accent-amber-600"
+                            checked={longShiftAck}
+                            onChange={(e) => setLongShiftAck(e.target.checked)}
+                          />
+                          These times are accurate
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center justify-end text-[11px]">
+                  {hardwareDenied ? (
+                    <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-800 dark:text-amber-200">
+                      ⚠️ Location blocked — check device permission
+                    </span>
+                  ) : awaitingGps ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Getting location…
+                    </span>
+                  ) : livePos ? (
+                    <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-800 dark:text-emerald-200">
+                      📍 Location ready ✓
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-muted-foreground">
+                      📍 Acquiring location…
+                    </span>
+                  )}
+                </div>
                 <div
                   className="w-full"
                   onMouseEnter={() => { if (!narrativeOk) setShowNarrativeError(true); }}

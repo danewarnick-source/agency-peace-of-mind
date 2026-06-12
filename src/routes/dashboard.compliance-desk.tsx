@@ -793,6 +793,8 @@ function ComplianceDeskPage() {
           approving={reviewApprove.isPending}
           rejecting={reviewReject.isPending}
         />
+      ) : sub === "incidents" ? (
+        <AdminIncidentsSection />
       ) : sub === "reconcile" ? (
         <ReconcileTable
           rows={reconcileQ.data ?? []}

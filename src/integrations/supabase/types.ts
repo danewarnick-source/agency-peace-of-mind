@@ -3889,6 +3889,114 @@ export type Database = {
           },
         ]
       }
+      hhp_cue_cards: {
+        Row: {
+          address: string | null
+          behavioral_comfort: string | null
+          commitment_length: string | null
+          communication_abilities: string | null
+          created_at: string
+          created_by: string | null
+          criminal_history_flag: boolean
+          email: string | null
+          experience_summary: string | null
+          form_submission_id: string | null
+          household_members: Json
+          id: string
+          independence_levels_accepted: string[]
+          location_city: string | null
+          location_county: string | null
+          medical_comfort: string[]
+          name: string
+          organization_id: string
+          pets: string | null
+          phone: string | null
+          provider_notes: string | null
+          schedule_availability: string | null
+          sign_language: boolean
+          source: Database["public"]["Enums"]["hhp_cue_card_source"]
+          status: Database["public"]["Enums"]["hhp_cue_card_status"]
+          updated_at: string
+          updated_by: string | null
+          wheelchair_accessible: boolean
+        }
+        Insert: {
+          address?: string | null
+          behavioral_comfort?: string | null
+          commitment_length?: string | null
+          communication_abilities?: string | null
+          created_at?: string
+          created_by?: string | null
+          criminal_history_flag?: boolean
+          email?: string | null
+          experience_summary?: string | null
+          form_submission_id?: string | null
+          household_members?: Json
+          id?: string
+          independence_levels_accepted?: string[]
+          location_city?: string | null
+          location_county?: string | null
+          medical_comfort?: string[]
+          name: string
+          organization_id: string
+          pets?: string | null
+          phone?: string | null
+          provider_notes?: string | null
+          schedule_availability?: string | null
+          sign_language?: boolean
+          source?: Database["public"]["Enums"]["hhp_cue_card_source"]
+          status?: Database["public"]["Enums"]["hhp_cue_card_status"]
+          updated_at?: string
+          updated_by?: string | null
+          wheelchair_accessible?: boolean
+        }
+        Update: {
+          address?: string | null
+          behavioral_comfort?: string | null
+          commitment_length?: string | null
+          communication_abilities?: string | null
+          created_at?: string
+          created_by?: string | null
+          criminal_history_flag?: boolean
+          email?: string | null
+          experience_summary?: string | null
+          form_submission_id?: string | null
+          household_members?: Json
+          id?: string
+          independence_levels_accepted?: string[]
+          location_city?: string | null
+          location_county?: string | null
+          medical_comfort?: string[]
+          name?: string
+          organization_id?: string
+          pets?: string | null
+          phone?: string | null
+          provider_notes?: string | null
+          schedule_availability?: string | null
+          sign_language?: boolean
+          source?: Database["public"]["Enums"]["hhp_cue_card_source"]
+          status?: Database["public"]["Enums"]["hhp_cue_card_status"]
+          updated_at?: string
+          updated_by?: string | null
+          wheelchair_accessible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hhp_cue_cards_form_submission_id_fkey"
+            columns: ["form_submission_id"]
+            isOneToOne: true
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hhp_cue_cards_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hhs_client_inventories: {
         Row: {
           added_on: string
@@ -11365,6 +11473,8 @@ export type Database = {
       bc_flag_type: "credential_mismatch" | "deadline_overdue" | "coverage_gap"
       bc_review_note_type: "monthly_review" | "note"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
+      hhp_cue_card_source: "questionnaire" | "manual"
+      hhp_cue_card_status: "onboarding" | "ready" | "placed"
       hive_ticket_category:
         | "structural_gap"
         | "parsing_failure"
@@ -11543,6 +11653,8 @@ export const Constants = {
       bc_flag_type: ["credential_mismatch", "deadline_overdue", "coverage_gap"],
       bc_review_note_type: ["monthly_review", "note"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
+      hhp_cue_card_source: ["questionnaire", "manual"],
+      hhp_cue_card_status: ["onboarding", "ready", "placed"],
       hive_ticket_category: [
         "structural_gap",
         "parsing_failure",

@@ -190,7 +190,7 @@ const UpdatePlanPatch = z.object({
   plan_type: PlanType.optional(),
   retention_pct: z.number().optional(),
   expense_selection: z.record(z.string(), z.boolean()).optional(),
-  formula_json: z.unknown().optional(),
+  formula_json: z.any().optional(),
   nectar_summary: z.string().nullable().optional(),
   status: z.enum(["draft", "approved"]).optional(),
   is_active: z.boolean().optional(),

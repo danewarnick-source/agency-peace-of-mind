@@ -474,6 +474,29 @@ export function AdminIncidentsSection({
 
   const [guardianId, setGuardianId] = useState<string | null>(null);
   const [completeId, setCompleteId] = useState<string | null>(null);
+  const [logScFor, setLogScFor] = useState<string | null>(null);
+  const [respondScFor, setRespondScFor] = useState<string | null>(null);
+
+  const onTrendPick = (f: TrendFilter) => {
+    if (f.kind === "month") {
+      const [y, m] = f.monthKey.split("-").map(Number);
+      const first = new Date(Date.UTC(y, m - 1, 1));
+      const last = new Date(Date.UTC(y, m, 0));
+      setFrom(first.toISOString().slice(0, 10));
+      setTo(last.toISOString().slice(0, 10));
+      setStatus("all");
+    } else if (f.kind === "category") {
+      setFilterCategory(f.category);
+      const [y, m] = f.monthKey.split("-").map(Number);
+      setFrom(new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10));
+      setTo(new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10));
+      setStatus("all");
+    } else if (f.kind === "client") {
+      setFilterClient(f.clientId);
+      setStatus("all");
+    }
+  };
+
   const initiate = useMutation({
     mutationFn: (id: string) => initFn({ data: { id } }),
     onSuccess: () => {

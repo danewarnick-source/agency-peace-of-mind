@@ -23,6 +23,15 @@ function ClientsHub() {
   ];
   if (can("view_referrals") || can("manage_referrals")) {
     tabs.push({
+      key: "whiteboard",
+      label: "Whiteboard",
+      render: () => (
+        <RequirePermission perm="view_referrals">
+          <ClientWhiteboardTab />
+        </RequirePermission>
+      ),
+    });
+    tabs.push({
       key: "referrals",
       label: "Referrals",
       render: () => (
@@ -33,6 +42,7 @@ function ClientsHub() {
     });
   }
   tabs.push(
+
     {
       key: "teams",
       label: "Teams & homes",

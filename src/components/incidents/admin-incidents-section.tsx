@@ -410,7 +410,9 @@ export function AdminIncidentsSection({
     queryFn: () =>
       listFn({
         data: {
-          status: view === "queue" ? "open" : status,
+          // Always pull all; queue re-surface rule is applied client-side so
+          // a closed incident with an open SC request still shows in the queue.
+          status: view === "queue" ? "all" : status,
           category: filterCategory === "all" ? null : filterCategory,
           client_id: filterClient === "all" ? null : filterClient,
           from: from ? new Date(from).toISOString() : null,
@@ -420,14 +422,32 @@ export function AdminIncidentsSection({
       }),
   });
   const incidents = (data?.incidents ?? []) as Incident[];
+  const scRequests = (data?.sc_requests ?? []) as ScRequest[];
+  const scByIncident = useMemo(() => {
+    const m = new Map<string, ScRequest[]>();
+    for (const s of scRequests) {
+      const arr = m.get(s.incident_id) ?? [];
+      arr.push(s);
+      m.set(s.incident_id, arr);
+    }
+    return m;
+  }, [scRequests]);
 
-  // Sort: fatalities first, then by discovered_at desc (already sorted server-side).
+  // Queue view: open incidents OR any incident with an unresponded SC request.
+  const visible = useMemo(() => {
+    if (view === "log") return incidents;
+    return incidents.filter((ir) => {
+      if (ir.status !== "closed") return true;
+      return (scByIncident.get(ir.id) ?? []).some((s) => !s.responded_at);
+    });
+  }, [view, incidents, scByIncident]);
+
   const sorted = useMemo(() => {
-    return [...incidents].sort((a, b) => {
+    return [...visible].sort((a, b) => {
       if (a.is_fatality !== b.is_fatality) return a.is_fatality ? -1 : 1;
       return (b.discovered_at ?? b.created_at).localeCompare(a.discovered_at ?? a.created_at);
     });
-  }, [incidents]);
+  }, [visible]);
 
   const actorIds = useMemo(() => {
     const s = new Set<string>();

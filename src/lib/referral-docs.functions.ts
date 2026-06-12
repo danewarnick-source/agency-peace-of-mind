@@ -106,11 +106,9 @@ export const parseReferralDocument = createServerFn({ method: "POST" })
     if (!SUPABASE_URL) throw new Error("Server misconfigured");
 
     // Forward the caller's bearer so the edge function's verify_jwt passes.
-    const authHeader = `Bearer ${(context.claims as { __raw?: string })?.__raw ?? ""}`;
-    // Fallback: pull from supabase client's session if needed.
-    const sessionToken =
-      (await supabase.auth.getSession()).data.session?.access_token ?? "";
-    const bearer = sessionToken ? `Bearer ${sessionToken}` : authHeader;
+    const req = getRequest();
+    const bearer = req?.headers?.get("authorization") ?? "";
+    if (!bearer) throw new Error("Unauthorized");
 
     const res = await fetch(`${SUPABASE_URL}/functions/v1/parse-referral-doc`, {
       method: "POST",
@@ -125,6 +123,7 @@ export const parseReferralDocument = createServerFn({ method: "POST" })
           : { text: data.text },
       ),
     });
+
 
     const payload = (await res.json().catch(() => ({}))) as {
       fields?: ReferralPrefill;

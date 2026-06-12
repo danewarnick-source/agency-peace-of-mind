@@ -7712,6 +7712,62 @@ export type Database = {
           },
         ]
       }
+      provider_interest_outline: {
+        Row: {
+          codes_held: string[]
+          created_at: string
+          disability_levels_served: string[]
+          disability_types_served: string[]
+          id: string
+          location_mode: string
+          location_values: string[]
+          match_weights: Json
+          name: string
+          need_levels_served: string[]
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          codes_held?: string[]
+          created_at?: string
+          disability_levels_served?: string[]
+          disability_types_served?: string[]
+          id?: string
+          location_mode?: string
+          location_values?: string[]
+          match_weights?: Json
+          name?: string
+          need_levels_served?: string[]
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          codes_held?: string[]
+          created_at?: string
+          disability_levels_served?: string[]
+          disability_types_served?: string[]
+          id?: string
+          location_mode?: string
+          location_values?: string[]
+          match_weights?: Json
+          name?: string
+          need_levels_served?: string[]
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_interest_outline_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_ledger_entries: {
         Row: {
           amount: number

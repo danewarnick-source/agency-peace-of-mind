@@ -40,6 +40,7 @@ import {
   ReferralStageBadge,
   StageAdvancer,
 } from "./referral-pipeline";
+import { ProviderInterestOutlineButton } from "./provider-interest-outline";
 
 type Category = "direct_support" | "rhs" | "hhs";
 const CATEGORIES: { key: Category; label: string }[] = [
@@ -111,7 +112,12 @@ export function ReferralsPage() {
             in later increments.
           </p>
         </div>
-        {orgId && <NewReferralDialog organizationId={orgId} />}
+        {orgId && (
+          <div className="flex flex-wrap gap-2">
+            <ProviderInterestOutlineButton organizationId={orgId} />
+            <NewReferralDialog organizationId={orgId} />
+          </div>
+        )}
       </div>
 
       <PipelineStatsBar stats={stats.data} />

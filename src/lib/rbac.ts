@@ -42,6 +42,8 @@ export const ALL_PERMISSIONS = [
   "view_financial_tns_gross",
   "view_financial_rhs",
   "view_financial_employees",
+  "view_referrals",
+  "manage_referrals",
 ] as const;
 
 
@@ -72,6 +74,8 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   view_financial_tns_gross: "View Financial — Gross",
   view_financial_rhs: "View Financial — RHS",
   view_financial_employees: "View Financial — Employees",
+  view_referrals: "View referrals (CRM)",
+  manage_referrals: "Manage referrals (CRM)",
 };
 
 
@@ -88,6 +92,8 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
     "view_financial_tns_gross",
     "view_financial_rhs",
     "view_financial_employees",
+    "view_referrals",
+    "manage_referrals",
   ],
 
   manager: [

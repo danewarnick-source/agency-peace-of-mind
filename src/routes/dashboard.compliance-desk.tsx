@@ -29,6 +29,7 @@ import {
 import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode } from "@/lib/evv-codes";
 import { searchTimesheetsByVector, backfillTimesheetEmbeddings } from "@/lib/vector-search.functions";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
+import { AdminIncidentsSection } from "@/components/incidents/admin-incidents-section";
 import { Home as HomeIcon } from "lucide-react";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both

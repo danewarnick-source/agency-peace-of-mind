@@ -1085,6 +1085,11 @@ function PendingTable({
                   {r.staff?.full_name ?? r.staff?.email ?? "—"}
                   <EditedByAdminBadge row={r} />
                   <FlagDot row={r} />
+                  {r.edit_reason && (
+                    <div className="mt-0.5 max-w-[260px] truncate text-[11px] font-normal italic text-amber-700 dark:text-amber-300" title={r.edit_reason}>
+                      ✎ {r.edit_reason}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="whitespace-nowrap">{r.clients?.first_name} {r.clients?.last_name}</div>

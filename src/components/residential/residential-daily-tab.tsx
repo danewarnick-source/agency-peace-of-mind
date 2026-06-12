@@ -171,6 +171,25 @@ export function ResidentialDailyTab() {
     },
   });
 
+  // §1.27 incident counts for the month — feeds the per-client "Incidents"
+  // chip and matches the admin Incidents queue / log filters exactly.
+  const incidentsQ = useQuery({
+    enabled: clientIds.length > 0,
+    queryKey: ["res-incidents", orgId, start, end, clientIds.join(",")],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("incident_reports")
+        .select("id, client_id, discovered_at, status, is_fatality")
+        .eq("organization_id", orgId)
+        .gte("discovered_at", `${start}T00:00:00Z`)
+        .lte("discovered_at", `${end}T23:59:59Z`)
+        .in("client_id", clientIds);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; client_id: string; discovered_at: string; status: string | null; is_fatality: boolean | null }>;
+    },
+  });
+
   const summary = useMemo(() => {
     type Row = {
       id: string;

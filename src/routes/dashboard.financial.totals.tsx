@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +11,17 @@ import { computeEntryUnits, fmtUSD } from "@/lib/billing-units";
 import { computePeriodBounds, type PaySchedule } from "@/lib/pay-periods";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import {
+  getTotalsTps,
+  getTotalsCbc,
+  getTotalsEvv,
+  getTotalsHhs,
+  getTotalsHostSet,
+  getTotalsHhp,
+  getTotalsCtr,
+  getTotalsProfiles,
+  getTotalsLedger,
+} from "@/lib/financial-totals.functions";
 
 export const Route = createFileRoute("/dashboard/financial/totals")({
   head: () => ({ meta: [{ title: "Totals — HIVE" }] }),

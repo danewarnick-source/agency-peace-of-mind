@@ -285,6 +285,64 @@ function ClientBillingDetail() {
   );
 }
 
+function RateHistoryButton({ clientId, serviceCode }: { clientId: string; serviceCode: string }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<RateHistoryRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const fetchHistory = useServerFn(listRateHistory);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await fetchHistory({ data: { clientId, serviceCode } });
+      setRows(r);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o && rows === null) load(); }}>
+      <PopoverTrigger asChild>
+        <Button size="icon" variant="ghost" title="Rate history">
+          <History className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80" align="end">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          {serviceCode} — prior rates
+        </div>
+        {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
+        {!loading && rows !== null && rows.length === 0 && (
+          <p className="text-xs text-muted-foreground">No prior versions. The current rate is the original.</p>
+        )}
+        {!loading && rows && rows.length > 0 && (
+          <ul className="space-y-2 max-h-64 overflow-y-auto">
+            {rows.map((h) => (
+              <li key={h.id} className="rounded border border-border p-2 text-xs">
+                <div className="flex items-center justify-between font-mono">
+                  <span className="font-bold">${Number(h.rate_per_unit).toFixed(4)} / {h.unit_type}</span>
+                  <span className="text-muted-foreground">superseded {new Date(h.superseded_at).toLocaleDateString()}</span>
+                </div>
+                <div className="mt-1 text-muted-foreground">
+                  Effective: {h.effective_start ?? "—"} → {h.effective_end ?? "—"}
+                </div>
+                {h.rate_source && (
+                  <div className="mt-0.5 text-muted-foreground">
+                    Source: {h.rate_source}{h.rate_source_plan_number ? ` · plan ${h.rate_source_plan_number}` : ""}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function BudgetCard({ b }: { b: CodeBudget }) {
   const Icon = b.is_daily ? CalendarDays : Clock;
   const annual = b.code.annual_unit_authorization ?? 0;

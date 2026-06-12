@@ -56,6 +56,10 @@ import {
   type ReferralPrefill,
 } from "@/lib/referral-docs.functions";
 import {
+  discardReferral,
+  archiveAutoIngestedReferral,
+} from "@/lib/gmail.functions";
+import {
   PipelineStatsBar,
   ReferralDetailDialog,
   ReferralStageBadge,

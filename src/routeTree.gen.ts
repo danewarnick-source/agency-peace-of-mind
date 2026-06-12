@@ -127,6 +127,7 @@ import { Route as DashboardBillingNectarRouteImport } from './routes/dashboard.b
 import { Route as DashboardBillingMonthlyGridRouteImport } from './routes/dashboard.billing.monthly-grid'
 import { Route as DashboardBillingImportsRouteImport } from './routes/dashboard.billing.imports'
 import { Route as DashboardBillingHostHomeRouteImport } from './routes/dashboard.billing.host-home'
+import { Route as DashboardBillingGrossRouteImport } from './routes/dashboard.billing.gross'
 import { Route as DashboardBillingForm520RouteImport } from './routes/dashboard.billing.form520'
 import { Route as DashboardBillingContractorsRouteImport } from './routes/dashboard.billing.contractors'
 import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard.billing.$clientId'
@@ -770,6 +771,11 @@ const DashboardBillingHostHomeRoute =
     path: '/host-home',
     getParentRoute: () => DashboardBillingRoute,
   } as any)
+const DashboardBillingGrossRoute = DashboardBillingGrossRouteImport.update({
+  id: '/gross',
+  path: '/gross',
+  getParentRoute: () => DashboardBillingRoute,
+} as any)
 const DashboardBillingForm520Route = DashboardBillingForm520RouteImport.update({
   id: '/form520',
   path: '/form520',
@@ -947,6 +953,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/contractors': typeof DashboardBillingContractorsRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
+  '/dashboard/billing/gross': typeof DashboardBillingGrossRoute
   '/dashboard/billing/host-home': typeof DashboardBillingHostHomeRoute
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/billing/monthly-grid': typeof DashboardBillingMonthlyGridRoute
@@ -1079,6 +1086,7 @@ export interface FileRoutesByTo {
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/contractors': typeof DashboardBillingContractorsRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
+  '/dashboard/billing/gross': typeof DashboardBillingGrossRoute
   '/dashboard/billing/host-home': typeof DashboardBillingHostHomeRoute
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/billing/monthly-grid': typeof DashboardBillingMonthlyGridRoute
@@ -1218,6 +1226,7 @@ export interface FileRoutesById {
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
   '/dashboard/billing/contractors': typeof DashboardBillingContractorsRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
+  '/dashboard/billing/gross': typeof DashboardBillingGrossRoute
   '/dashboard/billing/host-home': typeof DashboardBillingHostHomeRoute
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
   '/dashboard/billing/monthly-grid': typeof DashboardBillingMonthlyGridRoute
@@ -1358,6 +1367,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/contractors'
     | '/dashboard/billing/form520'
+    | '/dashboard/billing/gross'
     | '/dashboard/billing/host-home'
     | '/dashboard/billing/imports'
     | '/dashboard/billing/monthly-grid'
@@ -1490,6 +1500,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/contractors'
     | '/dashboard/billing/form520'
+    | '/dashboard/billing/gross'
     | '/dashboard/billing/host-home'
     | '/dashboard/billing/imports'
     | '/dashboard/billing/monthly-grid'
@@ -1628,6 +1639,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing/$clientId'
     | '/dashboard/billing/contractors'
     | '/dashboard/billing/form520'
+    | '/dashboard/billing/gross'
     | '/dashboard/billing/host-home'
     | '/dashboard/billing/imports'
     | '/dashboard/billing/monthly-grid'
@@ -2545,6 +2557,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBillingHostHomeRouteImport
       parentRoute: typeof DashboardBillingRoute
     }
+    '/dashboard/billing/gross': {
+      id: '/dashboard/billing/gross'
+      path: '/gross'
+      fullPath: '/dashboard/billing/gross'
+      preLoaderRoute: typeof DashboardBillingGrossRouteImport
+      parentRoute: typeof DashboardBillingRoute
+    }
     '/dashboard/billing/form520': {
       id: '/dashboard/billing/form520'
       path: '/form520'
@@ -2678,6 +2697,7 @@ interface DashboardBillingRouteChildren {
   DashboardBillingClientIdRoute: typeof DashboardBillingClientIdRoute
   DashboardBillingContractorsRoute: typeof DashboardBillingContractorsRoute
   DashboardBillingForm520Route: typeof DashboardBillingForm520Route
+  DashboardBillingGrossRoute: typeof DashboardBillingGrossRoute
   DashboardBillingHostHomeRoute: typeof DashboardBillingHostHomeRoute
   DashboardBillingImportsRoute: typeof DashboardBillingImportsRoute
   DashboardBillingMonthlyGridRoute: typeof DashboardBillingMonthlyGridRoute
@@ -2691,6 +2711,7 @@ const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
   DashboardBillingClientIdRoute: DashboardBillingClientIdRoute,
   DashboardBillingContractorsRoute: DashboardBillingContractorsRoute,
   DashboardBillingForm520Route: DashboardBillingForm520Route,
+  DashboardBillingGrossRoute: DashboardBillingGrossRoute,
   DashboardBillingHostHomeRoute: DashboardBillingHostHomeRoute,
   DashboardBillingImportsRoute: DashboardBillingImportsRoute,
   DashboardBillingMonthlyGridRoute: DashboardBillingMonthlyGridRoute,
@@ -3067,3 +3088,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

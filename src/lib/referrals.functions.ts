@@ -103,6 +103,7 @@ export const listReferrals = createServerFn({ method: "GET" })
       )
       .eq("organization_id", data.organization_id)
       .neq("status", "archived")
+      .is("archived_at", null)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return rows ?? [];

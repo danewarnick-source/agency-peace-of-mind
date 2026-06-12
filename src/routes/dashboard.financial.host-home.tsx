@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +10,13 @@ import { ChevronLeft, ChevronRight, Home, Info } from "lucide-react";
 import { fmtUSD } from "@/lib/billing-units";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import {
+  getHhCodes,
+  getHhClients,
+  getHhDays,
+  getHhSettings,
+  getHhMonthly,
+} from "@/lib/financial-host-home.functions";
 
 export const Route = createFileRoute("/dashboard/financial/host-home")({
   head: () => ({ meta: [{ title: "Host Home — HIVE" }] }),

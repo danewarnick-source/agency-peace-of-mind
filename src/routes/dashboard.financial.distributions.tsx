@@ -87,17 +87,29 @@ function DistributionsPage() {
   const [scopeIdx, setScopeIdx] = useState(today.getMonth()); // month: 0-11; quarter: 0-3
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
+  // ---------- Server fn bindings ----------
+  const fnGetPlans = useServerFn(getDistPlans);
+  const fnGetParts = useServerFn(getDistParticipants);
+  const fnGetCbc = useServerFn(getDistCbc);
+  const fnGetEvv = useServerFn(getDistEvv);
+  const fnGetHhs = useServerFn(getDistHhs);
+  const fnGetCtr = useServerFn(getDistCtr);
+  const fnGetLedger = useServerFn(getDistLedger);
+  const fnCreatePlan = useServerFn(createDistPlan);
+  const fnUpdatePlan = useServerFn(updateDistPlan);
+  const fnDeletePlan = useServerFn(deleteDistPlan);
+  const fnDuplicatePlan = useServerFn(duplicateDistPlan);
+  const fnAddParticipant = useServerFn(addDistParticipant);
+  const fnUpdateParticipant = useServerFn(updateDistParticipant);
+  const fnDeleteParticipant = useServerFn(deleteDistParticipant);
+
   // ---------- Plans ----------
   const plansQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-plans", org?.organization_id],
     queryFn: async (): Promise<Plan[]> => {
-      const { data, error } = await (supabase.from("distribution_plans" as never) as any)
-        .select("*")
-        .eq("organization_id", org!.organization_id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as Plan[];
+      const rows = await fnGetPlans({ data: { organizationId: org!.organization_id } });
+      return rows as unknown as Plan[];
     },
   });
 
@@ -108,96 +120,47 @@ function DistributionsPage() {
   }, [plansQ.data, selectedPlanId]);
 
   const partsQ = useQuery({
-    enabled: !!selectedPlanId,
+    enabled: !!selectedPlanId && !!org?.organization_id,
     queryKey: ["dist-parts", selectedPlanId],
     queryFn: async (): Promise<Participant[]> => {
-      const { data, error } = await (supabase.from("distribution_plan_participants" as never) as any)
-        .select("*")
-        .eq("plan_id", selectedPlanId!)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as unknown as Participant[];
+      const rows = await fnGetParts({
+        data: { organizationId: org!.organization_id, planId: selectedPlanId! },
+      });
+      return rows as unknown as Participant[];
     },
   });
 
   const selectedPlan = plansQ.data?.find((p) => p.id === selectedPlanId) ?? null;
 
   // ---------- Financial data (mirror of Totals tab) ----------
-  const yearStartIso = new Date(year, 0, 1).toISOString();
-  const yearEndIso = new Date(year + 1, 0, 1).toISOString();
-  const yearStartDate = `${year}-01-01`;
-  const yearEndDate = `${year + 1}-01-01`;
-
   const cbcQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-cbc", org?.organization_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select("client_id, service_code, rate_per_unit")
-        .eq("organization_id", org!.organization_id);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () => fnGetCbc({ data: { organizationId: org!.organization_id } }),
   });
 
   const evvQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-evv", org?.organization_id, year],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("evv_timesheets")
-        .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
-        .eq("organization_id", org!.organization_id)
-        .gte("clock_in_timestamp", yearStartIso)
-        .lt("clock_in_timestamp", yearEndIso);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () => fnGetEvv({ data: { organizationId: org!.organization_id, year } }),
   });
 
   const hhsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-hhs", org?.organization_id, year],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hhs_daily_records_v")
-        .select("client_id, record_date, billable, service_code")
-        .eq("organization_id", org!.organization_id)
-        .eq("service_code", "HHS")
-        .gte("record_date", yearStartDate)
-        .lt("record_date", yearEndDate);
-      if (error) throw error;
-      return (data ?? []).filter((r: any) => r.billable);
-    },
+    queryFn: async () => fnGetHhs({ data: { organizationId: org!.organization_id, year } }),
   });
 
   const ctrQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-ctr", org?.organization_id, year],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contractor_monthly_pay" as never)
-        .select("staff_id, year, month, net_pay, additional_pay, tax_federal, tax_state, tax_fica")
-        .eq("organization_id", org!.organization_id)
-        .eq("year", year);
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
+    queryFn: async () => fnGetCtr({ data: { organizationId: org!.organization_id, year } }),
   });
 
   const ledgerQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["dist-ledger", org?.organization_id, year],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("provider_ledger_entries")
-        .select("period_year, period_month, category, label, amount")
-        .eq("organization_id", org!.organization_id)
-        .eq("period_year", year);
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
+    queryFn: async () => fnGetLedger({ data: { organizationId: org!.organization_id, year } }),
   });
 
   // Rate map

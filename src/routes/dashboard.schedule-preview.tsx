@@ -831,7 +831,7 @@ function ViewSeg({ value, onChange, disabled }: { value: ViewMode; onChange: (v:
 function MobileDayBoard({
   day, onSelectDay, sites, visibleSites, showHostHomes, onToggleHostHomes,
   siteId, onPickSite, siteShifts, siteClients, allShifts, staff, clients,
-  isLoading, conflictShiftIds, hostHomeNames, reqsBySiteName, noteDays, overnightDays,
+  isLoading, conflictShiftIds, hostHomeNames, reqsBySiteName, computedReqByDayBySiteName, twoToOneBySiteName, noteDays, overnightDays,
   weekStart, weekEndIso, organizationId, onOpenEditor, onOpenTimeline, onOpenSettings,
 }: {
   day: Date;

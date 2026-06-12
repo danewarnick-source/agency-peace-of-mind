@@ -190,7 +190,7 @@ function sumEvvBilled(
   let billed = 0;
   for (const t of rows) {
     if (HHS_CODES.has(t.service_type_code)) continue;
-    const units = computeEntryUnits(t.clock_in_timestamp, t.clock_out_timestamp);
+    const units = computeBillableEntryUnits(t);
     billed += units * (rates[`${t.client_id}|${t.service_type_code}`] ?? 0);
   }
   return billed;

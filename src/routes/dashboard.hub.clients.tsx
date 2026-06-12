@@ -26,9 +26,9 @@ export const Route = createFileRoute("/dashboard/hub/clients")({
           key: "referrals",
           label: "Referrals",
           render: () => (
-            <RequireRole roles={["admin", "manager", "super_admin"]}>
+            <RequirePermission perm="view_referrals">
               <ReferralsPage />
-            </RequireRole>
+            </RequirePermission>
           ),
         },
         {

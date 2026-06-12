@@ -161,10 +161,12 @@ function CategoryLane({
   category,
   referrals,
   clients,
+  organizationId,
 }: {
   category: WhiteboardCategory;
   referrals: WhiteboardReferral[];
   clients: WhiteboardClient[];
+  organizationId: string;
 }) {
   const meta = CATEGORY_META[category];
   const sortedRefs = useMemo(

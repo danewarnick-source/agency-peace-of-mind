@@ -8309,6 +8309,69 @@ export type Database = {
           },
         ]
       }
+      referral_match_scores: {
+        Row: {
+          best_host_ids: string[]
+          code_overlap: number
+          computed_at: string
+          disability_fit: number
+          host_fit: number
+          id: string
+          location_fit: number
+          need_fit: number
+          organization_id: string
+          overall_score: number
+          reasons: Json
+          referral_id: string
+          weights: Json
+        }
+        Insert: {
+          best_host_ids?: string[]
+          code_overlap: number
+          computed_at?: string
+          disability_fit: number
+          host_fit: number
+          id?: string
+          location_fit: number
+          need_fit: number
+          organization_id: string
+          overall_score: number
+          reasons?: Json
+          referral_id: string
+          weights?: Json
+        }
+        Update: {
+          best_host_ids?: string[]
+          code_overlap?: number
+          computed_at?: string
+          disability_fit?: number
+          host_fit?: number
+          id?: string
+          location_fit?: number
+          need_fit?: number
+          organization_id?: string
+          overall_score?: number
+          reasons?: Json
+          referral_id?: string
+          weights?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_match_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_match_scores_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: true
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referrals: {
         Row: {
           age: number | null

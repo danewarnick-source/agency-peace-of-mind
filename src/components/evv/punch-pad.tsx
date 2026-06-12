@@ -760,7 +760,7 @@ export function PunchPad({
     : 0;
   const isLongShift = liveDurationMs > 16 * 60 * 60 * 1000;
   const longShiftOk = !isLongShift || longShiftAck;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && !busy;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && !busy;
 
 
   function openCompliance() {

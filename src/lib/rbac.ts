@@ -44,6 +44,7 @@ export const ALL_PERMISSIONS = [
   "view_financial_employees",
   "view_referrals",
   "manage_referrals",
+  "send_emails",
 ] as const;
 
 
@@ -76,6 +77,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   view_financial_employees: "View Financial — Employees",
   view_referrals: "View referrals (CRM)",
   manage_referrals: "Manage referrals (CRM)",
+  send_emails: "Send emails (Resend rail)",
 };
 
 
@@ -94,7 +96,9 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
     "view_financial_employees",
     "view_referrals",
     "manage_referrals",
+    "send_emails",
   ],
+
 
   manager: [
     "invite_users", "assign_training", "view_team_reports", "approve_external_certs",

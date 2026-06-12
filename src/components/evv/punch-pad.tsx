@@ -1109,6 +1109,9 @@ export function PunchPad({
       update.nectar_drafted_confirmed_by = user.id;
     }
     if (args.outsideReason) update.outside_geofence_reason = args.outsideReason;
+    if (incidentFlag || incidentReportIds.length > 0) {
+      update.incident_flag = true;
+    }
     if (args.aiStatus) {
       update.ai_compliance_status    = args.aiStatus;
       update.ai_compliance_feedback  = args.aiFeedback ?? null;

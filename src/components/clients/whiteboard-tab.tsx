@@ -161,10 +161,12 @@ function CategoryLane({
   category,
   referrals,
   clients,
+  organizationId,
 }: {
   category: WhiteboardCategory;
   referrals: WhiteboardReferral[];
   clients: WhiteboardClient[];
+  organizationId: string;
 }) {
   const meta = CATEGORY_META[category];
   const sortedRefs = useMemo(
@@ -219,7 +221,7 @@ function CategoryLane({
         ) : (
           <div className="space-y-1.5">
             {clients.map((c) => (
-              <ClientRow key={c.id} c={c} />
+              <ClientRow key={c.id} c={c} organizationId={organizationId} />
             ))}
           </div>
         )}
@@ -408,16 +410,19 @@ export function ClientWhiteboardTab() {
               category="direct_support"
               referrals={byCategory.direct_support.refs}
               clients={byCategory.direct_support.clients}
+              organizationId={organizationId!}
             />
             <CategoryLane
               category="rhs"
               referrals={byCategory.rhs.refs}
               clients={byCategory.rhs.clients}
+              organizationId={organizationId!}
             />
             <CategoryLane
               category="hhs"
               referrals={byCategory.hhs.refs}
               clients={byCategory.hhs.clients}
+              organizationId={organizationId!}
             />
           </div>
 

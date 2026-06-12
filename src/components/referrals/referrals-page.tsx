@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Plus, UserPlus } from "lucide-react";
+import { AlertTriangle, Plus, UserPlus, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
 import {
   createReferral,
   createSupportCoordinator,
@@ -35,6 +35,11 @@ import {
   type ReferralStage,
 } from "@/lib/referrals.functions";
 import {
+  archiveReferral,
+  restoreReferral,
+  listArchivedReferrals,
+} from "@/lib/retention.functions";
+import {
   PipelineStatsBar,
   ReferralDetailDialog,
   ReferralStageBadge,
@@ -42,6 +47,7 @@ import {
 } from "./referral-pipeline";
 import { ProviderInterestOutlineButton } from "./provider-interest-outline";
 import { MatchScorePanel } from "./match-score-panel";
+
 
 type Category = "direct_support" | "rhs" | "hhs";
 const CATEGORIES: { key: Category; label: string }[] = [
@@ -66,6 +72,8 @@ export function ReferralsPage() {
   const statsFn = useServerFn(getReferralPipelineStats);
 
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [view, setView] = useState<"active" | "archived">("active");
+
 
   const referrals = useQuery({
     enabled: !!orgId,
@@ -115,13 +123,34 @@ export function ReferralsPage() {
         </div>
         {orgId && (
           <div className="flex flex-wrap gap-2">
+            <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setView("active")}
+                className={`rounded px-3 py-1 ${view === "active" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("archived")}
+                className={`rounded px-3 py-1 ${view === "archived" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Archived
+              </button>
+            </div>
             <ProviderInterestOutlineButton organizationId={orgId} />
             <NewReferralDialog organizationId={orgId} />
           </div>
         )}
       </div>
 
+      {view === "archived" && orgId ? (
+        <ArchivedReferralsList organizationId={orgId} />
+      ) : (
+        <>
       <PipelineStatsBar stats={stats.data} />
+
 
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -211,13 +240,16 @@ export function ReferralsPage() {
                               referralId={r.id}
                               currentStage={(r.stage ?? "new") as ReferralStage}
                             />
-                            <button
-                              type="button"
-                              className="text-[11px] text-muted-foreground hover:text-foreground"
-                              onClick={() => setDetailId(r.id)}
-                            >
-                              Activity →
-                            </button>
+                            <div className="flex items-center gap-3">
+                              <ArchiveReferralButton organizationId={orgId} referralId={r.id} />
+                              <button
+                                type="button"
+                                className="text-[11px] text-muted-foreground hover:text-foreground"
+                                onClick={() => setDetailId(r.id)}
+                              >
+                                Activity →
+                              </button>
+                            </div>
                           </div>
                         )}
                         {r.stage === "decision" && r.decision_outcome && (
@@ -246,6 +278,10 @@ export function ReferralsPage() {
           );
         })}
       </div>
+        </>
+      )}
+
+
 
       {orgId && (
         <ReferralDetailDialog
@@ -668,6 +704,150 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
             disabled={!firstName.trim() || create.isPending}
           >
             Create referral
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Archived list ─────────────────────────────────────────────
+
+function ArchivedReferralsList({ organizationId }: { organizationId: string }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listArchivedReferrals);
+  const restoreFn = useServerFn(restoreReferral);
+
+  const q = useQuery({
+    queryKey: ["referrals-archived", organizationId],
+    queryFn: () => listFn({ data: { organization_id: organizationId } }),
+  });
+
+  const restore = useMutation({
+    mutationFn: (id: string) =>
+      restoreFn({ data: { organization_id: organizationId, referral_id: id } }),
+    onSuccess: () => {
+      toast.success("Referral restored");
+      qc.invalidateQueries({ queryKey: ["referrals-archived", organizationId] });
+      qc.invalidateQueries({ queryKey: ["referrals", organizationId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (q.isLoading) {
+    return <p className="py-6 text-sm text-muted-foreground">Loading archived…</p>;
+  }
+  const rows = q.data ?? [];
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+        No archived referrals.
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-2">
+      {rows.map((r) => {
+        const pAfter = r.purge_after ? new Date(r.purge_after) : null;
+        const aged = pAfter ? pAfter.getTime() < Date.now() : false;
+        return (
+          <li
+            key={r.id}
+            className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm opacity-90"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="truncate font-medium">{r.first_name}</span>
+                <Badge variant="outline" className="text-[10px]">{r.category}</Badge>
+                {aged ? (
+                  <Badge variant="destructive" className="text-[10px]">Past grace — eligible to purge</Badge>
+                ) : pAfter ? (
+                  <Badge variant="secondary" className="text-[10px]">
+                    Purges {pAfter.toLocaleDateString()}
+                  </Badge>
+                ) : null}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Archived {r.archived_at ? new Date(r.archived_at).toLocaleString() : "—"}
+                {r.archive_reason ? ` · ${r.archive_reason}` : ""}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={aged || restore.isPending}
+              onClick={() => restore.mutate(r.id)}
+            >
+              <RotateCcw className="mr-1 h-3 w-3" /> Restore
+            </Button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function ArchiveReferralButton({
+  organizationId,
+  referralId,
+}: {
+  organizationId: string;
+  referralId: string;
+}) {
+  const qc = useQueryClient();
+  const archiveFn = useServerFn(archiveReferral);
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const m = useMutation({
+    mutationFn: () =>
+      archiveFn({
+        data: {
+          organization_id: organizationId,
+          referral_id: referralId,
+          reason: reason.trim() || null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Referral archived");
+      qc.invalidateQueries({ queryKey: ["referrals", organizationId] });
+      qc.invalidateQueries({ queryKey: ["referrals-archived", organizationId] });
+      setOpen(false);
+      setReason("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="text-[11px] text-muted-foreground hover:text-destructive"
+        >
+          <ArchiveIcon className="mr-1 inline h-3 w-3" />
+          Archive
+        </button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Archive referral</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Archive is soft — recoverable until the purge grace period elapses.
+          A log entry is written to the activity timeline.
+        </p>
+        <div className="grid gap-2">
+          <Label htmlFor="archive-reason">Reason (optional)</Label>
+          <Textarea
+            id="archive-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. SC withdrew, placed elsewhere…"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={() => m.mutate()} disabled={m.isPending}>
+            Archive
           </Button>
         </DialogFooter>
       </DialogContent>

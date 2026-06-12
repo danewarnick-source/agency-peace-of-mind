@@ -2939,6 +2939,115 @@ export type Database = {
           },
         ]
       }
+      distribution_plan_participants: {
+        Row: {
+          allocation_pct: number
+          created_at: string
+          id: string
+          notes: string | null
+          participant_name: string
+          participant_user_id: string | null
+          plan_id: string
+          role_label: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          allocation_pct?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          participant_name: string
+          participant_user_id?: string | null
+          plan_id: string
+          role_label?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          allocation_pct?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          participant_name?: string
+          participant_user_id?: string | null
+          plan_id?: string
+          role_label?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distribution_plan_participants_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distribution_plans: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          expense_selection: Json
+          formula_json: Json | null
+          id: string
+          is_active: boolean
+          name: string
+          nectar_summary: string | null
+          organization_id: string
+          plan_type: string
+          retention_pct: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          expense_selection?: Json
+          formula_json?: Json | null
+          id?: string
+          is_active?: boolean
+          name: string
+          nectar_summary?: string | null
+          organization_id: string
+          plan_type: string
+          retention_pct?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          expense_selection?: Json
+          formula_json?: Json | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          nectar_summary?: string | null
+          organization_id?: string
+          plan_type?: string
+          retention_pct?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distribution_plans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       els_usage_ledger: {
         Row: {
           client_id: string

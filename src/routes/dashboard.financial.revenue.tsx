@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/select";
 import { fmtUSD } from "@/lib/billing-units";
 import {
+  ChevronDown,
+  ChevronRight,
   Info,
   Lock,
   Pencil,
@@ -42,8 +44,10 @@ import {
   UserPen,
 } from "lucide-react";
 import { YourInputsSection } from "@/components/financial/your-inputs-section";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
 import { toast } from "sonner";
+import { getRevenueClientPills } from "@/lib/financial-detail.functions";
+import { BillingDetailDialog } from "@/components/financial/billing-detail-dialog";
 
 export const Route = createFileRoute("/dashboard/financial/revenue")({
   head: () => ({ meta: [{ title: "Revenue — Financial — HIVE" }] }),
@@ -60,6 +64,7 @@ const MONTH_LABELS = [
 function RevenuePage() {
   const { data: org } = useCurrentOrg();
   const organizationId = org?.organization_id;
+  const providerName = useOrgDisplayName().displayName;
   const nowYear = new Date().getFullYear();
   const nowMonth = new Date().getMonth() + 1;
   const [year, setYear] = useState<number>(nowYear);
@@ -96,6 +101,7 @@ function RevenuePage() {
       return months.map((m) => ({
         label: `${MONTH_LABELS[m.month - 1]} ${year}`,
         billed: m.billed,
+        month: m.month,
       }));
     }
     if (granularity === "quarterly") {
@@ -104,6 +110,7 @@ function RevenuePage() {
         return {
           label: `Q${qi + 1} ${year}`,
           billed: slice.reduce((s, x) => s + x.billed, 0),
+          month: null as number | null,
         };
       });
     }
@@ -111,6 +118,7 @@ function RevenuePage() {
       {
         label: `YTD ${year}`,
         billed: months.reduce((s, x) => s + x.billed, 0),
+        month: null as number | null,
       },
     ];
   }, [months, granularity, year]);
@@ -224,24 +232,17 @@ function RevenuePage() {
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.label} className="border-b border-border/60">
-                      <td className="px-3 py-2 font-medium">{r.label}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {fmtUSD(r.billed)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {receivedAvailable ? (
-                          <span className="tabular-nums text-muted-foreground">—</span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                            Pending — not yet imported
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        —
-                      </td>
-                    </tr>
+                    <RevenueRow
+                      key={r.label}
+                      label={r.label}
+                      billed={r.billed}
+                      month={r.month}
+                      year={year}
+                      organizationId={organizationId}
+                      providerName={providerName}
+                      receivedAvailable={receivedAvailable}
+                      canExpand={!isManualMode && r.month != null && !!organizationId}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -701,5 +702,114 @@ function BilledMonthDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── Expandable monthly row with per-client pills + detail dialog ────────
+
+function RevenueRow({
+  label,
+  billed,
+  month,
+  year,
+  organizationId,
+  providerName,
+  receivedAvailable,
+  canExpand,
+}: {
+  label: string;
+  billed: number;
+  month: number | null;
+  year: number;
+  organizationId: string | undefined;
+  providerName: string;
+  receivedAvailable: boolean;
+  canExpand: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activePill, setActivePill] = useState<{ clientId: string; name: string } | null>(null);
+  const fetchPills = useServerFn(getRevenueClientPills);
+  const pillsQ = useQuery({
+    enabled: open && canExpand && !!organizationId && month != null,
+    queryKey: ["fin-revenue-pills", organizationId, year, month],
+    queryFn: () =>
+      fetchPills({
+        data: { organizationId: organizationId!, year, month: month! },
+      }),
+  });
+
+  return (
+    <>
+      <tr className="border-b border-border/60">
+        <td className="px-3 py-2 font-medium">
+          {canExpand ? (
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              className="inline-flex items-center gap-1 hover:underline"
+            >
+              {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              {label}
+            </button>
+          ) : (
+            label
+          )}
+        </td>
+        <td className="px-3 py-2 text-right tabular-nums">{fmtUSD(billed)}</td>
+        <td className="px-3 py-2 text-right">
+          {receivedAvailable ? (
+            <span className="tabular-nums text-muted-foreground">—</span>
+          ) : (
+            <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+              Pending — not yet imported
+            </span>
+          )}
+        </td>
+        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">—</td>
+      </tr>
+      {open && canExpand && (
+        <tr className="border-b border-border/60 bg-muted/20">
+          <td colSpan={4} className="px-3 py-3">
+            {pillsQ.isLoading ? (
+              <p className="text-xs text-muted-foreground">Loading clients…</p>
+            ) : pillsQ.isError ? (
+              <p className="text-xs text-destructive">
+                {(pillsQ.error as Error)?.message || "Failed to load client breakdown."}
+              </p>
+            ) : (pillsQ.data?.pills.length ?? 0) === 0 ? (
+              <p className="text-xs text-muted-foreground">No client billing this month.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {pillsQ.data!.pills.map((p) => (
+                  <button
+                    key={p.clientId}
+                    type="button"
+                    onClick={() => setActivePill({ clientId: p.clientId, name: p.name })}
+                    className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs hover:bg-muted/60"
+                  >
+                    <span className="font-medium">{p.name}</span>
+                    <span className="font-mono tabular-nums text-muted-foreground">{fmtUSD(p.billed)}</span>
+                    <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{p.codeCount} code{p.codeCount === 1 ? "" : "s"}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+      {activePill && organizationId && month != null && (
+        <BillingDetailDialog
+          variant="revenue-client"
+          open={!!activePill}
+          onOpenChange={(o) => !o && setActivePill(null)}
+          organizationId={organizationId}
+          year={year}
+          month={month}
+          providerName={providerName}
+          clientId={activePill.clientId}
+          clientName={activePill.name}
+        />
+      )}
+    </>
   );
 }

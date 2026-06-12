@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
 import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { fmtHours, fmtUSD, fmtUnits, unitsToHours, computeEntryUnits, UNITS_PER_HOUR } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, Users2, GraduationCap, Info, Briefcase } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { BillingDetailDialog } from "@/components/financial/billing-detail-dialog";
 
 export const Route = createFileRoute("/dashboard/financial/monthly-grid")({
   head: () => ({ meta: [{ title: "Monthly Grid — HIVE" }] }),
@@ -37,6 +38,7 @@ type GridRow = {
 
 function MonthlyGridPage() {
   const { data: org } = useCurrentOrg();
+  const providerName = useOrgDisplayName().displayName;
   const today = new Date();
   const [month, setMonth] = useState({ y: today.getFullYear(), m: today.getMonth() });
 
@@ -419,18 +421,30 @@ function MonthlyGridPage() {
           subtitle="Hourly + per-visit codes (SLN, SLH, DSI, SEI, CHA, COM, etc.)"
           rows={directRows}
           asOf={asOf}
+          organizationId={org?.organization_id}
+          year={month.y}
+          month={month.m + 1}
+          providerName={providerName}
         />
         <GridSection
           title="RHS"
           subtitle="Residential daily-rate code (RHS)"
           rows={rhsRows}
           asOf={asOf}
+          organizationId={org?.organization_id}
+          year={month.y}
+          month={month.m + 1}
+          providerName={providerName}
         />
         <GridSection
           title="Host Home"
           subtitle="Daily-rate host-home codes (HHS, PPS)"
           rows={hostRows}
           asOf={asOf}
+          organizationId={org?.organization_id}
+          year={month.y}
+          month={month.m + 1}
+          providerName={providerName}
         />
 
         <section className="rounded-2xl border border-dashed border-border bg-card p-4 shadow-sm">
@@ -490,15 +504,21 @@ function MonthlyGridPage() {
 }
 
 function GridSection({
-  title, subtitle, rows, asOf,
+  title, subtitle, rows, asOf, organizationId, year, month, providerName,
 }: {
   title: string;
   subtitle: string;
   rows: GridRow[];
   asOf: string;
+  organizationId: string | undefined;
+  year: number;
+  month: number;
+  providerName: string;
 }) {
   const cellBase = "px-3 py-2 border-r border-border/30 last:border-r-0";
+  const [active, setActive] = useState<{ clientId: string; clientName: string; code: string } | null>(null);
   return (
+    <>
     <section className="rounded-2xl border border-border bg-card shadow-sm">
       <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
         <div>
@@ -531,7 +551,16 @@ function GridSection({
               const toBill = u * r.rate;
               const overMax = r.monthly_max != null && u > r.monthly_max;
               return (
-                <tr key={`${r.client.id}::${r.code.service_code}`} className="border-t border-border hover:bg-muted/30">
+                <tr
+                  key={`${r.client.id}::${r.code.service_code}`}
+                  className="cursor-pointer border-t border-border hover:bg-muted/30"
+                  onClick={() => setActive({
+                    clientId: r.client.id,
+                    clientName: `${r.client.last_name}, ${r.client.first_name}`,
+                    code: r.code.service_code,
+                  })}
+                  title="View shift detail"
+                >
                   <td className={`${cellBase} font-medium`}>{r.client.last_name}, {r.client.first_name}</td>
                   <td className={`${cellBase} font-mono font-semibold`}>
                     {r.code.service_code}
@@ -590,6 +619,21 @@ function GridSection({
         </table>
       </div>
     </section>
+    {active && organizationId && (
+      <BillingDetailDialog
+        variant="grid-row"
+        open={!!active}
+        onOpenChange={(o) => !o && setActive(null)}
+        organizationId={organizationId}
+        year={year}
+        month={month}
+        providerName={providerName}
+        clientId={active.clientId}
+        clientName={active.clientName}
+        serviceCode={active.code}
+      />
+    )}
+    </>
   );
 }
 

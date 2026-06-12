@@ -240,7 +240,18 @@ export function ReferralsPage() {
                               referralId={r.id}
                               currentStage={(r.stage ?? "new") as ReferralStage}
                             />
-                            <button
+                            <div className="flex items-center gap-3">
+                              <ArchiveReferralButton organizationId={orgId} referralId={r.id} />
+                              <button
+                                type="button"
+                                className="text-[11px] text-muted-foreground hover:text-foreground"
+                                onClick={() => setDetailId(r.id)}
+                              >
+                                Activity →
+                              </button>
+                            </div>
+                          </div>
+                        )}
                               type="button"
                               className="text-[11px] text-muted-foreground hover:text-foreground"
                               onClick={() => setDetailId(r.id)}

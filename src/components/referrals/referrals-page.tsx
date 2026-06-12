@@ -282,7 +282,14 @@ export function ReferralsPage() {
                                   referralId={r.id}
                                 />
                               )}
-                              <ArchiveReferralButton organizationId={orgId} referralId={r.id} />
+                              {r.source === "email" ? (
+                                <ArchiveAutoIngestedButton
+                                  organizationId={orgId}
+                                  referralId={r.id}
+                                />
+                              ) : (
+                                <ArchiveReferralButton organizationId={orgId} referralId={r.id} />
+                              )}
                               <button
                                 type="button"
                                 className="text-[11px] text-muted-foreground hover:text-foreground"

@@ -204,6 +204,8 @@ export function AuditPage() {
 function NewPacketDialog({ orgId, onClose }: { orgId: string; onClose: (newId?: string) => void }) {
   const qc = useQueryClient();
   const produce = useServerFn(parseAndProduceAuditPacket);
+  const { displayName, legalName } = useOrgDisplayName();
+  const placeholderName = displayName || legalName || "Provider name";
   const [providerName, setProviderName] = useState("");
   const [fiscalYear, setFiscalYear] = useState(`FY${String(new Date().getFullYear() % 100).padStart(2, "0")}`);
   const [letterText, setLetterText] = useState("");

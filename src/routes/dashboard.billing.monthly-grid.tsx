@@ -7,7 +7,7 @@ import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { fmtHours, fmtUSD, fmtUnits, unitsToHours, computeEntryUnits, UNITS_PER_HOUR } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ChevronDown, Users2, GraduationCap, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Users2, GraduationCap, Info, Briefcase } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/dashboard/billing/monthly-grid")({
@@ -122,6 +122,82 @@ function MonthlyGridPage() {
     }
     return map;
   }, [profilesQ.data]);
+
+  // ── General shifts (non-billable admin / training / etc.) ──
+  const generalShiftsQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["mg-general-shifts", org?.organization_id, month.y, month.m],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("general_shifts")
+        .select("user_id, category, clock_in_timestamp, clock_out_timestamp")
+        .eq("organization_id", org!.organization_id)
+        .not("clock_out_timestamp", "is", null)
+        .gte("clock_in_timestamp", monthStartIso)
+        .lt("clock_in_timestamp", monthEndIso);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        user_id: string; category: string;
+        clock_in_timestamp: string; clock_out_timestamp: string;
+      }>;
+    },
+  });
+
+  const genShiftUserIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of generalShiftsQ.data ?? []) s.add(r.user_id);
+    return [...s];
+  }, [generalShiftsQ.data]);
+
+  const genShiftProfilesQ = useQuery({
+    enabled: genShiftUserIds.length > 0,
+    queryKey: ["mg-gen-profiles", genShiftUserIds.sort().join(",")],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, first_name, last_name, full_name" as any)
+        .in("id", genShiftUserIds);
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{
+        id: string; first_name: string | null; last_name: string | null; full_name: string | null;
+      }>;
+    },
+  });
+
+  const generalShiftHours = useMemo(() => {
+    const profMap = new Map<string, string>();
+    for (const p of genShiftProfilesQ.data ?? []) {
+      const n =
+        (p.first_name || p.last_name)
+          ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
+          : (p.full_name ?? p.id.slice(0, 8));
+      profMap.set(p.id, n);
+    }
+    const byStaff = new Map<string, { name: string; byCat: Map<string, number>; total: number }>();
+    for (const r of generalShiftsQ.data ?? []) {
+      const h = Math.max(
+        0,
+        (new Date(r.clock_out_timestamp).getTime() - new Date(r.clock_in_timestamp).getTime()) / 3_600_000,
+      );
+      const s = byStaff.get(r.user_id) ?? {
+        name: profMap.get(r.user_id) ?? r.user_id.slice(0, 8),
+        byCat: new Map(),
+        total: 0,
+      };
+      s.byCat.set(r.category, (s.byCat.get(r.category) ?? 0) + h);
+      s.total += h;
+      byStaff.set(r.user_id, s);
+    }
+    return [...byStaff.entries()]
+      .map(([userId, s]) => ({
+        userId,
+        name: s.name,
+        categories: [...s.byCat.entries()].sort((a, b) => b[1] - a[1]),
+        total: s.total,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [generalShiftsQ.data, genShiftProfilesQ.data]);
 
   // Rate history for as-of resolution.
   const historyQ = useQuery({
@@ -316,15 +392,55 @@ function MonthlyGridPage() {
           />
 
           <section className="rounded-2xl border border-dashed border-border bg-card p-4 shadow-sm">
-            <header className="mb-2 flex items-center gap-2">
-              <GraduationCap className="h-4 w-4 text-muted-foreground" />
+            <header className="mb-3 flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-muted-foreground" />
               <h3 className="font-display text-base font-semibold">Admin / Training hours</h3>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Placeholder</span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                Non-billable
+              </span>
             </header>
-            <p className="text-xs text-muted-foreground">
-              Non-billable hours from <code>general_shifts</code> (admin + training + meetings) will roll up here for payroll
-              reconciliation. Wired in a later step — not part of "To Bill" totals.
+            <p className="mb-3 text-xs text-muted-foreground">
+              Employer time from <code>general_shifts</code> (admin, training, meetings, travel). These hours are <strong>never</strong> added to billing totals.
             </p>
+            {generalShiftHours.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No admin / training time logged this month.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/40 text-left uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-2 py-1.5">Staff</th>
+                      <th className="px-2 py-1.5 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {generalShiftHours.map((s) => (
+                      <tr key={s.userId} className="border-t border-border">
+                        <td className="px-2 py-1.5 font-medium">
+                          {s.name}
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {s.categories.map(([cat, h]) => (
+                              <span key={cat} className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                {cat} · {fmtHours(h)}h
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{fmtHours(s.total)}h</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-muted/40">
+                    <tr>
+                      <td className="px-2 py-1.5 font-semibold uppercase text-muted-foreground">Section total</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums font-bold">
+                        {fmtHours(generalShiftHours.reduce((sum, s) => sum + s.total, 0))}h
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </section>
         </div>
 

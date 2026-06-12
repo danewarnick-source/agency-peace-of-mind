@@ -8468,6 +8468,7 @@ export type Database = {
           overall_score: number
           reasons: Json
           referral_id: string
+          scored_components: string[]
           weights: Json
         }
         Insert: {
@@ -8483,6 +8484,7 @@ export type Database = {
           overall_score: number
           reasons?: Json
           referral_id: string
+          scored_components?: string[]
           weights?: Json
         }
         Update: {
@@ -8498,6 +8500,7 @@ export type Database = {
           overall_score?: number
           reasons?: Json
           referral_id?: string
+          scored_components?: string[]
           weights?: Json
         }
         Relationships: [

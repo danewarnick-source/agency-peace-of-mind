@@ -175,10 +175,8 @@ export function CoverageBar24h({ day, shifts, requirements = [], computedRequire
           )}
           {tooltipNote && (
             <div className="mt-0.5 text-[10px] font-medium text-amber-700">{tooltipNote}</div>
-          )}
-
-          )}
         </>
+
       )}
     </div>
   );

@@ -755,14 +755,38 @@ function ComplianceDeskPage() {
           approving={approve.isPending}
         />
       ) : sub === "pending" ? (
-        <PendingTable
-          rows={pendingQ.data ?? []}
-          loading={pendingQ.isLoading}
-          onMap={setMapOpen}
-          onEdit={setEditRow}
-          onApprove={(id) => approve.mutate(id)}
-          approving={approve.isPending}
-          onReason={setReasonRow}
+        <div className="space-y-4">
+          <PendingTable
+            title="Pending EVV Shifts"
+            description="EVV-locked codes (SOW §1.12 — geofence + UEVV transmission)."
+            rows={(pendingQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
+            loading={pendingQ.isLoading}
+            onMap={setMapOpen}
+            onEdit={setEditRow}
+            onApprove={(id) => approve.mutate(id)}
+            approving={approve.isPending}
+            onReason={setReasonRow}
+          />
+          <PendingTable
+            title="Internal (non-EVV) pending"
+            description="Time-capture only — payroll / service evidence, not transmitted to UEVV."
+            rows={(pendingQ.data ?? []).filter((r) => !isEvvLockedCode(r.service_type_code))}
+            loading={pendingQ.isLoading}
+            onMap={setMapOpen}
+            onEdit={setEditRow}
+            onApprove={(id) => approve.mutate(id)}
+            approving={approve.isPending}
+            onReason={setReasonRow}
+          />
+        </div>
+      ) : sub === "needs-review" ? (
+        <NeedsReviewTable
+          rows={needsReviewQ.data ?? []}
+          loading={needsReviewQ.isLoading}
+          onApprove={(id) => reviewApprove.mutate({ id })}
+          onReject={(id, note) => reviewReject.mutate({ id, note })}
+          approving={reviewApprove.isPending}
+          rejecting={reviewReject.isPending}
         />
       ) : sub === "reconcile" ? (
         <ReconcileTable

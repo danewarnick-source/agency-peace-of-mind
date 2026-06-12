@@ -123,6 +123,82 @@ function MonthlyGridPage() {
     return map;
   }, [profilesQ.data]);
 
+  // ── General shifts (non-billable admin / training / etc.) ──
+  const generalShiftsQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["mg-general-shifts", org?.organization_id, month.y, month.m],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("general_shifts")
+        .select("user_id, category, clock_in_timestamp, clock_out_timestamp")
+        .eq("organization_id", org!.organization_id)
+        .not("clock_out_timestamp", "is", null)
+        .gte("clock_in_timestamp", monthStartIso)
+        .lt("clock_in_timestamp", monthEndIso);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        user_id: string; category: string;
+        clock_in_timestamp: string; clock_out_timestamp: string;
+      }>;
+    },
+  });
+
+  const genShiftUserIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of generalShiftsQ.data ?? []) s.add(r.user_id);
+    return [...s];
+  }, [generalShiftsQ.data]);
+
+  const genShiftProfilesQ = useQuery({
+    enabled: genShiftUserIds.length > 0,
+    queryKey: ["mg-gen-profiles", genShiftUserIds.sort().join(",")],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, first_name, last_name, full_name" as any)
+        .in("id", genShiftUserIds);
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{
+        id: string; first_name: string | null; last_name: string | null; full_name: string | null;
+      }>;
+    },
+  });
+
+  const generalShiftHours = useMemo(() => {
+    const profMap = new Map<string, string>();
+    for (const p of genShiftProfilesQ.data ?? []) {
+      const n =
+        (p.first_name || p.last_name)
+          ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
+          : (p.full_name ?? p.id.slice(0, 8));
+      profMap.set(p.id, n);
+    }
+    const byStaff = new Map<string, { name: string; byCat: Map<string, number>; total: number }>();
+    for (const r of generalShiftsQ.data ?? []) {
+      const h = Math.max(
+        0,
+        (new Date(r.clock_out_timestamp).getTime() - new Date(r.clock_in_timestamp).getTime()) / 3_600_000,
+      );
+      const s = byStaff.get(r.user_id) ?? {
+        name: profMap.get(r.user_id) ?? r.user_id.slice(0, 8),
+        byCat: new Map(),
+        total: 0,
+      };
+      s.byCat.set(r.category, (s.byCat.get(r.category) ?? 0) + h);
+      s.total += h;
+      byStaff.set(r.user_id, s);
+    }
+    return [...byStaff.entries()]
+      .map(([userId, s]) => ({
+        userId,
+        name: s.name,
+        categories: [...s.byCat.entries()].sort((a, b) => b[1] - a[1]),
+        total: s.total,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [generalShiftsQ.data, genShiftProfilesQ.data]);
+
   // Rate history for as-of resolution.
   const historyQ = useQuery({
     enabled: !!org?.organization_id,

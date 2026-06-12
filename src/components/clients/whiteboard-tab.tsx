@@ -9,11 +9,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   AlertTriangle,
+  ArrowRight,
   HomeIcon,
   Info,
   Sparkles,
   Users,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 import {
   getWhiteboardSnapshot,

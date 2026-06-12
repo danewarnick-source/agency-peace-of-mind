@@ -572,6 +572,8 @@ function ComplianceDeskPage() {
     },
     onError: (e) => toast.error((e as Error).message),
   });
+
+  const submitAiSearch = () => {
     const q = aiInput.trim();
     if (q.length === 0) {
       toast.error("Type a question first.");

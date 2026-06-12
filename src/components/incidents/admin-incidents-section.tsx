@@ -216,17 +216,23 @@ function CompleteDialog({ incidentId, onClose }: { incidentId: string | null; on
 
 function IncidentCard({
   ir,
+  scRequests,
   actors,
   onInitiate,
   onNotify,
   onComplete,
+  onLogSc,
+  onRespondSc,
   initPending,
 }: {
   ir: Incident;
+  scRequests: ScRequest[];
   actors: Map<string, string>;
   onInitiate: (id: string) => void;
   onNotify: (id: string) => void;
   onComplete: (id: string) => void;
+  onLogSc: (incidentId: string) => void;
+  onRespondSc: (scRequestId: string) => void;
   initPending: boolean;
 }) {
   const discovered = ir.discovered_at ? new Date(ir.discovered_at) : new Date(ir.created_at);
@@ -235,6 +241,8 @@ function IncidentCard({
   const completionDeadline = addBusinessDays(discovered, 5);
   const clientName = ir.clients ? `${ir.clients.first_name} ${ir.clients.last_name}` : "Client";
   const closed = ir.status === "closed";
+  const openSc = scRequests.filter((s) => !s.responded_at);
+  const respondedSc = scRequests.filter((s) => !!s.responded_at);
 
   return (
     <Card className={`overflow-hidden ${ir.is_fatality ? "border-rose-500 border-2" : ""}`}>
@@ -276,7 +284,19 @@ function IncidentCard({
           <CountdownPill deadline={upiDeadline} done={!!ir.upi_initiated_at} totalHours={24} label="UPI initiation 24h" />
           <CountdownPill deadline={guardianDeadline} done={!!ir.guardian_notified_at} totalHours={24} label="Guardian 24h" />
           <CountdownPill deadline={completionDeadline} done={!!ir.upi_completed_at} totalHours={5 * 24} label="UPI completion 5 bus.d" />
-          {closed && <Badge className="bg-slate-600 text-white">Closed</Badge>}
+          {openSc.map((s) => (
+            <CountdownPill
+              key={s.id}
+              deadline={addBusinessDays(new Date(s.requested_at), 5)}
+              done={false}
+              totalHours={5 * 24}
+              label="SC response 5 bus.d"
+            />
+          ))}
+          {closed && openSc.length === 0 && <Badge className="bg-slate-600 text-white">Closed</Badge>}
+          {closed && openSc.length > 0 && (
+            <Badge className="bg-amber-600 text-white">Re-surfaced · open SC request</Badge>
+          )}
         </div>
 
         {(ir.upi_initiated_at || ir.guardian_notified_at || ir.upi_completed_at) && (
@@ -296,29 +316,65 @@ function IncidentCard({
           </div>
         )}
 
-        {!closed && (
-          <div className="flex flex-wrap gap-2">
-            {!ir.upi_initiated_at && (
-              <Button size="sm" disabled={initPending} onClick={() => onInitiate(ir.id)}>
-                <FileCheck2 className="mr-1 h-3.5 w-3.5" />Mark initiated in UPI
-              </Button>
-            )}
-            {!ir.guardian_notified_at && (
-              <Button size="sm" variant="outline" onClick={() => onNotify(ir.id)}>
-                <Phone className="mr-1 h-3.5 w-3.5" />Log guardian notification
-              </Button>
-            )}
-            {!ir.upi_completed_at && (
-              <Button size="sm" variant="outline" onClick={() => onComplete(ir.id)}>
-                <CheckCircle2 className="mr-1 h-3.5 w-3.5" />Mark detailed report completed
-              </Button>
+        {/* SC request trail */}
+        {scRequests.length > 0 && (
+          <div className="space-y-2 rounded-md border border-border bg-card/60 p-2 text-[11px]">
+            <p className="font-semibold text-foreground">Support Coordinator follow-up (§1.27(5))</p>
+            {scRequests.map((s) => (
+              <div key={s.id} className="rounded border border-border/60 bg-background/60 p-2">
+                <div className="text-[10px] text-muted-foreground">
+                  Requested {fmtDate(s.requested_at)}
+                </div>
+                <div className="whitespace-pre-wrap text-foreground">{s.request_summary}</div>
+                {s.responded_at ? (
+                  <div className="mt-1 text-[10px] text-emerald-700 dark:text-emerald-300">
+                    Responded {fmtDate(s.responded_at)}
+                    <ActorNames ids={[s.responded_by]} actors={actors} />
+                    {s.response_summary && (
+                      <div className="mt-0.5 whitespace-pre-wrap text-foreground">↳ {s.response_summary}</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="text-amber-700 dark:text-amber-300">Awaiting SC response.</span>
+                    <Button size="sm" variant="outline" onClick={() => onRespondSc(s.id)}>
+                      Mark responded
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {respondedSc.length > 0 && respondedSc.length === scRequests.length && (
+              <p className="text-[10px] text-muted-foreground">All SC requests responded.</p>
             )}
           </div>
         )}
+
+        <div className="flex flex-wrap gap-2">
+          {!closed && !ir.upi_initiated_at && (
+            <Button size="sm" disabled={initPending} onClick={() => onInitiate(ir.id)}>
+              <FileCheck2 className="mr-1 h-3.5 w-3.5" />Mark initiated in UPI
+            </Button>
+          )}
+          {!closed && !ir.guardian_notified_at && (
+            <Button size="sm" variant="outline" onClick={() => onNotify(ir.id)}>
+              <Phone className="mr-1 h-3.5 w-3.5" />Log guardian notification
+            </Button>
+          )}
+          {!closed && !ir.upi_completed_at && (
+            <Button size="sm" variant="outline" onClick={() => onComplete(ir.id)}>
+              <CheckCircle2 className="mr-1 h-3.5 w-3.5" />Mark detailed report completed
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => onLogSc(ir.id)}>
+            <MessageSquare className="mr-1 h-3.5 w-3.5" />Log SC information request
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
 }
+
 
 export function AdminIncidentsSection({
   initialClientId,

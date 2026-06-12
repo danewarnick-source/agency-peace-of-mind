@@ -316,6 +316,86 @@ function SchedulePreviewPage() {
     return m;
   }, [sites, siteShifts]);
 
+  // Ratio-computed per-day required-staff minutes, keyed by lower-cased site
+  // (team) name to match how reqsBySiteName is keyed downstream.
+  const { computedReqByDayBySiteName, twoToOneBySiteName } = useMemo(() => {
+    const byDay = new Map<string, Map<string, number[]>>();
+    const twoToOne = new Set<string>();
+    const ratiosByClient = new Map<string, { client_id: string; ratio_staff: number; ratio_clients: number }>();
+    const todayIso = new Date().toISOString().slice(0, 10);
+    for (const r of ratiosAllQ.data ?? []) {
+      const start = (r.effective_start as string) ?? "0000-01-01";
+      const end = (r.effective_end as string | null) ?? null;
+      if (start > todayIso) continue;
+      if (end && end < todayIso) continue;
+      ratiosByClient.set(r.client_id as string, {
+        client_id: r.client_id as string,
+        ratio_staff: Number(r.ratio_staff ?? 1),
+        ratio_clients: Number(r.ratio_clients ?? 3),
+      });
+    }
+    for (const s of sites) {
+      const key = s.name.toLowerCase();
+      const residents = (siteClients.get(s.id) ?? []).map((c) => ({ id: c.id }));
+      if (residents.length === 0) continue;
+      const ratios = residents
+        .map((r) => ratiosByClient.get(r.id))
+        .filter((x): x is { client_id: string; ratio_staff: number; ratio_clients: number } => !!x);
+      // 2:1 detection (Utah DSPD SOW §1.33 — requires approved rights modification)
+      for (const r of ratios) if (r.ratio_staff >= 2 && r.ratio_clients === 1) twoToOne.add(key);
+      const shifts = siteShifts.get(s.id) ?? [];
+      const away: Array<{ client_id: string; start_ms: number; end_ms: number }> = [];
+      for (const sh of shifts) {
+        if (!sh.client_id) continue;
+        const code = (sh.service_code ?? sh.job_code ?? "").toUpperCase();
+        const isAway = !!sh.parent_shift_id || code === "DSI" || code === "SEI";
+        if (!isAway) continue;
+        away.push({
+          client_id: sh.client_id,
+          start_ms: new Date(sh.starts_at).getTime(),
+          end_ms: new Date(sh.ends_at).getTime(),
+        });
+      }
+      const perDay = new Map<string, number[]>();
+      for (const d of days) {
+        const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
+        const dayStartMs = dayStart.getTime();
+        const dayEndMs = dayStartMs + 24 * 3600 * 1000;
+        const absentByClient = new Map<string, Uint8Array>();
+        for (const w of away) {
+          const s0 = Math.max(w.start_ms, dayStartMs);
+          const s1 = Math.min(w.end_ms, dayEndMs);
+          if (s1 <= s0) continue;
+          const m0 = Math.floor((s0 - dayStartMs) / 60000);
+          const m1 = Math.ceil((s1 - dayStartMs) / 60000);
+          let arr = absentByClient.get(w.client_id);
+          if (!arr) { arr = new Uint8Array(1440); absentByClient.set(w.client_id, arr); }
+          for (let i = m0; i < m1; i++) arr[i] = 1;
+        }
+        const totals = new Float64Array(1440);
+        for (const r of residents) {
+          const ratio = ratiosByClient.get(r.id);
+          const num = ratio?.ratio_staff ?? 1;
+          const den = ratio?.ratio_clients ?? 3;
+          const contribution = num / den;
+          const absent = absentByClient.get(r.id);
+          if (!absent) {
+            for (let i = 0; i < 1440; i++) totals[i] += contribution;
+          } else {
+            for (let i = 0; i < 1440; i++) if (!absent[i]) totals[i] += contribution;
+          }
+        }
+        const out = new Array<number>(1440);
+        for (let i = 0; i < 1440; i++) out[i] = Math.ceil(totals[i] - 1e-9);
+        const isoKey = (() => { const x = new Date(d); x.setHours(12); return x.toISOString().slice(0, 10); })();
+        perDay.set(isoKey, out);
+      }
+      byDay.set(key, perDay);
+    }
+    return { computedReqByDayBySiteName: byDay, twoToOneBySiteName: twoToOne };
+  }, [sites, siteClients, siteShifts, ratiosAllQ.data, days]);
+
+
   if (orgLoading) return <Shell><div style={{ padding: 24, color: SCHED.muted, fontSize: 13 }}>Loading…</div></Shell>;
   if (!isAdmin) {
     return (

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useCurrentOrg } from "@/hooks/use-org";
+import { useCurrentOrg, useOrgDisplayName } from "@/hooks/use-org";
 import { RequireRole } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,17 +34,19 @@ export const Route = createFileRoute("/dashboard/financial/nectar")({
   ),
 });
 
-const SOURCE_LABEL: Record<NectarFinSource, string> = {
-  revenue: "Revenue",
-  monthly_grid: "Monthly Grid",
-  host_home: "Host Home",
-  rhs: "RHS",
-  contractors: "Contractors",
-  employees: "Employees",
-  totals: "Totals",
-  tns_gross: "TNS Gross",
-  distributions: "Distributions",
-};
+function sourceLabel(s: NectarFinSource, grossLabel: string): string {
+  switch (s) {
+    case "revenue": return "Revenue";
+    case "monthly_grid": return "Monthly Grid";
+    case "host_home": return "Host Home";
+    case "rhs": return "RHS";
+    case "contractors": return "Contractors";
+    case "employees": return "Employees";
+    case "totals": return "Totals";
+    case "tns_gross": return grossLabel;
+    case "distributions": return "Distributions";
+  }
+}
 
 const SUGGESTIONS = [
   "Summarize this year's revenue vs total payroll expenses.",

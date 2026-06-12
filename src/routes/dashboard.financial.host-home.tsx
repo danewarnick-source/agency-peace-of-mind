@@ -39,6 +39,7 @@ type MonthlyInputs = {
 
 function HostHomePage() {
   const { data: org } = useCurrentOrg();
+  const { prefixLabel } = useOrgDisplayName();
   const qc = useQueryClient();
   const today = new Date();
   const [month, setMonth] = useState({ y: today.getFullYear(), m: today.getMonth() });

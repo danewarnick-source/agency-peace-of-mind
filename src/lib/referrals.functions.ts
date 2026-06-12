@@ -82,11 +82,13 @@ const referralBase = {
   budget_note: z.string().trim().max(500).optional().nullable(),
   need_level: z.string().trim().max(80).optional().nullable(),
   description: z.string().trim().max(4000).optional().nullable(),
-  category: referralCategory,
+  notes: z.string().trim().max(8000).optional().nullable(),
+  category: referralCategory.optional().nullable(),
   source: referralSource.default("manual_upload"),
   support_coordinator_id: z.string().uuid().optional().nullable(),
   due_date: z.string().optional().nullable(), // ISO date
 };
+
 
 const createReferralInput = orgOnly.extend(referralBase);
 

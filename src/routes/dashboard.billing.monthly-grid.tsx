@@ -392,15 +392,55 @@ function MonthlyGridPage() {
           />
 
           <section className="rounded-2xl border border-dashed border-border bg-card p-4 shadow-sm">
-            <header className="mb-2 flex items-center gap-2">
-              <GraduationCap className="h-4 w-4 text-muted-foreground" />
+            <header className="mb-3 flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-muted-foreground" />
               <h3 className="font-display text-base font-semibold">Admin / Training hours</h3>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Placeholder</span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                Non-billable
+              </span>
             </header>
-            <p className="text-xs text-muted-foreground">
-              Non-billable hours from <code>general_shifts</code> (admin + training + meetings) will roll up here for payroll
-              reconciliation. Wired in a later step — not part of "To Bill" totals.
+            <p className="mb-3 text-xs text-muted-foreground">
+              Employer time from <code>general_shifts</code> (admin, training, meetings, travel). These hours are <strong>never</strong> added to billing totals.
             </p>
+            {generalShiftHours.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No admin / training time logged this month.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/40 text-left uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-2 py-1.5">Staff</th>
+                      <th className="px-2 py-1.5 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {generalShiftHours.map((s) => (
+                      <tr key={s.userId} className="border-t border-border">
+                        <td className="px-2 py-1.5 font-medium">
+                          {s.name}
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {s.categories.map(([cat, h]) => (
+                              <span key={cat} className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                {cat} · {fmtHours(h)}h
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{fmtHours(s.total)}h</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-muted/40">
+                    <tr>
+                      <td className="px-2 py-1.5 font-semibold uppercase text-muted-foreground">Section total</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums font-bold">
+                        {fmtHours(generalShiftHours.reduce((sum, s) => sum + s.total, 0))}h
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </section>
         </div>
 

@@ -290,16 +290,41 @@ function GrossPage() {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={() => { setStartYear((y) => y - 1); setEndYear((y) => y - 1); }}><ChevronLeft className="h-4 w-4" /></Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={trackingStartYear !== null && startYear <= trackingStartYear}
+                onClick={() => {
+                  const floor = trackingStartYear ?? -Infinity;
+                  if (startYear - 1 < floor) return;
+                  setStartYear((y) => y - 1);
+                  setEndYear((y) => y - 1);
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
               <span className="min-w-[64px] text-center text-sm font-medium">{startYear}</span>
               <Button variant="outline" size="sm" onClick={() => { setStartYear((y) => y + 1); setEndYear((y) => y + 1); }}><ChevronRight className="h-4 w-4" /></Button>
             </div>
             <span className="text-sm text-muted-foreground">to</span>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={() => setEndYear((y) => y - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={endYear <= startYear}
+                onClick={() => setEndYear((y) => Math.max(startYear, y - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
               <span className="min-w-[64px] text-center text-sm font-medium">{endYear}</span>
               <Button variant="outline" size="sm" onClick={() => setEndYear((y) => y + 1)}><ChevronRight className="h-4 w-4" /></Button>
             </div>
+            {trackingStartYear !== null && (
+              <span className="text-xs text-muted-foreground">Tracking began {trackingStartYear}</span>
+            )}
+            {!hasAnyData && !trackQ.isLoading && (
+              <span className="text-xs text-muted-foreground">No financial activity yet</span>
+            )}
           </div>
         </div>
 

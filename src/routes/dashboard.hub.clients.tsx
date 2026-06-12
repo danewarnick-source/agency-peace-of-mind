@@ -9,10 +9,12 @@ import { TeamsPage } from "./dashboard.teams";
 import { PbaLedgerPage } from "./dashboard.pba-ledger";
 import { ClientLoansPage } from "./dashboard.client-loans";
 import { ReferralsPage } from "@/components/referrals/referrals-page";
+import { ClientWhiteboardTab } from "@/components/clients/whiteboard-tab";
 
 const search = z.object({
-  tab: z.enum(["directory", "referrals", "teams", "funds"]).optional(),
+  tab: z.enum(["directory", "whiteboard", "referrals", "teams", "funds"]).optional(),
 });
+
 
 function ClientsHub() {
   const { can } = usePermissions();

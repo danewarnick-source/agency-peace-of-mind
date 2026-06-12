@@ -1249,15 +1249,30 @@ export function PunchPad({
 
     setBusy(true);
     try {
-      if (hardwareDenied) {
-        toast.error("Location access blocked. Open device Settings, enable location for this browser, then try again.");
-        return;
+      const isEvv = isEvvLockedCode(active.service_type_code);
+
+      // Sequence GPS acquisition: never block a non-EVV clock-out on a fix.
+      let pos = livePosRef.current ?? livePos;
+      if (!pos && isEvv) {
+        if (hardwareDenied) {
+          toast.error("Location access blocked. Check that location permission is enabled, then try again.");
+          return;
+        }
+        setAwaitingGps(true);
+        try {
+          const deadline = Date.now() + 15_000;
+          while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 250));
+            if (livePosRef.current) { pos = livePosRef.current; break; }
+          }
+        } finally {
+          setAwaitingGps(false);
+        }
+        if (!pos) {
+          toast.error("Couldn't get a location fix. Check that location permission is enabled, then try again.");
+          return;
+        }
       }
-      if (!livePos) {
-        toast.error("Still acquiring GPS — please wait a moment and try again.");
-        return;
-      }
-      const pos = livePos;
 
       // Symmetric geofence check on clock-out — EVV-locked codes only.
       const refClient = lockedClient ?? (() => {
@@ -1275,7 +1290,8 @@ export function PunchPad({
       const radius = refClient?.geofenceRadiusFeet ?? 1000;
 
       if (
-        isEvvLockedCode(active.service_type_code) &&
+        pos &&
+        isEvv &&
         typeof lat === "number" && typeof lng === "number" &&
         isFinite(lat) && isFinite(lng)
       ) {

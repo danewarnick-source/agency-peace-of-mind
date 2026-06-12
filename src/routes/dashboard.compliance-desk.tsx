@@ -1025,18 +1025,25 @@ function UnifiedSearchResults({
 
 function PendingTable({
   rows, loading, onMap, onEdit, onApprove, approving, onReason,
+  title = "Pending EVV Shifts",
+  description,
 }: {
   rows: Row[]; loading: boolean;
   onMap: (r: Row) => void; onEdit: (r: Row) => void;
   onApprove: (id: string) => void; approving: boolean;
   onReason: (r: Row) => void;
+  title?: string;
+  description?: string;
 }) {
   const exp = useRowExpansion();
   const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Pending EVV Shifts</h2>
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+          {description && <p className="mt-0.5 text-[11px] text-muted-foreground/80">{description}</p>}
+        </div>
         <div className="flex items-center gap-2">
           <ExpandControls exp={exp} ids={allIds} />
           <Badge variant="outline" className="font-mono text-[10px]">{rows.length} pending</Badge>

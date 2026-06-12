@@ -33,10 +33,52 @@ export const Route = createFileRoute("/dashboard/hive-exec/messages")({
   head: () => ({ meta: [{ title: "Message Center — HIVE Executive" }] }),
   component: () => (
     <RequireHiveExecutive>
-      <MessageCenter />
+      <MessageCenterPage />
     </RequireHiveExecutive>
   ),
 });
+
+type Tab = "compose" | "sent";
+
+function MessageCenterPage() {
+  const [tab, setTab] = useState<Tab>("compose");
+  return (
+    <div className="space-y-4">
+      <NectarHeader
+        surface="navy"
+        eyebrow="HIVE Platform Operations"
+        title="Message Center"
+        description="Compose and send announcements or directives, and review what you've sent."
+        right={<NectarBadge size="sm" label="EXEC ONLY" />}
+      />
+      <div className="flex gap-1 rounded-xl border border-border bg-card p-1 shadow-sm w-fit">
+        {([
+          { id: "compose", label: "Compose", icon: Send },
+          { id: "sent", label: "Sent", icon: Inbox },
+        ] as Array<{ id: Tab; label: string; icon: typeof Send }>).map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                active
+                  ? "bg-[#0f1b3d] text-white"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+      {tab === "compose" ? <MessageCenter /> : <SentMessagesView />}
+    </div>
+  );
+}
+
 
 type Scope = "all" | "selected";
 

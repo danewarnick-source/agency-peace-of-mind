@@ -2486,6 +2486,7 @@ export type Database = {
           feature_config: Json | null
           first_name: string
           geofence_radius_feet: number
+          hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
           id: string
@@ -2511,6 +2512,7 @@ export type Database = {
           feature_config?: Json | null
           first_name: string
           geofence_radius_feet?: number
+          hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
@@ -2536,6 +2538,7 @@ export type Database = {
           feature_config?: Json | null
           first_name?: string
           geofence_radius_feet?: number
+          hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
@@ -5221,6 +5224,47 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      host_supervision_contacts: {
+        Row: {
+          client_id: string
+          conducted_by: string | null
+          contact_date: string
+          contact_type: string
+          created_at: string
+          id: string
+          organization_id: string
+          summary: string | null
+        }
+        Insert: {
+          client_id: string
+          conducted_by?: string | null
+          contact_date: string
+          contact_type?: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          summary?: string | null
+        }
+        Update: {
+          client_id?: string
+          conducted_by?: string | null
+          contact_date?: string
+          contact_type?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "host_supervision_contacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -11821,6 +11865,7 @@ export type Database = {
           feature_config: Json | null
           first_name: string
           geofence_radius_feet: number
+          hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
           id: string

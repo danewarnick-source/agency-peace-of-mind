@@ -2479,6 +2479,8 @@ export function PunchPad({
                     {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {aiBusy
                       ? "🧠 NECTAR Coach reviewing your note…"
+                      : awaitingGps
+                      ? "Getting location…"
                       : aiCoach?.status === "Flagged"
                       ? "🔁 Re-Check with NECTAR Coach"
                       : "💾 Submit Final Timesheet"}

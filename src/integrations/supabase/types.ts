@@ -6316,6 +6316,50 @@ export type Database = {
           },
         ]
       }
+      incident_sc_requests: {
+        Row: {
+          created_at: string
+          id: string
+          incident_id: string
+          organization_id: string
+          request_summary: string
+          requested_at: string
+          responded_at: string | null
+          responded_by: string | null
+          response_summary: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          incident_id: string
+          organization_id: string
+          request_summary: string
+          requested_at: string
+          responded_at?: string | null
+          responded_by?: string | null
+          response_summary?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          incident_id?: string
+          organization_id?: string
+          request_summary?: string
+          requested_at?: string
+          responded_at?: string | null
+          responded_by?: string | null
+          response_summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_sc_requests_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incident_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null

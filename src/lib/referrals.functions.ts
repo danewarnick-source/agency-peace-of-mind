@@ -12,7 +12,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requireRoleAtLeast } from "@/lib/require-permission";
+import { requirePermission, requireAnyPermission } from "@/lib/require-permission";
 
 const orgOnly = z.object({ organization_id: z.string().uuid() });
 
@@ -26,7 +26,7 @@ export const listSupportCoordinators = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     const { data: rows, error } = await supabase
       .from("support_coordinators")
       .select("id, name, agency, email, phone, region")
@@ -49,7 +49,7 @@ export const createSupportCoordinator = createServerFn({ method: "POST" })
   .inputValidator((d) => createScInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const { data: row, error } = await supabase
       .from("support_coordinators")
       .insert({
@@ -95,7 +95,7 @@ export const listReferrals = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     const { data: rows, error } = await supabase
       .from("referrals")
       .select(
@@ -113,7 +113,7 @@ export const createReferral = createServerFn({ method: "POST" })
   .inputValidator((d) => createReferralInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
 
     const { data: row, error } = await supabase
       .from("referrals")
@@ -154,7 +154,7 @@ export const findPossibleDuplicateReferral = createServerFn({ method: "POST" })
   .inputValidator((d) => dupCheckInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (supabase as any).rpc(
       "find_possible_duplicate_referral",
@@ -217,7 +217,7 @@ export const updateReferralStage = createServerFn({ method: "POST" })
   .inputValidator((d) => updateStageInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
 
     const patch = {
       stage: data.stage,
@@ -257,7 +257,7 @@ export const addReferralActivity = createServerFn({ method: "POST" })
   .inputValidator((d) => addActivityInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const { data: row, error } = await supabase
       .from("referral_activities")
       .insert({
@@ -286,7 +286,7 @@ export const editReferralNote = createServerFn({ method: "POST" })
   .inputValidator((d) => editNoteInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const { data: orig, error: oErr } = await supabase
       .from("referral_activities")
       .select("id, organization_id, referral_id, activity_type, channel, occurred_at")
@@ -320,7 +320,7 @@ export const listReferralActivities = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     const { data: rows, error } = await supabase
       .from("referral_activities")
       .select(
@@ -339,7 +339,7 @@ export const getReferralPipelineStats = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireRoleAtLeast(supabase, userId, data.organization_id, "manager");
+    await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: stats, error } = await (supabase as any).rpc(
       "get_referral_pipeline_stats",

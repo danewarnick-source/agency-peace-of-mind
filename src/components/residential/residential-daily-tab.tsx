@@ -201,6 +201,9 @@ export function ResidentialDailyTab() {
       missingDays: number;
       supportHoursDelivered: number;
       supervisionContacts: number;
+      incidentsOpen: number;
+      incidentsClosed: number;
+      fatalityThisMonth: boolean;
     };
     const map = new Map<string, Row>();
     for (const c of clients) {
@@ -214,6 +217,9 @@ export function ResidentialDailyTab() {
         missingDays: 0,
         supportHoursDelivered: 0,
         supervisionContacts: 0,
+        incidentsOpen: 0,
+        incidentsClosed: 0,
+        fatalityThisMonth: false,
       });
     }
     for (const r of dailyRows) {

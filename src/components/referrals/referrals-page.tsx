@@ -61,6 +61,9 @@ export function ReferralsPage() {
 
   const listFn = useServerFn(listReferrals);
   const scListFn = useServerFn(listSupportCoordinators);
+  const statsFn = useServerFn(getReferralPipelineStats);
+
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const referrals = useQuery({
     enabled: !!orgId,
@@ -71,6 +74,11 @@ export function ReferralsPage() {
     enabled: !!orgId,
     queryKey: ["support-coordinators", orgId],
     queryFn: () => scListFn({ data: { organization_id: orgId! } }),
+  });
+  const stats = useQuery({
+    enabled: !!orgId,
+    queryKey: ["referral-pipeline-stats", orgId],
+    queryFn: () => statsFn({ data: { organization_id: orgId! } }),
   });
 
   const scById = useMemo(() => {
@@ -93,18 +101,21 @@ export function ReferralsPage() {
   }, [referrals.data]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Referrals</h2>
           <p className="text-sm text-muted-foreground">
-            Prospective-client intake inquiries. Foundation for the Client
-            Whiteboard CRM — matching, pipeline stages, and follow-up land in
-            later increments.
+            Prospective-client intake inquiries. Move through the pipeline; log
+            every contact, meeting, and note. Matching and follow-up email land
+            in later increments.
           </p>
         </div>
         {orgId && <NewReferralDialog organizationId={orgId} />}
       </div>
+
+      <PipelineStatsBar stats={stats.data} />
+
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {CATEGORIES.map((cat) => {

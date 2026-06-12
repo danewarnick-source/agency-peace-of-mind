@@ -23,6 +23,15 @@ export const Route = createFileRoute("/dashboard/hub/clients")({
       tabs={[
         { key: "directory", label: "Directory", render: () => <ClientsPage /> },
         {
+          key: "referrals",
+          label: "Referrals",
+          render: () => (
+            <RequireRole roles={["admin", "manager", "super_admin"]}>
+              <ReferralsPage />
+            </RequireRole>
+          ),
+        },
+        {
           key: "teams",
           label: "Teams & homes",
           render: () => (

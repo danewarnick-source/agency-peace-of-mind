@@ -49,18 +49,24 @@ function TotalsPage() {
   const yearStartDate = `${year}-01-01`;
   const yearEndDate = `${year + 1}-01-01`;
 
+  // Server-fn wrappers (gated by view_financial_totals server-side)
+  const fnTps = useServerFn(getTotalsTps);
+  const fnCbc = useServerFn(getTotalsCbc);
+  const fnEvv = useServerFn(getTotalsEvv);
+  const fnHhs = useServerFn(getTotalsHhs);
+  const fnHostSet = useServerFn(getTotalsHostSet);
+  const fnHhp = useServerFn(getTotalsHhp);
+  const fnCtr = useServerFn(getTotalsCtr);
+  const fnProfiles = useServerFn(getTotalsProfiles);
+  const fnLedger = useServerFn(getTotalsLedger);
+
   // Pay schedule
   const tpsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["totals-tps", org?.organization_id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("time_pay_settings" as never)
-        .select("w2_schedule, w2_period_anchor, contractor_schedule, contractor_period_anchor")
-        .eq("organization_id", org!.organization_id)
-        .maybeSingle();
-      if (error) throw error;
-      return (data ?? null) as unknown as {
+      const row = await fnTps({ data: { organizationId: org!.organization_id } });
+      return row as unknown as {
         w2_schedule: PaySchedule; w2_period_anchor: string;
         contractor_schedule: PaySchedule; contractor_period_anchor: string;
       } | null;
@@ -71,123 +77,64 @@ function TotalsPage() {
   const cbcQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["totals-cbc", org?.organization_id],
-    queryFn: async (): Promise<Cbc[]> => {
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select("client_id, service_code, rate_per_unit")
-        .eq("organization_id", org!.organization_id);
-      if (error) throw error;
-      return (data ?? []) as Cbc[];
-    },
+    queryFn: async (): Promise<Cbc[]> =>
+      (await fnCbc({ data: { organizationId: org!.organization_id } })) as Cbc[],
   });
 
   // EVV for year (same shape as Tab A)
   const evvQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["totals-evv", org?.organization_id, year],
-    queryFn: async (): Promise<Ts[]> => {
-      const { data, error } = await supabase
-        .from("evv_timesheets")
-        .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, staff_id")
-        .eq("organization_id", org!.organization_id)
-        .gte("clock_in_timestamp", yearStartIso)
-        .lt("clock_in_timestamp", yearEndIso);
-      if (error) throw error;
-      return (data ?? []) as Ts[];
-    },
+    queryFn: async (): Promise<Ts[]> =>
+      (await fnEvv({ data: { organizationId: org!.organization_id, year } })) as Ts[],
   });
 
   // HHS billable days for year (same view as Tab B)
   const hhsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["totals-hhs", org?.organization_id, year],
-    queryFn: async (): Promise<HhsDay[]> => {
-      const { data, error } = await supabase
-        .from("hhs_daily_records_v")
-        .select("client_id, record_date, billable, service_code")
-        .eq("organization_id", org!.organization_id)
-        .eq("service_code", "HHS")
-        .gte("record_date", yearStartDate)
-        .lt("record_date", yearEndDate);
-      if (error) throw error;
-      return ((data ?? []) as Array<HhsDay & { service_code: string }>).filter((r) => r.billable);
-    },
+    queryFn: async (): Promise<HhsDay[]> =>
+      (await fnHhs({ data: { organizationId: org!.organization_id, year } })) as HhsDay[],
   });
 
   // Host settings (host_daily_rate per client) for HHP pay
   const hostSetQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["totals-host", org?.organization_id],
-    queryFn: async (): Promise<HostSet[]> => {
-      const { data, error } = await supabase
-        .from("hhs_host_home_settings" as never)
-        .select("client_id, host_daily_rate");
-      if (error) throw error;
-      return (data ?? []) as unknown as HostSet[];
-    },
+    queryFn: async (): Promise<HostSet[]> =>
+      (await fnHostSet({ data: { organizationId: org!.organization_id } })) as HostSet[],
   });
 
   // Staff assignments → HHP clients per staff
   const hhpQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["totals-hhp", org?.organization_id],
-    queryFn: async (): Promise<StaffAssn[]> => {
-      const { data, error } = await supabase
-        .from("staff_assignments")
-        .select("staff_id, client_id, service_codes")
-        .eq("organization_id", org!.organization_id)
-        .overlaps("service_codes", ["CMP", "CMS"]);
-      if (error) throw error;
-      return (data ?? []) as StaffAssn[];
-    },
+    queryFn: async (): Promise<StaffAssn[]> =>
+      (await fnHhp({ data: { organizationId: org!.organization_id } })) as StaffAssn[],
   });
 
   // Contractor pay inputs (Tab C)
   const ctrQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["totals-ctr", org?.organization_id, year],
-    queryFn: async (): Promise<CtrPay[]> => {
-      const { data, error } = await supabase
-        .from("contractor_monthly_pay" as never)
-        .select("staff_id, year, month, net_pay, additional_pay")
-        .eq("organization_id", org!.organization_id)
-        .eq("year", year);
-      if (error) throw error;
-      return (data ?? []) as unknown as CtrPay[];
-    },
+    queryFn: async (): Promise<CtrPay[]> =>
+      (await fnCtr({ data: { organizationId: org!.organization_id, year } })) as CtrPay[],
   });
 
   // Staff profiles for hourly_rate (for DSP gross totals)
   const profilesQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["totals-profiles", org?.organization_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, hourly_rate");
-      if (error) throw error;
-      const map: Record<string, number> = {};
-      for (const p of (data ?? []) as Array<{ id: string; hourly_rate: number | null }>) {
-        map[p.id] = Number(p.hourly_rate ?? 0);
-      }
-      return map;
-    },
+    queryFn: async () =>
+      (await fnProfiles({ data: { organizationId: org!.organization_id } })) as Record<string, number>,
   });
 
   // Ledger entries for the year — received + payroll_tax
   const ledgerQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["totals-ledger", org?.organization_id, year],
-    queryFn: async (): Promise<LedgerRow[]> => {
-      const { data, error } = await supabase
-        .from("provider_ledger_entries")
-        .select("id, period_year, period_month, category, label, amount, note")
-        .eq("organization_id", org!.organization_id)
-        .eq("period_year", year)
-        .in("category", ["received", "payroll_tax"]);
-      if (error) throw error;
-      return (data ?? []) as LedgerRow[];
-    },
+    queryFn: async (): Promise<LedgerRow[]> =>
+      (await fnLedger({ data: { organizationId: org!.organization_id, year } })) as LedgerRow[],
   });
 
   // Lookups

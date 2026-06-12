@@ -42,6 +42,8 @@ export const ALL_PERMISSIONS = [
   "view_financial_tns_gross",
   "view_financial_rhs",
   "view_financial_employees",
+  "view_referrals",
+  "manage_referrals",
 ] as const;
 
 

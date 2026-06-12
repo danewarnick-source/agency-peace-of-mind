@@ -1,16 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Mail, Paperclip, Inbox as InboxIcon, Download, ArrowLeft, AlertCircle } from "lucide-react";
+import { Mail, Paperclip, Inbox as InboxIcon, Download, ArrowLeft, AlertCircle, Info } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { RequireRole } from "@/components/rbac-guard";
 import {
   listInboxMessages,
   openInboxMessage,
   type InboxMessageDetail,
+  type InboxAttachment,
 } from "@/lib/inbox-messages.functions";
+
 
 export const Route = createFileRoute("/dashboard/inbox")({
   head: () => ({ meta: [{ title: "Inbox — HIVE" }] }),
@@ -91,42 +93,47 @@ function InboxPage() {
           </div>
           {openMsg.attachments.length > 0 && (
             <div className="mt-6 border-t border-border pt-4">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Attachments ({openMsg.attachments.length})
               </div>
-              <ul className="space-y-1.5">
+              <ul className="space-y-4">
                 {openMsg.attachments.map((a) => (
                   <li
                     key={a.id}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    className="rounded-md border border-border bg-background p-3"
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{a.filename}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatBytes(a.size_bytes)}
-                      </span>
+                    <div className="flex flex-col items-start justify-between gap-2 md:flex-row md:items-center">
+                      <div className="flex min-w-0 items-center gap-2 text-sm">
+                        <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate font-medium">{a.filename}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {formatBytes(a.size_bytes)}
+                          {a.mime_type ? ` · ${a.mime_type}` : ""}
+                        </span>
+                      </div>
+                      {a.signed_url ? (
+                        <a
+                          href={a.signed_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={a.filename}
+                          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                        >
+                          <Download className="h-3.5 w-3.5" /> Download
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-destructive">
+                          <AlertCircle className="h-3.5 w-3.5" /> Unavailable
+                        </span>
+                      )}
                     </div>
-                    {a.signed_url ? (
-                      <a
-                        href={a.signed_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download={a.filename}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
-                      >
-                        <Download className="h-3.5 w-3.5" /> Download
-                      </a>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3.5 w-3.5" /> Unavailable
-                      </span>
-                    )}
+                    {a.signed_url && <AttachmentPreview a={a} />}
                   </li>
                 ))}
               </ul>
             </div>
           )}
+
         </div>
       </div>
     );

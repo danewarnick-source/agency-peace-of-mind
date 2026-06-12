@@ -210,3 +210,113 @@ export const discardExecMessage = createServerFn({ method: "POST" })
     if (delErr) throw delErr;
     return { ok: true };
   });
+
+// ─── Sent messages (HIVE Exec only) ───────────────────────────────────────
+
+export interface SentMessageRecipient {
+  organization_id: string;
+  organization_name: string;
+  is_demo: boolean;
+  read_at: string | null;
+}
+
+export interface SentMessageRow {
+  message_id: string;
+  subject: string;
+  body: string;
+  created_at: string;
+  recipient_count: number;
+  read_count: number;
+  attachment_count: number;
+  recipients: SentMessageRecipient[];
+}
+
+export const listSentExecMessages = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<SentMessageRow[]> => {
+    const { supabase, userId } = context;
+    await ensureHiveExecutive(supabase, userId);
+
+    // Messages this exec sent
+    const { data: msgs, error: msgErr } = await supabase
+      .from("exec_messages")
+      .select("id, subject, body, created_at")
+      .eq("sender_user_id", userId)
+      .order("created_at", { ascending: false });
+    if (msgErr) throw msgErr;
+    const messages = (msgs ?? []) as Array<{
+      id: string;
+      subject: string;
+      body: string | null;
+      created_at: string;
+    }>;
+    if (messages.length === 0) return [];
+
+    const messageIds = messages.map((m) => m.id);
+
+    // Recipients with read state
+    const { data: recs, error: recErr } = await supabase
+      .from("exec_message_recipients")
+      .select("message_id, organization_id, read_at")
+      .in("message_id", messageIds);
+    if (recErr) throw recErr;
+    const recRows = (recs ?? []) as Array<{
+      message_id: string;
+      organization_id: string;
+      read_at: string | null;
+    }>;
+
+    // Org names (HIVE execs can read every org via existing RLS)
+    const orgIds = Array.from(new Set(recRows.map((r) => r.organization_id)));
+    const { data: orgs, error: orgErr } = await supabase
+      .from("organizations")
+      .select("id, name, is_demo")
+      .in("id", orgIds);
+    if (orgErr) throw orgErr;
+    const orgById = new Map<string, { name: string; is_demo: boolean }>();
+    for (const o of (orgs ?? []) as Array<{ id: string; name: string; is_demo: boolean }>) {
+      orgById.set(o.id, { name: o.name, is_demo: o.is_demo });
+    }
+
+    // Attachment counts (one row per distinct file per message)
+    const { data: atts, error: attErr } = await supabase
+      .from("exec_message_attachments")
+      .select("message_id")
+      .in("message_id", messageIds);
+    if (attErr) throw attErr;
+    const attCountByMsg = new Map<string, number>();
+    for (const a of (atts ?? []) as Array<{ message_id: string }>) {
+      attCountByMsg.set(a.message_id, (attCountByMsg.get(a.message_id) ?? 0) + 1);
+    }
+
+    const recsByMsg = new Map<string, SentMessageRecipient[]>();
+    for (const r of recRows) {
+      const o = orgById.get(r.organization_id);
+      const item: SentMessageRecipient = {
+        organization_id: r.organization_id,
+        organization_name: o?.name ?? "(unknown org)",
+        is_demo: o?.is_demo ?? false,
+        read_at: r.read_at,
+      };
+      const arr = recsByMsg.get(r.message_id) ?? [];
+      arr.push(item);
+      recsByMsg.set(r.message_id, arr);
+    }
+
+    return messages.map((m): SentMessageRow => {
+      const rs = recsByMsg.get(m.id) ?? [];
+      rs.sort((a, b) => a.organization_name.localeCompare(b.organization_name));
+      const readCount = rs.reduce((n, r) => n + (r.read_at ? 1 : 0), 0);
+      return {
+        message_id: m.id,
+        subject: m.subject,
+        body: m.body ?? "",
+        created_at: m.created_at,
+        recipient_count: rs.length,
+        read_count: readCount,
+        attachment_count: attCountByMsg.get(m.id) ?? 0,
+        recipients: rs,
+      };
+    });
+  });
+

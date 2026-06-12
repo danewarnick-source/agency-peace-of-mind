@@ -2292,6 +2292,24 @@ export function PunchPad({
                   )}
                 </div>
 
+                {/* Quick action: file an Incident Report mid-shift without leaving punch-pad. */}
+                {active && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs">
+                    <span className="text-muted-foreground">
+                      Something happen this shift? File the §1.27 Incident Report now — your supervisor is notified the moment you submit.
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIncidentDialogOpen(true)}
+                    >
+                      <AlertTriangleIcon className="mr-1 h-3.5 w-3.5 text-amber-600" />
+                      File Incident Report
+                    </Button>
+                  </div>
+                )}
+
                 {/* NECTAR trigger gate — on-device lexicon scan; blocks submit until resolved */}
                 {active && (
                   <NoteTriggerPrompt
@@ -2299,18 +2317,40 @@ export function PunchPad({
                     clientId={active.client_id}
                     date={new Date().toISOString().slice(0, 10)}
                     onOpenForm={(kind) => {
-                      // Navigate to the client workspace where incident / appointment
-                      // intake lives. Trigger is marked resolved by the prompt itself.
+                      if (kind === "incident") {
+                        // Open the IR dialog inline; submission marks the trigger
+                        // resolved AND flips incident_flag on this timesheet row.
+                        setIncidentTriggerOpen(true);
+                        setIncidentDialogOpen(true);
+                        return;
+                      }
+                      // Appointment: still send staff to the workspace to log it.
                       navigate({ to: `/dashboard/workspace/${active.client_id}` });
-                      toast.message(
-                        kind === "incident"
-                          ? "Opened client workspace — file the Incident Report there, then return."
-                          : "Opened client workspace — log the appointment, then return.",
-                      );
+                      toast.message("Opened client workspace — log the appointment, then return.");
                     }}
                     onAllResolved={setTriggersResolved}
                   />
                 )}
+
+                {active && (
+                  <IncidentReportDialog
+                    open={incidentDialogOpen}
+                    onOpenChange={(o) => {
+                      setIncidentDialogOpen(o);
+                      if (!o) setIncidentTriggerOpen(false);
+                    }}
+                    clientId={active.client_id}
+                    triggeredByNoteId={active.id}
+                    triggeredByNoteType={incidentTriggerOpen ? "evv_shift_note_trigger" : "evv_shift_quick_action"}
+                    onSubmitted={(id) => {
+                      setIncidentReportIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                      setIncidentFlag(true);
+                      // Mark trigger resolved so the gate clears even when filed via the dialog.
+                      if (incidentTriggerOpen) setTriggersResolved(true);
+                    }}
+                  />
+                )}
+
 
                 {/* NECTAR Documentation Coach */}
                 {(aiBusy || aiCoach) && (

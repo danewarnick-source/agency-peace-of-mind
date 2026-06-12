@@ -1801,6 +1801,86 @@ export type Database = {
           },
         ]
       }
+      client_discharges: {
+        Row: {
+          additional_notes: string | null
+          attested_items: Json
+          client_id: string
+          discharge_date: string
+          discharge_reason: string
+          id: string
+          initiated_by: string
+          organization_id: string
+          prior_team_id: string | null
+          recorded_at: string
+          recorded_by: string
+          source_citation: string
+          source_document_id: string | null
+          source_excerpt: string
+        }
+        Insert: {
+          additional_notes?: string | null
+          attested_items?: Json
+          client_id: string
+          discharge_date: string
+          discharge_reason: string
+          id?: string
+          initiated_by: string
+          organization_id: string
+          prior_team_id?: string | null
+          recorded_at?: string
+          recorded_by: string
+          source_citation: string
+          source_document_id?: string | null
+          source_excerpt: string
+        }
+        Update: {
+          additional_notes?: string | null
+          attested_items?: Json
+          client_id?: string
+          discharge_date?: string
+          discharge_reason?: string
+          id?: string
+          initiated_by?: string
+          organization_id?: string
+          prior_team_id?: string | null
+          recorded_at?: string
+          recorded_by?: string
+          source_citation?: string
+          source_document_id?: string | null
+          source_excerpt?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_discharges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_discharges_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_discharges_prior_team_id_fkey"
+            columns: ["prior_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_discharges_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_documents: {
         Row: {
           client_id: string

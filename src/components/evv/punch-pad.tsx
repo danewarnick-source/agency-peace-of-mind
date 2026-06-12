@@ -2284,6 +2284,25 @@ export function PunchPad({
                   )}
                 </div>
 
+                {/* NECTAR trigger gate — on-device lexicon scan; blocks submit until resolved */}
+                {active && (
+                  <NoteTriggerPrompt
+                    text={narrative}
+                    clientId={active.client_id}
+                    date={new Date().toISOString().slice(0, 10)}
+                    onOpenForm={(kind) => {
+                      // Navigate to the client workspace where incident / appointment
+                      // intake lives. Trigger is marked resolved by the prompt itself.
+                      navigate({ to: `/dashboard/workspace/${active.client_id}` });
+                      toast.message(
+                        kind === "incident"
+                          ? "Opened client workspace — file the Incident Report there, then return."
+                          : "Opened client workspace — log the appointment, then return.",
+                      );
+                    }}
+                    onAllResolved={setTriggersResolved}
+                  />
+                )}
 
                 {/* NECTAR Documentation Coach */}
                 {(aiBusy || aiCoach) && (

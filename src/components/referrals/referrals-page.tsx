@@ -1303,3 +1303,463 @@ function ArchiveAutoIngestedButton({
     </button>
   );
 }
+
+// ─── Call-capture (C2): provider types call notes → NECTAR parses → reviewable draft ──
+function CallCaptureDialog({ organizationId }: { organizationId: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const scListFn = useServerFn(listSupportCoordinators);
+  const createScFn = useServerFn(createSupportCoordinator);
+  const createRefFn = useServerFn(createReferral);
+  const parseDocFn = useServerFn(parseReferralDocument);
+
+  const scs = useQuery({
+    queryKey: ["support-coordinators", organizationId],
+    queryFn: () => scListFn({ data: { organization_id: organizationId } }),
+    enabled: open,
+  });
+
+  // Raw call notes — preserved verbatim on the referral
+  const [callNotes, setCallNotes] = useState("");
+  const [callerPhone, setCallerPhone] = useState("");
+
+  // Parsed / editable structured fields
+  const [firstName, setFirstName] = useState("");
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("");
+  const [city, setCity] = useState("");
+  const [county, setCounty] = useState("");
+  const [category, setCategory] = useState<Category | "">("");
+  const [needLevel, setNeedLevel] = useState("");
+  const [disabilityTypes, setDisabilityTypes] = useState("");
+  const [disabilityLevel, setDisabilityLevel] = useState("");
+  const [requestedCodes, setRequestedCodes] = useState("");
+  const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [scId, setScId] = useState<string>("");
+
+  const [parsing, setParsing] = useState(false);
+  const [parseMsg, setParseMsg] = useState<string | null>(null);
+  const [autoFilled, setAutoFilled] = useState<Set<string>>(new Set());
+
+  // inline SC create
+  const [showScForm, setShowScForm] = useState(false);
+  const [scName, setScName] = useState("");
+  const [scAgency, setScAgency] = useState("");
+  const [scEmail, setScEmail] = useState("");
+  const [scPhone, setScPhone] = useState("");
+  const [scRegion, setScRegion] = useState("");
+
+  const reset = () => {
+    setCallNotes("");
+    setCallerPhone("");
+    setFirstName("");
+    setAge("");
+    setGender("");
+    setCity("");
+    setCounty("");
+    setCategory("");
+    setNeedLevel("");
+    setDisabilityTypes("");
+    setDisabilityLevel("");
+    setRequestedCodes("");
+    setDescription("");
+    setDueDate("");
+    setScId("");
+    setParseMsg(null);
+    setAutoFilled(new Set());
+    setShowScForm(false);
+    setScName("");
+    setScAgency("");
+    setScEmail("");
+    setScPhone("");
+    setScRegion("");
+  };
+
+  const applyPrefill = (p: ReferralPrefill) => {
+    const filled = new Set(autoFilled);
+    const set = (key: string, current: string, next?: string | number | null) => {
+      if (next == null || next === "") return null;
+      if (current.trim().length > 0) return null;
+      filled.add(key);
+      return String(next);
+    };
+    const arrSet = (key: string, current: string, next?: string[]) => {
+      if (!next || next.length === 0) return null;
+      if (current.trim().length > 0) return null;
+      filled.add(key);
+      return next.join(", ");
+    };
+    const fn = set("first_name", firstName, p.first_name);
+    if (fn != null) setFirstName(fn);
+    const a = set("age", age, p.age);
+    if (a != null) setAge(a);
+    const g = set("gender", gender, p.gender);
+    if (g != null) setGender(g);
+    const ci = set("location_city", city, p.location_city);
+    if (ci != null) setCity(ci);
+    const co = set("location_county", county, p.location_county);
+    if (co != null) setCounty(co);
+    const dl = set("disability_level", disabilityLevel, p.disability_level);
+    if (dl != null) setDisabilityLevel(dl);
+    const dt = arrSet("disability_types", disabilityTypes, p.disability_types);
+    if (dt != null) setDisabilityTypes(dt);
+    const rc = arrSet("requested_codes", requestedCodes, p.requested_codes);
+    if (rc != null) setRequestedCodes(rc);
+    const nl = set("need_level", needLevel, p.need_level);
+    if (nl != null) setNeedLevel(nl);
+    const ds = set("description", description, p.description);
+    if (ds != null) setDescription(ds);
+    const dd = set("due_date", dueDate, p.due_date);
+    if (dd != null) setDueDate(dd);
+    if (p.category && !category) {
+      filled.add("category");
+      setCategory(p.category);
+    }
+    setAutoFilled(filled);
+  };
+
+  const buildDraftFromNotes = async () => {
+    if (!callNotes.trim()) {
+      setParseMsg("Type or paste call notes first.");
+      return;
+    }
+    setParseMsg(null);
+    setParsing(true);
+    try {
+      const res = await parseDocFn({
+        data: { organization_id: organizationId, text: callNotes },
+      });
+      if (res.ok) {
+        applyPrefill(res.fields);
+        const count = Object.keys(res.fields).filter(
+          (k) => res.fields[k as keyof ReferralPrefill] != null,
+        ).length;
+        setParseMsg(
+          count > 0
+            ? `NECTAR pre-filled ${count} field${count === 1 ? "" : "s"} from your call notes — review and correct before saving. Raw notes are preserved.`
+            : "NECTAR couldn't extract structured fields — fill what you know. Raw call notes are still saved verbatim.",
+        );
+      } else {
+        setParseMsg(res.message);
+      }
+    } catch (e) {
+      setParseMsg((e as Error).message);
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const createSc = useMutation({
+    mutationFn: () =>
+      createScFn({
+        data: {
+          organization_id: organizationId,
+          name: scName.trim(),
+          agency: scAgency || null,
+          email: scEmail || null,
+          phone: scPhone || null,
+          region: scRegion || null,
+        },
+      }),
+    onSuccess: (row) => {
+      toast.success("Support Coordinator added");
+      qc.invalidateQueries({ queryKey: ["support-coordinators", organizationId] });
+      if (row?.id) setScId(row.id);
+      setShowScForm(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const create = useMutation({
+    mutationFn: async () => {
+      if (!callNotes.trim()) throw new Error("Call notes are required");
+      if (!firstName.trim()) throw new Error("At least a first name (or initial) is required");
+      // Preserve raw call notes verbatim on the referral
+      const preservedNotes = [
+        "📞 CALL NOTES (verbatim):",
+        callNotes.trim(),
+        callerPhone.trim() ? `\nCaller phone: ${callerPhone.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      return await createRefFn({
+        data: {
+          organization_id: organizationId,
+          first_name: firstName.trim(),
+          age: age ? Number(age) : null,
+          gender: gender || null,
+          date_of_birth: null,
+          location_city: city || null,
+          location_county: county || null,
+          disability_types: splitList(disabilityTypes),
+          disability_level: disabilityLevel || null,
+          requested_codes: splitList(requestedCodes).map((s) => s.toUpperCase()),
+          budget_note: null,
+          need_level: needLevel || null,
+          description: description || null,
+          notes: preservedNotes,
+          category: (category || null) as Category | null,
+          source: "call_capture",
+          support_coordinator_id: scId || null,
+          due_date: dueDate || null,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Referral draft saved from call");
+      qc.invalidateQueries({ queryKey: ["referrals", organizationId] });
+      reset();
+      setOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const isAuto = (k: string) => autoFilled.has(k);
+  const autoMark = (k: string) =>
+    isAuto(k) ? (
+      <Badge variant="secondary" className="ml-2 gap-1 text-[10px]">
+        <Sparkles className="h-3 w-3" /> auto-filled
+      </Badge>
+    ) : null;
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="gap-1">
+          <Phone className="h-4 w-4" /> Log a call
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>New referral from a call</DialogTitle>
+        </DialogHeader>
+
+        <Alert>
+          <Phone className="h-4 w-4" />
+          <AlertTitle>Call capture</AlertTitle>
+          <AlertDescription>
+            Type or paste what was discussed. NECTAR will read it and pre-fill a
+            reviewable referral draft. Your raw call notes are preserved on the
+            referral so nothing is lost.
+          </AlertDescription>
+        </Alert>
+
+        {/* Raw call notes — preserved verbatim */}
+        <div className="grid gap-2">
+          <Label htmlFor="cc-notes">
+            Call notes <span className="text-destructive">*</span>
+          </Label>
+          <Textarea
+            id="cc-notes"
+            value={callNotes}
+            onChange={(e) => setCallNotes(e.target.value)}
+            rows={8}
+            placeholder="e.g. Spoke with SC Jane Doe at Chrysalis. 23 y/o male in Utah County, has IDD, mom looking at HSQ + PAC, no DSPD case yet. Mom callback: 801-555-0142. Wants response within a week."
+          />
+          <p className="text-[11px] text-muted-foreground">
+            These notes are saved verbatim on the referral.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="cc-caller-phone">Caller phone (optional)</Label>
+            <Input
+              id="cc-caller-phone"
+              value={callerPhone}
+              onChange={(e) => setCallerPhone(e.target.value)}
+              placeholder="801-555-0142"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Support Coordinator (optional)</Label>
+            <div className="flex gap-2">
+              <Select value={scId} onValueChange={setScId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select SC…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(scs.data ?? []).map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                      {s.agency ? ` · ${s.agency}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowScForm((v) => !v)}
+              >
+                <UserPlus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {showScForm && (
+          <div className="grid grid-cols-1 gap-2 rounded-md border border-border bg-muted/30 p-3 sm:grid-cols-2">
+            <div className="grid gap-1 sm:col-span-2">
+              <Label htmlFor="cc-sc-name">SC name *</Label>
+              <Input id="cc-sc-name" value={scName} onChange={(e) => setScName(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="cc-sc-agency">Agency</Label>
+              <Input id="cc-sc-agency" value={scAgency} onChange={(e) => setScAgency(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="cc-sc-region">Region</Label>
+              <Input id="cc-sc-region" value={scRegion} onChange={(e) => setScRegion(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="cc-sc-email">Email</Label>
+              <Input id="cc-sc-email" value={scEmail} onChange={(e) => setScEmail(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="cc-sc-phone">Phone</Label>
+              <Input id="cc-sc-phone" value={scPhone} onChange={(e) => setScPhone(e.target.value)} />
+            </div>
+            <div className="sm:col-span-2">
+              <Button
+                size="sm"
+                disabled={!scName.trim() || createSc.isPending}
+                onClick={() => createSc.mutate()}
+              >
+                Add SC
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            onClick={buildDraftFromNotes}
+            disabled={parsing || !callNotes.trim()}
+            className="gap-1"
+          >
+            <Sparkles className="h-4 w-4" />
+            {parsing ? "NECTAR reading…" : "NECTAR: build draft from notes"}
+          </Button>
+          {parseMsg && (
+            <span className="text-xs text-muted-foreground">{parseMsg}</span>
+          )}
+        </div>
+
+        {/* Editable / reviewable parsed fields */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid gap-1">
+            <Label htmlFor="cc-first">First name / initial *{autoMark("first_name")}</Label>
+            <Input id="cc-first" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="cc-age">Age{autoMark("age")}</Label>
+            <Input
+              id="cc-age"
+              inputMode="numeric"
+              value={age}
+              onChange={(e) => setAge(e.target.value.replace(/[^0-9]/g, ""))}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="cc-gender">Gender{autoMark("gender")}</Label>
+            <Input id="cc-gender" value={gender} onChange={(e) => setGender(e.target.value)} />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="cc-category">Category{autoMark("category")}</Label>
+            <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
+              <SelectTrigger id="cc-category">
+                <SelectValue placeholder="Choose…" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c.key} value={c.key}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="cc-city">City{autoMark("location_city")}</Label>
+            <Input id="cc-city" value={city} onChange={(e) => setCity(e.target.value)} />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="cc-county">County{autoMark("location_county")}</Label>
+            <Input id="cc-county" value={county} onChange={(e) => setCounty(e.target.value)} />
+          </div>
+          <div className="grid gap-1 sm:col-span-2">
+            <Label htmlFor="cc-dtypes">Disability types (comma-separated){autoMark("disability_types")}</Label>
+            <Input
+              id="cc-dtypes"
+              value={disabilityTypes}
+              onChange={(e) => setDisabilityTypes(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="cc-dlevel">Disability level{autoMark("disability_level")}</Label>
+            <Input
+              id="cc-dlevel"
+              value={disabilityLevel}
+              onChange={(e) => setDisabilityLevel(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="cc-need">Need level{autoMark("need_level")}</Label>
+            <Input id="cc-need" value={needLevel} onChange={(e) => setNeedLevel(e.target.value)} />
+          </div>
+          <div className="grid gap-1 sm:col-span-2">
+            <Label htmlFor="cc-codes">Requested codes (comma-separated){autoMark("requested_codes")}</Label>
+            <Input
+              id="cc-codes"
+              value={requestedCodes}
+              onChange={(e) => setRequestedCodes(e.target.value)}
+              placeholder="HSQ, PAC, SLN…"
+            />
+          </div>
+          <div className="grid gap-1 sm:col-span-2">
+            <Label htmlFor="cc-desc">Description{autoMark("description")}</Label>
+            <Textarea
+              id="cc-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="cc-due">Due date{autoMark("due_date")}</Label>
+            <Input
+              id="cc-due"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => create.mutate()}
+            disabled={create.isPending || !callNotes.trim() || !firstName.trim()}
+          >
+            Save referral draft
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

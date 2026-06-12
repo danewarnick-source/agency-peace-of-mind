@@ -80,9 +80,11 @@ function ClientWorkspace() {
     () => (client ? allowedCodesFor(assignments, client.id, clientCodes) : []),
     [client, assignments, clientCodes],
   );
-  // EVV workspace is the hourly surface — needs at least one hourly assigned code.
+  // EVV workspace is the clock-in surface — needs at least one clockable
+  // code (excludes only HHS host-home & PPS parent-paid codes; RHS and the
+  // other daily-rate codes remain clock-inable for payroll capture).
   const allowedHourly = useMemo(
-    () => allowedCodes.filter(isHourlyServiceCode),
+    () => allowedCodes.filter(isClockableServiceCode),
     [allowedCodes],
   );
 

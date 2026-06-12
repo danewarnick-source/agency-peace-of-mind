@@ -4040,6 +4040,57 @@ export type Database = {
         }
         Relationships: []
       }
+      hhs_monthly_certifications: {
+        Row: {
+          away_days: number
+          blocked_days: number
+          certified_at: string
+          certified_by: string
+          client_id: string
+          id: string
+          month: string
+          organization_id: string
+          present_days: number
+        }
+        Insert: {
+          away_days?: number
+          blocked_days?: number
+          certified_at?: string
+          certified_by: string
+          client_id: string
+          id?: string
+          month: string
+          organization_id: string
+          present_days?: number
+        }
+        Update: {
+          away_days?: number
+          blocked_days?: number
+          certified_at?: string
+          certified_by?: string
+          client_id?: string
+          id?: string
+          month?: string
+          organization_id?: string
+          present_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hhs_monthly_certifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hhs_monthly_certifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hhs_monthly_summaries: {
         Row: {
           client_id: string
@@ -10229,6 +10280,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_ui_dismissals: {
+        Row: {
+          dismissed_at: string
+          id: string
+          pref_key: string
+          user_id: string
+        }
+        Insert: {
+          dismissed_at?: string
+          id?: string
+          pref_key: string
+          user_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          id?: string
+          pref_key?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       week_templates: {
         Row: {

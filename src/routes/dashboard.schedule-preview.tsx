@@ -146,6 +146,26 @@ function SchedulePreviewPage() {
     return m;
   }, [reqsAllQ.data, locationsQ.data]);
 
+  // Ratio-computed residential coverage (Utah DSPD SOW §1.33) — per-day,
+  // per-home required-staff minute arrays derived from each resident's
+  // client_ratios row + away-windows (their own DSI/SEI shifts and 1:1
+  // segments where a staff has them out of the home). Manual overrides
+  // (location_coverage_requirements) only RAISE the bar via max-merging
+  // inside CoverageBar24h.
+  const ratiosAllQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["client-ratios-all", org?.organization_id],
+    queryFn: async () => {
+      const { data: rows, error } = await supabase
+        .from("client_ratios")
+        .select("client_id, ratio_staff, ratio_clients, effective_start, effective_end, setting")
+        .eq("organization_id", org!.organization_id)
+        .eq("setting", "residential");
+      if (error) throw error;
+      return rows ?? [];
+    },
+  });
+
   // Weekly hour targets per (client, code) — drives the 1:1 and host-home meters.
   const listTargetsCall = useServerFn(listClientWeeklyTargets);
   const targetsQ = useQuery({
@@ -296,6 +316,86 @@ function SchedulePreviewPage() {
     return m;
   }, [sites, siteShifts]);
 
+  // Ratio-computed per-day required-staff minutes, keyed by lower-cased site
+  // (team) name to match how reqsBySiteName is keyed downstream.
+  const { computedReqByDayBySiteName, twoToOneBySiteName } = useMemo(() => {
+    const byDay = new Map<string, Map<string, number[]>>();
+    const twoToOne = new Set<string>();
+    const ratiosByClient = new Map<string, { client_id: string; ratio_staff: number; ratio_clients: number }>();
+    const todayIso = new Date().toISOString().slice(0, 10);
+    for (const r of ratiosAllQ.data ?? []) {
+      const start = (r.effective_start as string) ?? "0000-01-01";
+      const end = (r.effective_end as string | null) ?? null;
+      if (start > todayIso) continue;
+      if (end && end < todayIso) continue;
+      ratiosByClient.set(r.client_id as string, {
+        client_id: r.client_id as string,
+        ratio_staff: Number(r.ratio_staff ?? 1),
+        ratio_clients: Number(r.ratio_clients ?? 3),
+      });
+    }
+    for (const s of sites) {
+      const key = s.name.toLowerCase();
+      const residents = (siteClients.get(s.id) ?? []).map((c) => ({ id: c.id }));
+      if (residents.length === 0) continue;
+      const ratios = residents
+        .map((r) => ratiosByClient.get(r.id))
+        .filter((x): x is { client_id: string; ratio_staff: number; ratio_clients: number } => !!x);
+      // 2:1 detection (Utah DSPD SOW §1.33 — requires approved rights modification)
+      for (const r of ratios) if (r.ratio_staff >= 2 && r.ratio_clients === 1) twoToOne.add(key);
+      const shifts = siteShifts.get(s.id) ?? [];
+      const away: Array<{ client_id: string; start_ms: number; end_ms: number }> = [];
+      for (const sh of shifts) {
+        if (!sh.client_id) continue;
+        const code = (sh.service_code ?? sh.job_code ?? "").toUpperCase();
+        const isAway = !!sh.parent_shift_id || code === "DSI" || code === "SEI";
+        if (!isAway) continue;
+        away.push({
+          client_id: sh.client_id,
+          start_ms: new Date(sh.starts_at).getTime(),
+          end_ms: new Date(sh.ends_at).getTime(),
+        });
+      }
+      const perDay = new Map<string, number[]>();
+      for (const d of days) {
+        const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
+        const dayStartMs = dayStart.getTime();
+        const dayEndMs = dayStartMs + 24 * 3600 * 1000;
+        const absentByClient = new Map<string, Uint8Array>();
+        for (const w of away) {
+          const s0 = Math.max(w.start_ms, dayStartMs);
+          const s1 = Math.min(w.end_ms, dayEndMs);
+          if (s1 <= s0) continue;
+          const m0 = Math.floor((s0 - dayStartMs) / 60000);
+          const m1 = Math.ceil((s1 - dayStartMs) / 60000);
+          let arr = absentByClient.get(w.client_id);
+          if (!arr) { arr = new Uint8Array(1440); absentByClient.set(w.client_id, arr); }
+          for (let i = m0; i < m1; i++) arr[i] = 1;
+        }
+        const totals = new Float64Array(1440);
+        for (const r of residents) {
+          const ratio = ratiosByClient.get(r.id);
+          const num = ratio?.ratio_staff ?? 1;
+          const den = ratio?.ratio_clients ?? 3;
+          const contribution = num / den;
+          const absent = absentByClient.get(r.id);
+          if (!absent) {
+            for (let i = 0; i < 1440; i++) totals[i] += contribution;
+          } else {
+            for (let i = 0; i < 1440; i++) if (!absent[i]) totals[i] += contribution;
+          }
+        }
+        const out = new Array<number>(1440);
+        for (let i = 0; i < 1440; i++) out[i] = Math.ceil(totals[i] - 1e-9);
+        const isoKey = (() => { const x = new Date(d); x.setHours(12); return x.toISOString().slice(0, 10); })();
+        perDay.set(isoKey, out);
+      }
+      byDay.set(key, perDay);
+    }
+    return { computedReqByDayBySiteName: byDay, twoToOneBySiteName: twoToOne };
+  }, [sites, siteClients, siteShifts, ratiosAllQ.data, days]);
+
+
   if (orgLoading) return <Shell><div style={{ padding: 24, color: SCHED.muted, fontSize: 13 }}>Loading…</div></Shell>;
   if (!isAdmin) {
     return (
@@ -371,6 +471,8 @@ function SchedulePreviewPage() {
           conflictShiftIds={conflictShiftIds}
           hostHomeNames={hostHomeNames}
           reqsBySiteName={reqsBySiteName}
+          computedReqByDayBySiteName={computedReqByDayBySiteName}
+          twoToOneBySiteName={twoToOneBySiteName}
           noteDays={hostSignalsQ.data?.noteDays}
           overnightDays={hostSignalsQ.data?.overnightDays}
           weekStart={weekStart}
@@ -500,6 +602,8 @@ function SchedulePreviewPage() {
             settings={settings} onPickSite={setSiteId}
             hostHomeNames={hostHomeNames}
             reqsBySiteName={reqsBySiteName}
+            computedReqByDayBySiteName={computedReqByDayBySiteName}
+            twoToOneBySiteName={twoToOneBySiteName}
             targetsByClient={targetsByClient}
             noteDays={hostSignalsQ.data?.noteDays}
             overnightDays={hostSignalsQ.data?.overnightDays}
@@ -727,7 +831,7 @@ function ViewSeg({ value, onChange, disabled }: { value: ViewMode; onChange: (v:
 function MobileDayBoard({
   day, onSelectDay, sites, visibleSites, showHostHomes, onToggleHostHomes,
   siteId, onPickSite, siteShifts, siteClients, allShifts, staff, clients,
-  isLoading, conflictShiftIds, hostHomeNames, reqsBySiteName, noteDays, overnightDays,
+  isLoading, conflictShiftIds, hostHomeNames, reqsBySiteName, computedReqByDayBySiteName, twoToOneBySiteName, noteDays, overnightDays,
   weekStart, weekEndIso, organizationId, onOpenEditor, onOpenTimeline, onOpenSettings,
 }: {
   day: Date;
@@ -747,6 +851,8 @@ function MobileDayBoard({
   conflictShiftIds: Set<string>;
   hostHomeNames: Set<string>;
   reqsBySiteName: Map<string, ReqRow[]>;
+  computedReqByDayBySiteName?: Map<string, Map<string, number[]>>;
+  twoToOneBySiteName?: Set<string>;
   noteDays?: Set<string>;
   overnightDays?: Set<string>;
   weekStart: Date;
@@ -985,6 +1091,8 @@ function MobileDayBoard({
                       job_code: sh.job_code, parent_shift_id: sh.parent_shift_id,
                     }))}
                     requirements={dayReqs}
+                    computedRequiredMinutes={computedReqByDayBySiteName?.get(s.name.toLowerCase())?.get((() => { const x = new Date(day); x.setHours(12); return x.toISOString().slice(0, 10); })())}
+                    tooltipNote={twoToOneBySiteName?.has(s.name.toLowerCase()) ? "2:1 ratio requires an approved rights modification (SOW §1.33)." : undefined}
                   />
                 </button>
               );
@@ -1123,7 +1231,7 @@ function HostDot({ state, label }: { state: "done" | "partial" | "none"; label: 
 
 function AllHomesBoard({
   days, sites, siteClients, siteShifts, settings, onPickSite, onOpenDay, hostHomeNames,
-  reqsBySiteName, targetsByClient, noteDays, overnightDays,
+  reqsBySiteName, computedReqByDayBySiteName, twoToOneBySiteName, targetsByClient, noteDays, overnightDays,
 }: {
   days: Date[];
   sites: { id: string; name: string }[];
@@ -1134,6 +1242,8 @@ function AllHomesBoard({
   onOpenDay?: (siteId: string, siteName: string, day: Date) => void;
   hostHomeNames?: Set<string>;
   reqsBySiteName?: Map<string, ReqRow[]>;
+  computedReqByDayBySiteName?: Map<string, Map<string, number[]>>;
+  twoToOneBySiteName?: Set<string>;
   targetsByClient?: Map<string, Array<{ service_code: string; target_hours_per_week: number }>>;
   noteDays?: Set<string>;
   overnightDays?: Set<string>;
@@ -1285,6 +1395,8 @@ function AllHomesBoard({
                             parent_shift_id: sh.parent_shift_id,
                           }))}
                           requirements={dayReqs}
+                          computedRequiredMinutes={computedReqByDayBySiteName?.get(s.name.toLowerCase())?.get(isoDay(d))}
+                          tooltipNote={twoToOneBySiteName?.has(s.name.toLowerCase()) ? "2:1 ratio requires an approved rights modification (SOW §1.33)." : undefined}
                         />
                       </div>
                     );

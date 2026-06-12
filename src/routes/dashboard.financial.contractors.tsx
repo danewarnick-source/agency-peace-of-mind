@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,9 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Users2, Info } from "lucide-react";
-import { computeEntryUnits, unitsToHours, fmtHours, fmtUSD } from "@/lib/billing-units";
+import { unitsToHours, fmtHours, fmtUSD } from "@/lib/billing-units";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import {
+  getCtrEvv,
+  getCtrHhp,
+  getCtrHostSettings,
+  getCtrHhsDays,
+  getCtrClients,
+  getCtrStaff,
+  getCtrInputs,
+} from "@/lib/financial-contractors.functions";
 
 export const Route = createFileRoute("/dashboard/financial/contractors")({
   head: () => ({ meta: [{ title: "Contractors — HIVE" }] }),
@@ -40,135 +50,54 @@ function ContractorsPage() {
   const monthEndDateIso = monthEndExclusive.toISOString().slice(0, 10);
   const monthLabel = monthStart.toLocaleString(undefined, { month: "long", year: "numeric" });
 
-  // Same EVV path as Tab A
+  const fnEvv = useServerFn(getCtrEvv);
+  const fnHhp = useServerFn(getCtrHhp);
+  const fnHostSettings = useServerFn(getCtrHostSettings);
+  const fnHhsDays = useServerFn(getCtrHhsDays);
+  const fnClients = useServerFn(getCtrClients);
+  const fnStaff = useServerFn(getCtrStaff);
+  const fnInputs = useServerFn(getCtrInputs);
+
   const evvQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["ctr-evv", org?.organization_id, month.y, month.m],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("evv_timesheets")
-        .select("staff_id, clock_in_timestamp, clock_out_timestamp")
-        .eq("organization_id", org!.organization_id)
-        .gte("clock_in_timestamp", monthStartIso)
-        .lt("clock_in_timestamp", monthEndIso);
-      if (error) throw error;
-      const units: Record<string, number> = {};
-      for (const r of (data ?? []) as Array<{ staff_id: string | null; clock_in_timestamp: string; clock_out_timestamp: string | null }>) {
-        if (!r.staff_id) continue;
-        units[r.staff_id] = (units[r.staff_id] ?? 0) + computeEntryUnits(r.clock_in_timestamp, r.clock_out_timestamp);
-      }
-      return units;
-    },
+    queryFn: async () => fnEvv({ data: { organizationId: org!.organization_id, monthStartIso, monthEndIso } }),
   });
 
-  // HHP per (staff, client): staff_assignments where service_codes overlaps CMP/CMS
   const hhpQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["ctr-hhp", org?.organization_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("staff_assignments")
-        .select("staff_id, client_id, service_codes")
-        .eq("organization_id", org!.organization_id)
-        .overlaps("service_codes", ["CMP", "CMS"]);
-      if (error) throw error;
-      const map: Record<string, string[]> = {};
-      for (const r of (data ?? []) as Array<{ staff_id: string; client_id: string }>) {
-        (map[r.staff_id] ??= []).push(r.client_id);
-      }
-      return map;
-    },
+    queryFn: async () => fnHhp({ data: { organizationId: org!.organization_id } }),
   });
 
-  // Host home rate per client (for HHS pay derivation)
   const hostSettingsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["ctr-host-settings", org?.organization_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hhs_host_home_settings" as never)
-        .select("client_id, host_daily_rate");
-      if (error) throw error;
-      const map: Record<string, number> = {};
-      for (const r of (data ?? []) as unknown as Array<{ client_id: string; host_daily_rate: number }>) {
-        map[r.client_id] = Number(r.host_daily_rate) || 0;
-      }
-      return map;
-    },
+    queryFn: async () => fnHostSettings({ data: { organizationId: org!.organization_id } }),
   });
 
-  // Billable HHS days per client for the month (one source of truth)
   const hhsDaysQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["ctr-hhs-days", org?.organization_id, month.y, month.m],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hhs_daily_records_v")
-        .select("client_id, billable, service_code, record_date")
-        .eq("organization_id", org!.organization_id)
-        .eq("service_code", "HHS")
-        .gte("record_date", monthStartDateIso)
-        .lt("record_date", monthEndDateIso);
-      if (error) throw error;
-      const map: Record<string, number> = {};
-      for (const r of (data ?? []) as Array<{ client_id: string; billable: boolean }>) {
-        if (r.billable) map[r.client_id] = (map[r.client_id] ?? 0) + 1;
-      }
-      return map;
-    },
+    queryFn: async () => fnHhsDays({ data: { organizationId: org!.organization_id, monthStartDateIso, monthEndDateIso } }),
   });
 
   const clientsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["ctr-clients", org?.organization_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, first_name, last_name")
-        .eq("organization_id", org!.organization_id);
-      if (error) throw error;
-      const map: Record<string, string> = {};
-      for (const c of (data ?? []) as Array<{ id: string; first_name: string; last_name: string }>) {
-        map[c.id] = `${c.first_name} ${c.last_name}`.trim();
-      }
-      return map;
-    },
+    queryFn: async () => fnClients({ data: { organizationId: org!.organization_id } }),
   });
 
-  // Staff list (members of org), plus profile data
   const staffQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["ctr-staff", org?.organization_id],
-    queryFn: async (): Promise<ProfileLite[]> => {
-      const { data: members, error: e1 } = await supabase
-        .from("organization_members")
-        .select("user_id")
-        .eq("organization_id", org!.organization_id);
-      if (e1) throw e1;
-      const ids = (members ?? []).map((m: { user_id: string }) => m.user_id);
-      if (ids.length === 0) return [];
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, full_name, hourly_rate")
-        .in("id", ids);
-      if (error) throw error;
-      return (data ?? []) as ProfileLite[];
-    },
+    queryFn: async () => fnStaff({ data: { organizationId: org!.organization_id } }),
   });
 
   const inputsQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["ctr-inputs", org?.organization_id, month.y, month.m],
-    queryFn: async (): Promise<Inputs[]> => {
-      const { data, error } = await supabase
-        .from("contractor_monthly_pay" as never)
-        .select("staff_id, additional_pay, net_pay, tax_federal, tax_state, tax_fica")
-        .eq("organization_id", org!.organization_id)
-        .eq("year", month.y)
-        .eq("month", month.m + 1);
-      if (error) throw error;
-      return (data ?? []) as unknown as Inputs[];
-    },
+    queryFn: async () => fnInputs({ data: { organizationId: org!.organization_id, year: month.y, month: month.m + 1 } }),
   });
 
   const inputsByStaff = useMemo(() => {

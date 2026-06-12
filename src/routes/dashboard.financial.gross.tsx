@@ -39,14 +39,40 @@ function GrossPage() {
   const { data: org } = useCurrentOrg();
   const { prefixLabel } = useOrgDisplayName();
   const today = new Date();
-  const [startYear, setStartYear] = useState(today.getFullYear() - 2);
-  const [endYear, setEndYear] = useState(today.getFullYear() + 1);
+  const currentYear = today.getFullYear();
+  const [startYear, setStartYear] = useState(currentYear - 2);
+  const [endYear, setEndYear] = useState(currentYear + 1);
 
   const cbcFn = useServerFn(getGrossCbc);
   const evvFn = useServerFn(getGrossEvv);
   const hhsFn = useServerFn(getGrossHhs);
   const ctrFn = useServerFn(getGrossCtr);
   const ledgerFn = useServerFn(getGrossLedger);
+  const startFn = useServerFn(getGrossTrackingStart);
+
+  // Per-org auto-detected financial tracking start (cached once per org).
+  const trackQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["gross-tracking-start", org?.organization_id],
+    queryFn: () => startFn({ data: { organizationId: org!.organization_id } }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const trackingStartYear = trackQ.data?.earliestYear ?? null;
+  const hasAnyData = trackingStartYear !== null;
+
+  // Once we know the floor, clamp the window so we never render pre-tracking rows.
+  // If the org has no data at all, collapse to just the current year.
+  useEffect(() => {
+    if (trackQ.data === undefined) return;
+    if (!hasAnyData) {
+      setStartYear(currentYear);
+      setEndYear(currentYear);
+      return;
+    }
+    setStartYear((y) => (y < trackingStartYear! ? trackingStartYear! : y));
+    setEndYear((y) => (y < trackingStartYear! ? trackingStartYear! : y));
+  }, [trackQ.data, hasAnyData, trackingStartYear, currentYear]);
+
 
   // Client billing code rates
   const cbcQ = useQuery({

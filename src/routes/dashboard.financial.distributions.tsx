@@ -252,19 +252,13 @@ function DistributionsPage() {
   // ---------- Mutations ----------
   const createPlan = useMutation({
     mutationFn: async (vars: { name: string; plan_type: PlanType }) => {
-      const { data, error } = await (supabase.from("distribution_plans" as never) as any)
-        .insert({
-          organization_id: org!.organization_id,
+      return await fnCreatePlan({
+        data: {
+          organizationId: org!.organization_id,
           name: vars.name,
           plan_type: vars.plan_type,
-          retention_pct: 0,
-          status: "draft",
-          is_active: false,
-        } as any)
-        .select()
-        .single();
-      if (error) throw error;
-      return data as any;
+        },
+      });
     },
     onSuccess: (row: any) => {
       qc.invalidateQueries({ queryKey: ["dist-plans"] });
@@ -277,10 +271,13 @@ function DistributionsPage() {
   const updatePlan = useMutation({
     mutationFn: async (vars: Partial<Plan> & { id: string }) => {
       const { id, ...rest } = vars;
-      const { error } = await (supabase.from("distribution_plans" as never) as any)
-        .update(rest as any)
-        .eq("id", id);
-      if (error) throw error;
+      await fnUpdatePlan({
+        data: {
+          organizationId: org!.organization_id,
+          id,
+          patch: rest as any,
+        },
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-plans"] }),
     onError: (e: any) => toast.error(e.message),
@@ -288,50 +285,19 @@ function DistributionsPage() {
 
   const deletePlan = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("distribution_plans" as never) as any).delete().eq("id", id);
-      if (error) throw error;
+      await fnDeletePlan({ data: { organizationId: org!.organization_id, id } });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["dist-plans"] });
       setSelectedPlanId(null);
       toast.success("Plan deleted");
     },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const duplicatePlan = useMutation({
     mutationFn: async (id: string) => {
-      const plan = plansQ.data?.find((p) => p.id === id);
-      const parts = partsQ.data ?? [];
-      if (!plan) throw new Error("Plan not found");
-      const { data: newPlan, error } = await (supabase.from("distribution_plans" as never) as any)
-        .insert({
-          organization_id: plan.organization_id,
-          name: `${plan.name} (copy)`,
-          plan_type: plan.plan_type,
-          retention_pct: plan.retention_pct,
-          expense_selection: plan.expense_selection,
-          formula_json: plan.formula_json,
-          nectar_summary: plan.nectar_summary,
-          status: "draft",
-          is_active: false,
-        } as any)
-        .select()
-        .single();
-      if (error) throw error;
-      if (parts.length) {
-        const inserts = parts.map((p) => ({
-          plan_id: (newPlan as any).id,
-          participant_name: p.participant_name,
-          participant_user_id: p.participant_user_id,
-          allocation_pct: p.allocation_pct,
-          role_label: p.role_label,
-          notes: p.notes,
-          sort_order: p.sort_order,
-        }));
-        const { error: e2 } = await (supabase.from("distribution_plan_participants" as never) as any).insert(inserts as any);
-        if (e2) throw e2;
-      }
-      return newPlan as any;
+      return await fnDuplicatePlan({ data: { organizationId: org!.organization_id, id } });
     },
     onSuccess: (row: any) => {
       qc.invalidateQueries({ queryKey: ["dist-plans"] });
@@ -343,33 +309,40 @@ function DistributionsPage() {
 
   const addParticipant = useMutation({
     mutationFn: async () => {
-      const order = (partsQ.data?.length ?? 0);
-      const { error } = await (supabase.from("distribution_plan_participants" as never) as any).insert({
-        plan_id: selectedPlanId!,
-        participant_name: "New participant",
-        allocation_pct: 0,
-        sort_order: order,
-      } as any);
-      if (error) throw error;
+      const order = partsQ.data?.length ?? 0;
+      await fnAddParticipant({
+        data: {
+          organizationId: org!.organization_id,
+          planId: selectedPlanId!,
+          sort_order: order,
+        },
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-parts", selectedPlanId] }),
+    onError: (e: any) => toast.error(e.message),
   });
 
   const updateParticipant = useMutation({
     mutationFn: async (vars: Partial<Participant> & { id: string }) => {
       const { id, ...rest } = vars;
-      const { error } = await (supabase.from("distribution_plan_participants" as never) as any).update(rest as any).eq("id", id);
-      if (error) throw error;
+      await fnUpdateParticipant({
+        data: {
+          organizationId: org!.organization_id,
+          id,
+          patch: rest as any,
+        },
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-parts", selectedPlanId] }),
+    onError: (e: any) => toast.error(e.message),
   });
 
   const deleteParticipant = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("distribution_plan_participants" as never) as any).delete().eq("id", id);
-      if (error) throw error;
+      await fnDeleteParticipant({ data: { organizationId: org!.organization_id, id } });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dist-parts", selectedPlanId] }),
+    onError: (e: any) => toast.error(e.message),
   });
 
   // Local edit state for plan editor

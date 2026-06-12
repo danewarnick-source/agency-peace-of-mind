@@ -13,12 +13,12 @@ export const Route = createFileRoute("/dashboard/financial")({
 
 const TABS: Array<{ to: string; label: string; icon: typeof Grid3x3; disabled?: boolean }> = [
   { to: "/dashboard/financial/revenue", label: "Revenue", icon: LineChart },
-  { to: "/dashboard/billing/monthly-grid", label: "Monthly Grid", icon: Grid3x3 },
-  { to: "/dashboard/billing/host-home", label: "Host Home", icon: Home },
-  { to: "/dashboard/billing/contractors", label: "Contractors", icon: HardHat },
-  { to: "/dashboard/billing/totals", label: "Totals", icon: TableProperties },
-  { to: "/dashboard/billing/gross", label: "TNS Gross", icon: BarChart3 },
-  { to: "/dashboard/billing/distributions", label: "Distributions", icon: PieChart },
+  { to: "/dashboard/financial/monthly-grid", label: "Monthly Grid", icon: Grid3x3 },
+  { to: "/dashboard/financial/host-home", label: "Host Home", icon: Home },
+  { to: "/dashboard/financial/contractors", label: "Contractors", icon: HardHat },
+  { to: "/dashboard/financial/totals", label: "Totals", icon: TableProperties },
+  { to: "/dashboard/financial/gross", label: "TNS Gross", icon: BarChart3 },
+  { to: "/dashboard/financial/distributions", label: "Distributions", icon: PieChart },
   // Placeholders — not built yet (see prompt: View 1 only)
   { to: "#", label: "Profitability", icon: LineChart, disabled: true },
   { to: "#", label: "Cash Flow", icon: LineChart, disabled: true },

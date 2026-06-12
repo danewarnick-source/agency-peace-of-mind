@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Mail, Paperclip, Inbox as InboxIcon, Download, ArrowLeft, AlertCircle, Eye, EyeOff, Info } from "lucide-react";
+import { Mail, Paperclip, Inbox as InboxIcon, Download, ArrowLeft, AlertCircle, Info } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { RequireRole } from "@/components/rbac-guard";
 import {

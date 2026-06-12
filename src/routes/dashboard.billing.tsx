@@ -21,6 +21,7 @@ const TABS: Array<{ to: string; label: string; icon: typeof Users; exact?: boole
   { to: "/dashboard/billing/contractors", label: "Contractors", icon: HardHat },
   { to: "/dashboard/billing/totals", label: "Totals", icon: TableProperties },
   { to: "/dashboard/billing/gross", label: "TNS Gross", icon: BarChart3 },
+  { to: "/dashboard/billing/distributions", label: "Distributions", icon: PieChart },
   { to: "/dashboard/billing/nectar", label: "NECTAR", icon: Sparkles },
   { to: "/dashboard/billing/form520", label: "520 Form", icon: FileSpreadsheet },
   { to: "/dashboard/billing/imports", label: "Imports / Authorizations", icon: Upload },

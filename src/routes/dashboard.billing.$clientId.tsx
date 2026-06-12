@@ -19,7 +19,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { fmtHours, fmtUnits, unitsToHours, UNITS_PER_HOUR } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
-import { ArrowLeft, Plus, Trash2, AlertTriangle, CheckCircle2, Clock, CalendarDays } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, AlertTriangle, CheckCircle2, Clock, CalendarDays, History } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { listRateHistory, type RateHistoryRow } from "@/lib/billing-rates.functions";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export const Route = createFileRoute("/dashboard/billing/$clientId")({
   head: () => ({ meta: [{ title: "Client Billing — HIVE" }] }),
@@ -226,9 +229,12 @@ function ClientBillingDetail() {
                       className="h-8 w-24" />
                   </td>
                   <td className="p-2">
-                    <Button size="icon" variant="ghost" onClick={() => remove(row.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <RateHistoryButton clientId={row.client_id} serviceCode={row.service_code} />
+                      <Button size="icon" variant="ghost" onClick={() => remove(row.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -777,7 +777,7 @@ export const getReferralMatchScore = createServerFn({ method: "POST" })
     const { data: cached } = await supabase
       .from("referral_match_scores")
       .select(
-        "referral_id, organization_id, overall_score, location_fit, host_fit, disability_fit, need_fit, code_overlap, best_host_ids, weights, reasons, computed_at",
+        "referral_id, organization_id, overall_score, location_fit, host_fit, disability_fit, need_fit, code_overlap, best_host_ids, weights, reasons, scored_components, computed_at",
       )
       .eq("referral_id", data.referral_id)
       .eq("organization_id", data.organization_id)
@@ -791,6 +791,13 @@ export const getReferralMatchScore = createServerFn({ method: "POST" })
         disability_fit: Number(cached.disability_fit),
         need_fit: Number(cached.need_fit),
         code_overlap: Number(cached.code_overlap),
+        scored_components: (cached.scored_components ?? [
+          "location",
+          "host_fit",
+          "disability_fit",
+          "need_fit",
+          "code_overlap",
+        ]) as ScoredComponent[],
       } as ReferralMatchScore;
     }
 
@@ -818,10 +825,12 @@ export const getReferralMatchScore = createServerFn({ method: "POST" })
           best_host_ids: computed.best_host_ids,
           weights: computed.weights,
           reasons: computed.reasons,
+          scored_components: computed.scored_components,
           computed_at: computed.computed_at,
         },
         { onConflict: "referral_id" },
       );
+
 
     return computed;
   });

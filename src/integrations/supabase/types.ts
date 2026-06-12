@@ -1655,6 +1655,71 @@ export type Database = {
         }
         Relationships: []
       }
+      client_billing_code_rate_history: {
+        Row: {
+          billing_code_id: string
+          client_id: string
+          created_at: string
+          effective_end: string | null
+          effective_start: string | null
+          id: string
+          organization_id: string
+          rate_per_unit: number
+          rate_source: string | null
+          rate_source_at: string | null
+          rate_source_document_id: string | null
+          rate_source_plan_number: string | null
+          service_code: string
+          superseded_at: string
+          superseded_by: string | null
+          unit_type: string
+        }
+        Insert: {
+          billing_code_id: string
+          client_id: string
+          created_at?: string
+          effective_end?: string | null
+          effective_start?: string | null
+          id?: string
+          organization_id: string
+          rate_per_unit: number
+          rate_source?: string | null
+          rate_source_at?: string | null
+          rate_source_document_id?: string | null
+          rate_source_plan_number?: string | null
+          service_code: string
+          superseded_at?: string
+          superseded_by?: string | null
+          unit_type: string
+        }
+        Update: {
+          billing_code_id?: string
+          client_id?: string
+          created_at?: string
+          effective_end?: string | null
+          effective_start?: string | null
+          id?: string
+          organization_id?: string
+          rate_per_unit?: number
+          rate_source?: string | null
+          rate_source_at?: string | null
+          rate_source_document_id?: string | null
+          rate_source_plan_number?: string | null
+          service_code?: string
+          superseded_at?: string
+          superseded_by?: string | null
+          unit_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_billing_code_rate_history_billing_code_id_fkey"
+            columns: ["billing_code_id"]
+            isOneToOne: false
+            referencedRelation: "client_billing_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_billing_codes: {
         Row: {
           annual_unit_authorization: number
@@ -10565,6 +10630,18 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_rate_as_of: {
+        Args: { _as_of: string; _client_id: string; _service_code: string }
+        Returns: {
+          effective_end: string
+          effective_start: string
+          rate_per_unit: number
+          rate_source: string
+          rate_source_plan_number: string
+          source_kind: string
+          unit_type: string
+        }[]
       }
       get_staff_pii: {
         Args: { _org: string; _staff: string }

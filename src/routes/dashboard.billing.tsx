@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { RequireRole } from "@/components/rbac-guard";
-import { Receipt, Users, FileSpreadsheet, Upload, CreditCard, Sparkles, Grid3x3, Home } from "lucide-react";
+import { Receipt, Users, FileSpreadsheet, Upload, CreditCard, Sparkles, Grid3x3, Home, HardHat } from "lucide-react";
 import { NectarBillingReadinessBar } from "@/components/billing/nectar-billing-readiness-bar";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Permission } from "@/lib/rbac";

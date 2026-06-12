@@ -72,6 +72,8 @@ export function ReferralsPage() {
   const statsFn = useServerFn(getReferralPipelineStats);
 
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [view, setView] = useState<"active" | "archived">("active");
+
 
   const referrals = useQuery({
     enabled: !!orgId,

@@ -461,6 +461,30 @@ function ComplianceDeskPage() {
   });
   const reconcilePendingCount = (reconcileQ.data ?? []).filter((r) => r.reconciliation_status === "pending").length;
 
+  // ── Supervisor review queue ──────────────────────────────────────────────
+  // Surfaces every evv_timesheets row where the punch-pad's correction flow
+  // sent the shift to `review_status='needs_review'` (incident_flag, ≥16h
+  // shifts, or staff used the "forgot to clock out" correction). Approving
+  // sets review_status='approved' (corrected times then become effective
+  // for billing via effectiveBillingTimes). Rejecting requires a note and
+  // sends the shift back to the caregiver as 'rejected' (excluded from
+  // billable units until they resubmit).
+  const needsReviewQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["evv-needs-review", org?.organization_id],
+    queryFn: async (): Promise<Row[]> => {
+      const { data, error } = await supabase
+        .from("evv_timesheets")
+        .select(SELECT_COLS)
+        .eq("organization_id", org!.organization_id)
+        .eq("review_status", "needs_review")
+        .order("clock_in_timestamp", { ascending: false });
+      if (error) throw error;
+      return hydrateStaff((data ?? []) as unknown as Row[]);
+    },
+  });
+  const needsReviewCount = needsReviewQ.data?.length ?? 0;
+
   const vectorQ = useQuery({
     enabled: isSearching && !!org?.organization_id,
     queryKey: ["evv-hybrid-search", org?.organization_id, submitted?.query],

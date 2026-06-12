@@ -140,7 +140,8 @@ export const getDistCtr = createServerFn({ method: "POST" })
       .eq("organization_id", data.organizationId)
       .eq("year", data.year);
     if (error) throw new Error(error.message);
-    return (rows ?? []) as unknown[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (rows ?? []) as any[];
   });
 
 export const getDistLedger = createServerFn({ method: "POST" })

@@ -269,6 +269,7 @@ export function PunchPad({
   const [narrative, setNarrative]               = useState("");
   const [showNarrativeError, setShowNarrativeError] = useState(false);
   const [longShiftAck, setLongShiftAck]         = useState(false);
+  const [triggersResolved, setTriggersResolved] = useState(true);
 
   // ── Review-by-exception (Timeclock pass) ────────────────────────────────────
   // Variance + attestation + incident + "forgot to clock out" correction. None

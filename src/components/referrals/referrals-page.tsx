@@ -275,6 +275,10 @@ export function ReferralsPage() {
           );
         })}
       </div>
+        </>
+      )}
+
+
 
       {orgId && (
         <ReferralDetailDialog

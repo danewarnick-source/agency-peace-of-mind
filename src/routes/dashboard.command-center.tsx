@@ -884,7 +884,7 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     is_out_of_bounds, outside_geofence_reason,
     gps_in_coordinates, gps_out_coordinates,
     shift_note_text, goals_completed, submitted_late, denial_reason,
-    approved_at, approved_by,
+    approved_at, approved_by, edit_reason, review_status,
     clients:client_id (first_name, last_name, physical_address)`;
 
   const { data: pendingTimesheets = [], isLoading: tsLoading } = useQuery({

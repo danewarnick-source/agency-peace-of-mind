@@ -316,10 +316,29 @@ export function ResidentialDailyTab() {
                 <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
                   <div>
                     <CardTitle className="text-sm">{row.name}</CardTitle>
-                    <div className="mt-1 flex flex-wrap gap-1">
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
                       {row.codes.map((c) => (
                         <Badge key={c} variant="outline" className="text-[10px] font-mono">{c}</Badge>
                       ))}
+                      {row.fatalityThisMonth && (
+                        <Badge className="bg-rose-600 text-[10px] text-white hover:bg-rose-600">
+                          §1.26 Fatality
+                        </Badge>
+                      )}
+                      {row.incidentsOpen + row.incidentsClosed > 0 ? (
+                        <Badge
+                          variant={row.incidentsOpen > 0 ? "destructive" : "outline"}
+                          className="text-[10px]"
+                        >
+                          {row.incidentsOpen > 0
+                            ? `${row.incidentsOpen} open IR${row.incidentsOpen === 1 ? "" : "s"}`
+                            : `${row.incidentsClosed} IR${row.incidentsClosed === 1 ? "" : "s"} closed`}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                          0 incidents
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">

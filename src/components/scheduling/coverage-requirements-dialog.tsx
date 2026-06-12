@@ -62,12 +62,58 @@ export function CoverageRequirementsDialog({ open, onOpenChange, organizationId 
     queryFn: () => listReqCall({ data: { organizationId, locationId: locationId! } }),
   });
 
+  const computeCall = useServerFn(computeRequiredStaff);
+  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const computedQ = useQuery({
+    enabled: open && !!locationId,
+    queryKey: ["computed-required", organizationId, locationId, todayIso],
+    queryFn: () => computeCall({ data: { locationId: locationId!, startDate: todayIso } }),
+  });
+
   const locations = useMemo(() => locsQ.data ?? [], [locsQ.data]);
   const activeLoc = locations.find((l) => l.id === locationId) ?? null;
   const isResidential = activeLoc?.type === "residential";
 
+  // Build a short human summary of today's computed requirement curve.
+  const computedSummary = useMemo(() => {
+    const day = computedQ.data?.days?.[0];
+    if (!day) return null;
+    const mins = day.required;
+    if (!mins?.length) return null;
+    const baseline = mins[12 * 60] ?? mins[0] ?? 0;
+    const segments: Array<{ from: number; to: number; n: number }> = [];
+    let i = 0;
+    while (i < mins.length) {
+      const v = mins[i];
+      if (v !== baseline) {
+        const start = i;
+        while (i < mins.length && mins[i] === v) i++;
+        segments.push({ from: start, to: i, n: v });
+      } else i++;
+    }
+    const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    const segText = segments.slice(0, 2).map((s) => `${s.n} staff ${fmt(s.from)}–${fmt(s.to)}`).join(" · ");
+    return segText
+      ? `${baseline} staff baseline · drops/rises to ${segText}`
+      : `${baseline} staff while all residents are home`;
+  }, [computedQ.data]);
+
   const invalidate = () =>
     qc.invalidateQueries({ queryKey: ["coverage-reqs", organizationId, locationId] });
+
+  function applyPreset(p: "awake-overnight" | "min-1-24h" | "three-bands") {
+    if (p === "awake-overnight") {
+      setDayOfWeek(null); setStartTime("23:00"); setEndTime("07:00");
+      setRequiredStaffCount("1"); setAwakeRequired(true);
+    } else if (p === "min-1-24h") {
+      setDayOfWeek(null); setStartTime("00:00"); setEndTime("24:00");
+      setRequiredStaffCount("1"); setAwakeRequired(false);
+    } else {
+      setDayOfWeek(null); setStartTime("07:00"); setEndTime("23:00");
+      setRequiredStaffCount("1"); setAwakeRequired(false);
+    }
+  }
+
 
   async function handleAdd() {
     if (!locationId) return;

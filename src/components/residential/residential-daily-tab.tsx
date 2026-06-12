@@ -88,9 +88,11 @@ export function ResidentialDailyTab() {
         .select("id, first_name, last_name, hhs_monthly_support_hours" as any)
         .eq("organization_id", orgId)
         .in("id", ids);
-      return (clients ?? []).map((c) => {
-        const cc = byClient.get((c as { id: string }).id)!;
-        const row = c as { id: string; first_name: string; last_name: string; hhs_monthly_support_hours: number | null };
+      const rows = (clients ?? []) as unknown as Array<{
+        id: string; first_name: string; last_name: string; hhs_monthly_support_hours: number | null;
+      }>;
+      return rows.map((row) => {
+        const cc = byClient.get(row.id)!;
         return {
           id: row.id,
           name: `${row.first_name} ${row.last_name}`.trim(),
@@ -139,7 +141,7 @@ export function ResidentialDailyTab() {
         .lte("clock_in_timestamp", `${end}T23:59:59`)
         .in("client_id", clientIds);
       if (error) throw error;
-      return (data ?? []) as Array<{
+      return (data ?? []) as unknown as Array<{
         client_id: string;
         service_type_code: string | null;
         clock_in_timestamp: string;

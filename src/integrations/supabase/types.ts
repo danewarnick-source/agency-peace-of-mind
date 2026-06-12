@@ -8078,6 +8078,96 @@ export type Database = {
         }
         Relationships: []
       }
+      referrals: {
+        Row: {
+          age: number | null
+          budget_note: string | null
+          category: string
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          description: string | null
+          disability_level: string | null
+          disability_types: string[]
+          due_date: string | null
+          first_name: string
+          gender: string | null
+          id: string
+          location_city: string | null
+          location_county: string | null
+          need_level: string | null
+          organization_id: string
+          requested_codes: string[]
+          source: string
+          status: string
+          support_coordinator_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          age?: number | null
+          budget_note?: string | null
+          category: string
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          description?: string | null
+          disability_level?: string | null
+          disability_types?: string[]
+          due_date?: string | null
+          first_name: string
+          gender?: string | null
+          id?: string
+          location_city?: string | null
+          location_county?: string | null
+          need_level?: string | null
+          organization_id: string
+          requested_codes?: string[]
+          source?: string
+          status?: string
+          support_coordinator_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          age?: number | null
+          budget_note?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          description?: string | null
+          disability_level?: string | null
+          disability_types?: string[]
+          due_date?: string | null
+          first_name?: string
+          gender?: string | null
+          id?: string
+          location_city?: string | null
+          location_county?: string | null
+          need_level?: string | null
+          organization_id?: string
+          requested_codes?: string[]
+          source?: string
+          status?: string
+          support_coordinator_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_support_coordinator_id_fkey"
+            columns: ["support_coordinator_id"]
+            isOneToOne: false
+            referencedRelation: "support_coordinators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       respite_stays: {
         Row: {
           created_at: string
@@ -9775,6 +9865,53 @@ export type Database = {
         }
         Relationships: []
       }
+      support_coordinators: {
+        Row: {
+          agency: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          organization_id: string
+          phone: string | null
+          region: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          phone?: string | null
+          region?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          phone?: string | null
+          region?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_coordinators_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_features: {
         Row: {
           category: string
@@ -10837,6 +10974,22 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      find_possible_duplicate_referral: {
+        Args: {
+          _age: number
+          _first_name: string
+          _organization_id: string
+          _support_coordinator_id: string
+        }
+        Returns: {
+          age: number
+          category: string
+          created_at: string
+          first_name: string
+          id: string
+          support_coordinator_id: string
+        }[]
       }
       generate_pba_audit_sample: { Args: { _org: string }; Returns: number }
       get_client_caps: {

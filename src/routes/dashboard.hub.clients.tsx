@@ -7,8 +7,11 @@ import { ClientsPage } from "./dashboard.clients";
 import { TeamsPage } from "./dashboard.teams";
 import { PbaLedgerPage } from "./dashboard.pba-ledger";
 import { ClientLoansPage } from "./dashboard.client-loans";
+import { ReferralsPage } from "@/components/referrals/referrals-page";
 
-const search = z.object({ tab: z.enum(["directory", "teams", "funds"]).optional() });
+const search = z.object({
+  tab: z.enum(["directory", "referrals", "teams", "funds"]).optional(),
+});
 
 export const Route = createFileRoute("/dashboard/hub/clients")({
   head: () => ({ meta: [{ title: "Clients — HIVE" }] }),
@@ -19,6 +22,15 @@ export const Route = createFileRoute("/dashboard/hub/clients")({
       basePath="/dashboard/hub/clients"
       tabs={[
         { key: "directory", label: "Directory", render: () => <ClientsPage /> },
+        {
+          key: "referrals",
+          label: "Referrals",
+          render: () => (
+            <RequireRole roles={["admin", "manager", "super_admin"]}>
+              <ReferralsPage />
+            </RequireRole>
+          ),
+        },
         {
           key: "teams",
           label: "Teams & homes",

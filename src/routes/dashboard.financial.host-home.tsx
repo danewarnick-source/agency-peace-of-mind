@@ -49,18 +49,20 @@ function HostHomePage() {
   const monthEndIso = monthEndExclusive.toISOString().slice(0, 10);
   const monthLabel = monthStart.toLocaleString(undefined, { month: "long", year: "numeric" });
 
+  // Server-fn wrappers (gated by view_financial_host_home server-side)
+  const fnCodes = useServerFn(getHhCodes);
+  const fnClients = useServerFn(getHhClients);
+  const fnDays = useServerFn(getHhDays);
+  const fnSettings = useServerFn(getHhSettings);
+  const fnMonthly = useServerFn(getHhMonthly);
+
   // HHS client list: any client with an HHS billing code authorization
   const hhsCodesQ = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["hh-hhs-codes", org?.organization_id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select("client_id, rate_per_unit")
-        .eq("organization_id", org!.organization_id)
-        .eq("service_code", "HHS");
-      if (error) throw error;
-      return (data ?? []) as Array<{ client_id: string; rate_per_unit: number }>;
+      const rows = await fnCodes({ data: { organizationId: org!.organization_id } });
+      return rows as Array<{ client_id: string; rate_per_unit: number }>;
     },
   });
 
@@ -73,13 +75,8 @@ function HostHomePage() {
     enabled: !!org?.organization_id && clientIds.length > 0,
     queryKey: ["hh-clients", org?.organization_id, clientIds.join(",")],
     queryFn: async (): Promise<ClientLite[]> => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, first_name, last_name")
-        .in("id", clientIds)
-        .order("last_name");
-      if (error) throw error;
-      return (data ?? []) as ClientLite[];
+      const rows = await fnClients({ data: { organizationId: org!.organization_id, clientIds } });
+      return rows as ClientLite[];
     },
   });
 
@@ -88,19 +85,9 @@ function HostHomePage() {
     enabled: !!org?.organization_id && clientIds.length > 0,
     queryKey: ["hh-days", org?.organization_id, month.y, month.m],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hhs_daily_records_v")
-        .select("client_id, record_date, billable, service_code")
-        .eq("organization_id", org!.organization_id)
-        .eq("service_code", "HHS")
-        .gte("record_date", monthStartIso)
-        .lt("record_date", monthEndIso);
-      if (error) throw error;
-      const counts: Record<string, number> = {};
-      for (const r of (data ?? []) as Array<{ client_id: string; billable: boolean }>) {
-        if (r.billable) counts[r.client_id] = (counts[r.client_id] ?? 0) + 1;
-      }
-      return counts;
+      return (await fnDays({
+        data: { organizationId: org!.organization_id, year: month.y, month: month.m + 1 },
+      })) as Record<string, number>;
     },
   });
 
@@ -108,12 +95,8 @@ function HostHomePage() {
     enabled: !!org?.organization_id,
     queryKey: ["hh-settings", org?.organization_id],
     queryFn: async (): Promise<HostSettings[]> => {
-      const { data, error } = await supabase
-        .from("hhs_host_home_settings" as never)
-        .select("client_id, hhp_name, host_daily_rate")
-        .eq("organization_id", org!.organization_id);
-      if (error) throw error;
-      return (data ?? []) as unknown as HostSettings[];
+      const rows = await fnSettings({ data: { organizationId: org!.organization_id } });
+      return rows as unknown as HostSettings[];
     },
   });
 
@@ -121,14 +104,10 @@ function HostHomePage() {
     enabled: !!org?.organization_id,
     queryKey: ["hh-monthly", org?.organization_id, month.y, month.m],
     queryFn: async (): Promise<MonthlyInputs[]> => {
-      const { data, error } = await supabase
-        .from("hhs_host_home_monthly" as never)
-        .select("client_id, activities_amount, room_and_board_amount")
-        .eq("organization_id", org!.organization_id)
-        .eq("year", month.y)
-        .eq("month", month.m + 1);
-      if (error) throw error;
-      return (data ?? []) as unknown as MonthlyInputs[];
+      const rows = await fnMonthly({
+        data: { organizationId: org!.organization_id, year: month.y, month: month.m + 1 },
+      });
+      return rows as unknown as MonthlyInputs[];
     },
   });
 

@@ -20,3 +20,16 @@ export function isHourlyServiceCode(code: string | null | undefined): boolean {
 export function billingUnitLabel(code: string | null | undefined): "Hourly" | "Daily" {
   return isDailyServiceCode(code) ? "Daily" : "Hourly";
 }
+
+// Codes that staff CAN clock in on for payroll/evidence capture even though
+// they may also have a daily-rate component (e.g. RHS — residential staff
+// clock for payroll even though the client billing is daily; DSG/RL6/RP4/
+// RP5/SED similarly capture time for payroll). The only codes excluded from
+// staff clock-in are host/parent-paid daily rates with no agency clock
+// component: HHS (host home) and PPS (professional parent supports).
+const NON_CLOCKABLE_CODES: ReadonlySet<string> = new Set(["HHS", "PPS"]);
+
+export function isClockableServiceCode(code: string | null | undefined): boolean {
+  return !!code && !NON_CLOCKABLE_CODES.has(code);
+}
+

@@ -90,6 +90,7 @@ import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashbo
 import { Route as DashboardSettingsSubscriptionRouteImport } from './routes/dashboard.settings.subscription'
 import { Route as DashboardSettingsServiceCodesRouteImport } from './routes/dashboard.settings.service-codes'
 import { Route as DashboardSettingsServiceCatalogRouteImport } from './routes/dashboard.settings.service-catalog'
+import { Route as DashboardSettingsEmailRouteImport } from './routes/dashboard.settings.email'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardSettingsAutomationRulesRouteImport } from './routes/dashboard.settings.automation-rules'
 import { Route as DashboardProgramsProgramIdRouteImport } from './routes/dashboard.programs.$programId'
@@ -577,6 +578,11 @@ const DashboardSettingsServiceCatalogRoute =
     path: '/service-catalog',
     getParentRoute: () => DashboardSettingsRoute,
   } as any)
+const DashboardSettingsEmailRoute = DashboardSettingsEmailRouteImport.update({
+  id: '/email',
+  path: '/email',
+  getParentRoute: () => DashboardSettingsRoute,
+} as any)
 const DashboardSettingsBankMappingRoute =
   DashboardSettingsBankMappingRouteImport.update({
     id: '/bank-mapping',
@@ -1077,6 +1083,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
+  '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
   '/dashboard/settings/subscription': typeof DashboardSettingsSubscriptionRoute
@@ -1221,6 +1228,7 @@ export interface FileRoutesByTo {
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
+  '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
   '/dashboard/settings/subscription': typeof DashboardSettingsSubscriptionRoute
@@ -1372,6 +1380,7 @@ export interface FileRoutesById {
   '/dashboard/programs/$programId': typeof DashboardProgramsProgramIdRoute
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
+  '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
   '/dashboard/settings/subscription': typeof DashboardSettingsSubscriptionRoute
@@ -1524,6 +1533,7 @@ export interface FileRouteTypes {
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
+    | '/dashboard/settings/email'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
     | '/dashboard/settings/subscription'
@@ -1668,6 +1678,7 @@ export interface FileRouteTypes {
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
+    | '/dashboard/settings/email'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
     | '/dashboard/settings/subscription'
@@ -1818,6 +1829,7 @@ export interface FileRouteTypes {
     | '/dashboard/programs/$programId'
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
+    | '/dashboard/settings/email'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
     | '/dashboard/settings/subscription'
@@ -2437,6 +2449,13 @@ declare module '@tanstack/react-router' {
       path: '/service-catalog'
       fullPath: '/dashboard/settings/service-catalog'
       preLoaderRoute: typeof DashboardSettingsServiceCatalogRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
+    '/dashboard/settings/email': {
+      id: '/dashboard/settings/email'
+      path: '/email'
+      fullPath: '/dashboard/settings/email'
+      preLoaderRoute: typeof DashboardSettingsEmailRouteImport
       parentRoute: typeof DashboardSettingsRoute
     }
     '/dashboard/settings/bank-mapping': {
@@ -3084,6 +3103,7 @@ const DashboardProgramsRouteWithChildren =
 interface DashboardSettingsRouteChildren {
   DashboardSettingsAutomationRulesRoute: typeof DashboardSettingsAutomationRulesRoute
   DashboardSettingsBankMappingRoute: typeof DashboardSettingsBankMappingRoute
+  DashboardSettingsEmailRoute: typeof DashboardSettingsEmailRoute
   DashboardSettingsServiceCatalogRoute: typeof DashboardSettingsServiceCatalogRoute
   DashboardSettingsServiceCodesRoute: typeof DashboardSettingsServiceCodesRoute
   DashboardSettingsSubscriptionRoute: typeof DashboardSettingsSubscriptionRoute
@@ -3093,6 +3113,7 @@ interface DashboardSettingsRouteChildren {
 const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
   DashboardSettingsAutomationRulesRoute: DashboardSettingsAutomationRulesRoute,
   DashboardSettingsBankMappingRoute: DashboardSettingsBankMappingRoute,
+  DashboardSettingsEmailRoute: DashboardSettingsEmailRoute,
   DashboardSettingsServiceCatalogRoute: DashboardSettingsServiceCatalogRoute,
   DashboardSettingsServiceCodesRoute: DashboardSettingsServiceCodesRoute,
   DashboardSettingsSubscriptionRoute: DashboardSettingsSubscriptionRoute,

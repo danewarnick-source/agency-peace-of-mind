@@ -6987,6 +6987,44 @@ export type Database = {
         }
         Relationships: []
       }
+      org_email_settings: {
+        Row: {
+          from_address: string
+          from_name: string
+          organization_id: string
+          reply_to: string | null
+          updated_at: string
+          updated_by: string | null
+          verified: boolean
+        }
+        Insert: {
+          from_address?: string
+          from_name?: string
+          organization_id: string
+          reply_to?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified?: boolean
+        }
+        Update: {
+          from_address?: string
+          from_name?: string
+          organization_id?: string
+          reply_to?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_email_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_loan_attestations: {
         Row: {
           attestation_text: string

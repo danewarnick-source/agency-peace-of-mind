@@ -168,10 +168,15 @@ export function CoverageBar24h({ day, shifts, requirements = [], computedRequire
             <span>18</span>
             <span>24</span>
           </div>
-          {requirements.length > 0 && (
+          {hasRequirement && (
             <div className={cn("mt-1 text-[11px] font-semibold", hasGap ? "text-destructive" : "text-emerald-600")}>
               {hasGap ? "⚠ Coverage gap" : hasOver ? "✓ Met (over-staffed in places)" : "✓ Requirement met"}
             </div>
+          )}
+          {tooltipNote && (
+            <div className="mt-0.5 text-[10px] font-medium text-amber-700">{tooltipNote}</div>
+          )}
+
           )}
         </>
       )}

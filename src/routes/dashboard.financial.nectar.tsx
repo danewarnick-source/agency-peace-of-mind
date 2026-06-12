@@ -276,7 +276,7 @@ function ReportCard({ report }: { report: NectarFinReport }) {
           <div className="flex flex-wrap gap-1.5">
             {declined.map((s) => (
               <Badge key={s.source} variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">
-                {SOURCE_LABEL[s.source]}
+                {labelFor(s.source)}
               </Badge>
             ))}
           </div>
@@ -292,7 +292,7 @@ function ReportCard({ report }: { report: NectarFinReport }) {
             <span className="font-semibold text-muted-foreground">Sources used:</span>
             {allowed.map((s) => (
               <Badge key={s.source} variant="secondary" className="text-[10px]">
-                {SOURCE_LABEL[s.source]}
+                {labelFor(s.source)}
               </Badge>
             ))}
           </div>
@@ -309,7 +309,7 @@ function ReportCard({ report }: { report: NectarFinReport }) {
                 {allowed.flatMap((s) =>
                   Object.entries(s.data ?? {}).map(([k, v]) => (
                     <tr key={`${s.source}-${k}`} className="border-t">
-                      <td className="px-2 py-1.5 font-medium">{SOURCE_LABEL[s.source]}</td>
+                      <td className="px-2 py-1.5 font-medium">{labelFor(s.source)}</td>
                       <td className="px-2 py-1.5 text-muted-foreground">{k}</td>
                       <td className="px-2 py-1.5 text-right font-mono">
                         {Array.isArray(v) ? JSON.stringify(v) : String(v ?? "—")}

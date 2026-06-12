@@ -36,6 +36,7 @@ import {
 import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
 import { getPendingTrackingForms } from "@/lib/forms.functions";
 import { PendingTrackingFormsDialog, type PendingForm } from "@/components/evv/pending-tracking-forms-dialog";
+import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
 
 
 
@@ -268,6 +269,7 @@ export function PunchPad({
   const [narrative, setNarrative]               = useState("");
   const [showNarrativeError, setShowNarrativeError] = useState(false);
   const [longShiftAck, setLongShiftAck]         = useState(false);
+  const [triggersResolved, setTriggersResolved] = useState(true);
 
   // ── Review-by-exception (Timeclock pass) ────────────────────────────────────
   // Variance + attestation + incident + "forgot to clock out" correction. None
@@ -758,7 +760,7 @@ export function PunchPad({
     : 0;
   const isLongShift = liveDurationMs > 16 * 60 * 60 * 1000;
   const longShiftOk = !isLongShift || longShiftAck;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && !busy;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && !busy;
 
 
   function openCompliance() {
@@ -783,6 +785,7 @@ export function PunchPad({
     setDismissReasonDraft("");
     setBehaviorAnswers(emptyBehaviorAnswers);
     setLongShiftAck(false);
+    setTriggersResolved(true);
     stopRecording();
     setShowCompliance(true);
   }
@@ -1196,6 +1199,10 @@ export function PunchPad({
     }
     if (behaviorEnabled && behaviorError) {
       toast.error(`Behavior observations: ${behaviorError}`);
+      return;
+    }
+    if (!triggersResolved) {
+      toast.error("Resolve the NECTAR trigger(s) in your note before submitting.");
       return;
     }
 
@@ -2277,6 +2284,25 @@ export function PunchPad({
                   )}
                 </div>
 
+                {/* NECTAR trigger gate — on-device lexicon scan; blocks submit until resolved */}
+                {active && (
+                  <NoteTriggerPrompt
+                    text={narrative}
+                    clientId={active.client_id}
+                    date={new Date().toISOString().slice(0, 10)}
+                    onOpenForm={(kind) => {
+                      // Navigate to the client workspace where incident / appointment
+                      // intake lives. Trigger is marked resolved by the prompt itself.
+                      navigate({ to: `/dashboard/workspace/${active.client_id}` });
+                      toast.message(
+                        kind === "incident"
+                          ? "Opened client workspace — file the Incident Report there, then return."
+                          : "Opened client workspace — log the appointment, then return.",
+                      );
+                    }}
+                    onAllResolved={setTriggersResolved}
+                  />
+                )}
 
                 {/* NECTAR Documentation Coach */}
                 {(aiBusy || aiCoach) && (

@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { User, Search, Clock, Home, Info, ChevronDown, CalendarCheck2 } from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 import { ClientCapBars } from "@/components/staff-mobile/client-cap-bars";
-import { billingUnitLabel, isClockableServiceCode } from "@/lib/service-billing";
+import { billingUnitLabel, isClockableServiceCode, isDailyServiceCode } from "@/lib/service-billing";
+import { isEvvLockedCode } from "@/lib/evv-codes";
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
@@ -108,6 +109,25 @@ function ClientDetail({
                   ].join(" ")}
                 >
                   {billingLabel(code)}
+                </span>
+                <span
+                  className={[
+                    "mt-1 inline-block rounded-full px-1.5 py-[1px] text-[9px] font-semibold uppercase tracking-wide",
+                    isEvvLockedCode(code)
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                      : isDailyServiceCode(code)
+                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                        : "bg-slate-500/15 text-slate-600 dark:text-slate-300",
+                  ].join(" ")}
+                  title={
+                    isEvvLockedCode(code)
+                      ? "EVV-billed: clock-in transmits to UEVV; time = billable units"
+                      : isDailyServiceCode(code)
+                        ? "Daily-rate: billed per day; clocking captures payroll only"
+                        : "Payroll only: not billed by clock — separate evidence required"
+                  }
+                >
+                  {isEvvLockedCode(code) ? "EVV billable" : isDailyServiceCode(code) ? "Daily rate" : "Payroll only"}
                 </span>
               </button>
             );

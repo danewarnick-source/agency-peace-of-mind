@@ -195,11 +195,33 @@ export function CoverageRequirementsDialog({ open, onOpenChange, organizationId 
                 </div>
               )}
 
+              {isResidential && (
+                <div className="rounded-md border border-teal-200 bg-teal-50/60 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-teal-900">
+                    <Info className="h-3.5 w-3.5" /> Computed from resident ratios
+                  </div>
+                  <div className="text-sm text-teal-900 tabular-nums">
+                    {computedQ.isLoading
+                      ? "Calculating…"
+                      : computedSummary ?? "No active residents — nothing to compute."}
+                  </div>
+                  {computedQ.data?.twoToOne && (
+                    <div className="text-[11px] font-medium text-amber-800">
+                      2:1 ratio requires an approved rights modification (SOW §1.33).
+                    </div>
+                  )}
+                  <p className="text-[11px] leading-snug text-teal-900/80">
+                    Hive derives required staffing from each resident's DSPD Worksheet ratio. Add manual
+                    windows only for house rules beyond the worksheet (e.g., awake overnight).
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-md border divide-y">
                 {reqsQ.isLoading ? (
                   <div className="p-3 text-sm text-muted-foreground">Loading…</div>
                 ) : (reqsQ.data ?? []).length === 0 ? (
-                  <div className="p-3 text-sm text-muted-foreground">No requirements yet.</div>
+                  <div className="p-3 text-sm text-muted-foreground">No manual overrides yet.</div>
                 ) : (reqsQ.data ?? []).map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
@@ -216,8 +238,20 @@ export function CoverageRequirementsDialog({ open, onOpenChange, organizationId 
               </div>
 
               <div className="rounded-md border p-3 space-y-2">
-                <Label className="text-xs">Add requirement</Label>
+                <Label className="text-xs">Manual overrides</Label>
                 <div className="flex flex-wrap gap-1">
+                  <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => applyPreset("awake-overnight")}>
+                    1 awake overnight (11p–7a)
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => applyPreset("min-1-24h")}>
+                    24-hour minimum 1 staff
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => applyPreset("three-bands")}>
+                    Day + Swing + Overnight (1 each)
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+
                   <button
                     onClick={() => setDayOfWeek(null)}
                     className={`min-h-[36px] rounded-md border px-2 text-xs font-semibold ${dayOfWeek === null ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}

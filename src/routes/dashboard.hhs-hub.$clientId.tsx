@@ -507,7 +507,7 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           <Button
             className="h-12 w-full bg-emerald-600 text-base font-semibold hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
             onClick={() => handleSubmit()}
-            disabled={!hasGoal || !narrativeOk || aiBusy}>
+            disabled={!hasGoal || !narrativeOk || aiBusy || !triggersResolved || !finalAttest}>
             {aiBusy
               ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />NECTAR reviewing your note…</>
               : coach?.status === "Flagged"

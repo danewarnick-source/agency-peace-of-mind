@@ -44,7 +44,7 @@ interface Props {
  * red-striped gaps where staffing falls below the requirement and
  * green-striped bands where it exceeds it (over-coverage).
  */
-export function CoverageBar24h({ day, shifts, requirements = [], className, micro }: Props) {
+export function CoverageBar24h({ day, shifts, requirements = [], computedRequiredMinutes, tooltipNote, className, micro }: Props) {
   const dayStart = useMemo(() => {
     const d = new Date(day);
     d.setHours(0, 0, 0, 0);
@@ -69,15 +69,21 @@ export function CoverageBar24h({ day, shifts, requirements = [], className, micr
   }, [shifts, dayStart, dayEnd]);
 
   // Minute-by-minute coverage vs requirement (segments subtract their staff).
-  const { gaps, overs } = useMemo(() => {
-    if (requirements.length === 0) return { gaps: [], overs: [] } as {
-      gaps: Array<{ left: number; width: number }>;
-      overs: Array<{ left: number; width: number }>;
-    };
+  const { gaps, overs, hasRequirement } = useMemo(() => {
+    const hasComputed = !!computedRequiredMinutes && computedRequiredMinutes.length > 0;
+    if (requirements.length === 0 && !hasComputed) {
+      return { gaps: [], overs: [], hasRequirement: false } as {
+        gaps: Array<{ left: number; width: number }>;
+        overs: Array<{ left: number; width: number }>;
+        hasRequirement: boolean;
+      };
+    }
     const minutes = coverageCountMinutes(dayStart, shifts);
-    const required = requiredMinutes(requirements);
+    const manual = requirements.length ? requiredMinutes(requirements) : new Array(1440).fill(0);
+    const computed = hasComputed ? computedRequiredMinutes! : new Array(1440).fill(0);
+    const required = new Array<number>(1440);
+    for (let i = 0; i < 1440; i++) required[i] = Math.max(manual[i] ?? 0, computed[i] ?? 0);
     const gaps = uncoveredBands(minutes, required);
-    // Over-coverage: staffing above a non-zero requirement.
     const overs: Array<{ left: number; width: number }> = [];
     let i = 0;
     const n = 24 * 60;
@@ -88,8 +94,9 @@ export function CoverageBar24h({ day, shifts, requirements = [], className, micr
         overs.push({ left: (start / n) * 100, width: ((i - start) / n) * 100 });
       } else i++;
     }
-    return { gaps, overs };
-  }, [shifts, requirements, dayStart]);
+    return { gaps, overs, hasRequirement: true };
+  }, [shifts, requirements, computedRequiredMinutes, dayStart]);
+
 
   const hasGap = gaps.length > 0;
   const hasOver = overs.length > 0;

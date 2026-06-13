@@ -586,8 +586,27 @@ export function IncidentReportDialog({
         if (aErr) return aErr;
         return null;
       }
-      case "narrative":
-        return validateNarrative(description);
+      case "narrative": {
+        const nErr = validateNarrative(description);
+        if (nErr) return nErr;
+        if (!aiEnabled) return null;
+        if (narrativeReviewStatus === "idle") {
+          return "Click 'Review with NECTAR' below — NECTAR has to check the narrative before you can continue.";
+        }
+        if (narrativeReviewStatus === "reviewing") {
+          return "Nectar is still reviewing — give it a moment.";
+        }
+        if (narrativeReviewStatus === "needs_answers") {
+          const unresolved = narrativeReviewIssues
+            .map((g, i) => ({ g, i }))
+            .filter(({ g, i }) => g.severity === "must_fix"
+              && !(narrativeGapAnswers[i]?.trim() || narrativeGapNA[i]?.trim()));
+          if (unresolved.length) {
+            return "Answer (or mark N/A) every required NECTAR follow-up before continuing.";
+          }
+        }
+        return null;
+      }
       case "details": {
         if (!block) return null;
         const missing = missingRequired(block, details);

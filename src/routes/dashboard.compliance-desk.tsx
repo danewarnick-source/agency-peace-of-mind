@@ -814,13 +814,28 @@ function ComplianceDeskPage() {
           }}
         />
       ) : sub === "evv-archive" ? (
-        <ArchiveTable
-          variant="evv"
-          rows={(approvedQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
-          loading={approvedQ.isLoading}
-          onMap={setMapOpen}
-          onEdit={setEditRow}
-        />
+        <div className="space-y-4">
+          {org?.organization_id && (
+            <EvvExportArchiveStrip
+              organizationId={org.organization_id}
+              approvedRows={(approvedQ.data ?? []).map((r) => ({
+                id: r.id, service_type_code: r.service_type_code,
+                clock_in_timestamp: r.clock_in_timestamp,
+                outside_geofence_reason: r.outside_geofence_reason,
+                clients: r.clients ? { first_name: r.clients.first_name, last_name: r.clients.last_name, medicaid_id: r.clients.medicaid_id } : null,
+              }))}
+              staffNameMap={staffNameMap}
+              onOpenExport={() => setUtahExportOpen(true)}
+            />
+          )}
+          <ArchiveTable
+            variant="evv"
+            rows={(approvedQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
+            loading={approvedQ.isLoading}
+            onMap={setMapOpen}
+            onEdit={setEditRow}
+          />
+        </div>
       ) : (
         <ArchiveTable
           variant="non-evv"
@@ -835,6 +850,14 @@ function ComplianceDeskPage() {
       <EditShiftDialog row={editRow} onClose={() => setEditRow(null)} />
       <ReasonDialog row={reasonRow} onClose={() => setReasonRow(null)} />
       <ReviewReconciliationDialog row={reviewRow} onClose={() => setReviewRow(null)} />
+      {org?.organization_id && (
+        <UtahExportDialog
+          open={utahExportOpen}
+          onClose={() => setUtahExportOpen(false)}
+          organizationId={org.organization_id}
+          staffNameMap={staffNameMap}
+        />
+      )}
     </div>
   );
 }

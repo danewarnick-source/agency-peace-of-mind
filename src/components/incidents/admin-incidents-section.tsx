@@ -295,6 +295,12 @@ function IncidentCard({
               label="SC response 5 bus.d"
             />
           ))}
+          {ir.is_abuse_neglect && !ir.aps_notified_at && (
+            <Badge className="bg-rose-600 text-white">APS-PENDING</Badge>
+          )}
+          {ir.restraint_used && (
+            <Badge className="bg-amber-600 text-white">RESTRAINT</Badge>
+          )}
           {closed && openSc.length === 0 && <Badge className="bg-slate-600 text-white">Closed</Badge>}
           {closed && openSc.length > 0 && (
             <Badge className="bg-amber-600 text-white">Re-surfaced · open SC request</Badge>

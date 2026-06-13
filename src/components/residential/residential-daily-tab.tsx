@@ -254,7 +254,7 @@ export function ResidentialDailyTab({
     for (const ir of incidentsQ.data ?? []) {
       const row = map.get(ir.client_id);
       if (!row) continue;
-      if (ir.status === "closed") row.incidentsClosed += 1;
+      if (ir.status === "State_Confirmed") row.incidentsClosed += 1;
       else row.incidentsOpen += 1;
       if (ir.is_fatality) row.fatalityThisMonth = true;
     }

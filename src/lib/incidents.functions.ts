@@ -123,7 +123,7 @@ export const createIncident = createServerFn({ method: "POST" })
       is_abuse_neglect: !!data.is_abuse_neglect,
       prevention_strategies: data.prevention_strategies ?? null,
       is_fatality: !!data.is_fatality,
-      status: "submitted",
+      status: "Pending_Admin_Review",
       triggered_by_note_id: data.triggered_by_note_id ?? null,
       triggered_by_note_type: data.triggered_by_note_type ?? null,
       details: data.details ?? {},
@@ -172,7 +172,7 @@ export const listIncidents = createServerFn({ method: "GET" })
     // For the "open queue" view we widen the SQL to include closed incidents
     // too — the caller layers the "open SC request" re-surface rule client-side
     // so a closed incident with an outstanding SC request still appears.
-    if (data.status === "closed") q = q.eq("status", "closed");
+    if (data.status === "closed") q = q.eq("status", "State_Confirmed");
     if (data.client_id) q = q.eq("client_id", data.client_id);
     if (data.category) q = q.eq("category", data.category);
     if (data.from) q = q.gte("discovered_at", data.from);
@@ -309,9 +309,9 @@ async function maybeClose(supabase: AnySupabase, id: string) {
     .eq("id", id)
     .maybeSingle();
   if (!data) return;
-  if (data.status === "closed") return;
+  if (data.status === "State_Confirmed") return;
   if (data.upi_initiated_at && data.upi_completed_at && data.guardian_notified_at) {
-    await supabase.from("incident_reports").update({ status: "closed" }).eq("id", id);
+    await supabase.from("incident_reports").update({ status: "State_Confirmed" }).eq("id", id);
   }
 }
 

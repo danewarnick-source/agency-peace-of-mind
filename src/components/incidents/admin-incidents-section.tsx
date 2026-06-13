@@ -242,7 +242,7 @@ function IncidentCard({
   const guardianDeadline = new Date(discovered.getTime() + 24 * 3_600_000);
   const completionDeadline = addBusinessDays(discovered, 5);
   const clientName = ir.clients ? `${ir.clients.first_name} ${ir.clients.last_name}` : "Client";
-  const closed = ir.status === "closed";
+  const closed = ir.status === "State_Confirmed";
   const openSc = scRequests.filter((s) => !s.responded_at);
   const respondedSc = scRequests.filter((s) => !!s.responded_at);
 
@@ -445,7 +445,7 @@ export function AdminIncidentsSection({
   const visible = useMemo(() => {
     if (view === "log") return incidents;
     return incidents.filter((ir) => {
-      if (ir.status !== "closed") return true;
+      if (ir.status !== "State_Confirmed") return true;
       return (scByIncident.get(ir.id) ?? []).some((s) => !s.responded_at);
     });
   }, [view, incidents, scByIncident]);

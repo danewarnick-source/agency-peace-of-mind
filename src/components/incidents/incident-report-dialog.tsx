@@ -342,6 +342,10 @@ export function IncidentReportDialog({
     setDetails({});
     setDismissedTerms(new Set());
     setSubmitted(false);
+    setAiIssues(null);
+    setAiStatus(null);
+    setAiAnswers({});
+    setAiNA({});
   }, [open, clientId, initialDiscovered]);
 
   const isAbuse = category === ABUSE_CATEGORY;

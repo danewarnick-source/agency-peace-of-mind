@@ -237,7 +237,7 @@ export function IncidentReportDialog({
   const [shorthand, setShorthand] = useState("");
   const [nectarDraft, setNectarDraft] = useState<string | null>(null);
   const [nectarDraftGaps, setNectarDraftGaps] = useState<Array<{
-    field: string; severity: "must_fix" | "should_add"; question: string;
+    field: string; severity: "must_fix" | "should_add"; question: string; answer_type?: "yes_no" | "text";
   }>>([]);
   const [gapAnswers, setGapAnswers] = useState<Record<number, string>>({});
   const [gapNA, setGapNA] = useState<Record<number, string>>({});

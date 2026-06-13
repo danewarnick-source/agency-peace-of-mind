@@ -123,7 +123,7 @@ export const createIncident = createServerFn({ method: "POST" })
       is_abuse_neglect: !!data.is_abuse_neglect,
       prevention_strategies: data.prevention_strategies ?? null,
       is_fatality: !!data.is_fatality,
-      status: "submitted",
+      status: "Pending_Admin_Review",
       triggered_by_note_id: data.triggered_by_note_id ?? null,
       triggered_by_note_type: data.triggered_by_note_type ?? null,
       details: data.details ?? {},

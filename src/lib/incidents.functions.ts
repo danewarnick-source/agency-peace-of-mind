@@ -52,6 +52,14 @@ const createInput = z.object({
   is_fatality: z.boolean().default(false),
   triggered_by_note_id: z.string().uuid().nullable().optional(),
   triggered_by_note_type: z.string().max(60).nullable().optional(),
+  // §1.27 structured detail extensions
+  details: z.record(z.string(), z.unknown()).default({}),
+  witnessed_directly: z.boolean().nullable().optional(),
+  reported_to_reporter_by: z.string().max(300).nullable().optional(),
+  restraint_used: z.boolean().default(false),
+  aps_notified_at: z.string().datetime().nullable().optional(),
+  aps_notified_by: z.string().max(300).nullable().optional(),
+  aps_reference: z.string().max(120).nullable().optional(),
 });
 
 export const createIncident = createServerFn({ method: "POST" })

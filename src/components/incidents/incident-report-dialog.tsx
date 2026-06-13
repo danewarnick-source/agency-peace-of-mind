@@ -256,6 +256,19 @@ export function IncidentReportDialog({
   const [completenessIssues, setCompletenessIssues] = useState<AiIssue[] | null>(null);
   const [completenessBusy, setCompletenessBusy] = useState(false);
 
+  // ── In-step NECTAR review on the narrative step ─────────────────────────
+  // Gates Next on the narrative step until staff click "Review with NECTAR"
+  // and resolve any must_fix follow-ups. Mirrors the Draft-with-NECTAR gap UI.
+  const [narrativeReviewStatus, setNarrativeReviewStatus] = useState<
+    "idle" | "reviewing" | "passed" | "needs_answers" | "skipped"
+  >("idle");
+  const [narrativeReviewIssues, setNarrativeReviewIssues] = useState<AiIssue[]>([]);
+  const [narrativeGapAnswers, setNarrativeGapAnswers] = useState<Record<number, string>>({});
+  const [narrativeGapNA, setNarrativeGapNA] = useState<Record<number, string>>({});
+  // Snapshot of the description text the review ran against — used to
+  // invalidate the review when staff edit the narrative afterwards.
+  const [reviewedDescription, setReviewedDescription] = useState<string>("");
+
   const [orgAiEnabled, setOrgAiEnabled] = useState<boolean | null>(null);
   useEffect(() => {
     if (!open || !org?.organization_id) return;

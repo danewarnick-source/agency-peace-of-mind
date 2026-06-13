@@ -14,15 +14,22 @@ import { InternalAuditPage } from "./dashboard.internal-audit";
 import { AuditPage } from "./dashboard.audit";
 import { AuditZone } from "@/components/audit-zone/audit-zone";
 import { HrcPage } from "./dashboard.hrc";
+import { AdminIncidentsSection } from "@/components/incidents/admin-incidents-section";
 
 const search = z.object({
-  tab: z.enum(["review", "evv", "host-home", "forms", "audit", "hrc"]).optional(),
+  tab: z.enum(["review", "evv", "incidents", "host-home", "forms", "audit", "hrc"]).optional(),
+  client: z.string().optional(),
 });
 
 export const Route = createFileRoute("/dashboard/hub/documentation")({
   head: () => ({ meta: [{ title: "Documentation — HIVE" }] }),
   validateSearch: (s) => search.parse(s),
-  component: () => (
+  component: DocumentationHub,
+});
+
+function DocumentationHub() {
+  const { client } = Route.useSearch();
+  return (
     <HubShell
       title="Documentation"
       basePath="/dashboard/hub/documentation"
@@ -44,6 +51,16 @@ export const Route = createFileRoute("/dashboard/hub/documentation")({
             </section>
           </div>
         ) },
+        {
+          key: "incidents",
+          label: "Incidents",
+          render: () => (
+            <AdminIncidentsSection
+              initialClientId={client ?? null}
+              initialView={client ? "log" : "queue"}
+            />
+          ),
+        },
         { key: "host-home", label: "Host home", render: () => <HostHomeControl /> },
         { key: "forms", label: "Forms", render: () => <FormsIndex /> },
         {
@@ -82,8 +99,8 @@ export const Route = createFileRoute("/dashboard/hub/documentation")({
         { key: "hrc", label: "Human Rights Committee", render: () => <HrcPage /> },
       ]}
     />
-  ),
-});
+  );
+}
 
 // ─── Review landing (read-only summary tiles) ────────────────────────────────
 function ReviewLanding() {
@@ -139,7 +156,7 @@ function ReviewLanding() {
       Icon: ClipboardCheck,
       tone: "text-[#137182] bg-[#137182]/10",
       to: "/dashboard/hub/documentation",
-      tab: "evv",
+      tab: "evv" as const,
     },
     {
       key: "flags",
@@ -149,7 +166,7 @@ function ReviewLanding() {
       Icon: AlertTriangle,
       tone: "text-amber-700 bg-amber-100",
       to: "/dashboard/hub/documentation",
-      tab: "evv",
+      tab: "evv" as const,
     },
     {
       key: "forms",
@@ -159,7 +176,7 @@ function ReviewLanding() {
       Icon: FileText,
       tone: "text-[#0B1126] bg-[#0B1126]/10",
       to: "/dashboard/hub/documentation",
-      tab: "forms",
+      tab: "forms" as const,
     },
   ];
 

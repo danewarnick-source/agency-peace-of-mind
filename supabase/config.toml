@@ -9,3 +9,6 @@ verify_jwt = true
 [functions.parse-referral-doc]
 verify_jwt = true
 
+[functions.review-incident-report]
+verify_jwt = true
+

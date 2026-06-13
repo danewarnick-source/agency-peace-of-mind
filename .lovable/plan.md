@@ -1,22 +1,11 @@
-## Problem
+## Diagnosis
 
-`/dashboard/workspace/$clientId` crashes with **React error #310** ("Rendered more hooks than during the previous render").
-
-In `src/routes/dashboard.workspace.$clientId.tsx` two hooks — `useClientFeature(client, "emar")` and `useQuery({ queryKey: ["workspace-bs-tab", …] })` — are called **after** the `if (isLoading || !client) return …` early return. On the first render `client` is null, the function returns early, and those hooks never run. As soon as the caseload resolves and `client` becomes truthy, React sees two new hooks appear in the render and throws #310.
+The preview shows "preview has not built yet" because the Vite dev server in the sandbox is not responding (`curl localhost:5173` → 000, no connection). The log shows only deprecation warnings (no fatal errors) and the last activity was at 8:27 PM, so the process is wedged rather than crashed on a syntax error. Env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`) are present and correct.
 
 ## Fix
 
-Move every hook call above the early return. Specifically, in `src/routes/dashboard.workspace.$clientId.tsx`:
+1. Restart the Vite dev server via `code--restart_dev_server`.
+2. Re-check `curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/` returns 200, and tail `/tmp/dev-server-logs/dev-server.log` for any new fatal errors.
+3. If it comes back up, done — preview will render. If it crashes on startup, read the new error and fix the offending file (most likely a stale build artifact from the recent `celebrations.functions.ts` / `dashboard.workspace.$clientId.tsx` edits).
 
-1. Move `const { enabled: emarEnabled } = useClientFeature(client, "emar");` up to sit with the other hooks (right after `useTodayShifts` / `effectivePresetCode`). `useClientFeature` must accept a possibly-null client; if it doesn't already, pass `client ?? null` and gate the result with `client ? emarEnabled : false`.
-2. Move the `useQuery` that powers `bsTab` up to the same hook block, and set `enabled: !!client?.id` on the query so it doesn't fire until the client is loaded. Keep its `queryFn` reading `client.id` only when enabled.
-3. Leave the `if (isLoading || !client) return …` early return where it is, but now *below* all hook calls.
-4. No other behavior changes — tabs, gating logic, and rendering stay identical.
-
-## Why not the other route changes
-
-This crash is unrelated to the incident-wizard work. The workspace route hasn't changed recently; the bug was latent and only triggers when the caseload query flips from loading to loaded on this screen. One small reordering fixes it.
-
-## Verification
-
-After the edit, hard-reload `/dashboard/workspace/<clientId>?tab=forms`. The page should render the client header + tabs instead of the error boundary, and the console should be free of #310.
+No source-code changes are expected — this is a stuck dev-server process, not a code bug.

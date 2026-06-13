@@ -51,6 +51,8 @@ type Incident = {
   followup_notes: string | null;
   created_at: string;
   clients: { first_name: string; last_name: string } | null;
+  restraint_used?: boolean | null;
+  aps_notified_at?: string | null;
 };
 
 type ScRequest = {

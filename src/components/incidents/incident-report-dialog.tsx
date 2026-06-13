@@ -17,7 +17,7 @@ import {
   AlertTriangle, Skull, ShieldAlert, Sparkles, X, Loader2, ShieldCheck, Mic, MicOff, Wand2,
 } from "lucide-react";
 import { createIncident } from "@/lib/incidents.functions";
-import { draftIncidentNarrative } from "@/lib/ai-coach.functions";
+import { draftIncidentNarrative, reviewIncidentReport } from "@/lib/ai-coach.functions";
 import {
   INCIDENT_CATEGORIES, ABUSE_CATEGORY, FATALITY_CATEGORY, type IncidentCategory,
 } from "./incident-categories";

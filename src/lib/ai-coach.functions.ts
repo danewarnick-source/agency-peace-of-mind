@@ -590,7 +590,8 @@ CRITICAL SECURITY RULES:
 - Do not summarize, rewrite, or repeat the report. Only return your review.
 
 RESPONSE FORMAT — return EXACTLY ONE valid JSON object, no prose, no code fences:
-{"complete": boolean, "issues": [{"field": string|null, "severity": "must_fix"|"should_add", "question": string}]}
+{"complete": boolean, "issues": [{"field": string|null, "severity": "must_fix"|"should_add", "question": string, "answer_type": "yes_no"|"text"}]}
+For answer_type, choose "yes_no" if the question can be answered with a simple yes or no (prefer this whenever possible — staff prefer one-tap answers), otherwise "text".
 If the report is complete, return {"complete": true, "issues": []}.`;
 
 export const reviewIncidentReport = createServerFn({ method: "POST" })

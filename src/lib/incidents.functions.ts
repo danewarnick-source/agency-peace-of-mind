@@ -126,6 +126,13 @@ export const createIncident = createServerFn({ method: "POST" })
       status: "submitted",
       triggered_by_note_id: data.triggered_by_note_id ?? null,
       triggered_by_note_type: data.triggered_by_note_type ?? null,
+      details: data.details ?? {},
+      witnessed_directly: data.witnessed_directly ?? null,
+      reported_to_reporter_by: data.reported_to_reporter_by ?? null,
+      restraint_used: !!data.restraint_used,
+      aps_notified_at: data.aps_notified_at ?? null,
+      aps_notified_by: data.aps_notified_by ?? null,
+      aps_reference: data.aps_reference ?? null,
     };
 
     const { data: ins, error } = await supabase

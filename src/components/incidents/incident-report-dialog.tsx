@@ -483,53 +483,79 @@ export function IncidentReportDialog({
     } finally { setDraftBusy(false); }
   }
 
-  // Gate: every must_fix gap must have an answer OR an N/A reason before
-  // staff can click "Use this draft". This is the first of two NECTAR
-  // gates — the second runs at the nectar-interview step after the
-  // description is committed.
+  // Gate: every must_fix gap must have an answer before staff can click
+  // "Use this draft". This is the first of two NECTAR gates — the second
+  // runs at the nectar-interview step after the description is committed.
   const draftMustFixUnresolved = nectarDraftGaps
     .map((g, i) => ({ g, i }))
-    .filter(({ g, i }) => g.severity === "must_fix"
-      && !(gapAnswers[i]?.trim() || gapNA[i]?.trim()));
+    .filter(({ g, i }) => g.severity === "must_fix" && !gapAnswers[i]?.trim());
   const canAcceptDraft = !!nectarDraft && draftMustFixUnresolved.length === 0;
 
-  function acceptNectarDraft() {
+  async function acceptNectarDraft() {
     if (!nectarDraft) return;
     if (draftMustFixUnresolved.length > 0) {
-      toast.error("Answer (or mark N/A) every required follow-up below before using this draft.");
+      toast.error("Answer every required follow-up below before using this draft.");
       return;
     }
-    // Fold the answered follow-ups into the description as a final paragraph
-    // so the staff's clarifications land in the narrative without a second
-    // AI hop. Skipped (N/A) items are recorded with the staff's reason.
-    const answered = nectarDraftGaps
+    // Re-draft via Nectar with the staff's follow-up answers folded into
+    // knownFacts so the polished narrative actually incorporates them
+    // (instead of just tacking a Q&A block onto the bottom).
+    const answeredFacts = nectarDraftGaps
       .map((g, i) => {
         const ans = gapAnswers[i]?.trim();
-        const na = gapNA[i]?.trim();
-        if (ans) return `Q: ${g.question}\nA: ${ans}`;
-        if (na) return `Q: ${g.question}\nA: N/A — ${na}`;
-        return null;
+        if (!ans) return null;
+        return `${g.question} → ${ans}`;
       })
       .filter((s): s is string => !!s);
-    const composed = answered.length
-      ? `${nectarDraft}\n\nStaff follow-up answers:\n${answered.join("\n\n")}`
-      : nectarDraft;
+
+    const baseFacts = [
+      location ? `Location: ${location}` : "",
+      witnessedDirectly === "no" && reportedBy ? `Reported by: ${reportedBy}` : "",
+      ...answeredFacts,
+    ].filter(Boolean).join(" | ");
+
+    setDraftBusy(true);
+    let composed = nectarDraft;
+    try {
+      const res = await withAiTimeout(draftFn({
+        data: {
+          shorthand: shorthand.trim(),
+          category: category || "",
+          clientName: resolvedClientName || "the individual",
+          occurredAt: occurredAt ? new Date(occurredAt).toISOString() : null,
+          discoveredAt: discoveredAt ? new Date(discoveredAt).toISOString() : null,
+          knownFacts: baseFacts || null,
+        },
+      }));
+      composed = res.draft;
+      setNectarDraft(res.draft);
+    } catch {
+      // Re-draft failed — fall back to appending answers to the existing
+      // draft so staff aren't blocked.
+      const appended = nectarDraftGaps
+        .map((g, i) => {
+          const ans = gapAnswers[i]?.trim();
+          return ans ? `Q: ${g.question}\nA: ${ans}` : null;
+        })
+        .filter((s): s is string => !!s);
+      composed = appended.length ? `${nectarDraft}\n\n${appended.join("\n\n")}` : nectarDraft;
+    } finally {
+      setDraftBusy(false);
+    }
+
     setDescription(composed);
-    // Stash so the persisted incident retains the structured Q&A.
     setDetails((d) => ({
       ...d,
-      nectar_draft_followups: nectarDraftGaps.map((g, i) => ({
-        field: g.field,
-        severity: g.severity,
-        question: g.question,
-        answer: gapAnswers[i]?.trim() || null,
-        not_applicable_reason: gapNA[i]?.trim() || null,
-      })),
+      nectar_draft_followups: nectarDraftGaps
+        .filter((g) => g.severity === "must_fix")
+        .map((g, i) => ({
+          field: g.field,
+          severity: g.severity,
+          question: g.question,
+          answer: gapAnswers[i]?.trim() || null,
+        })),
     }));
-    toast.success("Draft accepted — edit it before continuing.");
-    // Kick off second-pass review immediately so follow-up questions are
-    // ready by the time the user reaches the nectar-interview step
-    // (description isn't in state yet, so pass it directly as an override).
+    toast.success("Draft re-generated with your answers — edit it before continuing.");
     void runAiReview(composed);
   }
 

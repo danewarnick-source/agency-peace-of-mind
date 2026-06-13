@@ -2339,27 +2339,25 @@ export function PunchPad({
                   />
                 )}
 
-                {active && (
-                  <IncidentReportDialog
-                    open={incidentDialogOpen}
-                    onOpenChange={(o) => {
-                      setIncidentDialogOpen(o);
-                      if (!o) setIncidentTriggerOpen(false);
-                    }}
-                    clientId={active.client_id}
-                    triggeredByNoteId={active.id}
-                    triggeredByNoteType={incidentTriggerOpen ? "evv_shift_note_trigger" : "evv_shift_quick_action"}
-                    onSubmitted={(id) => {
-                      setIncidentReportIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-                      setIncidentFlag(true);
-                      // Force the NoteTriggerPrompt poll to refetch so the
-                      // incident gate clears the moment the IR is submitted.
-                      qc.invalidateQueries({
-                        queryKey: ["incident-submitted-for", active.client_id, new Date().toISOString().slice(0, 10)],
-                      });
-                    }}
-                  />
-                )}
+                <IncidentReportDialog
+                  open={incidentDialogOpen && !!active}
+                  onOpenChange={(o) => {
+                    setIncidentDialogOpen(o);
+                    if (!o) setIncidentTriggerOpen(false);
+                  }}
+                  clientId={active?.client_id}
+                  triggeredByNoteId={active?.id}
+                  triggeredByNoteType={incidentTriggerOpen ? "evv_shift_note_trigger" : "evv_shift_quick_action"}
+                  onSubmitted={(id) => {
+                    setIncidentReportIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                    setIncidentFlag(true);
+                    // Force the NoteTriggerPrompt poll to refetch so the
+                    // incident gate clears the moment the IR is submitted.
+                    qc.invalidateQueries({
+                      queryKey: ["incident-submitted-for", active?.client_id, new Date().toISOString().slice(0, 10)],
+                    });
+                  }}
+                />
 
 
                 {/* NECTAR Documentation Coach */}

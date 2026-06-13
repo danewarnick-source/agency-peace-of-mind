@@ -701,12 +701,8 @@ export function IncidentReportDialog({
     setNarrativeReviewStatus("reviewing");
     try {
       const draft = { ...buildDraft(), description: text };
-      const result = await withAiTimeout(
-        supabase.functions.invoke("review-incident-report", { body: { draft } }),
-      );
-      const { data: r, error: rerr } =
-        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
-      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+      const r = await withAiTimeout(reviewFn({ data: { draft } }));
+      if (!r || typeof r.complete !== "boolean" || r.skipped) {
         setNarrativeReviewIssues([]);
         setNarrativeReviewStatus("skipped");
         setReviewedDescription(text);

@@ -189,6 +189,7 @@ type AiIssue = {
   field: string | null;
   severity: "must_fix" | "should_add";
   question: string;
+  answer_type?: "yes_no" | "text";
   answer?: string | null;
   not_applicable_reason?: string | null;
 };
@@ -236,7 +237,7 @@ export function IncidentReportDialog({
   const [shorthand, setShorthand] = useState("");
   const [nectarDraft, setNectarDraft] = useState<string | null>(null);
   const [nectarDraftGaps, setNectarDraftGaps] = useState<Array<{
-    field: string; severity: "must_fix" | "should_add"; question: string;
+    field: string; severity: "must_fix" | "should_add"; question: string; answer_type?: "yes_no" | "text";
   }>>([]);
   const [gapAnswers, setGapAnswers] = useState<Record<number, string>>({});
   const [gapNA, setGapNA] = useState<Record<number, string>>({});
@@ -482,53 +483,79 @@ export function IncidentReportDialog({
     } finally { setDraftBusy(false); }
   }
 
-  // Gate: every must_fix gap must have an answer OR an N/A reason before
-  // staff can click "Use this draft". This is the first of two NECTAR
-  // gates — the second runs at the nectar-interview step after the
-  // description is committed.
+  // Gate: every must_fix gap must have an answer before staff can click
+  // "Use this draft". This is the first of two NECTAR gates — the second
+  // runs at the nectar-interview step after the description is committed.
   const draftMustFixUnresolved = nectarDraftGaps
     .map((g, i) => ({ g, i }))
-    .filter(({ g, i }) => g.severity === "must_fix"
-      && !(gapAnswers[i]?.trim() || gapNA[i]?.trim()));
+    .filter(({ g, i }) => g.severity === "must_fix" && !gapAnswers[i]?.trim());
   const canAcceptDraft = !!nectarDraft && draftMustFixUnresolved.length === 0;
 
-  function acceptNectarDraft() {
+  async function acceptNectarDraft() {
     if (!nectarDraft) return;
     if (draftMustFixUnresolved.length > 0) {
-      toast.error("Answer (or mark N/A) every required follow-up below before using this draft.");
+      toast.error("Answer every required follow-up below before using this draft.");
       return;
     }
-    // Fold the answered follow-ups into the description as a final paragraph
-    // so the staff's clarifications land in the narrative without a second
-    // AI hop. Skipped (N/A) items are recorded with the staff's reason.
-    const answered = nectarDraftGaps
+    // Re-draft via Nectar with the staff's follow-up answers folded into
+    // knownFacts so the polished narrative actually incorporates them
+    // (instead of just tacking a Q&A block onto the bottom).
+    const answeredFacts = nectarDraftGaps
       .map((g, i) => {
         const ans = gapAnswers[i]?.trim();
-        const na = gapNA[i]?.trim();
-        if (ans) return `Q: ${g.question}\nA: ${ans}`;
-        if (na) return `Q: ${g.question}\nA: N/A — ${na}`;
-        return null;
+        if (!ans) return null;
+        return `${g.question} → ${ans}`;
       })
       .filter((s): s is string => !!s);
-    const composed = answered.length
-      ? `${nectarDraft}\n\nStaff follow-up answers:\n${answered.join("\n\n")}`
-      : nectarDraft;
+
+    const baseFacts = [
+      location ? `Location: ${location}` : "",
+      witnessedDirectly === "no" && reportedBy ? `Reported by: ${reportedBy}` : "",
+      ...answeredFacts,
+    ].filter(Boolean).join(" | ");
+
+    setDraftBusy(true);
+    let composed = nectarDraft;
+    try {
+      const res = await withAiTimeout(draftFn({
+        data: {
+          shorthand: shorthand.trim(),
+          category: category || "",
+          clientName: resolvedClientName || "the individual",
+          occurredAt: occurredAt ? new Date(occurredAt).toISOString() : null,
+          discoveredAt: discoveredAt ? new Date(discoveredAt).toISOString() : null,
+          knownFacts: baseFacts || null,
+        },
+      }));
+      composed = res.draft;
+      setNectarDraft(res.draft);
+    } catch {
+      // Re-draft failed — fall back to appending answers to the existing
+      // draft so staff aren't blocked.
+      const appended = nectarDraftGaps
+        .map((g, i) => {
+          const ans = gapAnswers[i]?.trim();
+          return ans ? `Q: ${g.question}\nA: ${ans}` : null;
+        })
+        .filter((s): s is string => !!s);
+      composed = appended.length ? `${nectarDraft}\n\n${appended.join("\n\n")}` : nectarDraft;
+    } finally {
+      setDraftBusy(false);
+    }
+
     setDescription(composed);
-    // Stash so the persisted incident retains the structured Q&A.
     setDetails((d) => ({
       ...d,
-      nectar_draft_followups: nectarDraftGaps.map((g, i) => ({
-        field: g.field,
-        severity: g.severity,
-        question: g.question,
-        answer: gapAnswers[i]?.trim() || null,
-        not_applicable_reason: gapNA[i]?.trim() || null,
-      })),
+      nectar_draft_followups: nectarDraftGaps
+        .filter((g) => g.severity === "must_fix")
+        .map((g, i) => ({
+          field: g.field,
+          severity: g.severity,
+          question: g.question,
+          answer: gapAnswers[i]?.trim() || null,
+        })),
     }));
-    toast.success("Draft accepted — edit it before continuing.");
-    // Kick off second-pass review immediately so follow-up questions are
-    // ready by the time the user reaches the nectar-interview step
-    // (description isn't in state yet, so pass it directly as an override).
+    toast.success("Draft re-generated with your answers — edit it before continuing.");
     void runAiReview(composed);
   }
 
@@ -600,10 +627,9 @@ export function IncidentReportDialog({
         if (narrativeReviewStatus === "needs_answers") {
           const unresolved = narrativeReviewIssues
             .map((g, i) => ({ g, i }))
-            .filter(({ g, i }) => g.severity === "must_fix"
-              && !(narrativeGapAnswers[i]?.trim() || narrativeGapNA[i]?.trim()));
+            .filter(({ g, i }) => g.severity === "must_fix" && !narrativeGapAnswers[i]?.trim());
           if (unresolved.length) {
-            return "Answer (or mark N/A) every required NECTAR follow-up before continuing.";
+            return "Answer every required NECTAR follow-up before continuing.";
           }
         }
         return null;
@@ -660,14 +686,13 @@ export function IncidentReportDialog({
     // the structured Q&A on details for the persisted record.
     if (currentKey === "narrative"
         && narrativeReviewStatus === "needs_answers"
-        && narrativeReviewIssues.length > 0) {
+        && narrativeReviewIssues.some((g) => g.severity === "must_fix")) {
       const answered = narrativeReviewIssues
         .map((g, i) => {
+          if (g.severity !== "must_fix") return null;
           const ans = narrativeGapAnswers[i]?.trim();
-          const na = narrativeGapNA[i]?.trim();
-          if (ans) return `Q: ${g.question}\nA: ${ans}`;
-          if (na) return `Q: ${g.question}\nA: N/A — ${na}`;
-          return null;
+          if (!ans) return null;
+          return `Q: ${g.question}\nA: ${ans}`;
         })
         .filter((s): s is string => !!s);
       if (answered.length) {
@@ -677,13 +702,14 @@ export function IncidentReportDialog({
       }
       setDetails((d) => ({
         ...d,
-        nectar_narrative_followups: narrativeReviewIssues.map((g, i) => ({
-          field: g.field,
-          severity: g.severity,
-          question: g.question,
-          answer: narrativeGapAnswers[i]?.trim() || null,
-          not_applicable_reason: narrativeGapNA[i]?.trim() || null,
-        })),
+        nectar_narrative_followups: narrativeReviewIssues
+          .filter((g) => g.severity === "must_fix")
+          .map((g, i) => ({
+            field: g.field,
+            severity: g.severity,
+            question: g.question,
+            answer: narrativeGapAnswers[i]?.trim() || null,
+          })),
       }));
     }
     setStep((s) => Math.min(lastStep, s + 1));
@@ -1190,44 +1216,41 @@ export function IncidentReportDialog({
                           <p className="whitespace-pre-wrap">{nectarDraft}</p>
                         </div>
                       )}
-                      {nectarDraft && nectarDraftGaps.length > 0 && (
+                      {nectarDraft && nectarDraftGaps.filter((g) => g.severity === "must_fix").length > 0 && (
                         <div className="mt-2 space-y-2 rounded border border-amber-300 bg-amber-50/60 p-2 text-xs dark:bg-amber-950/30 dark:border-amber-800">
                           <p className="text-[11px] font-semibold text-amber-900 dark:text-amber-100">
-                            NECTAR needs a few details before it can finalize this draft. Answer each question (or mark N/A with a reason) — NECTAR will NOT make up information for you.
+                            NECTAR needs a few details before it can finalize this draft. Answer each question — NECTAR will NOT make up information for you.
                           </p>
                           {nectarDraftGaps.map((g, i) => {
-                            const answered = !!(gapAnswers[i]?.trim() || gapNA[i]?.trim());
+                            if (g.severity !== "must_fix") return null;
+                            const answered = !!gapAnswers[i]?.trim();
+                            const isYesNo = g.answer_type === "yes_no";
                             return (
                               <div key={i} className="rounded border border-amber-200 bg-background p-2 dark:border-amber-900">
-                                <div className="mb-1 flex items-start gap-2">
-                                  <Badge
-                                    variant={g.severity === "must_fix" ? "destructive" : "outline"}
-                                    className="text-[10px]"
-                                  >
-                                    {g.severity === "must_fix" ? "Required" : "Suggested"}
-                                  </Badge>
+                                <div className="mb-2 flex items-start gap-2">
+                                  <Badge variant="destructive" className="text-[10px]">Required</Badge>
                                   <p className="text-[11px] leading-snug">{g.question}</p>
                                 </div>
-                                <Textarea
-                                  rows={2}
-                                  value={gapAnswers[i] ?? ""}
-                                  onChange={(e) => setGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
-                                  placeholder="Type your answer in 1–2 sentences…"
-                                  className="text-xs"
-                                />
-                                <div className="mt-1">
-                                  <Label className="text-[10px] text-muted-foreground">
-                                    Or mark N/A — explain why
-                                  </Label>
+                                {isYesNo ? (
+                                  <div className="flex gap-2">
+                                    {(["Yes", "No"] as const).map((v) => (
+                                      <Button key={v} type="button" size="sm"
+                                        variant={gapAnswers[i] === v ? "default" : "outline"}
+                                        onClick={() => setGapAnswers((s) => ({ ...s, [i]: v }))}>
+                                        {v}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                ) : (
                                   <Textarea
-                                    rows={1}
-                                    value={gapNA[i] ?? ""}
-                                    onChange={(e) => setGapNA((s) => ({ ...s, [i]: e.target.value }))}
-                                    placeholder="e.g. 'Not witnessed — incident discovered after the fact'"
+                                    rows={2}
+                                    value={gapAnswers[i] ?? ""}
+                                    onChange={(e) => setGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
+                                    placeholder="Type your answer in 1–2 sentences…"
                                     className="text-xs"
                                   />
-                                </div>
-                                {!answered && g.severity === "must_fix" && (
+                                )}
+                                {!answered && (
                                   <p className="mt-1 text-[10px] text-rose-700 dark:text-rose-300">
                                     Required to use this draft.
                                   </p>
@@ -1286,44 +1309,41 @@ export function IncidentReportDialog({
                           </Badge>
                         )}
                       </div>
-                      {narrativeReviewStatus === "needs_answers" && narrativeReviewIssues.length > 0 && (
+                      {narrativeReviewStatus === "needs_answers" && narrativeReviewIssues.filter((g) => g.severity === "must_fix").length > 0 && (
                         <div className="mt-2 space-y-2 rounded border border-amber-300 bg-amber-50/60 p-2 text-xs dark:bg-amber-950/30 dark:border-amber-800">
                           <p className="text-[11px] font-semibold text-amber-900 dark:text-amber-100">
-                            NECTAR needs a few details. Answer each question (or mark N/A with a reason) before continuing — NECTAR will NOT make up information for you.
+                            NECTAR needs a few details. Answer each question before continuing — NECTAR will NOT make up information for you.
                           </p>
                           {narrativeReviewIssues.map((g, i) => {
-                            const answered = !!(narrativeGapAnswers[i]?.trim() || narrativeGapNA[i]?.trim());
+                            if (g.severity !== "must_fix") return null;
+                            const answered = !!narrativeGapAnswers[i]?.trim();
+                            const isYesNo = g.answer_type === "yes_no";
                             return (
                               <div key={i} className="rounded border border-amber-200 bg-background p-2 dark:border-amber-900">
-                                <div className="mb-1 flex items-start gap-2">
-                                  <Badge
-                                    variant={g.severity === "must_fix" ? "destructive" : "outline"}
-                                    className="text-[10px]"
-                                  >
-                                    {g.severity === "must_fix" ? "Required" : "Suggested"}
-                                  </Badge>
+                                <div className="mb-2 flex items-start gap-2">
+                                  <Badge variant="destructive" className="text-[10px]">Required</Badge>
                                   <p className="text-[11px] leading-snug">{g.question}</p>
                                 </div>
-                                <Textarea
-                                  rows={2}
-                                  value={narrativeGapAnswers[i] ?? ""}
-                                  onChange={(e) => setNarrativeGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
-                                  placeholder="Type your answer in 1–2 sentences…"
-                                  className="text-xs"
-                                />
-                                <div className="mt-1">
-                                  <Label className="text-[10px] text-muted-foreground">
-                                    Or mark N/A — explain why
-                                  </Label>
+                                {isYesNo ? (
+                                  <div className="flex gap-2">
+                                    {(["Yes", "No"] as const).map((v) => (
+                                      <Button key={v} type="button" size="sm"
+                                        variant={narrativeGapAnswers[i] === v ? "default" : "outline"}
+                                        onClick={() => setNarrativeGapAnswers((s) => ({ ...s, [i]: v }))}>
+                                        {v}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                ) : (
                                   <Textarea
-                                    rows={1}
-                                    value={narrativeGapNA[i] ?? ""}
-                                    onChange={(e) => setNarrativeGapNA((s) => ({ ...s, [i]: e.target.value }))}
-                                    placeholder="e.g. 'Not witnessed — incident discovered after the fact'"
+                                    rows={2}
+                                    value={narrativeGapAnswers[i] ?? ""}
+                                    onChange={(e) => setNarrativeGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
+                                    placeholder="Type your answer in 1–2 sentences…"
                                     className="text-xs"
                                   />
-                                </div>
-                                {!answered && g.severity === "must_fix" && (
+                                )}
+                                {!answered && (
                                   <p className="mt-1 text-[10px] text-rose-700 dark:text-rose-300">
                                     Required to continue.
                                   </p>
@@ -1332,7 +1352,7 @@ export function IncidentReportDialog({
                             );
                           })}
                           <p className="text-[10px] text-amber-800 dark:text-amber-200">
-                            Your answers will be appended to the narrative as a "Staff follow-up answers" section when you click Next.
+                            Your answers will be appended to the narrative when you click Next.
                           </p>
                         </div>
                       )}

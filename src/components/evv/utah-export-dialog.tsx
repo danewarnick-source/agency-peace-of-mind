@@ -565,7 +565,7 @@ export function EvvExportArchiveStrip({
         .eq("organization_id", organizationId);
       if (error) throw error;
       const s = new Set<string>();
-      for (const r of (data ?? []) as Array<{ timesheet_id: string }>) s.add(r.timesheet_id);
+      for (const r of ((data ?? []) as unknown) as Array<{ timesheet_id: string }>) s.add(r.timesheet_id);
       return s;
     },
   });
@@ -658,7 +658,7 @@ export function EvvExportArchiveStrip({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .select("id, record_id" as any)
           .in("id", origIds);
-        for (const r of (origs ?? []) as Array<{ id: string; record_id: number }>) origMap.set(r.id, r.record_id);
+        for (const r of ((origs ?? []) as unknown) as Array<{ id: string; record_id: number }>) origMap.set(r.id, r.record_id);
       }
 
       const lines: UtahExportLine[] = records.map((rec) => {

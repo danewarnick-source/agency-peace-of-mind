@@ -723,7 +723,7 @@ function ComplianceDeskPage() {
           {[
             { id: "pending" as const, label: "Pending Review", Icon: Inbox, count: undefined as number | undefined },
             { id: "needs-review" as const, label: "Needs Review", Icon: AlertTriangle, count: needsReviewCount },
-            { id: "incidents" as const, label: "Incidents", Icon: Flag, count: undefined },
+            
             { id: "reconcile" as const, label: "EVV Reconciliation", Icon: AlertCircle, count: reconcilePendingCount },
             { id: "residential" as const, label: "Residential / Daily", Icon: HomeIcon, count: undefined },
             { id: "evv-archive" as const, label: "State EVV Archive", Icon: FolderArchive, count: undefined },

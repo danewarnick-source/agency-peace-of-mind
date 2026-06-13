@@ -443,6 +443,10 @@ export function IncidentReportDialog({
     if (!nectarDraft) return;
     setDescription(nectarDraft);
     toast.success("Draft accepted — edit it before continuing.");
+    // Kick off AI review immediately so follow-up questions are ready by the time
+    // the user reaches the nectar-interview step (description isn't in state yet,
+    // so pass it directly as an override).
+    void runAiReview(nectarDraft);
   }
 
   // Build draft for AI review + contradiction scan
@@ -552,42 +556,55 @@ export function IncidentReportDialog({
     setStep((s) => Math.min(lastStep, s + 1));
   }
 
+  // ── Shared Nectar review runner — called both by the nectar-interview step
+  // useEffect and by acceptNectarDraft for early eager review.
+  // descriptionOverride: pass the draft text when description state hasn't
+  // updated yet (React batches the setState from acceptNectarDraft).
+  // isCancelled: optional cleanup guard injected by the useEffect.
+  async function runAiReview(descriptionOverride?: string, isCancelled?: () => boolean) {
+    if (!aiEnabled || aiAttempted) return;
+    setAiAttempted(true);
+    setAiReviewing(true);
+    try {
+      const base = buildDraft();
+      const draft = descriptionOverride !== undefined
+        ? { ...base, description: descriptionOverride.trim() }
+        : base;
+      const result = await withAiTimeout(
+        supabase.functions.invoke("review-incident-report", { body: { draft } }),
+      );
+      if (isCancelled?.()) return;
+      const { data: r, error: rerr } =
+        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
+      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+        // Fail-open — never block the 24h clock
+        setAiIssues([]); setAiStatus("skipped");
+        setDetails((d) => ({ ...d, ai_review_skipped: true }));
+        return;
+      }
+      const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
+      setAiIssues(issues);
+      setAiStatus(issues.length === 0 ? "passed" : null);
+    } catch {
+      if (isCancelled?.()) return;
+      // 10s timeout / error fallback
+      setAiIssues([]); setAiStatus("skipped");
+      setDetails((d) => ({ ...d, ai_review_skipped: true }));
+    } finally {
+      if (!isCancelled?.()) setAiReviewing(false);
+    }
+  }
+
   // ── Nectar AI review — runs when entering the nectar-interview step.
   // Issues that come back become real wizard steps via stepKeys recompute.
+  // If acceptNectarDraft already kicked off the review, aiAttempted is true
+  // and this effect exits immediately.
   useEffect(() => {
     if (currentKey !== "nectar-interview") return;
     if (!aiEnabled) return;
     if (aiAttempted) return;
-    setAiAttempted(true);
-    setAiReviewing(true);
     let cancelled = false;
-    (async () => {
-      try {
-        const draft = buildDraft();
-        const result = await withAiTimeout(
-          supabase.functions.invoke("review-incident-report", { body: { draft } }),
-        );
-        if (cancelled) return;
-        const { data: r, error: rerr } =
-          result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
-        if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
-          // Fail-open — never block the 24h clock
-          setAiIssues([]); setAiStatus("skipped");
-          setDetails((d) => ({ ...d, ai_review_skipped: true }));
-          return;
-        }
-        const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
-        setAiIssues(issues);
-        setAiStatus(issues.length === 0 ? "passed" : null);
-      } catch {
-        if (cancelled) return;
-        // 10s timeout / error fallback
-        setAiIssues([]); setAiStatus("skipped");
-        setDetails((d) => ({ ...d, ai_review_skipped: true }));
-      } finally {
-        if (!cancelled) setAiReviewing(false);
-      }
-    })();
+    void runAiReview(undefined, () => cancelled);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentKey, aiEnabled, aiAttempted]);

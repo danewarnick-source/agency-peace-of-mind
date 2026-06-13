@@ -142,6 +142,9 @@ export const createIncident = createServerFn({ method: "POST" })
       aps_notified_at: data.aps_notified_at ?? null,
       aps_notified_by: data.aps_notified_by ?? null,
       aps_reference: data.aps_reference ?? null,
+      ai_review_status: data.ai_review_status ?? null,
+      ai_review_issues: data.ai_review_issues ?? null,
+      ai_review_at: data.ai_review_status ? new Date().toISOString() : null,
     };
 
     const { data: ins, error } = await supabase

@@ -81,6 +81,7 @@ function SettingsPage() {
         display_acronym: displayAcronym.trim() || null,
         dhhs_provider_id: dhhsProviderId.trim() || null,
         evv_vendor_name: evvVendorName.trim() || "Hive",
+        incident_ai_review_enabled: incidentAiEnabled,
       } as any)
       .eq("id", org.organization_id);
     setBusy(false);

@@ -294,6 +294,28 @@ export function IncidentReportDialog({
   // Category-specific details
   const [details, setDetails] = useState<Record<string, unknown>>({});
 
+  // Nectar AI pre-submit review
+  type AiIssue = { field: string | null; severity: "must_fix" | "should_add"; question: string };
+  const [aiIssues, setAiIssues] = useState<AiIssue[] | null>(null);
+  const [aiStatus, setAiStatus] = useState<"passed" | "answered" | "skipped" | "disabled" | null>(null);
+  const [aiAnswers, setAiAnswers] = useState<Record<number, string>>({});
+  const [aiNA, setAiNA] = useState<Record<number, string>>({});
+  const [aiReviewing, setAiReviewing] = useState(false);
+  const [orgAiEnabled, setOrgAiEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!open || !org?.organization_id) return;
+    void supabase
+      .from("organizations")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("incident_ai_review_enabled" as any)
+      .eq("id", org.organization_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const v = (data as { incident_ai_review_enabled?: boolean } | null)?.incident_ai_review_enabled;
+        setOrgAiEnabled(v === false ? false : true);
+      });
+  }, [open, org?.organization_id]);
+
   // Live narrative nudges
   const [dismissedTerms, setDismissedTerms] = useState<Set<string>>(new Set());
   const detailKey = detailKeyForCategory(category);

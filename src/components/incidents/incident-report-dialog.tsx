@@ -234,6 +234,11 @@ export function IncidentReportDialog({
   // ── Nectar narrative drafter (copies punch-pad pattern) ────────────────
   const [shorthand, setShorthand] = useState("");
   const [nectarDraft, setNectarDraft] = useState<string | null>(null);
+  const [nectarDraftGaps, setNectarDraftGaps] = useState<Array<{
+    field: string; severity: "must_fix" | "should_add"; question: string;
+  }>>([]);
+  const [gapAnswers, setGapAnswers] = useState<Record<number, string>>({});
+  const [gapNA, setGapNA] = useState<Record<number, string>>({});
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftSkipped, setDraftSkipped] = useState(false);
   const [isRecording, setIsRecording] = useState(false);

@@ -309,9 +309,9 @@ async function maybeClose(supabase: AnySupabase, id: string) {
     .eq("id", id)
     .maybeSingle();
   if (!data) return;
-  if (data.status === "closed") return;
+  if (data.status === "State_Confirmed") return;
   if (data.upi_initiated_at && data.upi_completed_at && data.guardian_notified_at) {
-    await supabase.from("incident_reports").update({ status: "closed" }).eq("id", id);
+    await supabase.from("incident_reports").update({ status: "State_Confirmed" }).eq("id", id);
   }
 }
 

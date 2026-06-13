@@ -27,6 +27,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode } from "@/lib/evv-codes";
+import { UtahExportDialog, EvvExportArchiveStrip } from "@/components/evv/utah-export-dialog";
 import { searchTimesheetsByVector, backfillTimesheetEmbeddings } from "@/lib/vector-search.functions";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { AdminIncidentsSection } from "@/components/incidents/admin-incidents-section";
@@ -596,15 +597,14 @@ function ComplianceDeskPage() {
     resetAiSearch();
   };
 
-  const onGlobalUtahExport = () => {
-    const all = approvedQ.data ?? [];
-    const eligible = all.filter((r) => isEvvLockedCode(r.service_type_code) && !r.outside_geofence_reason);
-    if (!eligible.length) { toast.error("No approved EVV-locked, in-bounds shifts to export."); return; }
-    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    downloadCsv(`utah_dhhs_evv_${stamp}.csv`, buildUtahCsv(eligible));
-    const skipped = all.length - eligible.length;
-    toast.success(`Exported ${eligible.length} shift${eligible.length === 1 ? "" : "s"}.${skipped > 0 ? ` Skipped ${skipped} (non-EVV or NO MATCH).` : ""}`);
-  };
+  const [utahExportOpen, setUtahExportOpen] = useState(false);
+  const staffNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of approvedQ.data ?? []) {
+      if (r.staff_id) m.set(r.staff_id, r.staff?.full_name ?? r.staff?.email ?? "");
+    }
+    return m;
+  }, [approvedQ.data]);
   const onGlobalMasterExport = () => {
     const all = approvedQ.data ?? [];
     if (!all.length) { toast.error("No approved shifts to export."); return; }

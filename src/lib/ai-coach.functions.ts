@@ -416,6 +416,12 @@ ${data.narrative}
 // Same pattern as draftShiftNote: staff types shorthand ("client hit roommate,
 // cops came, arrested"), NECTAR expands it into a UPI-grade narrative the
 // staff edits before continuing.
+//
+// IMPORTANT: NECTAR must NEVER write "Staff did not record [X]" filler into
+// the draft body, and must NEVER invent facts. When the shorthand is silent on
+// a required coverage element, surface it as a `gaps[]` follow-up question for
+// the staff to answer BEFORE the draft is accepted. The wizard blocks
+// acceptance on any must_fix gap (see src/components/incidents/incident-report-dialog.tsx).
 
 interface IncidentDraftInput {
   shorthand: string;
@@ -442,7 +448,17 @@ function validateIncidentDraft(input: unknown): IncidentDraftInput {
   };
 }
 
-export interface IncidentDraftResult { draft: string; wordCount: number; }
+export interface IncidentDraftGap {
+  field: "who" | "antecedent" | "event" | "staff_response" | "outcome" | "other";
+  severity: "must_fix" | "should_add";
+  question: string;
+}
+
+export interface IncidentDraftResult {
+  draft: string;
+  wordCount: number;
+  gaps: IncidentDraftGap[];
+}
 
 export const draftIncidentNarrative = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -450,23 +466,34 @@ export const draftIncidentNarrative = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<IncidentDraftResult> => {
     const system = `You are NECTAR, a Utah DSPD UPI-grade incident-narrative drafter.
 
-GOAL: Expand the staff's rough shorthand into a complete, professional incident narrative a UPI reviewer would accept.
+GOAL: Help staff produce a complete, professional incident narrative a UPI reviewer would accept — WITHOUT inventing facts and WITHOUT documenting the absence of information inside the draft body.
 
-REQUIRED COVERAGE (every narrative must address all five, in order):
-1) Who was involved (use the individual's real name; identify peers/staff/visitors only by role unless the shorthand names them).
-2) What led up to it (antecedent / setting / mood).
-3) What happened (the event itself, in sequence — do NOT skip from setup to aftermath).
-4) Staff response during the event (what YOU did, where you were, who you called).
-5) Outcome (injuries, medical attention, law enforcement, current status).
+REQUIRED COVERAGE (every complete narrative must address all five, in order):
+1) who — Who was involved (use the individual's real name; identify peers/staff/visitors only by role unless the shorthand names them).
+2) antecedent — What led up to it (setting, mood, behavior right before).
+3) event — What actually happened, in sequence (do NOT skip from setup to aftermath).
+4) staff_response — What staff did DURING the event (where they were, who they called, what they tried).
+5) outcome — Result (injuries, medical attention, law enforcement, current status).
 
-RULES:
-- 90–180 words. Past tense, third person, objective. No "had a good day" fluff.
-- NEVER invent facts (no fake names, times, injuries, medications, police IDs). If the shorthand is silent on a required element, write "Staff did not record [X]" so the reviewer can ask.
+DRAFT RULES (the "draft" field):
+- Write ONLY sentences supported by the staff's shorthand and the known facts provided. Target 90–180 words, but a shorter draft is fine if the shorthand is thin.
+- Past tense, third person, objective. No "had a good day" fluff.
+- NEVER invent facts (no fake names, times, injuries, medications, police IDs, locations).
+- NEVER write "Staff did not record [X]", "It is unclear whether…", "Information about X was not documented", or any placeholder/absence sentence. If a required element is missing, it belongs in "gaps", NOT in the draft.
 - Use the individual's first name naturally; do not call them "the client" repeatedly.
 - No markdown, no bullets, no headings — one to three clean paragraphs.
 
+GAPS RULES (the "gaps" array):
+- For each of the 5 required coverage elements the shorthand+knownFacts do NOT cover, push one entry to gaps with:
+  - field: "who" | "antecedent" | "event" | "staff_response" | "outcome"
+  - severity: "must_fix" if a UPI reviewer would reject without it; "should_add" if it would improve the record but isn't blocking.
+  - question: a CONCRETE follow-up the staff can answer in 1–2 sentences. Examples: "Where were you (the staff) when the medication was administered?", "What was Marcus's mood or behavior in the 30 minutes before the dose?", "Was Marcus evaluated by medical staff or only visually checked?"
+- Default antecedent, staff_response, and outcome to "must_fix" when missing — a UPI reviewer almost always asks for these.
+- Gaps may be empty if the shorthand truly covers all five.
+- Do NOT repeat in gaps anything you already covered in the draft.
+
 OUTPUT FORMAT — STRICT JSON only, no markdown, no code fences:
-{"draft":"<the narrative paragraph(s)>"}`;
+{"draft":"<the narrative paragraph(s) — only facts that are actually known>","gaps":[{"field":"...","severity":"...","question":"..."}]}`;
 
     const user = `INDIVIDUAL: ${data.clientName}
 INCIDENT CATEGORY: ${data.category || "(unspecified)"}
@@ -480,11 +507,35 @@ ${data.shorthand}
 """`;
 
     const raw = await callAI(system, user);
-    let parsed: { draft?: string } = {};
+    let parsed: { draft?: string; gaps?: unknown } = {};
     try { parsed = JSON.parse(raw); }
     catch { const m = raw.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch { /* ignore */ } } }
     const draft = typeof parsed.draft === "string" ? parsed.draft.trim() : "";
     if (!draft) throw new Error("NECTAR could not draft the narrative — please write it manually.");
+
+    const ALLOWED_FIELDS: ReadonlySet<IncidentDraftGap["field"]> = new Set([
+      "who", "antecedent", "event", "staff_response", "outcome", "other",
+    ]);
+    const gaps: IncidentDraftGap[] = Array.isArray(parsed.gaps)
+      ? (parsed.gaps as unknown[])
+          .map((g) => g as Record<string, unknown>)
+          .filter((g) =>
+            typeof g?.question === "string" &&
+            (g?.severity === "must_fix" || g?.severity === "should_add"),
+          )
+          .slice(0, 8)
+          .map((g) => {
+            const field = (typeof g.field === "string" && ALLOWED_FIELDS.has(g.field as IncidentDraftGap["field"]))
+              ? (g.field as IncidentDraftGap["field"])
+              : "other";
+            return {
+              field,
+              severity: g.severity as "must_fix" | "should_add",
+              question: (g.question as string).slice(0, 400),
+            };
+          })
+      : [];
+
     const wordCount = draft.split(/\s+/).filter(Boolean).length;
-    return { draft, wordCount };
+    return { draft, wordCount, gaps };
   });

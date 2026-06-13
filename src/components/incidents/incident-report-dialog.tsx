@@ -234,6 +234,11 @@ export function IncidentReportDialog({
   // ── Nectar narrative drafter (copies punch-pad pattern) ────────────────
   const [shorthand, setShorthand] = useState("");
   const [nectarDraft, setNectarDraft] = useState<string | null>(null);
+  const [nectarDraftGaps, setNectarDraftGaps] = useState<Array<{
+    field: string; severity: "must_fix" | "should_add"; question: string;
+  }>>([]);
+  const [gapAnswers, setGapAnswers] = useState<Record<number, string>>({});
+  const [gapNA, setGapNA] = useState<Record<number, string>>({});
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftSkipped, setDraftSkipped] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -307,7 +312,7 @@ export function IncidentReportDialog({
     setMedicalAttention(""); setImmediateActions(""); setPreventionStrategies("");
     setWitnessedDirectly(""); setReportedBy("");
     setDetails({}); setDismissedTerms(new Set()); setSubmitted(false);
-    setShorthand(""); setNectarDraft(null); setDraftSkipped(false); setDraftBusy(false);
+    setShorthand(""); setNectarDraft(null); setNectarDraftGaps([]); setGapAnswers({}); setGapNA({}); setDraftSkipped(false); setDraftBusy(false);
     setAiIssues(null); setAiStatus(null); setAiAnswers({}); setAiNA({});
     setAiReviewing(false); setAiAttempted(false);
     setCompletenessIssues(null); setCompletenessBusy(false);
@@ -427,10 +432,13 @@ export function IncidentReportDialog({
         },
       }));
       setNectarDraft(res.draft);
+      setNectarDraftGaps(res.gaps ?? []);
+      setGapAnswers({}); setGapNA({});
       setDraftSkipped(false);
     } catch (e) {
       // 10s timeout / error fallback — let staff write manually with AI-skipped badge
       setDraftSkipped(true);
+      setNectarDraftGaps([]);
       setDetails((d) => ({ ...d, ai_review_skipped: true }));
       toast.error(
         (e as Error).message === "__AI_TIMEOUT__"
@@ -439,14 +447,55 @@ export function IncidentReportDialog({
       );
     } finally { setDraftBusy(false); }
   }
+
+  // Gate: every must_fix gap must have an answer OR an N/A reason before
+  // staff can click "Use this draft". This is the first of two NECTAR
+  // gates — the second runs at the nectar-interview step after the
+  // description is committed.
+  const draftMustFixUnresolved = nectarDraftGaps
+    .map((g, i) => ({ g, i }))
+    .filter(({ g, i }) => g.severity === "must_fix"
+      && !(gapAnswers[i]?.trim() || gapNA[i]?.trim()));
+  const canAcceptDraft = !!nectarDraft && draftMustFixUnresolved.length === 0;
+
   function acceptNectarDraft() {
     if (!nectarDraft) return;
-    setDescription(nectarDraft);
+    if (draftMustFixUnresolved.length > 0) {
+      toast.error("Answer (or mark N/A) every required follow-up below before using this draft.");
+      return;
+    }
+    // Fold the answered follow-ups into the description as a final paragraph
+    // so the staff's clarifications land in the narrative without a second
+    // AI hop. Skipped (N/A) items are recorded with the staff's reason.
+    const answered = nectarDraftGaps
+      .map((g, i) => {
+        const ans = gapAnswers[i]?.trim();
+        const na = gapNA[i]?.trim();
+        if (ans) return `Q: ${g.question}\nA: ${ans}`;
+        if (na) return `Q: ${g.question}\nA: N/A — ${na}`;
+        return null;
+      })
+      .filter((s): s is string => !!s);
+    const composed = answered.length
+      ? `${nectarDraft}\n\nStaff follow-up answers:\n${answered.join("\n\n")}`
+      : nectarDraft;
+    setDescription(composed);
+    // Stash so the persisted incident retains the structured Q&A.
+    setDetails((d) => ({
+      ...d,
+      nectar_draft_followups: nectarDraftGaps.map((g, i) => ({
+        field: g.field,
+        severity: g.severity,
+        question: g.question,
+        answer: gapAnswers[i]?.trim() || null,
+        not_applicable_reason: gapNA[i]?.trim() || null,
+      })),
+    }));
     toast.success("Draft accepted — edit it before continuing.");
-    // Kick off AI review immediately so follow-up questions are ready by the time
-    // the user reaches the nectar-interview step (description isn't in state yet,
-    // so pass it directly as an override).
-    void runAiReview(nectarDraft);
+    // Kick off second-pass review immediately so follow-up questions are
+    // ready by the time the user reaches the nectar-interview step
+    // (description isn't in state yet, so pass it directly as an override).
+    void runAiReview(composed);
   }
 
   // Build draft for AI review + contradiction scan
@@ -1002,7 +1051,11 @@ export function IncidentReportDialog({
                           </Button>
                         )}
                         {nectarDraft && (
-                          <Button type="button" size="sm" variant="secondary" onClick={acceptNectarDraft}>
+                          <Button type="button" size="sm" variant="secondary"
+                            onClick={acceptNectarDraft}
+                            disabled={!canAcceptDraft}
+                            title={canAcceptDraft ? "" : "Answer the required follow-ups below first"}
+                          >
                             Use this draft
                           </Button>
                         )}
@@ -1014,6 +1067,53 @@ export function IncidentReportDialog({
                         <div className="mt-2 rounded border border-violet-200 bg-background p-2 text-xs dark:border-violet-900">
                           <p className="mb-1 text-[10px] uppercase tracking-wide text-violet-700 dark:text-violet-300">NECTAR draft — review then click "Use this draft"</p>
                           <p className="whitespace-pre-wrap">{nectarDraft}</p>
+                        </div>
+                      )}
+                      {nectarDraft && nectarDraftGaps.length > 0 && (
+                        <div className="mt-2 space-y-2 rounded border border-amber-300 bg-amber-50/60 p-2 text-xs dark:bg-amber-950/30 dark:border-amber-800">
+                          <p className="text-[11px] font-semibold text-amber-900 dark:text-amber-100">
+                            NECTAR needs a few details before it can finalize this draft. Answer each question (or mark N/A with a reason) — NECTAR will NOT make up information for you.
+                          </p>
+                          {nectarDraftGaps.map((g, i) => {
+                            const answered = !!(gapAnswers[i]?.trim() || gapNA[i]?.trim());
+                            return (
+                              <div key={i} className="rounded border border-amber-200 bg-background p-2 dark:border-amber-900">
+                                <div className="mb-1 flex items-start gap-2">
+                                  <Badge
+                                    variant={g.severity === "must_fix" ? "destructive" : "outline"}
+                                    className="text-[10px]"
+                                  >
+                                    {g.severity === "must_fix" ? "Required" : "Suggested"}
+                                  </Badge>
+                                  <p className="text-[11px] leading-snug">{g.question}</p>
+                                </div>
+                                <Textarea
+                                  rows={2}
+                                  value={gapAnswers[i] ?? ""}
+                                  onChange={(e) => setGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
+                                  placeholder="Type your answer in 1–2 sentences…"
+                                  className="text-xs"
+                                />
+                                <div className="mt-1">
+                                  <Label className="text-[10px] text-muted-foreground">
+                                    Or mark N/A — explain why
+                                  </Label>
+                                  <Textarea
+                                    rows={1}
+                                    value={gapNA[i] ?? ""}
+                                    onChange={(e) => setGapNA((s) => ({ ...s, [i]: e.target.value }))}
+                                    placeholder="e.g. 'Not witnessed — incident discovered after the fact'"
+                                    className="text-xs"
+                                  />
+                                </div>
+                                {!answered && g.severity === "must_fix" && (
+                                  <p className="mt-1 text-[10px] text-rose-700 dark:text-rose-300">
+                                    Required to use this draft.
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1133,8 +1233,12 @@ export function IncidentReportDialog({
                 <div className="space-y-3 rounded-md border border-violet-300 bg-violet-50/40 p-4 dark:bg-violet-950/30 dark:border-violet-800">
                   <div className="flex items-center gap-2 text-violet-900 dark:text-violet-100">
                     <ShieldCheck className="h-4 w-4" />
-                    <span className="text-sm font-semibold">NECTAR is reviewing your draft</span>
+                    <span className="text-sm font-semibold">NECTAR is reviewing your narrative</span>
                   </div>
+                  <p className="text-[11px] text-violet-900/70 dark:text-violet-100/70">
+                    NECTAR reviews every narrative — whether you used its draft or wrote your own — and will ask follow-ups before you can submit. It never makes up information for you.
+                  </p>
+
                   {aiReviewing ? (
                     <p className="flex items-center gap-2 text-xs text-violet-900/80 dark:text-violet-100/80">
                       <Loader2 className="h-3 w-3 animate-spin" />

@@ -636,70 +636,30 @@ export function IncidentReportDialog({
       const discoveredIso = new Date(discoveredAt).toISOString();
       const occurredIso = occurredAt ? new Date(occurredAt).toISOString() : null;
 
-      // Pre-submit Nectar AI review.
-      // - Org toggle off → bypass entirely (status='disabled').
-      // - Reviewer error / 5xx / timeout → fail-open, status='skipped'.
-      // - must_fix issues → block submit until each is answered or marked N/A.
-      let finalStatus: "passed" | "answered" | "skipped" | "disabled" = "disabled";
+      // AI review already ran on the Review step (effect above). Just resolve
+      // the final status from the already-populated state.
+      let finalStatus: "passed" | "answered" | "skipped" | "disabled";
       let finalIssues: AiIssue[] | null = null;
-      if (orgAiEnabled === false) {
+      if (orgAiEnabled === false || aiStatus === "disabled") {
         finalStatus = "disabled";
+      } else if (aiStatus === "skipped") {
+        finalStatus = "skipped";
       } else {
-        let issues = aiIssues;
-        if (issues === null) {
-          setAiReviewing(true);
-          try {
-            const draft = {
-              category, description: description.trim(), location, occurred_at: occurredIso,
-              discovered_at: discoveredIso, people_involved: peopleInvolved, witnesses,
-              injuries, medical_attention: medicalAttention, immediate_actions: immediateActions,
-              is_abuse_neglect: isAbuse, prevention_strategies: preventionStrategies,
-              witnessed_directly: witnessedDirectly === "yes",
-              reported_to_reporter_by: witnessedDirectly === "no" ? reportedBy : null,
-              details,
-            };
-            const { data: r, error: rerr } = await supabase.functions.invoke(
-              "review-incident-report", { body: { draft } },
-            );
-            if (rerr || !r || typeof r.complete !== "boolean") throw new Error("review unavailable");
-            if (r.skipped) {
-              setAiIssues([]);
-              setAiStatus("skipped");
-              finalStatus = "skipped";
-              issues = [];
-            } else {
-              issues = Array.isArray(r.issues) ? r.issues as AiIssue[] : [];
-              setAiIssues(issues);
-            }
-          } catch {
-            setAiIssues([]);
-            setAiStatus("skipped");
-            finalStatus = "skipped";
-            issues = [];
-          } finally {
-            setAiReviewing(false);
-          }
-        }
-        if (finalStatus !== "skipped" && issues) {
-          const mustFix = issues
-            .map((q, i) => ({ q, i }))
-            .filter(({ q }) => q.severity === "must_fix");
-          const unresolved = mustFix.filter(({ i }) =>
-            !(aiAnswers[i]?.trim() || aiNA[i]?.trim()),
-          );
-          if (unresolved.length > 0) {
-            // Stop here; UI shows the must_fix panel.
-            throw new Error("__AI_REVIEW_PENDING__");
-          }
-          finalStatus = issues.length === 0 ? "passed" : "answered";
-          finalIssues = issues.map((q, i) => ({
-            ...q,
-            answer: aiAnswers[i]?.trim() || null,
-            not_applicable_reason: aiNA[i]?.trim() || null,
-          })) as AiIssue[];
-        }
+        const issues = aiIssues ?? [];
+        const unresolved = issues
+          .map((q, i) => ({ q, i }))
+          .filter(({ q, i }) => q.severity === "must_fix" && !(aiAnswers[i]?.trim() || aiNA[i]?.trim()));
+        if (unresolved.length > 0) throw new Error("__AI_REVIEW_PENDING__");
+        finalStatus = issues.length === 0 ? "passed" : "answered";
+        finalIssues = issues.map((q, i) => ({
+          ...q,
+          answer: aiAnswers[i]?.trim() || null,
+          not_applicable_reason: aiNA[i]?.trim() || null,
+        })) as AiIssue[];
       }
       setAiStatus(finalStatus);
+
+
 
       return createFn({
         data: {

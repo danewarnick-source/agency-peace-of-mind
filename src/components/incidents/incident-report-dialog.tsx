@@ -189,6 +189,7 @@ type AiIssue = {
   field: string | null;
   severity: "must_fix" | "should_add";
   question: string;
+  answer_type?: "yes_no" | "text";
   answer?: string | null;
   not_applicable_reason?: string | null;
 };

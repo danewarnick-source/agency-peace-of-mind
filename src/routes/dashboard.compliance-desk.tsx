@@ -401,8 +401,8 @@ async function hydrateStaff(list: Row[]) {
 function ComplianceDeskPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
-  const [sub, setSub] = useState<"pending" | "needs-review" | "incidents" | "reconcile" | "evv-archive" | "non-evv-archive" | "residential">("pending");
-  const [incidentPrefilterClient, setIncidentPrefilterClient] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [sub, setSub] = useState<"pending" | "needs-review" | "reconcile" | "evv-archive" | "non-evv-archive" | "residential">("pending");
   const [mapOpen, setMapOpen] = useState<Row | null>(null);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [reasonRow, setReasonRow] = useState<Row | null>(null);

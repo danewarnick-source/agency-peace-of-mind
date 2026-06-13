@@ -793,12 +793,8 @@ export function IncidentReportDialog({
     setCompletenessBusy(true);
     try {
       const draft = buildDraft();
-      const result = await withAiTimeout(
-        supabase.functions.invoke("review-incident-report", { body: { draft } }),
-      );
-      const { data: r, error: rerr } =
-        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
-      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+      const r = await withAiTimeout(reviewFn({ data: { draft } }));
+      if (!r || typeof r.complete !== "boolean" || r.skipped) {
         setCompletenessIssues([]); setAiStatus("skipped");
         setDetails((d) => ({ ...d, ai_review_skipped: true }));
         toast.message("Nectar review unavailable — submitting with standard checks.");

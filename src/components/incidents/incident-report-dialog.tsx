@@ -505,8 +505,15 @@ export function IncidentReportDialog({
               "review-incident-report", { body: { draft } },
             );
             if (rerr || !r || typeof r.complete !== "boolean") throw new Error("review unavailable");
-            issues = Array.isArray(r.issues) ? r.issues as AiIssue[] : [];
-            setAiIssues(issues);
+            if (r.skipped) {
+              setAiIssues([]);
+              setAiStatus("skipped");
+              finalStatus = "skipped";
+              issues = [];
+            } else {
+              issues = Array.isArray(r.issues) ? r.issues as AiIssue[] : [];
+              setAiIssues(issues);
+            }
           } catch {
             setAiIssues([]);
             setAiStatus("skipped");

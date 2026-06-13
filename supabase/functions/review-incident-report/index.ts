@@ -149,13 +149,14 @@ Deno.serve(async (req) => {
       temperature: 0.1,
     });
 
+    // Fail-open: AI availability must NEVER block an incident report (the
+    // 24-hour UPI clock outweighs review quality). On any non-2xx — including
+    // upstream Bedrock crashes like "Not implemented: Http2Session.settings"
+    // — return 200 with skipped=true so the client wrapper degrades cleanly.
     if (!aiRes.ok) {
       const t = await aiRes.text();
       console.error("nectar incident-review error", aiRes.status, t);
-      return json(
-        { error: "Reviewer unavailable", detail: t.slice(0, 400) },
-        aiRes.status === 429 ? 429 : 502,
-      );
+      return json({ complete: true, issues: [], skipped: true, reason: t.slice(0, 200) }, 200);
     }
 
     const j = (await aiRes.json()) as {
@@ -163,20 +164,19 @@ Deno.serve(async (req) => {
     };
     const call = j.choices?.[0]?.message?.tool_calls?.[0];
     if (!call?.function?.arguments) {
-      return json({ error: "Empty reviewer response" }, 502);
+      return json({ complete: true, issues: [], skipped: true, reason: "empty reviewer response" }, 200);
     }
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(call.function.arguments);
     } catch {
-      return json({ error: "Reviewer returned invalid JSON" }, 502);
+      return json({ complete: true, issues: [], skipped: true, reason: "invalid reviewer JSON" }, 200);
     }
 
-    // Minimal shape guard — strict zod-equivalent done client-side as well.
     const obj = (parsed ?? {}) as { complete?: unknown; issues?: unknown };
     if (typeof obj.complete !== "boolean" || !Array.isArray(obj.issues)) {
-      return json({ error: "Reviewer returned unexpected shape" }, 502);
+      return json({ complete: true, issues: [], skipped: true, reason: "unexpected reviewer shape" }, 200);
     }
     const issues = (obj.issues as Array<Record<string, unknown>>)
       .filter(
@@ -194,6 +194,7 @@ Deno.serve(async (req) => {
     return json({ complete: obj.complete, issues }, 200);
   } catch (e) {
     console.error("review-incident-report error", e);
-    return json({ error: (e as Error).message }, 500);
+    // Fail-open — see note above. Never block the IR on reviewer crashes.
+    return json({ complete: true, issues: [], skipped: true, reason: (e as Error).message?.slice(0, 200) }, 200);
   }
 });

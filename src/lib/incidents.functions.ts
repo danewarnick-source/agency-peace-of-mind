@@ -60,6 +60,15 @@ const createInput = z.object({
   aps_notified_at: z.string().datetime().nullable().optional(),
   aps_notified_by: z.string().max(300).nullable().optional(),
   aps_reference: z.string().max(120).nullable().optional(),
+  // Nectar AI pre-submit review
+  ai_review_status: z.enum(["passed", "answered", "skipped", "disabled"]).nullable().optional(),
+  ai_review_issues: z.array(z.object({
+    field: z.string().nullable().optional(),
+    severity: z.enum(["must_fix", "should_add"]),
+    question: z.string(),
+    answer: z.string().nullable().optional(),
+    not_applicable_reason: z.string().nullable().optional(),
+  })).nullable().optional(),
 });
 
 export const createIncident = createServerFn({ method: "POST" })
@@ -133,6 +142,9 @@ export const createIncident = createServerFn({ method: "POST" })
       aps_notified_at: data.aps_notified_at ?? null,
       aps_notified_by: data.aps_notified_by ?? null,
       aps_reference: data.aps_reference ?? null,
+      ai_review_status: data.ai_review_status ?? null,
+      ai_review_issues: data.ai_review_issues ?? null,
+      ai_review_at: data.ai_review_status ? new Date().toISOString() : null,
     };
 
     const { data: ins, error } = await supabase
@@ -163,7 +175,7 @@ export const listIncidents = createServerFn({ method: "GET" })
     let q = supabase
       .from("incident_reports")
       .select(
-        "id, report_number, client_id, reported_by, discovered_at, occurred_at, category, description, location, status, is_abuse_neglect, is_fatality, prevention_strategies, guardian_notified_at, guardian_notified_method, guardian_notified_by, upi_initiated_at, upi_initiated_by, upi_completed_at, upi_completed_by, followup_notes, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, clients:client_id(first_name,last_name)",
+        "id, report_number, client_id, reported_by, discovered_at, occurred_at, category, description, location, status, is_abuse_neglect, is_fatality, prevention_strategies, guardian_notified_at, guardian_notified_method, guardian_notified_by, upi_initiated_at, upi_initiated_by, upi_completed_at, upi_completed_by, followup_notes, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, ai_review_status, ai_review_issues, ai_review_at, clients:client_id(first_name,last_name)",
       )
       .eq("organization_id", m.organization_id)
       .order("discovered_at", { ascending: false, nullsFirst: false })

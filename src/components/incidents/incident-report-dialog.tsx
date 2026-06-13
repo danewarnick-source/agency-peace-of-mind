@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Skull, ShieldAlert, Sparkles, X, Loader2 } from "lucide-react";
+import { AlertTriangle, Skull, ShieldAlert, Sparkles, X, Loader2, ShieldCheck } from "lucide-react";
 import { createIncident } from "@/lib/incidents.functions";
 import {
   INCIDENT_CATEGORIES, ABUSE_CATEGORY, FATALITY_CATEGORY, type IncidentCategory,
@@ -294,6 +294,28 @@ export function IncidentReportDialog({
   // Category-specific details
   const [details, setDetails] = useState<Record<string, unknown>>({});
 
+  // Nectar AI pre-submit review
+  type AiIssue = { field: string | null; severity: "must_fix" | "should_add"; question: string };
+  const [aiIssues, setAiIssues] = useState<AiIssue[] | null>(null);
+  const [aiStatus, setAiStatus] = useState<"passed" | "answered" | "skipped" | "disabled" | null>(null);
+  const [aiAnswers, setAiAnswers] = useState<Record<number, string>>({});
+  const [aiNA, setAiNA] = useState<Record<number, string>>({});
+  const [aiReviewing, setAiReviewing] = useState(false);
+  const [orgAiEnabled, setOrgAiEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!open || !org?.organization_id) return;
+    void supabase
+      .from("organizations")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("incident_ai_review_enabled" as any)
+      .eq("id", org.organization_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const v = (data as { incident_ai_review_enabled?: boolean } | null)?.incident_ai_review_enabled;
+        setOrgAiEnabled(v === false ? false : true);
+      });
+  }, [open, org?.organization_id]);
+
   // Live narrative nudges
   const [dismissedTerms, setDismissedTerms] = useState<Set<string>>(new Set());
   const detailKey = detailKeyForCategory(category);
@@ -320,6 +342,10 @@ export function IncidentReportDialog({
     setDetails({});
     setDismissedTerms(new Set());
     setSubmitted(false);
+    setAiIssues(null);
+    setAiStatus(null);
+    setAiAnswers({});
+    setAiNA({});
   }, [open, clientId, initialDiscovered]);
 
   const isAbuse = category === ABUSE_CATEGORY;
@@ -452,6 +478,65 @@ export function IncidentReportDialog({
 
       const discoveredIso = new Date(discoveredAt).toISOString();
       const occurredIso = occurredAt ? new Date(occurredAt).toISOString() : null;
+
+      // Pre-submit Nectar AI review.
+      // - Org toggle off → bypass entirely (status='disabled').
+      // - Reviewer error / 5xx / timeout → fail-open, status='skipped'.
+      // - must_fix issues → block submit until each is answered or marked N/A.
+      let finalStatus: "passed" | "answered" | "skipped" | "disabled" = "disabled";
+      let finalIssues: AiIssue[] | null = null;
+      if (orgAiEnabled === false) {
+        finalStatus = "disabled";
+      } else {
+        let issues = aiIssues;
+        if (issues === null) {
+          setAiReviewing(true);
+          try {
+            const draft = {
+              category, description: description.trim(), location, occurred_at: occurredIso,
+              discovered_at: discoveredIso, people_involved: peopleInvolved, witnesses,
+              injuries, medical_attention: medicalAttention, immediate_actions: immediateActions,
+              is_abuse_neglect: isAbuse, prevention_strategies: preventionStrategies,
+              witnessed_directly: witnessedDirectly === "yes",
+              reported_to_reporter_by: witnessedDirectly === "no" ? reportedBy : null,
+              details,
+            };
+            const { data: r, error: rerr } = await supabase.functions.invoke(
+              "review-incident-report", { body: { draft } },
+            );
+            if (rerr || !r || typeof r.complete !== "boolean") throw new Error("review unavailable");
+            issues = Array.isArray(r.issues) ? r.issues as AiIssue[] : [];
+            setAiIssues(issues);
+          } catch {
+            setAiIssues([]);
+            setAiStatus("skipped");
+            finalStatus = "skipped";
+            issues = [];
+          } finally {
+            setAiReviewing(false);
+          }
+        }
+        if (finalStatus !== "skipped" && issues) {
+          const mustFix = issues
+            .map((q, i) => ({ q, i }))
+            .filter(({ q }) => q.severity === "must_fix");
+          const unresolved = mustFix.filter(({ i }) =>
+            !(aiAnswers[i]?.trim() || aiNA[i]?.trim()),
+          );
+          if (unresolved.length > 0) {
+            // Stop here; UI shows the must_fix panel.
+            throw new Error("__AI_REVIEW_PENDING__");
+          }
+          finalStatus = issues.length === 0 ? "passed" : "answered";
+          finalIssues = issues.map((q, i) => ({
+            ...q,
+            answer: aiAnswers[i]?.trim() || null,
+            not_applicable_reason: aiNA[i]?.trim() || null,
+          })) as AiIssue[];
+        }
+      }
+      setAiStatus(finalStatus);
+
       return createFn({
         data: {
           client_id: pickedClientId,
@@ -477,6 +562,8 @@ export function IncidentReportDialog({
           aps_notified_at: apsNotifiedAt,
           aps_notified_by: apsNotifiedBy,
           aps_reference: apsReference,
+          ai_review_status: finalStatus,
+          ai_review_issues: finalIssues,
         },
       });
     },
@@ -488,7 +575,11 @@ export function IncidentReportDialog({
       toast.success(`Incident filed (${res?.report_number ?? ""}). Your supervisor has been notified.`);
       onSubmitted?.(res!.id);
     },
-    onError: (e) => toast.error((e as Error).message ?? "Could not file incident."),
+    onError: (e) => {
+      const msg = (e as Error).message;
+      if (msg === "__AI_REVIEW_PENDING__") return; // surfaced inline below
+      toast.error(msg ?? "Could not file incident.");
+    },
   });
 
   return (
@@ -749,10 +840,72 @@ export function IncidentReportDialog({
                         placeholder="What did you do in the moment to keep the person safe?" />
             </div>
 
+            {/* Nectar AI review panel */}
+            {(aiReviewing || aiIssues || aiStatus) && (
+              <div className="rounded-md border border-violet-300 bg-violet-50/60 p-3 text-xs dark:bg-violet-950/30 dark:border-violet-800">
+                <div className="mb-2 flex items-center gap-2 text-violet-900 dark:text-violet-100">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span className="font-semibold">Nectar review</span>
+                  {aiReviewing && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {aiStatus === "skipped" && (
+                    <Badge variant="outline" className="text-[10px]">AI-skipped — reviewer unavailable</Badge>
+                  )}
+                  {aiStatus === "passed" && (
+                    <Badge variant="outline" className="text-[10px]">No follow-ups</Badge>
+                  )}
+                </div>
+                {aiIssues && aiIssues.length > 0 && (
+                  <div className="space-y-2">
+                    {aiIssues.map((q, i) => (
+                      <div key={i} className={`rounded border p-2 ${q.severity === "must_fix" ? "border-rose-300 bg-rose-50 dark:bg-rose-950/30" : "border-amber-300 bg-amber-50 dark:bg-amber-950/20"}`}>
+                        <div className="flex items-start gap-2">
+                          <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px] shrink-0">
+                            {q.severity === "must_fix" ? "Must answer" : "Suggested"}
+                          </Badge>
+                          <span className="font-medium">{q.question}</span>
+                        </div>
+                        <Textarea
+                          rows={2}
+                          className="mt-2"
+                          placeholder="Answer in 1–2 sentences…"
+                          value={aiAnswers[i] ?? ""}
+                          onChange={(e) => setAiAnswers((s) => ({ ...s, [i]: e.target.value }))}
+                          disabled={!!aiNA[i]}
+                        />
+                        <div className="mt-1 flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`ai-na-${i}`}
+                            checked={!!aiNA[i]}
+                            onChange={(e) => setAiNA((s) => {
+                              const next = { ...s };
+                              if (e.target.checked) next[i] = next[i] || "";
+                              else delete next[i];
+                              return next;
+                            })}
+                          />
+                          <Label htmlFor={`ai-na-${i}`} className="text-[11px]">N/A — reason:</Label>
+                          <Input
+                            className="h-7 text-[11px]"
+                            placeholder="Why this question doesn't apply"
+                            value={aiNA[i] ?? ""}
+                            onChange={(e) => setAiNA((s) => ({ ...s, [i]: e.target.value }))}
+                            disabled={!aiNA[i] && aiNA[i] !== ""}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <DialogFooter>
               <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button onClick={() => submit.mutate()} disabled={submit.isPending || photoUploading}>
-                {submit.isPending ? "Submitting…" : "Submit incident report"}
+              <Button onClick={() => submit.mutate()} disabled={submit.isPending || photoUploading || aiReviewing}>
+                {submit.isPending || aiReviewing
+                  ? (aiReviewing ? "Nectar reviewing…" : "Submitting…")
+                  : (aiIssues && aiIssues.some((q) => q.severity === "must_fix") ? "Answer & submit" : "Submit incident report")}
               </Button>
             </DialogFooter>
           </div>

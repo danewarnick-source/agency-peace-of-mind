@@ -53,6 +53,9 @@ type Incident = {
   clients: { first_name: string; last_name: string } | null;
   restraint_used?: boolean | null;
   aps_notified_at?: string | null;
+  ai_review_status?: string | null;
+  ai_review_issues?: Array<{ field?: string | null; severity: string; question: string; answer?: string | null; not_applicable_reason?: string | null }> | null;
+  ai_review_at?: string | null;
 };
 
 type ScRequest = {
@@ -279,6 +282,32 @@ function IncidentCard({
           <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs dark:bg-amber-950/30">
             <p className="font-semibold text-amber-800 dark:text-amber-100">Prevention strategies (§1.27(3))</p>
             <p className="whitespace-pre-wrap text-amber-900 dark:text-amber-100">{ir.prevention_strategies}</p>
+          </div>
+        )}
+        {ir.ai_review_status && (
+          <div className="rounded-md border border-violet-300 bg-violet-50/60 p-2 text-[11px] dark:bg-violet-950/30 dark:border-violet-800">
+            <div className="mb-1 flex items-center gap-2 font-semibold text-violet-900 dark:text-violet-100">
+              Nectar review
+              <Badge variant="outline" className="text-[10px]">
+                {ir.ai_review_status === "passed" ? "No follow-ups"
+                  : ir.ai_review_status === "answered" ? "Questions answered"
+                  : ir.ai_review_status === "skipped" ? "AI-skipped"
+                  : "Disabled"}
+              </Badge>
+            </div>
+            {Array.isArray(ir.ai_review_issues) && ir.ai_review_issues.length > 0 && (
+              <ul className="space-y-1.5">
+                {ir.ai_review_issues.map((q, i) => (
+                  <li key={i} className="rounded border border-violet-200 bg-white/60 p-1.5 dark:bg-violet-950/20">
+                    <div className="font-medium">Q: {q.question}</div>
+                    {q.answer && <div className="text-muted-foreground">A: {q.answer}</div>}
+                    {q.not_applicable_reason && (
+                      <div className="text-muted-foreground">N/A: {q.not_applicable_reason}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 

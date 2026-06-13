@@ -113,6 +113,20 @@ function SettingsPage() {
             <div className="grid gap-2"><Label htmlFor="display_acronym">Display acronym</Label><Input id="display_acronym" value={displayAcronym} onChange={(e) => setDisplayAcronym(e.target.value)} placeholder="e.g. ACME" maxLength={12} /></div>
             <div className="grid gap-2"><Label htmlFor="dhhs_provider_id">DHHS Provider ID</Label><Input id="dhhs_provider_id" value={dhhsProviderId} onChange={(e) => setDhhsProviderId(e.target.value)} placeholder="Required for Utah EVV export" /></div>
             <div className="grid gap-2"><Label htmlFor="evv_vendor_name">EVV Vendor name</Label><Input id="evv_vendor_name" value={evvVendorName} onChange={(e) => setEvvVendorName(e.target.value)} placeholder="Hive" /></div>
+            <label className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={incidentAiEnabled}
+                onChange={(e) => setIncidentAiEnabled(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Nectar incident-report review</span>
+                <span className="block text-xs text-muted-foreground">
+                  Before staff submit an incident report, Nectar reads the draft and flags missing 5-Ws or vague phrases as concrete follow-up questions. Reviewer outages never block submission — the IR is filed with an AI-skipped badge.
+                </span>
+              </span>
+            </label>
             <Button type="submit" disabled={busy}>Save organization</Button>
           </div>
         </form>

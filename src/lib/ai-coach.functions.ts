@@ -452,6 +452,7 @@ export interface IncidentDraftGap {
   field: "who" | "antecedent" | "event" | "staff_response" | "outcome" | "other";
   severity: "must_fix" | "should_add";
   question: string;
+  answer_type: "yes_no" | "text";
 }
 
 export interface IncidentDraftResult {

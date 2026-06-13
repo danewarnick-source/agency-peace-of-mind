@@ -749,15 +749,11 @@ export function IncidentReportDialog({
       const draft = descriptionOverride !== undefined
         ? { ...base, description: descriptionOverride.trim() }
         : base;
-      console.log("AIREV calling edge fn");
-      const result = await withAiTimeout(
-        supabase.functions.invoke("review-incident-report", { body: { draft } }),
-      );
-      console.log("AIREV result", result);
+      console.log("AIREV calling server fn");
+      const r = await withAiTimeout(reviewFn({ data: { draft } }));
+      console.log("AIREV result", r);
       if (isCancelled?.()) return;
-      const { data: r, error: rerr } =
-        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
-      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+      if (!r || typeof r.complete !== "boolean" || r.skipped) {
         console.log("AIREV bad response", r);
         // Fail-open — never block the 24h clock
         setAiIssues([]); setAiStatus("skipped");

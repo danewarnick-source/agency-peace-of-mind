@@ -663,6 +663,7 @@ export const reviewIncidentReport = createServerFn({ method: "POST" })
           field: typeof i.field === "string" ? i.field : null,
           severity: i.severity as "must_fix" | "should_add",
           question: (i.question as string).slice(0, 400),
+          answer_type: (i.answer_type === "yes_no" ? "yes_no" : "text") as "yes_no" | "text",
         }));
       return { complete: obj.complete, issues };
     } catch (e) {

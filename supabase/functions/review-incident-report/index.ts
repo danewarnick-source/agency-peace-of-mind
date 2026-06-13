@@ -194,6 +194,7 @@ Deno.serve(async (req) => {
     return json({ complete: obj.complete, issues }, 200);
   } catch (e) {
     console.error("review-incident-report error", e);
-    return json({ error: (e as Error).message }, 500);
+    // Fail-open — see note above. Never block the IR on reviewer crashes.
+    return json({ complete: true, issues: [], skipped: true, reason: (e as Error).message?.slice(0, 200) }, 200);
   }
 });

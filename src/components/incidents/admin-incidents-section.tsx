@@ -284,6 +284,32 @@ function IncidentCard({
             <p className="whitespace-pre-wrap text-amber-900 dark:text-amber-100">{ir.prevention_strategies}</p>
           </div>
         )}
+        {ir.ai_review_status && (
+          <div className="rounded-md border border-violet-300 bg-violet-50/60 p-2 text-[11px] dark:bg-violet-950/30 dark:border-violet-800">
+            <div className="mb-1 flex items-center gap-2 font-semibold text-violet-900 dark:text-violet-100">
+              Nectar review
+              <Badge variant="outline" className="text-[10px]">
+                {ir.ai_review_status === "passed" ? "No follow-ups"
+                  : ir.ai_review_status === "answered" ? "Questions answered"
+                  : ir.ai_review_status === "skipped" ? "AI-skipped"
+                  : "Disabled"}
+              </Badge>
+            </div>
+            {Array.isArray(ir.ai_review_issues) && ir.ai_review_issues.length > 0 && (
+              <ul className="space-y-1.5">
+                {ir.ai_review_issues.map((q, i) => (
+                  <li key={i} className="rounded border border-violet-200 bg-white/60 p-1.5 dark:bg-violet-950/20">
+                    <div className="font-medium">Q: {q.question}</div>
+                    {q.answer && <div className="text-muted-foreground">A: {q.answer}</div>}
+                    {q.not_applicable_reason && (
+                      <div className="text-muted-foreground">N/A: {q.not_applicable_reason}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <CountdownPill deadline={upiDeadline} done={!!ir.upi_initiated_at} totalHours={24} label="UPI initiation 24h" />

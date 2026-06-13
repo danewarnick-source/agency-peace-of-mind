@@ -6172,6 +6172,9 @@ export type Database = {
       incident_reports: {
         Row: {
           additional_client_ids: string[] | null
+          ai_review_at: string | null
+          ai_review_issues: Json | null
+          ai_review_status: string | null
           ai_trigger_reasons: string[] | null
           amendment_reason: string | null
           aps_notified: boolean | null
@@ -6249,6 +6252,9 @@ export type Database = {
         }
         Insert: {
           additional_client_ids?: string[] | null
+          ai_review_at?: string | null
+          ai_review_issues?: Json | null
+          ai_review_status?: string | null
           ai_trigger_reasons?: string[] | null
           amendment_reason?: string | null
           aps_notified?: boolean | null
@@ -6326,6 +6332,9 @@ export type Database = {
         }
         Update: {
           additional_client_ids?: string[] | null
+          ai_review_at?: string | null
+          ai_review_issues?: Json | null
+          ai_review_status?: string | null
           ai_trigger_reasons?: string[] | null
           amendment_reason?: string | null
           aps_notified?: boolean | null
@@ -7950,6 +7959,7 @@ export type Database = {
           display_acronym: string | null
           evv_vendor_name: string
           id: string
+          incident_ai_review_enabled: boolean
           is_demo: boolean
           legal_name: string | null
           logo_url: string | null
@@ -7967,6 +7977,7 @@ export type Database = {
           display_acronym?: string | null
           evv_vendor_name?: string
           id?: string
+          incident_ai_review_enabled?: boolean
           is_demo?: boolean
           legal_name?: string | null
           logo_url?: string | null
@@ -7984,6 +7995,7 @@ export type Database = {
           display_acronym?: string | null
           evv_vendor_name?: string
           id?: string
+          incident_ai_review_enabled?: boolean
           is_demo?: boolean
           legal_name?: string | null
           logo_url?: string | null

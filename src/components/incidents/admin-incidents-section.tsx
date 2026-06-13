@@ -453,6 +453,9 @@ export function AdminIncidentsSection({
   const sorted = useMemo(() => {
     return [...visible].sort((a, b) => {
       if (a.is_fatality !== b.is_fatality) return a.is_fatality ? -1 : 1;
+      const aAps = a.is_abuse_neglect && !a.aps_notified_at;
+      const bAps = b.is_abuse_neglect && !b.aps_notified_at;
+      if (aAps !== bAps) return aAps ? -1 : 1;
       return (b.discovered_at ?? b.created_at).localeCompare(a.discovered_at ?? a.created_at);
     });
   }, [visible]);

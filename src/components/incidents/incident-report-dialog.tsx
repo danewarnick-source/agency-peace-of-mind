@@ -256,6 +256,19 @@ export function IncidentReportDialog({
   const [completenessIssues, setCompletenessIssues] = useState<AiIssue[] | null>(null);
   const [completenessBusy, setCompletenessBusy] = useState(false);
 
+  // ── In-step NECTAR review on the narrative step ─────────────────────────
+  // Gates Next on the narrative step until staff click "Review with NECTAR"
+  // and resolve any must_fix follow-ups. Mirrors the Draft-with-NECTAR gap UI.
+  const [narrativeReviewStatus, setNarrativeReviewStatus] = useState<
+    "idle" | "reviewing" | "passed" | "needs_answers" | "skipped"
+  >("idle");
+  const [narrativeReviewIssues, setNarrativeReviewIssues] = useState<AiIssue[]>([]);
+  const [narrativeGapAnswers, setNarrativeGapAnswers] = useState<Record<number, string>>({});
+  const [narrativeGapNA, setNarrativeGapNA] = useState<Record<number, string>>({});
+  // Snapshot of the description text the review ran against — used to
+  // invalidate the review when staff edit the narrative afterwards.
+  const [reviewedDescription, setReviewedDescription] = useState<string>("");
+
   const [orgAiEnabled, setOrgAiEnabled] = useState<boolean | null>(null);
   useEffect(() => {
     if (!open || !org?.organization_id) return;
@@ -284,17 +297,24 @@ export function IncidentReportDialog({
 
   // ─── Step keys (dynamic — Nectar's questions become real steps) ────────
   const aiEnabled = orgAiEnabled !== false;
+  // When the staff has already run the in-step narrative review (passed,
+  // answered, or skipped), the old downstream `nectar-interview` step (plus
+  // its derived nectar-q-* sub-steps) is redundant — drop them.
+  const narrativeReviewedInStep =
+    narrativeReviewStatus === "passed" ||
+    narrativeReviewStatus === "needs_answers" ||
+    narrativeReviewStatus === "skipped";
   const stepKeys = useMemo<string[]>(() => {
     const base: string[] = ["who-when", "witnessed", "where-what", "narrative"];
     if (block) base.push("details");
     base.push("people", "injuries", "actions");
-    if (aiEnabled) base.push("nectar-interview");
-    if (aiEnabled && aiIssues) {
+    if (aiEnabled && !narrativeReviewedInStep) base.push("nectar-interview");
+    if (aiEnabled && !narrativeReviewedInStep && aiIssues) {
       aiIssues.forEach((_, i) => base.push(`nectar-q-${i}`));
     }
     base.push("review");
     return base;
-  }, [block, aiEnabled, aiIssues]);
+  }, [block, aiEnabled, aiIssues, narrativeReviewedInStep]);
 
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);
@@ -316,8 +336,21 @@ export function IncidentReportDialog({
     setAiIssues(null); setAiStatus(null); setAiAnswers({}); setAiNA({});
     setAiReviewing(false); setAiAttempted(false);
     setCompletenessIssues(null); setCompletenessBusy(false);
+    setNarrativeReviewStatus("idle"); setNarrativeReviewIssues([]);
+    setNarrativeGapAnswers({}); setNarrativeGapNA({}); setReviewedDescription("");
     setStep(0); setStepError(null);
   }, [open, clientId, initialDiscovered]);
+
+  // Invalidate the in-step narrative review when staff edits the narrative
+  // after running it — prevents "review → edit → next" bypass.
+  useEffect(() => {
+    if (narrativeReviewStatus === "idle") return;
+    if (description.trim() === reviewedDescription.trim()) return;
+    setNarrativeReviewStatus("idle");
+    setNarrativeReviewIssues([]);
+    setNarrativeGapAnswers({});
+    setNarrativeGapNA({});
+  }, [description, reviewedDescription, narrativeReviewStatus]);
 
   const isAbuse = category === ABUSE_CATEGORY;
   const isFatality = category === FATALITY_CATEGORY;
@@ -553,8 +586,27 @@ export function IncidentReportDialog({
         if (aErr) return aErr;
         return null;
       }
-      case "narrative":
-        return validateNarrative(description);
+      case "narrative": {
+        const nErr = validateNarrative(description);
+        if (nErr) return nErr;
+        if (!aiEnabled) return null;
+        if (narrativeReviewStatus === "idle") {
+          return "Click 'Review with NECTAR' below — NECTAR has to check the narrative before you can continue.";
+        }
+        if (narrativeReviewStatus === "reviewing") {
+          return "Nectar is still reviewing — give it a moment.";
+        }
+        if (narrativeReviewStatus === "needs_answers") {
+          const unresolved = narrativeReviewIssues
+            .map((g, i) => ({ g, i }))
+            .filter(({ g, i }) => g.severity === "must_fix"
+              && !(narrativeGapAnswers[i]?.trim() || narrativeGapNA[i]?.trim()));
+          if (unresolved.length) {
+            return "Answer (or mark N/A) every required NECTAR follow-up before continuing.";
+          }
+        }
+        return null;
+      }
       case "details": {
         if (!block) return null;
         const missing = missingRequired(block, details);
@@ -602,7 +654,87 @@ export function IncidentReportDialog({
     const err = validateStep(currentKey);
     if (err) { setStepError(err); return; }
     setStepError(null);
+    // On the narrative step: fold any answered NECTAR follow-ups into the
+    // description before advancing (mirrors acceptNectarDraft), and stash
+    // the structured Q&A on details for the persisted record.
+    if (currentKey === "narrative"
+        && narrativeReviewStatus === "needs_answers"
+        && narrativeReviewIssues.length > 0) {
+      const answered = narrativeReviewIssues
+        .map((g, i) => {
+          const ans = narrativeGapAnswers[i]?.trim();
+          const na = narrativeGapNA[i]?.trim();
+          if (ans) return `Q: ${g.question}\nA: ${ans}`;
+          if (na) return `Q: ${g.question}\nA: N/A — ${na}`;
+          return null;
+        })
+        .filter((s): s is string => !!s);
+      if (answered.length) {
+        const composed = `${description.trim()}\n\nStaff follow-up answers:\n${answered.join("\n\n")}`;
+        setDescription(composed);
+        setReviewedDescription(composed);
+      }
+      setDetails((d) => ({
+        ...d,
+        nectar_narrative_followups: narrativeReviewIssues.map((g, i) => ({
+          field: g.field,
+          severity: g.severity,
+          question: g.question,
+          answer: narrativeGapAnswers[i]?.trim() || null,
+          not_applicable_reason: narrativeGapNA[i]?.trim() || null,
+        })),
+      }));
+    }
     setStep((s) => Math.min(lastStep, s + 1));
+  }
+
+  // ── In-step NECTAR review for the narrative — called by the "Review with
+  // NECTAR" button on the narrative step. Same edge function as the
+  // downstream nectar-interview, but the questions answer in-place rather
+  // than becoming wizard sub-steps.
+  async function runNarrativeReview() {
+    const text = description.trim();
+    const nErr = validateNarrative(text);
+    if (nErr) { setStepError(nErr); return; }
+    setStepError(null);
+    setNarrativeReviewStatus("reviewing");
+    try {
+      const draft = { ...buildDraft(), description: text };
+      const result = await withAiTimeout(
+        supabase.functions.invoke("review-incident-report", { body: { draft } }),
+      );
+      const { data: r, error: rerr } =
+        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
+      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+        setNarrativeReviewIssues([]);
+        setNarrativeReviewStatus("skipped");
+        setReviewedDescription(text);
+        setDetails((d) => ({ ...d, ai_review_skipped: true }));
+        toast.message("Nectar review unavailable — you can continue. An 'AI review skipped' badge will be visible to admins.");
+        return;
+      }
+      const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
+      setNarrativeReviewIssues(issues);
+      setNarrativeGapAnswers({});
+      setNarrativeGapNA({});
+      setReviewedDescription(text);
+      if (issues.length === 0) {
+        setNarrativeReviewStatus("passed");
+        toast.success("NECTAR: no follow-ups — you can continue.");
+      } else {
+        setNarrativeReviewStatus("needs_answers");
+      }
+    } catch (e) {
+      setNarrativeReviewIssues([]);
+      setNarrativeReviewStatus("skipped");
+      setReviewedDescription(text);
+      setDetails((d) => ({ ...d, ai_review_skipped: true }));
+      toast.message(
+        (e as Error).message === "__AI_TIMEOUT__"
+          ? "Nectar didn't respond in 10s — you can continue."
+          : "Nectar review unavailable — you can continue.",
+      );
+    }
   }
 
   // ── Shared Nectar review runner — called both by the nectar-interview step
@@ -1127,6 +1259,96 @@ export function IncidentReportDialog({
                       {description.trim().length} characters
                     </p>
                   </div>
+                  {aiEnabled && (
+                    <div className="rounded-md border-2 border-violet-300 bg-violet-50/40 p-3 dark:bg-violet-950/30 dark:border-violet-800">
+                      <div className="mb-2 flex items-center gap-2 text-violet-900 dark:text-violet-100">
+                        <ShieldCheck className="h-4 w-4" />
+                        <span className="text-sm font-semibold">Review with NECTAR</span>
+                      </div>
+                      <p className="text-[11px] text-violet-900/80 dark:text-violet-100/80">
+                        NECTAR reads your narrative and asks for anything a UPI reviewer would push back on.
+                        You must run a review before continuing — NECTAR will NOT make up information for you.
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={runNarrativeReview}
+                          disabled={narrativeReviewStatus === "reviewing" || description.trim().length < 120}
+                          title={description.trim().length < 120 ? "Write at least 120 characters first." : ""}
+                        >
+                          {narrativeReviewStatus === "reviewing"
+                            ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />NECTAR reviewing…</>
+                            : narrativeReviewStatus === "idle"
+                              ? <><Sparkles className="mr-1 h-3 w-3" />Review with NECTAR</>
+                              : <><Sparkles className="mr-1 h-3 w-3" />Re-run NECTAR review</>}
+                        </Button>
+                        {narrativeReviewStatus === "passed" && (
+                          <Badge variant="outline" className="border-emerald-400 text-[10px] text-emerald-700 dark:text-emerald-300">
+                            NECTAR has no follow-ups — you can continue.
+                          </Badge>
+                        )}
+                        {narrativeReviewStatus === "skipped" && (
+                          <Badge variant="outline" className="text-[10px]">AI review skipped — you can continue</Badge>
+                        )}
+                        {narrativeReviewStatus === "needs_answers" && (
+                          <Badge variant="destructive" className="text-[10px]">
+                            {narrativeReviewIssues.filter((g) => g.severity === "must_fix").length} required follow-up{narrativeReviewIssues.filter((g) => g.severity === "must_fix").length === 1 ? "" : "s"}
+                          </Badge>
+                        )}
+                      </div>
+                      {narrativeReviewStatus === "needs_answers" && narrativeReviewIssues.length > 0 && (
+                        <div className="mt-2 space-y-2 rounded border border-amber-300 bg-amber-50/60 p-2 text-xs dark:bg-amber-950/30 dark:border-amber-800">
+                          <p className="text-[11px] font-semibold text-amber-900 dark:text-amber-100">
+                            NECTAR needs a few details. Answer each question (or mark N/A with a reason) before continuing — NECTAR will NOT make up information for you.
+                          </p>
+                          {narrativeReviewIssues.map((g, i) => {
+                            const answered = !!(narrativeGapAnswers[i]?.trim() || narrativeGapNA[i]?.trim());
+                            return (
+                              <div key={i} className="rounded border border-amber-200 bg-background p-2 dark:border-amber-900">
+                                <div className="mb-1 flex items-start gap-2">
+                                  <Badge
+                                    variant={g.severity === "must_fix" ? "destructive" : "outline"}
+                                    className="text-[10px]"
+                                  >
+                                    {g.severity === "must_fix" ? "Required" : "Suggested"}
+                                  </Badge>
+                                  <p className="text-[11px] leading-snug">{g.question}</p>
+                                </div>
+                                <Textarea
+                                  rows={2}
+                                  value={narrativeGapAnswers[i] ?? ""}
+                                  onChange={(e) => setNarrativeGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
+                                  placeholder="Type your answer in 1–2 sentences…"
+                                  className="text-xs"
+                                />
+                                <div className="mt-1">
+                                  <Label className="text-[10px] text-muted-foreground">
+                                    Or mark N/A — explain why
+                                  </Label>
+                                  <Textarea
+                                    rows={1}
+                                    value={narrativeGapNA[i] ?? ""}
+                                    onChange={(e) => setNarrativeGapNA((s) => ({ ...s, [i]: e.target.value }))}
+                                    placeholder="e.g. 'Not witnessed — incident discovered after the fact'"
+                                    className="text-xs"
+                                  />
+                                </div>
+                                {!answered && g.severity === "must_fix" && (
+                                  <p className="mt-1 text-[10px] text-rose-700 dark:text-rose-300">
+                                    Required to continue.
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <p className="text-[10px] text-amber-800 dark:text-amber-200">
+                            Your answers will be appended to the narrative as a "Staff follow-up answers" section when you click Next.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {liveNudges.length > 0 && (
                     <div className="space-y-2">
                       {liveNudges.map((n) => (
@@ -1360,8 +1582,24 @@ export function IncidentReportDialog({
                   </Button>
                 )}
                 {step < reviewStepIndex && (
-                  <Button onClick={handleNext} disabled={currentKey === "nectar-interview" && aiReviewing}>
-                    {currentKey === "nectar-interview" && aiReviewing ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />NECTAR…</> : "Next"}
+                  <Button
+                    onClick={handleNext}
+                    disabled={
+                      (currentKey === "nectar-interview" && aiReviewing)
+                      || (currentKey === "narrative" && aiEnabled
+                          && (narrativeReviewStatus === "idle" || narrativeReviewStatus === "reviewing"))
+                    }
+                    title={
+                      currentKey === "narrative" && aiEnabled && narrativeReviewStatus === "idle"
+                        ? "Click 'Review with NECTAR' below before continuing."
+                        : ""
+                    }
+                  >
+                    {currentKey === "nectar-interview" && aiReviewing
+                      ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />NECTAR…</>
+                      : currentKey === "narrative" && narrativeReviewStatus === "reviewing"
+                        ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />NECTAR…</>
+                        : "Next"}
                   </Button>
                 )}
                 {step === reviewStepIndex && (

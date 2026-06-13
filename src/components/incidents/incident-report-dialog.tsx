@@ -1233,7 +1233,7 @@ export function IncidentReportDialog({
                 <div className="space-y-3 rounded-md border border-violet-300 bg-violet-50/40 p-4 dark:bg-violet-950/30 dark:border-violet-800">
                   <div className="flex items-center gap-2 text-violet-900 dark:text-violet-100">
                     <ShieldCheck className="h-4 w-4" />
-                    <span className="text-sm font-semibold">NECTAR is reviewing your draft</span>
+                    <span className="text-sm font-semibold">NECTAR is reviewing your narrative</span>
                   </div>
                   {aiReviewing ? (
                     <p className="flex items-center gap-2 text-xs text-violet-900/80 dark:text-violet-100/80">

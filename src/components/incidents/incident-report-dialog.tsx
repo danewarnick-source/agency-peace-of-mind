@@ -654,7 +654,87 @@ export function IncidentReportDialog({
     const err = validateStep(currentKey);
     if (err) { setStepError(err); return; }
     setStepError(null);
+    // On the narrative step: fold any answered NECTAR follow-ups into the
+    // description before advancing (mirrors acceptNectarDraft), and stash
+    // the structured Q&A on details for the persisted record.
+    if (currentKey === "narrative"
+        && narrativeReviewStatus === "needs_answers"
+        && narrativeReviewIssues.length > 0) {
+      const answered = narrativeReviewIssues
+        .map((g, i) => {
+          const ans = narrativeGapAnswers[i]?.trim();
+          const na = narrativeGapNA[i]?.trim();
+          if (ans) return `Q: ${g.question}\nA: ${ans}`;
+          if (na) return `Q: ${g.question}\nA: N/A — ${na}`;
+          return null;
+        })
+        .filter((s): s is string => !!s);
+      if (answered.length) {
+        const composed = `${description.trim()}\n\nStaff follow-up answers:\n${answered.join("\n\n")}`;
+        setDescription(composed);
+        setReviewedDescription(composed);
+      }
+      setDetails((d) => ({
+        ...d,
+        nectar_narrative_followups: narrativeReviewIssues.map((g, i) => ({
+          field: g.field,
+          severity: g.severity,
+          question: g.question,
+          answer: narrativeGapAnswers[i]?.trim() || null,
+          not_applicable_reason: narrativeGapNA[i]?.trim() || null,
+        })),
+      }));
+    }
     setStep((s) => Math.min(lastStep, s + 1));
+  }
+
+  // ── In-step NECTAR review for the narrative — called by the "Review with
+  // NECTAR" button on the narrative step. Same edge function as the
+  // downstream nectar-interview, but the questions answer in-place rather
+  // than becoming wizard sub-steps.
+  async function runNarrativeReview() {
+    const text = description.trim();
+    const nErr = validateNarrative(text);
+    if (nErr) { setStepError(nErr); return; }
+    setStepError(null);
+    setNarrativeReviewStatus("reviewing");
+    try {
+      const draft = { ...buildDraft(), description: text };
+      const result = await withAiTimeout(
+        supabase.functions.invoke("review-incident-report", { body: { draft } }),
+      );
+      const { data: r, error: rerr } =
+        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
+      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+        setNarrativeReviewIssues([]);
+        setNarrativeReviewStatus("skipped");
+        setReviewedDescription(text);
+        setDetails((d) => ({ ...d, ai_review_skipped: true }));
+        toast.message("Nectar review unavailable — you can continue. An 'AI review skipped' badge will be visible to admins.");
+        return;
+      }
+      const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
+      setNarrativeReviewIssues(issues);
+      setNarrativeGapAnswers({});
+      setNarrativeGapNA({});
+      setReviewedDescription(text);
+      if (issues.length === 0) {
+        setNarrativeReviewStatus("passed");
+        toast.success("NECTAR: no follow-ups — you can continue.");
+      } else {
+        setNarrativeReviewStatus("needs_answers");
+      }
+    } catch (e) {
+      setNarrativeReviewIssues([]);
+      setNarrativeReviewStatus("skipped");
+      setReviewedDescription(text);
+      setDetails((d) => ({ ...d, ai_review_skipped: true }));
+      toast.message(
+        (e as Error).message === "__AI_TIMEOUT__"
+          ? "Nectar didn't respond in 10s — you can continue."
+          : "Nectar review unavailable — you can continue.",
+      );
+    }
   }
 
   // ── Shared Nectar review runner — called both by the nectar-interview step

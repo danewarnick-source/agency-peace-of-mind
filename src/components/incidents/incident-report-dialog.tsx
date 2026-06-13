@@ -263,7 +263,7 @@ export function IncidentReportDialog({
 }: Props) {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const org = useCurrentOrg();
+  const { data: org } = useCurrentOrg();
   const { data: caseload = [] } = useCaseload();
   const createFn = useServerFn(createIncident);
 

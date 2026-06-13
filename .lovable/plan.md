@@ -1,43 +1,40 @@
 ## Root cause
 
-The "Nectar review unavailable" toast is the client's fail-open path firing because the `review-incident-report` Supabase edge function is returning `skipped: true`. Edge logs show every call crashing inside the Bedrock shim:
+The new toast is "Nectar didn't respond in 10s — you can continue." That's the client-side `__AI_TIMEOUT__` branch firing in `runNarrativeReview`. The server function is reaching Bedrock fine (no 500s in logs anymore), but the call doesn't return inside the 10-second window.
 
-```
-Bedrock Error (500) for model global.anthropic.claude-sonnet-4-6 in us-east-1:
-Not implemented: Http2Session.settings
-```
+Two things make the reviewer slow:
 
-This is a Deno runtime limitation — the AWS SDK's HTTP/2 client isn't supported in Supabase Edge Functions. The draft path works because it runs as a **TanStack server function** (`draftIncidentNarrative` in `src/lib/ai-coach.functions.ts`) using the **Node-side** `gatewayFetch` from `src/lib/ai-bedrock.server.ts`, where HTTP/2 works fine. The review path is the only Nectar surface still on the broken Deno/Bedrock shim.
+1. **Same model as draft, heavier workload.** Both `draftIncidentNarrative` and `reviewIncidentReport` go through `gatewayFetch` in `src/lib/ai-bedrock.server.ts`, which ALWAYS uses `BEDROCK_MODEL_ID` (the `model` field in the body is ignored — `gatewayFetch` hard-codes `getModelId()`). So both calls hit Bedrock Claude.
+2. **Tool calling adds latency.** The reviewer uses Bedrock `toolConfig` with a forced tool call. Tool-mode responses on Converse are noticeably slower than plain JSON-object responses. The draft uses `response_format: { type: "json_object" }` (no tools) and finishes in time; the reviewer doesn't.
+
+`AI_TIMEOUT_MS = 10_000` in the dialog; reviewer routinely takes longer than that, so the user sees the timeout even though Bedrock is healthy.
 
 ## Fix
 
-Move the reviewer off the edge function and onto the same TanStack server-function + Node Bedrock path the draft uses. No UI/UX change, no DB change — only the transport.
+Make the reviewer match the draft's transport — plain JSON object mode, no tools — and give the call a bit more headroom.
 
 ### Changes
 
-1. **New server function `reviewIncidentReport`** in `src/lib/ai-coach.functions.ts`
-   - Pattern matches `draftIncidentNarrative` (createServerFn POST + `requireSupabaseAuth` + `inputValidator` for `{ draft }`).
-   - Reuses the existing `SYSTEM_PROMPT`, `return_incident_review` tool schema, and 30k-char truncation from `supabase/functions/review-incident-report/index.ts` — copied verbatim into the server function.
-   - Calls `gatewayFetch` from `@/lib/ai-bedrock.server` (Node side, HTTP/2 works).
-   - Preserves fail-open contract: returns `{ complete: true, issues: [], skipped: true, reason }` on any error/non-2xx/bad shape, exactly like the edge function does today — the client wrapper already expects that shape.
+1. **`src/lib/ai-coach.functions.ts` → `reviewIncidentReport`**
+   - Drop `tools` + `tool_choice`. Send `response_format: { type: "json_object" }` and append a strict JSON instruction to the system prompt (same shape as the existing tool schema):
+     ```
+     {"complete": boolean, "issues": [{"field": string|null, "severity": "must_fix"|"should_add", "question": string}]}
+     ```
+   - Parse `choices[0].message.content` as JSON (with a `{…}` fallback regex, mirroring how `draftIncidentNarrative` recovers from stray prose).
+   - Keep the existing `IncidentReviewIssue` post-filter (severity allowlist, 20-item cap, 400-char question cap).
+   - Keep the fail-open contract verbatim: any error/non-2xx/bad shape returns `{ complete: true, issues: [], skipped: true, reason }`.
+   - Lower `max_tokens` from 1500 → 800 (reviewer JSON is small; cuts streaming time).
 
-2. **Client swap** in `src/components/incidents/incident-report-dialog.tsx`
-   - In `runNarrativeReview` (~line 695) and `runAiReview` (~line 745) and the submit-time reviewer (~line 810): replace
-     `supabase.functions.invoke("review-incident-report", { body: { draft } })`
-     with a `useServerFn(reviewIncidentReport)` call (kept inside `withAiTimeout`).
-   - Result shape is identical, so the existing `{ data, error }` branches stay; we adapt the wrapper to return the same `{ data, error }` shape the call sites consume.
+2. **`src/components/incidents/incident-report-dialog.tsx`**
+   - Bump `AI_TIMEOUT_MS` from `10_000` → `20_000`. JSON-mode review is faster, but 20s gives Bedrock cold-start margin without making staff wait excessively. Update the timeout toast string from "didn't respond in 10s" to "didn't respond in 20s".
 
-3. **Edge function deprecation**
-   - Delete `supabase/functions/review-incident-report/` since nothing else calls it. (Removes a dead broken path; prevents future regressions.)
+### Why this works
+
+- The (proven-fast) draft path already uses JSON-object mode through the same `gatewayFetch`/`BEDROCK_MODEL_ID` and returns inside the 10s budget. Removing tool-mode from the reviewer puts it on the same fast path.
+- Fail-open is unchanged — if Bedrock still misbehaves, the user gets the "AI review skipped" badge and can continue. The 24-hour UPI clock is never blocked.
+- No DB, no schema, no UI change beyond the toast string.
 
 ### Files touched
 
-- `src/lib/ai-coach.functions.ts` — add `reviewIncidentReport` server function (~60 lines, mirrors `draftIncidentNarrative`).
-- `src/components/incidents/incident-report-dialog.tsx` — 3 call-site swaps, no logic changes.
-- `supabase/functions/review-incident-report/` — delete.
-
-### Why this works / risk
-
-- Same Bedrock model, same prompt, same tool schema, same fail-open contract → reviewer behavior is unchanged when AI is healthy.
-- Node runtime (Cloudflare Worker with nodejs_compat) supports HTTP/2 in the AWS SDK — the draft path proves this in production today.
-- Fail-open semantics preserved: if Bedrock is still flaky for some other reason, the user still gets the "AI review skipped" badge and can continue (24-hour UPI clock rule).
+- `src/lib/ai-coach.functions.ts` — swap tool config for `response_format`, parse content, shrink max_tokens.
+- `src/components/incidents/incident-report-dialog.tsx` — `AI_TIMEOUT_MS = 20_000` and timeout-toast string.

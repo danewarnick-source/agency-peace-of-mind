@@ -17,7 +17,7 @@ import {
   AlertTriangle, Skull, ShieldAlert, Sparkles, X, Loader2, ShieldCheck, Mic, MicOff, Wand2,
 } from "lucide-react";
 import { createIncident } from "@/lib/incidents.functions";
-import { draftIncidentNarrative } from "@/lib/ai-coach.functions";
+import { draftIncidentNarrative, reviewIncidentReport } from "@/lib/ai-coach.functions";
 import {
   INCIDENT_CATEGORIES, ABUSE_CATEGORY, FATALITY_CATEGORY, type IncidentCategory,
 } from "./incident-categories";
@@ -205,6 +205,7 @@ export function IncidentReportDialog({
   const { data: caseload = [] } = useCaseload();
   const createFn = useServerFn(createIncident);
   const draftFn = useServerFn(draftIncidentNarrative);
+  const reviewFn = useServerFn(reviewIncidentReport);
 
   const initialDiscovered = useMemo(
     () => toLocalInput(defaultDiscoveredAt ?? new Date().toISOString()),
@@ -700,12 +701,8 @@ export function IncidentReportDialog({
     setNarrativeReviewStatus("reviewing");
     try {
       const draft = { ...buildDraft(), description: text };
-      const result = await withAiTimeout(
-        supabase.functions.invoke("review-incident-report", { body: { draft } }),
-      );
-      const { data: r, error: rerr } =
-        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
-      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+      const r = await withAiTimeout(reviewFn({ data: { draft } }));
+      if (!r || typeof r.complete !== "boolean" || r.skipped) {
         setNarrativeReviewIssues([]);
         setNarrativeReviewStatus("skipped");
         setReviewedDescription(text);
@@ -752,15 +749,11 @@ export function IncidentReportDialog({
       const draft = descriptionOverride !== undefined
         ? { ...base, description: descriptionOverride.trim() }
         : base;
-      console.log("AIREV calling edge fn");
-      const result = await withAiTimeout(
-        supabase.functions.invoke("review-incident-report", { body: { draft } }),
-      );
-      console.log("AIREV result", result);
+      console.log("AIREV calling server fn");
+      const r = await withAiTimeout(reviewFn({ data: { draft } }));
+      console.log("AIREV result", r);
       if (isCancelled?.()) return;
-      const { data: r, error: rerr } =
-        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
-      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+      if (!r || typeof r.complete !== "boolean" || r.skipped) {
         console.log("AIREV bad response", r);
         // Fail-open — never block the 24h clock
         setAiIssues([]); setAiStatus("skipped");
@@ -800,12 +793,8 @@ export function IncidentReportDialog({
     setCompletenessBusy(true);
     try {
       const draft = buildDraft();
-      const result = await withAiTimeout(
-        supabase.functions.invoke("review-incident-report", { body: { draft } }),
-      );
-      const { data: r, error: rerr } =
-        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
-      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+      const r = await withAiTimeout(reviewFn({ data: { draft } }));
+      if (!r || typeof r.complete !== "boolean" || r.skipped) {
         setCompletenessIssues([]); setAiStatus("skipped");
         setDetails((d) => ({ ...d, ai_review_skipped: true }));
         toast.message("Nectar review unavailable — submitting with standard checks.");

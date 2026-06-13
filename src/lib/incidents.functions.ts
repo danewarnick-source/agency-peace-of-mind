@@ -398,3 +398,56 @@ export const getIncidentActors = createServerFn({ method: "GET" })
       .in("id", data.user_ids);
     return { profiles: rows ?? [] };
   });
+
+/**
+ * Gate query for the NoteTriggerPrompt: did this client have a SUBMITTED
+ * incident report on this date? The trigger-prompt's "Open form" path no
+ * longer self-resolves — only an actual submission (or a reasoned dismissal)
+ * clears the gate.
+ */
+export const hasSubmittedIncidentForClientDate = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      client_id: z.string().uuid(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    const start = new Date(`${data.date}T00:00:00`).toISOString();
+    const end = new Date(`${data.date}T23:59:59.999`).toISOString();
+    const { data: rows, error } = await supabase
+      .from("incident_reports")
+      .select("id, report_number")
+      .eq("organization_id", m.organization_id)
+      .eq("client_id", data.client_id)
+      .gte("discovered_at", start)
+      .lte("discovered_at", end)
+      .limit(1);
+    if (error) throw new Error(error.message);
+    const ir = rows?.[0] ?? null;
+    return { submitted: !!ir, incident: ir };
+  });
+
+/** Sign storage paths in the incident-photos bucket so the admin view can
+ *  display thumbnails. Org-scoped: caller must be a member. */
+export const signIncidentPhotos = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    await getMembership(supabase, userId);
+    if (!data.paths.length) return { urls: {} as Record<string, string> };
+    const out: Record<string, string> = {};
+    for (const p of data.paths) {
+      const { data: signed } = await supabase.storage
+        .from("incident-photos")
+        .createSignedUrl(p, 60 * 30); // 30 minutes
+      if (signed?.signedUrl) out[p] = signed.signedUrl;
+    }
+    return { urls: out };
+  });

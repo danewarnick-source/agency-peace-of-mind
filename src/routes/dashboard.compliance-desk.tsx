@@ -794,11 +794,6 @@ function ComplianceDeskPage() {
           approving={reviewApprove.isPending}
           rejecting={reviewReject.isPending}
         />
-      ) : sub === "incidents" ? (
-        <AdminIncidentsSection
-          initialClientId={incidentPrefilterClient}
-          initialView={incidentPrefilterClient ? "log" : "queue"}
-        />
       ) : sub === "reconcile" ? (
         <ReconcileTable
           rows={reconcileQ.data ?? []}
@@ -809,8 +804,10 @@ function ComplianceDeskPage() {
       ) : sub === "residential" ? (
         <ResidentialDailyTab
           onOpenIncidents={(clientId) => {
-            setIncidentPrefilterClient(clientId);
-            setSub("incidents");
+            navigate({
+              to: "/dashboard/hub/documentation",
+              search: { tab: "incidents", ...(clientId ? { clientId } : {}) } as never,
+            });
           }}
         />
       ) : sub === "evv-archive" ? (

@@ -9,6 +9,18 @@
  * explicit dismissal with a reason.
  */
 
+import {
+  type DetailCategoryKey,
+  ABUSE_CATEGORY_NAME,
+  INJURY_CATEGORY_NAME,
+  MEDICATION_ERROR_CATEGORY_NAME,
+  MEDICAL_EMERGENCY_CATEGORY_NAME,
+  BEHAVIOR_CATEGORY_NAME,
+  POLICE_CATEGORY_NAME,
+  MISSING_CATEGORY_NAME,
+  FATALITY_CATEGORY_NAME,
+} from "./incident-detail-schemas";
+
 export type TriggerKind = "incident" | "appointment";
 
 export type NoteTriggerHit = {
@@ -21,11 +33,15 @@ export type NoteTriggerHit = {
 // as phrases. Keep these EXACTLY as authored — they encode the agency's
 // must-report surface, not heuristics.
 const INCIDENT_TERMS = [
-  "fall", "fell", "injury", "injured", "hurt", "bruise", "bleeding",
-  "ER", "emergency", "hospital", "911", "police", "missing", "eloped",
-  "ran away", "restraint", "hit", "bit", "aggression", "seizure",
-  "choking", "med error", "wrong medication", "missed dose", "abuse",
-  "neglect", "suicidal", "self-harm", "death", "died",
+  "fall", "fell", "injury", "injured", "hurt", "bruise", "bruised",
+  "swelling", "swollen", "bleeding", "bled",
+  "ER", "emergency", "hospital", "911", "ambulance", "paramedic",
+  "police", "officer", "missing", "eloped",
+  "ran away", "restraint", "restrained", "hit", "bit", "aggression",
+  "seizure", "choking", "med error", "wrong medication", "wrong med",
+  "missed dose", "wrong dose", "abuse", "neglect", "exploitation",
+  "APS", "suicidal", "self-harm", "death", "died", "deceased",
+  "unresponsive", "passed away",
 ] as const;
 
 const APPOINTMENT_TERMS = [
@@ -55,7 +71,6 @@ const APPOINTMENT_RX = buildLexiconRegex(APPOINTMENT_TERMS);
 export function scanNoteForTriggers(text: string | null | undefined): NoteTriggerHit[] {
   if (!text || !text.trim()) return [];
   const hits: NoteTriggerHit[] = [];
-  // Reset lastIndex because we use the /g flag.
   INCIDENT_RX.lastIndex = 0;
   APPOINTMENT_RX.lastIndex = 0;
   const incMatch = INCIDENT_RX.exec(text);
@@ -71,7 +86,7 @@ export function triggerLabel(kind: TriggerKind): string {
 
 export function triggerDismissPrompt(kind: TriggerKind): string {
   return kind === "incident"
-    ? "Confirm no reportable incident occurred"
+    ? "No reportable incident occurred"
     : "Confirm no appointment to log";
 }
 
@@ -82,4 +97,101 @@ export function triggerDismissalKey(
   date: string,
 ): string {
   return `nectar_trigger:${kind}:${clientId}:${date}`;
+}
+
+// ---------------------------------------------------------------------------
+// Live narrative category scanner — drives in-form Nectar nudges that point
+// staff to the right category-detail block. Same on-device rule: no API.
+// ---------------------------------------------------------------------------
+
+export type NarrativeCategoryHit = {
+  term: string;
+  categoryKey: DetailCategoryKey;
+  categoryName: string;
+  /** When true, the hit also implies the behavior-restraint flag. */
+  flagsRestraint?: boolean;
+};
+
+const NARRATIVE_TERMS: ReadonlyArray<{
+  terms: ReadonlyArray<string>;
+  categoryKey: DetailCategoryKey;
+  categoryName: string;
+  flagsRestraint?: boolean;
+}> = [
+  {
+    terms: ["bruise", "bruised", "swelling", "swollen", "cut", "laceration",
+            "bleeding", "bled", "scratch", "abrasion", "fall", "fell", "hurt",
+            "injured", "injury"],
+    categoryKey: "injury",
+    categoryName: INJURY_CATEGORY_NAME,
+  },
+  {
+    terms: ["wrong medication", "wrong med", "wrong dose", "missed dose",
+            "med error", "wrong pill", "refused medication"],
+    categoryKey: "medication_error",
+    categoryName: MEDICATION_ERROR_CATEGORY_NAME,
+  },
+  {
+    terms: ["restraint", "restrained", "physical hold", "held him down",
+            "held her down"],
+    categoryKey: "behavior",
+    categoryName: BEHAVIOR_CATEGORY_NAME,
+    flagsRestraint: true,
+  },
+  {
+    terms: ["abuse", "neglect", "exploitation", "APS"],
+    categoryKey: "abuse",
+    categoryName: ABUSE_CATEGORY_NAME,
+  },
+  {
+    terms: ["911", "ambulance", "paramedic", "unresponsive", "seizure",
+            "choking", "ER", "hospital"],
+    categoryKey: "medical",
+    categoryName: MEDICAL_EMERGENCY_CATEGORY_NAME,
+  },
+  {
+    terms: ["police", "officer", "arrested", "citation"],
+    categoryKey: "police",
+    categoryName: POLICE_CATEGORY_NAME,
+  },
+  {
+    terms: ["missing", "eloped", "ran away", "unaccounted"],
+    categoryKey: "missing",
+    categoryName: MISSING_CATEGORY_NAME,
+  },
+  {
+    terms: ["died", "deceased", "death", "passed away"],
+    categoryKey: "fatality",
+    categoryName: FATALITY_CATEGORY_NAME,
+  },
+];
+
+const NARRATIVE_RXS = NARRATIVE_TERMS.map((g) => ({
+  ...g,
+  rx: buildLexiconRegex(g.terms),
+}));
+
+/**
+ * Scan the narrative text and return ALL distinct category hits (first
+ * matched term per category). Used for in-form Nectar nudges that point the
+ * writer at the missing category-detail block.
+ */
+export function scanNarrativeForCategories(
+  text: string | null | undefined,
+): NarrativeCategoryHit[] {
+  if (!text || !text.trim()) return [];
+  const out: NarrativeCategoryHit[] = [];
+  for (const g of NARRATIVE_RXS) {
+    g.rx.lastIndex = 0;
+    const m = g.rx.exec(text);
+    if (m) {
+      out.push({
+        term: m[0].toLowerCase(),
+        categoryKey: g.categoryKey,
+        categoryName: g.categoryName,
+        flagsRestraint: g.flagsRestraint,
+      });
+    }
+  }
+  return out;
 }

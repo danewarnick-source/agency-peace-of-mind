@@ -1213,6 +1213,13 @@ export function PunchPad({
       toast.error("Resolve the NECTAR trigger(s) in your note before submitting.");
       return;
     }
+    // Hard gate: if staff toggled the clock-out incident flag (or a Nectar
+    // trigger fired), require a SUBMITTED Incident Report on this shift.
+    if (incidentFlag && incidentReportIds.length === 0) {
+      toast.error("You marked an incident — submit the Incident Report before submitting the timesheet.");
+      setIncidentDialogOpen(true);
+      return;
+    }
 
     // NECTAR Completeness Check (Infusion only). Without infusion, basic field
     // validation above is sufficient — the cross-checks are the locked layer.
@@ -2345,8 +2352,11 @@ export function PunchPad({
                     onSubmitted={(id) => {
                       setIncidentReportIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
                       setIncidentFlag(true);
-                      // Mark trigger resolved so the gate clears even when filed via the dialog.
-                      if (incidentTriggerOpen) setTriggersResolved(true);
+                      // Force the NoteTriggerPrompt poll to refetch so the
+                      // incident gate clears the moment the IR is submitted.
+                      qc.invalidateQueries({
+                        queryKey: ["incident-submitted-for", active.client_id, new Date().toISOString().slice(0, 10)],
+                      });
                     }}
                   />
                 )}

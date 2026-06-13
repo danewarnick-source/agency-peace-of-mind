@@ -52,6 +52,14 @@ const createInput = z.object({
   is_fatality: z.boolean().default(false),
   triggered_by_note_id: z.string().uuid().nullable().optional(),
   triggered_by_note_type: z.string().max(60).nullable().optional(),
+  // §1.27 structured detail extensions
+  details: z.record(z.string(), z.unknown()).default({}),
+  witnessed_directly: z.boolean().nullable().optional(),
+  reported_to_reporter_by: z.string().max(300).nullable().optional(),
+  restraint_used: z.boolean().default(false),
+  aps_notified_at: z.string().datetime().nullable().optional(),
+  aps_notified_by: z.string().max(300).nullable().optional(),
+  aps_reference: z.string().max(120).nullable().optional(),
 });
 
 export const createIncident = createServerFn({ method: "POST" })
@@ -118,6 +126,13 @@ export const createIncident = createServerFn({ method: "POST" })
       status: "submitted",
       triggered_by_note_id: data.triggered_by_note_id ?? null,
       triggered_by_note_type: data.triggered_by_note_type ?? null,
+      details: data.details ?? {},
+      witnessed_directly: data.witnessed_directly ?? null,
+      reported_to_reporter_by: data.reported_to_reporter_by ?? null,
+      restraint_used: !!data.restraint_used,
+      aps_notified_at: data.aps_notified_at ?? null,
+      aps_notified_by: data.aps_notified_by ?? null,
+      aps_reference: data.aps_reference ?? null,
     };
 
     const { data: ins, error } = await supabase
@@ -148,7 +163,7 @@ export const listIncidents = createServerFn({ method: "GET" })
     let q = supabase
       .from("incident_reports")
       .select(
-        "id, report_number, client_id, reported_by, discovered_at, occurred_at, category, description, location, status, is_abuse_neglect, is_fatality, prevention_strategies, guardian_notified_at, guardian_notified_method, guardian_notified_by, upi_initiated_at, upi_initiated_by, upi_completed_at, upi_completed_by, followup_notes, created_at, clients:client_id(first_name,last_name)",
+        "id, report_number, client_id, reported_by, discovered_at, occurred_at, category, description, location, status, is_abuse_neglect, is_fatality, prevention_strategies, guardian_notified_at, guardian_notified_method, guardian_notified_by, upi_initiated_at, upi_initiated_by, upi_completed_at, upi_completed_by, followup_notes, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, clients:client_id(first_name,last_name)",
       )
       .eq("organization_id", m.organization_id)
       .order("discovered_at", { ascending: false, nullsFirst: false })
@@ -382,4 +397,57 @@ export const getIncidentActors = createServerFn({ method: "GET" })
       .select("id, first_name, last_name")
       .in("id", data.user_ids);
     return { profiles: rows ?? [] };
+  });
+
+/**
+ * Gate query for the NoteTriggerPrompt: did this client have a SUBMITTED
+ * incident report on this date? The trigger-prompt's "Open form" path no
+ * longer self-resolves — only an actual submission (or a reasoned dismissal)
+ * clears the gate.
+ */
+export const hasSubmittedIncidentForClientDate = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      client_id: z.string().uuid(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    const start = new Date(`${data.date}T00:00:00`).toISOString();
+    const end = new Date(`${data.date}T23:59:59.999`).toISOString();
+    const { data: rows, error } = await supabase
+      .from("incident_reports")
+      .select("id, report_number")
+      .eq("organization_id", m.organization_id)
+      .eq("client_id", data.client_id)
+      .gte("discovered_at", start)
+      .lte("discovered_at", end)
+      .limit(1);
+    if (error) throw new Error(error.message);
+    const ir = rows?.[0] ?? null;
+    return { submitted: !!ir, incident: ir };
+  });
+
+/** Sign storage paths in the incident-photos bucket so the admin view can
+ *  display thumbnails. Org-scoped: caller must be a member. */
+export const signIncidentPhotos = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    await getMembership(supabase, userId);
+    if (!data.paths.length) return { urls: {} as Record<string, string> };
+    const out: Record<string, string> = {};
+    for (const p of data.paths) {
+      const { data: signed } = await supabase.storage
+        .from("incident-photos")
+        .createSignedUrl(p, 60 * 30); // 30 minutes
+      if (signed?.signedUrl) out[p] = signed.signedUrl;
+    }
+    return { urls: out };
   });

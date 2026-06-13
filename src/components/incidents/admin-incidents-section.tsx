@@ -51,6 +51,8 @@ type Incident = {
   followup_notes: string | null;
   created_at: string;
   clients: { first_name: string; last_name: string } | null;
+  restraint_used?: boolean | null;
+  aps_notified_at?: string | null;
 };
 
 type ScRequest = {
@@ -293,6 +295,12 @@ function IncidentCard({
               label="SC response 5 bus.d"
             />
           ))}
+          {ir.is_abuse_neglect && !ir.aps_notified_at && (
+            <Badge className="bg-rose-600 text-white">APS-PENDING</Badge>
+          )}
+          {ir.restraint_used && (
+            <Badge className="bg-amber-600 text-white">RESTRAINT</Badge>
+          )}
           {closed && openSc.length === 0 && <Badge className="bg-slate-600 text-white">Closed</Badge>}
           {closed && openSc.length > 0 && (
             <Badge className="bg-amber-600 text-white">Re-surfaced · open SC request</Badge>
@@ -445,6 +453,9 @@ export function AdminIncidentsSection({
   const sorted = useMemo(() => {
     return [...visible].sort((a, b) => {
       if (a.is_fatality !== b.is_fatality) return a.is_fatality ? -1 : 1;
+      const aAps = a.is_abuse_neglect && !a.aps_notified_at;
+      const bAps = b.is_abuse_neglect && !b.aps_notified_at;
+      if (aAps !== bAps) return aAps ? -1 : 1;
       return (b.discovered_at ?? b.created_at).localeCompare(a.discovered_at ?? a.created_at);
     });
   }, [visible]);

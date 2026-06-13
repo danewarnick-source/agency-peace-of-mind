@@ -25,6 +25,7 @@ function SettingsPage() {
   const [displayAcronym, setDisplayAcronym] = useState("");
   const [dhhsProviderId, setDhhsProviderId] = useState("");
   const [evvVendorName, setEvvVendorName] = useState("Hive");
+  const [incidentAiEnabled, setIncidentAiEnabled] = useState(true);
   const [busy, setBusy] = useState(false);
 
   if (pathname !== "/dashboard/settings") {

@@ -1051,7 +1051,11 @@ export function IncidentReportDialog({
                           </Button>
                         )}
                         {nectarDraft && (
-                          <Button type="button" size="sm" variant="secondary" onClick={acceptNectarDraft}>
+                          <Button type="button" size="sm" variant="secondary"
+                            onClick={acceptNectarDraft}
+                            disabled={!canAcceptDraft}
+                            title={canAcceptDraft ? "" : "Answer the required follow-ups below first"}
+                          >
                             Use this draft
                           </Button>
                         )}
@@ -1063,6 +1067,53 @@ export function IncidentReportDialog({
                         <div className="mt-2 rounded border border-violet-200 bg-background p-2 text-xs dark:border-violet-900">
                           <p className="mb-1 text-[10px] uppercase tracking-wide text-violet-700 dark:text-violet-300">NECTAR draft — review then click "Use this draft"</p>
                           <p className="whitespace-pre-wrap">{nectarDraft}</p>
+                        </div>
+                      )}
+                      {nectarDraft && nectarDraftGaps.length > 0 && (
+                        <div className="mt-2 space-y-2 rounded border border-amber-300 bg-amber-50/60 p-2 text-xs dark:bg-amber-950/30 dark:border-amber-800">
+                          <p className="text-[11px] font-semibold text-amber-900 dark:text-amber-100">
+                            NECTAR needs a few details before it can finalize this draft. Answer each question (or mark N/A with a reason) — NECTAR will NOT make up information for you.
+                          </p>
+                          {nectarDraftGaps.map((g, i) => {
+                            const answered = !!(gapAnswers[i]?.trim() || gapNA[i]?.trim());
+                            return (
+                              <div key={i} className="rounded border border-amber-200 bg-background p-2 dark:border-amber-900">
+                                <div className="mb-1 flex items-start gap-2">
+                                  <Badge
+                                    variant={g.severity === "must_fix" ? "destructive" : "outline"}
+                                    className="text-[10px]"
+                                  >
+                                    {g.severity === "must_fix" ? "Required" : "Suggested"}
+                                  </Badge>
+                                  <p className="text-[11px] leading-snug">{g.question}</p>
+                                </div>
+                                <Textarea
+                                  rows={2}
+                                  value={gapAnswers[i] ?? ""}
+                                  onChange={(e) => setGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
+                                  placeholder="Type your answer in 1–2 sentences…"
+                                  className="text-xs"
+                                />
+                                <div className="mt-1">
+                                  <Label className="text-[10px] text-muted-foreground">
+                                    Or mark N/A — explain why
+                                  </Label>
+                                  <Textarea
+                                    rows={1}
+                                    value={gapNA[i] ?? ""}
+                                    onChange={(e) => setGapNA((s) => ({ ...s, [i]: e.target.value }))}
+                                    placeholder="e.g. 'Not witnessed — incident discovered after the fact'"
+                                    className="text-xs"
+                                  />
+                                </div>
+                                {!answered && g.severity === "must_fix" && (
+                                  <p className="mt-1 text-[10px] text-rose-700 dark:text-rose-300">
+                                    Required to use this draft.
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

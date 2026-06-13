@@ -439,6 +439,143 @@ export function IncidentReportDialog({
     }
   }
 
+  // ─── Per-step validation ─────────────────────────────────────────────────
+  function validateStep(key: string): string | null {
+    switch (key) {
+      case "who-when":
+        if (!pickedClientId) return "Pick the individual involved.";
+        if (!discoveredAt) return "Record when you DISCOVERED this — drives the 24-hour clock.";
+        return null;
+      case "witnessed":
+        if (witnessedDirectly === "") return "Tell us whether you witnessed this directly.";
+        if (witnessedDirectly === "no") {
+          const nameErr = validatePersonName(reportedBy);
+          if (nameErr) return `Who reported it? ${nameErr}`;
+        }
+        return null;
+      case "where-what":
+        if (!category) return "Pick an incident category.";
+        return null;
+      case "narrative":
+        return validateNarrative(description);
+      case "details": {
+        if (!block) return null;
+        const missing = missingRequired(block, details);
+        if (missing.length) return `Complete the ${block.title.toLowerCase()}: ${missing.join(", ")}.`;
+        if (detailKey === "behavior" && details.restraintUsed === "Yes") {
+          const need: string[] = [];
+          if (!String(details.holdType ?? "").trim()) need.push("type of hold");
+          if (!String(details.restraintDuration ?? "").trim()) need.push("restraint duration");
+          if (!String(details.restraintAuthorizedBy ?? "").trim()) need.push("authorized by");
+          if (need.length) return `Restraint was used — also record: ${need.join(", ")}.`;
+        }
+        return null;
+      }
+      case "people": {
+        const err = validatePersonName(peopleInvolved);
+        if (err) return `People involved: ${err}`;
+        return null;
+      }
+      case "injuries": {
+        const e1 = validateRequiredText(injuries, 10);
+        if (e1) return `Injuries: ${e1}`;
+        const e2 = validateRequiredText(medicalAttention, 10);
+        if (e2) return `Medical attention: ${e2}`;
+        return null;
+      }
+      case "actions": {
+        const e1 = validateRequiredText(immediateActions, 20);
+        if (e1) return `Immediate actions: ${e1}`;
+        if (isAbuse) {
+          const e2 = validateRequiredText(preventionStrategies, 20);
+          if (e2) return `Prevention strategies (§1.27(3)): ${e2}`;
+        }
+        return null;
+      }
+      default:
+        return null;
+    }
+  }
+
+  function handleNext() {
+    const err = validateStep(currentKey);
+    if (err) { setStepError(err); return; }
+    setStepError(null);
+    setStep((s) => Math.min(lastStep, s + 1));
+  }
+
+  // Draft built for AI review + contradiction scanning.
+  function buildDraft() {
+    return {
+      category, description: description.trim(), location,
+      occurred_at: occurredAt ? new Date(occurredAt).toISOString() : null,
+      discovered_at: discoveredAt ? new Date(discoveredAt).toISOString() : null,
+      people_involved: peopleInvolved, witnesses, injuries,
+      medical_attention: medicalAttention, immediate_actions: immediateActions,
+      is_abuse_neglect: isAbuse, prevention_strategies: preventionStrategies,
+      witnessed_directly: witnessedDirectly === "yes",
+      reported_to_reporter_by: witnessedDirectly === "no" ? reportedBy : null,
+      details,
+    };
+  }
+
+  // Contradictions across the whole draft — recomputed every render of review step.
+  const contradictions = useMemo(
+    () => (currentKey === "review" ? findContradictions(buildDraft()) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentKey, description, peopleInvolved, witnesses, injuries, medicalAttention, immediateActions],
+  );
+
+  // Kick off Nectar AI review the moment we hit the Review step.
+  // 10s timeout via Promise.race — AI downtime must never permanently block
+  // an incident report (24-hour UPI clock).
+  useEffect(() => {
+    if (currentKey !== "review") return;
+    if (orgAiEnabled === null) return;                 // wait for org pref
+    if (orgAiEnabled === false) { setAiStatus("disabled"); return; }
+    if (aiIssues !== null || aiStatus === "skipped") return;
+    let cancelled = false;
+    (async () => {
+      setAiReviewing(true);
+      try {
+        const draft = buildDraft();
+        const result = await Promise.race([
+          supabase.functions.invoke("review-incident-report", { body: { draft } }),
+          new Promise<{ data: null; error: Error }>((resolve) =>
+            setTimeout(() => resolve({ data: null, error: new Error("timeout") }), 10000),
+          ),
+        ]);
+        if (cancelled) return;
+        const { data: r, error: rerr } = result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
+        if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+          setAiIssues([]);
+          setAiStatus("skipped");
+          return;
+        }
+        const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
+        setAiIssues(issues);
+        setAiStatus(issues.length === 0 ? "passed" : null);
+      } catch {
+        if (!cancelled) { setAiIssues([]); setAiStatus("skipped"); }
+      } finally {
+        if (!cancelled) setAiReviewing(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentKey, orgAiEnabled]);
+
+  // Submit blocked while contradictions exist OR any must_fix is unanswered.
+  const unresolvedMustFix = (aiIssues ?? [])
+    .map((q, i) => ({ q, i }))
+    .filter(({ q, i }) => q.severity === "must_fix" && !(aiAnswers[i]?.trim() || aiNA[i]?.trim()));
+  const submitBlocked =
+    contradictions.length > 0 ||
+    aiReviewing ||
+    (aiStatus !== "skipped" && aiStatus !== "disabled" && unresolvedMustFix.length > 0);
+
+
+
   const submit = useMutation({
     mutationFn: async () => {
       if (!pickedClientId) throw new Error("Pick the individual involved.");

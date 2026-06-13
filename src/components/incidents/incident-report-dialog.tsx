@@ -312,7 +312,7 @@ export function IncidentReportDialog({
     setMedicalAttention(""); setImmediateActions(""); setPreventionStrategies("");
     setWitnessedDirectly(""); setReportedBy("");
     setDetails({}); setDismissedTerms(new Set()); setSubmitted(false);
-    setShorthand(""); setNectarDraft(null); setDraftSkipped(false); setDraftBusy(false);
+    setShorthand(""); setNectarDraft(null); setNectarDraftGaps([]); setGapAnswers({}); setGapNA({}); setDraftSkipped(false); setDraftBusy(false);
     setAiIssues(null); setAiStatus(null); setAiAnswers({}); setAiNA({});
     setAiReviewing(false); setAiAttempted(false);
     setCompletenessIssues(null); setCompletenessBusy(false);

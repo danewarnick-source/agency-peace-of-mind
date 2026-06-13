@@ -177,7 +177,7 @@ function missingRequired(block: { fields: DetailField[] }, values: Record<string
 }
 
 // ─── 10-second AI race helper — AI downtime must NEVER block an IR ────────
-const AI_TIMEOUT_MS = 10_000;
+const AI_TIMEOUT_MS = 20_000;
 async function withAiTimeout<T>(p: Promise<T>): Promise<T> {
   return Promise.race([
     p,
@@ -476,7 +476,7 @@ export function IncidentReportDialog({
       setDetails((d) => ({ ...d, ai_review_skipped: true }));
       toast.error(
         (e as Error).message === "__AI_TIMEOUT__"
-          ? "Nectar didn't respond in 10s — write the narrative manually. Submission won't be blocked."
+          ? "Nectar didn't respond in 20s — write the narrative manually. Submission won't be blocked."
           : "Nectar draft unavailable — write the narrative manually. Submission won't be blocked.",
       );
     } finally { setDraftBusy(false); }
@@ -728,7 +728,7 @@ export function IncidentReportDialog({
       setDetails((d) => ({ ...d, ai_review_skipped: true }));
       toast.message(
         (e as Error).message === "__AI_TIMEOUT__"
-          ? "Nectar didn't respond in 10s — you can continue."
+          ? "Nectar didn't respond in 20s — you can continue."
           : "Nectar review unavailable — you can continue.",
       );
     }
@@ -807,7 +807,7 @@ export function IncidentReportDialog({
     } catch {
       setCompletenessIssues([]); setAiStatus("skipped");
       setDetails((d) => ({ ...d, ai_review_skipped: true }));
-      toast.message("Nectar didn't respond in 10s — you can still submit.");
+      toast.message("Nectar didn't respond in 20s — you can still submit.");
     } finally {
       setCompletenessBusy(false);
     }

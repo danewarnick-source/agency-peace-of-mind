@@ -679,7 +679,7 @@ export function IncidentReportDialog({
           is_fatality: isFatality,
           triggered_by_note_id: triggeredByNoteId ?? null,
           triggered_by_note_type: triggeredByNoteType ?? null,
-          details,
+          details: finalStatus === "skipped" ? { ...details, ai_review_skipped: true } : details,
           witnessed_directly: witnessedDirectly === "yes",
           reported_to_reporter_by: witnessedDirectly === "no" ? reportedBy.trim() : null,
           restraint_used: restraintFlag,

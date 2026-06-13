@@ -27,6 +27,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode } from "@/lib/evv-codes";
+import { UtahExportDialog, EvvExportArchiveStrip } from "@/components/evv/utah-export-dialog";
 import { searchTimesheetsByVector, backfillTimesheetEmbeddings } from "@/lib/vector-search.functions";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { AdminIncidentsSection } from "@/components/incidents/admin-incidents-section";
@@ -173,7 +174,7 @@ type Row = {
   reviewed_by: string | null;
   reviewed_at: string | null;
   review_note: string | null;
-  clients: { first_name: string; last_name: string; physical_address: string | null } | null;
+  clients: { first_name: string; last_name: string; physical_address: string | null; medicaid_id: string | null } | null;
   staff: { full_name: string | null; email: string | null } | null;
 };
 
@@ -378,7 +379,7 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
 
 
 
-const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, review_status, attested_accurate, corrected_clock_in, corrected_clock_out, edit_reason, edited_by, edited_at, incident_flag, reviewed_by, reviewed_at, review_note, clients(first_name,last_name,physical_address)";
+const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, review_status, attested_accurate, corrected_clock_in, corrected_clock_out, edit_reason, edited_by, edited_at, incident_flag, reviewed_by, reviewed_at, review_note, clients(first_name,last_name,physical_address,medicaid_id)";
 
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));
@@ -596,15 +597,14 @@ function ComplianceDeskPage() {
     resetAiSearch();
   };
 
-  const onGlobalUtahExport = () => {
-    const all = approvedQ.data ?? [];
-    const eligible = all.filter((r) => isEvvLockedCode(r.service_type_code) && !r.outside_geofence_reason);
-    if (!eligible.length) { toast.error("No approved EVV-locked, in-bounds shifts to export."); return; }
-    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    downloadCsv(`utah_dhhs_evv_${stamp}.csv`, buildUtahCsv(eligible));
-    const skipped = all.length - eligible.length;
-    toast.success(`Exported ${eligible.length} shift${eligible.length === 1 ? "" : "s"}.${skipped > 0 ? ` Skipped ${skipped} (non-EVV or NO MATCH).` : ""}`);
-  };
+  const [utahExportOpen, setUtahExportOpen] = useState(false);
+  const staffNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of approvedQ.data ?? []) {
+      if (r.staff_id) m.set(r.staff_id, r.staff?.full_name ?? r.staff?.email ?? "");
+    }
+    return m;
+  }, [approvedQ.data]);
   const onGlobalMasterExport = () => {
     const all = approvedQ.data ?? [];
     if (!all.length) { toast.error("No approved shifts to export."); return; }
@@ -623,7 +623,7 @@ function ComplianceDeskPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button onClick={onGlobalUtahExport} disabled={approvedQ.isLoading}>
+          <Button onClick={() => setUtahExportOpen(true)} disabled={!org?.organization_id}>
             <Download /> Export Utah DHHS EVV CSV
           </Button>
           <Button onClick={onGlobalMasterExport} disabled={approvedQ.isLoading} variant="secondary">
@@ -814,13 +814,28 @@ function ComplianceDeskPage() {
           }}
         />
       ) : sub === "evv-archive" ? (
-        <ArchiveTable
-          variant="evv"
-          rows={(approvedQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
-          loading={approvedQ.isLoading}
-          onMap={setMapOpen}
-          onEdit={setEditRow}
-        />
+        <div className="space-y-4">
+          {org?.organization_id && (
+            <EvvExportArchiveStrip
+              organizationId={org.organization_id}
+              approvedRows={(approvedQ.data ?? []).map((r) => ({
+                id: r.id, service_type_code: r.service_type_code,
+                clock_in_timestamp: r.clock_in_timestamp,
+                outside_geofence_reason: r.outside_geofence_reason,
+                clients: r.clients ? { first_name: r.clients.first_name, last_name: r.clients.last_name, medicaid_id: r.clients.medicaid_id } : null,
+              }))}
+              staffNameMap={staffNameMap}
+              onOpenExport={() => setUtahExportOpen(true)}
+            />
+          )}
+          <ArchiveTable
+            variant="evv"
+            rows={(approvedQ.data ?? []).filter((r) => isEvvLockedCode(r.service_type_code))}
+            loading={approvedQ.isLoading}
+            onMap={setMapOpen}
+            onEdit={setEditRow}
+          />
+        </div>
       ) : (
         <ArchiveTable
           variant="non-evv"
@@ -835,6 +850,14 @@ function ComplianceDeskPage() {
       <EditShiftDialog row={editRow} onClose={() => setEditRow(null)} />
       <ReasonDialog row={reasonRow} onClose={() => setReasonRow(null)} />
       <ReviewReconciliationDialog row={reviewRow} onClose={() => setReviewRow(null)} />
+      {org?.organization_id && (
+        <UtahExportDialog
+          open={utahExportOpen}
+          onClose={() => setUtahExportOpen(false)}
+          organizationId={org.organization_id}
+          staffNameMap={staffNameMap}
+        />
+      )}
     </div>
   );
 }

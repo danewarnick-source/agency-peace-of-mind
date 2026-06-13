@@ -23,6 +23,8 @@ function SettingsPage() {
   const [legalName, setLegalName] = useState("");
   const [dbaName, setDbaName] = useState("");
   const [displayAcronym, setDisplayAcronym] = useState("");
+  const [dhhsProviderId, setDhhsProviderId] = useState("");
+  const [evvVendorName, setEvvVendorName] = useState("Hive");
   const [busy, setBusy] = useState(false);
 
   if (pathname !== "/dashboard/settings") {
@@ -36,6 +38,20 @@ function SettingsPage() {
       setLegalName(org.legal_name ?? "");
       setDbaName(org.dba_name ?? "");
       setDisplayAcronym(org.display_acronym ?? "");
+      // Fetch EVV-specific org fields directly (not part of useCurrentOrg)
+      void supabase
+        .from("organizations")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("dhhs_provider_id, evv_vendor_name" as any)
+        .eq("id", org.organization_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          const d = (data ?? null) as { dhhs_provider_id: string | null; evv_vendor_name: string | null } | null;
+          if (d) {
+            setDhhsProviderId(d.dhhs_provider_id ?? "");
+            setEvvVendorName(d.evv_vendor_name ?? "Hive");
+          }
+        });
     }
   }, [user, org]);
 
@@ -55,12 +71,15 @@ function SettingsPage() {
     setBusy(true);
     const { error } = await supabase
       .from("organizations")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .update({
         name: orgName,
         legal_name: legalName.trim() || null,
         dba_name: dbaName.trim() || null,
         display_acronym: displayAcronym.trim() || null,
-      })
+        dhhs_provider_id: dhhsProviderId.trim() || null,
+        evv_vendor_name: evvVendorName.trim() || "Hive",
+      } as any)
       .eq("id", org.organization_id);
     setBusy(false);
     if (error) return toast.error(error.message);
@@ -89,6 +108,8 @@ function SettingsPage() {
             <div className="grid gap-2"><Label htmlFor="legal_name">Legal name</Label><Input id="legal_name" value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="e.g. Acme Supports LLC" /></div>
             <div className="grid gap-2"><Label htmlFor="dba_name">Doing-business-as (DBA)</Label><Input id="dba_name" value={dbaName} onChange={(e) => setDbaName(e.target.value)} placeholder="Optional" /></div>
             <div className="grid gap-2"><Label htmlFor="display_acronym">Display acronym</Label><Input id="display_acronym" value={displayAcronym} onChange={(e) => setDisplayAcronym(e.target.value)} placeholder="e.g. ACME" maxLength={12} /></div>
+            <div className="grid gap-2"><Label htmlFor="dhhs_provider_id">DHHS Provider ID</Label><Input id="dhhs_provider_id" value={dhhsProviderId} onChange={(e) => setDhhsProviderId(e.target.value)} placeholder="Required for Utah EVV export" /></div>
+            <div className="grid gap-2"><Label htmlFor="evv_vendor_name">EVV Vendor name</Label><Input id="evv_vendor_name" value={evvVendorName} onChange={(e) => setEvvVendorName(e.target.value)} placeholder="Hive" /></div>
             <Button type="submit" disabled={busy}>Save organization</Button>
           </div>
         </form>

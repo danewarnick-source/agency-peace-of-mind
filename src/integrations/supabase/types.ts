@@ -3278,6 +3278,94 @@ export type Database = {
           },
         ]
       }
+      evv_export_batches: {
+        Row: {
+          batch_number: number
+          created_at: string
+          created_by: string | null
+          id: string
+          organization_id: string
+          range_end: string
+          range_start: string
+          row_count: number
+        }
+        Insert: {
+          batch_number: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id: string
+          range_end: string
+          range_start: string
+          row_count?: number
+        }
+        Update: {
+          batch_number?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id?: string
+          range_end?: string
+          range_start?: string
+          row_count?: number
+        }
+        Relationships: []
+      }
+      evv_export_records: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          is_correction: boolean
+          organization_id: string
+          orig_record: string | null
+          record_id: number
+          timesheet_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          is_correction?: boolean
+          organization_id: string
+          orig_record?: string | null
+          record_id: number
+          timesheet_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          is_correction?: boolean
+          organization_id?: string
+          orig_record?: string | null
+          record_id?: number
+          timesheet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evv_export_records_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "evv_export_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evv_export_records_orig_record_fkey"
+            columns: ["orig_record"]
+            isOneToOne: false
+            referencedRelation: "evv_export_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evv_export_records_timesheet_id_fkey"
+            columns: ["timesheet_id"]
+            isOneToOne: false
+            referencedRelation: "evv_timesheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evv_timesheets: {
         Row: {
           ai_coaching_iterations: number
@@ -7858,7 +7946,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           dba_name: string | null
+          dhhs_provider_id: string | null
           display_acronym: string | null
+          evv_vendor_name: string
           id: string
           is_demo: boolean
           legal_name: string | null
@@ -7873,7 +7963,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dba_name?: string | null
+          dhhs_provider_id?: string | null
           display_acronym?: string | null
+          evv_vendor_name?: string
           id?: string
           is_demo?: boolean
           legal_name?: string | null
@@ -7888,7 +7980,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dba_name?: string | null
+          dhhs_provider_id?: string | null
           display_acronym?: string | null
+          evv_vendor_name?: string
           id?: string
           is_demo?: boolean
           legal_name?: string | null

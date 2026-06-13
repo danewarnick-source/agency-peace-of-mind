@@ -53,6 +53,9 @@ type Incident = {
   clients: { first_name: string; last_name: string } | null;
   restraint_used?: boolean | null;
   aps_notified_at?: string | null;
+  ai_review_status?: string | null;
+  ai_review_issues?: Array<{ field?: string | null; severity: string; question: string; answer?: string | null; not_applicable_reason?: string | null }> | null;
+  ai_review_at?: string | null;
 };
 
 type ScRequest = {

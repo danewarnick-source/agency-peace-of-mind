@@ -60,6 +60,15 @@ const createInput = z.object({
   aps_notified_at: z.string().datetime().nullable().optional(),
   aps_notified_by: z.string().max(300).nullable().optional(),
   aps_reference: z.string().max(120).nullable().optional(),
+  // Nectar AI pre-submit review
+  ai_review_status: z.enum(["passed", "answered", "skipped", "disabled"]).nullable().optional(),
+  ai_review_issues: z.array(z.object({
+    field: z.string().nullable().optional(),
+    severity: z.enum(["must_fix", "should_add"]),
+    question: z.string(),
+    answer: z.string().nullable().optional(),
+    not_applicable_reason: z.string().nullable().optional(),
+  })).nullable().optional(),
 });
 
 export const createIncident = createServerFn({ method: "POST" })

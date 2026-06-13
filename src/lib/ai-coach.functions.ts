@@ -410,3 +410,81 @@ ${data.narrative}
       triggerSummary:     typeof parsed.triggerSummary === "string" ? parsed.triggerSummary : "",
     };
   });
+
+
+// ─── Incident-report narrative drafter ───────────────────────────────────────
+// Same pattern as draftShiftNote: staff types shorthand ("client hit roommate,
+// cops came, arrested"), NECTAR expands it into a UPI-grade narrative the
+// staff edits before continuing.
+
+interface IncidentDraftInput {
+  shorthand: string;
+  category: string;
+  clientName: string;
+  occurredAt: string | null;
+  discoveredAt: string | null;
+  knownFacts?: string | null;
+}
+
+function validateIncidentDraft(input: unknown): IncidentDraftInput {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const shorthand = typeof i.shorthand === "string" ? i.shorthand.trim() : "";
+  if (shorthand.length < 3 || shorthand.length > 4000) {
+    throw new Error("Shorthand must be 3–4000 characters.");
+  }
+  return {
+    shorthand,
+    category: typeof i.category === "string" ? i.category.slice(0, 120) : "",
+    clientName: typeof i.clientName === "string" ? i.clientName.slice(0, 120) : "the individual",
+    occurredAt: typeof i.occurredAt === "string" ? i.occurredAt : null,
+    discoveredAt: typeof i.discoveredAt === "string" ? i.discoveredAt : null,
+    knownFacts: typeof i.knownFacts === "string" ? i.knownFacts.slice(0, 2000) : null,
+  };
+}
+
+export interface IncidentDraftResult { draft: string; wordCount: number; }
+
+export const draftIncidentNarrative = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validateIncidentDraft)
+  .handler(async ({ data }): Promise<IncidentDraftResult> => {
+    const system = `You are NECTAR, a Utah DSPD UPI-grade incident-narrative drafter.
+
+GOAL: Expand the staff's rough shorthand into a complete, professional incident narrative a UPI reviewer would accept.
+
+REQUIRED COVERAGE (every narrative must address all five, in order):
+1) Who was involved (use the individual's real name; identify peers/staff/visitors only by role unless the shorthand names them).
+2) What led up to it (antecedent / setting / mood).
+3) What happened (the event itself, in sequence — do NOT skip from setup to aftermath).
+4) Staff response during the event (what YOU did, where you were, who you called).
+5) Outcome (injuries, medical attention, law enforcement, current status).
+
+RULES:
+- 90–180 words. Past tense, third person, objective. No "had a good day" fluff.
+- NEVER invent facts (no fake names, times, injuries, medications, police IDs). If the shorthand is silent on a required element, write "Staff did not record [X]" so the reviewer can ask.
+- Use the individual's first name naturally; do not call them "the client" repeatedly.
+- No markdown, no bullets, no headings — one to three clean paragraphs.
+
+OUTPUT FORMAT — STRICT JSON only, no markdown, no code fences:
+{"draft":"<the narrative paragraph(s)>"}`;
+
+    const user = `INDIVIDUAL: ${data.clientName}
+INCIDENT CATEGORY: ${data.category || "(unspecified)"}
+OCCURRED AT: ${data.occurredAt ?? "(unknown)"}
+DISCOVERED AT: ${data.discoveredAt ?? "(unknown)"}
+KNOWN FACTS (already captured on the form): ${data.knownFacts ?? "(none)"}
+
+STAFF SHORTHAND:
+"""
+${data.shorthand}
+"""`;
+
+    const raw = await callAI(system, user);
+    let parsed: { draft?: string } = {};
+    try { parsed = JSON.parse(raw); }
+    catch { const m = raw.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch { /* ignore */ } } }
+    const draft = typeof parsed.draft === "string" ? parsed.draft.trim() : "";
+    if (!draft) throw new Error("NECTAR could not draft the narrative — please write it manually.");
+    const wordCount = draft.split(/\s+/).filter(Boolean).length;
+    return { draft, wordCount };
+  });

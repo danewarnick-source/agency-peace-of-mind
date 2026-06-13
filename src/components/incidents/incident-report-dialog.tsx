@@ -1259,6 +1259,96 @@ export function IncidentReportDialog({
                       {description.trim().length} characters
                     </p>
                   </div>
+                  {aiEnabled && (
+                    <div className="rounded-md border-2 border-violet-300 bg-violet-50/40 p-3 dark:bg-violet-950/30 dark:border-violet-800">
+                      <div className="mb-2 flex items-center gap-2 text-violet-900 dark:text-violet-100">
+                        <ShieldCheck className="h-4 w-4" />
+                        <span className="text-sm font-semibold">Review with NECTAR</span>
+                      </div>
+                      <p className="text-[11px] text-violet-900/80 dark:text-violet-100/80">
+                        NECTAR reads your narrative and asks for anything a UPI reviewer would push back on.
+                        You must run a review before continuing — NECTAR will NOT make up information for you.
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={runNarrativeReview}
+                          disabled={narrativeReviewStatus === "reviewing" || description.trim().length < 120}
+                          title={description.trim().length < 120 ? "Write at least 120 characters first." : ""}
+                        >
+                          {narrativeReviewStatus === "reviewing"
+                            ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />NECTAR reviewing…</>
+                            : narrativeReviewStatus === "idle"
+                              ? <><Sparkles className="mr-1 h-3 w-3" />Review with NECTAR</>
+                              : <><Sparkles className="mr-1 h-3 w-3" />Re-run NECTAR review</>}
+                        </Button>
+                        {narrativeReviewStatus === "passed" && (
+                          <Badge variant="outline" className="border-emerald-400 text-[10px] text-emerald-700 dark:text-emerald-300">
+                            NECTAR has no follow-ups — you can continue.
+                          </Badge>
+                        )}
+                        {narrativeReviewStatus === "skipped" && (
+                          <Badge variant="outline" className="text-[10px]">AI review skipped — you can continue</Badge>
+                        )}
+                        {narrativeReviewStatus === "needs_answers" && (
+                          <Badge variant="destructive" className="text-[10px]">
+                            {narrativeReviewIssues.filter((g) => g.severity === "must_fix").length} required follow-up{narrativeReviewIssues.filter((g) => g.severity === "must_fix").length === 1 ? "" : "s"}
+                          </Badge>
+                        )}
+                      </div>
+                      {narrativeReviewStatus === "needs_answers" && narrativeReviewIssues.length > 0 && (
+                        <div className="mt-2 space-y-2 rounded border border-amber-300 bg-amber-50/60 p-2 text-xs dark:bg-amber-950/30 dark:border-amber-800">
+                          <p className="text-[11px] font-semibold text-amber-900 dark:text-amber-100">
+                            NECTAR needs a few details. Answer each question (or mark N/A with a reason) before continuing — NECTAR will NOT make up information for you.
+                          </p>
+                          {narrativeReviewIssues.map((g, i) => {
+                            const answered = !!(narrativeGapAnswers[i]?.trim() || narrativeGapNA[i]?.trim());
+                            return (
+                              <div key={i} className="rounded border border-amber-200 bg-background p-2 dark:border-amber-900">
+                                <div className="mb-1 flex items-start gap-2">
+                                  <Badge
+                                    variant={g.severity === "must_fix" ? "destructive" : "outline"}
+                                    className="text-[10px]"
+                                  >
+                                    {g.severity === "must_fix" ? "Required" : "Suggested"}
+                                  </Badge>
+                                  <p className="text-[11px] leading-snug">{g.question}</p>
+                                </div>
+                                <Textarea
+                                  rows={2}
+                                  value={narrativeGapAnswers[i] ?? ""}
+                                  onChange={(e) => setNarrativeGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
+                                  placeholder="Type your answer in 1–2 sentences…"
+                                  className="text-xs"
+                                />
+                                <div className="mt-1">
+                                  <Label className="text-[10px] text-muted-foreground">
+                                    Or mark N/A — explain why
+                                  </Label>
+                                  <Textarea
+                                    rows={1}
+                                    value={narrativeGapNA[i] ?? ""}
+                                    onChange={(e) => setNarrativeGapNA((s) => ({ ...s, [i]: e.target.value }))}
+                                    placeholder="e.g. 'Not witnessed — incident discovered after the fact'"
+                                    className="text-xs"
+                                  />
+                                </div>
+                                {!answered && g.severity === "must_fix" && (
+                                  <p className="mt-1 text-[10px] text-rose-700 dark:text-rose-300">
+                                    Required to continue.
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <p className="text-[10px] text-amber-800 dark:text-amber-200">
+                            Your answers will be appended to the narrative as a "Staff follow-up answers" section when you click Next.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {liveNudges.length > 0 && (
                     <div className="space-y-2">
                       {liveNudges.map((n) => (

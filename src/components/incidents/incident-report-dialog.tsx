@@ -1191,44 +1191,41 @@ export function IncidentReportDialog({
                           <p className="whitespace-pre-wrap">{nectarDraft}</p>
                         </div>
                       )}
-                      {nectarDraft && nectarDraftGaps.length > 0 && (
+                      {nectarDraft && nectarDraftGaps.filter((g) => g.severity === "must_fix").length > 0 && (
                         <div className="mt-2 space-y-2 rounded border border-amber-300 bg-amber-50/60 p-2 text-xs dark:bg-amber-950/30 dark:border-amber-800">
                           <p className="text-[11px] font-semibold text-amber-900 dark:text-amber-100">
-                            NECTAR needs a few details before it can finalize this draft. Answer each question (or mark N/A with a reason) — NECTAR will NOT make up information for you.
+                            NECTAR needs a few details before it can finalize this draft. Answer each question — NECTAR will NOT make up information for you.
                           </p>
                           {nectarDraftGaps.map((g, i) => {
-                            const answered = !!(gapAnswers[i]?.trim() || gapNA[i]?.trim());
+                            if (g.severity !== "must_fix") return null;
+                            const answered = !!gapAnswers[i]?.trim();
+                            const isYesNo = g.answer_type === "yes_no";
                             return (
                               <div key={i} className="rounded border border-amber-200 bg-background p-2 dark:border-amber-900">
-                                <div className="mb-1 flex items-start gap-2">
-                                  <Badge
-                                    variant={g.severity === "must_fix" ? "destructive" : "outline"}
-                                    className="text-[10px]"
-                                  >
-                                    {g.severity === "must_fix" ? "Required" : "Suggested"}
-                                  </Badge>
+                                <div className="mb-2 flex items-start gap-2">
+                                  <Badge variant="destructive" className="text-[10px]">Required</Badge>
                                   <p className="text-[11px] leading-snug">{g.question}</p>
                                 </div>
-                                <Textarea
-                                  rows={2}
-                                  value={gapAnswers[i] ?? ""}
-                                  onChange={(e) => setGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
-                                  placeholder="Type your answer in 1–2 sentences…"
-                                  className="text-xs"
-                                />
-                                <div className="mt-1">
-                                  <Label className="text-[10px] text-muted-foreground">
-                                    Or mark N/A — explain why
-                                  </Label>
+                                {isYesNo ? (
+                                  <div className="flex gap-2">
+                                    {(["Yes", "No"] as const).map((v) => (
+                                      <Button key={v} type="button" size="sm"
+                                        variant={gapAnswers[i] === v ? "default" : "outline"}
+                                        onClick={() => setGapAnswers((s) => ({ ...s, [i]: v }))}>
+                                        {v}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                ) : (
                                   <Textarea
-                                    rows={1}
-                                    value={gapNA[i] ?? ""}
-                                    onChange={(e) => setGapNA((s) => ({ ...s, [i]: e.target.value }))}
-                                    placeholder="e.g. 'Not witnessed — incident discovered after the fact'"
+                                    rows={2}
+                                    value={gapAnswers[i] ?? ""}
+                                    onChange={(e) => setGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
+                                    placeholder="Type your answer in 1–2 sentences…"
                                     className="text-xs"
                                   />
-                                </div>
-                                {!answered && g.severity === "must_fix" && (
+                                )}
+                                {!answered && (
                                   <p className="mt-1 text-[10px] text-rose-700 dark:text-rose-300">
                                     Required to use this draft.
                                   </p>

@@ -2345,8 +2345,11 @@ export function PunchPad({
                     onSubmitted={(id) => {
                       setIncidentReportIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
                       setIncidentFlag(true);
-                      // Mark trigger resolved so the gate clears even when filed via the dialog.
-                      if (incidentTriggerOpen) setTriggersResolved(true);
+                      // Force the NoteTriggerPrompt poll to refetch so the
+                      // incident gate clears the moment the IR is submitted.
+                      qc.invalidateQueries({
+                        queryKey: ["incident-submitted-for", active.client_id, new Date().toISOString().slice(0, 10)],
+                      });
                     }}
                   />
                 )}

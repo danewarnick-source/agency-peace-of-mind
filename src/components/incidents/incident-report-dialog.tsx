@@ -341,6 +341,17 @@ export function IncidentReportDialog({
     setStep(0); setStepError(null);
   }, [open, clientId, initialDiscovered]);
 
+  // Invalidate the in-step narrative review when staff edits the narrative
+  // after running it — prevents "review → edit → next" bypass.
+  useEffect(() => {
+    if (narrativeReviewStatus === "idle") return;
+    if (description.trim() === reviewedDescription.trim()) return;
+    setNarrativeReviewStatus("idle");
+    setNarrativeReviewIssues([]);
+    setNarrativeGapAnswers({});
+    setNarrativeGapNA({});
+  }, [description, reviewedDescription, narrativeReviewStatus]);
+
   const isAbuse = category === ABUSE_CATEGORY;
   const isFatality = category === FATALITY_CATEGORY;
 

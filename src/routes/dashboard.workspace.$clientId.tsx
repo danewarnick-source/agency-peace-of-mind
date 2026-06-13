@@ -122,28 +122,24 @@ function ClientWorkspace() {
     }
   }, [isLoading, client, assignments, allowedHourly.length, navigate]);
 
-  if (isLoading || !client) {
-    return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
-  }
-
-
-  const codes = allowedHourly.length ? allowedHourly : clientCodes;
-  const { enabled: emarEnabled } = useClientFeature(client, "emar");
+  const { enabled: emarEnabled } = useClientFeature(client ?? null, "emar");
 
   // Behavior Support visibility: bc_code set, features_enabled true, ≥1 published behavior
   const { data: bsTab } = useQuery({
-    queryKey: ["workspace-bs-tab", client.id],
+    queryKey: ["workspace-bs-tab", client?.id ?? null],
+    enabled: !!client?.id,
     queryFn: async () => {
+      const cid = client!.id;
       const { data: bsc } = await supabase
         .from("behavior_support_clients")
         .select("organization_id, bc_code, features_enabled")
-        .eq("client_id", client.id)
+        .eq("client_id", cid)
         .maybeSingle();
       if (!bsc?.features_enabled || !bsc?.bc_code) return { show: false as const };
       const { count } = await supabase
         .from("bc_behaviors")
         .select("id", { count: "exact", head: true })
-        .eq("client_id", client.id)
+        .eq("client_id", cid)
         .eq("status", "published");
       return {
         show: (count ?? 0) > 0,
@@ -152,6 +148,12 @@ function ClientWorkspace() {
     },
   });
   const showBehaviorTab = !!bsTab?.show;
+
+  if (isLoading || !client) {
+    return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
+  }
+
+  const codes = allowedHourly.length ? allowedHourly : clientCodes;
 
   return (
     <>

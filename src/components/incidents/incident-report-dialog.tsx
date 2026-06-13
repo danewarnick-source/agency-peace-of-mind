@@ -325,6 +325,20 @@ export function IncidentReportDialog({
   const block = detailKey ? DETAIL_BLOCKS[detailKey] : null;
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
 
+  // ─── WIZARD: one question/group per step ─────────────────────────────────
+  // Step keys; "details" is skipped when no category-specific block applies.
+  const stepKeys = useMemo<string[]>(() => {
+    const base = ["who-when", "witnessed", "where-what", "narrative"];
+    if (block) base.push("details");
+    base.push("people", "injuries", "actions", "review");
+    return base;
+  }, [block]);
+  const [step, setStep] = useState(0);
+  const [stepError, setStepError] = useState<string | null>(null);
+  const lastStep = stepKeys.length - 1;
+  const reviewStepIndex = lastStep;
+  const currentKey = stepKeys[Math.min(step, lastStep)];
+
   // Reset when dialog opens.
   useEffect(() => {
     if (!open) return;
@@ -349,7 +363,10 @@ export function IncidentReportDialog({
     setAiStatus(null);
     setAiAnswers({});
     setAiNA({});
+    setStep(0);
+    setStepError(null);
   }, [open, clientId, initialDiscovered]);
+
 
   const isAbuse = category === ABUSE_CATEGORY;
   const isFatality = category === FATALITY_CATEGORY;

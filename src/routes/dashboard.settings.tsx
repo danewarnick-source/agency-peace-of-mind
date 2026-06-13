@@ -43,14 +43,15 @@ function SettingsPage() {
       void supabase
         .from("organizations")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("dhhs_provider_id, evv_vendor_name" as any)
+        .select("dhhs_provider_id, evv_vendor_name, incident_ai_review_enabled" as any)
         .eq("id", org.organization_id)
         .maybeSingle()
         .then(({ data }) => {
-          const d = (data ?? null) as { dhhs_provider_id: string | null; evv_vendor_name: string | null } | null;
+          const d = (data ?? null) as { dhhs_provider_id: string | null; evv_vendor_name: string | null; incident_ai_review_enabled: boolean | null } | null;
           if (d) {
             setDhhsProviderId(d.dhhs_provider_id ?? "");
             setEvvVendorName(d.evv_vendor_name ?? "Hive");
+            setIncidentAiEnabled(d.incident_ai_review_enabled !== false);
           }
         });
     }

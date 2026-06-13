@@ -534,6 +534,7 @@ ${data.shorthand}
               field,
               severity: g.severity as "must_fix" | "should_add",
               question: (g.question as string).slice(0, 400),
+              answer_type: (g.answer_type === "yes_no" ? "yes_no" : "text") as "yes_no" | "text",
             };
           })
       : [];

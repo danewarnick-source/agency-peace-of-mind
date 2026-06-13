@@ -489,12 +489,13 @@ GAPS RULES (the "gaps" array):
   - field: "who" | "antecedent" | "event" | "staff_response" | "outcome"
   - severity: "must_fix" if a UPI reviewer would reject without it; "should_add" if it would improve the record but isn't blocking.
   - question: a CONCRETE follow-up the staff can answer in 1–2 sentences. Examples: "Where were you (the staff) when the medication was administered?", "What was Marcus's mood or behavior in the 30 minutes before the dose?", "Was Marcus evaluated by medical staff or only visually checked?"
+  - answer_type: "yes_no" if the question can be answered with a simple yes or no (e.g. "Was law enforcement contacted?", "Was the individual evaluated by medical staff?"); "text" if it needs a written explanation (who/what/when/where/how). Prefer yes_no whenever possible — staff prefer one-tap answers.
 - Default antecedent, staff_response, and outcome to "must_fix" when missing — a UPI reviewer almost always asks for these.
 - Gaps may be empty if the shorthand truly covers all five.
 - Do NOT repeat in gaps anything you already covered in the draft.
 
 OUTPUT FORMAT — STRICT JSON only, no markdown, no code fences:
-{"draft":"<the narrative paragraph(s) — only facts that are actually known>","gaps":[{"field":"...","severity":"...","question":"..."}]}`;
+{"draft":"<the narrative paragraph(s) — only facts that are actually known>","gaps":[{"field":"...","severity":"...","question":"...","answer_type":"yes_no"|"text"}]}`;
 
     const user = `INDIVIDUAL: ${data.clientName}
 INCIDENT CATEGORY: ${data.category || "(unspecified)"}

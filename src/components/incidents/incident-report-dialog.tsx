@@ -562,6 +562,7 @@ export function IncidentReportDialog({
   // updated yet (React batches the setState from acceptNectarDraft).
   // isCancelled: optional cleanup guard injected by the useEffect.
   async function runAiReview(descriptionOverride?: string, isCancelled?: () => boolean) {
+    console.log("AIREV entry", { aiEnabled, aiAttempted });
     if (!aiEnabled || aiAttempted) return;
     setAiAttempted(true);
     setAiReviewing(true);
@@ -570,13 +571,16 @@ export function IncidentReportDialog({
       const draft = descriptionOverride !== undefined
         ? { ...base, description: descriptionOverride.trim() }
         : base;
+      console.log("AIREV calling edge fn");
       const result = await withAiTimeout(
         supabase.functions.invoke("review-incident-report", { body: { draft } }),
       );
+      console.log("AIREV result", result);
       if (isCancelled?.()) return;
       const { data: r, error: rerr } =
         result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
       if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+        console.log("AIREV bad response", r);
         // Fail-open — never block the 24h clock
         setAiIssues([]); setAiStatus("skipped");
         setDetails((d) => ({ ...d, ai_review_skipped: true }));
@@ -585,7 +589,8 @@ export function IncidentReportDialog({
       const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
       setAiIssues(issues);
       setAiStatus(issues.length === 0 ? "passed" : null);
-    } catch {
+    } catch (e) {
+      console.log("AIREV catch", e);
       if (isCancelled?.()) return;
       // 10s timeout / error fallback
       setAiIssues([]); setAiStatus("skipped");

@@ -23,6 +23,9 @@ import {
   APS_HOTLINE,
 } from "@/lib/incident-detail-schemas";
 import { scanNarrativeForCategories, type NarrativeCategoryHit } from "@/lib/nectar-triggers";
+import {
+  validateNarrative, validatePersonName, validateRequiredText, findContradictions,
+} from "@/lib/nectar-quality";
 import { useCaseload } from "@/hooks/use-caseload";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";

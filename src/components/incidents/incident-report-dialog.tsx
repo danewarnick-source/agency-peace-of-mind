@@ -329,6 +329,8 @@ export function IncidentReportDialog({
     setAiIssues(null); setAiStatus(null); setAiAnswers({}); setAiNA({});
     setAiReviewing(false); setAiAttempted(false);
     setCompletenessIssues(null); setCompletenessBusy(false);
+    setNarrativeReviewStatus("idle"); setNarrativeReviewIssues([]);
+    setNarrativeGapAnswers({}); setNarrativeGapNA({}); setReviewedDescription("");
     setStep(0); setStepError(null);
   }, [open, clientId, initialDiscovered]);
 

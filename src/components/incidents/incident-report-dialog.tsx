@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Skull, ShieldAlert, Sparkles, X, Loader2 } from "lucide-react";
+import { AlertTriangle, Skull, ShieldAlert, Sparkles, X, Loader2, ShieldCheck } from "lucide-react";
 import { createIncident } from "@/lib/incidents.functions";
 import {
   INCIDENT_CATEGORIES, ABUSE_CATEGORY, FATALITY_CATEGORY, type IncidentCategory,

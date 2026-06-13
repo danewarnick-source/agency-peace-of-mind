@@ -23,6 +23,8 @@ function SettingsPage() {
   const [legalName, setLegalName] = useState("");
   const [dbaName, setDbaName] = useState("");
   const [displayAcronym, setDisplayAcronym] = useState("");
+  const [dhhsProviderId, setDhhsProviderId] = useState("");
+  const [evvVendorName, setEvvVendorName] = useState("Hive");
   const [busy, setBusy] = useState(false);
 
   if (pathname !== "/dashboard/settings") {
@@ -36,6 +38,20 @@ function SettingsPage() {
       setLegalName(org.legal_name ?? "");
       setDbaName(org.dba_name ?? "");
       setDisplayAcronym(org.display_acronym ?? "");
+      // Fetch EVV-specific org fields directly (not part of useCurrentOrg)
+      void supabase
+        .from("organizations")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("dhhs_provider_id, evv_vendor_name" as any)
+        .eq("id", org.organization_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          const d = (data ?? null) as { dhhs_provider_id: string | null; evv_vendor_name: string | null } | null;
+          if (d) {
+            setDhhsProviderId(d.dhhs_provider_id ?? "");
+            setEvvVendorName(d.evv_vendor_name ?? "Hive");
+          }
+        });
     }
   }, [user, org]);
 

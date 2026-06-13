@@ -297,17 +297,24 @@ export function IncidentReportDialog({
 
   // ─── Step keys (dynamic — Nectar's questions become real steps) ────────
   const aiEnabled = orgAiEnabled !== false;
+  // When the staff has already run the in-step narrative review (passed,
+  // answered, or skipped), the old downstream `nectar-interview` step (plus
+  // its derived nectar-q-* sub-steps) is redundant — drop them.
+  const narrativeReviewedInStep =
+    narrativeReviewStatus === "passed" ||
+    narrativeReviewStatus === "needs_answers" ||
+    narrativeReviewStatus === "skipped";
   const stepKeys = useMemo<string[]>(() => {
     const base: string[] = ["who-when", "witnessed", "where-what", "narrative"];
     if (block) base.push("details");
     base.push("people", "injuries", "actions");
-    if (aiEnabled) base.push("nectar-interview");
-    if (aiEnabled && aiIssues) {
+    if (aiEnabled && !narrativeReviewedInStep) base.push("nectar-interview");
+    if (aiEnabled && !narrativeReviewedInStep && aiIssues) {
       aiIssues.forEach((_, i) => base.push(`nectar-q-${i}`));
     }
     base.push("review");
     return base;
-  }, [block, aiEnabled, aiIssues]);
+  }, [block, aiEnabled, aiIssues, narrativeReviewedInStep]);
 
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);

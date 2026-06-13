@@ -34,6 +34,55 @@ export function validateRequiredText(text: string, min = 20): string | null {
   return null;
 }
 
+// ─── Address ─────────────────────────────────────────────────────────────
+// A real street address has at least one digit AND at least one word that
+// looks like a street name (3+ letters). "Home", "house", "there" all FAIL.
+// Selecting from the client's known addresses (exact match) auto-passes.
+const ADDRESS_NONWORDS = new Set([
+  "home", "house", "there", "here", "out", "outside", "inside",
+  "the home", "their home", "his home", "her home", "the house",
+]);
+export function validateAddress(text: string, knownAddresses: string[] = []): string | null {
+  if (isNonAnswer(text)) return "Enter a street address — UPI reviewers reject 'Home' or blanks.";
+  const raw = text.trim();
+  const lower = raw.toLowerCase();
+  if (knownAddresses.some((a) => a.trim().toLowerCase() === lower)) return null;
+  if (ADDRESS_NONWORDS.has(lower)) {
+    return "Enter a street address — 'Home' won't work for UPI. Include the house number and street.";
+  }
+  const hasDigit = /\d/.test(raw);
+  const hasStreetWord = /[A-Za-z]{3,}/.test(raw);
+  if (!hasDigit || !hasStreetWord) {
+    return "Enter a real street address (house number + street name), or pick one from the client's known addresses.";
+  }
+  return null;
+}
+
+// ─── Date logic ──────────────────────────────────────────────────────────
+// discoveredAt MUST be >= occurredAt; neither may be in the future.
+// Accepts datetime-local strings (no Z) or full ISO — both parse fine via Date.
+export function validateDateLogic(occurredAt: string | null, discoveredAt: string | null): string | null {
+  const now = Date.now();
+  let occ: number | null = null;
+  let dis: number | null = null;
+  if (occurredAt) {
+    const t = new Date(occurredAt).getTime();
+    if (Number.isNaN(t)) return "Occurred date/time is invalid.";
+    occ = t;
+  }
+  if (discoveredAt) {
+    const t = new Date(discoveredAt).getTime();
+    if (Number.isNaN(t)) return "Discovered date/time is invalid.";
+    dis = t;
+  }
+  if (occ !== null && occ > now + 60_000) return "Occurred date/time can't be in the future.";
+  if (dis !== null && dis > now + 60_000) return "Discovered date/time can't be in the future.";
+  if (occ !== null && dis !== null && dis < occ) {
+    return "Discovered must be on or after Occurred — you can't discover something before it happens.";
+  }
+  return null;
+}
+
 type Draft = Record<string, unknown>;
 
 const PEER_TERMS = [

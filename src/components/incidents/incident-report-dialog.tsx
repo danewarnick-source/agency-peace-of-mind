@@ -1234,6 +1234,7 @@ export function IncidentReportDialog({
                   <div className="flex items-center gap-2 text-violet-900 dark:text-violet-100">
                     <ShieldCheck className="h-4 w-4" />
                     <span className="text-sm font-semibold">NECTAR is reviewing your narrative</span>
+                  </div>
                   <p className="text-[11px] text-violet-900/70 dark:text-violet-100/70">
                     NECTAR reviews every narrative — whether you used its draft or wrote your own — and will ask follow-ups before you can submit. It never makes up information for you.
                   </p>

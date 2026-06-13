@@ -205,6 +205,7 @@ export function IncidentReportDialog({
   const { data: caseload = [] } = useCaseload();
   const createFn = useServerFn(createIncident);
   const draftFn = useServerFn(draftIncidentNarrative);
+  const reviewFn = useServerFn(reviewIncidentReport);
 
   const initialDiscovered = useMemo(
     () => toLocalInput(defaultDiscoveredAt ?? new Date().toISOString()),

@@ -1582,8 +1582,24 @@ export function IncidentReportDialog({
                   </Button>
                 )}
                 {step < reviewStepIndex && (
-                  <Button onClick={handleNext} disabled={currentKey === "nectar-interview" && aiReviewing}>
-                    {currentKey === "nectar-interview" && aiReviewing ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />NECTAR…</> : "Next"}
+                  <Button
+                    onClick={handleNext}
+                    disabled={
+                      (currentKey === "nectar-interview" && aiReviewing)
+                      || (currentKey === "narrative" && aiEnabled
+                          && (narrativeReviewStatus === "idle" || narrativeReviewStatus === "reviewing"))
+                    }
+                    title={
+                      currentKey === "narrative" && aiEnabled && narrativeReviewStatus === "idle"
+                        ? "Click 'Review with NECTAR' below before continuing."
+                        : ""
+                    }
+                  >
+                    {currentKey === "nectar-interview" && aiReviewing
+                      ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />NECTAR…</>
+                      : currentKey === "narrative" && narrativeReviewStatus === "reviewing"
+                        ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />NECTAR…</>
+                        : "Next"}
                   </Button>
                 )}
                 {step === reviewStepIndex && (

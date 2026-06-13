@@ -13,18 +13,22 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Skull, ShieldAlert, Sparkles, X, Loader2, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle, Skull, ShieldAlert, Sparkles, X, Loader2, ShieldCheck, Mic, MicOff, Wand2,
+} from "lucide-react";
 import { createIncident } from "@/lib/incidents.functions";
+import { draftIncidentNarrative } from "@/lib/ai-coach.functions";
 import {
   INCIDENT_CATEGORIES, ABUSE_CATEGORY, FATALITY_CATEGORY, type IncidentCategory,
 } from "./incident-categories";
 import {
-  DETAIL_BLOCKS, detailKeyForCategory, type DetailField, type DetailCategoryKey,
+  DETAIL_BLOCKS, detailKeyForCategory, type DetailField,
   APS_HOTLINE,
 } from "@/lib/incident-detail-schemas";
 import { scanNarrativeForCategories, type NarrativeCategoryHit } from "@/lib/nectar-triggers";
 import {
   validateNarrative, validatePersonName, validateRequiredText, findContradictions,
+  validateAddress, validateDateLogic,
 } from "@/lib/nectar-quality";
 import { useCaseload } from "@/hooks/use-caseload";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -51,11 +55,7 @@ function toLocalInput(iso: string): string {
 // ─── Detail block renderer ────────────────────────────────────────────────
 
 function FieldRenderer({
-  field,
-  value,
-  onChange,
-  onUploadPhoto,
-  photoUploading,
+  field, value, onChange, onUploadPhoto, photoUploading,
 }: {
   field: DetailField;
   value: unknown;
@@ -70,48 +70,17 @@ function FieldRenderer({
   );
   switch (field.type) {
     case "text":
-      return (
-        <div>
-          {labelEl}
-          <Input
-            value={String(value ?? "")}
-            placeholder={field.placeholder}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        </div>
-      );
+      return (<div>{labelEl}<Input value={String(value ?? "")} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} /></div>);
     case "textarea":
-      return (
-        <div>
-          {labelEl}
-          <Textarea
-            rows={field.rows ?? 3}
-            value={String(value ?? "")}
-            placeholder={field.placeholder}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        </div>
-      );
+      return (<div>{labelEl}<Textarea rows={field.rows ?? 3} value={String(value ?? "")} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} /></div>);
     case "datetime":
-      return (
-        <div>
-          {labelEl}
-          <Input
-            type="datetime-local"
-            value={String(value ?? "")}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        </div>
-      );
+      return (<div>{labelEl}<Input type="datetime-local" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} /></div>);
     case "select":
       return (
-        <div>
-          {labelEl}
+        <div>{labelEl}
           <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
             <SelectTrigger><SelectValue placeholder="Pick one…" /></SelectTrigger>
-            <SelectContent>
-              {field.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-            </SelectContent>
+            <SelectContent>{field.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
           </Select>
         </div>
       );
@@ -119,23 +88,11 @@ function FieldRenderer({
     case "yesno_na": {
       const opts = field.type === "yesno_na" ? ["Yes", "No", "N/A"] : ["Yes", "No"];
       return (
-        <div>
-          {labelEl}
+        <div>{labelEl}
           <div className="mt-1 flex flex-wrap gap-2">
-            {opts.map((o) => {
-              const active = value === o;
-              return (
-                <Button
-                  key={o}
-                  type="button"
-                  size="sm"
-                  variant={active ? "default" : "outline"}
-                  onClick={() => onChange(o)}
-                >
-                  {o}
-                </Button>
-              );
-            })}
+            {opts.map((o) => (
+              <Button key={o} type="button" size="sm" variant={value === o ? "default" : "outline"} onClick={() => onChange(o)}>{o}</Button>
+            ))}
           </div>
         </div>
       );
@@ -143,25 +100,17 @@ function FieldRenderer({
     case "multiselect": {
       const selected = Array.isArray(value) ? (value as string[]) : [];
       return (
-        <div>
-          {labelEl}
+        <div>{labelEl}
           <div className="mt-1 flex flex-wrap gap-1.5">
             {field.options.map((o) => {
               const active = selected.includes(o);
               return (
-                <button
-                  key={o}
-                  type="button"
+                <button key={o} type="button"
                   onClick={() => {
                     const next = active ? selected.filter((s) => s !== o) : [...selected, o];
                     onChange(next);
                   }}
-                  className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                    active
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-background text-foreground hover:bg-muted"
-                  }`}
-                >
+                  className={`rounded-full border px-2 py-0.5 text-[11px] ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:bg-muted"}`}>
                   {o}
                 </button>
               );
@@ -173,37 +122,20 @@ function FieldRenderer({
     case "photos": {
       const photos = Array.isArray(value) ? (value as string[]) : [];
       return (
-        <div>
-          {labelEl}
+        <div>{labelEl}
           <div className="mt-1 space-y-2">
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              disabled={photoUploading}
-              onChange={(e) => {
-                if (e.target.files && e.target.files.length) onUploadPhoto?.(e.target.files);
-                e.currentTarget.value = "";
-              }}
-              className="block w-full text-xs"
-            />
+            <input type="file" accept="image/*" multiple disabled={photoUploading}
+              onChange={(e) => { if (e.target.files?.length) onUploadPhoto?.(e.target.files); e.currentTarget.value = ""; }}
+              className="block w-full text-xs" />
             {photoUploading && (
-              <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> Uploading…
-              </p>
+              <p className="flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</p>
             )}
             {photos.length > 0 && (
               <ul className="space-y-1 text-[11px]">
                 {photos.map((p) => (
                   <li key={p} className="flex items-center justify-between gap-2 rounded border border-border bg-muted/40 px-2 py-1">
                     <span className="truncate font-mono">{p.split("/").pop()}</span>
-                    <button
-                      type="button"
-                      className="text-rose-600 hover:underline"
-                      onClick={() => onChange(photos.filter((x) => x !== p))}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
+                    <button type="button" className="text-rose-600 hover:underline" onClick={() => onChange(photos.filter((x) => x !== p))}><X className="h-3 w-3" /></button>
                   </li>
                 ))}
               </ul>
@@ -227,48 +159,52 @@ function ApsNotice() {
         report suspected abuse, neglect, or exploitation of a vulnerable adult to Adult
         Protective Services — this duty cannot be delegated.
       </p>
-      <p className="mt-1">
-        APS intake: <span className="font-mono font-semibold">{APS_HOTLINE}</span>{" "}
-        <span className="text-[10px] opacity-80">(verify with current state listing)</span>
-      </p>
+      <p className="mt-1">APS intake: <span className="font-mono font-semibold">{APS_HOTLINE}</span></p>
     </div>
   );
 }
 
-// Required-field check inside a detail block.
 function missingRequired(block: { fields: DetailField[] }, values: Record<string, unknown>): string[] {
   const missing: string[] = [];
   for (const f of block.fields) {
     if (!("required" in f) || !f.required) continue;
     const v = values[f.name];
-    if (f.type === "multiselect") {
-      if (!Array.isArray(v) || v.length === 0) missing.push(f.label);
-    } else if (typeof v === "string") {
-      if (!v.trim()) missing.push(f.label);
-    } else if (v === undefined || v === null) {
-      missing.push(f.label);
-    }
+    if (f.type === "multiselect") { if (!Array.isArray(v) || v.length === 0) missing.push(f.label); }
+    else if (typeof v === "string") { if (!v.trim()) missing.push(f.label); }
+    else if (v === undefined || v === null) { missing.push(f.label); }
   }
   return missing;
 }
 
+// ─── 10-second AI race helper — AI downtime must NEVER block an IR ────────
+const AI_TIMEOUT_MS = 10_000;
+async function withAiTimeout<T>(p: Promise<T>): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, rej) => setTimeout(() => rej(new Error("__AI_TIMEOUT__")), AI_TIMEOUT_MS)),
+  ]);
+}
+
+type AiIssue = {
+  field: string | null;
+  severity: "must_fix" | "should_add";
+  question: string;
+  answer?: string | null;
+  not_applicable_reason?: string | null;
+};
+
 // ─── Main dialog ─────────────────────────────────────────────────────────
 
 export function IncidentReportDialog({
-  open,
-  onOpenChange,
-  clientId,
-  clientName,
-  defaultDiscoveredAt,
-  triggeredByNoteId,
-  triggeredByNoteType,
-  onSubmitted,
+  open, onOpenChange, clientId, clientName, defaultDiscoveredAt,
+  triggeredByNoteId, triggeredByNoteType, onSubmitted,
 }: Props) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { data: caseload = [] } = useCaseload();
   const createFn = useServerFn(createIncident);
+  const draftFn = useServerFn(draftIncidentNarrative);
 
   const initialDiscovered = useMemo(
     () => toLocalInput(defaultDiscoveredAt ?? new Date().toISOString()),
@@ -290,20 +226,31 @@ export function IncidentReportDialog({
   const [preventionStrategies, setPreventionStrategies] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  // Discovery chain
   const [witnessedDirectly, setWitnessedDirectly] = useState<"yes" | "no" | "">("");
   const [reportedBy, setReportedBy] = useState("");
 
-  // Category-specific details
   const [details, setDetails] = useState<Record<string, unknown>>({});
 
-  // Nectar AI pre-submit review
-  type AiIssue = { field: string | null; severity: "must_fix" | "should_add"; question: string };
+  // ── Nectar narrative drafter (copies punch-pad pattern) ────────────────
+  const [shorthand, setShorthand] = useState("");
+  const [nectarDraft, setNectarDraft] = useState<string | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftSkipped, setDraftSkipped] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+
+  // ── Nectar AI review (questions become wizard steps) ────────────────────
   const [aiIssues, setAiIssues] = useState<AiIssue[] | null>(null);
   const [aiStatus, setAiStatus] = useState<"passed" | "answered" | "skipped" | "disabled" | null>(null);
   const [aiAnswers, setAiAnswers] = useState<Record<number, string>>({});
   const [aiNA, setAiNA] = useState<Record<number, string>>({});
   const [aiReviewing, setAiReviewing] = useState(false);
+  const [aiAttempted, setAiAttempted] = useState(false);
+  const [completenessIssues, setCompletenessIssues] = useState<AiIssue[] | null>(null);
+  const [completenessBusy, setCompletenessBusy] = useState(false);
+
   const [orgAiEnabled, setOrgAiEnabled] = useState<boolean | null>(null);
   useEffect(() => {
     if (!open || !org?.organization_id) return;
@@ -319,75 +266,70 @@ export function IncidentReportDialog({
       });
   }, [open, org?.organization_id]);
 
-  // Live narrative nudges
   const [dismissedTerms, setDismissedTerms] = useState<Set<string>>(new Set());
   const detailKey = detailKeyForCategory(category);
   const block = detailKey ? DETAIL_BLOCKS[detailKey] : null;
-  const detailScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // ─── WIZARD: one question/group per step ─────────────────────────────────
-  // Step keys; "details" is skipped when no category-specific block applies.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    setSpeechSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
+  }, []);
+
+  // ─── Step keys (dynamic — Nectar's questions become real steps) ────────
+  const aiEnabled = orgAiEnabled !== false;
   const stepKeys = useMemo<string[]>(() => {
-    const base = ["who-when", "witnessed", "where-what", "narrative"];
+    const base: string[] = ["who-when", "witnessed", "where-what", "narrative"];
     if (block) base.push("details");
-    base.push("people", "injuries", "actions", "review");
+    base.push("people", "injuries", "actions");
+    if (aiEnabled) base.push("nectar-interview");
+    if (aiEnabled && aiIssues) {
+      aiIssues.forEach((_, i) => base.push(`nectar-q-${i}`));
+    }
+    base.push("review");
     return base;
-  }, [block]);
+  }, [block, aiEnabled, aiIssues]);
+
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);
   const lastStep = stepKeys.length - 1;
   const reviewStepIndex = lastStep;
   const currentKey = stepKeys[Math.min(step, lastStep)];
 
-  // Reset when dialog opens.
+  // Reset on open
   useEffect(() => {
     if (!open) return;
     setPickedClientId(clientId ?? "");
-    setOccurredAt("");
-    setDiscoveredAt(initialDiscovered);
-    setLocation("");
-    setCategory("");
-    setDescription("");
-    setPeopleInvolved("");
-    setWitnesses("");
-    setInjuries("");
-    setMedicalAttention("");
-    setImmediateActions("");
-    setPreventionStrategies("");
-    setWitnessedDirectly("");
-    setReportedBy("");
-    setDetails({});
-    setDismissedTerms(new Set());
-    setSubmitted(false);
-    setAiIssues(null);
-    setAiStatus(null);
-    setAiAnswers({});
-    setAiNA({});
-    setStep(0);
-    setStepError(null);
+    setOccurredAt(""); setDiscoveredAt(initialDiscovered);
+    setLocation(""); setCategory(""); setDescription("");
+    setPeopleInvolved(""); setWitnesses(""); setInjuries("");
+    setMedicalAttention(""); setImmediateActions(""); setPreventionStrategies("");
+    setWitnessedDirectly(""); setReportedBy("");
+    setDetails({}); setDismissedTerms(new Set()); setSubmitted(false);
+    setShorthand(""); setNectarDraft(null); setDraftSkipped(false); setDraftBusy(false);
+    setAiIssues(null); setAiStatus(null); setAiAnswers({}); setAiNA({});
+    setAiReviewing(false); setAiAttempted(false);
+    setCompletenessIssues(null); setCompletenessBusy(false);
+    setStep(0); setStepError(null);
   }, [open, clientId, initialDiscovered]);
-
 
   const isAbuse = category === ABUSE_CATEGORY;
   const isFatality = category === FATALITY_CATEGORY;
 
-  // Live narrative scan (debounced via useMemo on text)
-  const narrativeHits = useMemo<NarrativeCategoryHit[]>(
-    () => scanNarrativeForCategories(description),
-    [description],
-  );
+  const knownAddresses = useMemo(() => {
+    return caseload.map((c) => (c as { physical_address?: string | null }).physical_address ?? "").filter(Boolean) as string[];
+  }, [caseload]);
 
-  /** Hits that the writer hasn't acknowledged — either the matching category
-   *  block isn't selected, or its key fields are empty. */
+  const narrativeHits = useMemo<NarrativeCategoryHit[]>(
+    () => scanNarrativeForCategories(description), [description],
+  );
   const liveNudges = useMemo(() => {
     const out: NarrativeCategoryHit[] = [];
     for (const h of narrativeHits) {
       if (dismissedTerms.has(h.term)) continue;
-      // If the selected category already maps to this block AND a required
-      // key field is set, skip the nudge.
       if (detailKey === h.categoryKey) {
         const targetBlock = DETAIL_BLOCKS[h.categoryKey];
-        // The block is "engaged" once at least one required field has a value
         const hasAny = targetBlock.fields
           .filter((f) => "required" in f && f.required)
           .some((f) => {
@@ -409,12 +351,11 @@ export function IncidentReportDialog({
     return c ? `${c.first_name} ${c.last_name}`.trim() : "";
   }, [caseload, pickedClientId, clientId, clientName]);
 
-  // Photo upload to incident-photos bucket — relative paths stored in details.photos
+  // ── Photo upload
   const [photoUploading, setPhotoUploading] = useState(false);
   async function uploadPhotos(files: FileList) {
     if (!org?.organization_id || !user?.id) {
-      toast.error("Cannot upload photos until your session and org are loaded.");
-      return;
+      toast.error("Cannot upload photos until your session and org are loaded."); return;
     }
     setPhotoUploading(true);
     try {
@@ -424,28 +365,128 @@ export function IncidentReportDialog({
         const ts = Date.now();
         const safe = file.name.replace(/[^A-Za-z0-9._-]/g, "_");
         const path = `${org.organization_id}/${pickedClientId || "unassigned"}/${ts}_${safe}`;
-        const { error } = await supabase.storage
-          .from("incident-photos")
+        const { error } = await supabase.storage.from("incident-photos")
           .upload(path, file, { upsert: false, contentType: file.type || undefined });
-        if (error) {
-          toast.error(`${file.name}: ${error.message}`);
-          continue;
-        }
+        if (error) { toast.error(`${file.name}: ${error.message}`); continue; }
         next.push(path);
       }
       setDetails((d) => ({ ...d, photos: next }));
-    } finally {
-      setPhotoUploading(false);
-    }
+    } finally { setPhotoUploading(false); }
   }
 
-  // ─── Per-step validation ─────────────────────────────────────────────────
+  // ── Voice (Speak shorthand)
+  function stopRecording() {
+    try { recognitionRef.current?.stop?.(); } catch { /* ignore */ }
+    recognitionRef.current = null;
+    setIsRecording(false);
+  }
+  function startRecording() {
+    if (typeof window === "undefined") return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) { toast.error("Voice input isn't supported on this browser."); return; }
+    try {
+      const rec = new SR();
+      rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rec.onresult = (e: any) => {
+        let finalText = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
+        }
+        if (finalText) setShorthand((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
+      };
+      rec.onerror = () => stopRecording();
+      rec.onend = () => setIsRecording(false);
+      recognitionRef.current = rec;
+      rec.start(); setIsRecording(true);
+    } catch { toast.error("Couldn't start voice input — please type instead."); }
+  }
+
+  // ── Draft with Nectar — same shape as draftShiftNote call site
+  async function runDraftWithNectar() {
+    const text = shorthand.trim();
+    if (text.length < 3) {
+      toast.error("Add a few words of shorthand first (e.g. 'client hit roommate, cops came, arrested')."); return;
+    }
+    stopRecording();
+    setDraftBusy(true);
+    try {
+      const res = await withAiTimeout(draftFn({
+        data: {
+          shorthand: text,
+          category: category || "",
+          clientName: resolvedClientName || "the individual",
+          occurredAt: occurredAt ? new Date(occurredAt).toISOString() : null,
+          discoveredAt: discoveredAt ? new Date(discoveredAt).toISOString() : null,
+          knownFacts: [
+            location ? `Location: ${location}` : "",
+            witnessedDirectly === "no" && reportedBy ? `Reported by: ${reportedBy}` : "",
+          ].filter(Boolean).join(" | ") || null,
+        },
+      }));
+      setNectarDraft(res.draft);
+      setDraftSkipped(false);
+    } catch (e) {
+      // 10s timeout / error fallback — let staff write manually with AI-skipped badge
+      setDraftSkipped(true);
+      setDetails((d) => ({ ...d, ai_review_skipped: true }));
+      toast.error(
+        (e as Error).message === "__AI_TIMEOUT__"
+          ? "Nectar didn't respond in 10s — write the narrative manually. Submission won't be blocked."
+          : "Nectar draft unavailable — write the narrative manually. Submission won't be blocked.",
+      );
+    } finally { setDraftBusy(false); }
+  }
+  function acceptNectarDraft() {
+    if (!nectarDraft) return;
+    setDescription(nectarDraft);
+    toast.success("Draft accepted — edit it before continuing.");
+  }
+
+  // Build draft for AI review + contradiction scan
+  function buildDraft() {
+    return {
+      category, description: description.trim(), location,
+      occurred_at: occurredAt ? new Date(occurredAt).toISOString() : null,
+      discovered_at: discoveredAt ? new Date(discoveredAt).toISOString() : null,
+      people_involved: peopleInvolved, witnesses, injuries,
+      medical_attention: medicalAttention, immediate_actions: immediateActions,
+      is_abuse_neglect: isAbuse, prevention_strategies: preventionStrategies,
+      witnessed_directly: witnessedDirectly === "yes",
+      reported_to_reporter_by: witnessedDirectly === "no" ? reportedBy : null,
+      details,
+      // Pass any answered Nectar follow-ups so re-check can see the enriched picture
+      nectar_followups: (aiIssues ?? []).map((q, i) => ({
+        question: q.question,
+        severity: q.severity,
+        answer: aiAnswers[i]?.trim() || null,
+        not_applicable_reason: aiNA[i]?.trim() || null,
+      })),
+    };
+  }
+
+  // ── Per-step validation
   function validateStep(key: string): string | null {
+    if (key.startsWith("nectar-q-")) {
+      const idx = Number(key.slice("nectar-q-".length));
+      const q = aiIssues?.[idx];
+      if (!q) return null;
+      if (q.severity !== "must_fix") return null;
+      const ans = aiAnswers[idx]?.trim();
+      const na = aiNA[idx]?.trim();
+      if (!ans && !na) return "Answer this question or mark it N/A with a reason — Nectar generated it from what you wrote.";
+      return null;
+    }
     switch (key) {
-      case "who-when":
+      case "who-when": {
         if (!pickedClientId) return "Pick the individual involved.";
         if (!discoveredAt) return "Record when you DISCOVERED this — drives the 24-hour clock.";
+        const dErr = validateDateLogic(occurredAt || null, discoveredAt || null);
+        if (dErr) return dErr;
         return null;
+      }
       case "witnessed":
         if (witnessedDirectly === "") return "Tell us whether you witnessed this directly.";
         if (witnessedDirectly === "no") {
@@ -453,9 +494,12 @@ export function IncidentReportDialog({
           if (nameErr) return `Who reported it? ${nameErr}`;
         }
         return null;
-      case "where-what":
+      case "where-what": {
         if (!category) return "Pick an incident category.";
+        const aErr = validateAddress(location, knownAddresses);
+        if (aErr) return aErr;
         return null;
+      }
       case "narrative":
         return validateNarrative(description);
       case "details": {
@@ -492,6 +536,10 @@ export function IncidentReportDialog({
         }
         return null;
       }
+      case "nectar-interview":
+        // Cannot advance until the review attempt has resolved (success or skip)
+        if (aiReviewing) return "Nectar is still reviewing — give it a moment.";
+        return null;
       default:
         return null;
     }
@@ -504,107 +552,112 @@ export function IncidentReportDialog({
     setStep((s) => Math.min(lastStep, s + 1));
   }
 
-  // Draft built for AI review + contradiction scanning.
-  function buildDraft() {
-    return {
-      category, description: description.trim(), location,
-      occurred_at: occurredAt ? new Date(occurredAt).toISOString() : null,
-      discovered_at: discoveredAt ? new Date(discoveredAt).toISOString() : null,
-      people_involved: peopleInvolved, witnesses, injuries,
-      medical_attention: medicalAttention, immediate_actions: immediateActions,
-      is_abuse_neglect: isAbuse, prevention_strategies: preventionStrategies,
-      witnessed_directly: witnessedDirectly === "yes",
-      reported_to_reporter_by: witnessedDirectly === "no" ? reportedBy : null,
-      details,
-    };
-  }
-
-  // Contradictions across the whole draft — recomputed every render of review step.
-  const contradictions = useMemo(
-    () => (currentKey === "review" ? findContradictions(buildDraft()) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentKey, description, peopleInvolved, witnesses, injuries, medicalAttention, immediateActions],
-  );
-
-  // Kick off Nectar AI review the moment we hit the Review step.
-  // 10s timeout via Promise.race — AI downtime must never permanently block
-  // an incident report (24-hour UPI clock).
+  // ── Nectar AI review — runs when entering the nectar-interview step.
+  // Issues that come back become real wizard steps via stepKeys recompute.
   useEffect(() => {
-    if (currentKey !== "review") return;
-    if (orgAiEnabled === null) return;                 // wait for org pref
-    if (orgAiEnabled === false) { setAiStatus("disabled"); return; }
-    if (aiIssues !== null || aiStatus === "skipped") return;
+    if (currentKey !== "nectar-interview") return;
+    if (!aiEnabled) return;
+    if (aiAttempted) return;
+    setAiAttempted(true);
+    setAiReviewing(true);
     let cancelled = false;
     (async () => {
-      setAiReviewing(true);
       try {
         const draft = buildDraft();
-        const result = await Promise.race([
+        const result = await withAiTimeout(
           supabase.functions.invoke("review-incident-report", { body: { draft } }),
-          new Promise<{ data: null; error: Error }>((resolve) =>
-            setTimeout(() => resolve({ data: null, error: new Error("timeout") }), 10000),
-          ),
-        ]);
+        );
         if (cancelled) return;
-        const { data: r, error: rerr } = result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
+        const { data: r, error: rerr } =
+          result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
         if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
-          setAiIssues([]);
-          setAiStatus("skipped");
+          // Fail-open — never block the 24h clock
+          setAiIssues([]); setAiStatus("skipped");
+          setDetails((d) => ({ ...d, ai_review_skipped: true }));
           return;
         }
         const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
         setAiIssues(issues);
         setAiStatus(issues.length === 0 ? "passed" : null);
       } catch {
-        if (!cancelled) { setAiIssues([]); setAiStatus("skipped"); }
+        if (cancelled) return;
+        // 10s timeout / error fallback
+        setAiIssues([]); setAiStatus("skipped");
+        setDetails((d) => ({ ...d, ai_review_skipped: true }));
       } finally {
         if (!cancelled) setAiReviewing(false);
       }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentKey, orgAiEnabled]);
+  }, [currentKey, aiEnabled, aiAttempted]);
 
-  // Submit blocked while contradictions exist OR any must_fix is unanswered.
+  // ── Completeness Check on Review step (copies shift-note pattern)
+  async function runCompletenessCheck() {
+    setCompletenessBusy(true);
+    try {
+      const draft = buildDraft();
+      const result = await withAiTimeout(
+        supabase.functions.invoke("review-incident-report", { body: { draft } }),
+      );
+      const { data: r, error: rerr } =
+        result as { data: { complete?: boolean; skipped?: boolean; issues?: AiIssue[] } | null; error: Error | null };
+      if (rerr || !r || typeof r.complete !== "boolean" || r.skipped) {
+        setCompletenessIssues([]); setAiStatus("skipped");
+        setDetails((d) => ({ ...d, ai_review_skipped: true }));
+        toast.message("Nectar review unavailable — submitting with standard checks.");
+        return;
+      }
+      const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
+      setCompletenessIssues(issues);
+      if (issues.length === 0) toast.success("NECTAR: no remaining gaps.");
+      else toast.warning(`NECTAR found ${issues.length} remaining item(s) to address.`);
+    } catch {
+      setCompletenessIssues([]); setAiStatus("skipped");
+      setDetails((d) => ({ ...d, ai_review_skipped: true }));
+      toast.message("Nectar didn't respond in 10s — you can still submit.");
+    } finally {
+      setCompletenessBusy(false);
+    }
+  }
+
+  const contradictions = useMemo(
+    () => (currentKey === "review" ? findContradictions(buildDraft()) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentKey, description, peopleInvolved, witnesses, injuries, medicalAttention, immediateActions],
+  );
+
+  // Submit blocked while any must_fix Nectar question is unanswered, or
+  // completeness check returned new must_fix items, or contradictions exist.
   const unresolvedMustFix = (aiIssues ?? [])
     .map((q, i) => ({ q, i }))
     .filter(({ q, i }) => q.severity === "must_fix" && !(aiAnswers[i]?.trim() || aiNA[i]?.trim()));
+  const completenessMustFix = (completenessIssues ?? []).filter((q) => q.severity === "must_fix");
   const submitBlocked =
     contradictions.length > 0 ||
-    aiReviewing ||
-    (orgAiEnabled !== false && aiIssues === null && aiStatus === null) ||
-    (aiStatus !== "skipped" && aiStatus !== "disabled" && unresolvedMustFix.length > 0);
-
-
+    aiReviewing || completenessBusy ||
+    (aiStatus !== "skipped" && aiStatus !== "disabled" && unresolvedMustFix.length > 0) ||
+    (aiStatus !== "skipped" && aiStatus !== "disabled" && completenessMustFix.length > 0);
 
   const submit = useMutation({
     mutationFn: async () => {
       if (!pickedClientId) throw new Error("Pick the individual involved.");
       if (!category) throw new Error("Pick an incident category.");
-      if (description.trim().length < 10) throw new Error("Add a short description of what happened.");
 
-      // Discovery chain
-      if (witnessedDirectly === "") {
-        throw new Error("Tell us whether you witnessed this directly.");
-      }
-      if (witnessedDirectly === "no" && reportedBy.trim().length < 2) {
-        throw new Error("Who reported this to you?");
-      }
+      const aErr = validateAddress(location, knownAddresses);
+      if (aErr) throw new Error(aErr);
+      const dErr = validateDateLogic(occurredAt || null, discoveredAt || null);
+      if (dErr) throw new Error(dErr);
 
-      // Abuse-specific prevention strategies (§1.27(3))
-      if (isAbuse && preventionStrategies.trim().length < 5) {
-        throw new Error("Abuse / neglect / exploitation requires prevention strategies (§1.27(3)).");
-      }
+      if (witnessedDirectly === "") throw new Error("Tell us whether you witnessed this directly.");
+      if (witnessedDirectly === "no" && reportedBy.trim().length < 2) throw new Error("Who reported this to you?");
+      if (isAbuse && preventionStrategies.trim().length < 5) throw new Error("Abuse / neglect / exploitation requires prevention strategies (§1.27(3)).");
 
-      // Category-specific required-field validation
       if (block) {
         const missing = missingRequired(block, details);
-        if (missing.length) {
-          throw new Error(`Complete the ${block.title.toLowerCase()}: ${missing.join(", ")}.`);
-        }
+        if (missing.length) throw new Error(`Complete the ${block.title.toLowerCase()}: ${missing.join(", ")}.`);
       }
 
-      // Behavior — restraint cross-check
       let restraintFlag = false;
       if (detailKey === "behavior" && details.restraintUsed === "Yes") {
         restraintFlag = true;
@@ -615,19 +668,14 @@ export function IncidentReportDialog({
         if (need.length) throw new Error(`Restraint was used — also record: ${need.join(", ")}.`);
       }
 
-      // Abuse APS capture
       let apsNotifiedAt: string | null = null;
       let apsNotifiedBy: string | null = null;
       let apsReference: string | null = null;
       if (isAbuse) {
         const status = String(details.apsNotifiedStatus ?? "");
         if (status === "Yes") {
-          if (!String(details.apsNotifiedBy ?? "").trim()) {
-            throw new Error("Record who notified APS (must be the person with direct knowledge).");
-          }
-          if (!String(details.apsNotifiedAt ?? "").trim()) {
-            throw new Error("Record the APS notification date/time.");
-          }
+          if (!String(details.apsNotifiedBy ?? "").trim()) throw new Error("Record who notified APS (must be the person with direct knowledge).");
+          if (!String(details.apsNotifiedAt ?? "").trim()) throw new Error("Record the APS notification date/time.");
           apsNotifiedBy = String(details.apsNotifiedBy);
           apsNotifiedAt = new Date(String(details.apsNotifiedAt)).toISOString();
           apsReference = String(details.apsReference ?? "").trim() || null;
@@ -637,30 +685,27 @@ export function IncidentReportDialog({
       const discoveredIso = new Date(discoveredAt).toISOString();
       const occurredIso = occurredAt ? new Date(occurredAt).toISOString() : null;
 
-      // AI review already ran on the Review step (effect above). Just resolve
-      // the final status from the already-populated state.
       let finalStatus: "passed" | "answered" | "skipped" | "disabled";
       let finalIssues: AiIssue[] | null = null;
-      if (orgAiEnabled === false || aiStatus === "disabled") {
-        finalStatus = "disabled";
-      } else if (aiStatus === "skipped") {
-        finalStatus = "skipped";
-      } else {
+      if (orgAiEnabled === false) finalStatus = "disabled";
+      else if (aiStatus === "skipped") finalStatus = "skipped";
+      else {
         const issues = aiIssues ?? [];
-        const unresolved = issues
-          .map((q, i) => ({ q, i }))
-          .filter(({ q, i }) => q.severity === "must_fix" && !(aiAnswers[i]?.trim() || aiNA[i]?.trim()));
-        if (unresolved.length > 0) throw new Error("__AI_REVIEW_PENDING__");
+        if (unresolvedMustFix.length > 0) throw new Error("__AI_REVIEW_PENDING__");
         finalStatus = issues.length === 0 ? "passed" : "answered";
         finalIssues = issues.map((q, i) => ({
           ...q,
           answer: aiAnswers[i]?.trim() || null,
           not_applicable_reason: aiNA[i]?.trim() || null,
-        })) as AiIssue[];
+        }));
       }
-      setAiStatus(finalStatus);
 
-
+      const aiSkipped = finalStatus === "skipped" || draftSkipped;
+      const detailsOut: Record<string, unknown> = {
+        ...details,
+        nectar_followups: finalIssues ?? [],
+      };
+      if (aiSkipped) detailsOut.ai_review_skipped = true;
 
       return createFn({
         data: {
@@ -680,7 +725,7 @@ export function IncidentReportDialog({
           is_fatality: isFatality,
           triggered_by_note_id: triggeredByNoteId ?? null,
           triggered_by_note_type: triggeredByNoteType ?? null,
-          details: finalStatus === "skipped" ? { ...details, ai_review_skipped: true } : details,
+          details: detailsOut,
           witnessed_directly: witnessedDirectly === "yes",
           reported_to_reporter_by: witnessedDirectly === "no" ? reportedBy.trim() : null,
           restraint_used: restraintFlag,
@@ -702,10 +747,67 @@ export function IncidentReportDialog({
     },
     onError: (e) => {
       const msg = (e as Error).message;
-      if (msg === "__AI_REVIEW_PENDING__") return; // surfaced inline below
+      if (msg === "__AI_REVIEW_PENDING__") return;
       toast.error(msg ?? "Could not file incident.");
     },
   });
+
+  // Helpers for rendering per-question step
+  function renderQuestionStep(idx: number) {
+    const q = aiIssues?.[idx];
+    if (!q) return null;
+    const answered = !!(aiAnswers[idx]?.trim() || aiNA[idx]?.trim());
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-xs text-violet-700 dark:text-violet-300">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          <span className="font-semibold">NECTAR follow-up {idx + 1} of {aiIssues!.length}</span>
+          <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px]">
+            {q.severity === "must_fix" ? "Must answer" : "Suggested"}
+          </Badge>
+          {answered && <Badge variant="outline" className="border-emerald-400 text-[10px] text-emerald-700">Answered</Badge>}
+        </div>
+        <div className="rounded-md border border-violet-300 bg-violet-50/50 p-3 text-sm dark:bg-violet-950/30 dark:border-violet-800">
+          <p className="text-[11px] uppercase tracking-wide text-violet-700 dark:text-violet-300">Nectar's question — generated from what you wrote</p>
+          <p className="mt-1 font-medium">{q.question}</p>
+        </div>
+        <div>
+          <Label className="text-xs">Your answer</Label>
+          <Textarea
+            rows={3}
+            value={aiAnswers[idx] ?? ""}
+            onChange={(e) => setAiAnswers((s) => ({ ...s, [idx]: e.target.value }))}
+            disabled={aiNA[idx] !== undefined}
+            placeholder="Answer in 1–2 sentences."
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id={`ai-na-${idx}`}
+            checked={aiNA[idx] !== undefined}
+            onChange={(e) => setAiNA((s) => {
+              const next = { ...s };
+              if (e.target.checked) next[idx] = "";
+              else delete next[idx];
+              return next;
+            })}
+          />
+          <Label htmlFor={`ai-na-${idx}`} className="text-[11px]">Not applicable — reason:</Label>
+          <Input
+            className="h-7 text-[11px]"
+            placeholder="Why this question doesn't apply"
+            value={aiNA[idx] ?? ""}
+            onChange={(e) => setAiNA((s) => ({ ...s, [idx]: e.target.value }))}
+            disabled={aiNA[idx] === undefined}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const isQuestionStep = currentKey.startsWith("nectar-q-");
+  const questionIdx = isQuestionStep ? Number(currentKey.slice("nectar-q-".length)) : -1;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -731,31 +833,22 @@ export function IncidentReportDialog({
                 UPI report within 5 business days.
               </p>
             </div>
-            <DialogFooter>
-              <Button onClick={() => onOpenChange(false)}>Close</Button>
-            </DialogFooter>
+            <DialogFooter><Button onClick={() => onOpenChange(false)}>Close</Button></DialogFooter>
           </div>
         ) : (
           <div className="space-y-4 text-sm">
-            {/* ─── Stepper header — one question per step ─────────────── */}
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold text-foreground">
                 Step {step + 1} of {stepKeys.length}
-                <span className="ml-2 font-normal text-muted-foreground">— {stepKeys[step]}</span>
+                <span className="ml-2 font-normal text-muted-foreground">— {currentKey}</span>
               </p>
               <div className="flex gap-1">
                 {stepKeys.map((_, i) => (
-                  <span
-                    key={i}
-                    className={`h-1.5 w-5 rounded-full ${
-                      i < step ? "bg-primary" : i === step ? "bg-primary/70" : "bg-muted"
-                    }`}
-                  />
+                  <span key={i} className={`h-1.5 w-5 rounded-full ${i < step ? "bg-primary" : i === step ? "bg-primary/70" : "bg-muted"}`} />
                 ))}
               </div>
             </div>
 
-            {/* ─── Step body — render ONLY the current step's fields ──── */}
             <div className="min-h-[260px] space-y-4">
               {currentKey === "who-when" && (
                 <div className="space-y-3">
@@ -766,9 +859,7 @@ export function IncidentReportDialog({
                         <SelectTrigger><SelectValue placeholder="Pick the individual…" /></SelectTrigger>
                         <SelectContent>
                           {caseload.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.first_name} {c.last_name}
-                            </SelectItem>
+                            <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -782,14 +873,12 @@ export function IncidentReportDialog({
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <Label className="text-xs">Date/time the incident occurred</Label>
-                      <Input type="datetime-local" value={occurredAt}
-                             onChange={(e) => setOccurredAt(e.target.value)} />
+                      <Input type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} />
                       <p className="mt-1 text-[10px] text-muted-foreground">Leave blank if unknown.</p>
                     </div>
                     <div>
                       <Label className="text-xs">Date/time DISCOVERED *</Label>
-                      <Input type="datetime-local" value={discoveredAt}
-                             onChange={(e) => setDiscoveredAt(e.target.value)} required />
+                      <Input type="datetime-local" value={discoveredAt} onChange={(e) => setDiscoveredAt(e.target.value)} required />
                       <p className="mt-1 text-[10px] text-muted-foreground">
                         Drives the 24-hour UPI / guardian and 5-business-day completion clocks.
                       </p>
@@ -804,13 +893,9 @@ export function IncidentReportDialog({
                     <Label className="text-xs">Did you witness this directly? *</Label>
                     <div className="mt-1 flex gap-2">
                       {(["yes", "no"] as const).map((v) => (
-                        <Button
-                          key={v}
-                          type="button"
-                          size="sm"
+                        <Button key={v} type="button" size="sm"
                           variant={witnessedDirectly === v ? "default" : "outline"}
-                          onClick={() => setWitnessedDirectly(v)}
-                        >
+                          onClick={() => setWitnessedDirectly(v)}>
                           {v === "yes" ? "Yes" : "No — reported to me"}
                         </Button>
                       ))}
@@ -820,7 +905,7 @@ export function IncidentReportDialog({
                     <div>
                       <Label className="text-xs">Who reported it to you? *</Label>
                       <Input value={reportedBy} onChange={(e) => setReportedBy(e.target.value)}
-                             placeholder="Full name and role (e.g. Maria Lopez, DSP)" />
+                        placeholder="Full name and role (e.g. Maria Lopez, DSP)" />
                     </div>
                   )}
                 </div>
@@ -829,9 +914,23 @@ export function IncidentReportDialog({
               {currentKey === "where-what" && (
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-xs">Location</Label>
+                    <Label className="text-xs">Location (street address) *</Label>
                     <Input value={location} onChange={(e) => setLocation(e.target.value)}
-                           placeholder="Where did it happen?" />
+                      placeholder="House number + street, or pick from known addresses below" />
+                    {knownAddresses.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {knownAddresses.slice(0, 6).map((a) => (
+                          <button type="button" key={a}
+                            onClick={() => setLocation(a)}
+                            className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] hover:bg-muted">
+                            {a}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      "Home" / "house" won't pass UPI review — enter a real street address.
+                    </p>
                   </div>
                   <div>
                     <Label className="text-xs">Category *</Label>
@@ -845,10 +944,7 @@ export function IncidentReportDialog({
                   {isFatality && (
                     <div className="flex items-start gap-2 rounded-md border-2 border-rose-500 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-950/40 dark:text-rose-100">
                       <Skull className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>
-                        Fatality — immediate DHHS / §1.26 notifications are required. After you
-                        submit, contact the on-call administrator by phone now.
-                      </span>
+                      <span>Fatality — immediate DHHS / §1.26 notifications are required. After you submit, contact the on-call administrator by phone now.</span>
                     </div>
                   )}
                 </div>
@@ -856,23 +952,63 @@ export function IncidentReportDialog({
 
               {currentKey === "narrative" && (
                 <div className="space-y-3">
+                  {aiEnabled && (
+                    <div className="rounded-md border-2 border-violet-300 bg-violet-50/60 p-3 dark:bg-violet-950/30 dark:border-violet-800">
+                      <div className="mb-2 flex items-center gap-2 text-violet-900 dark:text-violet-100">
+                        <Sparkles className="h-4 w-4" />
+                        <span className="text-sm font-semibold">Draft with NECTAR</span>
+                      </div>
+                      <p className="text-[11px] text-violet-900/80 dark:text-violet-100/80">
+                        Type rough shorthand — Nectar expands it into a UPI-grade narrative you edit before continuing.
+                        Example: "client hit roommate, cops came, arrested".
+                      </p>
+                      <Textarea
+                        rows={3}
+                        value={shorthand}
+                        onChange={(e) => setShorthand(e.target.value)}
+                        placeholder="Shorthand — who/what/when in 1–2 lines…"
+                        className="mt-2"
+                      />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button type="button" size="sm" onClick={runDraftWithNectar} disabled={draftBusy}>
+                          {draftBusy ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Drafting…</> : <><Wand2 className="mr-1 h-3 w-3" />Draft with NECTAR</>}
+                        </Button>
+                        {speechSupported && (
+                          <Button type="button" size="sm" variant="outline"
+                            onClick={isRecording ? stopRecording : startRecording}>
+                            {isRecording ? <><MicOff className="mr-1 h-3 w-3" />Stop voice</> : <><Mic className="mr-1 h-3 w-3" />Speak shorthand</>}
+                          </Button>
+                        )}
+                        {nectarDraft && (
+                          <Button type="button" size="sm" variant="secondary" onClick={acceptNectarDraft}>
+                            Use this draft
+                          </Button>
+                        )}
+                        {draftSkipped && (
+                          <Badge variant="outline" className="text-[10px]">AI draft skipped — write manually</Badge>
+                        )}
+                      </div>
+                      {nectarDraft && (
+                        <div className="mt-2 rounded border border-violet-200 bg-background p-2 text-xs dark:border-violet-900">
+                          <p className="mb-1 text-[10px] uppercase tracking-wide text-violet-700 dark:text-violet-300">NECTAR draft — review then click "Use this draft"</p>
+                          <p className="whitespace-pre-wrap">{nectarDraft}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div>
                     <Label className="text-xs">What happened * (at least 120 characters)</Label>
-                    <Textarea
-                      rows={6}
-                      value={description}
+                    <Textarea rows={6} value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Describe in plain language — who was there, what led up to it, what happened, and the outcome."
-                    />
+                      placeholder="Describe in plain language — who was there, what led up to it, what happened, and the outcome." />
                     <p className="mt-1 text-[10px] text-muted-foreground">
-                      {description.trim().length} / 120 characters
+                      {description.trim().length} characters
                     </p>
                   </div>
                   {liveNudges.length > 0 && (
                     <div className="space-y-2">
                       {liveNudges.map((n) => (
-                        <div key={n.term}
-                             className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs dark:bg-amber-950/30">
+                        <div key={n.term} className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs dark:bg-amber-950/30">
                           <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
                           <div className="min-w-0 flex-1">
                             <p className="text-amber-900 dark:text-amber-100">
@@ -884,15 +1020,12 @@ export function IncidentReportDialog({
                             <div className="mt-1 flex flex-wrap gap-2">
                               {detailKey !== n.categoryKey && (
                                 <Button type="button" size="sm" variant="outline"
-                                        onClick={() => setCategory(n.categoryName as IncidentCategory)}>
+                                  onClick={() => setCategory(n.categoryName as IncidentCategory)}>
                                   Switch category to {n.categoryName}
                                 </Button>
                               )}
-                              <button type="button"
-                                      className="text-[11px] text-muted-foreground hover:text-foreground"
-                                      onClick={() => setDismissedTerms((s) => new Set(s).add(n.term))}>
-                                Dismiss
-                              </button>
+                              <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground"
+                                onClick={() => setDismissedTerms((s) => new Set(s).add(n.term))}>Dismiss</button>
                             </div>
                           </div>
                         </div>
@@ -903,8 +1036,7 @@ export function IncidentReportDialog({
               )}
 
               {currentKey === "details" && block && (
-                <div ref={detailScrollRef}
-                     className="rounded-md border-2 border-amber-400 bg-amber-50/30 p-3 dark:bg-amber-950/20">
+                <div className="rounded-md border-2 border-amber-400 bg-amber-50/30 p-3 dark:bg-amber-950/20">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-xs font-semibold">{block.title}</p>
                     <Badge variant="outline" className="text-[10px]">Required</Badge>
@@ -915,22 +1047,11 @@ export function IncidentReportDialog({
                   )}
                   <div className="mt-2 grid gap-3">
                     {block.fields.map((f) => (
-                      <FieldRenderer
-                        key={f.name}
-                        field={f}
-                        value={details[f.name]}
+                      <FieldRenderer key={f.name} field={f} value={details[f.name]}
                         onChange={(v) => setDetails((d) => ({ ...d, [f.name]: v }))}
-                        onUploadPhoto={uploadPhotos}
-                        photoUploading={photoUploading}
-                      />
+                        onUploadPhoto={uploadPhotos} photoUploading={photoUploading} />
                     ))}
                   </div>
-                  {block.key === "behavior" && details.restraintUsed === "Yes" && (
-                    <div className="mt-2 rounded-md border border-amber-500 bg-amber-100/60 p-2 text-[11px] text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-                      <strong>Restraint use is separately reportable</strong> and must align with an
-                      approved rights modification / BSP. The fields above are required.
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -938,15 +1059,13 @@ export function IncidentReportDialog({
                 <div className="space-y-3">
                   <div>
                     <Label className="text-xs">People involved * (full names)</Label>
-                    <Textarea rows={2} value={peopleInvolved}
-                              onChange={(e) => setPeopleInvolved(e.target.value)}
-                              placeholder="Full names of everyone directly involved (not just first names). Write 'no one else' if applicable." />
+                    <Textarea rows={2} value={peopleInvolved} onChange={(e) => setPeopleInvolved(e.target.value)}
+                      placeholder="Full names of everyone directly involved (not just first names). Write 'no one else' if applicable." />
                   </div>
                   <div>
                     <Label className="text-xs">Witnesses</Label>
-                    <Textarea rows={2} value={witnesses}
-                              onChange={(e) => setWitnesses(e.target.value)}
-                              placeholder="Who else saw or heard this happen?" />
+                    <Textarea rows={2} value={witnesses} onChange={(e) => setWitnesses(e.target.value)}
+                      placeholder="Who else saw or heard this happen?" />
                   </div>
                 </div>
               )}
@@ -955,15 +1074,13 @@ export function IncidentReportDialog({
                 <div className="space-y-3">
                   <div>
                     <Label className="text-xs">Injuries *</Label>
-                    <Textarea rows={3} value={injuries}
-                              onChange={(e) => setInjuries(e.target.value)}
-                              placeholder="Describe any injuries observed, or write 'No injuries observed at time of report.'" />
+                    <Textarea rows={3} value={injuries} onChange={(e) => setInjuries(e.target.value)}
+                      placeholder="Describe any injuries observed, or write 'No injuries observed at time of report.'" />
                   </div>
                   <div>
                     <Label className="text-xs">Medical attention received *</Label>
-                    <Textarea rows={3} value={medicalAttention}
-                              onChange={(e) => setMedicalAttention(e.target.value)}
-                              placeholder="What medical care was provided? Who provided it? If none, say so explicitly." />
+                    <Textarea rows={3} value={medicalAttention} onChange={(e) => setMedicalAttention(e.target.value)}
+                      placeholder="What medical care was provided? Who provided it? If none, say so explicitly." />
                   </div>
                 </div>
               )}
@@ -972,9 +1089,8 @@ export function IncidentReportDialog({
                 <div className="space-y-3">
                   <div>
                     <Label className="text-xs">Immediate actions taken *</Label>
-                    <Textarea rows={4} value={immediateActions}
-                              onChange={(e) => setImmediateActions(e.target.value)}
-                              placeholder="What did you do in the moment to keep the person safe?" />
+                    <Textarea rows={4} value={immediateActions} onChange={(e) => setImmediateActions(e.target.value)}
+                      placeholder="What did you do in the moment to keep the person safe?" />
                   </div>
                   {isAbuse && (
                     <div className="rounded-md border-2 border-amber-500 bg-amber-50 p-3 dark:bg-amber-950/40">
@@ -985,11 +1101,52 @@ export function IncidentReportDialog({
                         Required by §1.27(3) for abuse / neglect / exploitation incidents.
                       </p>
                       <Textarea rows={3} value={preventionStrategies}
-                                onChange={(e) => setPreventionStrategies(e.target.value)} className="mt-2" />
+                        onChange={(e) => setPreventionStrategies(e.target.value)} className="mt-2" />
                     </div>
                   )}
                 </div>
               )}
+
+              {currentKey === "nectar-interview" && (
+                <div className="space-y-3 rounded-md border border-violet-300 bg-violet-50/40 p-4 dark:bg-violet-950/30 dark:border-violet-800">
+                  <div className="flex items-center gap-2 text-violet-900 dark:text-violet-100">
+                    <ShieldCheck className="h-4 w-4" />
+                    <span className="text-sm font-semibold">NECTAR is reviewing your draft</span>
+                  </div>
+                  {aiReviewing ? (
+                    <p className="flex items-center gap-2 text-xs text-violet-900/80 dark:text-violet-100/80">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Generating follow-up questions specific to what you wrote…
+                    </p>
+                  ) : aiStatus === "skipped" ? (
+                    <>
+                      <p className="text-xs text-amber-800 dark:text-amber-200">
+                        Nectar review unavailable (timeout or error). The 24-hour clock matters more — you can continue and submit. An <em>AI review skipped</em> badge will be visible to admins.
+                      </p>
+                    </>
+                  ) : aiIssues && aiIssues.length === 0 ? (
+                    <p className="text-xs text-emerald-800 dark:text-emerald-200">
+                      NECTAR has no follow-ups — the narrative covers what a UPI reviewer would ask. Continue to the final review.
+                    </p>
+                  ) : aiIssues && aiIssues.length > 0 ? (
+                    <div className="space-y-2 text-xs">
+                      <p>NECTAR generated <strong>{aiIssues.length}</strong> question{aiIssues.length === 1 ? "" : "s"} from your draft. Click Next to answer each one.</p>
+                      <ul className="ml-5 list-disc space-y-1">
+                        {aiIssues.map((q, i) => (
+                          <li key={i}>
+                            <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="mr-1 text-[10px]">
+                              {q.severity === "must_fix" ? "Must" : "Suggested"}
+                            </Badge>
+                            {q.question}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {isQuestionStep && renderQuestionStep(questionIdx)}
 
               {currentKey === "review" && (
                 <div className="space-y-4">
@@ -1000,7 +1157,6 @@ export function IncidentReportDialog({
                     </p>
                   </div>
 
-                  {/* Deterministic contradictions */}
                   {contradictions.length > 0 && (
                     <div className="space-y-2">
                       {contradictions.map((msg, i) => (
@@ -1008,93 +1164,55 @@ export function IncidentReportDialog({
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                           <div className="flex-1">
                             <p className="font-medium">{msg}</p>
-                            <div className="mt-1 flex gap-2">
-                              <button type="button" className="text-[11px] underline hover:no-underline"
-                                onClick={() => { const i = stepKeys.indexOf("narrative"); if (i >= 0) { setStep(i); setStepError(null); } }}>
-                                Edit narrative
-                              </button>
-                              <button type="button" className="text-[11px] underline hover:no-underline"
-                                onClick={() => { const i = stepKeys.indexOf("people"); if (i >= 0) { setStep(i); setStepError(null); } }}>
-                                Edit people
-                              </button>
-                              <button type="button" className="text-[11px] underline hover:no-underline"
-                                onClick={() => { const i = stepKeys.indexOf("injuries"); if (i >= 0) { setStep(i); setStepError(null); } }}>
-                                Edit injuries/medical
-                              </button>
-                            </div>
+                            <button type="button" className="mt-1 text-[11px] underline hover:no-underline"
+                              onClick={() => { const i2 = stepKeys.indexOf("narrative"); if (i2 >= 0) { setStep(i2); setStepError(null); } }}>
+                              Edit narrative
+                            </button>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* Nectar AI review */}
+                  {/* NECTAR Completeness Check — copies shift-note "Completeness Check" pattern */}
                   <div className="rounded-md border border-violet-300 bg-violet-50/60 p-3 text-xs dark:bg-violet-950/30 dark:border-violet-800">
-                    <div className="mb-2 flex items-center gap-2 text-violet-900 dark:text-violet-100">
+                    <div className="mb-2 flex flex-wrap items-center gap-2 text-violet-900 dark:text-violet-100">
                       <ShieldCheck className="h-3.5 w-3.5" />
-                      <span className="font-semibold">Nectar review</span>
-                      {aiReviewing && (
-                        <span className="flex items-center gap-1 text-[11px]">
-                          <Loader2 className="h-3 w-3 animate-spin" /> Nectar is reviewing…
-                        </span>
-                      )}
+                      <span className="font-semibold">NECTAR Completeness Check</span>
                       {aiStatus === "skipped" && (
-                        <Badge variant="outline" className="text-[10px]">
-                          Nectar review unavailable — submitting with standard checks
-                        </Badge>
+                        <Badge variant="outline" className="text-[10px]">AI review skipped</Badge>
                       )}
                       {aiStatus === "disabled" && (
-                        <Badge variant="outline" className="text-[10px]">AI review disabled by org settings</Badge>
+                        <Badge variant="outline" className="text-[10px]">AI disabled by org settings</Badge>
                       )}
                       {aiStatus === "passed" && (
                         <Badge variant="outline" className="text-[10px]">No follow-ups</Badge>
                       )}
+                      {aiStatus === "answered" && (
+                        <Badge variant="outline" className="text-[10px]">Follow-ups answered</Badge>
+                      )}
                     </div>
-                    {aiIssues && aiIssues.length > 0 && (
-                      <div className="space-y-2">
-                        {aiIssues.map((q, i) => {
-                          const answered = !!(aiAnswers[i]?.trim() || aiNA[i]?.trim());
-                          return (
-                            <div key={i} className={`rounded border p-2 ${q.severity === "must_fix" ? (answered ? "border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30" : "border-rose-300 bg-rose-50 dark:bg-rose-950/30") : "border-amber-300 bg-amber-50 dark:bg-amber-950/20"}`}>
-                              <div className="flex items-start gap-2">
-                                <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px] shrink-0">
-                                  {q.severity === "must_fix" ? "Must answer" : "Suggested"}
-                                </Badge>
-                                <span className="font-medium">{q.question}</span>
-                              </div>
-                              <Textarea
-                                rows={2}
-                                className="mt-2"
-                                placeholder="Answer in 1–2 sentences…"
-                                value={aiAnswers[i] ?? ""}
-                                onChange={(e) => setAiAnswers((s) => ({ ...s, [i]: e.target.value }))}
-                                disabled={aiNA[i] !== undefined}
-                              />
-                              <div className="mt-1 flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  id={`ai-na-${i}`}
-                                  checked={aiNA[i] !== undefined}
-                                  onChange={(e) => setAiNA((s) => {
-                                    const next = { ...s };
-                                    if (e.target.checked) next[i] = "";
-                                    else delete next[i];
-                                    return next;
-                                  })}
-                                />
-                                <Label htmlFor={`ai-na-${i}`} className="text-[11px]">N/A — reason:</Label>
-                                <Input
-                                  className="h-7 text-[11px]"
-                                  placeholder="Why this question doesn't apply"
-                                  value={aiNA[i] ?? ""}
-                                  onChange={(e) => setAiNA((s) => ({ ...s, [i]: e.target.value }))}
-                                  disabled={aiNA[i] === undefined}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                    <p className="text-[11px] text-violet-900/80 dark:text-violet-100/80">
+                      Re-run NECTAR on the enriched draft (narrative + your answers) to surface any remaining gaps before submit.
+                    </p>
+                    <Button type="button" size="sm" variant="outline" className="mt-2" onClick={runCompletenessCheck} disabled={completenessBusy || !aiEnabled}>
+                      {completenessBusy ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Re-checking…</> : "Re-check with NECTAR"}
+                    </Button>
+
+                    {completenessIssues && completenessIssues.length === 0 && !completenessBusy && (
+                      <p className="mt-2 text-[11px] text-emerald-800 dark:text-emerald-200">No remaining gaps. You can submit.</p>
+                    )}
+                    {completenessIssues && completenessIssues.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-[11px]">
+                        {completenessIssues.map((q, i) => (
+                          <li key={i} className="flex items-start gap-2 rounded border p-2 ${q.severity === 'must_fix' ? 'border-rose-300 bg-rose-50' : 'border-amber-300 bg-amber-50'}">
+                            <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px]">
+                              {q.severity === "must_fix" ? "Must address" : "Suggested"}
+                            </Badge>
+                            <span>{q.question}</span>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
                 </div>
@@ -1111,13 +1229,14 @@ export function IncidentReportDialog({
               <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
               <div className="flex gap-2">
                 {step > 0 && (
-                  <Button variant="outline"
-                          onClick={() => { setStepError(null); setStep((s) => Math.max(0, s - 1)); }}>
+                  <Button variant="outline" onClick={() => { setStepError(null); setStep((s) => Math.max(0, s - 1)); }}>
                     Back
                   </Button>
                 )}
                 {step < reviewStepIndex && (
-                  <Button onClick={handleNext}>Next</Button>
+                  <Button onClick={handleNext} disabled={currentKey === "nectar-interview" && aiReviewing}>
+                    {currentKey === "nectar-interview" && aiReviewing ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />NECTAR…</> : "Next"}
+                  </Button>
                 )}
                 {step === reviewStepIndex && (
                   <Button onClick={() => submit.mutate()} disabled={submit.isPending || photoUploading || submitBlocked}>

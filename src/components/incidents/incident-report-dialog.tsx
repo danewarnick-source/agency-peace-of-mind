@@ -686,14 +686,13 @@ export function IncidentReportDialog({
     // the structured Q&A on details for the persisted record.
     if (currentKey === "narrative"
         && narrativeReviewStatus === "needs_answers"
-        && narrativeReviewIssues.length > 0) {
+        && narrativeReviewIssues.some((g) => g.severity === "must_fix")) {
       const answered = narrativeReviewIssues
         .map((g, i) => {
+          if (g.severity !== "must_fix") return null;
           const ans = narrativeGapAnswers[i]?.trim();
-          const na = narrativeGapNA[i]?.trim();
-          if (ans) return `Q: ${g.question}\nA: ${ans}`;
-          if (na) return `Q: ${g.question}\nA: N/A — ${na}`;
-          return null;
+          if (!ans) return null;
+          return `Q: ${g.question}\nA: ${ans}`;
         })
         .filter((s): s is string => !!s);
       if (answered.length) {
@@ -703,13 +702,14 @@ export function IncidentReportDialog({
       }
       setDetails((d) => ({
         ...d,
-        nectar_narrative_followups: narrativeReviewIssues.map((g, i) => ({
-          field: g.field,
-          severity: g.severity,
-          question: g.question,
-          answer: narrativeGapAnswers[i]?.trim() || null,
-          not_applicable_reason: narrativeGapNA[i]?.trim() || null,
-        })),
+        nectar_narrative_followups: narrativeReviewIssues
+          .filter((g) => g.severity === "must_fix")
+          .map((g, i) => ({
+            field: g.field,
+            severity: g.severity,
+            question: g.question,
+            answer: narrativeGapAnswers[i]?.trim() || null,
+          })),
       }));
     }
     setStep((s) => Math.min(lastStep, s + 1));

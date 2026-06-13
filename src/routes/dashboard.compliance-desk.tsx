@@ -623,7 +623,7 @@ function ComplianceDeskPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button onClick={onGlobalUtahExport} disabled={approvedQ.isLoading}>
+          <Button onClick={() => setUtahExportOpen(true)} disabled={!org?.organization_id}>
             <Download /> Export Utah DHHS EVV CSV
           </Button>
           <Button onClick={onGlobalMasterExport} disabled={approvedQ.isLoading} variant="secondary">

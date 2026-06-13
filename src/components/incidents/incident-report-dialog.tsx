@@ -1205,7 +1205,7 @@ export function IncidentReportDialog({
                     {completenessIssues && completenessIssues.length > 0 && (
                       <ul className="mt-2 space-y-1 text-[11px]">
                         {completenessIssues.map((q, i) => (
-                          <li key={i} className="flex items-start gap-2 rounded border p-2 ${q.severity === 'must_fix' ? 'border-rose-300 bg-rose-50' : 'border-amber-300 bg-amber-50'}">
+                          <li key={i} className={`flex items-start gap-2 rounded border p-2 ${q.severity === "must_fix" ? "border-rose-300 bg-rose-50" : "border-amber-300 bg-amber-50"}`}>
                             <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px]">
                               {q.severity === "must_fix" ? "Must address" : "Suggested"}
                             </Badge>

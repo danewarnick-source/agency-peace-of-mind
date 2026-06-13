@@ -14,6 +14,7 @@ import {
   type ContentBlock,
   type Message,
 } from "npm:@aws-sdk/client-bedrock-runtime@3";
+import { FetchHttpHandler } from "npm:@smithy/fetch-http-handler";
 
 type OpenAITextPart = { type: "text"; text: string };
 type OpenAIImagePart = { type: "image_url"; image_url: { url: string } };
@@ -60,6 +61,7 @@ function getClient(): BedrockRuntimeClient {
   return new BedrockRuntimeClient({
     region,
     credentials: { accessKeyId, secretAccessKey },
+    requestHandler: new FetchHttpHandler(),
   });
 }
 

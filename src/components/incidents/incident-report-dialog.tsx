@@ -572,7 +572,7 @@ export function IncidentReportDialog({
   const submitBlocked =
     contradictions.length > 0 ||
     aiReviewing ||
-    (orgAiEnabled !== false && aiStatus === null) ||
+    (orgAiEnabled !== false && aiIssues === null && aiStatus === null) ||
     (aiStatus !== "skipped" && aiStatus !== "disabled" && unresolvedMustFix.length > 0);
 
 

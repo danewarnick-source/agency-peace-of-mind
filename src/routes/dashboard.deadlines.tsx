@@ -9,10 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
 import { useCurrentOrg } from "@/hooks/use-org";
-import {
-  markSummaryCompleted,
-  attestSummaryUpiEntered,
-} from "@/lib/progress-summaries.functions";
+import { attestSummaryUpiEntered } from "@/lib/progress-summaries.functions";
+
 
 export const Route = createFileRoute("/dashboard/deadlines")({
   head: () => ({ meta: [{ title: "Deadlines — HIVE" }] }),

@@ -5,6 +5,8 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import type { Json } from "@/integrations/supabase/types";
 import { reportPlatformEvent } from "./hive-tickets.functions";
 import { markDraftedByNectar } from "./nectar-approvals.functions";
+import { EVV_SERVICE_CODES } from "./evv-codes";
+
 
 
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
@@ -1030,7 +1032,97 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       }
     }
 
+    // --- Auto-emit: mapping_gap ---------------------------------------------
+    // For each requirement the extractor SUCCESSFULLY read but couldn't map
+    // to a known HIVE category bucket (the system's only structural
+    // classification today), file a per-requirement HIVE ticket. Certain
+    // signal: extraction returned it, item.category is null/unknown.
+    const KNOWN_REQ_CATEGORIES = new Set([
+      "audit_doc",
+      "obligation",
+      "rule",
+      "billing",
+    ]);
+    for (const item of aiItems) {
+      const titleClean = item.title.trim().slice(0, 200);
+      if (!titleClean) continue;
+      const cat = (item.category ?? "").toString();
+      if (cat && KNOWN_REQ_CATEGORIES.has(cat)) continue;
+      const reqKey = `${(doc.authoritative_kind as string) ?? "src"}:ai:${titleClean}:${item.citation ?? ""}`
+        .toLowerCase()
+        .slice(0, 120);
+      await reportPlatformEvent({
+        eventKind: "requirement_unmapped",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Unmapped requirement — "${titleClean.slice(0, 120)}"`,
+        detail: `NECTAR extracted a requirement from document ${doc.id} ("${(doc.title as string) ?? doc.file_name}") but could not map it to a known HIVE category bucket (audit_doc / obligation / rule / billing). Extracted title: "${titleClean}". Citation: ${item.citation ?? "(none)"}. Applies to: ${item.applies_to ?? "(unset)"}.`,
+        category: "mapping_gap",
+        severity: "low",
+        dedupeKey: `requirement_unmapped:${doc.id}:${reqKey}`,
+        eventRef: {
+          documentId: doc.id,
+          requirementKey: reqKey,
+          extractedTitle: titleClean,
+          extractedCategory: item.category ?? null,
+          citation: item.citation ?? null,
+          appliesTo: item.applies_to ?? null,
+        },
+      });
+    }
+
+    // --- Auto-emit: expansion_need (NARROW) ---------------------------------
+    // Scan the source text for service-code-like tokens cited in canonical
+    // DSPD patterns ("code XXX", "(XXX)", "XXX — Label"). Any token that
+    // doesn't appear in HIVE's known service-code registry is a wholly
+    // unknown code/structure HIVE has no template for — fire one ticket per
+    // distinct unknown code, deduped globally so re-runs / other docs don't
+    // duplicate. Strategic / addendum-pattern expansion stays MANUAL.
+    const knownCodes = new Set(EVV_SERVICE_CODES.map((c) => c.code));
+    const codeCandidates = new Set<string>();
+    const codeRegexes: RegExp[] = [
+      /\bcodes?\s+([A-Z]{2,4}\d?)\b/g,
+      /\bservice\s+codes?\s+([A-Z]{2,4}\d?)\b/g,
+      /\(([A-Z]{2,4}\d?)\)/g,
+      /\b([A-Z]{2,4}\d?)\s*[-—–]\s*[A-Z][a-z]/g,
+    ];
+    for (const rx of codeRegexes) {
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(rawText)) !== null) {
+        const tok = m[1];
+        if (!tok) continue;
+        if (knownCodes.has(tok)) continue;
+        // Skip obvious English false-positives in the all-caps capture.
+        if (/^(THE|AND|FOR|ALL|NOT|YOU|ARE|WAS|WITH|FROM|HAS|HAD|USA|LLC|INC|CFR|USC|DSP|DHS|DHHS|DSPD|SOW|PDF|PCSP|HCBS|EVV|UPI|UEVV)$/.test(tok)) continue;
+        codeCandidates.add(tok);
+      }
+    }
+    for (const code of codeCandidates) {
+      const snippetMatch = rawText.match(
+        new RegExp(`.{0,80}\\b${code}\\b.{0,80}`),
+      );
+      const snippet = snippetMatch ? snippetMatch[0].replace(/\s+/g, " ").trim() : null;
+      await reportPlatformEvent({
+        eventKind: "unknown_code_structure",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Unknown code/structure "${code}" — no HIVE template`,
+        detail: `Authoritative source ${doc.id} ("${(doc.title as string) ?? doc.file_name}") references "${code}", which is not in HIVE's known service-code registry. HIVE has no template for this code/structure yet.${snippet ? ` Context: "${snippet.slice(0, 280)}"` : ""}`,
+        category: "expansion_need",
+        severity: "low",
+        // Global dedupe on the code itself — same unknown code across docs/
+        // orgs collapses into one open ticket.
+        dedupeKey: `unknown_code_structure:${code}`,
+        eventRef: {
+          documentId: doc.id,
+          unknownCode: code,
+          contextSnippet: snippet,
+        },
+      });
+    }
+
     if (inserted === 0) {
+
       // Document parsed cleanly but yielded zero requirements. Worth a HIVE
       // ticket for the platform team to investigate — either the extractor
       // missed obligation language, or the document genuinely has none.

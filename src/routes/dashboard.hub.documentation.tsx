@@ -36,19 +36,21 @@ function DocumentationHub() {
       tabs={[
         { key: "review", label: "Review", render: () => <ReviewLanding /> },
         { key: "evv", label: "EVV & timesheets", render: () => (
-          <div className="space-y-10">
+          <div className="space-y-6">
             <ComplianceDeskWrapped />
-            <section>
-              <header className="mb-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">
-                  Pay-period reconciliation
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Coverage proof, billing burn-down, payroll, and exceptions — all derived from the same EVV punches above. Advisory.
+            <details className="group rounded-lg border border-border bg-card">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#0B1126]">
+                <span>Pay-period reconciliation</span>
+                <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+                <span className="hidden text-xs font-normal text-muted-foreground group-open:inline">Hide</span>
+              </summary>
+              <div className="border-t border-border px-4 py-4">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Coverage proof, billing burn-down, payroll, and exceptions — derived from the same EVV punches above. Advisory.
                 </p>
-              </header>
-              <TimesheetsReconcile />
-            </section>
+                <TimesheetsReconcile />
+              </div>
+            </details>
           </div>
         ) },
         {
@@ -67,7 +69,7 @@ function DocumentationHub() {
           key: "audit",
           label: "Audit",
           render: () => (
-            <div className="space-y-10">
+            <div className="space-y-6">
               <section>
                 <header className="mb-3">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">
@@ -79,20 +81,17 @@ function DocumentationHub() {
                 </header>
                 <InternalAuditPage />
               </section>
-              <section>
-                <header className="mb-3">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-[#0B1126]">
-                    Evidence pull
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Build audit packets and share evidence with auditors.
-                  </p>
-                </header>
-                <div className="space-y-8">
+              <details className="group rounded-lg border border-border bg-card">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#0B1126]">
+                  <span>Evidence pull — packets &amp; auditor sharing</span>
+                  <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+                  <span className="hidden text-xs font-normal text-muted-foreground group-open:inline">Hide</span>
+                </summary>
+                <div className="space-y-8 border-t border-border px-4 py-4">
                   <AuditPage />
                   <AuditZone />
                 </div>
-              </section>
+              </details>
             </div>
           ),
         },

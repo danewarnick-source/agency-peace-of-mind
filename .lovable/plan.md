@@ -1,53 +1,135 @@
-## Problem (verified)
+# HIVE — Information Architecture cleanup (A → E)
 
-The EVV Reconciliation queue already has a "Review" dialog with Accept/Flag + attestation — but **the queue is empty in practice because nothing ever sets `reconciliation_status='pending'`**. The `reconcileQ` filter is `.not("reconciliation_status", "is", null)`, while punch-pad inserts `outside_geofence_reason` and leaves `reconciliation_status` null. So out-of-bounds shifts never appear in the queue and there's effectively "no action" for the admin — matches the user's report.
+Single principle reinforced everywhere: records live ONCE in their existing tables. Each step below only adds new **views** and **filters** over data that already exists. No new shift/log/incident/summary tables. No changes to billing math, EVV CSV, HHS/protected logic, or the staff (DSP) nav.
 
-Two more real gaps:
-- No third "Correct (data error)" outcome.
-- Billing gate (`utah-export-dialog.tsx` line 90) excludes anything with `outside_geofence_reason`, regardless of reconciliation outcome — so even an admin-accepted shift would still be held out of billing.
-- Review dialog doesn't show captured GPS distance from the service address; user wants it shown alongside the staff explanation.
+Each step ships independently and is testable on its own.
 
-GPS distance math (`haversineFeet` in `punch-pad.tsx`) is correct (`EARTH_RADIUS_FEET = 20_925_525`). The ~6.3M-ft reading is consistent with a stray (0,0) "null island" coord or an old cached device fix — the formula isn't wrong, but the display should guard against obviously-invalid inputs.
+---
 
-## Plan — targeted fixes to the existing EVV reconciliation flow (no new tables, no new tool)
+## A. Approved-EVV searchable archive (real audit gap)
 
-1. **Auto-enroll out-of-bounds punches into the queue.**
-   In `src/components/evv/punch-pad.tsx` clock-in payload (~line 588), when `isOutOfBounds` is true add `reconciliation_status: 'pending'`. This is the single missing link that makes the queue populate. (Backfill query for any existing rows isn't needed — TNS hasn't launched. If needed we can later one-shot existing rows via SQL handoff.)
+**Goal.** One screen: "show me every approved EVV shift, filtered by staff / client / service code / date range / home / billing status, exportable to CSV."
 
-2. **Add a third decision: "Correct (data error)".**
-   - Migration via SQL handoff: extend the allowed values of `evv_timesheets.reconciliation_status` to include `'corrected'`. Add column comment documenting `pending|accepted|corrected|flagged`.
-   - In `ReviewReconciliationDialog` (compliance-desk.tsx ~2066-2207): add a third Decision button "Correct — data/GPS error". `corrected` requires a non-empty notes field (the correction explanation) but no attestation textarea (it's not an affirmation of service delivery).
+**Where it lives.** New tab inside Documentation hub: `tab=evv-archive` (sibling of the existing EVV & timesheets tab, not nested inside it). Existing Pending / Needs-review / Reconciliation / Archive tabs stay where they are — this is the cross-cutting search layer above them.
 
-3. **Strengthen Accept attestation wording (EVV-specific) and use signed-name pattern.**
-   Replace the freeform attestation textarea with the existing `AttestationDialog`-style pattern used for incidents (signed name + title + checkbox + locked attestation text):
-   > "I have reviewed this EVV location exception and the staff explanation, and I attest that the service was validly delivered and is approved for billing."
-   Persist into the existing `reconciliation_attestation` column as a JSON string `{ signed_name, signed_title, attestation_text, signed_at }`. `reconciliation_reviewed_by` continues to capture the admin's display name; `reconciliation_reviewed_at` continues to capture the timestamp. (Keeps schema unchanged besides the enum widening above.)
+**Data source.** `evv_timesheets` rows where `status = 'Approved'` (already exists). No new table. Reads only.
 
-4. **Show captured GPS + distance + client service address in the dialog.**
-   - Surface client `physical_address` (already on row) and the matched approved-location address if any.
-   - Compute distance with the same `haversineFeet` (lifted into a shared `src/lib/geo.ts`) between captured `gps_in_coordinates` and either the matched location or `clients.physical_address` (we already geocode approved locations; for raw `physical_address` we can fall back to "distance unknown — no coordinates on file"). Display in feet, with miles in parens when > 5,280 ft.
-   - **Sanity guard**: if either coord is missing, exactly (0,0), or distance > 1,000 miles → render as `Captured GPS appears invalid (lat/lng, accuracy Xm) — staff explanation required.` and still allow Correct/Flag. This matches the user's "handle obviously-bad GPS sensibly" ask without altering the captured value.
+**Filters (v1, all four user-confirmed groups):**
+- Staff (multi-select from org staff)
+- Client (multi-select from org clients)
+- Service code (multi-select from active `service_codes`)
+- Date range (clock_in date)
+- Home / team (`teams.id` via shift's home assignment)
+- Billing status: derive from existing `billing_submissions` / `evv_export_records` join — Billed / Held / Unbilled. No new state.
 
-5. **Make billing gate respect reconciliation outcome.**
-   In `src/components/evv/utah-export-dialog.tsx` `categorize()` (line 90), change the `out_of_bounds` exclusion from "any `outside_geofence_reason`" to "has `outside_geofence_reason` AND `reconciliation_status` IS NOT IN (`accepted`,`corrected`)". Pending or flagged → still excluded; accepted/corrected → cleared into the billable set. Add `reconciliation_status` to the existing select strings (3 spots in that file). No billing math changes.
+**Output.**
+- Paginated table: date, staff, client, code, in/out, units, home, billing status.
+- CSV export of the *currently filtered* set (reuses existing CSV builder pattern from `utah-export-dialog.tsx` — wrap into a shared `buildApprovedEvvCsv(rows)` util so the existing Utah export is untouched).
+- Each row links to the existing shift detail route.
 
-6. **Queue badge & filters.**
-   - `reconcilePendingCount` is already pending-only (line 467) — no change.
-   - Add `'corrected'` to the filter `<Select>` and to `GeofenceBadge` (compliance-desk.tsx line 40+). Keep the existing styling palette: accepted = success green (existing), corrected = info teal `bg-[#137182]/10 text-[#137182]`, flagged = destructive (existing), pending = warning (existing).
-   - Add `reconciliation_status` widening to the `Row` union type (line 160) and to `buildReconciliationCsv` column order (no header change needed beyond uppercase value).
+**Reuse on profiles.** Same query function, pre-filtered by `clientId` or `staffId`, becomes the "Shifts" tab in steps B and C — so the search infra built here is the foundation for the hubs.
 
-7. **Admin/manager-only gate.**
-   The Documentation hub's EVV tab is already inside `_authenticated` and exposed through admin/manager surfaces; the existing reconciliation Review button has no extra role check. Wrap the Review/Resolve button and dialog mount in `useHasRole('admin') || useHasRole('manager')` (use the existing `usePermissions`/role helpers — confirm exact hook name during build). Hide for everyone else; server-side RLS on `evv_timesheets` UPDATE already restricts to org admins/managers (we'll verify with a read query in build mode, no migration needed if so).
+---
 
-8. **Verification before declaring done.**
-   - Out-of-bounds clock-in inserts a row with `reconciliation_status='pending'`; it appears in the queue with the Resolve button.
-   - Resolve dialog shows: staff explanation, captured GPS + distance (or invalid-GPS banner), client + shift details.
-   - Three decisions: Accept (requires signed-name attestation), Correct (requires notes), Flag (notes optional).
-   - Saving updates status, attestation JSON, notes, reviewer, timestamp; row leaves the Pending filter; badge count drops.
-   - Utah export categorize: a row with `reconciliation_status='accepted'` and `outside_geofence_reason` set is **no longer** excluded; with `pending`/`flagged` it remains excluded.
-   - `tsc --noEmit` clean.
+## B. Client profile = full record hub (new route)
 
-## Out of scope (per user)
-- The separate timeclock punch-reconciliation tool (`TimesheetsReconcile` / Pay-period reconciliation): not touched.
-- Editing/correcting actual punch timestamps or service address (Correct only records the data-error decision + notes).
-- HHS daily logic, billing units, CSV column shape.
+**New route.** `src/routes/dashboard.clients.$clientId.tsx` — the consolidated profile/record hub.
+
+- Workspace (`/dashboard/workspace/$clientId`) **stays** as day-of-care for staff.
+- The new profile is the admin/manager record hub. Cross-link both directions ("Open workspace" / "Open profile").
+
+**Tabs (all surface existing data — no new storage):**
+1. **Overview** — demographics, status, current home/team, SCs, payor, intake completion bar (reads `client_intake_completion`).
+2. **Plan & goals** — PCSP, behavior support, weekly targets (reads existing).
+3. **Billing codes** — embeds the existing per-client view of `client_billing_codes` (read-only here; edit still in `/dashboard/client-billing-codes`).
+4. **Shifts (EVV)** — uses the A-archive query pre-scoped to `client_id`.
+5. **Daily logs** — `daily_logs` filtered by client.
+6. **Incidents** — `incident_reports` + `hhs_incident_reports` filtered by client.
+7. **Summaries** — `client_progress_summaries` for this client; deep-links to Summaries portal.
+8. **Host-home cert** (only if client lives in a host home) — `host_home_certifications` + `host_home_cert_concerns`.
+9. **Deadlines** — pre-filtered view of the deadlines hook by `client_id`.
+10. **Documents** — `client_documents`.
+
+**Discoverability.** Clients hub directory row → "Open profile" goes here; existing "Open workspace" link preserved.
+
+---
+
+## C. Staff profile = full record hub
+
+**Route.** `src/routes/dashboard.employees.$staffId.tsx` already exists — extend, don't replace. Add the missing record-hub tabs alongside what's there.
+
+**Tabs:**
+1. **Overview** — role, hire date, staff type, home assignments.
+2. **Shifts** — A-archive query scoped to `staff_id`.
+3. **Certifications** — `certifications` + `external_certifications` (already partly present; consolidate).
+4. **Trainings** — `training_completions`, `course_assignments`, `staff_other_assignments`, CE ledger.
+5. **Incidents filed** — `incident_reports` where filer = this staff.
+6. **HR / onboarding docs** — `hr_documents` (respect existing access log + RLS).
+7. **Deadlines** — pre-filtered to this staff.
+
+**Reuse rule.** Every tab is a pre-filtered call into the same hook/query used by the corresponding type-view. No duplicated logic.
+
+---
+
+## D. Documentation page simplification (type-view, cleanly)
+
+Documentation hub becomes the canonical TYPE view. One tab = "all X, searchable."
+
+**Tab set after cleanup:**
+- Review (existing landing — keep)
+- EVV & timesheets (existing operational queue — keep)
+- **EVV archive** (new from step A)
+- Incidents (existing — keep)
+- Summaries (link out / embed Summaries portal as type-view)
+- Forms (existing)
+- Host home (existing)
+- Audit (existing, includes HRC sub-section already)
+
+**Removed/merged:** any duplicated "records desk" / nested reconcile pages whose function is fully covered above. Behaviour-preserving: nothing deleted in this step that hasn't been verified as redundant in step E's list.
+
+---
+
+## E. Dead-route cleanup — produce verified list ONLY (no deletions)
+
+**Deliverable.** A markdown report at `docs/ORPHAN_ROUTES.md` containing, for every file in `src/routes/`:
+
+- Route path
+- Referenced by nav? (grep nav config + hub-shell tabs)
+- Referenced by `<Link to=...>` / `navigate({ to: ... })` / `router.navigate` / `redirect({ to: ... })` anywhere in `src/`
+- Referenced by dynamic string concatenation (best-effort grep for the path literal)
+- Verdict: **LIVE** / **LIKELY ORPHAN** / **NEEDS HUMAN REVIEW**
+- Suspected superseder (e.g. `dashboard.billing.*` → `dashboard.hub.finances`)
+
+Categories to scrutinize per the audit you described:
+- `dashboard.billing.*` vs `dashboard.hub.finances`
+- `dashboard.scheduling` / `dashboard.assignments` / `dashboard.schedule` vs `schedule-preview`
+- `dashboard.team` / `dashboard.teams` / `dashboard.roles` / `dashboard.hr-admin` vs `dashboard.hub.employees`
+- Multiple compliance/records desks (`dashboard.records-desk`, `dashboard.compliance-desk`, etc.)
+- Overlapping training systems (`dashboard.training.*`, `dashboard.courses.*`, `dashboard.tracks.*`, `dashboard.programs.*`)
+
+**No file deletions in this step.** Output the report; you approve removals in a follow-up turn.
+
+---
+
+## Sequencing & guardrails
+
+Order: **A → B → C → D → E**. Each step is one PR's worth of work.
+
+Hard guardrails enforced throughout:
+- Records surfaced, never duplicated in storage. No new shift/log/incident/summary tables.
+- Don't touch billing math, EVV CSV byte output, HHS host-home protected logic, conflict engine.
+- Staff (DSP) nav unchanged (verify only: clock-in/out is reachable from Caseload and Schedule).
+- All new queries respect existing RLS — no service-role bypass, no new SECURITY DEFINER functions.
+- Convention: hive-conventions + dspd-domain skills apply (unit math via `computeEntryUnits`, EVV-mandated set via `src/lib/evv-codes.ts`, daily-rate set via `src/lib/service-billing.ts`).
+
+## Technical notes (for me, not the user)
+
+- Build a shared `useApprovedEvvShifts({ clientIds?, staffIds?, codes?, homeIds?, from, to, billingStatus? })` hook. Reused by A's archive page, B's client Shifts tab, C's staff Shifts tab.
+- Extract `buildApprovedEvvCsv(rows)` from existing Utah export; leave the Utah export's existing call site untouched.
+- Billing-status derivation: left-join `evv_export_records` (presence → Billed), then check `billing_submissions` holds/warnings (`billing_submission_warnings`) → Held; otherwise Unbilled. All read-only.
+- New client profile route is additive; the workspace route stays — both link to each other.
+- Employees route already exists; only new tab components are added.
+- Documentation hub edits limited to tab list in `dashboard.hub.documentation.tsx` plus the new EVV-archive tab component.
+- Orphan-route report uses ripgrep over `src/` for each candidate route path; flags catch-all `$` and dynamic `$param` segments specially as NEEDS HUMAN REVIEW.
+
+Reply **"go"** (or "start with A") and I'll build step A first.

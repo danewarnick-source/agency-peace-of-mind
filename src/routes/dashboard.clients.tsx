@@ -1489,6 +1489,12 @@ function ProfileTab({
   const [dob, setDob]                   = useState(client.date_of_birth ?? "");
   const [ecName, setEcName]             = useState(client.emergency_contact_name ?? "");
   const [ecPhone, setEcPhone]           = useState(client.emergency_contact_phone ?? "");
+  const [isOwnGuardian, setIsOwnGuardian] = useState<boolean>(!!client.is_own_guardian);
+  const [gName, setGName]               = useState(client.guardian_name ?? "");
+  const [gPhone, setGPhone]             = useState(client.guardian_phone ?? "");
+  const [gRel, setGRel]                 = useState(client.guardian_relationship ?? "");
+  const [gEmail, setGEmail]             = useState(client.guardian_email ?? "");
+
   const [jobCodes, setJobCodes]         = useState<string[]>(client.job_code ?? []);
   const [radius, setRadius]             = useState(client.geofence_radius_feet ?? 1000);
   const [pinning, setPinning]           = useState(false);

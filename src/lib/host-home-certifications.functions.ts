@@ -3,10 +3,14 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
+export const HOST_HOME_CERT_ATTESTATION_TEXT =
+  "I attest that I personally conducted this inspection, that I am not the host home staff, and that the findings recorded here are true and accurate to the best of my knowledge.";
+
 export type HostHomeCertRow = {
   id: string;
   organization_id: string;
   client_id: string;
+  hhp_cue_card_id: string | null;
   team_id: string | null;
   cert_type: "initial" | "annual";
   inspection_date: string;
@@ -14,6 +18,8 @@ export type HostHomeCertRow = {
   inspector_name: string;
   host_home_address: string;
   inspector_not_host_confirmed: boolean;
+  attestation_confirmed: boolean;
+  attestation_text: string | null;
   checklist: Record<string, { status: "meets" | "does_not_meet" | "na"; note?: string }>;
   pcsp_status: "meets" | "does_not_meet";
   pcsp_notes: string | null;
@@ -53,12 +59,14 @@ const checklistAnswer = z.object({
 const createInput = z.object({
   organizationId: z.string().uuid(),
   clientId: z.string().uuid(),
+  hhpCueCardId: z.string().uuid().nullable().optional(),
   teamId: z.string().uuid().nullable().optional(),
   cert_type: z.enum(["initial", "annual"]),
   inspection_date: z.string(),
   inspector_name: z.string().min(1),
   host_home_address: z.string().min(1),
   inspector_not_host_confirmed: z.boolean(),
+  attestation_confirmed: z.boolean(),
   checklist: z.record(z.string(), checklistAnswer),
   pcsp_status: z.enum(["meets", "does_not_meet"]),
   pcsp_notes: z.string().nullable().optional(),
@@ -77,12 +85,28 @@ export const createHostHomeCertification = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
-    // Enforce the "inspector is not host" gate for any certified determination.
-    if (
-      (data.determination === "certified" || data.determination === "certified_with_corrections")
-      && !data.inspector_not_host_confirmed
-    ) {
+    const isCertifying =
+      data.determination === "certified" || data.determination === "certified_with_corrections";
+
+    // Server-side gates (DB trigger backs these up; we validate first for nicer errors).
+    if (isCertifying && !data.inspector_not_host_confirmed) {
       throw new Error("Inspector must confirm they are not the host home staff before certifying.");
+    }
+    if (isCertifying && !data.attestation_confirmed) {
+      throw new Error("Required attestation must be acknowledged before certifying.");
+    }
+    if (isCertifying && (!data.signature_name.trim() || !data.signature_title.trim())) {
+      throw new Error("Signature name and title are required to certify.");
+    }
+
+    // Every "Does Not Meet" item MUST have a note.
+    for (const [code, answer] of Object.entries(data.checklist)) {
+      if (answer.status === "does_not_meet" && !(answer.note ?? "").trim()) {
+        throw new Error(`A note is required for every "Does Not Meet" item (missing on ${code}).`);
+      }
+    }
+    if (data.pcsp_status === "does_not_meet" && !(data.pcsp_notes ?? "").trim()) {
+      throw new Error("PCSP notes are required when marking PCSP as Does Not Meet.");
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,6 +115,7 @@ export const createHostHomeCertification = createServerFn({ method: "POST" })
       .insert({
         organization_id: data.organizationId,
         client_id: data.clientId,
+        hhp_cue_card_id: data.hhpCueCardId ?? null,
         team_id: data.teamId ?? null,
         cert_type: data.cert_type,
         inspection_date: data.inspection_date,
@@ -98,6 +123,8 @@ export const createHostHomeCertification = createServerFn({ method: "POST" })
         inspector_name: data.inspector_name,
         host_home_address: data.host_home_address,
         inspector_not_host_confirmed: data.inspector_not_host_confirmed,
+        attestation_confirmed: data.attestation_confirmed,
+        attestation_text: isCertifying ? HOST_HOME_CERT_ATTESTATION_TEXT : null,
         checklist: data.checklist,
         pcsp_status: data.pcsp_status,
         pcsp_notes: data.pcsp_notes ?? null,

@@ -324,7 +324,6 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
  * ====================================================================*/
 function RequirementsTab({ organizationId, staffId }: { organizationId: string; staffId: string }) {
   const [filter, setFilter] = useState<"all" | "needs_action" | "current">("all");
-  const [uploadOpen, setUploadOpen] = useState(false);
   const fetchChecklist = useServerFn(getStaffChecklist);
   const checklistQ = useQuery({
     queryKey: ["staff-checklist", organizationId, staffId],

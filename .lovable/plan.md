@@ -1,24 +1,48 @@
-## Problem
-The static preview build (`preview--agency-peace-of-mind.lovable.app`) is failing with **"JavaScript heap out of memory"** during `vite build`. Node's default ~3 GB heap is exhausted while bundling the project: **154 route files** + the full Cloudflare worker bundle for Tanstack Start.
+# Deadlines page — surgical cleanup
 
-The live sandbox preview (the iframe in Lovable) works because `vite dev` is incremental and never bundles everything at once. The static preview URL serves a built artifact — when the build OOMs, you get the "Preview has not been built yet" screen.
+Three targeted fixes. No rebuilds. Working parts (summary completion, SEI UPI attestation, staff certs, incident clocks, billing-code rows) stay untouched.
 
-There's no code-level bug. The project just grew large enough that the bundler needs more memory.
+## Fix 1 — Remove the HHS monthly certification source
 
-## Fix
-Bump the Node heap for the build by setting `NODE_OPTIONS=--max-old-space-size=8192` in `package.json` build scripts:
+In `src/hooks/use-deadlines.tsx`:
 
-```json
-"build":     "NODE_OPTIONS=--max-old-space-size=8192 vite build",
-"build:dev": "NODE_OPTIONS=--max-old-space-size=8192 vite build --mode development",
-```
+- Drop the `"hhs_cert"` branch in the `items` builder (the loop that pushes `HHS monthly certification — …`).
+- Drop the now-unused `hhs_monthly_certifications` query block inside `hhsQ` — but keep `hhsQ.activeIds` because the **annual** host-home-cert source still depends on it. Simplify `hhsQ` to only return `{ activeIds }`.
+- Remove `"hhs_cert"` from the `DeadlineSource` union.
 
-This is the standard remediation for large TanStack Start / Vite projects and what's needed for ~150+ routes. No code changes, no route changes.
+In `src/routes/dashboard.deadlines.tsx`:
 
-## Verify
-After the change, run `bun run build` in the sandbox to confirm the production build completes; once it succeeds, the static preview rebuilds on the next push and stops showing the "not built yet" screen.
+- Remove the `hhs_cert` entries from `sourceIcon` and `sourceLabel` maps.
 
-## Out of scope
-- I am NOT removing routes, splitting the app, or refactoring imports — the existing route layout is intentional.
-- I am NOT touching the live sandbox preview (it's already working).
-- No SQL, no schema, no UI changes.
+Result: HHS appears exactly once on the Deadlines page, as the **annual** host-home-cert row driven by `host_home_certifications.next_due_date`.
+
+## Fix 2 — Every item links to the right place
+
+In `use-deadlines.tsx`, ensure every pushed item has a usable `href`:
+
+| Source | Current | New `href` |
+|---|---|---|
+| `summary` | none | `/dashboard/summaries?open=<summary.id>` (the page already accepts `?open=<uuid>` and auto-opens that summary dialog) |
+| `host_home_cert` | `/dashboard/hub/employees?tab=hosts` | keep — that's the Host Home Providers board |
+| `staff_cert` | `/dashboard/employees/$staffId` | keep |
+| `incident` | `/dashboard/hub/documentation?tab=incidents` | keep |
+| `billing_code` | `/dashboard/behavior-support/$clientId` | keep |
+
+In `dashboard.deadlines.tsx`'s `RowAction`:
+
+- Summaries already render their own action button (Mark complete / Entered into UPI) — leave those exactly as-is.
+- For every other source, `RowAction` already falls through to the "Open →" button when `item.href` is set. With Fix 2's summary `href` now populated, the row's **title** also needs to be clickable as a fallback. Wrap the title text inside `DeadlineRow` in an `<a href={item.href}>` when `href` is set, so the whole row name navigates too (small win, keeps the open button for summary action). Use `<Link to={item.href}>` is not possible without parsing — use a plain `<a>` since we already use `<a>` in the existing "Open" button.
+
+No other UI restructuring.
+
+## Fix 3 — Home dashboard Deadlines card
+
+`DeadlinesHomeCard` is already exported from `dashboard.deadlines.tsx` and already imported + rendered in `src/routes/dashboard.index.tsx` (line 142). Verify it renders, no changes needed. If during testing the card is missing on the current Home layout, re-add the `<DeadlinesHomeCard />` placement to match neighboring card styling.
+
+## Verification
+
+1. Load `/dashboard/deadlines` — confirm zero "HHS monthly certification — …" rows; the only HHS row is the annual "Host home annual certification".
+2. Click a summary row's title → opens `/dashboard/summaries?open=<id>` with that summary's dialog open.
+3. Click each other row type → lands on the documented destination.
+4. Confirm summary action buttons (Mark complete, Entered into UPI) still work — untouched.
+5. Open `/dashboard` Home — confirm Deadlines card shows overdue + due-this-week counts and links to `/dashboard/deadlines`.

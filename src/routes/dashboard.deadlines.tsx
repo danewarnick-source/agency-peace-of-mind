@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { AlarmClock, AlertTriangle, Clock, FileCheck2, ShieldCheck, FileSignature, Activity, ExternalLink } from "lucide-react";
+import { AlarmClock, AlertTriangle, Clock, FileCheck2, ShieldCheck, FileSignature, Activity, ExternalLink, Home } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/dashboard/deadlines")({
 const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   summary: FileSignature,
   hhs_cert: FileCheck2,
+  host_home_cert: Home,
   staff_cert: ShieldCheck,
   incident: Activity,
   billing_code: AlarmClock,
@@ -30,6 +31,7 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
 const sourceLabel: Record<DeadlineItem["source"], string> = {
   summary: "Progress summary",
   hhs_cert: "HHS certification",
+  host_home_cert: "Host home certification",
   staff_cert: "Staff certification",
   incident: "Incident clock",
   billing_code: "Billing-code deliverable",

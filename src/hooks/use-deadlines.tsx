@@ -14,6 +14,7 @@ import {
 export type DeadlineSource =
   | "summary"
   | "hhs_cert"
+  | "host_home_cert"
   | "staff_cert"
   | "incident"
   | "billing_code";
@@ -219,6 +220,30 @@ export function useDeadlines() {
     },
   });
 
+  // 8. Host home certifications — latest next_due_date per active HHS client.
+  const hhCertsQ = useQuery({
+    enabled: !!orgId && !!hhsQ.data,
+    queryKey: ["deadlines", "host_home_certs", orgId, (hhsQ.data?.activeIds ?? []).join(",")],
+    queryFn: async () => {
+      const activeIds = hhsQ.data?.activeIds ?? [];
+      if (activeIds.length === 0) return { latest: new Map<string, string>() };
+      const { data, error } = await supabase
+        .from("host_home_certifications" as never)
+        .select("client_id, next_due_date, inspection_date")
+        .eq("organization_id", orgId!)
+        .in("client_id", activeIds)
+        .order("inspection_date", { ascending: false });
+      if (error) throw error;
+      const latest = new Map<string, string>();
+      for (const row of (data ?? []) as unknown as Array<{ client_id: string; next_due_date: string }>) {
+        if (!latest.has(row.client_id)) latest.set(row.client_id, row.next_due_date);
+      }
+      return { latest };
+    },
+  });
+
+
+
   const items = useMemo<DeadlineItem[]>(() => {
     if (!orgId) return [];
     const now = new Date();
@@ -330,6 +355,25 @@ export function useDeadlines() {
       }
     }
 
+    // Host home certifications — HHS-only. Overdue/missing surfaces here.
+    if (hhsQ.data && hhCertsQ.data) {
+      for (const clientId of hhsQ.data.activeIds) {
+        const dueStr = hhCertsQ.data.latest.get(clientId);
+        const due = dueStr ? new Date(`${dueStr}T23:59:59`) : new Date(now.getTime() - DAY);
+        out.push({
+          key: `hhc:${clientId}`,
+          source: "host_home_cert",
+          title: dueStr ? "Host home annual certification" : "Host home certification (never completed)",
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: due,
+          status: bucketStatus(due, now),
+          href: `/dashboard/hhs-hub/${clientId}?tab=cert`,
+          clientId,
+        });
+      }
+    }
+
     out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
     return out;
   }, [
@@ -337,6 +381,7 @@ export function useDeadlines() {
     summariesQ.data,
     clientsQ.data,
     hhsQ.data,
+    hhCertsQ.data,
     certsQ.data,
     profilesQ.data,
     incidentsQ.data,
@@ -350,6 +395,6 @@ export function useDeadlines() {
     upcoming: items.filter((i) => i.status === "upcoming"),
     isLoading:
       summariesQ.isLoading || clientsQ.isLoading || hhsQ.isLoading ||
-      certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading,
+      certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading,
   };
 }

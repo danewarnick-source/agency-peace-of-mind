@@ -2078,32 +2078,86 @@ function ReconcileTable({
   );
 }
 
+const ACCEPT_ATTESTATION_TEXT =
+  "I have reviewed this EVV location exception and the staff explanation, and I attest that the service was validly delivered and is approved for billing.";
+
 function ReviewReconciliationDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
   const qc = useQueryClient();
   const { user } = useAuthHook();
-  const [decision, setDecision] = useState<"accepted" | "flagged">("accepted");
-  const [attestation, setAttestation] = useState("");
+  const [decision, setDecision] = useState<"accepted" | "corrected" | "flagged">("accepted");
+  const [signedName, setSignedName] = useState("");
+  const [signedTitle, setSignedTitle] = useState("");
+  const [attestChecked, setAttestChecked] = useState(false);
   const [notes, setNotes] = useState("");
+  const isReadOnly = !!row && row.reconciliation_status && row.reconciliation_status !== "pending";
 
   useEffect(() => {
     if (!row) return;
-    setDecision(row.reconciliation_status === "flagged" ? "flagged" : "accepted");
-    setAttestation(row.reconciliation_attestation ?? "");
+    const s = row.reconciliation_status;
+    setDecision(s === "flagged" || s === "corrected" ? s : "accepted");
+    setSignedName("");
+    setSignedTitle("");
+    setAttestChecked(false);
     setNotes(row.reconciliation_review_notes ?? "");
   }, [row]);
+
+  // Nearest approved location for distance display.
+  const approvedQ = useQuery({
+    enabled: !!row?.client_id,
+    queryKey: ["evv-reconcile-approved-locs", row?.client_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_approved_locations")
+        .select("id, label, address, latitude, longitude, geofence_radius_feet")
+        .eq("client_id", row!.client_id);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const gpsIn = row?.gps_in_coordinates
+    ? { lat: row.gps_in_coordinates.latitude, lng: row.gps_in_coordinates.longitude }
+    : null;
+  const gpsBad = isLikelyBadCoord(gpsIn);
+  const nearest = useMemo(() => {
+    if (!gpsIn || gpsBad || !approvedQ.data?.length) return null;
+    let best: { label: string; address: string; distFt: number } | null = null;
+    for (const loc of approvedQ.data) {
+      if (loc.latitude == null || loc.longitude == null) continue;
+      const d = haversineFeet(gpsIn, { lat: Number(loc.latitude), lng: Number(loc.longitude) });
+      if (!best || d < best.distFt) best = { label: loc.label, address: loc.address ?? "", distFt: d };
+    }
+    return best;
+  }, [gpsIn, gpsBad, approvedQ.data]);
+  const distSuspicious = nearest ? isDistanceSuspicious(nearest.distFt) : false;
 
   const save = useMutation({
     mutationFn: async () => {
       if (!row) return;
-      if (decision === "accepted" && attestation.trim().length < 10) {
-        throw new Error("Please attest to the variance (at least 10 characters).");
+      if (decision === "accepted") {
+        if (!attestChecked) throw new Error("Please confirm the attestation checkbox.");
+        if (signedName.trim().length < 2 || signedTitle.trim().length < 2) {
+          throw new Error("Signed name and title are required to accept.");
+        }
+      }
+      if (decision === "corrected" && notes.trim().length < 10) {
+        throw new Error("Describe the data/GPS correction (at least 10 characters).");
       }
       const adminName = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Administrator";
+      const attestationPayload =
+        decision === "accepted"
+          ? JSON.stringify({
+              signed_name: signedName.trim(),
+              signed_title: signedTitle.trim(),
+              attestation_text: ACCEPT_ATTESTATION_TEXT,
+              signed_at: new Date().toISOString(),
+            })
+          : null;
       const { error } = await supabase
         .from("evv_timesheets")
         .update({
           reconciliation_status: decision,
-          reconciliation_attestation: decision === "accepted" ? attestation.trim() : null,
+          reconciliation_attestation: attestationPayload,
           reconciliation_review_notes: notes.trim() || null,
           reconciliation_reviewed_by: adminName,
           reconciliation_reviewed_at: new Date().toISOString(),
@@ -2112,7 +2166,13 @@ function ReviewReconciliationDialog({ row, onClose }: { row: Row | null; onClose
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success(decision === "accepted" ? "Variance reconciled and attested." : "Shift flagged for follow-up.");
+      toast.success(
+        decision === "accepted"
+          ? "Exception accepted and attested — visit is billable."
+          : decision === "corrected"
+          ? "Marked as data/GPS correction — visit is billable."
+          : "Shift flagged for follow-up — held out of billing."
+      );
       qc.invalidateQueries({ queryKey: ["evv-reconcile"] });
       qc.invalidateQueries({ queryKey: ["evv-pending"] });
       qc.invalidateQueries({ queryKey: ["evv-approved"] });
@@ -2121,13 +2181,18 @@ function ReviewReconciliationDialog({ row, onClose }: { row: Row | null; onClose
     onError: (e) => toast.error((e as Error).message),
   });
 
+  let parsedPriorAttestation: { signed_name?: string; signed_title?: string; attestation_text?: string; signed_at?: string } | null = null;
+  if (isReadOnly && row?.reconciliation_attestation) {
+    try { parsedPriorAttestation = JSON.parse(row.reconciliation_attestation); } catch { /* legacy free-text */ }
+  }
+
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>EVV Reconciliation Review</DialogTitle>
+          <DialogTitle>{isReadOnly ? "EVV Reconciliation — Review" : "Resolve EVV Location Exception"}</DialogTitle>
           <DialogDescription>
-            This shift was punched outside all approved client locations. Review the captured GPS and the staff's reconciliation explanation, then accept with attestation or flag for follow-up.
+            This shift was punched outside all approved client locations. Review the captured GPS and the staff's explanation, then record your decision.
           </DialogDescription>
         </DialogHeader>
         {row && (
@@ -2140,6 +2205,9 @@ function ReviewReconciliationDialog({ row, onClose }: { row: Row | null; onClose
               <div className="rounded-md border border-border bg-muted/30 p-2">
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Client</div>
                 <div className="font-medium">{row.clients?.first_name} {row.clients?.last_name}</div>
+                {row.clients?.physical_address && (
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">{row.clients.physical_address}</div>
+                )}
               </div>
               <div className="rounded-md border border-border bg-muted/30 p-2">
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Service</div>
@@ -2165,56 +2233,130 @@ function ReviewReconciliationDialog({ row, onClose }: { row: Row | null; onClose
 
             <div className="rounded-lg border border-border p-3 text-xs">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Captured GPS</div>
-              <div className="mt-1 font-mono">
-                In: {row.gps_in_coordinates?.latitude?.toFixed?.(6)}, {row.gps_in_coordinates?.longitude?.toFixed?.(6)}
-                {row.gps_out_coordinates && (
-                  <> · Out: {row.gps_out_coordinates.latitude.toFixed(6)}, {row.gps_out_coordinates.longitude.toFixed(6)}</>
+              {gpsBad ? (
+                <div className="mt-1 rounded border border-destructive/40 bg-destructive/10 p-2 text-destructive">
+                  Captured GPS appears invalid (lat {String(row.gps_in_coordinates?.latitude ?? "—")}, lng {String(row.gps_in_coordinates?.longitude ?? "—")}). Treat the staff explanation as the primary evidence.
+                </div>
+              ) : (
+                <div className="mt-1 font-mono">
+                  In: {gpsIn!.lat.toFixed(6)}, {gpsIn!.lng.toFixed(6)}
+                  {row.gps_in_coordinates?.accuracy_meters != null && <> · ±{Math.round(row.gps_in_coordinates.accuracy_meters)}m</>}
+                  {row.gps_out_coordinates && (
+                    <> · Out: {row.gps_out_coordinates.latitude.toFixed(6)}, {row.gps_out_coordinates.longitude.toFixed(6)}</>
+                  )}
+                </div>
+              )}
+              {nearest && (
+                <div className={`mt-2 ${distSuspicious ? "text-destructive" : "text-muted-foreground"}`}>
+                  Nearest approved location: <span className="font-medium">{nearest.label}</span>
+                  {nearest.address ? <> — <span className="font-mono text-[11px]">{nearest.address}</span></> : null}
+                  <div>Distance from punch: <span className="font-mono">{formatDistanceFeet(nearest.distFt)}</span>{distSuspicious && " — likely a bad GPS reading"}</div>
+                </div>
+              )}
+              {!nearest && !gpsBad && (
+                <div className="mt-2 text-muted-foreground">No approved location coordinates on file — distance can't be computed.</div>
+              )}
+            </div>
+
+            {isReadOnly ? (
+              <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Resolution</div>
+                <div className="mt-1">
+                  <Badge variant="outline" className="uppercase">{row.reconciliation_status}</Badge>{" "}
+                  by <span className="font-medium">{row.reconciliation_reviewed_by ?? "—"}</span> on{" "}
+                  {row.reconciliation_reviewed_at ? new Date(row.reconciliation_reviewed_at).toLocaleString() : "—"}
+                </div>
+                {parsedPriorAttestation?.attestation_text && (
+                  <div className="mt-2 rounded border border-border bg-card p-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Attestation</div>
+                    <p className="mt-1 italic">"{parsedPriorAttestation.attestation_text}"</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Signed: {parsedPriorAttestation.signed_name} · {parsedPriorAttestation.signed_title}
+                    </p>
+                  </div>
+                )}
+                {!parsedPriorAttestation && row.reconciliation_attestation && (
+                  <p className="mt-2 whitespace-pre-wrap">{row.reconciliation_attestation}</p>
+                )}
+                {row.reconciliation_review_notes && (
+                  <div className="mt-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Notes</div>
+                    <p className="mt-0.5 whitespace-pre-wrap">{row.reconciliation_review_notes}</p>
+                  </div>
                 )}
               </div>
-            </div>
+            ) : (
+              <>
+                <div>
+                  <Label className="text-xs">Decision</Label>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant={decision === "accepted" ? "default" : "outline"} onClick={() => setDecision("accepted")}>
+                      <CheckCircle2 /> Accept (valid)
+                    </Button>
+                    <Button type="button" size="sm" variant={decision === "corrected" ? "default" : "outline"} onClick={() => setDecision("corrected")}>
+                      <Pencil /> Correct (data/GPS error)
+                    </Button>
+                    <Button type="button" size="sm" variant={decision === "flagged" ? "destructive" : "outline"} onClick={() => setDecision("flagged")}>
+                      <Flag /> Flag — do not bill
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {decision === "accepted" && "Service was validly delivered away from the address (community, transport, appointment). Keeps the visit billable."}
+                    {decision === "corrected" && "Captured GPS or service address was wrong. Keeps the visit billable; note the correction below."}
+                    {decision === "flagged" && "Explanation doesn't hold up or visit is questionable. Holds the visit out of billing pending follow-up."}
+                  </p>
+                </div>
 
-            <div>
-              <Label className="text-xs">Decision</Label>
-              <div className="mt-1 flex gap-2">
-                <Button type="button" size="sm" variant={decision === "accepted" ? "default" : "outline"} onClick={() => setDecision("accepted")}>
-                  <CheckCircle2 /> Accept with attestation
-                </Button>
-                <Button type="button" size="sm" variant={decision === "flagged" ? "destructive" : "outline"} onClick={() => setDecision("flagged")}>
-                  <Flag /> Flag for follow-up
-                </Button>
-              </div>
-            </div>
+                {decision === "accepted" && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-800 dark:bg-amber-950/30">
+                    <p className="font-semibold text-amber-900 dark:text-amber-100">Attestation (required)</p>
+                    <p className="mt-1 whitespace-pre-wrap text-amber-950 dark:text-amber-50">{ACCEPT_ATTESTATION_TEXT}</p>
+                    <label className="mt-2 flex items-start gap-2 text-amber-950 dark:text-amber-50">
+                      <input
+                        type="checkbox"
+                        checked={attestChecked}
+                        onChange={(e) => setAttestChecked(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span>I confirm the above attestation is true and accurate.</span>
+                    </label>
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div>
+                        <Label className="text-[11px]">Your full name *</Label>
+                        <Input value={signedName} onChange={(e) => setSignedName(e.target.value)} maxLength={120} />
+                      </div>
+                      <div>
+                        <Label className="text-[11px]">Your title *</Label>
+                        <Input value={signedTitle} onChange={(e) => setSignedTitle(e.target.value)} maxLength={120} placeholder="e.g. Program Director" />
+                      </div>
+                    </div>
+                    <p className="mt-1 text-[10px] text-muted-foreground">Signing at: {new Date().toLocaleString()}</p>
+                  </div>
+                )}
 
-            {decision === "accepted" && (
-              <div>
-                <Label htmlFor="attest" className="text-xs">Provider attestation (required)</Label>
-                <Textarea
-                  id="attest"
-                  rows={3}
-                  value={attestation}
-                  onChange={(e) => setAttestation(e.target.value)}
-                  placeholder="e.g. Reviewed shift note and contacted staff. Variance is consistent with community outing documented in the PCSP. Provider accepts responsibility for the call."
-                />
-              </div>
+                <div>
+                  <Label htmlFor="rnotes" className="text-xs">
+                    {decision === "corrected" ? "Correction notes (required)" : "Internal review notes (optional)"}
+                  </Label>
+                  <Textarea
+                    id="rnotes"
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder={decision === "corrected" ? "Describe the data/GPS error and how you verified it." : "Any internal follow-up actions or context."}
+                  />
+                </div>
+              </>
             )}
-
-            <div>
-              <Label htmlFor="rnotes" className="text-xs">Internal review notes (optional)</Label>
-              <Textarea
-                id="rnotes"
-                rows={2}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any internal follow-up actions or context."
-              />
-            </div>
           </div>
         )}
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
-            {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save reconciliation"}
-          </Button>
+          <Button variant="ghost" onClick={onClose}>{isReadOnly ? "Close" : "Cancel"}</Button>
+          {!isReadOnly && (
+            <Button onClick={() => save.mutate()} disabled={save.isPending}>
+              {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save resolution"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

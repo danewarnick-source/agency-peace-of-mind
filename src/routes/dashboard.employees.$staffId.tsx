@@ -149,10 +149,13 @@ function StaffProfilePage() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="requirements">Requirements</TabsTrigger>
+        <TabsList className="flex flex-wrap h-auto justify-start">
+          <TabsTrigger value="profile">Overview</TabsTrigger>
+          <TabsTrigger value="requirements">Certs &amp; trainings</TabsTrigger>
+          <TabsTrigger value="shifts">Shifts</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="hrdocs">HR docs</TabsTrigger>
+          <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
         </TabsList>
 
         {/* ----- PROFILE ----- */}

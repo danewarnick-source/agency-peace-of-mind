@@ -48,7 +48,7 @@ function StaffProfilePage() {
       const { data: p } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, employee_id, position, department, hire_date, account_status, worker_type, team_id" as any)
+        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id" as any)
         .eq("id", staffId)
         .maybeSingle();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -139,7 +139,12 @@ function StaffProfilePage() {
             <h1 className="text-xl font-semibold">{name}</h1>
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <Badge variant="secondary" className="uppercase">{m.role}</Badge>
-              {p?.position && <Badge variant="outline">{p.position}</Badge>}
+              {(() => {
+                const list = ((p?.positions as string[] | null) ?? []).filter(Boolean);
+                const fallback = p?.position ? [p.position as string] : [];
+                const positions = list.length ? list : fallback;
+                return positions.map((pos) => <Badge key={pos} variant="outline">{pos}</Badge>);
+              })()}
               <span>{m.active ? "Active" : "Deactivated"}</span>
               {p?.hire_date && <span>· Hired {p.hire_date}</span>}
             </div>
@@ -168,7 +173,12 @@ function StaffProfilePage() {
                 <Row label="Email" value={p?.email ?? "—"} />
                 <Row label="Login" value={p?.username ?? p?.email ?? "—"} />
                 <Row label="Employee ID" value={p?.employee_id ?? "—"} />
-                <Row label="Position" value={p?.position ?? "—"} />
+                <Row label="Position" value={(() => {
+                  const list = ((p?.positions as string[] | null) ?? []).filter(Boolean);
+                  const fallback = p?.position ? [p.position as string] : [];
+                  const positions = list.length ? list : fallback;
+                  return positions.length ? positions.join(", ") : "—";
+                })()} />
                 <Row label="System role" value={m.role} />
                 <Row label="Worker type" value={p?.worker_type === "1099" ? "1099 contractor" : "W-2 employee"} />
                 <Row label="Status" value={m.active ? "Active" : "Deactivated"} />

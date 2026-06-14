@@ -57,6 +57,7 @@ type EditableMember = {
   role: Role;
   active: boolean;
   position: Position | "";
+  positions: Position[];
   workerType: WorkerType;
   hourlyRate: string;
   dailyRate: string;
@@ -77,6 +78,7 @@ export function EmployeesPage() {
   const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
   const [editingMember, setEditingMember] = useState<EditableMember | null>(null);
   const [editTopics, setEditTopics] = useState<string[]>([]);
+  const [editPositions, setEditPositions] = useState<Position[]>([]);
   const [editDirty, setEditDirty] = useState(false);
   const [caseloadFor, setCaseloadFor] = useState<{ id: string; name: string; role: string } | null>(null);
 
@@ -105,7 +107,7 @@ export function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, account_status, worker_type, ce_suggested_topics" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, positions, account_status, worker_type, ce_suggested_topics" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
@@ -240,7 +242,8 @@ export function EmployeesPage() {
           full_name: input.fullName,
           email: input.email || null,
           employee_id: input.employeeId || null,
-          position: input.position || null,
+          position: input.positions[0] ?? input.position ?? null,
+          positions: input.positions ?? [],
           worker_type: input.workerType,
           start_date: input.startDate || null,
           end_date: input.endDate || null,
@@ -369,6 +372,9 @@ export function EmployeesPage() {
                 const openEdit = () => {
                   const topics = ((m.profile as { ce_suggested_topics?: string[] | null } | undefined)?.ce_suggested_topics ?? []) as string[];
                   setEditTopics(topics);
+                  const positionsArr = ((m.profile as { positions?: string[] | null } | undefined)?.positions ?? []) as string[];
+                  const initialPositions = positionsArr.filter((x): x is Position => POSITIONS.includes(x as Position));
+                  setEditPositions(initialPositions.length ? initialPositions : (position ? [position as Position] : []));
                   setEditingMember({
                     membershipId: m.id,
                     userId: m.user_id,
@@ -378,6 +384,12 @@ export function EmployeesPage() {
                     role: m.role as Role,
                     active: m.active,
                     position,
+                    positions: (() => {
+                      const arr = ((m.profile as { positions?: string[] | null } | undefined)?.positions ?? []) as string[];
+                      const list = arr.filter((x): x is Position => POSITIONS.includes(x as Position));
+                      if (list.length) return list;
+                      return position ? [position as Position] : [];
+                    })(),
                     workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
                     hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
                     dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
@@ -667,7 +679,8 @@ export function EmployeesPage() {
                   employeeId: String(fd.get("employee_id") || "").trim(),
                   role: String(fd.get("role") || "employee") as Role,
                   active: String(fd.get("active") || "true") === "true",
-                  position: (String(fd.get("position") || "") as Position | ""),
+                  position: (editPositions[0] ?? "") as Position | "",
+                  positions: editPositions,
                   workerType: (String(fd.get("worker_type") || "w2") as WorkerType),
                   hourlyRate: String(fd.get("hourly_rate") || "").trim(),
                   dailyRate: String(fd.get("daily_rate") || "").trim(),
@@ -683,13 +696,33 @@ export function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={editingMember.email} /></div>
               <div className="grid gap-2"><Label htmlFor="employee_id">Employee ID</Label><Input id="employee_id" name="employee_id" defaultValue={editingMember.employeeId} placeholder="e.g. EMP-1042" /></div>
               <div className="grid gap-2">
-                <Label htmlFor="edit-position">Agency Position</Label>
-                <Select name="position" defaultValue={editingMember.position || undefined}>
-                  <SelectTrigger id="edit-position"><SelectValue placeholder="Select a position" /></SelectTrigger>
-                  <SelectContent>
-                    {POSITIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Agency Position</Label>
+                <p className="text-[11px] text-muted-foreground">Select one or more.</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {POSITIONS.map((p) => {
+                    const checked = editPositions.includes(p);
+                    const id = `edit-position-${p.replace(/\s+/g, "-").toLowerCase()}`;
+                    return (
+                      <label
+                        key={p}
+                        htmlFor={id}
+                        className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 py-2 hover:bg-muted/40"
+                      >
+                        <Checkbox
+                          id={id}
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            setEditDirty(true);
+                            setEditPositions((prev) =>
+                              v ? Array.from(new Set([...prev, p])) : prev.filter((x) => x !== p),
+                            );
+                          }}
+                        />
+                        <span className="text-sm">{p}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="grid gap-2">

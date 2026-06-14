@@ -64,19 +64,20 @@ export function useDeadlines() {
     },
   });
 
-  // 2. Clients (for names) — single org-wide fetch reused everywhere.
+  // 2. Clients (for names + guardianship) — single org-wide fetch reused everywhere.
   const clientsQ = useQuery({
     enabled: !!orgId,
     queryKey: ["deadlines", "clients", orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, is_own_guardian")
         .eq("organization_id", orgId!);
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; first_name: string; last_name: string }>;
+      return (data ?? []) as Array<{ id: string; first_name: string; last_name: string; is_own_guardian: boolean | null }>;
     },
   });
+
 
   // 3. Active HHS clients (drives the annual host-home-cert source below).
   const hhsQ = useQuery({

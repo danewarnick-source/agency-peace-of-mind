@@ -3,11 +3,14 @@ import { ALL_SECTIONS, statusLabel, type ChecklistAnswers } from "./host-home-ce
 
 export type CertificatePayload = {
   clientName: string;
+  hostName?: string | null;
   cert_type: "initial" | "annual";
   inspection_date: string;
   inspector_name: string;
   host_home_address: string;
   inspector_not_host_confirmed: boolean;
+  attestation_confirmed: boolean;
+  attestation_text: string;
   checklist: ChecklistAnswers;
   pcsp_status: "meets" | "does_not_meet";
   pcsp_notes?: string | null;

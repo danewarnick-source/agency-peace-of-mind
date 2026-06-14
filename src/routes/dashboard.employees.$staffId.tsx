@@ -341,6 +341,25 @@ function RequirementsTab({ organizationId, staffId }: { organizationId: string; 
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Certs &amp; trainings
+        </h2>
+        <Button
+          size="sm"
+          onClick={() => setUploadOpen(true)}
+          className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+        >
+          <Plus className="mr-1 h-4 w-4" /> Upload certificate
+        </Button>
+        <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+          <ExternalCertUploadDialog
+            onClose={() => setUploadOpen(false)}
+            targetUserId={staffId}
+          />
+        </Dialog>
+      </div>
+
       <Card>
         <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
           <SummaryStat label="Current" value={counts.current} tone="emerald" />
@@ -349,6 +368,7 @@ function RequirementsTab({ organizationId, staffId }: { organizationId: string; 
           <SummaryStat label="To do" value={counts.todo} tone="muted" />
         </CardContent>
       </Card>
+
 
       <div className="flex flex-wrap gap-2">
         <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>All</FilterChip>

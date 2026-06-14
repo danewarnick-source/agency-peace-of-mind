@@ -33,6 +33,7 @@ import { searchTimesheetsByVector, backfillTimesheetEmbeddings } from "@/lib/vec
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { useNavigate } from "@tanstack/react-router";
 import { Home as HomeIcon } from "lucide-react";
+import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
 // the Pending Approvals Ledger and the Approved Timesheets Archive.
@@ -189,7 +190,7 @@ type Row = {
   reviewed_by: string | null;
   reviewed_at: string | null;
   review_note: string | null;
-  clients: { first_name: string; last_name: string; physical_address: string | null; medicaid_id: string | null } | null;
+  clients: { first_name: string; last_name: string; physical_address: string | null; medicaid_id: string | null; team_id: string | null } | null;
   staff: { full_name: string | null; email: string | null } | null;
 };
 
@@ -394,7 +395,7 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
 
 
 
-const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, review_status, attested_accurate, corrected_clock_in, corrected_clock_out, edit_reason, edited_by, edited_at, incident_flag, reviewed_by, reviewed_at, review_note, clients(first_name,last_name,physical_address,medicaid_id)";
+const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, review_status, attested_accurate, corrected_clock_in, corrected_clock_out, edit_reason, edited_by, edited_at, incident_flag, reviewed_by, reviewed_at, review_note, clients(first_name,last_name,physical_address,medicaid_id,team_id)";
 
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));
@@ -458,9 +459,42 @@ function ComplianceDeskPage() {
         .eq("organization_id", org!.organization_id)
         .eq("status", "Approved")
         .order("clock_in_timestamp", { ascending: false })
-        .limit(1000);
+        .limit(5000);
       if (error) throw error;
       return hydrateStaff((data ?? []) as unknown as Row[]);
+    },
+  });
+
+  // Homes / teams in the org — feed the EVV-archive "Home" filter.
+  const teamsQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["compliance-teams", org?.organization_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, team_name")
+        .eq("organization_id", org!.organization_id)
+        .order("team_name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; team_name: string }>;
+    },
+  });
+
+  // Set of timesheet ids that have already been emitted in an EVV export
+  // batch — drives the Billed/Held/Unbilled column + filter on the archive.
+  const billedSetQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["compliance-billed-set", org?.organization_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("evv_export_records")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("timesheet_id" as any)
+        .eq("organization_id", org!.organization_id);
+      if (error) throw error;
+      const s = new Set<string>();
+      for (const r of (data ?? []) as unknown as Array<{ timesheet_id: string }>) s.add(r.timesheet_id);
+      return s;
     },
   });
 
@@ -846,6 +880,9 @@ function ComplianceDeskPage() {
             loading={approvedQ.isLoading}
             onMap={setMapOpen}
             onEdit={setEditRow}
+            staffNameMap={staffNameMap}
+            teams={teamsQ.data ?? []}
+            billedSet={billedSetQ.data ?? null}
           />
         </div>
       ) : (
@@ -855,6 +892,9 @@ function ComplianceDeskPage() {
           loading={approvedQ.isLoading}
           onMap={setMapOpen}
           onEdit={setEditRow}
+          staffNameMap={staffNameMap}
+          teams={teamsQ.data ?? []}
+          billedSet={billedSetQ.data ?? null}
         />
       )}
 
@@ -1521,28 +1561,121 @@ function NeedsReviewTable({
   );
 }
 
+type BillingStatus = "billed" | "held" | "unbilled";
+
+function deriveBillingStatus(r: Row, billedSet: Set<string> | null): BillingStatus {
+  if (billedSet?.has(r.id)) return "billed";
+  const hasUnresolvedGeo =
+    !!(r.outside_geofence_reason && r.outside_geofence_reason.trim().length > 0) &&
+    r.reconciliation_status !== "accepted" &&
+    r.reconciliation_status !== "corrected";
+  const noClockOut = !(r.rounded_clock_out ?? r.clock_out_timestamp);
+  if (hasUnresolvedGeo || noClockOut) return "held";
+  return "unbilled";
+}
+
+function BillingStatusBadge({ status }: { status: BillingStatus }) {
+  if (status === "billed")
+    return (
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[12px] font-medium leading-none text-success">
+        <CheckCircle2 className="h-3.5 w-3.5" /> BILLED
+      </span>
+    );
+  if (status === "held")
+    return (
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-warning/15 px-2 py-0.5 text-[12px] font-medium leading-none text-warning-foreground">
+        <AlertCircle className="h-3.5 w-3.5" /> HELD
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-muted px-2 py-0.5 text-[12px] font-medium leading-none text-muted-foreground">
+      UNBILLED
+    </span>
+  );
+}
+
 function ArchiveTable({
   rows, loading, onMap, onEdit, variant,
-}: { rows: Row[]; loading: boolean; onMap: (r: Row) => void; onEdit: (r: Row) => void; variant: "evv" | "non-evv" }) {
+  staffNameMap, teams, billedSet,
+}: {
+  rows: Row[];
+  loading: boolean;
+  onMap: (r: Row) => void;
+  onEdit: (r: Row) => void;
+  variant: "evv" | "non-evv";
+  staffNameMap?: Map<string, string>;
+  teams?: Array<{ id: string; team_name: string }>;
+  billedSet?: Set<string> | null;
+}) {
   const [search, setSearch] = useState("");
-  const [svc, setSvc] = useState<string>("all");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
+  // Multi-select filters
+  const [codes, setCodes] = useState<string[]>([]);
+  const [staffIds, setStaffIds] = useState<string[]>([]);
+  const [clientIds, setClientIds] = useState<string[]>([]);
+  const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [billingStatus, setBillingStatus] = useState<"all" | BillingStatus>("all");
 
   const codeOptions = useMemo(
-    () => EVV_SERVICE_CODES.filter((c) => (variant === "evv" ? c.evvLock : !c.evvLock)),
+    () =>
+      EVV_SERVICE_CODES.filter((c) => (variant === "evv" ? c.evvLock : !c.evvLock)).map((c) => ({
+        value: c.code,
+        label: c.code,
+        sublabel: c.label.split("— ")[1] ?? c.label,
+      })),
     [variant],
+  );
+
+  // Derive staff/client options from the rows currently in memory so we never
+  // surface options the user can't actually filter to within the loaded set.
+  const staffOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of rows) {
+      const label = r.staff?.full_name ?? r.staff?.email ?? staffNameMap?.get(r.staff_id) ?? r.staff_id;
+      if (!m.has(r.staff_id)) m.set(r.staff_id, label);
+    }
+    return Array.from(m.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [rows, staffNameMap]);
+
+  const clientOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of rows) {
+      const label = r.clients ? `${r.clients.last_name}, ${r.clients.first_name}` : r.client_id;
+      if (!m.has(r.client_id)) m.set(r.client_id, label);
+    }
+    return Array.from(m.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [rows]);
+
+  const teamOptions = useMemo(
+    () => (teams ?? []).map((t) => ({ value: t.id, label: t.team_name })),
+    [teams],
   );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const fromMs = from ? new Date(from).getTime() : null;
     const toMs = to ? new Date(to).getTime() + 86_399_000 : null;
+    const codeSet = codes.length ? new Set(codes) : null;
+    const staffSet = staffIds.length ? new Set(staffIds) : null;
+    const clientSet = clientIds.length ? new Set(clientIds) : null;
+    const teamSet = teamIds.length ? new Set(teamIds) : null;
     return rows.filter((r) => {
-      if (svc !== "all" && r.service_type_code !== svc) return false;
+      if (codeSet && !codeSet.has(r.service_type_code)) return false;
+      if (staffSet && !staffSet.has(r.staff_id)) return false;
+      if (clientSet && !clientSet.has(r.client_id)) return false;
+      if (teamSet) {
+        const tid = r.clients?.team_id;
+        if (!tid || !teamSet.has(tid)) return false;
+      }
       const t = new Date(effectiveIn(r)).getTime();
       if (fromMs && t < fromMs) return false;
       if (toMs && t > toMs) return false;
+      if (billingStatus !== "all" && deriveBillingStatus(r, billedSet ?? null) !== billingStatus) return false;
       if (q) {
         const hay = [
           r.staff?.full_name, r.staff?.email,
@@ -1553,7 +1686,7 @@ function ArchiveTable({
       }
       return true;
     });
-  }, [rows, search, svc, from, to]);
+  }, [rows, search, codes, staffIds, clientIds, teamIds, from, to, billingStatus, billedSet]);
 
   const onExport = () => {
     if (!filtered.length) { toast.error("No rows match the current filters."); return; }
@@ -1566,17 +1699,31 @@ function ArchiveTable({
     toast.success(`Exported ${filtered.length} shift${filtered.length === 1 ? "" : "s"}.`);
   };
 
+  const clearAll = () => {
+    setSearch(""); setFrom(""); setTo(""); setCodes([]); setStaffIds([]);
+    setClientIds([]); setTeamIds([]); setBillingStatus("all");
+  };
+  const activeFilterCount =
+    (search ? 1 : 0) + (from ? 1 : 0) + (to ? 1 : 0) +
+    codes.length + staffIds.length + clientIds.length + teamIds.length +
+    (billingStatus !== "all" ? 1 : 0);
+
   const heading = variant === "evv" ? "State EVV Archive (Geofence-Locked Codes)" : "Internal / Non-EVV Archive";
   const exportLabel = variant === "evv" ? "Export Utah DHHS EVV CSV" : "Export Payroll CSV";
 
   const exp = useRowExpansion();
   const allIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
+  const showBillingCol = variant === "evv";
+  const colSpan = showBillingCol ? 12 : 11;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{heading}</h2>
         <div className="flex items-center gap-2">
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {filtered.length.toLocaleString()} of {rows.length.toLocaleString()} approved shifts
+          </span>
           <ExpandControls exp={exp} ids={allIds} />
           <Button onClick={onExport}>
             <Download /> {exportLabel}
@@ -1584,18 +1731,67 @@ function ArchiveTable({
         </div>
       </div>
 
-      <div className="mb-3 grid gap-2 md:grid-cols-4">
-        <Input placeholder="Search staff, client, member ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <Select value={svc} onValueChange={setSvc}>
-          <SelectTrigger><SelectValue placeholder="Service code" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All service codes</SelectItem>
-            {codeOptions.map((c) => <SelectItem key={c.code} value={c.code}>{evvServiceLabel(c.code)}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+        <Input
+          placeholder="Search staff, client, member ID…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <CheckboxMultiSelect
+          value={codes}
+          onChange={setCodes}
+          options={codeOptions}
+          placeholder="All service codes"
+          searchPlaceholder="Filter codes…"
+          chipMonospace
+        />
+        <CheckboxMultiSelect
+          value={staffIds}
+          onChange={setStaffIds}
+          options={staffOptions}
+          placeholder="All staff"
+          searchPlaceholder="Filter staff…"
+          emptyLabel="No staff in current results"
+        />
+        <CheckboxMultiSelect
+          value={clientIds}
+          onChange={setClientIds}
+          options={clientOptions}
+          placeholder="All clients"
+          searchPlaceholder="Filter clients…"
+          emptyLabel="No clients in current results"
+        />
+        {variant === "evv" && (
+          <CheckboxMultiSelect
+            value={teamIds}
+            onChange={setTeamIds}
+            options={teamOptions}
+            placeholder="All homes / teams"
+            searchPlaceholder="Filter homes…"
+            emptyLabel="No teams configured"
+          />
+        )}
+        {variant === "evv" && (
+          <Select value={billingStatus} onValueChange={(v) => setBillingStatus(v as typeof billingStatus)}>
+            <SelectTrigger><SelectValue placeholder="Billing status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All billing statuses</SelectItem>
+              <SelectItem value="billed">Billed (in EVV export)</SelectItem>
+              <SelectItem value="held">Held (excluded from export)</SelectItem>
+              <SelectItem value="unbilled">Unbilled (eligible, not yet exported)</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
       </div>
+
+      {activeFilterCount > 0 && (
+        <div className="mb-3 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span><Filter className="mr-1 inline h-3 w-3" />{activeFilterCount} filter{activeFilterCount === 1 ? "" : "s"} active</span>
+          <button type="button" onClick={clearAll} className="text-destructive hover:underline">Clear all filters</button>
+        </div>
+      )}
 
       <div className="overflow-x-auto [&_thead_th]:h-10 [&_thead_th]:whitespace-nowrap [&_thead_th]:text-[13px] [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_thead_th]:font-semibold [&_thead_th]:text-muted-foreground [&_tbody_td]:text-sm [&_tbody_td]:align-middle">
         <Table>
@@ -1611,14 +1807,15 @@ function ArchiveTable({
               <TableHead>Duration</TableHead>
               <TableHead>GPS</TableHead>
               <TableHead>Geofence Status</TableHead>
+              {showBillingCol && <TableHead>Billing</TableHead>}
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={colSpan} className="py-10 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={colSpan} className="py-10 text-center text-sm text-muted-foreground">No approved shifts match.</TableCell></TableRow>
             ) : filtered.map((r) => {
               const inIso = effectiveIn(r);
               const outIso = effectiveOut(r);
@@ -1651,13 +1848,18 @@ function ArchiveTable({
                   <TableCell>
                     <GeofenceBadge row={r} />
                   </TableCell>
+                  {showBillingCol && (
+                    <TableCell>
+                      <BillingStatusBadge status={deriveBillingStatus(r, billedSet ?? null)} />
+                    </TableCell>
+                  )}
                   <TableCell className="text-right" onClick={stopRowToggle}>
                     <Button size="sm" variant="secondary" onClick={() => onEdit(r)}>
                       <Pencil /> Edit
                     </Button>
                   </TableCell>
                 </TableRow>
-                {open && <InlineNotesRow row={r} colSpan={11} />}
+                {open && <InlineNotesRow row={r} colSpan={colSpan} />}
                 </Fragment>
               );
             })}

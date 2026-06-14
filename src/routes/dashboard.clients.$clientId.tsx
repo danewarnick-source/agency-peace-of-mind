@@ -147,7 +147,7 @@ function ClientProfileHub() {
           <DeadlinesPanel clientId={clientId} />
         </TabsContent>
         <TabsContent value="documents" className="mt-6">
-          <DocumentsPanel clientId={clientId} orgId={orgId} />
+          <ClientDocumentsCard clientId={clientId} clientName={fullName} />
         </TabsContent>
       </Tabs>
     </div>

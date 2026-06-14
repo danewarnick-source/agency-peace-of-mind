@@ -271,6 +271,29 @@ function StaffProfilePage() {
         <TabsContent value="activity" className="mt-4">
           <ActivityFeed organizationId={orgId} staffId={staffId} />
         </TabsContent>
+
+        {/* ----- SHIFTS (read-only) — staff-scoped evv_timesheets ----- */}
+        <TabsContent value="shifts" className="mt-4">
+          <StaffShiftsPanel organizationId={orgId} staffId={staffId} />
+        </TabsContent>
+
+        {/* ----- HR DOCS ----- */}
+        <TabsContent value="hrdocs" className="mt-4">
+          <StaffHrDocsPanel organizationId={orgId} staffId={staffId} />
+        </TabsContent>
+
+        {/* ----- DEADLINES ----- */}
+        <TabsContent value="deadlines" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Deadlines</CardTitle></CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Staff-scoped deadlines (training expirations, cert renewals, scheduled-shift
+              acknowledgements) are tracked centrally on the deadlines desk.
+              {" "}
+              <Link to="/dashboard/deadlines" className="underline">Open deadlines →</Link>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );

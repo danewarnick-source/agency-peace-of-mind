@@ -1702,6 +1702,80 @@ function ProfileTab({
           </div>
         </CollapsibleCard>
 
+        {/* Guardianship — drives whether the 24h guardian-notification duty
+            applies to incident reports for this client. */}
+        <CollapsibleCard
+          title="Guardianship"
+          description="Is this client their own guardian, or is there a separate legal guardian to notify on incidents?"
+          icon={Gavel}
+          storageKey={`${client.id}:guardianship`}
+          summary={isOwnGuardian
+            ? "Self-guardian — no separate guardian to notify"
+            : (gName.trim() ? `${gName.trim()}${gPhone.trim() ? ` · ${gPhone.trim()}` : ""}` : "Not set")}
+        >
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm">
+                <div className="font-medium">Is the client their own guardian?</div>
+                <div className="text-xs text-muted-foreground">
+                  If yes, no separate guardian notification is required on incidents.
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isOwnGuardian ? "default" : "outline"}
+                  onClick={() => setIsOwnGuardian(true)}
+                >
+                  Self-guardian
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={!isOwnGuardian ? "default" : "outline"}
+                  onClick={() => setIsOwnGuardian(false)}
+                >
+                  Has guardian
+                </Button>
+              </div>
+            </div>
+
+            {!isOwnGuardian && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-semibold">Guardian Name *</Label>
+                    <Input value={gName} onChange={(e) => setGName(e.target.value)}
+                      placeholder="Full legal name" maxLength={150} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-semibold">Guardian Phone *</Label>
+                    <Input value={gPhone} onChange={(e) => setGPhone(e.target.value)}
+                      placeholder="(801) 555-0100" maxLength={30} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-semibold">Relationship</Label>
+                    <Input value={gRel} onChange={(e) => setGRel(e.target.value)}
+                      placeholder="Mother, Brother, Court-appointed, …" maxLength={80} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-semibold">Email</Label>
+                    <Input value={gEmail} onChange={(e) => setGEmail(e.target.value)}
+                      placeholder="optional" maxLength={150} />
+                  </div>
+                </div>
+                {guardianInvalid && (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    Guardian name and phone are required when the client is not their own guardian.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </CollapsibleCard>
+
+
         {/* Clinical alert — the one colored callout on Profile; expanded by default */}
         <CollapsibleCard
           title="Clinical alert"

@@ -173,7 +173,12 @@ function StaffProfilePage() {
                 <Row label="Email" value={p?.email ?? "—"} />
                 <Row label="Login" value={p?.username ?? p?.email ?? "—"} />
                 <Row label="Employee ID" value={p?.employee_id ?? "—"} />
-                <Row label="Position" value={p?.position ?? "—"} />
+                <Row label="Position" value={(() => {
+                  const list = ((p?.positions as string[] | null) ?? []).filter(Boolean);
+                  const fallback = p?.position ? [p.position as string] : [];
+                  const positions = list.length ? list : fallback;
+                  return positions.length ? positions.join(", ") : "—";
+                })()} />
                 <Row label="System role" value={m.role} />
                 <Row label="Worker type" value={p?.worker_type === "1099" ? "1099 contractor" : "W-2 employee"} />
                 <Row label="Status" value={m.active ? "Active" : "Deactivated"} />

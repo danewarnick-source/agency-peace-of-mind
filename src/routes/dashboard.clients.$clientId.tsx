@@ -487,7 +487,7 @@ function DeadlinesPanel({ clientId }: { clientId: string }) {
       <CardHeader><CardTitle className="text-base">Deadlines</CardTitle></CardHeader>
       <CardContent className="text-sm text-muted-foreground">
         Client-scoped deadlines are tracked centrally. Open the deadlines desk and filter by this client.{" "}
-        <Link className="underline" to="/dashboard/deadlines" search={{ clientId } as never}>
+        <Link className="underline" to="/dashboard/deadlines">
           Open deadlines →
         </Link>
       </CardContent>

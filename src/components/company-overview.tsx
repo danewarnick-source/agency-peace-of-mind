@@ -251,12 +251,12 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
     {
       icon: MapPin, label: "EVV match", value: metrics.evv,
       nextAction: evvOut ? `Investigate ${evvOut} clock-in${evvOut === 1 ? "" : "s"}` : "Open EVV & timesheets",
-      to: "/dashboard/hub/documentation", search: { tab: "evv" },
+      to: "/dashboard/hub/documentation", search: { tab: "records" },
     },
     {
       icon: FileCheck2, label: "Documentation", value: metrics.docs,
       nextAction: docGaps ? `Review ${docGaps} doc${docGaps === 1 ? "" : "s"}` : "Open Documentation",
-      to: "/dashboard/hub/documentation", search: { tab: "review" },
+      to: "/dashboard/hub/documentation", search: { tab: "records" },
     },
     {
       icon: BadgeCheck, label: "Credentials current", value: metrics.creds,
@@ -440,9 +440,9 @@ export function CompanyOverview() {
     ? [
         { icon: CalendarClock, label: "Published shifts not yet accepted", count: att.unacceptedShifts, to: "/dashboard/scheduling", search: { tab: "builder" }, urgent: true },
         { icon: BadgeCheck, label: "Certifications expiring within 30 days", count: att.expiringCredentials, to: "/dashboard/hub/employees", search: { tab: "compliance" }, urgent: true },
-        { icon: Stethoscope, label: "Incident reports pending review", count: att.pendingIncidents, to: "/dashboard/hub/documentation", search: { tab: "review" }, urgent: true },
-        { icon: ClipboardX, label: "Daily logs returned for revision", count: att.missingDailyLogs, to: "/dashboard/hub/documentation", search: { tab: "review" } },
-        { icon: FileSignature, label: "Notes awaiting signature (last 7 days)", count: att.unsignedNotes, to: "/dashboard/hub/documentation", search: { tab: "review" } },
+        { icon: Stethoscope, label: "Incident reports pending review", count: att.pendingIncidents, to: "/dashboard/hub/documentation", search: { tab: "records" }, urgent: true },
+        { icon: ClipboardX, label: "Daily logs returned for revision", count: att.missingDailyLogs, to: "/dashboard/hub/documentation", search: { tab: "records" } },
+        { icon: FileSignature, label: "Notes awaiting signature (last 7 days)", count: att.unsignedNotes, to: "/dashboard/hub/documentation", search: { tab: "records" } },
       ]
     : [];
 

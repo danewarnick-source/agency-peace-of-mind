@@ -212,7 +212,7 @@ ${incidentsBlock}`;
       generated_at: new Date().toISOString(),
       daily_log_ids: approvedLogs.length,
       shift_report_count: submittedReports.length,
-      incident_ids: incidentList.map((i) => i.id ?? i.report_number),
+      incident_ids: incidentList.map((i) => i.report_number),
       pcsp_goals_used: goals,
       services,
       include_goal_progress: includeGoals,

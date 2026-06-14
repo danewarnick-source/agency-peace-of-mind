@@ -371,6 +371,9 @@ export function EmployeesPage() {
                 const openEdit = () => {
                   const topics = ((m.profile as { ce_suggested_topics?: string[] | null } | undefined)?.ce_suggested_topics ?? []) as string[];
                   setEditTopics(topics);
+                  const positionsArr = ((m.profile as { positions?: string[] | null } | undefined)?.positions ?? []) as string[];
+                  const initialPositions = positionsArr.filter((x): x is Position => POSITIONS.includes(x as Position));
+                  setEditPositions(initialPositions.length ? initialPositions : (position ? [position as Position] : []));
                   setEditingMember({
                     membershipId: m.id,
                     userId: m.user_id,

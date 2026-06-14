@@ -1,97 +1,68 @@
+## Plan — Seed a fully built-out fake HHS+DSI client for Summary Automator testing
 
-# Host Home Certification — relocate to Host Home Providers board
+### Scope
+Add ONE clearly-fake test client to True North Supports LLC with a complete quarter of approved documentation, then ensure a quarterly progress summary row exists so it shows up in the Summaries page ready to draft.
 
-The previous build put certification on the HHS client hub. The contract reality is that it belongs to the **host home** at the moment of placement (with the specific person being placed), then recertifies annually. This plan moves it to the Host Home Providers board, ties each certification to a host + person, and tightens the attestation/signature/notes rules.
+This is a **data-only seed** (insert tool, no schema change, no app code change). Everything is namespaced so it is trivial to find and delete later.
 
-## 1. Schema (one migration)
+### Target quarter
+Most recently completed calendar quarter relative to today (2026-06-14) → **2026 Q1 (Jan 1 – Mar 31, 2026)**.
 
-Extend `host_home_certifications`:
-- `hhp_cue_card_id uuid references hhp_cue_cards(id) on delete set null` — the host home this cert is for. Indexed.
-- `attestation_confirmed boolean not null default false` — required attestation checkbox state.
-- `attestation_text text` — frozen attestation wording stored with the record.
-- Trigger: when `determination = 'certified'` and `hhp_cue_card_id` is set, update the matching `hhp_cue_cards.status` to `'placed'`.
-- DB CHECK: when `determination` in (`certified`, `certified_with_corrections`), require `attestation_confirmed = true` AND `inspector_not_host_confirmed = true` AND `signature_name <> ''` AND `signature_title <> ''`.
+### What gets inserted
 
-Concerns table (`host_home_cert_concerns`) is already correct — no change.
+1. **Client** — `clients`
+   - Name: `ZZ TEST — Jordan Sample` (sorts to bottom, obviously fake)
+   - DOB, fake Medicaid ID (`TEST000000`), phone, address (Salt Lake City placeholder)
+   - `authorized_dspd_codes`: `{HHS, DSI}`
+   - `pcsp_goals` (4 specific goals):
+     1. Increase independence with the morning hygiene routine.
+     2. Build community connections through a weekly social activity.
+     3. Improve safe money-handling skills during community outings.
+     4. Expand verbal communication in group settings.
+   - `account_status = active`, `intake_status = complete`
 
-RLS: existing admin/manager-only insert/update/delete policies stay; SELECT stays org-member (cards rendered only inside admin/manager UI surfaces).
+2. **Authorizations** — `client_billing_codes` (2 rows)
+   - HHS: daily rate, worksheet rate ~$95/day, annual auth covering quarter.
+   - DSI: 15-min units, rate ~$5.50/unit, weekly cap, service dates spanning quarter.
 
-## 2. Server functions (`src/lib/host-home-certifications.functions.ts`)
+3. **Approved HHS daily logs** — `daily_logs` (~75 rows, ~25/month across Jan/Feb/Mar 2026)
+   - `status = approved`, `approved_at` set, `approved_by` = an existing admin user in the org.
+   - `user_id` = an existing TNS staff profile (picked at insert time).
+   - Varied narratives written in DSP voice (host-home morning routine, meals, evening wind-down, weekend outings, a doctor visit, a community event, a goal milestone, routine days).
+   - `pcsp_goals_addressed` tags 1–2 of the 4 goals per note, rotated so every goal accumulates evidence across the quarter.
 
-- Extend `createHostHomeCertification` input: `hhp_cue_card_id`, `attestation_confirmed`, `attestation_text`.
-- Server-side guard: reject when certifying and any of (attestation, not-host, signature name/title) is missing, or when any `does_not_meet` checklist item is missing a note.
-- New `listHostHomeCertificationsForHost({ organization_id, hhp_cue_card_id })` for the host card history view.
-- Keep existing `setHostHomeCertificatePdfPath` and `resolveHostHomeCertConcern`.
+4. **Approved DSI day-service logs** — `daily_logs` (~30 rows, ~10/month, weekdays)
+   - Same table (drafter pulls all approved daily_logs in period; service is implied by narrative + goal tag).
+   - Narratives describe day-service activities: community access trips, library/coffee shop visits, money-handling practice at the register, group-setting communication practice, skill-building sessions.
+   - Goal tagging emphasizes goals 2, 3, 4 (community / money / communication).
 
-## 3. Hosts board UI (`src/components/hosts/hosts-page.tsx`)
+5. **Shift reports** — `shift_reports` (~6 rows spread across quarter, `submitted_at` set)
+   - Short shift-level narratives that add texture for the drafter.
 
-In `HostDetailDialog`, add an **admin/manager-only** "Certification" panel (gated on `canManage` already in scope; staff never see it):
-- Status pill: Never certified / Overdue Xd / Due in Xd / Certified through YYYY-MM-DD (derived from latest cert for this host).
-- "New certification" / "Renew" button → opens the form dialog, prefilled with host address and host name.
-- History list: every cert ever done on this host (across people), showing person name, date, type, determination, concerns, PDF download.
+6. **Incident reports** — `incident_reports` (2 minor, appropriate)
+   - One minor (e.g. a stubbed toe during a community outing, first aid only).
+   - One behavioral (e.g. brief verbal escalation in a group setting, de-escalated; ties to goal #4).
+   - `status = approved/submitted`, dates inside quarter, narratives clinical and non-harmful.
 
-A small status badge also surfaces on the host card in the kanban (Cert ✓ / Due / Overdue).
+7. **Summary row** — `client_progress_summaries`
+   - Insert pending row for `2026-Q1`, kind `quarterly`, services `{HHS, DSI}`, `include_goal_progress = true`, status `pending`, due 2026-04-15.
+   - This makes the client appear immediately in the Summaries page; clicking "Draft with Nectar" will call `draftProgressSummary` which finds the seeded approved logs/reports/incidents and produces a real 6-section draft.
 
-## 4. Form dialog (move + extend the existing component)
+### How testing works after seed
+1. Open `/dashboard/summaries` → row for `ZZ TEST — Jordan Sample · 2026-Q1` appears as **Pending**.
+2. Click **Draft with Nectar** → Nectar reads the ~105 approved daily logs + 6 shift reports + 2 incidents + 4 PCSP goals and writes the full PERSON / SERVICES / DATE RANGE / GENERAL SUMMARY / GOAL PROGRESS prose.
+3. Edit in the side-by-side dialog, finalize, download PDF.
 
-Move `host-home-certification-section.tsx` logic into `src/components/hosts/host-home-certification-dialog.tsx`. Behavior changes:
+### Cleanup story
+All seed rows are reachable from the client row. `DELETE FROM clients WHERE first_name = 'ZZ TEST — Jordan' AND organization_id = '<TNS>'` cascades to billing codes / daily logs / incidents / summaries. I will note this in the closing message.
 
-- **Person selector at the top**: required dropdown of org HHS clients (active, service_codes contains `HHS`). The cert is saved with that `client_id`. Required to submit.
-- Host home auto-filled (name, address) from the `hhp_cue_card`.
-- Checklist content unchanged; **note becomes required for every "Does Not Meet" item** — submit disabled until each note is non-empty.
-- Required attestation checkbox with the exact contract wording:
-  > "I attest that I personally conducted this inspection, that I am not the host home staff, and that the findings recorded here are true and accurate to the best of my knowledge."
-- E-signature fields: printed name (required), title (required), date (auto = today). Already collected; now hard-required in submit gate and on the server.
-- Optional person/guardian acknowledgement line (already present).
-- Submit gate, all required: person selected, all checklist items answered, every DNM has a note, `inspector_not_host_confirmed`, `attestation_confirmed`, sigName, sigTitle, determination chosen.
+### Out of scope (explicitly NOT touching)
+- No schema changes, no migrations.
+- No changes to real clients, billing math, EVV, host-home certification logic, or Summary Automator code.
+- No fake host-home/HHP cue card record — host home placement UI isn't required for the summary draft to work, and the request is to test the **Summary Automator**, not the host-home certification flow.
 
-## 5. Certificate PDF (`src/lib/host-home-certificate-pdf.ts`)
-
-Add to the rendered PDF:
-- Host home name + address header.
-- Person certified for (client name).
-- Full attestation paragraph.
-- "Signed by" block (name, title, date) + acknowledgement line if present.
-- Each "Does Not Meet" item with its required note.
-- Concerns table with corrective action and target date.
-
-Existing private bucket `host-home-certificates` and signed-URL download flow stay.
-
-## 6. Deadlines integration (`src/hooks/use-deadlines.tsx`)
-
-Source already includes `host_home_cert`. Adjust so:
-- The deadline row is keyed by (host, client) and only listed for active HHS clients with a placement (host's `status = 'placed'` and a latest cert).
-- "Missing certification" rows surface only when an HHS client has an assigned host with no cert on file.
-- Label: "HHS Certification — {client} @ {host}".
-
-## 7. HHS Hub cleanup
-
-Remove the `HostHomeCertificationSection` from `dashboard.hhs-hub.$clientId.tsx`. Leave a small read-only "Latest certification" badge that links the admin/manager over to the host on the Host Home Providers board.
-
-## 8. RBAC
-
-All cert UI (host card panel, dialog, history, PDF link) is rendered only when `usePermissions().can('manage_referrals')` is true (same gate already used for the Hosts board write actions, which is admin/manager). Staff routes and HHS staff views never render any cert affordance.
-
-## Acceptance checks (must all be true before reply)
-
-1. Cert lives inside the Host Home Providers board → host detail dialog. Hidden for staff.
-2. Each cert row stores both `hhp_cue_card_id` and `client_id`.
-3. Form renders every section; each checklist item supports Meets / Does Not Meet / N/A.
-4. Submit blocked until every "Does Not Meet" has a note (client + server).
-5. Submit blocked until `inspector_not_host_confirmed` is checked.
-6. Submit blocked until attestation checkbox + signature name + signature title are all set.
-7. Concerns editor with finding, corrective action, target date, and post-submit resolution.
-8. On submit: row inserted, PDF generated, uploaded, path stored; PDF shows checklist, DNM notes, attestation, signature.
-9. `Certified` determination moves the host's kanban status to `placed` via trigger; new deadline appears one year out in the Deadlines page (HHS only).
-10. Per-host history list shows every past cert with PDF download.
-
-## Build order
-
-1. Migration (schema + trigger + check).
-2. Server fns update.
-3. New `host-home-certification-dialog.tsx` (moved + extended).
-4. Wire into `HostDetailDialog` + host kanban card badge.
-5. PDF renderer update.
-6. Deadlines query update.
-7. Remove cert section from HHS Hub, add small link badge.
-8. Manual self-check against the 10 acceptance items.
+### Technical details
+- All inserts go through the `supabase--insert` data tool in 2–3 SQL batches (client+auths first to get the id; then logs/reports/incidents in bulk using a CTE that re-selects the test client id; finally the summary row).
+- `user_id` for logs picked via subquery: first `organization_members` row in TNS with role in (`admin`,`manager`,`staff`).
+- `approved_by` picked the same way (admin/manager).
+- Narratives are inlined arrays in SQL — no script needed, no app-side code path involved.

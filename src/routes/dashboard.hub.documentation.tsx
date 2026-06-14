@@ -15,9 +15,10 @@ import { AuditPage } from "./dashboard.audit";
 import { AuditZone } from "@/components/audit-zone/audit-zone";
 import { HrcPage } from "./dashboard.hrc";
 import { AdminIncidentsSection } from "@/components/incidents/admin-incidents-section";
+import { EvvArchiveWrapped } from "./dashboard.evv-archive";
 
 const search = z.object({
-  tab: z.enum(["review", "evv", "incidents", "host-home", "forms", "audit", "hrc"]).optional(),
+  tab: z.enum(["review", "evv", "archive", "incidents", "host-home", "forms", "audit", "hrc"]).optional(),
   client: z.string().optional(),
 });
 

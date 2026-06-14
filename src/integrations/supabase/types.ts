@@ -2263,8 +2263,17 @@ export type Database = {
           completed_at: string | null
           completed_by: string | null
           created_at: string
+          draft_content: string | null
+          draft_source: Json | null
+          drafted_at: string | null
+          drafted_by: string | null
           due_date: string
+          final_content: string | null
+          finalized_at: string | null
+          finalized_by: string | null
+          finalized_by_name: string | null
           id: string
+          include_goal_progress: boolean
           organization_id: string
           period_end: string
           period_kind: string
@@ -2272,6 +2281,8 @@ export type Database = {
           period_start: string
           requires_upi_attestation: boolean
           service_codes: string[]
+          status: string
+          summary_kind: string
           updated_at: string
           upi_entered_at: string | null
           upi_entered_by: string | null
@@ -2281,8 +2292,17 @@ export type Database = {
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          draft_content?: string | null
+          draft_source?: Json | null
+          drafted_at?: string | null
+          drafted_by?: string | null
           due_date: string
+          final_content?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          finalized_by_name?: string | null
           id?: string
+          include_goal_progress?: boolean
           organization_id: string
           period_end: string
           period_kind: string
@@ -2290,6 +2310,8 @@ export type Database = {
           period_start: string
           requires_upi_attestation?: boolean
           service_codes?: string[]
+          status?: string
+          summary_kind?: string
           updated_at?: string
           upi_entered_at?: string | null
           upi_entered_by?: string | null
@@ -2299,8 +2321,17 @@ export type Database = {
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          draft_content?: string | null
+          draft_source?: Json | null
+          drafted_at?: string | null
+          drafted_by?: string | null
           due_date?: string
+          final_content?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          finalized_by_name?: string | null
           id?: string
+          include_goal_progress?: boolean
           organization_id?: string
           period_end?: string
           period_kind?: string
@@ -2308,6 +2339,8 @@ export type Database = {
           period_start?: string
           requires_upi_attestation?: boolean
           service_codes?: string[]
+          status?: string
+          summary_kind?: string
           updated_at?: string
           upi_entered_at?: string | null
           upi_entered_by?: string | null

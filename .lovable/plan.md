@@ -1,56 +1,70 @@
-## Goal
-Collapse Documentation from 8 top tabs + 6 sub-tabs into exactly **5 top tabs**: **Records · Incidents · Forms · Audit · Human Rights Committee**. Build a single Records surface that absorbs Review + EVV & timesheets (all sub-tabs) + Approved EVV Archive + Host home, with one combined "needs review" exception queue and a context-aware export gate. Incidents / Audit / HRC are untouched.
+# Records tab refinement
 
-## Reused (no rewrites)
-- `src/lib/utah-evv-export.ts` — `buildUtahCsv`, `downloadCsv`, header. Untouched.
-- `src/lib/evv-codes.ts` — `EVV_SERVICE_CODES`, `isEvvLockedCode`, `evvServiceLabel`. Untouched.
-- `src/lib/service-billing.ts` + `src/lib/billing-units.ts` — billing/units math. Untouched.
-- `src/lib/nectar-quality.ts` — `validateNarrative` for the "Missing/short note" flag.
-- `src/components/residential/residential-daily-tab.tsx` — rendered as-is when filter = Residential & Daily.
-- `src/components/evv/approved-evv-archive.tsx` `EvvArchivePage` — embedded as the "Approved/Billed" view.
-- `src/components/evv/utah-export-dialog.tsx` — existing Utah CSV export dialog (called only when gate passes).
-- `src/components/nectar/nectar-search-bar.tsx` — semantic search bar above the Records table.
-- `src/routes/dashboard.compliance-desk.tsx` `ComplianceDeskWrapped` — keep route; reuse the reconciliation / approve / reject mutations and `SELECT_COLS`. The Records "needs review" + "pending approval" lists call into the same queries it already runs against `evv_timesheets` (`review_status`, `is_out_of_bounds`/`outside_geofence_reason`, `corrected_clock_in/out`, etc.).
-- `src/components/scheduling/timesheets-reconcile.tsx` — kept as collapsible under Records → Pay-period (advisory), unchanged.
-- `src/components/admin-hubs/hub-shell.tsx` — same shell, just 5 tabs.
-- Incidents / Audit / HRC components — untouched.
+Targeted edits to `src/components/records/records-tab.tsx` only. No other files change. Exception engine, exports, NECTAR search, and the 5-tab Documentation shell are unchanged.
 
-## New (small, glue only)
-- `src/components/records/records-tab.tsx` — the Records surface. Filter bar + NECTAR search + one results table. Routes per-row click to existing detail.
-- `src/lib/records-review-rules.ts` — pure function `reviewExceptions(row)` returning `[{ code: "out_of_geofence" | "missing_note" | "no_clockout_stale", label }]`. Inputs only: existing columns (`is_out_of_bounds`, `outside_geofence_reason`, `shift_note_text`, `goals_completed`, `clock_out_timestamp`, `clock_in_timestamp`, service code → required-PCSP via existing config). Threshold for stale no-clockout: `clock_in_timestamp` older than 18h with `clock_out_timestamp = null`.
-- Tiny badge component for the reason chips (reuses shadcn Badge).
+## 1. Replace status strip with a two-way mode toggle
 
-## Filters (combinable, URL-backed via zod, default `status=needs_review`)
-- **Type**: EVV-locked · Residential & Daily (HHS+RHS) · Internal/Non-EVV. Implemented by filtering on service codes via `isEvvLockedCode` + the HHS/RHS set.
-- **Status**: Needs review · Pending approval · Approved · Billed. Derived exactly as today: needs_review = `reviewExceptions(row).length > 0`; pending = `review_status` in (`pending`, null) without exceptions; approved = `status='Approved'` no export record; billed = has `evv_export_records` row.
-- **Service code** (multi), **Staff** (multi), **Client** (multi), **Date range** (+ month for residential grid).
-- Selecting "Residential & Daily" swaps the table body for `<ResidentialDailyTab>` (program filter inside it preserved). Selecting "Billed/Approved" with EVV-only codes renders `<EvvArchivePage>` inline for that slice; otherwise the unified Records table.
+- Remove the 4-button strip (`needs_review`/`pending`/`approved`/`billed`).
+- New state: `mode: "attention" | "all"`, default `"attention"`.
+- Render a single inline pill group: **Needs attention (N)** · **All records**, with the live attention count as a small badge.
+- Drop `RecordStatus` from the row classifier — exceptions are still computed (and still drive the per-row badges in "All records"), but rows are no longer bucketed into approved/pending/billed.
 
-## Exception queue (one concept, was two)
-`reviewExceptions(row)` returns reasons; row is in "Needs review" iff non-empty:
-1. **Out of geofence** — `is_out_of_bounds === true` AND `outside_geofence_reason` is null/empty (variance grace already applied upstream by the punch flow).
-2. **Missing/short note or required PCSP goal not checked** — `validateNarrative(shift_note_text)` returns non-null, OR code requires a PCSP goal and `goals_completed` empty.
-3. **No clock-out (stale)** — `clock_out_timestamp` null AND `now − clock_in_timestamp > 18h`.
-Each row in the queue renders a Badge per reason ("Out of geofence", "Missing note", "No clock-out"). Clean rows skip the queue entirely (already approvable/billable).
+## 2. Fix the filter bug
 
-## Export gate (compliance-critical)
-Above the table, two buttons:
-- **Export Utah DHHS EVV CSV** — visible/enabled iff every code in the currently-filtered result set passes `isEvvLockedCode`. Calls the existing `utah-export-dialog` / `buildUtahCsv`. Otherwise hidden with hint: *"DHHS EVV export is available only when the filter shows EVV-locked codes only."*
-- **Export Master Agency Ledger CSV** — always available; exports the current filtered set via `downloadCsv` with human-readable columns (reused from existing archive CSV in `approved-evv-archive.tsx`).
+Root cause: the query was filtered by `derived_status === status` only at the end, so the server filters did re-fetch, but the client filter always collapsed back to the same exception set regardless of selection. New behavior:
 
-Gate is computed from the actual filtered rows' service codes, not just the filter input — a mixed result hides the DHHS button.
+- `mode === "attention"` → keep only rows where `reviewExceptions(r).length > 0`.
+- `mode === "all"` → keep every fetched row (then narrowed by the inline filters).
+- Remove the `status === "approved" | "billed"` server-side `eq("status","Approved")` branch — it's no longer reachable and confused the count.
+- Verify by toggling: "Needs attention" returns a strict subset of "All records" and the match count visibly changes.
 
-## File changes
-- **Edit** `src/routes/dashboard.hub.documentation.tsx` — tabs array down to 5: `records`, `incidents`, `forms`, `audit`, `hrc`. Update zod enum + `tab` search param. Remove top-level `review`, `evv`, `archive`, `host-home` entries. Mount `<RecordsTab />`.
-- **New** `src/components/records/records-tab.tsx`.
-- **New** `src/lib/records-review-rules.ts`.
-- **Edit** `src/routes/dashboard.evv-archive.tsx` — keep route alive (deep links), no UI change.
-- **No changes** to: compliance-desk route file internals (still routable standalone for legacy links), residential-daily-tab, approved-evv-archive component, utah-evv-export, evv-codes, billing libs, incidents/audit/hrc, RLS, RHS/HHS firewall.
+## 3. Compact filter row + table-first layout
 
-## Acceptance — verified before reply
-1. Documentation has exactly 5 tabs; old Review / EVV & timesheets / Approved EVV Archive / Host home are gone.
-2. Records defaults to `status=needs_review`, NECTAR search sits above, all 6 filters combine, residential view appears when Type = Residential & Daily.
-3. Needs-review rows show a reason badge; clean rows do not appear in the queue.
-4. DHHS EVV CSV button hidden the moment a non-EVV code is in the filtered result; Master Ledger always reflects filter.
-5. Incidents / Audit / HRC tabs render unchanged.
-6. No new tables / migrations / RLS / server functions; all reads via existing queries on `evv_timesheets` + `evv_export_records` under existing org-scoped RLS.
+Replace the 3-col grid of labeled filters with one horizontal strip directly above the table:
+
+```text
+[Staff ▾] [Client ▾] [Code ▾] [Home/Team ▾] [Date range ▾]   …………   N records · [Export ▾]
+```
+
+- Use the existing `CheckboxMultiSelect` for the four entity filters (no label stacking — placeholder text is the label).
+- Date range becomes one `Popover` trigger ("Last 30 days" / "Jun 1 – Jun 14") opening a small two-input panel; collapses to a single chip in the row.
+- Wrap the strip in `flex flex-wrap gap-2`; on `<md` it collapses behind a single **Filters** button that opens a `Sheet` containing the same controls.
+- Drop the surrounding `rounded-lg border bg-card p-3` block so the row is a thin strip; the results table renders immediately below.
+
+## 4. Live filtering, no submit
+
+Already live via React Query keying — keep that. Just confirm every filter (incl. mode and type) is in the `queryKey` and that the "N records match" count derives from the same `rowsQ.data?.rows.length`. No Apply button.
+
+## 5. Type strip — corrected order and meaning
+
+Replace current 4 types with exactly these, in order:
+
+1. **All types** — no code filter from this strip.
+2. **EVV timesheets** — codes where `evvLock === true` (SLN, SLH, ACA, CHA, COM, HSQ, PAC, RP2, RP3, CMP, CMS).
+3. **Non-EVV timesheets** — every clockable code where `evvLock === false`. RHS stays here (filterable via Service Code = RHS). HHS is excluded from this bucket.
+4. **Daily logs (HHS)** — renders the existing `ResidentialDailyTab` filtered/scoped to HHS only (host-home daily records, no clocking). RHS is NOT in this view.
+
+Implementation: `RecordType = "all" | "evv" | "non_evv" | "hhs_daily"`. The `non_evv` bucket = `EVV_SERVICE_CODES.filter(c => !c.evvLock).map(c => c.code)` (includes RHS, DSI, SEI, etc.). The `hhs_daily` branch renders `<ResidentialDailyTab />` — same component already in use; HHS-only scoping is its existing default. RHS punches-not-billable and HHS-no-clock rules are not touched (they live in billing-units / service-billing).
+
+## What stays exactly the same
+
+- `src/lib/records-review-rules.ts` — unchanged.
+- Context-aware exports: DHHS EVV CSV button is shown only when every filtered row's code is EVV-locked; Master Agency Ledger CSV always available for the current filter.
+- NECTAR search bar position (above the filter row).
+- 5 Documentation tabs (Records, Incidents, Forms, Audit, HRC).
+- All underlying queries against `evv_timesheets` + `evv_export_records` and existing RLS.
+
+## Explicitly NOT built here (relocate later)
+
+- Unbilled-revenue view → Finances.
+- Billed-vs-budget progress (annual/monthly/weekly caps from `client_billing_codes`) → client profile / Finances.
+
+These are noted so they aren't lost; no code added in Records for either.
+
+## Verification before reply
+
+- Toggle Needs attention ↔ All records: counts and rows change.
+- Each filter (staff, client, code, home/team, date range) re-queries live.
+- Filter strip + table fit above the fold on a 748px-wide viewport (current preview).
+- Type strip reads in order: All types · EVV timesheets · Non-EVV timesheets · Daily logs (HHS); selecting Non-EVV with Code=RHS returns RHS punches; Daily logs (HHS) does not show RHS.
+- DHHS EVV button hidden when any non-EVV-locked code is present in the result; Master Ledger CSV always exports the current filter.

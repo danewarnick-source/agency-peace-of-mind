@@ -273,10 +273,7 @@ function StaffProfilePage() {
           <ActivityFeed organizationId={orgId} staffId={staffId} />
         </TabsContent>
 
-        {/* ----- SHIFTS (read-only) — staff-scoped evv_timesheets ----- */}
-        <TabsContent value="shifts" className="mt-4">
-          <StaffShiftsPanel organizationId={orgId} staffId={staffId} />
-        </TabsContent>
+
 
         {/* ----- HR DOCS ----- */}
         <TabsContent value="hrdocs" className="mt-4">

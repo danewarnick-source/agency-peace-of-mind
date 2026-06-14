@@ -95,7 +95,7 @@ function ClientProfileHub() {
           </div>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link to="/dashboard/clients" search={{ open: clientId } as never}>
+          <Link to="/dashboard/clients">
             <Pencil className="h-4 w-4 mr-1" /> Edit in directory
           </Link>
         </Button>

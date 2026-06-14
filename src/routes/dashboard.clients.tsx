@@ -1537,11 +1537,19 @@ function ProfileTab({
     ecName !== (client.emergency_contact_name ?? "") ||
     ecPhone !== (client.emergency_contact_phone ?? "") ||
     radius !== (client.geofence_radius_feet ?? 1000) ||
+    isOwnGuardian !== !!client.is_own_guardian ||
+    gName !== (client.guardian_name ?? "") ||
+    gPhone !== (client.guardian_phone ?? "") ||
+    gRel !== (client.guardian_relationship ?? "") ||
+    gEmail !== (client.guardian_email ?? "") ||
     JSON.stringify(jobCodes) !== JSON.stringify(client.job_code ?? [])
-  ), [first, last, phone, addr, medicaidId, dob, ecName, ecPhone, radius, jobCodes, client]);
+  ), [first, last, phone, addr, medicaidId, dob, ecName, ecPhone, radius, jobCodes, isOwnGuardian, gName, gPhone, gRel, gEmail, client]);
+
+  const guardianInvalid = !isOwnGuardian && (!gName.trim() || !gPhone.trim());
 
   function handleSave() {
     onSave({
+
       first_name: first.trim(),
       last_name: last.trim(),
       phone_number: phone.trim(),

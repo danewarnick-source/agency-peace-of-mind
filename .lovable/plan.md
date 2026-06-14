@@ -1,116 +1,78 @@
-# Deadlines page
+# Host Home Certification — Plan
 
-## 1. Routing & navigation
+## Scope
+Add a "Host Home Certification" section to the HHS client hub (`src/routes/dashboard.hhs-hub.$clientId.tsx`) only. Inspector fills a structured form → row saved → PDF certificate generated → next-due date (inspection + 1 year) surfaces in Deadlines page for HHS clients only. Full history retained per client/home.
 
-- New route `src/routes/dashboard.deadlines.tsx` → `/dashboard/deadlines`.
-- Add to `ADMIN_NAV` in `src/routes/dashboard.tsx`, sitting between **Documentation** and **Finances**:
-  - `{ to: "/dashboard/deadlines", label: "Deadlines", icon: AlarmClock }`.
-- Add a small **Deadlines** card to `src/routes/dashboard.index.tsx` (admin view) — two numbers (Overdue / Due this week) + a link to the page. Counts come from the same hook the page uses.
+## Database (one migration)
 
-## 2. Data sources (all 5, real, org-scoped)
+**`public.host_home_certifications`** — one row per completed certification.
+- Identity/org: `id`, `organization_id`, `client_id` (FK clients), `team_id` (host home, nullable), `created_at`, `updated_at`.
+- Header: `cert_type` (`'initial'|'annual'`), `inspection_date` (date), `inspector_user_id` (FK profiles), `inspector_name`, `host_home_address`, `inspector_not_host_confirmed` (bool, must be true to certify).
+- Checklist results stored as one JSONB column `checklist` keyed by item code (e.g. `settings.choice`, `safety.smoke`, `ops.drills`) with `{ status: 'meets'|'does_not_meet'|'na', note?: string }`. Item codes enumerated in `src/lib/host-home-cert-items.ts` (single source of truth for the form).
+- PCSP: `pcsp_status` (`'meets'|'does_not_meet'`), `pcsp_notes` (text).
+- Determination: `determination` (`'certified'|'certified_with_corrections'|'not_certified'`), `signature_name`, `signature_title`, `signed_at` (timestamptz), `guardian_acknowledgement_name` (nullable).
+- Lifecycle: `next_due_date` (date, generated `(inspection_date + interval '1 year')::date`), `certificate_pdf_path` (text, storage path).
 
-A single hook `useDeadlines()` (`src/hooks/use-deadlines.tsx`) fans out to existing sources and returns a normalized `DeadlineItem[]`:
+**`public.host_home_cert_concerns`** — 0..N per certification.
+- `id`, `organization_id`, `certification_id` (FK cascade), `finding`, `corrective_action`, `target_date` (date), `resolved_at` (date, nullable), `resolution_notes` (text, nullable), `created_at`.
 
-```
-type DeadlineItem = {
-  key: string;                 // stable id for list keying
-  source: "summary" | "hhs_cert" | "staff_cert" | "incident" | "billing_code";
-  title: string;               // e.g. "Q2 quarterly summary"
-  subject: string;             // "Marcus B" / "Jane D"
-  subjectKind: "client" | "staff" | "agency";
-  dueAt: Date;
-  status: "overdue" | "due_soon" | "upcoming";
-  href?: string;               // deep link to act
-  meta?: Record<string, unknown>;
-};
-```
+Standard pattern for both: GRANT to authenticated + service_role, enable RLS, policies via `is_org_member` for SELECT and `is_org_admin_or_manager` for write. Indexes on `(organization_id, client_id, inspection_date desc)` and concerns `(certification_id)`.
 
-Wiring per source (all org-scoped via existing patterns):
+**Storage bucket**: `host-home-certificates` (private). RLS policy: org members can read objects whose path starts with `${organization_id}/`; service_role writes from server fn.
 
-1. **Client progress summaries** — new (§3 below). Reads `client_progress_summaries` rows where `completed_at IS NULL`.
-2. **HHS monthly certifications** — query `hhs_monthly_certifications` for the agency's HHS clients for the current + previous month; a row missing for a past month = overdue, current month = due_soon as we cross its 15th. Uses the same table `getMonthCertification` already reads.
-3. **Staff certification expirations** — `public.certifications` rows where `expires_at` is within 30 days or already past, scoped by `organization_id`. Subject = staff full_name from profiles (separate lookup; no FK embed per project rules).
-4. **Open incident clocks** — call existing `listIncidents` and reuse `addBusinessDays` from `admin-incidents-section.tsx` (extract it into `src/lib/incident-deadlines.ts` so both this page and the existing admin section share one implementation — no reinvented logic). 24h UPI clock = `discovered_at + 24h` while `upi_initiated_at IS NULL`; 5-business-day completion = `addBusinessDays(discovered_at, 5)` while `upi_completed_at IS NULL`.
-5. **Billing-code deadlines** — reuse `computeDeadlines()` from `src/lib/bc-deadlines.ts` over each client's BC docs. (Behavior support / SOW deliverable rows.)
+## Server functions (`src/lib/host-home-certifications.functions.ts`)
+All use `requireSupabaseAuth` + org-membership check + admin/manager role check for writes.
+- `listCertifications({ clientId })` → with concerns, newest first.
+- `getCertification({ id })` → row + concerns + signed download URL for PDF.
+- `createCertification({ clientId, payload })` → insert cert + concerns in a transaction-equivalent (server fn ordering with rollback by deleting cert on PDF failure), then call `renderCertificatePdf`, upload to bucket, store `certificate_pdf_path`. Returns `{ id, signedUrl }`.
+- `updateConcernResolution({ concernId, resolved_at, resolution_notes })`.
+- `getCertificateDownloadUrl({ certificationId })` → fresh signed URL.
 
-Hook returns `{ items, overdue, dueSoon, upcoming, isLoading }`. The Home card just reads `overdue.length` and `dueSoon.length`.
+PDF rendering: server-side using `pdf-lib` (already present in project if available — confirm in build mode; otherwise add). Renders header (client, home address, inspector, dates, cert type), each section with item label + result + note, PCSP block, concerns table, determination, signature block. No external services.
 
-## 3. Client progress summaries (new tracking — the only new schema)
+## UI
 
-### Rules
+**`src/components/hhs/host-home-certification-section.tsx`** — section card embedded in `dashboard.hhs-hub.$clientId.tsx`. Renders:
+- Status pill: Certified through {next_due_date} / Due in N days / Overdue / Never certified.
+- "Start new certification" button → opens dialog form.
+- History list: each prior cert as a row with date, type, determination badge, "Download PDF" button, and expandable concern resolutions.
 
-- A client owes a **quarterly** summary for any active `client_billing_codes.service_code` in {HHS, RHS, DSI, SLH, SLN}. Due 15 days after the quarter end (Q2 2026 → due **2026-07-15**).
-- A client owes a **monthly** summary for any active code in {SEI}. Due the 15th of the following month (June 2026 → due **2026-07-15**).
-- A client can owe both. We generate one row per (client, period_kind, period_label).
-- SEI rows are flagged `requires_upi_attestation = true`. Completion UI is **"Entered into UPI"** (records attesting user + timestamp) instead of plain "Mark complete".
+**`src/components/hhs/host-home-cert-form-dialog.tsx`** — large multi-section form (single Dialog with scrollable body, sticky footer). Sections built from `host-home-cert-items.ts`:
+1. Header (client auto-filled, address prefilled from team, type radio, date, inspector name auto from profile, **required** "inspector is not host" checkbox — gates submit).
+2. Settings Rule checklist (8 items, Meets/Does Not Meet/N/A toggle group + optional note).
+3. Home Safety checklist (~11 items).
+4. PCSP block (Meets/Does Not Meet + notes).
+5. HHS Operational — for `drills`, `inventory` items, render a small "Latest on file: {date}" pulled from existing `hhs_evacuation_drills` / `hhs_client_inventories` queries with a "Confirm current" toggle; occupancy + host-age plain toggles.
+6. Concerns — repeater (add/remove rows: finding, corrective action, target date).
+7. Determination + e-signature (typed name + title + auto timestamp on submit) + optional guardian ack.
 
-### Schema (single migration, SQL handoff)
+Submit validation:
+- All checklist items must have a status.
+- If determination is `certified`, `inspector_not_host_confirmed` MUST be true, and no item may be `does_not_meet` without a concern attached (soft warn → allow `certified_with_corrections`).
+- Determination `not_certified` allowed without all green; concerns still capturable.
 
-`public.client_progress_summaries`:
-- `id uuid pk`, `organization_id uuid`, `client_id uuid`
-- `period_kind text check in ('quarterly','monthly')`
-- `period_label text` (e.g. `'2026-Q2'`, `'2026-06'`) — unique with org/client/kind
-- `period_start date`, `period_end date`, `due_date date`
-- `service_codes text[]` (codes that triggered this row, for display)
-- `requires_upi_attestation boolean default false`
-- `completed_at timestamptz`, `completed_by uuid`
-- `upi_entered_at timestamptz`, `upi_entered_by uuid` (SEI only)
-- `created_at`, `updated_at` + trigger
+**Gating**: section + button render only when client has an active HHS billing code (reuse pattern from existing HHS hub checks). On non-HHS client workspaces, nothing changes.
 
-Migration includes the standard GRANTs (`authenticated`, `service_role`), `ENABLE RLS`, and policies scoped via `is_org_member` (read) / `is_org_admin_or_manager` (write). Unique index `(organization_id, client_id, period_kind, period_label)`.
+## Deadlines integration
 
-### Auto-generation (no manual creation)
+Extend `src/hooks/use-deadlines.tsx` with a 7th query: latest `host_home_certifications.next_due_date` per HHS client (and clients with HHS code but zero certs → due immediately / "Never certified", surfaced as overdue with `inspection_date = null`). New `DeadlineSource = "host_home_cert"` with icon `Home`, label "Host home certification", href to `/dashboard/hhs-hub/{clientId}#certification`. Only generated for clients that appear in the existing `hhsQ.activeIds` set — guarantees HHS-only.
 
-Server function `ensureCurrentSummaryPeriods({ organizationId })` called on page load (and by the Home card). It:
+No edits to existing billing, EVV, daily, or HHS attendance logic.
 
-1. Reads each client's active `client_billing_codes` for the org.
-2. For each quarter that has ended and is not yet completed (current quarter once past its end + grace, plus any unfilled prior quarters back to org's earliest active code or 4 quarters max), upserts a quarterly row for clients carrying HHS/RHS/DSI/SLH/SLN.
-3. Same for monthly periods for SEI clients (every closed month back to a sensible bound).
-4. Idempotent via the unique key.
+## Build order
+1. Migration (table, concerns table, GRANTs, RLS, storage bucket + policies).
+2. `src/lib/host-home-cert-items.ts` (checklist schema).
+3. `host-home-certifications.functions.ts` (CRUD + PDF render + upload).
+4. Form dialog + section component.
+5. Mount section in `dashboard.hhs-hub.$clientId.tsx`.
+6. Extend `use-deadlines.tsx` with host-home-cert source.
+7. Self-check reply confirming each acceptance bullet.
 
-This guarantees that on July 1, 2026 the page already shows the Q2 quarterly + the June SEI monthly rows due July 15.
-
-### Completion actions
-
-Two server fns: `markSummaryCompleted` (non-SEI) and `attestSummaryUpiEntered` (SEI). Both require `manager` role via `requireOrgMembership`. The latter sets both `upi_entered_at/_by` and `completed_at/_by`.
-
-## 4. Page layout
-
-`/dashboard/deadlines` — matches existing hub/card styling (no restyle):
-
-- Page header (`StaffPageHeader`-equivalent) + short caption.
-- **Overdue strip** — red-bordered card at top, list of items with `status === 'overdue'`, sorted by how late.
-- **Due soon (next 7 days)** — amber card.
-- **Upcoming (8-30 days)** — neutral card, collapsed by default.
-- Each row: icon for source, title, subject, due date (`Jul 15` / `in 3 days` / `2d overdue`), and either a deep link (`href`) or — for summary rows — an inline "Mark complete" / "Entered into UPI" button. SEI rows show a small **UPI** badge.
-
-Source-specific deep links:
-- Summary → no link (action is inline).
-- HHS cert → `/dashboard/workspace/$clientId` (HHS monthly tab).
-- Staff cert → `/dashboard/employees/$staffId`.
-- Incident → `/dashboard/inbox` (or the incidents section anchor).
-- Billing-code → `/dashboard/client-billing-codes`.
-
-## 5. Done-criteria self-check (reply contents)
-
-Before claiming complete, the build response will confirm each of:
-1. Sidebar shows **Deadlines** for admins.
-2. Page renders Overdue + Due soon sections (even when empty, with empty-state copy).
-3. Each of the five sources is wired to its real table/function (named in the reply: `client_progress_summaries`, `hhs_monthly_certifications`, `certifications`, `listIncidents` + shared deadline helper, `bc-deadlines.computeDeadlines`).
-4. Summary auto-generation creates Q2-2026 rows (due Jul 15) for HHS/RHS/DSI/SLH/SLN clients and June-2026 monthly rows (due Jul 15) for SEI clients, with the SEI "Entered into UPI" attestation button.
-5. Home dashboard card shows overdue + due-this-week counts and links to `/dashboard/deadlines`.
-
-## Technical notes
-
-- All Supabase reads use the browser `supabase` client with `useQuery`, gated by `useCurrentOrg`.
-- Writes go through `createServerFn` + `requireSupabaseAuth` + `requireOrgMembership`; client invokes via `useServerFn` + `useMutation`, invalidating `["deadlines", orgId]`.
-- No edits to billing math, EVV code lists, HHS daily logic, or existing incident workflow — only extracting `addBusinessDays` + 24h/5BD math into `src/lib/incident-deadlines.ts` and re-importing it in `admin-incidents-section.tsx` (no behavior change).
-- Migration runs via `supabase--migration` tool, awaiting user approval before any code that depends on the new table is written.
-
-Order of build:
-1. Migration (await approval).
-2. Shared `incident-deadlines.ts` extraction.
-3. `client-progress-summaries.functions.ts` (ensure + complete + attest + list).
-4. `use-deadlines.tsx` hook.
-5. Page + nav entry + Home card.
-6. Self-check reply.
+## Acceptance self-check (will verify before reporting done)
+- Section visible on HHS hub, absent elsewhere (no route changes for non-HHS clients).
+- Form renders every listed section/item with Meets/Does Not Meet/N/A.
+- "Inspector is not host" is a hard gate for `certified`/`certified_with_corrections`.
+- Concerns repeater supports add/edit/resolve.
+- Submit writes row + concerns and generates a downloadable PDF.
+- Deadlines page shows a new "Host home certification" row dated inspection + 1y for that HHS client only.
+- History list shows all prior certifications with PDF download.

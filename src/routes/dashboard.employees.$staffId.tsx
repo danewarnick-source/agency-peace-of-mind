@@ -685,10 +685,12 @@ function StaffHrDocsPanel({ organizationId, staffId }: { organizationId: string;
   });
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle className="text-base">HR documents on file</CardTitle>
         <Button asChild variant="outline" size="sm">
-          <Link to="/dashboard/employees">Manage in HR checklist →</Link>
+          <Link to="/dashboard/employees">
+            <Upload className="mr-1 h-3.5 w-3.5" /> Upload HR document (in checklist) →
+          </Link>
         </Button>
       </CardHeader>
       <CardContent className="p-0">

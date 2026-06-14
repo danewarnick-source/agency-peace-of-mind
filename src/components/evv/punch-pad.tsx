@@ -79,7 +79,7 @@ const TIMEZONES = [
   { v: "America/New_York",    l: "Eastern" },
 ];
 
-const EARTH_RADIUS_FEET = 20_925_525;
+import { haversineFeet as _sharedHaversineFeet } from "@/lib/geo";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -87,15 +87,7 @@ function haversineFeet(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number },
 ): number {
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dPhi = toRad(b.lat - a.lat);
-  const dLam = toRad(b.lng - a.lng);
-  const p1 = toRad(a.lat);
-  const p2 = toRad(b.lat);
-  const x =
-    Math.sin(dPhi / 2) ** 2 +
-    Math.cos(p1) * Math.cos(p2) * Math.sin(dLam / 2) ** 2;
-  return 2 * EARTH_RADIUS_FEET * Math.asin(Math.min(1, Math.sqrt(x)));
+  return _sharedHaversineFeet(a, b);
 }
 
 function fmtElapsed(ms: number): string {

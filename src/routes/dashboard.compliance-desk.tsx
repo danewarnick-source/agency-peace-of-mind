@@ -77,6 +77,20 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
       </TooltipProvider>
     );
   }
+  if (status === "corrected") {
+    return (
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[#137182]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[#137182]">
+              <CheckCircle2 className="h-3.5 w-3.5" /> CORRECTED
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs">Marked as a data/GPS error. {reason}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
   if (status === "flagged") {
     return (
       <TooltipProvider delayDuration={150}>

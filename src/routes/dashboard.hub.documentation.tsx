@@ -15,7 +15,7 @@ import { AuditPage } from "./dashboard.audit";
 import { AuditZone } from "@/components/audit-zone/audit-zone";
 import { HrcPage } from "./dashboard.hrc";
 import { AdminIncidentsSection } from "@/components/incidents/admin-incidents-section";
-import { EvvArchiveWrapped } from "./dashboard.evv-archive";
+import { EvvArchivePage } from "@/components/evv/approved-evv-archive";
 
 const search = z.object({
   tab: z.enum(["review", "evv", "archive", "incidents", "host-home", "forms", "audit", "hrc"]).optional(),
@@ -54,7 +54,7 @@ function DocumentationHub() {
             </details>
           </div>
         ) },
-        { key: "archive", label: "Approved EVV Archive", render: () => <EvvArchiveWrapped /> },
+        { key: "archive", label: "Approved EVV Archive", render: () => <EvvArchivePage /> },
         {
           key: "incidents",
           label: "Incidents",

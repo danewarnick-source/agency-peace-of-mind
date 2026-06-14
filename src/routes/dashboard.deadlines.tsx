@@ -21,7 +21,6 @@ export const Route = createFileRoute("/dashboard/deadlines")({
 
 const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   summary: FileSignature,
-  hhs_cert: FileCheck2,
   host_home_cert: Home,
   staff_cert: ShieldCheck,
   incident: Activity,
@@ -30,7 +29,6 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
   summary: "Progress summary",
-  hhs_cert: "HHS certification",
   host_home_cert: "Host home certification",
   staff_cert: "Staff certification",
   incident: "Incident clock",

@@ -492,7 +492,7 @@ function ComplianceDeskPage() {
         .eq("organization_id", org!.organization_id);
       if (error) throw error;
       const s = new Set<string>();
-      for (const r of (data ?? []) as Array<{ timesheet_id: string }>) s.add(r.timesheet_id);
+      for (const r of (data ?? []) as unknown as Array<{ timesheet_id: string }>) s.add(r.timesheet_id);
       return s;
     },
   });

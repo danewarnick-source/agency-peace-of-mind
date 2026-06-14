@@ -139,7 +139,7 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
       const { data, error } = await supabase
         .from("evv_timesheets")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, status, outside_geofence_reason, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
+        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, status, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
         .eq("organization_id", organizationId)
         .eq("status", "Approved")
         .gte("clock_in_timestamp", fromIso)
@@ -221,7 +221,7 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
       const { data: tsRows, error: e2 } = await supabase
         .from("evv_timesheets")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, status, outside_geofence_reason, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
+        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, status, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
         .eq("organization_id", organizationId)
         .in("id", candidateTsIds);
       if (e2) throw e2;
@@ -624,7 +624,7 @@ export function EvvExportArchiveStrip({
       const { data: tsRows, error: e3 } = await supabase
         .from("evv_timesheets")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, outside_geofence_reason, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
+        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
         .in("id", tsIds);
       if (e3) throw e3;
       const tsMap = new Map<string, TsRow>();

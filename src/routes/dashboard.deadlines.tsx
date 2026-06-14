@@ -150,7 +150,13 @@ function DeadlineRow({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["s
         <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${toneText}`} />
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">
-            {item.title}
+            {item.href ? (
+              <a href={item.href} className="hover:underline hover:text-[#137182]">
+                {item.title}
+              </a>
+            ) : (
+              item.title
+            )}
             {item.source === "summary" && item.summary?.requires_upi_attestation && (
               <Badge className="ml-2 bg-[#137182] text-white hover:bg-[#137182]">UPI</Badge>
             )}

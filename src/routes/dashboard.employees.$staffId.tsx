@@ -2,21 +2,21 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, CalendarDays, Users as UsersIcon, ShieldAlert, FileText, Clock, AlertTriangle, ClipboardList, Plus, Upload } from "lucide-react";
+import { ArrowLeft, CalendarDays, Users as UsersIcon, ShieldAlert, FileText, Clock, AlertTriangle, ClipboardList, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog } from "@/components/ui/dialog";
+
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
 import { OtherAssignmentsAdminSection } from "@/components/training/other-assignments-section";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
 import { getStaffChecklist } from "@/lib/hr-staff.functions";
 import { SmartImportRemindersPanel } from "@/components/smart-import/reminders-panel";
-import { UploadDialog as ExternalCertUploadDialog } from "@/routes/dashboard.external-certifications";
+
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (
@@ -324,7 +324,6 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
  * ====================================================================*/
 function RequirementsTab({ organizationId, staffId }: { organizationId: string; staffId: string }) {
   const [filter, setFilter] = useState<"all" | "needs_action" | "current">("all");
-  const [uploadOpen, setUploadOpen] = useState(false);
   const fetchChecklist = useServerFn(getStaffChecklist);
   const checklistQ = useQuery({
     queryKey: ["staff-checklist", organizationId, staffId],
@@ -355,19 +354,9 @@ function RequirementsTab({ organizationId, staffId }: { organizationId: string; 
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Certs &amp; trainings
         </h2>
-        <Button
-          size="sm"
-          onClick={() => setUploadOpen(true)}
-          className="bg-[image:var(--gradient-brand)] text-primary-foreground"
-        >
-          <Plus className="mr-1 h-4 w-4" /> Upload certificate
-        </Button>
-        <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-          <ExternalCertUploadDialog
-            onClose={() => setUploadOpen(false)}
-            targetUserId={staffId}
-          />
-        </Dialog>
+        <p className="text-[11px] text-muted-foreground">
+          Upload PDFs, Word docs, or certificate images directly on each checklist item below.
+        </p>
       </div>
 
       <Card>

@@ -1,29 +1,37 @@
 ## Goal
-Allow an employee to hold multiple Agency Positions (Direct Care, Host Staff, Office Staff, Admin), chosen via checkboxes in the Edit employee dialog. Reflect the multi-value field on the staff profile.
+Replace the generic "+ Upload certificate" button on the staff Certs & trainings tab with a per-item "+" upload control on every Compliance Checklist row. One click → file picker → file lands in that staff member's HR file and is linked to the specific requirement.
 
-## Scope (intentionally small)
-Only the Agency Position field changes. Edit dialog, mutation write, and the two read sites that render it. No other employee fields, no roles/permissions changes.
+## What's already there (reuse, don't rebuild)
+- `StaffHrChecklistCard` (`src/components/hr/staff-hr-checklist-card.tsx`) already renders each checklist row with a working per-row upload affordance (lines 504-535): a hidden `<input type="file">` that calls `uploadEvidence(file, row.requirement_id, row.category ?? "checklist_evidence")` and then `upsertFn` to set status `in_progress` with `evidence_document_id`.
+- `uploadEvidence` (line 138) uses the existing `createUpload` server fn → signed PUT → HR documents storage (the same staff-file storage NECTAR HR docs already read).
+- `viewDoc` (line 166) opens the attached evidence via `getDocUrl`.
 
-## Reuse (no new logic)
-- `POSITIONS` list and `Position` type in `src/routes/dashboard.employees.index.tsx` — unchanged values.
-- shadcn `Checkbox` + `Label` already used elsewhere in the file — same visual pattern.
-- Existing `editMemberMutation` (writes via `supabase.from("profiles").update(...)`).
-- Existing `Badge` rendering in `src/routes/dashboard.employees.$staffId.tsx`.
+The current limits are purely UI: the upload control only renders when `!completionDoc && !isSelf`. The pipe to the staff file is correct.
 
-## Storage
-Add `profiles.positions text[]` (default `'{}'`). Back-fill from the existing scalar `profiles.position` (single value → 1-element array). Keep the legacy `position` column for now and mirror writes (first selected value) so nothing downstream breaks; reads prefer `positions[]` and fall back to `[position]`. One migration via the Supabase migration tool.
+## Changes
 
-## Edit dialog (`dashboard.employees.index.tsx`)
-Replace the single `<Select name="position">` with a checkbox group built from `POSITIONS`. Local state `editPositions: Position[]` seeded from `editingMember.positions ?? (editingMember.position ? [editingMember.position] : [])`. Submit handler passes `positions` to the mutation. `editMemberMutation` writes `{ positions: editPositions, position: editPositions[0] ?? null }` to `profiles`. `EditableMember` type gains `positions: Position[]`; member list builder (line ~358) populates it.
+### 1. `src/components/hr/staff-hr-checklist-card.tsx` — make "+" per-row, always visible
+- Replace the existing conditional "Evidence" upload label with a permanent compact icon button per row:
+  - When no evidence attached: just the "+" upload button (icon-only, `aria-label="Upload evidence"`).
+  - When evidence attached: render the "Evidence" view button AND a "+ Replace" button so admins can add a newer document.
+- `accept=".pdf,.doc,.docx,image/*"` on the file input (PDF, Word, images of certificates).
+- Tap target ≥44×44 per project memory rule; keep `relative z-0`-ish positioning so it never hides behind the status pill.
+- Keep the existing `isSelf` gate (self-view stays read-only; HR uploads remain admin/manager-only). N/A rows stay non-uploadable.
+- No change to `uploadEvidence`, `upsertFn`, or the toast/invalidate flow.
 
-## Read sites
-- `dashboard.employees.$staffId.tsx` line 142 — render one `<Badge>` per position (fallback to legacy `position`).
-- Same file line 171 — "Position" row shows comma-joined list, dash if empty.
+### 2. `src/routes/dashboard.employees.$staffId.tsx` — drop the redundant button
+- Remove the top-right "+ Upload certificate" button and its `ExternalCertUploadDialog` wrapper from `RequirementsTab` (lines ~358-371) and the related `uploadOpen` state + dialog import (only this import; do not remove `ExternalCertUploadDialog` from the codebase — it's still used by `/dashboard/external-certifications`).
+- The header row keeps the "Certs & trainings" title; per-item "+" buttons are now the only upload entry point on this tab.
 
-## Out of scope
-Roles/permissions, scheduling rules, RLS, billing, anything keyed off position elsewhere (none found in current search). No changes to the create-employee form unless you ask for it.
+## Out of scope (explicitly)
+- No new tables, buckets, or server functions; no schema change.
+- No change to permissions: self stays read-only on HR checklist; admins/managers keep current write access via existing RLS on `staff_checklist_completion` + HR document upload.
+- No change to the `/dashboard/external-certifications` page or its `UploadDialog` (still available for ad-hoc certs not tied to a checklist row).
+- No change to HR docs tab, Deadlines tab, or client profile.
 
 ## Acceptance
-- Edit dialog shows 4 checkboxes; current value(s) pre-checked; can select 0–4.
-- Save persists to `profiles.positions`; staff profile shows all selected positions as badges and in the Position row.
-- Existing single-position records still display correctly before any new edit.
+- Every applicable Compliance Checklist row shows a "+" upload button. Clicking opens the OS file picker filtered to PDF/DOCX/images.
+- Uploaded file appears in the staff member's HR file (visible in HR docs / NECTAR docs) AND is linked to that requirement (row flips to `in_progress` with `Evidence` button to view).
+- Rows that already have evidence show both "Evidence" (view) and "+ Replace" (re-upload).
+- The old top-right "+ Upload certificate" button is gone; no parallel upload path is left on this tab.
+- N/A rows and self-view rows remain non-uploadable (unchanged).

@@ -492,7 +492,7 @@ export function StaffHrChecklistCard({
                                         </SelectContent>
                                       </Select>
                                     )}
-                                    {completionDoc ? (
+                                    {completionDoc && (
                                       <Button
                                         size="sm"
                                         variant="ghost"
@@ -500,12 +500,19 @@ export function StaffHrChecklistCard({
                                       >
                                         <Eye className="mr-1 h-3.5 w-3.5" /> Evidence
                                       </Button>
-                                    ) : isSelf ? null : (
-                                      <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted">
-                                        <Upload className="h-3.5 w-3.5" /> Evidence
+                                    )}
+                                    {!isSelf && (
+                                      <label
+                                        className="relative z-0 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+                                        title={completionDoc ? "Replace evidence" : "Upload evidence (PDF, DOCX, image)"}
+                                        aria-label={completionDoc ? "Replace evidence" : "Upload evidence"}
+                                      >
+                                        <Upload className="h-3.5 w-3.5" />
+                                        <span>{completionDoc ? "Replace" : "Upload"}</span>
                                         <input
                                           type="file"
                                           className="hidden"
+                                          accept=".pdf,.doc,.docx,image/*"
                                           onChange={async (e) => {
                                             const f = e.target.files?.[0];
                                             if (!f) return;

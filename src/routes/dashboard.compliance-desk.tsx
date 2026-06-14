@@ -879,6 +879,9 @@ function ComplianceDeskPage() {
             loading={approvedQ.isLoading}
             onMap={setMapOpen}
             onEdit={setEditRow}
+            staffNameMap={staffNameMap}
+            teams={teamsQ.data ?? []}
+            billedSet={billedSetQ.data ?? null}
           />
         </div>
       ) : (
@@ -888,6 +891,9 @@ function ComplianceDeskPage() {
           loading={approvedQ.isLoading}
           onMap={setMapOpen}
           onEdit={setEditRow}
+          staffNameMap={staffNameMap}
+          teams={teamsQ.data ?? []}
+          billedSet={billedSetQ.data ?? null}
         />
       )}
 

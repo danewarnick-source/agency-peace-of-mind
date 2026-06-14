@@ -379,6 +379,12 @@ export function EmployeesPage() {
                     role: m.role as Role,
                     active: m.active,
                     position,
+                    positions: (() => {
+                      const arr = ((m.profile as { positions?: string[] | null } | undefined)?.positions ?? []) as string[];
+                      const list = arr.filter((x): x is Position => POSITIONS.includes(x as Position));
+                      if (list.length) return list;
+                      return position ? [position as Position] : [];
+                    })(),
                     workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
                     hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
                     dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",

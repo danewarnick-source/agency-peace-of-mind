@@ -52,6 +52,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/schedule-preview", label: "Scheduler", icon: CalendarDays },
   { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck },
   { to: "/dashboard/deadlines", label: "Deadlines", icon: AlarmClock },
+  { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing" },
   { to: "/dashboard/reports", label: "Reports", icon: FileText, perm: "export_reports" },
   { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },

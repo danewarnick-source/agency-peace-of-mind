@@ -9,6 +9,7 @@ import { AlertTriangle, Clock, FileText, ArrowRight, Users } from "lucide-react"
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
 import { CompanyOverview } from "@/components/company-overview";
+import { DeadlinesHomeCard } from "./dashboard.deadlines";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
@@ -136,7 +137,13 @@ function Overview() {
 
   return (
     <div className="space-y-8">
-      {showAdmin && <CompanyOverview />}
+      {showAdmin && (
+        <>
+          <DeadlinesHomeCard />
+          <CompanyOverview />
+        </>
+      )}
+
 
       {!showAdmin && (
         <div className="space-y-5">

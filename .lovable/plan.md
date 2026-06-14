@@ -1,100 +1,65 @@
-# Guardian status + per-action attestations on incidents
+## Status check (already done in earlier turns)
 
-Three layers: schema, conditional duty, attestation-gated actions. Existing incident drafting / Nectar review / clocks stay intact.
+- **Fix 1** — `use-deadlines.tsx` no longer queries or emits `hhs_cert` rows; only the annual `host_home_cert` source remains. No other file references the old monthly cert. ✅
+- **Fix 2** — Every item in the hook sets `href` (summary → `/dashboard/summaries?open=<id>`, host home cert, staff cert, incident, billing-code), and rows render the title as a link. ✅
+- **Fix 3** — `DeadlinesHomeCard` is exported from `dashboard.deadlines.tsx` and already mounted in `dashboard.index.tsx`. ✅
 
-## Part 1 — Guardian fields on the client profile (migration)
+Verification will be a re-read of those three files to make sure nothing regressed.
 
-Add to `public.clients`:
+## Fix 4 — wire summary deadlines to the Summaries portal as the single source of truth
 
-- `is_own_guardian boolean NOT NULL DEFAULT false`
-- `guardian_name text`
-- `guardian_phone text`
-- `guardian_relationship text`
-- `guardian_email text` (optional)
-- `guardian_address text` (optional)
+Almost everything needed for Fix 4 is already in place:
 
-CHECK constraint (immutable, safe): when `is_own_guardian = false`, require `guardian_name` and `guardian_phone` non-empty. When `is_own_guardian = true`, all guardian_* fields must be null/empty (avoid stale data).
+- `listOpenSummaries` filters `completed_at IS NULL`, so deadlines automatically disappear once a summary is finalized.
+- `finalizeSummary` in `progress-summaries.functions.ts` sets `completed_at`, `finalized_at/by/by_name`, and `status='finalized'`.
+- `dashboard.summaries.tsx` accepts `?open=<uuid>` and opens that summary's review dialog.
+- Summary items in `use-deadlines.tsx` already set `href: /dashboard/summaries?open=<id>`.
 
-No new RLS — existing `clients` policies cover it.
+The only thing left is the redundant "Mark complete" button on the Deadlines page action column.
 
-UI: extend the existing client-edit form in `src/routes/dashboard.clients.tsx`. Add a "Guardianship" section near Emergency contact:
-- Radio "Is the client their own guardian?" Yes / No.
-- When No → guardian name, phone, relationship (required), email/address optional.
-- Admin/manager only (already gated by existing edit policies).
-- Select list and update payload extended to include the new columns.
+### Change in `src/routes/dashboard.deadlines.tsx` (`RowAction` component)
 
-## Part 2 — Conditional guardian duty
-
-Wherever the 24-hour guardian clock is computed:
-
-1. **`src/lib/incident-deadlines.ts`** — `getIncidentOpenClocks` takes an additional `clientIsOwnGuardian: boolean` flag (or accept full input including it). When true, do NOT emit the `guardian_notified` clock. Add a new clock kind `guardian_notified` (currently the file only has UPI clocks — guardian clock today is implemented inline in `admin-incidents-section.tsx`). Plan: keep the source of truth in `incident-deadlines.ts`; admin section uses the helper.
-
-2. **`src/hooks/use-deadlines.tsx`** — when building incident clocks, also fetch `clients.is_own_guardian` (already loaded via the `clientsQ` — extend select) and pass it into the helper so guardian rows never appear for own-guardian clients.
-
-3. **`src/components/incidents/admin-incidents-section.tsx`** — fetch `clients.is_own_guardian, guardian_name, guardian_phone, guardian_relationship` alongside incidents (single query keyed by `client_id`s). Suppress the `Guardian 24h` `CountdownPill` and the "Log guardian notification" button when own-guardian. Show a small `"Self-guardian — no notification required"` line in its place inside the action footer.
-
-## Part 3 — Guardian contact info in the dialog
-
-`GuardianDialog` (in `admin-incidents-section.tsx`) gets `clientId` plus the guardian fields and renders, at the top:
-
-```
-Notifying:  <guardian_name> (<relationship>)
-Phone:      <guardian_phone>
+Today:
+```text
+if (item.source === 'summary' && item.summary) {
+  if (requires_upi_attestation) → "Entered into UPI" button (attest)
+  else                          → "Mark complete" button (markSummaryCompleted)
+}
+else if (item.href)             → "Open" link
 ```
 
-Read-only block. Fetched via a small new server fn `getClientGuardianInfo({ id })` returning `{ is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email }` (manager-only). If the dialog is opened for an own-guardian client (should be impossible from UI), it shows "Client is their own guardian — no notification required" and disables submission.
-
-## Part 4 — Per-action attestations with signature
-
-Schema migration — `incident_reports` add columns:
-
-- `guardian_attestation_text text`, `guardian_signed_name text`, `guardian_signed_title text`, `guardian_signed_at timestamptz`
-- `upi_initiated_attestation_text text`, `upi_initiated_signed_name text`, `upi_initiated_signed_title text` (signed_at = existing `upi_initiated_at`)
-- `upi_completed_attestation_text text`, `upi_completed_signed_name text`, `upi_completed_signed_title text`
-- `sc_update_attestation_text text`, `sc_update_signed_name text`, `sc_update_signed_title text`, `sc_update_signed_at timestamptz`, `sc_update_signed_by uuid` (the existing `incident_sc_requests` covers "requested a response"; this attestation is the act of informing/updating the SC — distinct.)
-
-Attestation text constants live in a new `src/lib/incident-attestations.ts`:
-
-```ts
-export const GUARDIAN_ATTESTATION =
-  "I attest that I notified the Person's guardian, {guardian_name}, of this incident on {when} via {method}, and that the information provided was accurate.";
-export const UPI_INITIATED_ATTESTATION =
-  "I attest that I initiated entry of this incident report into the UPI system on {when} and that the information submitted is true and accurate to the best of my knowledge.";
-export const UPI_COMPLETED_ATTESTATION =
-  "I attest that I completed and submitted this incident report in the UPI system on {when} and that the information submitted is true and accurate to the best of my knowledge.";
-export const SC_UPDATE_ATTESTATION =
-  "I attest that I provided this incident information to the Person's Support Coordinator on {when}.";
+Target:
+```text
+if (item.source === 'summary' && item.summary) {
+  render: "Open summary" link → item.href (/dashboard/summaries?open=<id>)
+  if requires_upi_attestation AND finalized but not yet UPI-entered → also render "Entered into UPI" button
+}
+else if (item.href)             → "Open" link
 ```
 
-Server fns (`src/lib/incidents.functions.ts`) — extend each existing fn's input validator:
+Concretely:
+- Remove the `markSummaryCompleted` branch entirely from the Deadlines page UI (kept on the server in case other callers use it — quick grep first; remove the import + the `complete` mutation block here regardless).
+- Always render an "Open summary" link button (using `item.href`) for summary rows.
+- For SEI / UPI-required summaries, keep the existing `attestSummaryUpiEntered` button, but only show it when the summary is already finalized and `upi_entered_at` is null. (Today the button shows on any UPI-required open row; an unfinalized SEI summary still needs to be finalized first in the portal. If the summary is finalized but UPI-pending, the listOpenSummaries filter excludes it since `completed_at` is set — so the SEI attestation needs its own source in the hook OR we relax the filter for `requires_upi_attestation`.)
 
-| Fn | New required input |
-|---|---|
-| `markGuardianNotified` | `attested: true (literal)`, `signed_name`, `signed_title`. Writes attestation_text (resolved template), signed_name/title, signed_at = `notified_at` |
-| `markUpiInitiated` | same shape |
-| `markUpiCompleted` | same shape |
-| new `markScUpdated` | `id`, `attested`, `signed_name`, `signed_title`, optional `notes` |
+### Quick check needed before coding: does the SEI "Entered into UPI" deadline still appear after finalize?
 
-Each fn rejects without `attested === true`, non-empty `signed_name`, `signed_title`. All gated by `requireManager`.
+Reading `listOpenSummaries` — it excludes any row with `completed_at IS NOT NULL`, and `finalizeSummary` sets `completed_at`. That means today's SEI flow can only attest UPI *before* finalize. If the user expects the SEI attestation to be a separate step that survives finalize, we need to switch the open-summary filter to include rows where `requires_upi_attestation = true AND upi_entered_at IS NULL`, regardless of `completed_at`.
 
-UI — wrap each action button in a shared `<AttestationDialog>` component (new `src/components/incidents/attestation-dialog.tsx`):
+I'll confirm current SEI behavior with a one-line code read before editing — then make the minimal adjustment so:
+- Non-UPI summary → shown until finalized → "Open summary" link only.
+- UPI summary → shown until BOTH finalized AND `upi_entered_at` set → "Open summary" link always; "Entered into UPI" button appears once finalized.
 
-- Header: action label.
-- Body: action-specific attestation paragraph (template resolved with current preview values).
-- Required checkbox "I confirm the above attestation."
-- Inputs: full name, title, auto-filled "Signed at: <now>".
-- Submit calls the relevant server fn; button disabled until checked + both inputs filled.
+### Files touched
 
-Replace the current `markUpiInitiated` / `markUpiCompleted` direct buttons with this dialog. Same for the existing `GuardianDialog` (extended; currently only collects method) — add attestation block + signature inputs.
+- `src/routes/dashboard.deadlines.tsx` — drop "Mark complete" branch, render "Open summary" for all summary items, keep SEI attest button under the updated condition. Remove unused `markSummaryCompleted` import + mutation.
+- `src/lib/progress-summaries.functions.ts` (only if check above shows SEI rows disappear post-finalize) — broaden `listOpenSummaries` to keep UPI-attestation-pending rows visible after finalize.
 
-Add an `SC Update` button + dialog driven by `markScUpdated`. (Keeps the existing "Request SC response" flow untouched.)
+### Verification I'll run before replying done
 
-Show, in the existing "history" footer below an incident, the signer + date for each attested action, e.g. `Guardian notified (phone) Jan 4 2026 · signed by Jane Doe, Program Director`.
-
-## Verification
-
-1. Edit a client → set "is own guardian = yes" → save. Open a fresh incident for that client → no `Guardian 24h` pill, no "Log guardian notification" button, Deadlines page shows no guardian item for them.
-2. Edit a different client → "is own guardian = no" + name "Mary Sample" + phone. Open an incident → guardian pill shows, Deadlines page shows it. Click "Log guardian notification" → dialog shows Mary Sample + phone at top.
-3. Try to submit any of the 4 actions without checking attestation / filling name+title → button disabled.
-4. Submit each → row footer shows `… signed by <name>, <title>`. Re-open dialog disabled (already complete).
-5. Existing incident drafting, Nectar review, UPI clocks still function (clocks unchanged in math, just sourced from the same helper).
+1. Read the three "already done" files end-to-end and confirm no `hhs_cert`, no dead buttons, `DeadlinesHomeCard` still mounted.
+2. After the edit, confirm:
+   - Summary row action is "Open summary" (link), not "Mark complete".
+   - Clicking it routes to `/dashboard/summaries?open=<id>` and the review dialog opens (already supported by `searchSchema`).
+   - SEI row keeps the "Entered into UPI" button, still functional.
+3. `tsc --noEmit` clean.

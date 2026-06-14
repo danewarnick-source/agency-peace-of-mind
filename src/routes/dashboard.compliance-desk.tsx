@@ -1968,7 +1968,7 @@ function ReconcileTable({
   onMap: (r: Row) => void;
   onReview: (r: Row) => void;
 }) {
-  const [filter, setFilter] = useState<"pending" | "accepted" | "flagged" | "all">("pending");
+  const [filter, setFilter] = useState<"pending" | "accepted" | "corrected" | "flagged" | "all">("pending");
   const filtered = filter === "all" ? rows : rows.filter((r) => r.reconciliation_status === filter);
 
   const onExport = () => {
@@ -1999,6 +1999,7 @@ function ReconcileTable({
             <SelectContent>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="accepted">Reconciled</SelectItem>
+              <SelectItem value="corrected">Corrected</SelectItem>
               <SelectItem value="flagged">Flagged</SelectItem>
               <SelectItem value="all">All</SelectItem>
             </SelectContent>
@@ -2062,7 +2063,7 @@ function ReconcileTable({
                   </TableCell>
                   <TableCell className="text-right" onClick={stopRowToggle}>
                     <Button size="sm" onClick={() => onReview(r)}>
-                      Review
+                      {r.reconciliation_status === "pending" ? "Resolve" : "Review"}
                     </Button>
                   </TableCell>
                 </TableRow>

@@ -5388,6 +5388,136 @@ export type Database = {
           },
         ]
       }
+      host_home_cert_concerns: {
+        Row: {
+          certification_id: string
+          corrective_action: string
+          created_at: string
+          finding: string
+          id: string
+          organization_id: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          target_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          certification_id: string
+          corrective_action: string
+          created_at?: string
+          finding: string
+          id?: string
+          organization_id: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          target_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          certification_id?: string
+          corrective_action?: string
+          created_at?: string
+          finding?: string
+          id?: string
+          organization_id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          target_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "host_home_cert_concerns_certification_id_fkey"
+            columns: ["certification_id"]
+            isOneToOne: false
+            referencedRelation: "host_home_certifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      host_home_certifications: {
+        Row: {
+          cert_type: string
+          certificate_pdf_path: string | null
+          checklist: Json
+          client_id: string
+          created_at: string
+          determination: string
+          guardian_acknowledgement_name: string | null
+          host_home_address: string
+          id: string
+          inspection_date: string
+          inspector_name: string
+          inspector_not_host_confirmed: boolean
+          inspector_user_id: string
+          next_due_date: string | null
+          organization_id: string
+          pcsp_notes: string | null
+          pcsp_status: string
+          signature_name: string
+          signature_title: string
+          signed_at: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cert_type: string
+          certificate_pdf_path?: string | null
+          checklist?: Json
+          client_id: string
+          created_at?: string
+          determination: string
+          guardian_acknowledgement_name?: string | null
+          host_home_address: string
+          id?: string
+          inspection_date: string
+          inspector_name: string
+          inspector_not_host_confirmed?: boolean
+          inspector_user_id: string
+          next_due_date?: string | null
+          organization_id: string
+          pcsp_notes?: string | null
+          pcsp_status: string
+          signature_name: string
+          signature_title: string
+          signed_at?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cert_type?: string
+          certificate_pdf_path?: string | null
+          checklist?: Json
+          client_id?: string
+          created_at?: string
+          determination?: string
+          guardian_acknowledgement_name?: string | null
+          host_home_address?: string
+          id?: string
+          inspection_date?: string
+          inspector_name?: string
+          inspector_not_host_confirmed?: boolean
+          inspector_user_id?: string
+          next_due_date?: string | null
+          organization_id?: string
+          pcsp_notes?: string | null
+          pcsp_status?: string
+          signature_name?: string
+          signature_title?: string
+          signed_at?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "host_home_certifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       host_supervision_contacts: {
         Row: {
           client_id: string

@@ -452,6 +452,15 @@ function HostDetailDialog({
                 </p>
               )}
             </section>
+
+            {canManage && (
+              <HostCertificationPanel
+                orgId={organizationId}
+                hostCardId={c.id}
+                hostName={c.name}
+                defaultAddress={c.address ?? ""}
+              />
+            )}
           </div>
         )}
       </DialogContent>

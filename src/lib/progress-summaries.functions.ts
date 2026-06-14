@@ -193,7 +193,13 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
     return { ensured: inserts.length };
   });
 
-/** List all open (uncompleted) summaries for the org. */
+/** List all open summaries for the org.
+ *
+ * "Open" = not yet completed, OR a UPI-attestation-required summary that has
+ * been finalized but not yet attested as entered into the state UPI portal.
+ * This keeps the SEI "Entered into UPI" deadline visible after finalize, so
+ * finalizing in the Summaries portal does not hide the still-required UPI
+ * attestation step on the Deadlines page. */
 export const listOpenSummaries = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ organizationId: z.string().uuid() }).parse(i))
@@ -205,11 +211,12 @@ export const listOpenSummaries = createServerFn({ method: "POST" })
       .from("client_progress_summaries")
       .select(SUMMARY_SELECT)
       .eq("organization_id", data.organizationId)
-      .is("completed_at", null)
+      .or("completed_at.is.null,and(requires_upi_attestation.eq.true,upi_entered_at.is.null)")
       .order("due_date", { ascending: true });
     if (error) throw new Error(error.message);
     return (rows ?? []) as ProgressSummaryRow[];
   });
+
 
 /** List ALL summaries (open + finalized) for the org — admin Summaries page. */
 export const listAllSummaries = createServerFn({ method: "POST" })

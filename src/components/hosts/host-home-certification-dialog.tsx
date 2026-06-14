@@ -1,22 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
-  Home,
-  CalendarCheck2,
-  AlertTriangle,
-  Plus,
-  Trash2,
-  Download,
-  ShieldCheck,
-  CheckCircle2,
-  ClipboardCheck,
+  CalendarCheck2, AlertTriangle, Plus, Trash2, Download, ShieldCheck,
+  CheckCircle2, ClipboardCheck, Home as HomeIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -25,31 +17,26 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  ALL_SECTIONS,
-  ALL_ITEM_CODES,
-  statusLabel,
-  type ChecklistAnswers,
-  type ChecklistStatus,
+  ALL_SECTIONS, ALL_ITEM_CODES, statusLabel,
+  type ChecklistAnswers, type ChecklistStatus,
 } from "@/lib/host-home-cert-items";
 import {
-  createHostHomeCertification,
-  setHostHomeCertificatePdfPath,
-  resolveHostHomeCertConcern,
+  createHostHomeCertification, setHostHomeCertificatePdfPath,
+  resolveHostHomeCertConcern, HOST_HOME_CERT_ATTESTATION_TEXT,
 } from "@/lib/host-home-certifications.functions";
 import { renderCertificatePdf } from "@/lib/host-home-certificate-pdf";
 
+// ─── Types ──────────────────────────────────────────────
 type CertRow = {
   id: string;
-  organization_id: string;
   client_id: string;
+  hhp_cue_card_id: string | null;
   cert_type: "initial" | "annual";
   inspection_date: string;
   inspector_name: string;
@@ -70,29 +57,31 @@ type ConcernRow = {
   resolved_at: string | null;
   resolution_notes: string | null;
 };
+type HhsClient = { id: string; first_name: string; last_name: string };
 
-export function HostHomeCertificationSection({
+// ─── Panel rendered inside the host detail dialog ────────
+export function HostCertificationPanel({
   orgId,
-  clientId,
-  clientName,
+  hostCardId,
+  hostName,
   defaultAddress,
 }: {
   orgId: string;
-  clientId: string;
-  clientName: string;
+  hostCardId: string;
+  hostName: string;
   defaultAddress: string;
 }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
 
   const certsQ = useQuery({
-    queryKey: ["hhc", orgId, clientId],
+    queryKey: ["host-hhc", orgId, hostCardId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("host_home_certifications" as never)
-        .select("id, organization_id, client_id, cert_type, inspection_date, inspector_name, host_home_address, determination, signed_at, next_due_date, certificate_pdf_path, signature_name, signature_title")
+        .select("id, client_id, hhp_cue_card_id, cert_type, inspection_date, inspector_name, host_home_address, determination, signed_at, next_due_date, certificate_pdf_path, signature_name, signature_title")
         .eq("organization_id", orgId)
-        .eq("client_id", clientId)
+        .eq("hhp_cue_card_id", hostCardId)
         .order("inspection_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as CertRow[];
@@ -101,7 +90,7 @@ export function HostHomeCertificationSection({
 
   const concernsQ = useQuery({
     enabled: (certsQ.data?.length ?? 0) > 0,
-    queryKey: ["hhc-concerns", orgId, clientId, (certsQ.data ?? []).map((c) => c.id).join(",")],
+    queryKey: ["host-hhc-concerns", orgId, hostCardId, (certsQ.data ?? []).map((c) => c.id).join(",")],
     queryFn: async () => {
       const ids = (certsQ.data ?? []).map((c) => c.id);
       if (ids.length === 0) return [] as ConcernRow[];
@@ -111,6 +100,26 @@ export function HostHomeCertificationSection({
         .in("certification_id", ids);
       if (error) throw error;
       return (data ?? []) as unknown as ConcernRow[];
+    },
+  });
+
+  // Pull HHS client names so we can label history rows.
+  const clientIds = Array.from(new Set((certsQ.data ?? []).map((c) => c.client_id)));
+  const clientNamesQ = useQuery({
+    enabled: clientIds.length > 0,
+    queryKey: ["host-hhc-client-names", orgId, clientIds.join(",")],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name")
+        .eq("organization_id", orgId)
+        .in("id", clientIds);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const c of (data ?? []) as HhsClient[]) {
+        map[c.id] = `${c.first_name} ${c.last_name}`;
+      }
+      return map;
     },
   });
 
@@ -126,73 +135,94 @@ export function HostHomeCertificationSection({
   }, [latest]);
 
   const toneClasses =
-    status.tone === "rose"
-      ? "bg-rose-100 text-rose-800 border-rose-300"
-      : status.tone === "amber"
-        ? "bg-amber-100 text-amber-800 border-amber-300"
-        : "bg-emerald-100 text-emerald-800 border-emerald-300";
+    status.tone === "rose" ? "bg-rose-100 text-rose-800 border-rose-300"
+    : status.tone === "amber" ? "bg-amber-100 text-amber-800 border-amber-300"
+    : "bg-emerald-100 text-emerald-800 border-emerald-300";
 
   return (
-    <Card>
-      <CardHeader className="pb-3 flex flex-row items-start justify-between gap-3">
-        <div>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Home className="h-5 w-5 text-[#137182]" />
-            Host Home Certification
-          </CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Required annual safety & quality inspection of this host home.
-          </p>
+    <section className="space-y-3 rounded-md border border-border bg-card p-3">
+      <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <HomeIcon className="h-4 w-4 text-[#137182]" />
+          Host home certification
         </div>
-        <Button size="sm" onClick={() => setOpen(true)}>
-          <Plus className="mr-1 h-4 w-4" /> New certification
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${toneClasses}`}>
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {status.label}
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${toneClasses}`}>
+            <ShieldCheck className="h-3 w-3" /> {status.label}
+          </span>
+          <Button size="sm" onClick={() => setOpen(true)}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> {latest ? "Renew" : "Certify host"}
+          </Button>
         </div>
+      </header>
 
-        <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Certification history
-          </div>
-          {certsQ.isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : (certsQ.data?.length ?? 0) === 0 ? (
-            <p className="text-sm text-muted-foreground">No certifications on file yet.</p>
-          ) : (
-            <ul className="divide-y divide-border rounded-md border">
-              {(certsQ.data ?? []).map((c) => (
-                <CertHistoryRow
-                  key={c.id}
-                  cert={c}
-                  concerns={(concernsQ.data ?? []).filter((x) => x.certification_id === c.id)}
-                  orgId={orgId}
-                  onChanged={() => qc.invalidateQueries({ queryKey: ["hhc"] })}
-                />
-              ))}
-            </ul>
-          )}
+      <div>
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Certification history
         </div>
-      </CardContent>
+        {certsQ.isLoading ? (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        ) : (certsQ.data?.length ?? 0) === 0 ? (
+          <p className="text-xs text-muted-foreground">No certifications on file for this host yet.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-md border">
+            {(certsQ.data ?? []).map((c) => (
+              <CertHistoryRow
+                key={c.id}
+                cert={c}
+                clientName={(clientNamesQ.data ?? {})[c.client_id] ?? "—"}
+                concerns={(concernsQ.data ?? []).filter((x) => x.certification_id === c.id)}
+                orgId={orgId}
+                onChanged={() => qc.invalidateQueries({ queryKey: ["host-hhc"] })}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
 
       <CertificationFormDialog
         open={open}
         onOpenChange={setOpen}
         orgId={orgId}
-        clientId={clientId}
-        clientName={clientName}
+        hostCardId={hostCardId}
+        hostName={hostName}
         defaultAddress={defaultAddress}
         hasPriorCert={(certsQ.data?.length ?? 0) > 0}
         onSaved={() => {
-          qc.invalidateQueries({ queryKey: ["hhc"] });
+          qc.invalidateQueries({ queryKey: ["host-hhc"] });
+          qc.invalidateQueries({ queryKey: ["hhp-cue-cards"] });
+          qc.invalidateQueries({ queryKey: ["hhp-cue-card"] });
           qc.invalidateQueries({ queryKey: ["deadlines"] });
         }}
       />
-    </Card>
+    </section>
   );
+}
+
+// Small kanban-card badge.
+export function HostCertBadge({ orgId, hostCardId }: { orgId: string; hostCardId: string }) {
+  const q = useQuery({
+    queryKey: ["host-hhc-latest", orgId, hostCardId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("host_home_certifications" as never)
+        .select("next_due_date")
+        .eq("organization_id", orgId)
+        .eq("hhp_cue_card_id", hostCardId)
+        .order("inspection_date", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as Array<{ next_due_date: string }>;
+      return rows[0]?.next_due_date ?? null;
+    },
+  });
+  if (q.isLoading) return null;
+  if (!q.data) return <Badge variant="destructive" className="text-[10px]">No cert</Badge>;
+  const due = new Date(`${q.data}T23:59:59`);
+  const days = Math.round((due.getTime() - Date.now()) / 86_400_000);
+  if (days < 0) return <Badge variant="destructive" className="text-[10px]">Cert overdue</Badge>;
+  if (days <= 30) return <Badge className="bg-amber-500 text-[10px] hover:bg-amber-500">Cert due {days}d</Badge>;
+  return <Badge className="bg-emerald-600 text-[10px] hover:bg-emerald-600">Cert ✓</Badge>;
 }
 
 function determinationBadge(d: CertRow["determination"]) {
@@ -202,12 +232,10 @@ function determinationBadge(d: CertRow["determination"]) {
 }
 
 function CertHistoryRow({
-  cert,
-  concerns,
-  orgId,
-  onChanged,
+  cert, clientName, concerns, orgId, onChanged,
 }: {
   cert: CertRow;
+  clientName: string;
   concerns: ConcernRow[];
   orgId: string;
   onChanged: () => void;
@@ -215,31 +243,25 @@ function CertHistoryRow({
   const [expanded, setExpanded] = useState(false);
 
   const download = async () => {
-    if (!cert.certificate_pdf_path) {
-      toast.error("No PDF stored for this certification.");
-      return;
-    }
+    if (!cert.certificate_pdf_path) { toast.error("No PDF stored for this certification."); return; }
     const { data, error } = await supabase.storage
       .from("host-home-certificates")
       .createSignedUrl(cert.certificate_pdf_path, 60);
-    if (error || !data?.signedUrl) {
-      toast.error(error?.message ?? "Could not generate download link.");
-      return;
-    }
+    if (error || !data?.signedUrl) { toast.error(error?.message ?? "Could not generate download link."); return; }
     window.open(data.signedUrl, "_blank");
   };
 
   return (
-    <li className="px-3 py-2">
+    <li className="px-3 py-2 text-xs">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-medium">
+          <div className="flex flex-wrap items-center gap-2 font-medium">
             {format(new Date(cert.inspection_date), "MMM d, yyyy")}
-            <span className="text-xs text-muted-foreground">· {cert.cert_type === "initial" ? "Initial" : "Annual"}</span>
+            <span className="text-muted-foreground">· {cert.cert_type === "initial" ? "Initial" : "Annual"}</span>
             {determinationBadge(cert.determination)}
           </div>
-          <div className="text-xs text-muted-foreground">
-            Inspector: {cert.inspector_name} · Next due {cert.next_due_date}
+          <div className="mt-0.5 text-muted-foreground">
+            Person: {clientName} · Inspector: {cert.inspector_name} · Next due {cert.next_due_date}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -249,8 +271,7 @@ function CertHistoryRow({
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={download}>
-            <Download className="mr-1 h-3.5 w-3.5" />
-            PDF
+            <Download className="mr-1 h-3 w-3" /> PDF
           </Button>
         </div>
       </div>
@@ -266,9 +287,7 @@ function CertHistoryRow({
 }
 
 function ConcernRowEditor({
-  concern,
-  orgId,
-  onChanged,
+  concern, orgId, onChanged,
 }: {
   concern: ConcernRow;
   orgId: string;
@@ -278,24 +297,20 @@ function ConcernRowEditor({
   const [notes, setNotes] = useState(concern.resolution_notes ?? "");
   const resolveFn = useServerFn(resolveHostHomeCertConcern);
   const m = useMutation({
-    mutationFn: async () =>
-      resolveFn({
-        data: {
-          organizationId: orgId,
-          concernId: concern.id,
-          resolved_at: resolvedAt || new Date().toISOString().slice(0, 10),
-          resolution_notes: notes || undefined,
-        },
-      }),
-    onSuccess: () => {
-      toast.success("Concern updated.");
-      onChanged();
-    },
+    mutationFn: async () => resolveFn({
+      data: {
+        organizationId: orgId,
+        concernId: concern.id,
+        resolved_at: resolvedAt || new Date().toISOString().slice(0, 10),
+        resolution_notes: notes || undefined,
+      },
+    }),
+    onSuccess: () => { toast.success("Concern updated."); onChanged(); },
     onError: (e) => toast.error((e as Error).message),
   });
 
   return (
-    <div className="rounded border bg-background p-2 text-xs">
+    <div className="rounded border bg-background p-2">
       <div className="font-medium">{concern.finding}</div>
       <div className="text-muted-foreground">Action: {concern.corrective_action}</div>
       {concern.target_date && <div className="text-muted-foreground">Target: {concern.target_date}</div>}
@@ -310,25 +325,17 @@ function ConcernRowEditor({
   );
 }
 
-// ============================== Form Dialog ==============================
-
+// ═══════════════════════ Form Dialog ═══════════════════════
 type ConcernDraft = { finding: string; corrective_action: string; target_date: string };
 
 function CertificationFormDialog({
-  open,
-  onOpenChange,
-  orgId,
-  clientId,
-  clientName,
-  defaultAddress,
-  hasPriorCert,
-  onSaved,
+  open, onOpenChange, orgId, hostCardId, hostName, defaultAddress, hasPriorCert, onSaved,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   orgId: string;
-  clientId: string;
-  clientName: string;
+  hostCardId: string;
+  hostName: string;
   defaultAddress: string;
   hasPriorCert: boolean;
   onSaved: () => void;
@@ -338,11 +345,41 @@ function CertificationFormDialog({
   const defaultInspectorName =
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "";
 
+  // Active HHS clients for this org (service_codes contains HHS via client_billing_codes).
+  const hhsClientsQ = useQuery({
+    enabled: open,
+    queryKey: ["hhs-clients-for-cert", orgId],
+    queryFn: async () => {
+      const todayStr = today;
+      const { data: codes, error } = await supabase
+        .from("client_billing_codes")
+        .select("client_id, service_start_date, service_end_date")
+        .eq("organization_id", orgId)
+        .eq("service_code", "HHS");
+      if (error) throw error;
+      const activeIds = (codes ?? [])
+        .filter((c) => (!c.service_start_date || c.service_start_date <= todayStr)
+                    && (!c.service_end_date || c.service_end_date >= todayStr))
+        .map((c) => c.client_id);
+      if (activeIds.length === 0) return [] as HhsClient[];
+      const { data, error: cErr } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name")
+        .eq("organization_id", orgId)
+        .in("id", activeIds)
+        .order("last_name");
+      if (cErr) throw cErr;
+      return (data ?? []) as HhsClient[];
+    },
+  });
+
+  const [clientId, setClientId] = useState<string>("");
   const [certType, setCertType] = useState<"initial" | "annual">(hasPriorCert ? "annual" : "initial");
   const [inspectionDate, setInspectionDate] = useState(today);
   const [inspectorName, setInspectorName] = useState(defaultInspectorName);
   const [address, setAddress] = useState(defaultAddress);
   const [notHostConfirmed, setNotHostConfirmed] = useState(false);
+  const [attestationConfirmed, setAttestationConfirmed] = useState(false);
   const [answers, setAnswers] = useState<ChecklistAnswers>({});
   const [pcspStatus, setPcspStatus] = useState<"meets" | "does_not_meet">("meets");
   const [pcspNotes, setPcspNotes] = useState("");
@@ -352,22 +389,41 @@ function CertificationFormDialog({
   const [sigTitle, setSigTitle] = useState("");
   const [guardianName, setGuardianName] = useState("");
 
+  useEffect(() => {
+    if (!open) return;
+    setAddress(defaultAddress);
+    setInspectorName(defaultInspectorName);
+    setSigName(defaultInspectorName);
+    setCertType(hasPriorCert ? "annual" : "initial");
+  }, [open, defaultAddress, defaultInspectorName, hasPriorCert]);
+
   const allItemsAnswered = ALL_ITEM_CODES.every((c) => !!answers[c]?.status);
+  const allDnmHaveNotes = ALL_ITEM_CODES.every((c) => {
+    const a = answers[c];
+    return !a || a.status !== "does_not_meet" || (a.note ?? "").trim().length > 0;
+  });
+  const pcspNoteOk = pcspStatus !== "does_not_meet" || pcspNotes.trim().length > 0;
   const isCertifying = determination === "certified" || determination === "certified_with_corrections";
+
   const canSubmit =
+    !!clientId &&
     !!inspectionDate &&
-    !!inspectorName &&
-    !!address &&
-    !!sigName &&
-    !!sigTitle &&
+    !!inspectorName.trim() &&
+    !!address.trim() &&
+    !!sigName.trim() &&
+    !!sigTitle.trim() &&
     allItemsAnswered &&
-    (!isCertifying || notHostConfirmed);
+    allDnmHaveNotes &&
+    pcspNoteOk &&
+    (!isCertifying || (notHostConfirmed && attestationConfirmed));
 
   const createFn = useServerFn(createHostHomeCertification);
   const setPathFn = useServerFn(setHostHomeCertificatePdfPath);
 
   const submit = useMutation({
     mutationFn: async () => {
+      const selectedClient = (hhsClientsQ.data ?? []).find((c) => c.id === clientId);
+      const clientName = selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name}` : "Client";
       const concernsClean = concerns
         .filter((c) => c.finding.trim() && c.corrective_action.trim())
         .map((c) => ({
@@ -379,30 +435,34 @@ function CertificationFormDialog({
         data: {
           organizationId: orgId,
           clientId,
+          hhpCueCardId: hostCardId,
           cert_type: certType,
           inspection_date: inspectionDate,
-          inspector_name: inspectorName,
-          host_home_address: address,
+          inspector_name: inspectorName.trim(),
+          host_home_address: address.trim(),
           inspector_not_host_confirmed: notHostConfirmed,
+          attestation_confirmed: attestationConfirmed,
           checklist: answers,
           pcsp_status: pcspStatus,
           pcsp_notes: pcspNotes || null,
           determination,
-          signature_name: sigName,
-          signature_title: sigTitle,
+          signature_name: sigName.trim(),
+          signature_title: sigTitle.trim(),
           guardian_acknowledgement_name: guardianName || null,
           concerns: concernsClean,
         },
       });
 
-      // Render PDF and upload.
       const blob = renderCertificatePdf({
         clientName,
+        hostName,
         cert_type: certType,
         inspection_date: inspectionDate,
         inspector_name: inspectorName,
         host_home_address: address,
         inspector_not_host_confirmed: notHostConfirmed,
+        attestation_confirmed: attestationConfirmed,
+        attestation_text: HOST_HOME_CERT_ATTESTATION_TEXT,
         checklist: answers,
         pcsp_status: pcspStatus,
         pcsp_notes: pcspNotes,
@@ -413,9 +473,7 @@ function CertificationFormDialog({
         guardian_acknowledgement_name: guardianName || null,
         next_due_date,
         concerns: concernsClean.map((c) => ({
-          finding: c.finding,
-          corrective_action: c.corrective_action,
-          target_date: c.target_date,
+          finding: c.finding, corrective_action: c.corrective_action, target_date: c.target_date,
         })),
       });
       const path = `${orgId}/${id}.pdf`;
@@ -431,12 +489,9 @@ function CertificationFormDialog({
       toast.success("Certification saved and certificate generated.");
       onSaved();
       onOpenChange(false);
-      // Reset form
-      setAnswers({});
-      setConcerns([]);
-      setPcspNotes("");
-      setGuardianName("");
-      setNotHostConfirmed(false);
+      setAnswers({}); setConcerns([]); setPcspNotes("");
+      setGuardianName(""); setNotHostConfirmed(false); setAttestationConfirmed(false);
+      setClientId("");
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -447,17 +502,34 @@ function CertificationFormDialog({
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
             <ClipboardCheck className="h-5 w-5 text-[#137182]" />
-            Host Home Certification — {clientName}
+            Host Home Certification — {hostName}
           </DialogTitle>
           <DialogDescription>
-            Complete the inspection. A signed certificate PDF will be generated on submit.
+            Complete the inspection for the specific person being placed. A signed certificate PDF will be generated on submit.
           </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-y-auto px-6 py-4 space-y-6">
-          {/* Header block */}
+          {/* Person + header */}
           <section className="grid gap-3 md:grid-cols-2">
-            <div>
+            <div className="md:col-span-2">
+              <Label>Person being placed / certified for *</Label>
+              <Select value={clientId} onValueChange={setClientId}>
+                <SelectTrigger><SelectValue placeholder={
+                  hhsClientsQ.isLoading ? "Loading HHS clients…"
+                  : (hhsClientsQ.data?.length ?? 0) === 0 ? "No active HHS clients in this org"
+                  : "Select the person"
+                } /></SelectTrigger>
+                <SelectContent>
+                  {(hhsClientsQ.data ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.first_name} {c.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="md:col-span-2">
               <Label>Host home address</Label>
               <Input value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
@@ -469,7 +541,7 @@ function CertificationFormDialog({
                 onValueChange={(v) => setCertType(v as "initial" | "annual")}
               >
                 <label className="flex items-center gap-1.5 text-sm">
-                  <RadioGroupItem value="initial" /> Initial
+                  <RadioGroupItem value="initial" /> Initial (pre-placement)
                 </label>
                 <label className="flex items-center gap-1.5 text-sm">
                   <RadioGroupItem value="annual" /> Annual renewal
@@ -480,7 +552,7 @@ function CertificationFormDialog({
               <Label>Inspection date</Label>
               <Input type="date" value={inspectionDate} onChange={(e) => setInspectionDate(e.target.value)} />
             </div>
-            <div>
+            <div className="md:col-span-2">
               <Label>Inspector (staff name)</Label>
               <Input value={inspectorName} onChange={(e) => setInspectorName(e.target.value)} />
             </div>
@@ -537,7 +609,9 @@ function CertificationFormDialog({
             </RadioGroup>
             <Textarea
               className="mt-2"
-              placeholder="How the home and host support the person's PCSP needs"
+              placeholder={pcspStatus === "does_not_meet"
+                ? "Required: explain how the home does not meet the person's PCSP needs"
+                : "How the home and host support the person's PCSP needs"}
               value={pcspNotes}
               onChange={(e) => setPcspNotes(e.target.value)}
               rows={3}
@@ -565,39 +639,14 @@ function CertificationFormDialog({
               <div className="space-y-2">
                 {concerns.map((c, i) => (
                   <div key={i} className="grid gap-2 rounded-md border p-2 md:grid-cols-[1fr_1fr_160px_auto]">
-                    <Input
-                      placeholder="Finding"
-                      value={c.finding}
-                      onChange={(e) => {
-                        const copy = [...concerns];
-                        copy[i] = { ...copy[i], finding: e.target.value };
-                        setConcerns(copy);
-                      }}
-                    />
-                    <Input
-                      placeholder="Corrective action"
-                      value={c.corrective_action}
-                      onChange={(e) => {
-                        const copy = [...concerns];
-                        copy[i] = { ...copy[i], corrective_action: e.target.value };
-                        setConcerns(copy);
-                      }}
-                    />
-                    <Input
-                      type="date"
-                      value={c.target_date}
-                      onChange={(e) => {
-                        const copy = [...concerns];
-                        copy[i] = { ...copy[i], target_date: e.target.value };
-                        setConcerns(copy);
-                      }}
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      type="button"
-                      onClick={() => setConcerns((cs) => cs.filter((_, idx) => idx !== i))}
-                    >
+                    <Input placeholder="Finding" value={c.finding}
+                      onChange={(e) => { const copy = [...concerns]; copy[i] = { ...copy[i], finding: e.target.value }; setConcerns(copy); }} />
+                    <Input placeholder="Corrective action" value={c.corrective_action}
+                      onChange={(e) => { const copy = [...concerns]; copy[i] = { ...copy[i], corrective_action: e.target.value }; setConcerns(copy); }} />
+                    <Input type="date" value={c.target_date}
+                      onChange={(e) => { const copy = [...concerns]; copy[i] = { ...copy[i], target_date: e.target.value }; setConcerns(copy); }} />
+                    <Button size="icon" variant="ghost" type="button"
+                      onClick={() => setConcerns((cs) => cs.filter((_, idx) => idx !== i))}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -606,10 +655,10 @@ function CertificationFormDialog({
             )}
           </section>
 
-          {/* Determination + signature */}
+          {/* Determination */}
           <section className="space-y-3">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Determination & Signature
+              Determination
             </h3>
             <RadioGroup
               className="flex flex-col gap-2"
@@ -626,26 +675,48 @@ function CertificationFormDialog({
                 <RadioGroupItem value="not_certified" /> Not certified
               </label>
             </RadioGroup>
+          </section>
+
+          {/* Attestation + Signature */}
+          <section className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Attestation & E-Signature
+            </h3>
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/20">
+              <Checkbox
+                id="attest"
+                checked={attestationConfirmed}
+                onCheckedChange={(v) => setAttestationConfirmed(v === true)}
+                className="mt-0.5"
+              />
+              <label htmlFor="attest" className="text-sm leading-snug">
+                <span className="font-semibold">Required attestation:</span> {HOST_HOME_CERT_ATTESTATION_TEXT}
+              </label>
+            </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div>
-                <Label>Signature — printed name</Label>
+                <Label>E-signature — printed name *</Label>
                 <Input value={sigName} onChange={(e) => setSigName(e.target.value)} />
               </div>
               <div>
-                <Label>Signature — title</Label>
+                <Label>Title *</Label>
                 <Input value={sigTitle} onChange={(e) => setSigTitle(e.target.value)} placeholder="Manager / Administrator" />
               </div>
-              <div className="md:col-span-2">
+              <div>
+                <Label>Date</Label>
+                <Input value={today} readOnly className="bg-muted" />
+              </div>
+              <div>
                 <Label>Person / guardian acknowledgement (optional)</Label>
                 <Input value={guardianName} onChange={(e) => setGuardianName(e.target.value)} placeholder="Printed name" />
               </div>
             </div>
             {!canSubmit && (
-              <div className="flex items-start gap-2 rounded-md bg-muted/50 p-2 text-xs">
+              <div className="flex items-start gap-2 rounded-md bg-background p-2 text-xs">
                 <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />
                 <div>
-                  Before submitting: answer every checklist item
-                  {isCertifying ? ", and confirm the inspector is not the host home staff" : ""}.
+                  Before submitting: select the person, answer every checklist item, add a note to every
+                  "Does Not Meet"{isCertifying ? ", confirm the inspector is not the host home staff, check the attestation, and enter signature name + title" : ""}.
                 </div>
               </div>
             )}
@@ -656,9 +727,7 @@ function CertificationFormDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button disabled={!canSubmit || submit.isPending} onClick={() => submit.mutate()}>
             {submit.isPending ? "Saving…" : (
-              <>
-                <CalendarCheck2 className="mr-1 h-4 w-4" /> Save & generate certificate
-              </>
+              <><CalendarCheck2 className="mr-1 h-4 w-4" /> Save & generate certificate</>
             )}
           </Button>
         </DialogFooter>
@@ -668,9 +737,7 @@ function CertificationFormDialog({
 }
 
 function ChecklistItemRow({
-  label,
-  value,
-  onChange,
+  label, value, onChange,
 }: {
   label: string;
   value: { status: ChecklistStatus; note?: string } | undefined;
@@ -684,19 +751,18 @@ function ChecklistItemRow({
       onClick={() => onChange(s, note)}
       className={`min-h-[36px] rounded border px-2 py-1 text-xs font-medium transition ${
         status === s
-          ? s === "meets"
-            ? "border-emerald-500 bg-emerald-500 text-white"
-            : s === "does_not_meet"
-              ? "border-rose-500 bg-rose-500 text-white"
-              : "border-slate-500 bg-slate-500 text-white"
+          ? s === "meets" ? "border-emerald-500 bg-emerald-500 text-white"
+          : s === "does_not_meet" ? "border-rose-500 bg-rose-500 text-white"
+          : "border-slate-500 bg-slate-500 text-white"
           : "border-border bg-background hover:bg-muted"
       }`}
     >
       {statusLabel(s)}
     </button>
   );
+  const noteMissing = status === "does_not_meet" && !note.trim();
   return (
-    <div className="rounded-md border p-2">
+    <div className={`rounded-md border p-2 ${noteMissing ? "border-rose-400" : ""}`}>
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="text-sm">{label}</div>
         <div className="flex shrink-0 items-center gap-1">
@@ -707,8 +773,8 @@ function ChecklistItemRow({
       </div>
       {status === "does_not_meet" && (
         <Input
-          className="mt-2"
-          placeholder="Note (optional)"
+          className={`mt-2 ${noteMissing ? "border-rose-400" : ""}`}
+          placeholder='Required: note explaining "Does Not Meet"'
           value={note}
           onChange={(e) => onChange(status, e.target.value)}
         />

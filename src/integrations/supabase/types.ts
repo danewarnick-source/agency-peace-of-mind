@@ -5470,6 +5470,8 @@ export type Database = {
       }
       host_home_certifications: {
         Row: {
+          attestation_confirmed: boolean
+          attestation_text: string | null
           cert_type: string
           certificate_pdf_path: string | null
           checklist: Json
@@ -5477,6 +5479,7 @@ export type Database = {
           created_at: string
           determination: string
           guardian_acknowledgement_name: string | null
+          hhp_cue_card_id: string | null
           host_home_address: string
           id: string
           inspection_date: string
@@ -5494,6 +5497,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attestation_confirmed?: boolean
+          attestation_text?: string | null
           cert_type: string
           certificate_pdf_path?: string | null
           checklist?: Json
@@ -5501,6 +5506,7 @@ export type Database = {
           created_at?: string
           determination: string
           guardian_acknowledgement_name?: string | null
+          hhp_cue_card_id?: string | null
           host_home_address: string
           id?: string
           inspection_date: string
@@ -5518,6 +5524,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attestation_confirmed?: boolean
+          attestation_text?: string | null
           cert_type?: string
           certificate_pdf_path?: string | null
           checklist?: Json
@@ -5525,6 +5533,7 @@ export type Database = {
           created_at?: string
           determination?: string
           guardian_acknowledgement_name?: string | null
+          hhp_cue_card_id?: string | null
           host_home_address?: string
           id?: string
           inspection_date?: string
@@ -5547,6 +5556,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "host_home_certifications_hhp_cue_card_id_fkey"
+            columns: ["hhp_cue_card_id"]
+            isOneToOne: false
+            referencedRelation: "hhp_cue_cards"
             referencedColumns: ["id"]
           },
         ]

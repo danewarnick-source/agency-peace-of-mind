@@ -24,7 +24,7 @@ import {
   ArrowLeft, FileText, Pill, Calendar, CalendarRange, ClipboardList, AlertTriangle, Phone, Stethoscope, Box, Flame, Repeat, BookOpen, Eraser, CheckCircle2, Loader2, Home,
 } from "lucide-react";
 import { HhsMonthlyAttendanceTab } from "@/components/workspace/hhs-monthly-attendance-tab";
-import { HostHomeCertificationSection } from "@/components/hhs/host-home-certification-section";
+
 import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { saveDailyRecord, saveEmarLog, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
@@ -169,7 +169,7 @@ function HhsClientHub() {
         value={tabParam ?? "note"}
         onValueChange={(val) => navigate({ to: ".", search: { tab: val }, replace: true })}
       >
-        <TabsList className={`grid h-auto w-full ${emarEnabled ? "grid-cols-6" : "grid-cols-5"} gap-1 p-1`}>
+        <TabsList className={`grid h-auto w-full ${emarEnabled ? "grid-cols-5" : "grid-cols-4"} gap-1 p-1`}>
           <TabsTrigger value="note" className="h-11 text-[11px] sm:text-sm"><FileText className="mr-1 h-4 w-4" />Daily Note</TabsTrigger>
           {emarEnabled && (
             <TabsTrigger value="emar" className="h-11 text-[11px] sm:text-sm"><Pill className="mr-1 h-4 w-4" />MAR</TabsTrigger>
@@ -177,7 +177,6 @@ function HhsClientHub() {
           <TabsTrigger value="att" className="h-11 text-[11px] sm:text-sm"><Calendar className="mr-1 h-4 w-4" />Attendance</TabsTrigger>
           <TabsTrigger value="month" className="h-11 text-[11px] sm:text-sm"><CalendarRange className="mr-1 h-4 w-4" />Monthly</TabsTrigger>
           <TabsTrigger value="prn" className="h-11 text-[11px] sm:text-sm"><ClipboardList className="mr-1 h-4 w-4" />PRN Forms</TabsTrigger>
-          <TabsTrigger value="cert" className="h-11 text-[11px] sm:text-sm"><Home className="mr-1 h-4 w-4" />Certification</TabsTrigger>
         </TabsList>
 
         <TabsContent value="note" className="mt-3">
@@ -199,16 +198,6 @@ function HhsClientHub() {
         </TabsContent>
         <TabsContent value="prn" className="mt-3">
           <PrnFormsTab orgId={orgId} clientId={client.id} />
-        </TabsContent>
-        <TabsContent value="cert" className="mt-3">
-          {orgId && (
-            <HostHomeCertificationSection
-              orgId={orgId}
-              clientId={client.id}
-              clientName={fullName}
-              defaultAddress={client.physical_address ?? ""}
-            />
-          )}
         </TabsContent>
       </Tabs>
     </div>

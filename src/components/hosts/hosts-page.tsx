@@ -36,6 +36,7 @@ import {
   type HhpCueCard,
   type HhpStatus,
 } from "@/lib/hhp-cue-cards.functions";
+import { HostCertificationPanel, HostCertBadge } from "./host-home-certification-dialog";
 
 function splitList(s: string): string[] {
   return s
@@ -142,6 +143,9 @@ export function HostsPage() {
                             </div>
                           )}
                           <div className="mt-2 flex flex-wrap gap-1">
+                            {canManage && orgId && (
+                              <HostCertBadge orgId={orgId} hostCardId={c.id} />
+                            )}
                             {c.wheelchair_accessible && (
                               <Badge variant="outline" className="text-[10px]">
                                 Wheelchair
@@ -448,6 +452,15 @@ function HostDetailDialog({
                 </p>
               )}
             </section>
+
+            {canManage && (
+              <HostCertificationPanel
+                orgId={organizationId}
+                hostCardId={c.id}
+                hostName={c.name}
+                defaultAddress={c.address ?? ""}
+              />
+            )}
           </div>
         )}
       </DialogContent>

@@ -3,11 +3,14 @@ import { ALL_SECTIONS, statusLabel, type ChecklistAnswers } from "./host-home-ce
 
 export type CertificatePayload = {
   clientName: string;
+  hostName?: string | null;
   cert_type: "initial" | "annual";
   inspection_date: string;
   inspector_name: string;
   host_home_address: string;
   inspector_not_host_confirmed: boolean;
+  attestation_confirmed: boolean;
+  attestation_text: string;
   checklist: ChecklistAnswers;
   pcsp_status: "meets" | "does_not_meet";
   pcsp_notes?: string | null;
@@ -68,7 +71,8 @@ export function renderCertificatePdf(p: CertificatePayload): Blob {
   y += 14;
 
   // Metadata block
-  line(`Client: ${p.clientName}`);
+  line(`Person certified for: ${p.clientName}`);
+  if (p.hostName) line(`Host home provider: ${p.hostName}`);
   line(`Host home address: ${p.host_home_address}`);
   line(`Inspection type: ${p.cert_type === "initial" ? "Initial (pre-placement)" : "Annual renewal"}`);
   line(`Inspection date: ${p.inspection_date}`);
@@ -111,11 +115,14 @@ export function renderCertificatePdf(p: CertificatePayload): Blob {
     });
   }
 
-  // Signature
-  ensureSpace(80);
+  // Attestation + Signature
+  ensureSpace(100);
   doc.setDrawColor(180);
   doc.line(PAGE_MARGIN, y, PAGE_WIDTH - PAGE_MARGIN, y);
   y += 14;
+  line("Attestation", { bold: true, size: 12, gap: 4 });
+  line(p.attestation_text, { gap: 6 });
+  line(`Acknowledged: ${p.attestation_confirmed ? "YES" : "NO"}`, { gap: 8 });
   line("Inspector E-Signature", { bold: true, size: 12, gap: 4 });
   line(`Signed by: ${p.signature_name} — ${p.signature_title}`);
   line(`Signed at: ${new Date(p.signed_at).toLocaleString()}`);

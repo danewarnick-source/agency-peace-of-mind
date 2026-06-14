@@ -527,8 +527,13 @@ export function RecordsTab() {
       )}
 
       {/* Utah DHHS EVV export dialog — only mounted/opened when gate passes. */}
-      {utahDialogOpen && canDhhsExport && (
-        <UtahExportDialog open={utahDialogOpen} onOpenChange={setUtahDialogOpen} />
+      {utahDialogOpen && canDhhsExport && orgId && (
+        <UtahExportDialog
+          open={utahDialogOpen}
+          onClose={() => setUtahDialogOpen(false)}
+          organizationId={orgId}
+          staffNameMap={new Map((staffOptionsQ.data ?? []).map((s) => [s.value, s.label]))}
+        />
       )}
     </div>
   );

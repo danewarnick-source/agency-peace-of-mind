@@ -58,7 +58,6 @@ import { Route as DashboardFormsRouteImport } from './routes/dashboard.forms'
 import { Route as DashboardFinancialRouteImport } from './routes/dashboard.financial'
 import { Route as DashboardExternalComplianceRouteImport } from './routes/dashboard.external-compliance'
 import { Route as DashboardExternalCertificationsRouteImport } from './routes/dashboard.external-certifications'
-import { Route as DashboardEvvArchiveRouteImport } from './routes/dashboard.evv-archive'
 import { Route as DashboardEmarRouteImport } from './routes/dashboard.emar'
 import { Route as DashboardDeadlinesRouteImport } from './routes/dashboard.deadlines'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
@@ -417,11 +416,6 @@ const DashboardExternalCertificationsRoute =
     path: '/external-certifications',
     getParentRoute: () => DashboardRoute,
   } as any)
-const DashboardEvvArchiveRoute = DashboardEvvArchiveRouteImport.update({
-  id: '/evv-archive',
-  path: '/evv-archive',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardEmarRoute = DashboardEmarRouteImport.update({
   id: '/emar',
   path: '/emar',
@@ -1054,7 +1048,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/deadlines': typeof DashboardDeadlinesRoute
   '/dashboard/emar': typeof DashboardEmarRoute
-  '/dashboard/evv-archive': typeof DashboardEvvArchiveRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
@@ -1212,7 +1205,6 @@ export interface FileRoutesByTo {
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/deadlines': typeof DashboardDeadlinesRoute
   '/dashboard/emar': typeof DashboardEmarRoute
-  '/dashboard/evv-archive': typeof DashboardEvvArchiveRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/help': typeof DashboardHelpRoute
@@ -1369,7 +1361,6 @@ export interface FileRoutesById {
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/deadlines': typeof DashboardDeadlinesRoute
   '/dashboard/emar': typeof DashboardEmarRoute
-  '/dashboard/evv-archive': typeof DashboardEvvArchiveRoute
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
@@ -1531,7 +1522,6 @@ export interface FileRouteTypes {
     | '/dashboard/daily-logs'
     | '/dashboard/deadlines'
     | '/dashboard/emar'
-    | '/dashboard/evv-archive'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/financial'
@@ -1689,7 +1679,6 @@ export interface FileRouteTypes {
     | '/dashboard/daily-logs'
     | '/dashboard/deadlines'
     | '/dashboard/emar'
-    | '/dashboard/evv-archive'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/help'
@@ -1845,7 +1834,6 @@ export interface FileRouteTypes {
     | '/dashboard/daily-logs'
     | '/dashboard/deadlines'
     | '/dashboard/emar'
-    | '/dashboard/evv-archive'
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/financial'
@@ -2340,13 +2328,6 @@ declare module '@tanstack/react-router' {
       path: '/external-certifications'
       fullPath: '/dashboard/external-certifications'
       preLoaderRoute: typeof DashboardExternalCertificationsRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/evv-archive': {
-      id: '/dashboard/evv-archive'
-      path: '/evv-archive'
-      fullPath: '/dashboard/evv-archive'
-      preLoaderRoute: typeof DashboardEvvArchiveRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/emar': {
@@ -3378,7 +3359,6 @@ interface DashboardRouteChildren {
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardDeadlinesRoute: typeof DashboardDeadlinesRoute
   DashboardEmarRoute: typeof DashboardEmarRoute
-  DashboardEvvArchiveRoute: typeof DashboardEvvArchiveRoute
   DashboardExternalCertificationsRoute: typeof DashboardExternalCertificationsRoute
   DashboardExternalComplianceRoute: typeof DashboardExternalComplianceRoute
   DashboardFinancialRoute: typeof DashboardFinancialRouteWithChildren
@@ -3458,7 +3438,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardDeadlinesRoute: DashboardDeadlinesRoute,
   DashboardEmarRoute: DashboardEmarRoute,
-  DashboardEvvArchiveRoute: DashboardEvvArchiveRoute,
   DashboardExternalCertificationsRoute: DashboardExternalCertificationsRoute,
   DashboardExternalComplianceRoute: DashboardExternalComplianceRoute,
   DashboardFinancialRoute: DashboardFinancialRouteWithChildren,

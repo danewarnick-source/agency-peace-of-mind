@@ -589,6 +589,9 @@ export function PunchPad({
       gps_validated:                   !isOutOfBounds,
       is_out_of_bounds:                isOutOfBounds,
       geofence_variance_justification: args.outsideReason ?? null,
+      // Enroll out-of-bounds punches into the EVV Reconciliation queue so an
+      // admin/manager can document a review decision (accept/correct/flag).
+      reconciliation_status:           isOutOfBounds ? "pending" : null,
       raw_clock_in:                    nowIso,
       rounded_clock_in:                roundToQuarterHourISO(nowIso),
       matched_approved_location_id:    matched?.id ?? null,

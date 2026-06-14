@@ -157,7 +157,7 @@ type Row = {
   ai_compliance_feedback: string | null;
   matched_approved_location_id: string | null;
   matched_approved_location_label: string | null;
-  reconciliation_status: "pending" | "accepted" | "flagged" | null;
+  reconciliation_status: "pending" | "accepted" | "corrected" | "flagged" | null;
   reconciliation_attestation: string | null;
   reconciliation_review_notes: string | null;
   reconciliation_reviewed_by: string | null;

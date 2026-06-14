@@ -115,11 +115,14 @@ export function renderCertificatePdf(p: CertificatePayload): Blob {
     });
   }
 
-  // Signature
-  ensureSpace(80);
+  // Attestation + Signature
+  ensureSpace(100);
   doc.setDrawColor(180);
   doc.line(PAGE_MARGIN, y, PAGE_WIDTH - PAGE_MARGIN, y);
   y += 14;
+  line("Attestation", { bold: true, size: 12, gap: 4 });
+  line(p.attestation_text, { gap: 6 });
+  line(`Acknowledged: ${p.attestation_confirmed ? "YES" : "NO"}`, { gap: 8 });
   line("Inspector E-Signature", { bold: true, size: 12, gap: 4 });
   line(`Signed by: ${p.signature_name} — ${p.signature_title}`);
   line(`Signed at: ${new Date(p.signed_at).toLocaleString()}`);

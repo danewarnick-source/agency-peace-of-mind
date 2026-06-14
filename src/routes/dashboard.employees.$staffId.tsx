@@ -16,7 +16,7 @@ import { OtherAssignmentsAdminSection } from "@/components/training/other-assign
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
 import { getStaffChecklist } from "@/lib/hr-staff.functions";
 import { SmartImportRemindersPanel } from "@/components/smart-import/reminders-panel";
-import { UploadDialog as ExternalCertUploadDialog } from "@/routes/dashboard.external-certifications";
+
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (

@@ -478,12 +478,23 @@ export function ClientsPage() {
                           intakeStatus={c.intake_status}
                         />
                       </TableCell>
-                      <TableCell className="text-right py-2 w-[160px]" onClick={(e) => e.stopPropagation()}>
-                        <IntakeAction
-                          organizationId={org?.organization_id}
-                          clientId={c.id}
-                          intakeStatus={c.intake_status}
-                        />
+                      <TableCell className="text-right py-2 w-[220px]" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                            <Link
+                              to="/dashboard/clients/$clientId"
+                              params={{ clientId: c.id }}
+                              search={{ tab: "overview" }}
+                            >
+                              Profile
+                            </Link>
+                          </Button>
+                          <IntakeAction
+                            organizationId={org?.organization_id}
+                            clientId={c.id}
+                            intakeStatus={c.intake_status}
+                          />
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

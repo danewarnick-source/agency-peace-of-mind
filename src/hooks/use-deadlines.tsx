@@ -355,6 +355,25 @@ export function useDeadlines() {
       }
     }
 
+    // Host home certifications — HHS-only. Overdue/missing surfaces here.
+    if (hhsQ.data && hhCertsQ.data) {
+      for (const clientId of hhsQ.data.activeIds) {
+        const dueStr = hhCertsQ.data.latest.get(clientId);
+        const due = dueStr ? new Date(`${dueStr}T23:59:59`) : new Date(now.getTime() - DAY);
+        out.push({
+          key: `hhc:${clientId}`,
+          source: "host_home_cert",
+          title: dueStr ? "Host home annual certification" : "Host home certification (never completed)",
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: due,
+          status: bucketStatus(due, now),
+          href: `/dashboard/hhs-hub/${clientId}?tab=cert`,
+          clientId,
+        });
+      }
+    }
+
     out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
     return out;
   }, [
@@ -362,6 +381,7 @@ export function useDeadlines() {
     summariesQ.data,
     clientsQ.data,
     hhsQ.data,
+    hhCertsQ.data,
     certsQ.data,
     profilesQ.data,
     incidentsQ.data,
@@ -375,6 +395,6 @@ export function useDeadlines() {
     upcoming: items.filter((i) => i.status === "upcoming"),
     isLoading:
       summariesQ.isLoading || clientsQ.isLoading || hhsQ.isLoading ||
-      certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading,
+      certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading,
   };
 }

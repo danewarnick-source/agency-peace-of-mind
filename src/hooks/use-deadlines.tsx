@@ -288,7 +288,11 @@ export function useDeadlines() {
 
     // Incident clocks
     for (const inc of incidentsQ.data ?? []) {
-      const clocks = getIncidentOpenClocks(inc);
+      const client = (clientsQ.data ?? []).find((c) => c.id === inc.client_id);
+      const clocks = getIncidentOpenClocks({
+        ...inc,
+        client_is_own_guardian: !!client?.is_own_guardian,
+      });
       for (const clock of clocks) {
         out.push({
           key: `inc:${inc.id}:${clock.kind}`,
@@ -304,6 +308,7 @@ export function useDeadlines() {
         });
       }
     }
+
 
     // Billing-code / SOW deadlines
     for (const c of bcQ.data ?? []) {

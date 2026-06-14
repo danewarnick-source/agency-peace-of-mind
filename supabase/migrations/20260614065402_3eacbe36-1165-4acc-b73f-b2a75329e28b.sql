@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS positions text[] NOT NULL DEFAULT '{}';
+UPDATE public.profiles SET positions = ARRAY[position] WHERE position IS NOT NULL AND position <> '' AND (positions IS NULL OR cardinality(positions) = 0);

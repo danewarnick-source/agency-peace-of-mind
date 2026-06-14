@@ -8528,6 +8528,7 @@ export type Database = {
           last_name: string | null
           must_change_password: boolean
           position: string | null
+          positions: string[]
           ssn_last4: string | null
           staff_type_keys: string[]
           start_date: string | null
@@ -8561,6 +8562,7 @@ export type Database = {
           last_name?: string | null
           must_change_password?: boolean
           position?: string | null
+          positions?: string[]
           ssn_last4?: string | null
           staff_type_keys?: string[]
           start_date?: string | null
@@ -8594,6 +8596,7 @@ export type Database = {
           last_name?: string | null
           must_change_password?: boolean
           position?: string | null
+          positions?: string[]
           ssn_last4?: string | null
           staff_type_keys?: string[]
           start_date?: string | null

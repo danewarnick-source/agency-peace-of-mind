@@ -78,6 +78,13 @@ type Client = {
   date_of_birth: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
+  // Guardianship — when is_own_guardian = true, the other guardian_* fields
+  // must be empty. See `validate_client_guardianship` trigger.
+  is_own_guardian: boolean | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  guardian_relationship: string | null;
+  guardian_email: string | null;
   // feature toggles stored as JSON
   feature_config: Record<string, boolean> | null;
   profile_photo_url: string | null;
@@ -98,7 +105,14 @@ type ClientFormValues = {
   emergency_contact_name: string;
   emergency_contact_phone: string;
   profile_photo_url: string;
+  // Optional — only included by forms that expose guardianship editing.
+  is_own_guardian?: boolean;
+  guardian_name?: string;
+  guardian_phone?: string;
+  guardian_relationship?: string;
+  guardian_email?: string;
 };
+
 
 type StaffMember = {
   id: string;
@@ -215,7 +229,7 @@ export function ClientsPage() {
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await (supabase as any)
         .from("clients")
-        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, account_status, geofence_radius_feet, special_directions, date_of_birth, emergency_contact_name, emergency_contact_phone, feature_config, profile_photo_url, intake_status")
+        .select("id, first_name, last_name, phone_number, physical_address, pcsp_goals, job_code, authorized_dspd_codes, medicaid_id, account_status, geofence_radius_feet, special_directions, date_of_birth, emergency_contact_name, emergency_contact_phone, is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email, feature_config, profile_photo_url, intake_status")
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
@@ -271,29 +285,41 @@ export function ClientsPage() {
     mutationFn: async (input: ClientFormValues & { id: string }) => {
       const { id, ...rest } = input;
       const coords = await resolveCoords(rest.physical_address);
+      const patch: Record<string, unknown> = {
+        first_name:           rest.first_name,
+        last_name:            rest.last_name,
+        phone_number:         rest.phone_number,
+        physical_address:     rest.physical_address,
+        pcsp_goals:           rest.pcsp_goals,
+        authorized_dspd_codes: rest.job_code,
+        job_code:             rest.job_code,
+        medicaid_id:          rest.medicaid_id,
+        geofence_radius_feet: rest.geofence_radius_feet,
+        special_directions:   rest.special_directions || null,
+        date_of_birth:        rest.date_of_birth || null,
+        emergency_contact_name:  rest.emergency_contact_name || null,
+        emergency_contact_phone: rest.emergency_contact_phone || null,
+        profile_photo_url:    input.profile_photo_url ?? null,
+        home_latitude:        coords.lat,
+        home_longitude:       coords.lng,
+      };
+      // Guardianship — only patch when the form exposed these fields. The DB
+      // trigger validates the combination (own-guardian => guardian_* null;
+      // otherwise name + phone required).
+      if (rest.is_own_guardian !== undefined) {
+        patch.is_own_guardian = !!rest.is_own_guardian;
+        patch.guardian_name = rest.is_own_guardian ? null : (rest.guardian_name?.trim() || null);
+        patch.guardian_phone = rest.is_own_guardian ? null : (rest.guardian_phone?.trim() || null);
+        patch.guardian_relationship = rest.is_own_guardian ? null : (rest.guardian_relationship?.trim() || null);
+        patch.guardian_email = rest.is_own_guardian ? null : (rest.guardian_email?.trim() || null);
+      }
       const { error } = await (supabase as any)
         .from("clients")
-        .update({
-          first_name:           rest.first_name,
-          last_name:            rest.last_name,
-          phone_number:         rest.phone_number,
-          physical_address:     rest.physical_address,
-          pcsp_goals:           rest.pcsp_goals,
-          authorized_dspd_codes: rest.job_code,
-          job_code:             rest.job_code,
-          medicaid_id:          rest.medicaid_id,
-          geofence_radius_feet: rest.geofence_radius_feet,
-          special_directions:   rest.special_directions || null,
-          date_of_birth:        rest.date_of_birth || null,
-          emergency_contact_name:  rest.emergency_contact_name || null,
-          emergency_contact_phone: rest.emergency_contact_phone || null,
-          profile_photo_url:    input.profile_photo_url ?? null,
-          home_latitude:        coords.lat,
-          home_longitude:       coords.lng,
-        })
+        .update(patch)
         .eq("id", id);
       if (error) throw error;
     },
+
     onSuccess: () => {
       toast.success("Client updated.");
       qc.invalidateQueries({ queryKey: ["clients"] });
@@ -1463,6 +1489,12 @@ function ProfileTab({
   const [dob, setDob]                   = useState(client.date_of_birth ?? "");
   const [ecName, setEcName]             = useState(client.emergency_contact_name ?? "");
   const [ecPhone, setEcPhone]           = useState(client.emergency_contact_phone ?? "");
+  const [isOwnGuardian, setIsOwnGuardian] = useState<boolean>(!!client.is_own_guardian);
+  const [gName, setGName]               = useState(client.guardian_name ?? "");
+  const [gPhone, setGPhone]             = useState(client.guardian_phone ?? "");
+  const [gRel, setGRel]                 = useState(client.guardian_relationship ?? "");
+  const [gEmail, setGEmail]             = useState(client.guardian_email ?? "");
+
   const [jobCodes, setJobCodes]         = useState<string[]>(client.job_code ?? []);
   const [radius, setRadius]             = useState(client.geofence_radius_feet ?? 1000);
   const [pinning, setPinning]           = useState(false);
@@ -1505,11 +1537,19 @@ function ProfileTab({
     ecName !== (client.emergency_contact_name ?? "") ||
     ecPhone !== (client.emergency_contact_phone ?? "") ||
     radius !== (client.geofence_radius_feet ?? 1000) ||
+    isOwnGuardian !== !!client.is_own_guardian ||
+    gName !== (client.guardian_name ?? "") ||
+    gPhone !== (client.guardian_phone ?? "") ||
+    gRel !== (client.guardian_relationship ?? "") ||
+    gEmail !== (client.guardian_email ?? "") ||
     JSON.stringify(jobCodes) !== JSON.stringify(client.job_code ?? [])
-  ), [first, last, phone, addr, medicaidId, dob, ecName, ecPhone, radius, jobCodes, client]);
+  ), [first, last, phone, addr, medicaidId, dob, ecName, ecPhone, radius, jobCodes, isOwnGuardian, gName, gPhone, gRel, gEmail, client]);
+
+  const guardianInvalid = !isOwnGuardian && (!gName.trim() || !gPhone.trim());
 
   function handleSave() {
     onSave({
+
       first_name: first.trim(),
       last_name: last.trim(),
       phone_number: phone.trim(),
@@ -1523,6 +1563,12 @@ function ProfileTab({
       emergency_contact_name: ecName.trim(),
       emergency_contact_phone: ecPhone.trim(),
       profile_photo_url: photoUrl,
+      is_own_guardian: isOwnGuardian,
+      guardian_name: gName,
+      guardian_phone: gPhone,
+      guardian_relationship: gRel,
+      guardian_email: gEmail,
+
     });
   }
 
@@ -1655,6 +1701,80 @@ function ProfileTab({
             </div>
           </div>
         </CollapsibleCard>
+
+        {/* Guardianship — drives whether the 24h guardian-notification duty
+            applies to incident reports for this client. */}
+        <CollapsibleCard
+          title="Guardianship"
+          description="Is this client their own guardian, or is there a separate legal guardian to notify on incidents?"
+          icon={Gavel}
+          storageKey={`${client.id}:guardianship`}
+          summary={isOwnGuardian
+            ? "Self-guardian — no separate guardian to notify"
+            : (gName.trim() ? `${gName.trim()}${gPhone.trim() ? ` · ${gPhone.trim()}` : ""}` : "Not set")}
+        >
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm">
+                <div className="font-medium">Is the client their own guardian?</div>
+                <div className="text-xs text-muted-foreground">
+                  If yes, no separate guardian notification is required on incidents.
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isOwnGuardian ? "default" : "outline"}
+                  onClick={() => setIsOwnGuardian(true)}
+                >
+                  Self-guardian
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={!isOwnGuardian ? "default" : "outline"}
+                  onClick={() => setIsOwnGuardian(false)}
+                >
+                  Has guardian
+                </Button>
+              </div>
+            </div>
+
+            {!isOwnGuardian && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-semibold">Guardian Name *</Label>
+                    <Input value={gName} onChange={(e) => setGName(e.target.value)}
+                      placeholder="Full legal name" maxLength={150} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-semibold">Guardian Phone *</Label>
+                    <Input value={gPhone} onChange={(e) => setGPhone(e.target.value)}
+                      placeholder="(801) 555-0100" maxLength={30} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-semibold">Relationship</Label>
+                    <Input value={gRel} onChange={(e) => setGRel(e.target.value)}
+                      placeholder="Mother, Brother, Court-appointed, …" maxLength={80} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-semibold">Email</Label>
+                    <Input value={gEmail} onChange={(e) => setGEmail(e.target.value)}
+                      placeholder="optional" maxLength={150} />
+                  </div>
+                </div>
+                {guardianInvalid && (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    Guardian name and phone are required when the client is not their own guardian.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </CollapsibleCard>
+
 
         {/* Clinical alert — the one colored callout on Profile; expanded by default */}
         <CollapsibleCard

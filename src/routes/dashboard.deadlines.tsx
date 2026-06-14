@@ -175,18 +175,7 @@ function DeadlineRow({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["s
 function RowAction({ item }: { item: DeadlineItem }) {
   const qc = useQueryClient();
   const { data: org } = useCurrentOrg();
-  const completeFn = useServerFn(markSummaryCompleted);
   const attestFn = useServerFn(attestSummaryUpiEntered);
-
-  const complete = useMutation({
-    mutationFn: async () =>
-      completeFn({ data: { organizationId: org!.organization_id, summaryId: item.summary!.id } }),
-    onSuccess: () => {
-      toast.success("Summary marked complete.");
-      qc.invalidateQueries({ queryKey: ["deadlines"] });
-    },
-    onError: (e) => toast.error((e as Error).message),
-  });
 
   const attest = useMutation({
     mutationFn: async () =>
@@ -198,22 +187,33 @@ function RowAction({ item }: { item: DeadlineItem }) {
     onError: (e) => toast.error((e as Error).message),
   });
 
+  // Summary rows: completion happens in the Summaries portal (single source of
+  // truth). Always render "Open summary"; for SEI / UPI-required summaries
+  // that have been finalized but still need the state UPI entry, also show
+  // the "Entered into UPI" attestation button.
   if (item.source === "summary" && item.summary) {
-    if (item.summary.requires_upi_attestation) {
-      return (
-        <Button size="sm" disabled={attest.isPending || !org}
-          onClick={() => attest.mutate()}>
-          Entered into UPI
-        </Button>
-      );
-    }
+    const s = item.summary;
+    const needsUpi =
+      !!s.requires_upi_attestation && !!s.finalized_at && !s.upi_entered_at;
     return (
-      <Button size="sm" variant="outline" disabled={complete.isPending || !org}
-        onClick={() => complete.mutate()}>
-        Mark complete
-      </Button>
+      <div className="flex items-center gap-2">
+        {item.href && (
+          <Button asChild size="sm" variant="outline">
+            <a href={item.href}>
+              Open summary <ExternalLink className="ml-1 h-3 w-3" />
+            </a>
+          </Button>
+        )}
+        {needsUpi && (
+          <Button size="sm" disabled={attest.isPending || !org}
+            onClick={() => attest.mutate()}>
+            Entered into UPI
+          </Button>
+        )}
+      </div>
     );
   }
+
   if (item.href) {
     return (
       <Button asChild size="sm" variant="outline">
@@ -225,6 +225,7 @@ function RowAction({ item }: { item: DeadlineItem }) {
   }
   return null;
 }
+
 
 /** Compact card for the Home dashboard. */
 export function DeadlinesHomeCard() {

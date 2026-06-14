@@ -213,9 +213,9 @@ function RowAction({ item }: { item: DeadlineItem }) {
   if (item.href) {
     return (
       <Button asChild size="sm" variant="outline">
-        <Link to={item.href}>
+        <a href={item.href}>
           Open <ExternalLink className="ml-1 h-3 w-3" />
-        </Link>
+        </a>
       </Button>
     );
   }

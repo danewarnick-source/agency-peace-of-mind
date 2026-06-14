@@ -143,6 +143,9 @@ export function HostsPage() {
                             </div>
                           )}
                           <div className="mt-2 flex flex-wrap gap-1">
+                            {canManage && orgId && (
+                              <HostCertBadge orgId={orgId} hostCardId={c.id} />
+                            )}
                             {c.wheelchair_accessible && (
                               <Badge variant="outline" className="text-[10px]">
                                 Wheelchair

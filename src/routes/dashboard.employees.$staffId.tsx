@@ -48,7 +48,7 @@ function StaffProfilePage() {
       const { data: p } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, employee_id, position, department, hire_date, account_status, worker_type, team_id" as any)
+        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id" as any)
         .eq("id", staffId)
         .maybeSingle();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

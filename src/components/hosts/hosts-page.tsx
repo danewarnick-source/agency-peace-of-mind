@@ -36,6 +36,7 @@ import {
   type HhpCueCard,
   type HhpStatus,
 } from "@/lib/hhp-cue-cards.functions";
+import { HostCertificationPanel, HostCertBadge } from "./host-home-certification-dialog";
 
 function splitList(s: string): string[] {
   return s

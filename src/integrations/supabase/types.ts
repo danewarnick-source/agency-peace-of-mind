@@ -2591,11 +2591,17 @@ export type Database = {
           feature_config: Json | null
           first_name: string
           geofence_radius_feet: number
+          guardian_address: string | null
+          guardian_email: string | null
+          guardian_name: string | null
+          guardian_phone: string | null
+          guardian_relationship: string | null
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
           id: string
           intake_status: string
+          is_own_guardian: boolean
           job_code: string[]
           last_name: string
           medicaid_id: string | null
@@ -2617,11 +2623,17 @@ export type Database = {
           feature_config?: Json | null
           first_name: string
           geofence_radius_feet?: number
+          guardian_address?: string | null
+          guardian_email?: string | null
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          guardian_relationship?: string | null
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
           intake_status?: string
+          is_own_guardian?: boolean
           job_code?: string[]
           last_name: string
           medicaid_id?: string | null
@@ -2643,11 +2655,17 @@ export type Database = {
           feature_config?: Json | null
           first_name?: string
           geofence_radius_feet?: number
+          guardian_address?: string | null
+          guardian_email?: string | null
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          guardian_relationship?: string | null
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
           id?: string
           intake_status?: string
+          is_own_guardian?: boolean
           job_code?: string[]
           last_name?: string
           medicaid_id?: string | null
@@ -6443,9 +6461,13 @@ export type Database = {
           family_notified_at: string | null
           filed_at: string
           followup_notes: string | null
+          guardian_attestation_text: string | null
           guardian_notified_at: string | null
           guardian_notified_by: string | null
           guardian_notified_method: string | null
+          guardian_signed_at: string | null
+          guardian_signed_name: string | null
+          guardian_signed_title: string | null
           id: string
           immediate_actions: string
           incident_address: string | null
@@ -6480,6 +6502,12 @@ export type Database = {
           reported_to_reporter_by: string | null
           reporter_title: string | null
           restraint_used: boolean
+          sc_update_attestation_text: string | null
+          sc_update_notes: string | null
+          sc_update_signed_at: string | null
+          sc_update_signed_by: string | null
+          sc_update_signed_name: string | null
+          sc_update_signed_title: string | null
           staff_involved: Json | null
           staff_signature_url: string | null
           state_confirmation_number: string | null
@@ -6495,9 +6523,15 @@ export type Database = {
           triggered_by_note_type: string | null
           updated_at: string
           upi_completed_at: string | null
+          upi_completed_attestation_text: string | null
           upi_completed_by: string | null
+          upi_completed_signed_name: string | null
+          upi_completed_signed_title: string | null
           upi_initiated_at: string | null
+          upi_initiated_attestation_text: string | null
           upi_initiated_by: string | null
+          upi_initiated_signed_name: string | null
+          upi_initiated_signed_title: string | null
           witnessed_directly: boolean | null
           witnesses: Json | null
         }
@@ -6523,9 +6557,13 @@ export type Database = {
           family_notified_at?: string | null
           filed_at?: string
           followup_notes?: string | null
+          guardian_attestation_text?: string | null
           guardian_notified_at?: string | null
           guardian_notified_by?: string | null
           guardian_notified_method?: string | null
+          guardian_signed_at?: string | null
+          guardian_signed_name?: string | null
+          guardian_signed_title?: string | null
           id?: string
           immediate_actions?: string
           incident_address?: string | null
@@ -6560,6 +6598,12 @@ export type Database = {
           reported_to_reporter_by?: string | null
           reporter_title?: string | null
           restraint_used?: boolean
+          sc_update_attestation_text?: string | null
+          sc_update_notes?: string | null
+          sc_update_signed_at?: string | null
+          sc_update_signed_by?: string | null
+          sc_update_signed_name?: string | null
+          sc_update_signed_title?: string | null
           staff_involved?: Json | null
           staff_signature_url?: string | null
           state_confirmation_number?: string | null
@@ -6575,9 +6619,15 @@ export type Database = {
           triggered_by_note_type?: string | null
           updated_at?: string
           upi_completed_at?: string | null
+          upi_completed_attestation_text?: string | null
           upi_completed_by?: string | null
+          upi_completed_signed_name?: string | null
+          upi_completed_signed_title?: string | null
           upi_initiated_at?: string | null
+          upi_initiated_attestation_text?: string | null
           upi_initiated_by?: string | null
+          upi_initiated_signed_name?: string | null
+          upi_initiated_signed_title?: string | null
           witnessed_directly?: boolean | null
           witnesses?: Json | null
         }
@@ -6603,9 +6653,13 @@ export type Database = {
           family_notified_at?: string | null
           filed_at?: string
           followup_notes?: string | null
+          guardian_attestation_text?: string | null
           guardian_notified_at?: string | null
           guardian_notified_by?: string | null
           guardian_notified_method?: string | null
+          guardian_signed_at?: string | null
+          guardian_signed_name?: string | null
+          guardian_signed_title?: string | null
           id?: string
           immediate_actions?: string
           incident_address?: string | null
@@ -6640,6 +6694,12 @@ export type Database = {
           reported_to_reporter_by?: string | null
           reporter_title?: string | null
           restraint_used?: boolean
+          sc_update_attestation_text?: string | null
+          sc_update_notes?: string | null
+          sc_update_signed_at?: string | null
+          sc_update_signed_by?: string | null
+          sc_update_signed_name?: string | null
+          sc_update_signed_title?: string | null
           staff_involved?: Json | null
           staff_signature_url?: string | null
           state_confirmation_number?: string | null
@@ -6655,9 +6715,15 @@ export type Database = {
           triggered_by_note_type?: string | null
           updated_at?: string
           upi_completed_at?: string | null
+          upi_completed_attestation_text?: string | null
           upi_completed_by?: string | null
+          upi_completed_signed_name?: string | null
+          upi_completed_signed_title?: string | null
           upi_initiated_at?: string | null
+          upi_initiated_attestation_text?: string | null
           upi_initiated_by?: string | null
+          upi_initiated_signed_name?: string | null
+          upi_initiated_signed_title?: string | null
           witnessed_directly?: boolean | null
           witnesses?: Json | null
         }
@@ -12344,11 +12410,17 @@ export type Database = {
           feature_config: Json | null
           first_name: string
           geofence_radius_feet: number
+          guardian_address: string | null
+          guardian_email: string | null
+          guardian_name: string | null
+          guardian_phone: string | null
+          guardian_relationship: string | null
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
           id: string
           intake_status: string
+          is_own_guardian: boolean
           job_code: string[]
           last_name: string
           medicaid_id: string | null

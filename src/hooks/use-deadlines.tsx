@@ -220,6 +220,30 @@ export function useDeadlines() {
     },
   });
 
+  // 8. Host home certifications — latest next_due_date per active HHS client.
+  const hhCertsQ = useQuery({
+    enabled: !!orgId && !!hhsQ.data,
+    queryKey: ["deadlines", "host_home_certs", orgId, (hhsQ.data?.activeIds ?? []).join(",")],
+    queryFn: async () => {
+      const activeIds = hhsQ.data?.activeIds ?? [];
+      if (activeIds.length === 0) return { latest: new Map<string, string>() };
+      const { data, error } = await supabase
+        .from("host_home_certifications" as never)
+        .select("client_id, next_due_date, inspection_date")
+        .eq("organization_id", orgId!)
+        .in("client_id", activeIds)
+        .order("inspection_date", { ascending: false });
+      if (error) throw error;
+      const latest = new Map<string, string>();
+      for (const row of (data ?? []) as unknown as Array<{ client_id: string; next_due_date: string }>) {
+        if (!latest.has(row.client_id)) latest.set(row.client_id, row.next_due_date);
+      }
+      return { latest };
+    },
+  });
+
+
+
   const items = useMemo<DeadlineItem[]>(() => {
     if (!orgId) return [];
     const now = new Date();

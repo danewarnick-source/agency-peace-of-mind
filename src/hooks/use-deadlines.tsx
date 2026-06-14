@@ -126,7 +126,7 @@ export function useDeadlines() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("incident_reports")
-        .select("id, report_number, client_id, discovered_at, upi_initiated_at, upi_completed_at, status")
+        .select("id, report_number, client_id, discovered_at, upi_initiated_at, upi_completed_at, guardian_notified_at, status")
         .eq("organization_id", orgId!)
         .not("discovered_at", "is", null)
         .neq("status", "State_Confirmed")
@@ -135,10 +135,12 @@ export function useDeadlines() {
       if (error) throw error;
       return (data ?? []) as Array<{
         id: string; report_number: string; client_id: string;
-        discovered_at: string; upi_initiated_at: string | null; upi_completed_at: string | null; status: string;
+        discovered_at: string; upi_initiated_at: string | null; upi_completed_at: string | null;
+        guardian_notified_at: string | null; status: string;
       }>;
     },
   });
+
 
   // 6. Billing-code / SOW deadlines per behavior-support client.
   const bcQ = useQuery({

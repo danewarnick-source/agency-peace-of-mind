@@ -107,31 +107,27 @@ export function EvvArchiveWrapped() {
 }
 
 function EvvArchivePage() {
-  const sp = (Route.useSearch?.() ?? {}) as z.infer<typeof searchSchema>;
-  const navigate = useNavigate({ from: "/dashboard/evv-archive" }).bind
-    ? useNavigate()
-    : useNavigate();
+  const navigate = useNavigate();
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
   const isAdmin = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
 
-  // Filter state — initialized from search params; on change we push to URL.
-  const [staff, setStaff] = useState<string[]>(sp.staff ?? []);
-  const [client, setClient] = useState<string[]>(sp.client ?? []);
-  const [code, setCode] = useState<string[]>(sp.code ?? []);
-  const [team, setTeam] = useState<string[]>(sp.team ?? []);
-  const [from, setFrom] = useState<string>(sp.from ?? defaultFrom());
-  const [to, setTo] = useState<string>(sp.to ?? defaultTo());
-  const [billing, setBilling] = useState<"all" | "billed" | "unbilled" | "held">(sp.billing ?? "all");
-  const [page, setPage] = useState<number>(sp.page ?? 1);
+  // Filter state — local only. We sync to URL when embedded as a standalone route,
+  // but since this component is also rendered inside the Documentation hub
+  // (which owns its own search params), we keep state local for safety.
+  const [staff, setStaff] = useState<string[]>([]);
+  const [client, setClient] = useState<string[]>([]);
+  const [code, setCode] = useState<string[]>([]);
+  const [team, setTeam] = useState<string[]>([]);
+  const [from, setFrom] = useState<string>(defaultFrom());
+  const [to, setTo] = useState<string>(defaultTo());
+  const [billing, setBilling] = useState<"all" | "billed" | "unbilled" | "held">("all");
+  const [page, setPage] = useState<number>(1);
 
-  // Push filter changes to URL (debounced via state only).
-  const syncUrl = (next: Partial<z.infer<typeof searchSchema>>) => {
-    navigate({
-      to: "/dashboard/evv-archive",
-      search: (prev) => ({ ...prev, ...next }),
-      replace: true,
-    });
+  // No-op stub kept for future URL syncing — currently we just navigate to self.
+  const syncUrl = (_next: Partial<z.infer<typeof searchSchema>>) => {
+    void _next;
+    void navigate;
   };
 
   // Option sources

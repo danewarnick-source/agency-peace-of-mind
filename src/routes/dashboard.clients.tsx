@@ -285,29 +285,41 @@ export function ClientsPage() {
     mutationFn: async (input: ClientFormValues & { id: string }) => {
       const { id, ...rest } = input;
       const coords = await resolveCoords(rest.physical_address);
+      const patch: Record<string, unknown> = {
+        first_name:           rest.first_name,
+        last_name:            rest.last_name,
+        phone_number:         rest.phone_number,
+        physical_address:     rest.physical_address,
+        pcsp_goals:           rest.pcsp_goals,
+        authorized_dspd_codes: rest.job_code,
+        job_code:             rest.job_code,
+        medicaid_id:          rest.medicaid_id,
+        geofence_radius_feet: rest.geofence_radius_feet,
+        special_directions:   rest.special_directions || null,
+        date_of_birth:        rest.date_of_birth || null,
+        emergency_contact_name:  rest.emergency_contact_name || null,
+        emergency_contact_phone: rest.emergency_contact_phone || null,
+        profile_photo_url:    input.profile_photo_url ?? null,
+        home_latitude:        coords.lat,
+        home_longitude:       coords.lng,
+      };
+      // Guardianship — only patch when the form exposed these fields. The DB
+      // trigger validates the combination (own-guardian => guardian_* null;
+      // otherwise name + phone required).
+      if (rest.is_own_guardian !== undefined) {
+        patch.is_own_guardian = !!rest.is_own_guardian;
+        patch.guardian_name = rest.is_own_guardian ? null : (rest.guardian_name?.trim() || null);
+        patch.guardian_phone = rest.is_own_guardian ? null : (rest.guardian_phone?.trim() || null);
+        patch.guardian_relationship = rest.is_own_guardian ? null : (rest.guardian_relationship?.trim() || null);
+        patch.guardian_email = rest.is_own_guardian ? null : (rest.guardian_email?.trim() || null);
+      }
       const { error } = await (supabase as any)
         .from("clients")
-        .update({
-          first_name:           rest.first_name,
-          last_name:            rest.last_name,
-          phone_number:         rest.phone_number,
-          physical_address:     rest.physical_address,
-          pcsp_goals:           rest.pcsp_goals,
-          authorized_dspd_codes: rest.job_code,
-          job_code:             rest.job_code,
-          medicaid_id:          rest.medicaid_id,
-          geofence_radius_feet: rest.geofence_radius_feet,
-          special_directions:   rest.special_directions || null,
-          date_of_birth:        rest.date_of_birth || null,
-          emergency_contact_name:  rest.emergency_contact_name || null,
-          emergency_contact_phone: rest.emergency_contact_phone || null,
-          profile_photo_url:    input.profile_photo_url ?? null,
-          home_latitude:        coords.lat,
-          home_longitude:       coords.lng,
-        })
+        .update(patch)
         .eq("id", id);
       if (error) throw error;
     },
+
     onSuccess: () => {
       toast.success("Client updated.");
       qc.invalidateQueries({ queryKey: ["clients"] });

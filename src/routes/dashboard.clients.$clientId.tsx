@@ -496,42 +496,6 @@ function DeadlinesPanel({ clientId }: { clientId: string }) {
   );
 }
 
-function DocumentsPanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
-  const q = useQuery({
-    enabled: !!orgId,
-    queryKey: ["client-profile-docs", orgId, clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_documents")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, file_name, document_type, uploaded_at" as any)
-        .eq("organization_id", orgId!)
-        .eq("client_id", clientId)
-        .order("uploaded_at", { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data ?? []) as any[];
-    },
-  });
-  return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">Documents</CardTitle></CardHeader>
-      <CardContent className="p-0">
-        <ReadOnlyTable
-          loading={q.isLoading}
-          empty="No documents on file."
-          rows={q.data ?? []}
-          columns={[
-            { header: "Name", cell: (r) => r.file_name ?? "—" },
-            { header: "Type", cell: (r) => r.document_type ?? "—" },
-            { header: "Uploaded", cell: (r) => r.uploaded_at ? new Date(r.uploaded_at).toLocaleDateString() : "—" },
-          ]}
-        />
-      </CardContent>
-    </Card>
-  );
-}
 
 // ─── Tiny shared bits ─────────────────────────────────────────────────────────
 

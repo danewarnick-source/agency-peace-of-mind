@@ -15,7 +15,7 @@ export function addBusinessDays(start: Date, days: number): Date {
 }
 
 export type IncidentClock = {
-  kind: "upi_initiated" | "upi_completed";
+  kind: "upi_initiated" | "upi_completed" | "guardian_notified";
   label: string;
   deadline: Date;
   done: boolean;
@@ -25,6 +25,10 @@ export type IncidentClockInput = {
   discovered_at: string | null;
   upi_initiated_at: string | null;
   upi_completed_at: string | null;
+  guardian_notified_at?: string | null;
+  /** When true, the client is their own guardian and the 24h guardian
+   *  notification duty does NOT apply — no clock should surface. */
+  client_is_own_guardian?: boolean;
 };
 
 /** Return the still-open clocks for an incident (omits done ones). */
@@ -45,6 +49,15 @@ export function getIncidentOpenClocks(i: IncidentClockInput): IncidentClock[] {
       kind: "upi_completed",
       label: "5-business-day UPI completion",
       deadline: addBusinessDays(disc, 5),
+      done: false,
+    });
+  }
+  // Guardian notification duty: only when there's actually a guardian to notify.
+  if (!i.client_is_own_guardian && !i.guardian_notified_at) {
+    clocks.push({
+      kind: "guardian_notified",
+      label: "24-hour guardian notification",
+      deadline: new Date(disc.getTime() + 24 * 3_600_000),
       done: false,
     });
   }

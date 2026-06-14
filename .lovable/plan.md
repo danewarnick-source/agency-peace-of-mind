@@ -1,78 +1,82 @@
-# Host Home Certification — Plan
+## Summary Automator — Plan
 
-## Scope
-Add a "Host Home Certification" section to the HHS client hub (`src/routes/dashboard.hhs-hub.$clientId.tsx`) only. Inspector fills a structured form → row saved → PDF certificate generated → next-due date (inspection + 1 year) surfaces in Deadlines page for HHS clients only. Full history retained per client/home.
+Builds on the existing `client_progress_summaries` table + cadence logic (already feeding the Deadlines page). Adds: extended cadence (PN1/PN2, PBA), a Nectar drafter modeled on `draftIncidentNarrative`, and a full Summaries admin area with source-bundle review, edit, finalize, and PDF download.
 
-## Database (one migration)
+### 1. Cadence extension (`src/lib/progress-summaries.ts`)
+- `QUARTERLY_SUMMARY_CODES`: unchanged (HHS, RHS, DSI, SLH, SLN).
+- `MONTHLY_SUMMARY_CODES`: add `SEI, PN1, PN2`.
+- New `FINANCIAL_STATEMENT_CODES`: `PBA` (monthly, summary_kind = `financial_statement`, no narrative draft).
+- New `GOAL_PROGRESS_EXCLUDED_CODES`: `ELS, MTP, PBA, PM1, PM2, RP2, RP3, RP4, RP5, RL6` (controls whether goal-progress section is rendered).
+- Helper `clientNeedsGoalProgress(serviceCodes)`: true if any code is NOT in the excluded set.
 
-**`public.host_home_certifications`** — one row per completed certification.
-- Identity/org: `id`, `organization_id`, `client_id` (FK clients), `team_id` (host home, nullable), `created_at`, `updated_at`.
-- Header: `cert_type` (`'initial'|'annual'`), `inspection_date` (date), `inspector_user_id` (FK profiles), `inspector_name`, `host_home_address`, `inspector_not_host_confirmed` (bool, must be true to certify).
-- Checklist results stored as one JSONB column `checklist` keyed by item code (e.g. `settings.choice`, `safety.smoke`, `ops.drills`) with `{ status: 'meets'|'does_not_meet'|'na', note?: string }`. Item codes enumerated in `src/lib/host-home-cert-items.ts` (single source of truth for the form).
-- PCSP: `pcsp_status` (`'meets'|'does_not_meet'`), `pcsp_notes` (text).
-- Determination: `determination` (`'certified'|'certified_with_corrections'|'not_certified'`), `signature_name`, `signature_title`, `signed_at` (timestamptz), `guardian_acknowledgement_name` (nullable).
-- Lifecycle: `next_due_date` (date, generated `(inspection_date + interval '1 year')::date`), `certificate_pdf_path` (text, storage path).
+### 2. Migration — extend `client_progress_summaries`
+Add columns (no destructive changes to existing rows):
+- `summary_kind text not null default 'narrative'` check in (`narrative`, `financial_statement`)
+- `status text not null default 'pending'` check in (`pending`, `draft`, `in_review`, `finalized`, `no_source`)
+- `draft_content text`, `final_content text`
+- `draft_source jsonb` (snapshot of note IDs / incident IDs / goal list used for the draft — for the side-by-side viewer and audit)
+- `drafted_at timestamptz`, `drafted_by uuid`, `finalized_at timestamptz`, `finalized_by uuid`, `finalized_by_name text`
+- Update `ensureCurrentSummaryPeriods` to set `summary_kind` and include PN1/PN2/PBA buckets.
 
-**`public.host_home_cert_concerns`** — 0..N per certification.
-- `id`, `organization_id`, `certification_id` (FK cascade), `finding`, `corrective_action`, `target_date` (date), `resolved_at` (date, nullable), `resolution_notes` (text, nullable), `created_at`.
+Existing `completed_at` stays as the deadline-clearing field; `finalizeSummary` writes both `completed_at` and `finalized_*`. Deadlines page already keys off `completed_at`, so finalize clears the deadline with no change there.
 
-Standard pattern for both: GRANT to authenticated + service_role, enable RLS, policies via `is_org_member` for SELECT and `is_org_admin_or_manager` for write. Indexes on `(organization_id, client_id, inspection_date desc)` and concerns `(certification_id)`.
+### 3. Nectar drafter — `src/lib/progress-summary-draft.functions.ts`
+- `draftProgressSummary({ summaryId })` server fn, admin/manager-gated.
+- Pulls REAL data scoped to the client + period_start..period_end:
+  - `clients` (name, `pcsp_goals[]`)
+  - `client_billing_codes` active in window → service list
+  - `daily_logs` where `status = 'approved'` (narrative + `pcsp_goals_addressed[]`)
+  - `shift_reports` approved in window
+  - `incident_reports` in window
+- If zero approved notes AND zero incidents → set `status = 'no_source'`, do NOT call AI, return empty draft. UI then shows the blank manual editor.
+- Otherwise calls existing `callAI(system, user)` (same Bedrock gateway path the incident drafter uses — no new model wiring).
+- System prompt mirrors `draftIncidentNarrative` honesty contract:
+  - "Write ONLY what the source notes support. Never invent progress, dates, events, medications, staff actions."
+  - "For any goal with sparse/no supporting note text, state plainly: 'No documentation in this period supports progress on this goal.' — do NOT fabricate."
+  - "Output the six required sections in order: (1) Person's name (2) Services provided this period (3) Date range (4) General summary of services / status / response / notable events (5) Goal-by-goal progress — INCLUDE THIS SECTION ONLY IF `includeGoalProgress = true` — one heading per PCSP goal (6) Prepared by: <blank — admin fills on finalize>."
+- Goal-progress section is omitted when `clientNeedsGoalProgress(codes) === false`.
+- PBA rows are never drafted — the row exists only as a "Monthly financial statement due" marker that admin manually finalizes after they generate the statement elsewhere.
 
-**Storage bucket**: `host-home-certificates` (private). RLS policy: org members can read objects whose path starts with `${organization_id}/`; service_role writes from server fn.
+### 4. Server fns (`src/lib/progress-summaries.functions.ts` — extend)
+- `getSummaryWithSource(summaryId)` → returns row + bundled source: client, goals, services in period, approved daily_logs (id/date/staff_name/narrative/goals_addressed), shift_reports, incident_reports. Powers the side-by-side review pane.
+- `saveSummaryDraft({ summaryId, content })` (status → `in_review`)
+- `finalizeSummary({ summaryId, content, finalizedByName })` → sets `final_content`, `finalized_*`, `completed_at = now()`, `status = 'finalized'`. Clears matching Deadlines row automatically.
+- `regenerateDraft({ summaryId })` → re-runs `draftProgressSummary`, overwrites `draft_content` only if status ∈ {pending, draft, no_source}.
 
-## Server functions (`src/lib/host-home-certifications.functions.ts`)
-All use `requireSupabaseAuth` + org-membership check + admin/manager role check for writes.
-- `listCertifications({ clientId })` → with concerns, newest first.
-- `getCertification({ id })` → row + concerns + signed download URL for PDF.
-- `createCertification({ clientId, payload })` → insert cert + concerns in a transaction-equivalent (server fn ordering with rollback by deleting cert on PDF failure), then call `renderCertificatePdf`, upload to bucket, store `certificate_pdf_path`. Returns `{ id, signedUrl }`.
-- `updateConcernResolution({ concernId, resolved_at, resolution_notes })`.
-- `getCertificateDownloadUrl({ certificationId })` → fresh signed URL.
+### 5. UI — `src/routes/dashboard.summaries.tsx`
+Admin/manager gated (reuse `is_org_admin_or_manager` pattern). On mount: call `ensureCurrentSummaryPeriods` then `listOpenSummaries`.
 
-PDF rendering: server-side using `pdf-lib` (already present in project if available — confirm in build mode; otherwise add). Renders header (client, home address, inspector, dates, cert type), each section with item label + result + note, PCSP block, concerns table, determination, signature block. No external services.
+- Header: period filter (Current / Last quarter / All open), status filter.
+- Table grouped by due date: client name • period label • services • status pill • due date.
+- Row click → `SummaryReviewDialog`:
+  - **Left pane**: source bundle (PCSP goals list, approved daily logs with date/staff/narrative, shift reports, incidents) — read-only, scrollable. Each item has its own card so the admin can verify the draft against the source.
+  - **Right pane**: editable textarea pre-filled with `draft_content` (or blank for `no_source` / PBA). Buttons: "Re-draft with Nectar" (hidden for PBA / no_source initial state but available after dismissal), "Save draft", "Finalize" (prompts for finalizer name → defaults to current user's display name).
+  - PBA shows banner: "Monthly financial statement — generate via PBA tools, then mark complete here. Nectar does not draft financial statements."
+  - `no_source` shows banner: "No approved documentation found for this period. Write the summary manually below — Nectar will not draft from missing data."
+- After finalize: dialog offers **Download PDF** (client-side `jsPDF`, same pattern as `host-home-certificate-pdf.ts`), renders the six sections cleanly with finalizer name + date in the footer. PDF is generated on demand — no storage bucket needed.
 
-## UI
+### 6. Navigation
+- Add "Summaries" item to admin sidebar in `src/routes/dashboard.tsx` (icon: `FileText`).
+- Deadlines page already lists `client_progress_summaries`; row label updates to show status pill (`drafted`, `in review`, etc.) and links to `/dashboard/summaries?open={id}`.
 
-**`src/components/hhs/host-home-certification-section.tsx`** — section card embedded in `dashboard.hhs-hub.$clientId.tsx`. Renders:
-- Status pill: Certified through {next_due_date} / Due in N days / Overdue / Never certified.
-- "Start new certification" button → opens dialog form.
-- History list: each prior cert as a row with date, type, determination badge, "Download PDF" button, and expandable concern resolutions.
+### 7. Trigger model
+Lazy generation on page load + on-demand draft. Reasoning:
+- `ensureCurrentSummaryPeriods` already runs on every Summaries / Deadlines page load (idempotent upsert) — that satisfies the "1st of each period rows appear" requirement without a cron.
+- AI drafting is the expensive step, so we run it only when the admin opens a specific summary (`status = 'pending'` → auto-trigger `draftProgressSummary` on first open; subsequent opens just load the stored draft). This avoids spending tokens on summaries the admin hasn't gotten to and keeps the experience snappy. The admin can also click "Re-draft" any time.
 
-**`src/components/hhs/host-home-cert-form-dialog.tsx`** — large multi-section form (single Dialog with scrollable body, sticky footer). Sections built from `host-home-cert-items.ts`:
-1. Header (client auto-filled, address prefilled from team, type radio, date, inspector name auto from profile, **required** "inspector is not host" checkbox — gates submit).
-2. Settings Rule checklist (8 items, Meets/Does Not Meet/N/A toggle group + optional note).
-3. Home Safety checklist (~11 items).
-4. PCSP block (Meets/Does Not Meet + notes).
-5. HHS Operational — for `drills`, `inventory` items, render a small "Latest on file: {date}" pulled from existing `hhs_evacuation_drills` / `hhs_client_inventories` queries with a "Confirm current" toggle; occupancy + host-age plain toggles.
-6. Concerns — repeater (add/remove rows: finding, corrective action, target date).
-7. Determination + e-signature (typed name + title + auto timestamp on submit) + optional guardian ack.
+### 8. Guardrails honored
+- No edits to billing math, EVV logic, or HHS daily/billing logic.
+- Reuses `callAI` + Bedrock path that the incident reviewer already uses — no new AI infra.
+- Org-scoped via `is_org_admin_or_manager` on all writes, `is_org_member` on reads.
+- Deadlines page stays the single source of truth for "what's due"; finalize writes `completed_at` to clear it.
+- No service-role usage; everything via `requireSupabaseAuth` + RLS.
 
-Submit validation:
-- All checklist items must have a status.
-- If determination is `certified`, `inspector_not_host_confirmed` MUST be true, and no item may be `does_not_meet` without a concern attached (soft warn → allow `certified_with_corrections`).
-- Determination `not_certified` allowed without all green; concerns still capturable.
-
-**Gating**: section + button render only when client has an active HHS billing code (reuse pattern from existing HHS hub checks). On non-HHS client workspaces, nothing changes.
-
-## Deadlines integration
-
-Extend `src/hooks/use-deadlines.tsx` with a 7th query: latest `host_home_certifications.next_due_date` per HHS client (and clients with HHS code but zero certs → due immediately / "Never certified", surfaced as overdue with `inspection_date = null`). New `DeadlineSource = "host_home_cert"` with icon `Home`, label "Host home certification", href to `/dashboard/hhs-hub/{clientId}#certification`. Only generated for clients that appear in the existing `hhsQ.activeIds` set — guarantees HHS-only.
-
-No edits to existing billing, EVV, daily, or HHS attendance logic.
-
-## Build order
-1. Migration (table, concerns table, GRANTs, RLS, storage bucket + policies).
-2. `src/lib/host-home-cert-items.ts` (checklist schema).
-3. `host-home-certifications.functions.ts` (CRUD + PDF render + upload).
-4. Form dialog + section component.
-5. Mount section in `dashboard.hhs-hub.$clientId.tsx`.
-6. Extend `use-deadlines.tsx` with host-home-cert source.
-7. Self-check reply confirming each acceptance bullet.
-
-## Acceptance self-check (will verify before reporting done)
-- Section visible on HHS hub, absent elsewhere (no route changes for non-HHS clients).
-- Form renders every listed section/item with Meets/Does Not Meet/N/A.
-- "Inspector is not host" is a hard gate for `certified`/`certified_with_corrections`.
-- Concerns repeater supports add/edit/resolve.
-- Submit writes row + concerns and generates a downloadable PDF.
-- Deadlines page shows a new "Host home certification" row dated inspection + 1y for that HHS client only.
-- History list shows all prior certifications with PDF download.
+### Build order
+1. Migration (extend table).
+2. Extend `progress-summaries.ts` cadence + helpers; update `ensureCurrentSummaryPeriods`.
+3. `progress-summary-draft.functions.ts` (Nectar drafter, honest prompt).
+4. Extend `progress-summaries.functions.ts` (source bundle, save, finalize, regenerate).
+5. `progress-summary-pdf.ts` (jsPDF renderer).
+6. `dashboard.summaries.tsx` + `SummaryReviewDialog`.
+7. Sidebar + Deadlines link wiring.
+8. Self-check pass against the seven confirmations in the request.

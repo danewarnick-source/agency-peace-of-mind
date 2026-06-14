@@ -10,13 +10,14 @@ import { AdminIncidentsSection } from "@/components/incidents/admin-incidents-se
 import { RecordsTab } from "@/components/records/records-tab";
 
 const search = z.object({
-  tab: z.enum(["records", "incidents", "forms", "audit", "hrc"]).optional(),
+  tab: z.enum(["records", "incidents", "forms", "audit", "hrc"]).catch("records").optional(),
   client: z.string().optional(),
 });
 
 export const Route = createFileRoute("/dashboard/hub/documentation")({
   head: () => ({ meta: [{ title: "Documentation — HIVE" }] }),
   validateSearch: (s) => search.parse(s),
+
   component: DocumentationHub,
 });
 

@@ -57,6 +57,7 @@ type EditableMember = {
   role: Role;
   active: boolean;
   position: Position | "";
+  positions: Position[];
   workerType: WorkerType;
   hourlyRate: string;
   dailyRate: string;

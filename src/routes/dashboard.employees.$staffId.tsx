@@ -354,19 +354,9 @@ function RequirementsTab({ organizationId, staffId }: { organizationId: string; 
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Certs &amp; trainings
         </h2>
-        <Button
-          size="sm"
-          onClick={() => setUploadOpen(true)}
-          className="bg-[image:var(--gradient-brand)] text-primary-foreground"
-        >
-          <Plus className="mr-1 h-4 w-4" /> Upload certificate
-        </Button>
-        <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-          <ExternalCertUploadDialog
-            onClose={() => setUploadOpen(false)}
-            targetUserId={staffId}
-          />
-        </Dialog>
+        <p className="text-[11px] text-muted-foreground">
+          Upload PDFs, Word docs, or certificate images directly on each checklist item below.
+        </p>
       </div>
 
       <Card>

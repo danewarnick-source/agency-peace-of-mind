@@ -14,6 +14,7 @@ import {
 export type DeadlineSource =
   | "summary"
   | "hhs_cert"
+  | "host_home_cert"
   | "staff_cert"
   | "incident"
   | "billing_code";

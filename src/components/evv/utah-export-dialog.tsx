@@ -555,7 +555,7 @@ export function EvvExportArchiveStrip({
   onOpenExport,
 }: {
   organizationId: string;
-  approvedRows: Array<{ id: string; service_type_code: string; clock_in_timestamp: string; outside_geofence_reason: string | null; clients: { first_name: string; last_name: string; medicaid_id?: string | null } | null }>;
+  approvedRows: Array<{ id: string; service_type_code: string; clock_in_timestamp: string; outside_geofence_reason: string | null; reconciliation_status?: string | null; clients: { first_name: string; last_name: string; medicaid_id?: string | null } | null }>;
   staffNameMap: Map<string, string>;
   onOpenExport: () => void;
 }) {
@@ -598,7 +598,7 @@ export function EvvExportArchiveStrip({
 
   const reasonFor = (r: typeof evvRows[number]) => {
     if (!r.clients?.medicaid_id) return "Missing Member ID";
-    if (r.outside_geofence_reason) return "Out-of-bounds without accepted reason";
+    if (r.outside_geofence_reason && r.reconciliation_status !== "accepted" && r.reconciliation_status !== "corrected") return "Out-of-bounds, awaiting reconciliation";
     return "Ready to export";
   };
 

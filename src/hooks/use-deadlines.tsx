@@ -368,7 +368,7 @@ export function useDeadlines() {
           subjectKind: "client",
           dueAt: due,
           status: bucketStatus(due, now),
-          href: `/dashboard/hhs-hub/${clientId}?tab=cert`,
+          href: `/dashboard/hub/employees?tab=hosts`,
           clientId,
         });
       }

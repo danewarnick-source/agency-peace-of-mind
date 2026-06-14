@@ -38,7 +38,10 @@ export async function reportPlatformEvent(input: {
     | "parsing_no_text"
     | "ai_error"
     | "no_requirements_found"
-    | "ingest_failure";
+    | "ingest_failure"
+    | "requirement_unmapped"
+    | "unknown_code_structure";
+
   organizationId: string | null;
   organizationName: string | null;
   title: string;

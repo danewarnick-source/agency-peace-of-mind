@@ -692,13 +692,33 @@ export function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={editingMember.email} /></div>
               <div className="grid gap-2"><Label htmlFor="employee_id">Employee ID</Label><Input id="employee_id" name="employee_id" defaultValue={editingMember.employeeId} placeholder="e.g. EMP-1042" /></div>
               <div className="grid gap-2">
-                <Label htmlFor="edit-position">Agency Position</Label>
-                <Select name="position" defaultValue={editingMember.position || undefined}>
-                  <SelectTrigger id="edit-position"><SelectValue placeholder="Select a position" /></SelectTrigger>
-                  <SelectContent>
-                    {POSITIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Agency Position</Label>
+                <p className="text-[11px] text-muted-foreground">Select one or more.</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {POSITIONS.map((p) => {
+                    const checked = editPositions.includes(p);
+                    const id = `edit-position-${p.replace(/\s+/g, "-").toLowerCase()}`;
+                    return (
+                      <label
+                        key={p}
+                        htmlFor={id}
+                        className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 py-2 hover:bg-muted/40"
+                      >
+                        <Checkbox
+                          id={id}
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            setEditDirty(true);
+                            setEditPositions((prev) =>
+                              v ? Array.from(new Set([...prev, p])) : prev.filter((x) => x !== p),
+                            );
+                          }}
+                        />
+                        <span className="text-sm">{p}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="grid gap-2">

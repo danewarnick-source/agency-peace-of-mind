@@ -7,6 +7,8 @@ import {
   markUpiInitiated,
   markGuardianNotified,
   markUpiCompleted,
+  markScUpdated,
+  getClientGuardianInfo,
   getIncidentActors,
 } from "@/lib/incidents.functions";
 import { INCIDENT_CATEGORIES, GUARDIAN_METHODS, type GuardianMethod } from "./incident-categories";
@@ -20,12 +22,26 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import { AlertTriangle, CheckCircle2, Skull, Clock, Phone, FileCheck2, MessageSquare } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Skull, Clock, Phone, FileCheck2, MessageSquare, UserCheck } from "lucide-react";
 import { LogScRequestDialog, RespondScRequestDialog } from "./sc-request-dialogs";
 import { IncidentTrendsStrip, type TrendFilter } from "./incident-trends-strip";
+import { AttestationDialog, type AttestationSignature } from "./attestation-dialog";
+import {
+  renderGuardianAttestation,
+  renderUpiInitiatedAttestation,
+  renderUpiCompletedAttestation,
+  renderScUpdateAttestation,
+} from "@/lib/incident-attestations";
+
+type ClientLite = {
+  first_name: string;
+  last_name: string;
+  is_own_guardian?: boolean | null;
+  guardian_name?: string | null;
+  guardian_phone?: string | null;
+  guardian_relationship?: string | null;
+  guardian_email?: string | null;
+};
 
 type Incident = {
   id: string;
@@ -44,13 +60,24 @@ type Incident = {
   guardian_notified_at: string | null;
   guardian_notified_method: string | null;
   guardian_notified_by: string | null;
+  guardian_signed_name?: string | null;
+  guardian_signed_title?: string | null;
   upi_initiated_at: string | null;
   upi_initiated_by: string | null;
+  upi_initiated_signed_name?: string | null;
+  upi_initiated_signed_title?: string | null;
   upi_completed_at: string | null;
   upi_completed_by: string | null;
+  upi_completed_signed_name?: string | null;
+  upi_completed_signed_title?: string | null;
+  sc_update_signed_at?: string | null;
+  sc_update_signed_name?: string | null;
+  sc_update_signed_title?: string | null;
+  sc_update_signed_by?: string | null;
+  sc_update_notes?: string | null;
   followup_notes: string | null;
   created_at: string;
-  clients: { first_name: string; last_name: string } | null;
+  clients: ClientLite | null;
   restraint_used?: boolean | null;
   aps_notified_at?: string | null;
   ai_review_status?: string | null;
@@ -102,7 +129,6 @@ function CountdownPill({
     if (hrsLeft < 6) tone = "bg-rose-600 text-white animate-pulse";
     else if (hrsLeft < 12) tone = "bg-amber-500 text-white";
   } else {
-    // 5-business-day clock: amber within 24h, red within 8h
     if (hrsLeft < 8) tone = "bg-rose-600 text-white animate-pulse";
     else if (hrsLeft < 24) tone = "bg-amber-500 text-white";
   }
@@ -114,72 +140,153 @@ function CountdownPill({
   return <Badge className={`gap-1 ${overdue ? "bg-rose-700 text-white" : tone}`}><Clock className="h-3 w-3" />{text}</Badge>;
 }
 
-function ActorNames({ ids, actors }: { ids: Array<string | null>; actors: Map<string, string> }) {
+function ActorNames({ ids, actors }: { ids: Array<string | null | undefined>; actors: Map<string, string> }) {
   const names = ids.filter(Boolean).map((id) => actors.get(id!) ?? id!.slice(0, 8));
   if (!names.length) return null;
   return <span className="text-[10px] text-muted-foreground"> by {names.join(", ")}</span>;
 }
 
-function GuardianDialog({ incidentId, onClose }: { incidentId: string | null; onClose: () => void }) {
+// ── Guardian notification dialog (loads guardian contact info) ────────────────
+
+function GuardianNotifyDialog({
+  incident, onClose,
+}: { incident: Incident | null; onClose: () => void }) {
   const qc = useQueryClient();
   const fn = useServerFn(markGuardianNotified);
+  const getGuardian = useServerFn(getClientGuardianInfo);
   const [method, setMethod] = useState<GuardianMethod>("phone");
   const [when, setWhen] = useState(() => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
+
+  const guardianQ = useQuery({
+    enabled: !!incident,
+    queryKey: ["guardian-info", incident?.client_id],
+    queryFn: () => getGuardian({ data: { client_id: incident!.client_id } }),
+  });
+
+  const isOwn = guardianQ.data?.is_own_guardian === true;
+  const guardianName = guardianQ.data?.guardian_name ?? "—";
+  const guardianPhone = guardianQ.data?.guardian_phone ?? "—";
+  const guardianRel = guardianQ.data?.guardian_relationship ?? null;
+
+  const attestationText = renderGuardianAttestation({
+    guardian_name: guardianName,
+    method,
+    when: new Date(when).toLocaleString(),
+  });
+
   const m = useMutation({
-    mutationFn: async () => {
-      if (!incidentId) return;
-      return fn({ data: { id: incidentId, method, notified_at: new Date(when).toISOString() } });
+    mutationFn: async (sig: AttestationSignature) => {
+      if (!incident) return;
+      return fn({
+        data: {
+          id: incident.id,
+          method,
+          notified_at: new Date(when).toISOString(),
+          ...sig,
+        },
+      });
     },
     onSuccess: () => {
-      toast.success("Guardian notification logged.");
+      toast.success("Guardian notification signed & logged.");
+      qc.invalidateQueries({ queryKey: ["incidents"] });
+      onClose();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  return (
+    <AttestationDialog
+      open={!!incident}
+      onClose={onClose}
+      title="Log guardian notification"
+      attestationText={attestationText}
+      submitLabel="Sign & log notification"
+      onSubmit={(sig) => m.mutate(sig)}
+      pending={m.isPending}
+      disabled={isOwn}
+      intro={
+        <div className="space-y-2">
+          {guardianQ.isLoading ? (
+            <p className="text-xs text-muted-foreground">Loading guardian contact…</p>
+          ) : isOwn ? (
+            <div className="rounded-md border border-rose-300 bg-rose-50 p-2 text-xs text-rose-900 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-100">
+              This client is their own guardian — no separate notification required.
+            </div>
+          ) : (
+            <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+              <div><span className="text-muted-foreground">Notifying:</span> <span className="font-semibold">{guardianName}</span>{guardianRel ? ` (${guardianRel})` : ""}</div>
+              <div><span className="text-muted-foreground">Phone:</span> <span className="font-mono">{guardianPhone}</span></div>
+              {guardianQ.data?.guardian_email && (
+                <div><span className="text-muted-foreground">Email:</span> {guardianQ.data.guardian_email}</div>
+              )}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Method</Label>
+              <Select value={method} onValueChange={(v) => setMethod(v as GuardianMethod)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {GUARDIAN_METHODS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Notified at</Label>
+              <Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+            </div>
+          </div>
+        </div>
+      }
+    />
+  );
+}
+
+function UpiInitiateDialog({ incidentId, onClose }: { incidentId: string | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const fn = useServerFn(markUpiInitiated);
+  const text = renderUpiInitiatedAttestation({ when: new Date().toLocaleString() });
+  const m = useMutation({
+    mutationFn: async (sig: AttestationSignature) => {
+      if (!incidentId) return;
+      return fn({ data: { id: incidentId, ...sig } });
+    },
+    onSuccess: () => {
+      toast.success("UPI initiation attested.");
       qc.invalidateQueries({ queryKey: ["incidents"] });
       onClose();
     },
     onError: (e) => toast.error((e as Error).message),
   });
   return (
-    <Dialog open={!!incidentId} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Log guardian notification</DialogTitle></DialogHeader>
-        <div className="space-y-3 text-sm">
-          <div>
-            <Label className="text-xs">Method</Label>
-            <Select value={method} onValueChange={(v) => setMethod(v as GuardianMethod)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {GUARDIAN_METHODS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs">Notified at</Label>
-            <Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => m.mutate()} disabled={m.isPending}>Save</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <AttestationDialog
+      open={!!incidentId}
+      onClose={onClose}
+      title="Mark UPI report initiated"
+      attestationText={text}
+      submitLabel="Sign & mark initiated"
+      onSubmit={(sig) => m.mutate(sig)}
+      pending={m.isPending}
+    />
   );
 }
 
-function CompleteDialog({ incidentId, onClose }: { incidentId: string | null; onClose: () => void }) {
+function UpiCompleteDialog({ incidentId, onClose }: { incidentId: string | null; onClose: () => void }) {
   const qc = useQueryClient();
   const fn = useServerFn(markUpiCompleted);
   const [notes, setNotes] = useState("");
+  const text = renderUpiCompletedAttestation({ when: new Date().toLocaleString() });
   const m = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (sig: AttestationSignature) => {
       if (!incidentId) return;
-      return fn({ data: { id: incidentId, followup_notes: notes.trim() || null } });
+      return fn({ data: { id: incidentId, followup_notes: notes.trim() || null, ...sig } });
     },
     onSuccess: () => {
-      toast.success("Marked detailed UPI report completed.");
+      toast.success("UPI completion attested.");
       qc.invalidateQueries({ queryKey: ["incidents"] });
       setNotes("");
       onClose();
@@ -187,25 +294,59 @@ function CompleteDialog({ incidentId, onClose }: { incidentId: string | null; on
     onError: (e) => toast.error((e as Error).message),
   });
   return (
-    <Dialog open={!!incidentId} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Mark detailed UPI report completed</DialogTitle></DialogHeader>
-        <div className="space-y-3 text-sm">
-          <p className="text-xs text-muted-foreground">
-            Attest that the detailed report has been entered into UPI. Add any follow-up
-            or mitigating actions for the record.
-          </p>
-          <div>
-            <Label className="text-xs">Follow-up / mitigating actions</Label>
-            <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
+    <AttestationDialog
+      open={!!incidentId}
+      onClose={onClose}
+      title="Mark detailed UPI report completed"
+      attestationText={text}
+      submitLabel="Sign & mark completed"
+      onSubmit={(sig) => m.mutate(sig)}
+      pending={m.isPending}
+      intro={
+        <div>
+          <Label className="text-xs">Follow-up / mitigating actions</Label>
+          <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => m.mutate()} disabled={m.isPending}>Save & attest</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      }
+    />
+  );
+}
+
+function ScUpdateDialog({ incidentId, onClose }: { incidentId: string | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const fn = useServerFn(markScUpdated);
+  const [notes, setNotes] = useState("");
+  const text = renderScUpdateAttestation({ when: new Date().toLocaleString() });
+  const m = useMutation({
+    mutationFn: async (sig: AttestationSignature) => {
+      if (!incidentId) return;
+      return fn({ data: { id: incidentId, notes: notes.trim() || null, ...sig } });
+    },
+    onSuccess: () => {
+      toast.success("Support Coordinator update signed.");
+      qc.invalidateQueries({ queryKey: ["incidents"] });
+      setNotes("");
+      onClose();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  return (
+    <AttestationDialog
+      open={!!incidentId}
+      onClose={onClose}
+      title="Log Support Coordinator update"
+      attestationText={text}
+      submitLabel="Sign & log SC update"
+      onSubmit={(sig) => m.mutate(sig)}
+      pending={m.isPending}
+      intro={
+        <div>
+          <Label className="text-xs">Notes (optional)</Label>
+          <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)}
+            placeholder="Brief context of what was communicated to the SC." />
+        </div>
+      }
+    />
   );
 }
 
@@ -218,23 +359,24 @@ function IncidentCard({
   onComplete,
   onLogSc,
   onRespondSc,
-  initPending,
+  onScUpdate,
 }: {
   ir: Incident;
   scRequests: ScRequest[];
   actors: Map<string, string>;
   onInitiate: (id: string) => void;
-  onNotify: (id: string) => void;
+  onNotify: (ir: Incident) => void;
   onComplete: (id: string) => void;
   onLogSc: (incidentId: string) => void;
   onRespondSc: (scRequestId: string) => void;
-  initPending: boolean;
+  onScUpdate: (id: string) => void;
 }) {
   const discovered = ir.discovered_at ? new Date(ir.discovered_at) : new Date(ir.created_at);
   const upiDeadline = new Date(discovered.getTime() + 24 * 3_600_000);
   const guardianDeadline = new Date(discovered.getTime() + 24 * 3_600_000);
   const completionDeadline = addBusinessDays(discovered, 5);
   const clientName = ir.clients ? `${ir.clients.first_name} ${ir.clients.last_name}` : "Client";
+  const isOwnGuardian = !!ir.clients?.is_own_guardian;
   const closed = ir.status === "State_Confirmed";
   const openSc = scRequests.filter((s) => !s.responded_at);
   const respondedSc = scRequests.filter((s) => !!s.responded_at);
@@ -274,36 +416,17 @@ function IncidentCard({
             <p className="whitespace-pre-wrap text-amber-900 dark:text-amber-100">{ir.prevention_strategies}</p>
           </div>
         )}
-        {ir.ai_review_status && (
-          <div className="rounded-md border border-violet-300 bg-violet-50/60 p-2 text-[11px] dark:bg-violet-950/30 dark:border-violet-800">
-            <div className="mb-1 flex items-center gap-2 font-semibold text-violet-900 dark:text-violet-100">
-              Nectar review
-              <Badge variant="outline" className="text-[10px]">
-                {ir.ai_review_status === "passed" ? "No follow-ups"
-                  : ir.ai_review_status === "answered" ? "Questions answered"
-                  : ir.ai_review_status === "skipped" ? "AI-skipped"
-                  : "Disabled"}
-              </Badge>
-            </div>
-            {Array.isArray(ir.ai_review_issues) && ir.ai_review_issues.length > 0 && (
-              <ul className="space-y-1.5">
-                {ir.ai_review_issues.map((q, i) => (
-                  <li key={i} className="rounded border border-violet-200 bg-white/60 p-1.5 dark:bg-violet-950/20">
-                    <div className="font-medium">Q: {q.question}</div>
-                    {q.answer && <div className="text-muted-foreground">A: {q.answer}</div>}
-                    {q.not_applicable_reason && (
-                      <div className="text-muted-foreground">N/A: {q.not_applicable_reason}</div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <CountdownPill deadline={upiDeadline} done={!!ir.upi_initiated_at} totalHours={24} label="UPI initiation 24h" />
-          <CountdownPill deadline={guardianDeadline} done={!!ir.guardian_notified_at} totalHours={24} label="Guardian 24h" />
+          {!isOwnGuardian && (
+            <CountdownPill deadline={guardianDeadline} done={!!ir.guardian_notified_at} totalHours={24} label="Guardian 24h" />
+          )}
+          {isOwnGuardian && (
+            <Badge variant="outline" className="gap-1 border-slate-300 text-slate-700">
+              <UserCheck className="h-3 w-3" /> Self-guardian — no notification required
+            </Badge>
+          )}
           <CountdownPill deadline={completionDeadline} done={!!ir.upi_completed_at} totalHours={5 * 24} label="UPI completion 5 bus.d" />
           {openSc.map((s) => (
             <CountdownPill
@@ -321,21 +444,44 @@ function IncidentCard({
             <Badge className="bg-amber-600 text-white">RESTRAINT</Badge>
           )}
           {closed && openSc.length === 0 && <Badge className="bg-slate-600 text-white">Closed</Badge>}
-          {closed && openSc.length > 0 && (
-            <Badge className="bg-amber-600 text-white">Re-surfaced · open SC request</Badge>
-          )}
         </div>
 
-        {(ir.upi_initiated_at || ir.guardian_notified_at || ir.upi_completed_at) && (
+        {(ir.upi_initiated_at || ir.guardian_notified_at || ir.upi_completed_at || ir.sc_update_signed_at) && (
           <div className="space-y-0.5 rounded-md border border-border bg-card/60 p-2 text-[11px] text-muted-foreground">
             {ir.upi_initiated_at && (
-              <div>UPI initiated {fmtDate(ir.upi_initiated_at)}<ActorNames ids={[ir.upi_initiated_by]} actors={actors} /></div>
+              <div>
+                UPI initiated {fmtDate(ir.upi_initiated_at)}
+                <ActorNames ids={[ir.upi_initiated_by]} actors={actors} />
+                {ir.upi_initiated_signed_name && (
+                  <span> · signed by {ir.upi_initiated_signed_name}{ir.upi_initiated_signed_title ? `, ${ir.upi_initiated_signed_title}` : ""}</span>
+                )}
+              </div>
             )}
             {ir.guardian_notified_at && (
-              <div>Guardian notified ({ir.guardian_notified_method ?? "—"}) {fmtDate(ir.guardian_notified_at)}<ActorNames ids={[ir.guardian_notified_by]} actors={actors} /></div>
+              <div>
+                Guardian notified ({ir.guardian_notified_method ?? "—"}) {fmtDate(ir.guardian_notified_at)}
+                <ActorNames ids={[ir.guardian_notified_by]} actors={actors} />
+                {ir.guardian_signed_name && (
+                  <span> · signed by {ir.guardian_signed_name}{ir.guardian_signed_title ? `, ${ir.guardian_signed_title}` : ""}</span>
+                )}
+              </div>
             )}
             {ir.upi_completed_at && (
-              <div>UPI detailed report completed {fmtDate(ir.upi_completed_at)}<ActorNames ids={[ir.upi_completed_by]} actors={actors} /></div>
+              <div>
+                UPI detailed report completed {fmtDate(ir.upi_completed_at)}
+                <ActorNames ids={[ir.upi_completed_by]} actors={actors} />
+                {ir.upi_completed_signed_name && (
+                  <span> · signed by {ir.upi_completed_signed_name}{ir.upi_completed_signed_title ? `, ${ir.upi_completed_signed_title}` : ""}</span>
+                )}
+              </div>
+            )}
+            {ir.sc_update_signed_at && (
+              <div>
+                SC update logged {fmtDate(ir.sc_update_signed_at)}
+                {ir.sc_update_signed_name && (
+                  <span> · signed by {ir.sc_update_signed_name}{ir.sc_update_signed_title ? `, ${ir.sc_update_signed_title}` : ""}</span>
+                )}
+              </div>
             )}
             {ir.followup_notes && (
               <div className="mt-1 whitespace-pre-wrap text-foreground">Follow-up: {ir.followup_notes}</div>
@@ -343,15 +489,12 @@ function IncidentCard({
           </div>
         )}
 
-        {/* SC request trail */}
         {scRequests.length > 0 && (
           <div className="space-y-2 rounded-md border border-border bg-card/60 p-2 text-[11px]">
             <p className="font-semibold text-foreground">Support Coordinator follow-up (§1.27(5))</p>
             {scRequests.map((s) => (
               <div key={s.id} className="rounded border border-border/60 bg-background/60 p-2">
-                <div className="text-[10px] text-muted-foreground">
-                  Requested {fmtDate(s.requested_at)}
-                </div>
+                <div className="text-[10px] text-muted-foreground">Requested {fmtDate(s.requested_at)}</div>
                 <div className="whitespace-pre-wrap text-foreground">{s.request_summary}</div>
                 {s.responded_at ? (
                   <div className="mt-1 text-[10px] text-emerald-700 dark:text-emerald-300">
@@ -379,18 +522,23 @@ function IncidentCard({
 
         <div className="flex flex-wrap gap-2">
           {!closed && !ir.upi_initiated_at && (
-            <Button size="sm" disabled={initPending} onClick={() => onInitiate(ir.id)}>
+            <Button size="sm" onClick={() => onInitiate(ir.id)}>
               <FileCheck2 className="mr-1 h-3.5 w-3.5" />Mark initiated in UPI
             </Button>
           )}
-          {!closed && !ir.guardian_notified_at && (
-            <Button size="sm" variant="outline" onClick={() => onNotify(ir.id)}>
+          {!closed && !isOwnGuardian && !ir.guardian_notified_at && (
+            <Button size="sm" variant="outline" onClick={() => onNotify(ir)}>
               <Phone className="mr-1 h-3.5 w-3.5" />Log guardian notification
             </Button>
           )}
           {!closed && !ir.upi_completed_at && (
             <Button size="sm" variant="outline" onClick={() => onComplete(ir.id)}>
               <CheckCircle2 className="mr-1 h-3.5 w-3.5" />Mark detailed report completed
+            </Button>
+          )}
+          {!ir.sc_update_signed_at && (
+            <Button size="sm" variant="outline" onClick={() => onScUpdate(ir.id)}>
+              <UserCheck className="mr-1 h-3.5 w-3.5" />Log SC update
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => onLogSc(ir.id)}>
@@ -402,7 +550,6 @@ function IncidentCard({
   );
 }
 
-
 export function AdminIncidentsSection({
   initialClientId,
   initialView,
@@ -410,9 +557,7 @@ export function AdminIncidentsSection({
   initialClientId?: string | null;
   initialView?: "queue" | "log";
 } = {}) {
-  const qc = useQueryClient();
   const listFn = useServerFn(listIncidents);
-  const initFn = useServerFn(markUpiInitiated);
   const actorsFn = useServerFn(getIncidentActors);
 
   const [view, setView] = useState<"queue" | "log">(initialView ?? "queue");
@@ -422,7 +567,6 @@ export function AdminIncidentsSection({
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
 
-  // Re-sync when caller hands us a new prefilter (e.g. Residential tab deep-link).
   useEffect(() => {
     if (initialClientId) {
       setFilterClient(initialClientId);
@@ -437,8 +581,6 @@ export function AdminIncidentsSection({
     queryFn: () =>
       listFn({
         data: {
-          // Always pull all; queue re-surface rule is applied client-side so
-          // a closed incident with an open SC request still shows in the queue.
           status: view === "queue" ? "all" : status,
           category: filterCategory === "all" ? null : filterCategory,
           client_id: filterClient === "all" ? null : filterClient,
@@ -460,7 +602,6 @@ export function AdminIncidentsSection({
     return m;
   }, [scRequests]);
 
-  // Queue view: open incidents OR any incident with an unresponded SC request.
   const visible = useMemo(() => {
     if (view === "log") return incidents;
     return incidents.filter((ir) => {
@@ -486,6 +627,7 @@ export function AdminIncidentsSection({
       if (ir.upi_initiated_by) s.add(ir.upi_initiated_by);
       if (ir.guardian_notified_by) s.add(ir.guardian_notified_by);
       if (ir.upi_completed_by) s.add(ir.upi_completed_by);
+      if (ir.sc_update_signed_by) s.add(ir.sc_update_signed_by);
     }
     return [...s];
   }, [incidents]);
@@ -502,18 +644,18 @@ export function AdminIncidentsSection({
     return m;
   }, [actorsData]);
 
-  const [guardianId, setGuardianId] = useState<string | null>(null);
+  const [guardianFor, setGuardianFor] = useState<Incident | null>(null);
+  const [initiateFor, setInitiateFor] = useState<string | null>(null);
   const [completeId, setCompleteId] = useState<string | null>(null);
+  const [scUpdateFor, setScUpdateFor] = useState<string | null>(null);
   const [logScFor, setLogScFor] = useState<string | null>(null);
   const [respondScFor, setRespondScFor] = useState<string | null>(null);
 
   const onTrendPick = (f: TrendFilter) => {
     if (f.kind === "month") {
       const [y, m] = f.monthKey.split("-").map(Number);
-      const first = new Date(Date.UTC(y, m - 1, 1));
-      const last = new Date(Date.UTC(y, m, 0));
-      setFrom(first.toISOString().slice(0, 10));
-      setTo(last.toISOString().slice(0, 10));
+      setFrom(new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10));
+      setTo(new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10));
       setStatus("all");
     } else if (f.kind === "category") {
       setFilterCategory(f.category);
@@ -526,15 +668,6 @@ export function AdminIncidentsSection({
       setStatus("all");
     }
   };
-
-  const initiate = useMutation({
-    mutationFn: (id: string) => initFn({ data: { id } }),
-    onSuccess: () => {
-      toast.success("UPI initiation attested.");
-      qc.invalidateQueries({ queryKey: ["incidents"] });
-    },
-    onError: (e) => toast.error((e as Error).message),
-  });
 
   return (
     <div className="space-y-4">
@@ -622,19 +755,21 @@ export function AdminIncidentsSection({
               ir={ir}
               scRequests={scByIncident.get(ir.id) ?? []}
               actors={actorMap}
-              onInitiate={(id) => initiate.mutate(id)}
-              onNotify={setGuardianId}
+              onInitiate={setInitiateFor}
+              onNotify={setGuardianFor}
               onComplete={setCompleteId}
               onLogSc={setLogScFor}
               onRespondSc={setRespondScFor}
-              initPending={initiate.isPending}
+              onScUpdate={setScUpdateFor}
             />
           ))}
         </div>
       )}
 
-      <GuardianDialog incidentId={guardianId} onClose={() => setGuardianId(null)} />
-      <CompleteDialog incidentId={completeId} onClose={() => setCompleteId(null)} />
+      <UpiInitiateDialog incidentId={initiateFor} onClose={() => setInitiateFor(null)} />
+      <GuardianNotifyDialog incident={guardianFor} onClose={() => setGuardianFor(null)} />
+      <UpiCompleteDialog incidentId={completeId} onClose={() => setCompleteId(null)} />
+      <ScUpdateDialog incidentId={scUpdateFor} onClose={() => setScUpdateFor(null)} />
       <LogScRequestDialog incidentId={logScFor} onClose={() => setLogScFor(null)} />
       <RespondScRequestDialog scRequestId={respondScFor} onClose={() => setRespondScFor(null)} />
     </div>

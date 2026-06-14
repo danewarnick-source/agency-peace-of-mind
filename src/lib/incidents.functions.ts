@@ -175,7 +175,7 @@ export const listIncidents = createServerFn({ method: "GET" })
     let q = supabase
       .from("incident_reports")
       .select(
-        "id, report_number, client_id, reported_by, discovered_at, occurred_at, category, description, location, status, is_abuse_neglect, is_fatality, prevention_strategies, guardian_notified_at, guardian_notified_method, guardian_notified_by, upi_initiated_at, upi_initiated_by, upi_completed_at, upi_completed_by, followup_notes, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, ai_review_status, ai_review_issues, ai_review_at, clients:client_id(first_name,last_name)",
+        "id, report_number, client_id, reported_by, discovered_at, occurred_at, category, description, location, status, is_abuse_neglect, is_fatality, prevention_strategies, guardian_notified_at, guardian_notified_method, guardian_notified_by, guardian_attestation_text, guardian_signed_name, guardian_signed_title, guardian_signed_at, upi_initiated_at, upi_initiated_by, upi_initiated_attestation_text, upi_initiated_signed_name, upi_initiated_signed_title, upi_completed_at, upi_completed_by, upi_completed_attestation_text, upi_completed_signed_name, upi_completed_signed_title, sc_update_attestation_text, sc_update_signed_name, sc_update_signed_title, sc_update_signed_at, sc_update_signed_by, sc_update_notes, followup_notes, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, ai_review_status, ai_review_issues, ai_review_at, clients:client_id(first_name,last_name,is_own_guardian,guardian_name,guardian_phone,guardian_relationship,guardian_email)",
       )
       .eq("organization_id", m.organization_id)
       .order("discovered_at", { ascending: false, nullsFirst: false })
@@ -327,15 +327,31 @@ async function maybeClose(supabase: AnySupabase, id: string) {
   }
 }
 
+/** Shared attestation/signature input — every per-action duty requires it. */
+const attestation = z.object({
+  attested: z.literal(true),
+  signed_name: z.string().trim().min(2).max(120),
+  signed_title: z.string().trim().min(2).max(120),
+  attestation_text: z.string().min(10).max(2000),
+});
+
 export const markUpiInitiated = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) =>
+    attestation.extend({ id: z.string().uuid() }).parse(d),
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     await requireManager(supabase, userId);
     const { error } = await supabase
       .from("incident_reports")
-      .update({ upi_initiated_at: new Date().toISOString(), upi_initiated_by: userId })
+      .update({
+        upi_initiated_at: new Date().toISOString(),
+        upi_initiated_by: userId,
+        upi_initiated_attestation_text: data.attestation_text,
+        upi_initiated_signed_name: data.signed_name,
+        upi_initiated_signed_title: data.signed_title,
+      })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     await maybeClose(supabase, data.id);
@@ -345,7 +361,7 @@ export const markUpiInitiated = createServerFn({ method: "POST" })
 export const markGuardianNotified = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({
+    attestation.extend({
       id: z.string().uuid(),
       method: z.enum(["phone", "email", "face-to-face"]),
       notified_at: z.string().datetime().optional(),
@@ -354,6 +370,16 @@ export const markGuardianNotified = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     await requireManager(supabase, userId);
+    // Reject if the client is their own guardian — duty does not apply.
+    const { data: ir } = await supabase
+      .from("incident_reports")
+      .select("client_id, clients:client_id(is_own_guardian)")
+      .eq("id", data.id)
+      .maybeSingle();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((ir as any)?.clients?.is_own_guardian) {
+      throw new Error("Client is their own guardian — no guardian notification required.");
+    }
     const when = data.notified_at ?? new Date().toISOString();
     const { error } = await supabase
       .from("incident_reports")
@@ -361,8 +387,11 @@ export const markGuardianNotified = createServerFn({ method: "POST" })
         guardian_notified_at: when,
         guardian_notified_method: data.method,
         guardian_notified_by: userId,
-        // Legacy mirror — keep the older columns truthful so existing
-        // family-notified surfaces (timesheet / audit packets) stay in sync.
+        guardian_attestation_text: data.attestation_text,
+        guardian_signed_name: data.signed_name,
+        guardian_signed_title: data.signed_title,
+        guardian_signed_at: new Date().toISOString(),
+        // Legacy mirror — keep older "family_notified" surfaces in sync.
         family_notified: true,
         family_notified_at: when,
       })
@@ -375,7 +404,7 @@ export const markGuardianNotified = createServerFn({ method: "POST" })
 export const markUpiCompleted = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({
+    attestation.extend({
       id: z.string().uuid(),
       followup_notes: z.string().max(8000).optional().nullable(),
     }).parse(d),
@@ -388,12 +417,66 @@ export const markUpiCompleted = createServerFn({ method: "POST" })
       .update({
         upi_completed_at: new Date().toISOString(),
         upi_completed_by: userId,
+        upi_completed_attestation_text: data.attestation_text,
+        upi_completed_signed_name: data.signed_name,
+        upi_completed_signed_title: data.signed_title,
         followup_notes: data.followup_notes ?? null,
       })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     await maybeClose(supabase, data.id);
     return { ok: true };
+  });
+
+/** Attest that the Support Coordinator was informed of this incident. */
+export const markScUpdated = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    attestation.extend({
+      id: z.string().uuid(),
+      notes: z.string().max(4000).optional().nullable(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    await requireManager(supabase, userId);
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("incident_reports")
+      .update({
+        sc_update_attestation_text: data.attestation_text,
+        sc_update_signed_name: data.signed_name,
+        sc_update_signed_title: data.signed_title,
+        sc_update_signed_at: now,
+        sc_update_signed_by: userId,
+        sc_update_notes: data.notes ?? null,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Read a single client's guardian-of-record fields for the notification dialog. */
+export const getClientGuardianInfo = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ client_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await requireManager(supabase, userId);
+    const { data: c, error } = await supabase
+      .from("clients")
+      .select("id, first_name, last_name, is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email")
+      .eq("id", data.client_id)
+      .eq("organization_id", m.organization_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!c) throw new Error("Client not found.");
+    return c as {
+      id: string; first_name: string; last_name: string;
+      is_own_guardian: boolean;
+      guardian_name: string | null; guardian_phone: string | null;
+      guardian_relationship: string | null; guardian_email: string | null;
+    };
   });
 
 /** Resolve reporter / actor names for the attestation trail. */

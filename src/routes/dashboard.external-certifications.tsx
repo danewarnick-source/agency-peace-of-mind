@@ -223,7 +223,7 @@ function CertList({
   );
 }
 
-function UploadDialog({ onClose }: { onClose: () => void }) {
+export function UploadDialog({ onClose, targetUserId }: { onClose: () => void; targetUserId?: string }) {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
@@ -239,13 +239,14 @@ function UploadDialog({ onClose }: { onClose: () => void }) {
     mutationFn: async () => {
       if (!user || !org) throw new Error("Missing context");
       if (!file) throw new Error("Please attach a certificate file");
+      const ownerId = targetUserId ?? user.id;
       const ext = file.name.split(".").pop() ?? "pdf";
-      const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+      const path = `${ownerId}/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("certificates").upload(path, file, { upsert: false });
       if (upErr) throw upErr;
       const { data: signed } = await supabase.storage.from("certificates").createSignedUrl(path, 60 * 60 * 24 * 365);
       const { error } = await supabase.from("external_certifications").insert({
-        user_id: user.id,
+        user_id: ownerId,
         organization_id: org.organization_id,
         cert_type: certType,
         cert_name: certName || null,
@@ -261,6 +262,7 @@ function UploadDialog({ onClose }: { onClose: () => void }) {
       toast.success("Certification submitted for review");
       qc.invalidateQueries({ queryKey: ["my-ext-certs"] });
       qc.invalidateQueries({ queryKey: ["org-ext-certs"] });
+      qc.invalidateQueries({ queryKey: ["staff-checklist"] });
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),

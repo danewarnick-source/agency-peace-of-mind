@@ -2,19 +2,21 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, CalendarDays, Users as UsersIcon, ShieldAlert, FileText, Clock, AlertTriangle, ClipboardList } from "lucide-react";
+import { ArrowLeft, CalendarDays, Users as UsersIcon, ShieldAlert, FileText, Clock, AlertTriangle, ClipboardList, Plus, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog } from "@/components/ui/dialog";
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
 import { OtherAssignmentsAdminSection } from "@/components/training/other-assignments-section";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
 import { getStaffChecklist } from "@/lib/hr-staff.functions";
 import { SmartImportRemindersPanel } from "@/components/smart-import/reminders-panel";
+import { UploadDialog as ExternalCertUploadDialog } from "@/routes/dashboard.external-certifications";
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (
@@ -152,7 +154,6 @@ function StaffProfilePage() {
         <TabsList className="flex flex-wrap h-auto justify-start">
           <TabsTrigger value="profile">Overview</TabsTrigger>
           <TabsTrigger value="requirements">Certs &amp; trainings</TabsTrigger>
-          <TabsTrigger value="shifts">Shifts</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="hrdocs">HR docs</TabsTrigger>
           <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
@@ -272,10 +273,7 @@ function StaffProfilePage() {
           <ActivityFeed organizationId={orgId} staffId={staffId} />
         </TabsContent>
 
-        {/* ----- SHIFTS (read-only) — staff-scoped evv_timesheets ----- */}
-        <TabsContent value="shifts" className="mt-4">
-          <StaffShiftsPanel organizationId={orgId} staffId={staffId} />
-        </TabsContent>
+
 
         {/* ----- HR DOCS ----- */}
         <TabsContent value="hrdocs" className="mt-4">
@@ -316,6 +314,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
  * ====================================================================*/
 function RequirementsTab({ organizationId, staffId }: { organizationId: string; staffId: string }) {
   const [filter, setFilter] = useState<"all" | "needs_action" | "current">("all");
+  const [uploadOpen, setUploadOpen] = useState(false);
   const fetchChecklist = useServerFn(getStaffChecklist);
   const checklistQ = useQuery({
     queryKey: ["staff-checklist", organizationId, staffId],
@@ -342,6 +341,25 @@ function RequirementsTab({ organizationId, staffId }: { organizationId: string; 
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Certs &amp; trainings
+        </h2>
+        <Button
+          size="sm"
+          onClick={() => setUploadOpen(true)}
+          className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+        >
+          <Plus className="mr-1 h-4 w-4" /> Upload certificate
+        </Button>
+        <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+          <ExternalCertUploadDialog
+            onClose={() => setUploadOpen(false)}
+            targetUserId={staffId}
+          />
+        </Dialog>
+      </div>
+
       <Card>
         <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
           <SummaryStat label="Current" value={counts.current} tone="emerald" />
@@ -350,6 +368,7 @@ function RequirementsTab({ organizationId, staffId }: { organizationId: string; 
           <SummaryStat label="To do" value={counts.todo} tone="muted" />
         </CardContent>
       </Card>
+
 
       <div className="flex flex-wrap gap-2">
         <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>All</FilterChip>
@@ -418,6 +437,11 @@ type ActivityItem = {
   status: string;
   date: string; // ISO
   href?: string;
+  // Shift-only detail (preserved from the old StaffShiftsPanel table)
+  clientId?: string | null;
+  clientName?: string | null;
+  serviceCode?: string | null;
+  units?: number | null;
 };
 
 function ActivityFeed({ organizationId, staffId }: { organizationId: string; staffId: string }) {
@@ -426,21 +450,32 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
   // EVV timesheets carry both Shift (scheduled) and Timesheet (post-clock) semantics
   // on a single row. We surface every row twice — once tagged Shift if it has a
   // clock-in, once tagged Timesheet if it has an approval/claim status — so the
-  // filter chips work intuitively without a separate "shifts" table.
+  // filter chips work intuitively without a separate "shifts" table. Column set
+  // matches the previous StaffShiftsPanel so the Shifts filter retains full detail.
   const evvQ = useQuery({
     enabled: !!organizationId,
     queryKey: ["activity-evv", organizationId, staffId],
     queryFn: async () => {
       const { data } = await supabase
         .from("evv_timesheets")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, status, clock_in_timestamp, clock_out_timestamp" as any)
+        .select("id, client_id, service_type_code, status, clock_in_timestamp, clock_out_timestamp, billed_units")
         .eq("organization_id", organizationId)
         .eq("staff_id", staffId)
         .order("clock_in_timestamp", { ascending: false })
-        .limit(100);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data ?? []) as Array<any>;
+        .limit(200);
+      const rows = data ?? [];
+      const ids = Array.from(new Set(rows.map((r) => r.client_id).filter(Boolean))) as string[];
+      const nameById = new Map<string, string>();
+      if (ids.length) {
+        const { data: cs } = await supabase
+          .from("clients")
+          .select("id, first_name, last_name")
+          .in("id", ids);
+        for (const c of cs ?? []) {
+          nameById.set(c.id, `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || "—");
+        }
+      }
+      return rows.map((r) => ({ ...r, client_name: r.client_id ? nameById.get(r.client_id) ?? "—" : null }));
     },
   });
 
@@ -479,20 +514,27 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
   const items = useMemo<ActivityItem[]>(() => {
     const out: ActivityItem[] = [];
     for (const r of evvQ.data ?? []) {
+      const code = r.service_type_code ?? null;
+      const units = r.billed_units ?? null;
+      const titleSuffix = `${code ?? "Shift"}${units != null ? ` · ${units} u` : ""}`;
       if (r.clock_in_timestamp) {
         out.push({
           id: `evv-shift-${r.id}`,
           kind: "Shift",
-          title: `${r.service_code ?? "Shift"}${r.units != null ? ` · ${r.units} u` : ""}`,
-          status: r.clock_out_timestamp ? "Clocked out" : "Clocked in",
+          title: titleSuffix,
+          status: r.status ? String(r.status) : (r.clock_out_timestamp ? "Clocked out" : "Clocked in"),
           date: r.clock_in_timestamp as string,
+          clientId: r.client_id ?? null,
+          clientName: r.client_name ?? null,
+          serviceCode: code,
+          units,
         });
       }
       if (r.status) {
         out.push({
           id: `evv-ts-${r.id}`,
           kind: "Timesheet",
-          title: `${r.service_code ?? "Timesheet"}${r.units != null ? ` · ${r.units} u` : ""}`,
+          title: `${code ?? "Timesheet"}${units != null ? ` · ${units} u` : ""}`,
           status: String(r.status),
           date: (r.clock_in_timestamp ?? new Date().toISOString()) as string,
         });
@@ -545,6 +587,43 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
           <p className="text-sm text-muted-foreground">Loading activity…</p>
         ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground">No activity to show in this filter.</p>
+        ) : filter === "Shift" ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Date</th>
+                  <th className="px-3 py-2 text-left">Client</th>
+                  <th className="px-3 py-2 text-left">Code</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-right">Units</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((it) => (
+                  <tr key={it.id} className="border-t">
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {it.date ? new Date(it.date).toLocaleString() : "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      {it.clientId ? (
+                        <Link
+                          to="/dashboard/clients/$clientId"
+                          params={{ clientId: it.clientId }}
+                          className="hover:underline"
+                        >
+                          {it.clientName ?? "—"}
+                        </Link>
+                      ) : "—"}
+                    </td>
+                    <td className="px-3 py-2"><code className="font-mono text-xs">{it.serviceCode ?? "—"}</code></td>
+                    <td className="px-3 py-2"><Badge variant="outline" className="capitalize">{it.status}</Badge></td>
+                    <td className="px-3 py-2 text-right">{it.units ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <ul className="divide-y">
             {filtered.map((it) => (
@@ -581,89 +660,8 @@ function KindBadge({ kind }: { kind: ActivityItem["kind"] }) {
   );
 }
 
-/* ======================================================================
- * Staff Shifts panel — read-only evv_timesheets scoped to this staff.
- * Mirrors the EVV archive query shape; no new storage, no billing math.
- * ====================================================================*/
-function StaffShiftsPanel({ organizationId, staffId }: { organizationId: string; staffId: string }) {
-  const q = useQuery({
-    enabled: !!organizationId,
-    queryKey: ["staff-profile-shifts", organizationId, staffId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("evv_timesheets")
-        .select("id, client_id, service_type_code, status, clock_in_timestamp, clock_out_timestamp, billed_units")
-        .eq("organization_id", organizationId)
-        .eq("staff_id", staffId)
-        .order("clock_in_timestamp", { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      const ids = Array.from(new Set((data ?? []).map((r) => r.client_id).filter(Boolean))) as string[];
-      const nameById = new Map<string, string>();
-      if (ids.length) {
-        const { data: cs } = await supabase
-          .from("clients")
-          .select("id, first_name, last_name")
-          .in("id", ids);
-        for (const c of cs ?? []) {
-          nameById.set(c.id, `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || "—");
-        }
-      }
-      return (data ?? []).map((r) => ({ ...r, client_name: nameById.get(r.client_id) ?? "—" }));
-    },
-  });
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Recent shifts (last 200)</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        {q.isLoading ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
-        ) : (q.data ?? []).length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">No shifts recorded.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 text-left">Date</th>
-                  <th className="px-3 py-2 text-left">Client</th>
-                  <th className="px-3 py-2 text-left">Code</th>
-                  <th className="px-3 py-2 text-left">Status</th>
-                  <th className="px-3 py-2 text-right">Units</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(q.data ?? []).map((r) => (
-                  <tr key={r.id} className="border-t">
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {r.clock_in_timestamp ? new Date(r.clock_in_timestamp).toLocaleString() : "—"}
-                    </td>
-                    <td className="px-3 py-2">
-                      {r.client_id ? (
-                        <Link
-                          to="/dashboard/clients/$clientId"
-                          params={{ clientId: r.client_id }}
-                          className="hover:underline"
-                        >
-                          {r.client_name}
-                        </Link>
-                      ) : "—"}
-                    </td>
-                    <td className="px-3 py-2"><code className="font-mono text-xs">{r.service_type_code ?? "—"}</code></td>
-                    <td className="px-3 py-2"><Badge variant="outline">{r.status ?? "—"}</Badge></td>
-                    <td className="px-3 py-2 text-right">{r.billed_units ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+
+
 
 /* ======================================================================
  * Staff HR documents — read-only list. Storage URLs not surfaced here;
@@ -687,10 +685,12 @@ function StaffHrDocsPanel({ organizationId, staffId }: { organizationId: string;
   });
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle className="text-base">HR documents on file</CardTitle>
         <Button asChild variant="outline" size="sm">
-          <Link to="/dashboard/employees">Manage in HR checklist →</Link>
+          <Link to="/dashboard/employees">
+            <Upload className="mr-1 h-3.5 w-3.5" /> Upload HR document (in checklist) →
+          </Link>
         </Button>
       </CardHeader>
       <CardContent className="p-0">

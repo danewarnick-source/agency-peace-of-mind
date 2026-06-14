@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { AlarmClock, AlertTriangle, Clock, FileCheck2, ShieldCheck, FileSignature, Activity, ExternalLink, Home } from "lucide-react";
+import { AlarmClock, AlertTriangle, Clock, ShieldCheck, FileSignature, Activity, ExternalLink, Home } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,6 @@ export const Route = createFileRoute("/dashboard/deadlines")({
 
 const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   summary: FileSignature,
-  hhs_cert: FileCheck2,
   host_home_cert: Home,
   staff_cert: ShieldCheck,
   incident: Activity,
@@ -30,7 +29,6 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
   summary: "Progress summary",
-  hhs_cert: "HHS certification",
   host_home_cert: "Host home certification",
   staff_cert: "Staff certification",
   incident: "Incident clock",
@@ -152,7 +150,13 @@ function DeadlineRow({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["s
         <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${toneText}`} />
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">
-            {item.title}
+            {item.href ? (
+              <a href={item.href} className="hover:underline hover:text-[#137182]">
+                {item.title}
+              </a>
+            ) : (
+              item.title
+            )}
             {item.source === "summary" && item.summary?.requires_upi_attestation && (
               <Badge className="ml-2 bg-[#137182] text-white hover:bg-[#137182]">UPI</Badge>
             )}

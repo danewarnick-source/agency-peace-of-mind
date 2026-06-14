@@ -13,7 +13,6 @@ import {
 
 export type DeadlineSource =
   | "summary"
-  | "hhs_cert"
   | "host_home_cert"
   | "staff_cert"
   | "incident"
@@ -79,7 +78,7 @@ export function useDeadlines() {
     },
   });
 
-  // 3. Active HHS clients + their existing monthly certifications.
+  // 3. Active HHS clients (drives the annual host-home-cert source below).
   const hhsQ = useQuery({
     enabled: !!orgId,
     queryKey: ["deadlines", "hhs", orgId],
@@ -95,17 +94,7 @@ export function useDeadlines() {
         .filter((c) => (!c.service_start_date || c.service_start_date <= today)
                     && (!c.service_end_date || c.service_end_date >= today))
         .map((c) => c.client_id);
-      if (activeIds.length === 0) return { activeIds: [] as string[], certs: [] as Array<{ client_id: string; month: string }> };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const certsRes: { data: Array<{ client_id: string; month: string }> | null; error: unknown } = await (supabase as any)
-        .from("hhs_monthly_certifications")
-        .select("client_id, month")
-        .eq("organization_id", orgId!)
-        .in("client_id", activeIds);
-      return {
-        activeIds,
-        certs: (certsRes.data ?? []) as Array<{ client_id: string; month: string }>,
-      };
+      return { activeIds };
     },
   });
 
@@ -267,39 +256,16 @@ export function useDeadlines() {
         subjectKind: "client",
         dueAt: due,
         status: bucketStatus(due, now),
+        href: `/dashboard/summaries?open=${s.id}`,
         summary: s,
         clientId: s.client_id,
       });
     }
 
-    // HHS monthly certifications — for each active HHS client, the most recent
-    // closed month should have a cert row; if missing, it's a deadline.
-    if (hhsQ.data) {
-      const certSet = new Set(hhsQ.data.certs.map((c) => `${c.client_id}|${c.month}`));
-      // Last 2 closed months.
-      const today = new Date();
-      for (let back = 1; back <= 2; back++) {
-        const d = new Date(today.getFullYear(), today.getMonth() - back, 1);
-        const monthLabel = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        const monthFirstOfFollowing = new Date(d.getFullYear(), d.getMonth() + 1, 15);
-        for (const clientId of hhsQ.data.activeIds) {
-          const key = `${clientId}|${monthLabel}-01`;
-          // hhs_monthly_certifications.month may be stored as date — try both.
-          if (certSet.has(key) || certSet.has(`${clientId}|${monthLabel}`)) continue;
-          out.push({
-            key: `hhs:${clientId}:${monthLabel}`,
-            source: "hhs_cert",
-            title: `HHS monthly certification — ${fmtMonth(monthLabel)}`,
-            subject: nameOf(clientId),
-            subjectKind: "client",
-            dueAt: monthFirstOfFollowing,
-            status: bucketStatus(monthFirstOfFollowing, now),
-            href: `/dashboard/workspace/${clientId}`,
-            clientId,
-          });
-        }
-      }
-    }
+    // (HHS monthly certifications removed — host-home certification is annual,
+    // surfaced once via the host_home_cert source below.)
+
+
 
     // Staff certifications
     for (const c of certsQ.data ?? []) {

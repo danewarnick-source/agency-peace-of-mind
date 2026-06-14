@@ -1563,6 +1563,12 @@ function ProfileTab({
       emergency_contact_name: ecName.trim(),
       emergency_contact_phone: ecPhone.trim(),
       profile_photo_url: photoUrl,
+      is_own_guardian: isOwnGuardian,
+      guardian_name: gName,
+      guardian_phone: gPhone,
+      guardian_relationship: gRel,
+      guardian_email: gEmail,
+
     });
   }
 

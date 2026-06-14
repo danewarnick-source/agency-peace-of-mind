@@ -2,19 +2,21 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, CalendarDays, Users as UsersIcon, ShieldAlert, FileText, Clock, AlertTriangle, ClipboardList } from "lucide-react";
+import { ArrowLeft, CalendarDays, Users as UsersIcon, ShieldAlert, FileText, Clock, AlertTriangle, ClipboardList, Plus, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog } from "@/components/ui/dialog";
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
 import { OtherAssignmentsAdminSection } from "@/components/training/other-assignments-section";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
 import { getStaffChecklist } from "@/lib/hr-staff.functions";
 import { SmartImportRemindersPanel } from "@/components/smart-import/reminders-panel";
+import { UploadDialog as ExternalCertUploadDialog } from "@/routes/dashboard.external-certifications";
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (

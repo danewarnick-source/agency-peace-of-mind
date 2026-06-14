@@ -261,34 +261,10 @@ export function useDeadlines() {
       });
     }
 
-    // HHS monthly certifications — for each active HHS client, the most recent
-    // closed month should have a cert row; if missing, it's a deadline.
-    if (hhsQ.data) {
-      const certSet = new Set(hhsQ.data.certs.map((c) => `${c.client_id}|${c.month}`));
-      // Last 2 closed months.
-      const today = new Date();
-      for (let back = 1; back <= 2; back++) {
-        const d = new Date(today.getFullYear(), today.getMonth() - back, 1);
-        const monthLabel = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        const monthFirstOfFollowing = new Date(d.getFullYear(), d.getMonth() + 1, 15);
-        for (const clientId of hhsQ.data.activeIds) {
-          const key = `${clientId}|${monthLabel}-01`;
-          // hhs_monthly_certifications.month may be stored as date — try both.
-          if (certSet.has(key) || certSet.has(`${clientId}|${monthLabel}`)) continue;
-          out.push({
-            key: `hhs:${clientId}:${monthLabel}`,
-            source: "hhs_cert",
-            title: `HHS monthly certification — ${fmtMonth(monthLabel)}`,
-            subject: nameOf(clientId),
-            subjectKind: "client",
-            dueAt: monthFirstOfFollowing,
-            status: bucketStatus(monthFirstOfFollowing, now),
-            href: `/dashboard/workspace/${clientId}`,
-            clientId,
-          });
-        }
-      }
-    }
+    // (HHS monthly certifications removed — host-home certification is annual,
+    // surfaced once via the host_home_cert source below.)
+
+
 
     // Staff certifications
     for (const c of certsQ.data ?? []) {

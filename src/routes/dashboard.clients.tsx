@@ -78,6 +78,13 @@ type Client = {
   date_of_birth: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
+  // Guardianship — when is_own_guardian = true, the other guardian_* fields
+  // must be empty. See `validate_client_guardianship` trigger.
+  is_own_guardian: boolean | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  guardian_relationship: string | null;
+  guardian_email: string | null;
   // feature toggles stored as JSON
   feature_config: Record<string, boolean> | null;
   profile_photo_url: string | null;
@@ -98,7 +105,14 @@ type ClientFormValues = {
   emergency_contact_name: string;
   emergency_contact_phone: string;
   profile_photo_url: string;
+  // Optional — only included by forms that expose guardianship editing.
+  is_own_guardian?: boolean;
+  guardian_name?: string;
+  guardian_phone?: string;
+  guardian_relationship?: string;
+  guardian_email?: string;
 };
+
 
 type StaffMember = {
   id: string;

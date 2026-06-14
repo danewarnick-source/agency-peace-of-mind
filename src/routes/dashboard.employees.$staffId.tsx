@@ -437,6 +437,11 @@ type ActivityItem = {
   status: string;
   date: string; // ISO
   href?: string;
+  // Shift-only detail (preserved from the old StaffShiftsPanel table)
+  clientId?: string | null;
+  clientName?: string | null;
+  serviceCode?: string | null;
+  units?: number | null;
 };
 
 function ActivityFeed({ organizationId, staffId }: { organizationId: string; staffId: string }) {
@@ -445,21 +450,32 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
   // EVV timesheets carry both Shift (scheduled) and Timesheet (post-clock) semantics
   // on a single row. We surface every row twice — once tagged Shift if it has a
   // clock-in, once tagged Timesheet if it has an approval/claim status — so the
-  // filter chips work intuitively without a separate "shifts" table.
+  // filter chips work intuitively without a separate "shifts" table. Column set
+  // matches the previous StaffShiftsPanel so the Shifts filter retains full detail.
   const evvQ = useQuery({
     enabled: !!organizationId,
     queryKey: ["activity-evv", organizationId, staffId],
     queryFn: async () => {
       const { data } = await supabase
         .from("evv_timesheets")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, status, clock_in_timestamp, clock_out_timestamp" as any)
+        .select("id, client_id, service_type_code, status, clock_in_timestamp, clock_out_timestamp, billed_units")
         .eq("organization_id", organizationId)
         .eq("staff_id", staffId)
         .order("clock_in_timestamp", { ascending: false })
-        .limit(100);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data ?? []) as Array<any>;
+        .limit(200);
+      const rows = data ?? [];
+      const ids = Array.from(new Set(rows.map((r) => r.client_id).filter(Boolean))) as string[];
+      const nameById = new Map<string, string>();
+      if (ids.length) {
+        const { data: cs } = await supabase
+          .from("clients")
+          .select("id, first_name, last_name")
+          .in("id", ids);
+        for (const c of cs ?? []) {
+          nameById.set(c.id, `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || "—");
+        }
+      }
+      return rows.map((r) => ({ ...r, client_name: r.client_id ? nameById.get(r.client_id) ?? "—" : null }));
     },
   });
 
@@ -498,20 +514,27 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
   const items = useMemo<ActivityItem[]>(() => {
     const out: ActivityItem[] = [];
     for (const r of evvQ.data ?? []) {
+      const code = r.service_type_code ?? null;
+      const units = r.billed_units ?? null;
+      const titleSuffix = `${code ?? "Shift"}${units != null ? ` · ${units} u` : ""}`;
       if (r.clock_in_timestamp) {
         out.push({
           id: `evv-shift-${r.id}`,
           kind: "Shift",
-          title: `${r.service_code ?? "Shift"}${r.units != null ? ` · ${r.units} u` : ""}`,
-          status: r.clock_out_timestamp ? "Clocked out" : "Clocked in",
+          title: titleSuffix,
+          status: r.status ? String(r.status) : (r.clock_out_timestamp ? "Clocked out" : "Clocked in"),
           date: r.clock_in_timestamp as string,
+          clientId: r.client_id ?? null,
+          clientName: r.client_name ?? null,
+          serviceCode: code,
+          units,
         });
       }
       if (r.status) {
         out.push({
           id: `evv-ts-${r.id}`,
           kind: "Timesheet",
-          title: `${r.service_code ?? "Timesheet"}${r.units != null ? ` · ${r.units} u` : ""}`,
+          title: `${code ?? "Timesheet"}${units != null ? ` · ${units} u` : ""}`,
           status: String(r.status),
           date: (r.clock_in_timestamp ?? new Date().toISOString()) as string,
         });
@@ -564,6 +587,43 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
           <p className="text-sm text-muted-foreground">Loading activity…</p>
         ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground">No activity to show in this filter.</p>
+        ) : filter === "Shift" ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Date</th>
+                  <th className="px-3 py-2 text-left">Client</th>
+                  <th className="px-3 py-2 text-left">Code</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-right">Units</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((it) => (
+                  <tr key={it.id} className="border-t">
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {it.date ? new Date(it.date).toLocaleString() : "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      {it.clientId ? (
+                        <Link
+                          to="/dashboard/clients/$clientId"
+                          params={{ clientId: it.clientId }}
+                          className="hover:underline"
+                        >
+                          {it.clientName ?? "—"}
+                        </Link>
+                      ) : "—"}
+                    </td>
+                    <td className="px-3 py-2"><code className="font-mono text-xs">{it.serviceCode ?? "—"}</code></td>
+                    <td className="px-3 py-2"><Badge variant="outline" className="capitalize">{it.status}</Badge></td>
+                    <td className="px-3 py-2 text-right">{it.units ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <ul className="divide-y">
             {filtered.map((it) => (

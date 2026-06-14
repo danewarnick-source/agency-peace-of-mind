@@ -251,10 +251,9 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_billing_codes")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, service_code, status, authorized_units, units_period, rate_per_unit, effective_start, effective_end" as any)
+        .select("id, service_code, annual_unit_authorization, weekly_cap_units, monthly_max_units, unit_type, rate_per_unit, service_start_date, service_end_date")
         .eq("client_id", clientId)
-        .order("effective_start", { ascending: false });
+        .order("service_start_date", { ascending: false });
       if (error) throw error;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (data ?? []) as any[];
@@ -275,10 +274,10 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
           rows={q.data ?? []}
           columns={[
             { header: "Code", cell: (r) => <code className="font-mono">{r.service_code}</code> },
-            { header: "Status", cell: (r) => <Badge variant={r.status === "active" ? "default" : "outline"}>{r.status ?? "—"}</Badge> },
-            { header: "Authorized", cell: (r) => `${r.authorized_units ?? "—"} ${r.units_period ?? ""}`.trim() },
+            { header: "Unit", cell: (r) => r.unit_type ?? "—" },
+            { header: "Annual auth", cell: (r) => r.annual_unit_authorization ?? "—" },
             { header: "Rate", cell: (r) => (r.rate_per_unit != null ? `$${Number(r.rate_per_unit).toFixed(2)}` : "—") },
-            { header: "Effective", cell: (r) => `${r.effective_start ?? "—"} → ${r.effective_end ?? "open"}` },
+            { header: "Effective", cell: (r) => `${r.service_start_date ?? "—"} → ${r.service_end_date ?? "open"}` },
           ]}
         />
       </CardContent>
@@ -293,10 +292,10 @@ function ShiftsPanel({ clientId, orgId }: { clientId: string; orgId?: string }) 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("evv_timesheets")
-        .select("id, service_code, status, start_time_actual, end_time_actual, staff_id, total_units")
+        .select("id, service_type_code, status, clock_in_timestamp, clock_out_timestamp, staff_id, billed_units")
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
-        .order("start_time_actual", { ascending: false })
+        .order("clock_in_timestamp", { ascending: false })
         .limit(200);
       if (error) throw error;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -312,10 +311,10 @@ function ShiftsPanel({ clientId, orgId }: { clientId: string; orgId?: string }) 
           empty="No shifts recorded for this client."
           rows={q.data ?? []}
           columns={[
-            { header: "Date", cell: (r) => r.start_time_actual ? new Date(r.start_time_actual).toLocaleDateString() : "—" },
-            { header: "Code", cell: (r) => <code className="font-mono">{r.service_code ?? "—"}</code> },
+            { header: "Date", cell: (r) => r.clock_in_timestamp ? new Date(r.clock_in_timestamp).toLocaleDateString() : "—" },
+            { header: "Code", cell: (r) => <code className="font-mono">{r.service_type_code ?? "—"}</code> },
             { header: "Status", cell: (r) => <Badge variant="outline">{r.status ?? "—"}</Badge> },
-            { header: "Units", cell: (r) => r.total_units ?? "—" },
+            { header: "Units", cell: (r) => r.billed_units ?? "—" },
           ]}
         />
       </CardContent>
@@ -330,7 +329,7 @@ function DailyLogsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("daily_logs")
-        .select("id, log_date, status, mood, summary")
+        .select("id, log_date, status, narrative, submitted_at")
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
         .order("log_date", { ascending: false })
@@ -351,8 +350,8 @@ function DailyLogsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
           columns={[
             { header: "Date", cell: (r) => r.log_date ?? "—" },
             { header: "Status", cell: (r) => <Badge variant="outline">{r.status ?? "—"}</Badge> },
-            { header: "Mood", cell: (r) => r.mood ?? "—" },
-            { header: "Summary", cell: (r) => <span className="line-clamp-2 max-w-md">{r.summary ?? "—"}</span> },
+            { header: "Submitted", cell: (r) => r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—" },
+            { header: "Narrative", cell: (r) => <span className="line-clamp-2 max-w-md">{r.narrative ?? "—"}</span> },
           ]}
         />
       </CardContent>
@@ -367,8 +366,7 @@ function IncidentsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("incident_reports")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, incident_date, incident_type, severity, status" as any)
+        .select("id, incident_date, incident_types, status, is_abuse_neglect, is_fatality, report_number")
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
         .order("incident_date", { ascending: false })
@@ -388,8 +386,18 @@ function IncidentsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
           rows={q.data ?? []}
           columns={[
             { header: "Date", cell: (r) => r.incident_date ?? "—" },
-            { header: "Type", cell: (r) => r.incident_type ?? "—" },
-            { header: "Severity", cell: (r) => r.severity ? <Badge variant="destructive">{r.severity}</Badge> : "—" },
+            { header: "Report #", cell: (r) => <code className="font-mono text-xs">{r.report_number ?? "—"}</code> },
+            { header: "Types", cell: (r) => Array.isArray(r.incident_types) ? (r.incident_types as string[]).join(", ") || "—" : "—" },
+            {
+              header: "Flags",
+              cell: (r) => (
+                <div className="flex gap-1">
+                  {r.is_abuse_neglect ? <Badge variant="destructive">A/N</Badge> : null}
+                  {r.is_fatality ? <Badge variant="destructive">Fatality</Badge> : null}
+                  {!r.is_abuse_neglect && !r.is_fatality ? "—" : null}
+                </div>
+              ),
+            },
             { header: "Status", cell: (r) => <Badge variant="outline">{r.status ?? "—"}</Badge> },
           ]}
         />
@@ -405,8 +413,7 @@ function SummariesPanel({ clientId, orgId }: { clientId: string; orgId?: string 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_progress_summaries")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, summary_type, period_start, period_end, status, submitted_at" as any)
+        .select("id, summary_kind, period_kind, period_label, period_start, period_end, status, finalized_at")
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
         .order("period_end", { ascending: false })
@@ -425,10 +432,11 @@ function SummariesPanel({ clientId, orgId }: { clientId: string; orgId?: string 
           empty="No progress summaries on file."
           rows={q.data ?? []}
           columns={[
-            { header: "Type", cell: (r) => <Badge variant="outline">{r.summary_type ?? "—"}</Badge> },
-            { header: "Period", cell: (r) => `${r.period_start ?? "—"} → ${r.period_end ?? "—"}` },
+            { header: "Kind", cell: (r) => <Badge variant="outline">{r.summary_kind ?? "—"}</Badge> },
+            { header: "Cadence", cell: (r) => r.period_kind ?? "—" },
+            { header: "Period", cell: (r) => r.period_label ?? `${r.period_start ?? "—"} → ${r.period_end ?? "—"}` },
             { header: "Status", cell: (r) => r.status ?? "—" },
-            { header: "Submitted", cell: (r) => r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—" },
+            { header: "Finalized", cell: (r) => r.finalized_at ? new Date(r.finalized_at).toLocaleDateString() : "—" },
           ]}
         />
       </CardContent>
@@ -441,12 +449,13 @@ function HostHomeCertPanel({ clientId, orgId }: { clientId: string; orgId?: stri
     enabled: !!orgId,
     queryKey: ["client-profile-hhcert", orgId, clientId],
     queryFn: async () => {
-      const { data, error } = await (supabase as never as { from: (t: string) => { select: (s: string) => { eq: (a: string, b: string) => { eq: (a: string, b: string) => { order: (k: string, o: { ascending: boolean }) => Promise<{ data: unknown; error: unknown }> } } } } }).from("host_home_certifications")
-        .select("id, cert_date, expires_on, status, certifier_name")
+      const { data, error } = await supabase
+        .from("host_home_certifications")
+        .select("id, inspection_date, next_due_date, determination, inspector_name, cert_type")
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
-        .order("cert_date", { ascending: false });
-      if (error) throw error as Error;
+        .order("inspection_date", { ascending: false });
+      if (error) throw error;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (data ?? []) as any[];
     },
@@ -460,10 +469,11 @@ function HostHomeCertPanel({ clientId, orgId }: { clientId: string; orgId?: stri
           empty="No host-home certifications on file."
           rows={q.data ?? []}
           columns={[
-            { header: "Cert date", cell: (r) => r.cert_date ?? "—" },
-            { header: "Expires", cell: (r) => r.expires_on ?? "—" },
-            { header: "Status", cell: (r) => <Badge variant="outline">{r.status ?? "—"}</Badge> },
-            { header: "Certifier", cell: (r) => r.certifier_name ?? "—" },
+            { header: "Inspection", cell: (r) => r.inspection_date ?? "—" },
+            { header: "Cert type", cell: (r) => r.cert_type ?? "—" },
+            { header: "Next due", cell: (r) => r.next_due_date ?? "—" },
+            { header: "Determination", cell: (r) => <Badge variant="outline">{r.determination ?? "—"}</Badge> },
+            { header: "Inspector", cell: (r) => r.inspector_name ?? "—" },
           ]}
         />
       </CardContent>

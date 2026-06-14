@@ -33,6 +33,7 @@ import { searchTimesheetsByVector, backfillTimesheetEmbeddings } from "@/lib/vec
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { useNavigate } from "@tanstack/react-router";
 import { Home as HomeIcon } from "lucide-react";
+import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
 // the Pending Approvals Ledger and the Approved Timesheets Archive.

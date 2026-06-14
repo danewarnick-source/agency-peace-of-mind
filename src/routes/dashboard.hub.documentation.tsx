@@ -54,6 +54,7 @@ function DocumentationHub() {
             </details>
           </div>
         ) },
+        { key: "archive", label: "Approved EVV Archive", render: () => <EvvArchiveWrapped /> },
         {
           key: "incidents",
           label: "Incidents",

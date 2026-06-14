@@ -156,7 +156,7 @@ function DeadlineRow({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["s
               item.title
             )}
             {item.source === "summary" && item.summary?.requires_upi_attestation && (
-              <Badge className="ml-2 bg-[#137182] text-white hover:bg-[#137182]">UPI</Badge>
+              <Badge className="ml-2 bg-[#137182] text-white hover:bg-[#137182]">SEI — Monthly UPI submission required</Badge>
             )}
           </p>
           <p className="text-xs text-muted-foreground">

@@ -256,6 +256,7 @@ export function useDeadlines() {
         subjectKind: "client",
         dueAt: due,
         status: bucketStatus(due, now),
+        href: `/dashboard/summaries?open=${s.id}`,
         summary: s,
         clientId: s.client_id,
       });

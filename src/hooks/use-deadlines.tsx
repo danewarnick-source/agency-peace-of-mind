@@ -78,7 +78,7 @@ export function useDeadlines() {
     },
   });
 
-  // 3. Active HHS clients + their existing monthly certifications.
+  // 3. Active HHS clients (drives the annual host-home-cert source below).
   const hhsQ = useQuery({
     enabled: !!orgId,
     queryKey: ["deadlines", "hhs", orgId],
@@ -94,17 +94,7 @@ export function useDeadlines() {
         .filter((c) => (!c.service_start_date || c.service_start_date <= today)
                     && (!c.service_end_date || c.service_end_date >= today))
         .map((c) => c.client_id);
-      if (activeIds.length === 0) return { activeIds: [] as string[], certs: [] as Array<{ client_id: string; month: string }> };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const certsRes: { data: Array<{ client_id: string; month: string }> | null; error: unknown } = await (supabase as any)
-        .from("hhs_monthly_certifications")
-        .select("client_id, month")
-        .eq("organization_id", orgId!)
-        .in("client_id", activeIds);
-      return {
-        activeIds,
-        certs: (certsRes.data ?? []) as Array<{ client_id: string; month: string }>,
-      };
+      return { activeIds };
     },
   });
 

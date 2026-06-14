@@ -292,7 +292,7 @@ function DashboardLayout() {
 
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-screen h-[100dvh] flex-col overflow-hidden">
       <ImpersonationBanner />
 
       {/* Mobile shell — staff view only (below md) */}

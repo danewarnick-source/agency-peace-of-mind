@@ -58,7 +58,7 @@ function ClientProfileHub() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, living_arrangement" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id" as any)
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -70,9 +70,13 @@ function ClientProfileHub() {
   const fullName = client
     ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || "—"
     : "Loading…";
-  const isHostHome =
-    typeof client?.living_arrangement === "string" &&
-    client.living_arrangement === "host_home";
+  // Host-home flag derived from authorized service codes (HHS).
+  const codes: string[] = Array.isArray(client?.job_code)
+    ? (client?.job_code as string[])
+    : Array.isArray(client?.authorized_dspd_codes)
+    ? (client?.authorized_dspd_codes as string[])
+    : [];
+  const isHostHome = codes.some((c) => String(c).toUpperCase() === "HHS");
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-6 space-y-6">

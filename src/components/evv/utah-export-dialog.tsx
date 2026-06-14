@@ -36,6 +36,7 @@ interface TsRow {
   reviewed_at: string | null;
   status: string;
   outside_geofence_reason: string | null;
+  reconciliation_status: string | null;
   gps_in_coordinates: Coord;
   gps_out_coordinates: Coord;
   staff_id: string;
@@ -87,7 +88,12 @@ function categorize(rows: TsRow[], exportedIds: Set<string>, addressMap: Map<str
     if (!effOut(r)) excludeReason = "no_clock_out";
     else if (exportedIds.has(r.id)) excludeReason = "already_exported";
     else if (!memberId) excludeReason = "missing_member_id";
-    else if (r.outside_geofence_reason && r.outside_geofence_reason.trim().length > 0) excludeReason = "out_of_bounds";
+    else if (
+      r.outside_geofence_reason &&
+      r.outside_geofence_reason.trim().length > 0 &&
+      r.reconciliation_status !== "accepted" &&
+      r.reconciliation_status !== "corrected"
+    ) excludeReason = "out_of_bounds";
     return { row: r, address, memberId, excludeReason, addressBlank: !address };
   });
 }

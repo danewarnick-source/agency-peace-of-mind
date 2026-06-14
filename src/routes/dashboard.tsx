@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search, AlarmClock,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { toast } from "sonner";
@@ -51,6 +51,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2 },
   { to: "/dashboard/schedule-preview", label: "Scheduler", icon: CalendarDays },
   { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck },
+  { to: "/dashboard/deadlines", label: "Deadlines", icon: AlarmClock },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing" },
   { to: "/dashboard/reports", label: "Reports", icon: FileText, perm: "export_reports" },
   { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },

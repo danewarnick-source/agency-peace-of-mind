@@ -2257,6 +2257,78 @@ export type Database = {
         }
         Relationships: []
       }
+      client_progress_summaries: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          due_date: string
+          id: string
+          organization_id: string
+          period_end: string
+          period_kind: string
+          period_label: string
+          period_start: string
+          requires_upi_attestation: boolean
+          service_codes: string[]
+          updated_at: string
+          upi_entered_at: string | null
+          upi_entered_by: string | null
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          organization_id: string
+          period_end: string
+          period_kind: string
+          period_label: string
+          period_start: string
+          requires_upi_attestation?: boolean
+          service_codes?: string[]
+          updated_at?: string
+          upi_entered_at?: string | null
+          upi_entered_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          organization_id?: string
+          period_end?: string
+          period_kind?: string
+          period_label?: string
+          period_start?: string
+          requires_upi_attestation?: boolean
+          service_codes?: string[]
+          updated_at?: string
+          upi_entered_at?: string | null
+          upi_entered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_progress_summaries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_progress_summaries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_ratios: {
         Row: {
           client_id: string

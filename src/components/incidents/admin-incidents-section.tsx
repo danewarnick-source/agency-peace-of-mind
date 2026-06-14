@@ -68,17 +68,7 @@ type ScRequest = {
   responded_by: string | null;
 };
 
-// 5 business days from a discovery timestamp (skip Sat/Sun).
-function addBusinessDays(start: Date, days: number): Date {
-  const d = new Date(start);
-  let added = 0;
-  while (added < days) {
-    d.setDate(d.getDate() + 1);
-    const day = d.getDay();
-    if (day !== 0 && day !== 6) added += 1;
-  }
-  return d;
-}
+import { addBusinessDays } from "@/lib/incident-deadlines";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";

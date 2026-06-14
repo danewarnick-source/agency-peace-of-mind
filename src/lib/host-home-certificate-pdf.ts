@@ -71,7 +71,8 @@ export function renderCertificatePdf(p: CertificatePayload): Blob {
   y += 14;
 
   // Metadata block
-  line(`Client: ${p.clientName}`);
+  line(`Person certified for: ${p.clientName}`);
+  if (p.hostName) line(`Host home provider: ${p.hostName}`);
   line(`Host home address: ${p.host_home_address}`);
   line(`Inspection type: ${p.cert_type === "initial" ? "Initial (pre-placement)" : "Annual renewal"}`);
   line(`Inspection date: ${p.inspection_date}`);

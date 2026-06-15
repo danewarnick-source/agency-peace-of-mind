@@ -3145,6 +3145,223 @@ export type Database = {
           },
         ]
       }
+      day_program_attendance: {
+        Row: {
+          activity_note: string | null
+          arrival_time: string | null
+          attended: boolean
+          billed_code: string | null
+          billed_mode: string | null
+          billed_rate: number | null
+          billed_units: number | null
+          cap_snapshot: number | null
+          client_id: string
+          created_at: string
+          departure_time: string | null
+          id: string
+          override_reason: string | null
+          session_id: string
+          updated_at: string
+        }
+        Insert: {
+          activity_note?: string | null
+          arrival_time?: string | null
+          attended?: boolean
+          billed_code?: string | null
+          billed_mode?: string | null
+          billed_rate?: number | null
+          billed_units?: number | null
+          cap_snapshot?: number | null
+          client_id: string
+          created_at?: string
+          departure_time?: string | null
+          id?: string
+          override_reason?: string | null
+          session_id: string
+          updated_at?: string
+        }
+        Update: {
+          activity_note?: string | null
+          arrival_time?: string | null
+          attended?: boolean
+          billed_code?: string | null
+          billed_mode?: string | null
+          billed_rate?: number | null
+          billed_units?: number | null
+          cap_snapshot?: number | null
+          client_id?: string
+          created_at?: string
+          departure_time?: string | null
+          id?: string
+          override_reason?: string | null
+          session_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "day_program_attendance_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "day_program_attendance_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "day_program_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      day_program_session_staff: {
+        Row: {
+          clock_in: string | null
+          clock_out: string | null
+          created_at: string
+          id: string
+          session_id: string
+          staff_id: string
+          updated_at: string
+        }
+        Insert: {
+          clock_in?: string | null
+          clock_out?: string | null
+          created_at?: string
+          id?: string
+          session_id: string
+          staff_id: string
+          updated_at?: string
+        }
+        Update: {
+          clock_in?: string | null
+          clock_out?: string | null
+          created_at?: string
+          id?: string
+          session_id?: string
+          staff_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "day_program_session_staff_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "day_program_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      day_program_sessions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          location_id: string | null
+          location_label: string | null
+          notes: string | null
+          organization_id: string
+          service_code: string
+          session_date: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_time: string
+          id?: string
+          location_id?: string | null
+          location_label?: string | null
+          notes?: string | null
+          organization_id: string
+          service_code: string
+          session_date: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_time?: string
+          id?: string
+          location_id?: string | null
+          location_label?: string | null
+          notes?: string | null
+          organization_id?: string
+          service_code?: string
+          session_date?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "day_program_sessions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "day_program_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      day_program_transport: {
+        Row: {
+          attendance_id: string
+          created_at: string
+          dropoff_location: string | null
+          dropoff_time: string | null
+          id: string
+          mtp_billed: boolean
+          mtp_block_reason: string | null
+          pickup_location: string | null
+          pickup_time: string | null
+          transport_staff_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          attendance_id: string
+          created_at?: string
+          dropoff_location?: string | null
+          dropoff_time?: string | null
+          id?: string
+          mtp_billed?: boolean
+          mtp_block_reason?: string | null
+          pickup_location?: string | null
+          pickup_time?: string | null
+          transport_staff_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attendance_id?: string
+          created_at?: string
+          dropoff_location?: string | null
+          dropoff_time?: string | null
+          id?: string
+          mtp_billed?: boolean
+          mtp_block_reason?: string | null
+          pickup_location?: string | null
+          pickup_time?: string | null
+          transport_staff_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "day_program_transport_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: true
+            referencedRelation: "day_program_attendance"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distribution_plan_participants: {
         Row: {
           allocation_pct: number
@@ -12293,6 +12510,24 @@ export type Database = {
       }
     }
     Views: {
+      day_program_billable_v: {
+        Row: {
+          activity_note: string | null
+          attendance_id: string | null
+          billed_mode: string | null
+          billed_rate: number | null
+          billed_units: number | null
+          cap_snapshot: number | null
+          client_id: string | null
+          dollars: number | null
+          organization_id: string | null
+          row_kind: string | null
+          service_code: string | null
+          session_date: string | null
+          session_id: string | null
+        }
+        Relationships: []
+      }
       employee_client_assignments: {
         Row: {
           client_id: string | null

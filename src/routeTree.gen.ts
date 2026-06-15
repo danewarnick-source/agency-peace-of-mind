@@ -61,6 +61,7 @@ import { Route as DashboardExternalCertificationsRouteImport } from './routes/da
 import { Route as DashboardEvvArchiveRouteImport } from './routes/dashboard.evv-archive'
 import { Route as DashboardEmarRouteImport } from './routes/dashboard.emar'
 import { Route as DashboardDeadlinesRouteImport } from './routes/dashboard.deadlines'
+import { Route as DashboardDayProgramRouteImport } from './routes/dashboard.day-program'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
 import { Route as DashboardComplianceDeskRouteImport } from './routes/dashboard.compliance-desk'
 import { Route as DashboardCommandCenterRouteImport } from './routes/dashboard.command-center'
@@ -430,6 +431,11 @@ const DashboardEmarRoute = DashboardEmarRouteImport.update({
 const DashboardDeadlinesRoute = DashboardDeadlinesRouteImport.update({
   id: '/deadlines',
   path: '/deadlines',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardDayProgramRoute = DashboardDayProgramRouteImport.update({
+  id: '/day-program',
+  path: '/day-program',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardDailyLogsRoute = DashboardDailyLogsRouteImport.update({
@@ -1052,6 +1058,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
+  '/dashboard/day-program': typeof DashboardDayProgramRoute
   '/dashboard/deadlines': typeof DashboardDeadlinesRoute
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/evv-archive': typeof DashboardEvvArchiveRoute
@@ -1210,6 +1217,7 @@ export interface FileRoutesByTo {
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
+  '/dashboard/day-program': typeof DashboardDayProgramRoute
   '/dashboard/deadlines': typeof DashboardDeadlinesRoute
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/evv-archive': typeof DashboardEvvArchiveRoute
@@ -1367,6 +1375,7 @@ export interface FileRoutesById {
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
+  '/dashboard/day-program': typeof DashboardDayProgramRoute
   '/dashboard/deadlines': typeof DashboardDeadlinesRoute
   '/dashboard/emar': typeof DashboardEmarRoute
   '/dashboard/evv-archive': typeof DashboardEvvArchiveRoute
@@ -1529,6 +1538,7 @@ export interface FileRouteTypes {
     | '/dashboard/command-center'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
+    | '/dashboard/day-program'
     | '/dashboard/deadlines'
     | '/dashboard/emar'
     | '/dashboard/evv-archive'
@@ -1687,6 +1697,7 @@ export interface FileRouteTypes {
     | '/dashboard/command-center'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
+    | '/dashboard/day-program'
     | '/dashboard/deadlines'
     | '/dashboard/emar'
     | '/dashboard/evv-archive'
@@ -1843,6 +1854,7 @@ export interface FileRouteTypes {
     | '/dashboard/command-center'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
+    | '/dashboard/day-program'
     | '/dashboard/deadlines'
     | '/dashboard/emar'
     | '/dashboard/evv-archive'
@@ -2361,6 +2373,13 @@ declare module '@tanstack/react-router' {
       path: '/deadlines'
       fullPath: '/dashboard/deadlines'
       preLoaderRoute: typeof DashboardDeadlinesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/day-program': {
+      id: '/dashboard/day-program'
+      path: '/day-program'
+      fullPath: '/dashboard/day-program'
+      preLoaderRoute: typeof DashboardDayProgramRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/daily-logs': {
@@ -3376,6 +3395,7 @@ interface DashboardRouteChildren {
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
+  DashboardDayProgramRoute: typeof DashboardDayProgramRoute
   DashboardDeadlinesRoute: typeof DashboardDeadlinesRoute
   DashboardEmarRoute: typeof DashboardEmarRoute
   DashboardEvvArchiveRoute: typeof DashboardEvvArchiveRoute
@@ -3456,6 +3476,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
+  DashboardDayProgramRoute: DashboardDayProgramRoute,
   DashboardDeadlinesRoute: DashboardDeadlinesRoute,
   DashboardEmarRoute: DashboardEmarRoute,
   DashboardEvvArchiveRoute: DashboardEvvArchiveRoute,

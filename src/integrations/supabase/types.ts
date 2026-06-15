@@ -2583,6 +2583,7 @@ export type Database = {
       clients: {
         Row: {
           account_status: string
+          admin_hours_per_week: number | null
           authorized_dspd_codes: string[]
           created_at: string
           date_of_birth: string | null
@@ -2615,6 +2616,7 @@ export type Database = {
         }
         Insert: {
           account_status?: string
+          admin_hours_per_week?: number | null
           authorized_dspd_codes?: string[]
           created_at?: string
           date_of_birth?: string | null
@@ -2647,6 +2649,7 @@ export type Database = {
         }
         Update: {
           account_status?: string
+          admin_hours_per_week?: number | null
           authorized_dspd_codes?: string[]
           created_at?: string
           date_of_birth?: string | null
@@ -12640,6 +12643,7 @@ export type Database = {
         Args: { _org: string; _staff: string }
         Returns: {
           account_status: string
+          admin_hours_per_week: number | null
           authorized_dspd_codes: string[]
           created_at: string
           date_of_birth: string | null

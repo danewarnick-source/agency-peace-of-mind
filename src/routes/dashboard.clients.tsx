@@ -599,7 +599,7 @@ function ClientWorkspace({
   const { data: disabledTier } = useDisabledTierFeatures();
   const emarEnabled = isClientFeatureEnabled(client, "emar", disabledTier ?? null);
   const billingCodesQ = useClientBillingCodes(client.id);
-  const billingCodes = (billingCodesQ.data ?? []).map((b) => b.service_code);
+  const billingCodes = Array.from(new Set((billingCodesQ.data ?? []).map((b) => b.service_code)));
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col space-y-4">

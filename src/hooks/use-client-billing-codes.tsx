@@ -33,7 +33,13 @@ export function useClientBillingCodes(clientId: string | undefined) {
         .eq("client_id", clientId!)
         .order("service_code");
       if (error) throw error;
-      return (data ?? []) as unknown as ClientBillingCode[];
+      // Only currently-open authorizations. Soft-closed rows
+      // (service_end_date <= today) are excluded so removed codes disappear
+      // from the editor, profile summary, EVV clock-in dropdown, scheduler,
+      // and cap modal. Billing history reads use their own query.
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = (data ?? []) as unknown as ClientBillingCode[];
+      return rows.filter((r) => !r.service_end_date || r.service_end_date > today);
     },
   });
 }

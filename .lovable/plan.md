@@ -1,55 +1,26 @@
-## Goal
+## Bug
+Removed billing codes reappear after reload because:
+1. `useClientBillingCodes` returns every row (incl. soft-closed ones) → editor + header chip + EVV/scheduler dropdowns all see closed codes.
+2. The DB trigger `sync_client_authorized_codes_from_billing` (a) doesn't fire when a row is soft-closed (only watches `UPDATE OF service_code, client_id`), and (b) aggregates every row regardless of `service_end_date` → `clients.authorized_dspd_codes` / `job_code` keep removed codes.
 
-Make the "Authorized DSPD billing codes" card on the client profile **editable** by admins (multi-select + save). Selections write to `client_billing_codes` (the single source of truth) — the existing DB trigger keeps `clients.job_code` / `authorized_dspd_codes` in sync, so scheduling, time clocks, EVV, today-shift, and the Billing tab all stay aligned automatically.
+## Fix (one fix, two places, both must agree on "open = `service_end_date IS NULL OR service_end_date > CURRENT_DATE`")
 
-Only the one card changes. No business logic, rate logic, or EVV gating changes.
+### 1. Migration — trigger + backfill
+Rewrite `public.sync_client_authorized_codes_from_billing()` so its aggregate filters to open rows only, distinct on `service_code`. Recreate `trg_sync_client_authorized_codes` to also fire on `UPDATE OF service_end_date` (keep `service_code`, `client_id`, plus INSERT/DELETE). One-time backfill: recompute `clients.authorized_dspd_codes` and `clients.job_code` from open rows for every client; clients with no open rows get `ARRAY[]::text[]`.
 
-## What changes
+Result: closing a code immediately drops it from the EVV clock-in dropdown and the scheduler (both read `clients.job_code` / `authorized_dspd_codes` paths via this sync).
 
-### 1. Replace `AuthorizedCodesMirror` with an editable picker (`src/routes/dashboard.clients.tsx`)
+### 2. Frontend read — `src/hooks/use-client-billing-codes.tsx`
+In `useClientBillingCodes` (single-client hook) post-filter the returned array to rows where `service_end_date == null || service_end_date > today` (today = local `YYYY-MM-DD`). Do not touch `useAllClientBillingCodes` — admin/520 views need history.
 
-The component currently shows read-only chips. Replace with:
+This single hook feeds: profile editor `currentCodes`, profile "Service codes" summary chip, EVV `punch-pad` code list, scheduler `shift-editor` code list, and `cap-threshold-modal` — all of which want "currently authorized" semantics, matching the user's stated expectation.
 
-- `DspdCodesMultiSelect` (already imported, already used in the Care directory dialog) — admin-only via `RequirePermission perm="manage_users"`.
-- Initial value = current authorized codes derived from `client_billing_codes` (same `billingCodes` array the header chips use).
-- Dirty-state **Save** + **Cancel** buttons appear once the selection differs from saved.
-- Below the picker, keep the existing `BillingCodesDetail` table so admins can still edit rate / annual cap / dates per code.
+Also dedupe the derived string list in `src/routes/dashboard.clients.tsx` line 602 with `Array.from(new Set(...))` so duplicate service_code rows (open + historically re-added) render once in the chip and editor.
 
-### 2. Save behavior — writes to `client_billing_codes`
+## Out of scope (explicitly untouched)
+- Billing tab's own query in `dashboard.clients.$clientId.tsx` (reads full history — correct).
+- `useAllClientBillingCodes`, billing math, EVV rules, any other component, table, or feature.
+- No row deletes; closed rows remain for billing history.
 
-On Save, diff `selected` vs `current`:
-
-- **Codes added** → INSERT a minimal `client_billing_codes` row per code:
-  - `client_id`, `organization_id`, `service_code`
-  - `service_start_date = today`, `service_end_date = null`
-  - `unit_type` defaulted from the code's catalog entry (quarter-hour vs day vs visit) via existing `service_codes` lookup
-  - `rate_per_unit`, `annual_unit_authorization`, `weekly_cap_units`, `monthly_max_units` left null — flagged with a yellow "Needs 1056 details" badge in the BillingCodesDetail table so finance fills them in before billing.
-- **Codes removed** → soft-close the active row(s) for that code: `service_end_date = today`. Do **not** hard-delete (preserves historical billing / EVV references).
-- Same-code re-add after a close → INSERT a new row with today as start; old closed row remains for history.
-
-Wrapped in a single `Promise.all` then `queryClient.invalidateQueries` for `client-billing-codes`, `client-profile`, header chips, and Billing tab.
-
-### 3. Trigger does the rest (already deployed)
-
-The migration from the previous turn (`sync_client_authorized_codes_from_billing`) recomputes `clients.job_code` and `clients.authorized_dspd_codes` from active `client_billing_codes` rows on every INSERT/UPDATE/DELETE. So as soon as Save completes:
-
-- Header chips refresh.
-- Scheduling, EVV punch pad, today-shift, caseload, whiteboard (all the legacy-array consumers) see the new code list on next refetch.
-- Billing tab shows the new rows.
-
-### 4. Care directory dialog (`DspdCodesMultiSelect` at line 2751)
-
-Out of scope to remove, but its save path currently writes directly to `clients.job_code` — that write is now **redundant** (trigger overwrites it). Leave it alone in this change to avoid scope creep; flag for a follow-up to either remove that field from the dialog or rewire it to `client_billing_codes` the same way. Note the user can already see and edit codes via the new profile-card editor.
-
-## Verification
-
-1. Open Johnny → Care tab → "Authorized DSPD billing codes" card now shows the multi-select pre-populated with DSI / HHS / SEI / SLH / SLN.
-2. Add `DSG` → Save → row appears in BillingCodesDetail with "Needs 1056 details" badge; header chips update; `clients.job_code` includes `DSG` (trigger).
-3. Remove `SEI` → Save → its `client_billing_codes` row's `service_end_date` = today; header chips drop `SEI`; trigger removes it from `job_code`.
-4. EVV punch pad / scheduling dropdown for Johnny reflects the new code list (reads `clients.job_code`, kept in sync by trigger).
-
-## Files touched
-
-- `src/routes/dashboard.clients.tsx` — replace `AuthorizedCodesMirror` with editable `AuthorizedCodesEditor` (multi-select + save + diff logic).
-
-No migration, no new tables, no changes to billing math or EVV rules.
+## QA
+Open a client → remove a code → Save → navigate away → return: code gone from editor + header summary. Check EVV clock-in client dropdown and scheduler shift-editor code dropdown: code gone. Add a code: still works. Billing tab (1056 history) still shows the closed row with its end-date.

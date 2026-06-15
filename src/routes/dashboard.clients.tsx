@@ -1892,7 +1892,7 @@ function ProfileTab({
             </div>
             <div className="flex justify-between">
               <span>Service codes</span>
-              <span>{(client.job_code ?? []).join(", ") || "None"}</span>
+              <span>{billingCodes.length ? billingCodes.join(", ") : "None"}</span>
             </div>
             <div className="flex justify-between">
               <span>PCSP goals</span>

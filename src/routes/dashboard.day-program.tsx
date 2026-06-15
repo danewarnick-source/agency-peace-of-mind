@@ -281,7 +281,16 @@ type AttendanceRow = {
   billed_units: number | null;
   billed_rate: number | null;
   cap_snapshot: number | null;
-  transport: Array<{
+  transport: {
+    id: string;
+    pickup_location: string | null;
+    pickup_time: string | null;
+    dropoff_location: string | null;
+    dropoff_time: string | null;
+    mtp_billed: boolean;
+    mtp_block_reason: string | null;
+  } | null;
+};
     id: string;
     pickup_location: string | null;
     pickup_time: string | null;

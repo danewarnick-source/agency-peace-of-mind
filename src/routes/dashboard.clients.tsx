@@ -707,7 +707,7 @@ function ClientWorkspace({
             }
           >
             <LivingArrangementFlag clientId={client.id} />
-            <CareBillingCodesEditor client={client} onSave={onSave} saving={saving} />
+            <AuthorizedCodesMirror codes={billingCodes} />
             <div className="mt-4">
               <BillingCodesDetail
                 clientId={client.id}

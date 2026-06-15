@@ -1033,19 +1033,13 @@ function AuthorizedCodesEditor({
         )
         .map((r) => r.id);
 
-      const ops: Promise<unknown>[] = [];
-
       if (closeIds.length) {
-        ops.push(
-          supabase
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .from("client_billing_codes" as any)
-            .update({ service_end_date: today })
-            .in("id", closeIds)
-            .then(({ error }) => {
-              if (error) throw error;
-            }),
-        );
+        const { error } = await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from("client_billing_codes" as any)
+          .update({ service_end_date: today })
+          .in("id", closeIds);
+        if (error) throw error;
       }
 
       if (added.length) {
@@ -1055,18 +1049,12 @@ function AuthorizedCodesEditor({
           service_code: code,
           service_start_date: today,
         }));
-        ops.push(
-          supabase
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .from("client_billing_codes" as any)
-            .insert(rows)
-            .then(({ error }) => {
-              if (error) throw error;
-            }),
-        );
+        const { error } = await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from("client_billing_codes" as any)
+          .insert(rows);
+        if (error) throw error;
       }
-
-      await Promise.all(ops);
     },
     onSuccess: () => {
       toast.success("Authorized codes updated");

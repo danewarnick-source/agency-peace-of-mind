@@ -1053,7 +1053,7 @@ function AuthorizedCodesEditor({
         if (existingError) throw existingError;
 
         const existingByCode = new Map(
-          ((existingRows ?? []) as Array<{ id: string; service_code: string; service_end_date: string | null }>)
+          ((existingRows ?? []) as unknown as Array<{ id: string; service_code: string; service_end_date: string | null }>)
             .map((row) => [row.service_code, row]),
         );
 

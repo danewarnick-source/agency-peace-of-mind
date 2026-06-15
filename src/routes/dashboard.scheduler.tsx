@@ -177,17 +177,6 @@ function SchedulerPage() {
           <ViewBtn label="Month" active={view === "month"} onClick={() => setView("month")} />
         </div>
       )}
-            <button onClick={() => shift(-1)} className="px-2 py-1 hover:bg-muted" aria-label="Previous"><ChevronLeft className="h-4 w-4" /></button>
-            <button onClick={() => setAnchor(startOfDay(new Date()))} className="px-3 py-1 text-sm font-medium hover:bg-muted">Today</button>
-            <span className="px-3 py-1 text-sm font-medium tabular-nums min-w-[180px] text-center">{dateLabel}</span>
-            <button onClick={() => shift(1)} className="px-2 py-1 hover:bg-muted" aria-label="Next"><ChevronRight className="h-4 w-4" /></button>
-          </div>
-          <div className="flex-1" />
-          <ViewBtn label="Day" icon={<CalendarDays className="h-4 w-4" />} active={view === "day"} onClick={() => setView("day")} />
-          <ViewBtn label="Week" active={view === "week"} onClick={() => setView("week")} />
-          <ViewBtn label="Month" active={view === "month"} onClick={() => setView("month")} />
-        </div>
-      )}
 
       <SchedulerBody
         tab={tab}

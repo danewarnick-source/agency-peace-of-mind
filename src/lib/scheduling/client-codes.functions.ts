@@ -23,7 +23,7 @@ export const listClientAuthorizedCodes = createServerFn({ method: "POST" })
     if (error) throw error;
     return (rows ?? []).filter((r: { service_start_date: string | null; service_end_date: string | null }) => {
       if (r.service_start_date && r.service_start_date > today) return false;
-      if (r.service_end_date && r.service_end_date < today) return false;
+      if (r.service_end_date && r.service_end_date <= today) return false;
       return true;
     });
   });

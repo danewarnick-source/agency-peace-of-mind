@@ -324,6 +324,7 @@ export function ClientsPage() {
     onSuccess: () => {
       toast.success("Client updated.");
       qc.invalidateQueries({ queryKey: ["clients"] });
+      qc.invalidateQueries({ queryKey: ["client-auth-codes"] });
       // Refresh active client
       setActiveClient((prev) => prev ? { ...prev } : null);
     },

@@ -705,3 +705,112 @@ export const listAuditableStaff = createServerFn({ method: "GET" })
       };
     });
   });
+
+// ── Reconciliation audit: job_code vs client_billing_codes ────────────────────
+
+export interface ServiceCodeReconciliationEntry {
+  clientId: string;
+  clientName: string;
+  legacyJobCodes: string[];
+  billingCodes: string[];
+  missingFromBilling: string[] | null; // codes in job_code but not in billing
+  missingFromLegacy: string[] | null;  // codes in billing but not in job_code
+  inSync: boolean;
+}
+
+export interface ServiceCodeReconciliationReport {
+  generatedAt: string;
+  organizationId: string;
+  totalClients: number;
+  outOfSyncCount: number;
+  entries: ServiceCodeReconciliationEntry[];
+}
+
+/**
+ * Reconciliation audit: compares each client's legacy job_code array against
+ * their active client_billing_codes rows.
+ *
+ * Read-only — never modifies data.  job_code is now stale; client_billing_codes
+ * is the authoritative source.  This report surfaces divergences so admins can
+ * clean up job_code or add missing billing-code rows.
+ */
+export const reconcileServiceCodes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { organizationId: string }) =>
+    z.object({ organizationId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<ServiceCodeReconciliationReport> => {
+    const { supabase, userId } = context;
+    await assertAddonForOrg(supabase, userId, "internal_audit", data.organizationId);
+
+    const orgId = data.organizationId;
+
+    // Fetch all clients (just identity + legacy codes).
+    const { data: clientRows, error: clientErr } = await supabase
+      .from("clients")
+      .select("id, first_name, last_name, job_code")
+      .eq("organization_id", orgId);
+    if (clientErr) throw clientErr;
+
+    // Fetch all active client_billing_codes for this org.
+    const { data: bcodeRows, error: bcodeErr } = await supabase
+      .from("client_billing_codes")
+      .select("client_id, service_code, service_start_date, service_end_date")
+      .eq("organization_id", orgId);
+    if (bcodeErr) throw bcodeErr;
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Group active billing codes by client.
+    const billingByClient = new Map<string, Set<string>>();
+    for (const b of (bcodeRows ?? []) as Array<{
+      client_id: string;
+      service_code: string;
+      service_start_date: string | null;
+      service_end_date: string | null;
+    }>) {
+      if (b.service_start_date && b.service_start_date > today) continue;
+      if (b.service_end_date && b.service_end_date < today) continue;
+      if (!billingByClient.has(b.client_id)) billingByClient.set(b.client_id, new Set());
+      billingByClient.get(b.client_id)!.add(b.service_code);
+    }
+
+    const entries: ServiceCodeReconciliationEntry[] = [];
+    for (const c of (clientRows ?? []) as Array<{
+      id: string;
+      first_name: string;
+      last_name: string;
+      job_code: string[] | null;
+    }>) {
+      const legacy = new Set<string>(c.job_code ?? []);
+      const billing = billingByClient.get(c.id) ?? new Set<string>();
+
+      const missingFromBilling = Array.from(legacy).filter((code) => !billing.has(code));
+      const missingFromLegacy = Array.from(billing).filter((code) => !legacy.has(code));
+      const inSync = missingFromBilling.length === 0 && missingFromLegacy.length === 0;
+
+      entries.push({
+        clientId: c.id,
+        clientName: `${c.last_name}, ${c.first_name}`,
+        legacyJobCodes: Array.from(legacy).sort(),
+        billingCodes: Array.from(billing).sort(),
+        missingFromBilling: missingFromBilling.length ? missingFromBilling.sort() : null,
+        missingFromLegacy: missingFromLegacy.length ? missingFromLegacy.sort() : null,
+        inSync,
+      });
+    }
+
+    // Sort: out-of-sync first, then alphabetically by client name.
+    entries.sort((a, b) => {
+      if (a.inSync !== b.inSync) return a.inSync ? 1 : -1;
+      return a.clientName.localeCompare(b.clientName);
+    });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      organizationId: orgId,
+      totalClients: entries.length,
+      outOfSyncCount: entries.filter((e) => !e.inSync).length,
+      entries,
+    };
+  });

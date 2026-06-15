@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import { isDayProgramCode } from "@/lib/service-billing";
 import {
   Dialog,
   DialogContent,
@@ -76,6 +78,20 @@ export function NectarAutoAssignDialog({
 }) {
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
+
+  // Authorized billing codes from client_billing_codes (single source of truth).
+  // Filtered here to exclude day-program codes (DSG/DSP/DSI) — those codes are
+  // scheduled via the day-program module, not the standard shift auto-assign flow.
+  const allBillingCodesQ = useAllClientBillingCodes();
+  const billingCodesByClient = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const row of allBillingCodesQ.data ?? []) {
+      if (isDayProgramCode(row.service_code)) continue;
+      if (!map.has(row.client_id)) map.set(row.client_id, []);
+      map.get(row.client_id)!.push(row.service_code);
+    }
+    return map;
+  }, [allBillingCodesQ.data]);
 
   // Pull staff_assignments + scheduled_shifts (next 7 days) for the scoped clients.
   const clientIds = useMemo(() => clientsInScope.map((c) => c.id), [clientsInScope]);
@@ -157,7 +173,8 @@ export function NectarAutoAssignDialog({
       const assn = assignments.find((a) => a.client_id === client.id);
       const staff = assn ? profileMap.get(assn.staff_id) : undefined;
       const staffName = staff?.full_name ?? staff?.email ?? null;
-      const authorizedCodes = client.job_code ?? [];
+      // Use client_billing_codes as single source of truth; day-program codes already filtered.
+      const authorizedCodes = billingCodesByClient.get(client.id) ?? [];
       const assignmentCodes = assn?.service_codes ?? [];
       const matchedCode =
         authorizedCodes.find((c) => assignmentCodes.includes(c)) ??
@@ -186,7 +203,7 @@ export function NectarAutoAssignDialog({
         blockers,
       };
     });
-  }, [open, clientsInScope, assignmentsQ.data, profilesQ.data, existingQ.data]);
+  }, [open, clientsInScope, assignmentsQ.data, profilesQ.data, existingQ.data, billingCodesByClient]);
 
   const validCount = proposals.filter((p) => p.valid).length;
   const blockedCount = proposals.length - validCount;

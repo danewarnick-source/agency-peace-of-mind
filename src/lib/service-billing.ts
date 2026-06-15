@@ -36,4 +36,13 @@ export function isClockableServiceCode(code: string | null | undefined): boolean
   return !!code && !NON_CLOCKABLE_CODES.has(code);
 }
 
+// Day-program codes: DSG (Day Support — Group), DSP (Day Support — Individual),
+// DSI (Day Support — Individual, intensive). These are scheduled via the day-
+// program workflow and should NOT appear in the shift-picker service-code
+// dropdown. HHS is daily-rate but NOT a day-program code.
+const DAY_PROGRAM_CODES: ReadonlySet<string> = new Set(["DSG", "DSP", "DSI"]);
+
+export function isDayProgramCode(code: string | null | undefined): boolean {
+  return !!code && DAY_PROGRAM_CODES.has(code);
+}
 

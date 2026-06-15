@@ -39,6 +39,7 @@ import { PendingTrackingFormsDialog, type PendingForm } from "@/components/evv/p
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
 import { IncidentReportDialog } from "@/components/incidents/incident-report-dialog";
 import { AlertTriangle as AlertTriangleIcon } from "lucide-react";
+import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
 
 
 
@@ -444,6 +445,15 @@ export function PunchPad({
     return () => clearInterval(t);
   }, [activeMatchesThisPad, active?.id]);
 
+  // ── Authorized billing codes (single source of truth: client_billing_codes) ──
+  // Used instead of the stale job_code array on the clients row.
+  // EVV uses ALL authorized codes (no day-program filter here).
+  const effectiveClientId = lockedClient?.id ?? selectedClientId ?? undefined;
+  const clientBillingCodesQ = useClientBillingCodes(effectiveClientId || undefined);
+  const billingAuthorizedCodes: string[] | undefined = clientBillingCodesQ.data
+    ? clientBillingCodesQ.data.map((b) => b.service_code)
+    : undefined;
+
   // ── Client derivation ───────────────────────────────────────────────────────
   const clientForPunch: LockedClient | null = lockedClient
     ? lockedClient
@@ -455,7 +465,10 @@ export function PunchPad({
           name: `${c.first_name} ${c.last_name}`.trim(),
           memberId: padMemberId(c.medicaid_id),
           facility: c.physical_address,
-          authorizedCodes: c.job_code ?? undefined,
+          // Use billing codes from client_billing_codes; fall back to caseload
+          // job_code only while the query is still loading (billingAuthorizedCodes
+          // is undefined until the first response arrives).
+          authorizedCodes: billingAuthorizedCodes ?? c.job_code ?? undefined,
           homeLat: c.home_latitude ?? null,
           homeLng: c.home_longitude ?? null,
           geofenceRadiusFeet: c.geofence_radius_feet ?? null,
@@ -465,12 +478,21 @@ export function PunchPad({
 
   // ── Service codes ───────────────────────────────────────────────────────────
   const codesForClient = useMemo(() => {
-    const authorized = clientForPunch?.authorizedCodes;
+    // For a lockedClient, use its own authorizedCodes if available; otherwise
+    // fall back to billing codes fetched above.
+    const authorized = lockedClient
+      ? (lockedClient.authorizedCodes ?? billingAuthorizedCodes)
+      : billingAuthorizedCodes;
     if (authorized?.length) {
       return authorized.map((code) => ({ code, label: evvServiceLabel(code) }));
     }
-    return EVV_SERVICE_CODES.map((c) => ({ code: c.code, label: c.label }));
-  }, [clientForPunch?.authorizedCodes]);
+    // No authorized codes yet — if still loading, show nothing; once loaded
+    // an empty array means the client truly has no authorized codes.
+    if (clientBillingCodesQ.isLoading) {
+      return EVV_SERVICE_CODES.map((c) => ({ code: c.code, label: c.label }));
+    }
+    return [];
+  }, [lockedClient, billingAuthorizedCodes, clientBillingCodesQ.isLoading]);
 
   // ── Geofence derivation ─────────────────────────────────────────────────────
   const mapRadiusFeet = clientForPunch?.geofenceRadiusFeet ?? 1000;

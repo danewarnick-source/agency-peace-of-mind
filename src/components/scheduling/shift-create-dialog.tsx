@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { classesForCode, familyForCode, isDailyCode, maxRecommendedHours, minStaffAgeForCode } from "@/lib/scheduling/code-colors";
 import { listClientAuthorizedCodes } from "@/lib/scheduling/client-codes.functions";
+import { isDayProgramCode } from "@/lib/service-billing";
 import { rankStaffForShift } from "@/lib/scheduling/eligibility.functions";
 import { createShift } from "@/lib/scheduling/shifts.functions";
 import { postOpenShift } from "@/lib/scheduling/open-shifts.functions";
@@ -312,7 +313,7 @@ export function ShiftCreateDialog({
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {codesQ.data.map((row: { id: string; service_code: string; unit_type: string | null; rate_per_unit: number | null }) => {
+                {codesQ.data.filter((row: { id: string; service_code: string; unit_type: string | null; rate_per_unit: number | null }) => !isDayProgramCode(row.service_code)).map((row: { id: string; service_code: string; unit_type: string | null; rate_per_unit: number | null }) => {
                   const c = row.service_code;
                   const fc = classesForCode(c);
                   const on = code === c;

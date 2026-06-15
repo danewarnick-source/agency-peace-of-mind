@@ -33,7 +33,7 @@ export const EVV_SERVICE_CODES: ReadonlyArray<ServiceCodeDef> = [
   { code: "BC2", label: "BC2 — Behavior Consultation II", evvLock: false },
   { code: "BC3", label: "BC3 — Behavior Consultant III", evvLock: false },
   { code: "DSG", label: "DSG — Day Supports Group (Daily)", evvLock: false },
-  { code: "DSP", label: "DSP — Day Supports Group (Hourly)", evvLock: false },
+  { code: "DSP", label: "DSP — Day Supports Partial/Extended (qtr-hr or daily)", evvLock: false },
   { code: "DSI", label: "DSI — Day Supports Individual", evvLock: false },
   { code: "ELS", label: "ELS — Extended Living Supports", evvLock: false },
   { code: "EPR", label: "EPR — Employment Preparation Services", evvLock: false },

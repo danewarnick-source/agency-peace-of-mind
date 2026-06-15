@@ -413,7 +413,7 @@ function SessionRosterDialog({
           )}
           {attendance.map((a) => {
             const client = (clientsQ.data ?? []).find((c) => c.id === a.client_id);
-            const transport = a.transport?.[0];
+            const transport = a.transport;
             return (
               <Card key={a.id}>
                 <CardContent className="p-3 space-y-2">

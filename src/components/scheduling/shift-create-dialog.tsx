@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { classesForCode, familyForCode, isDailyCode, maxRecommendedHours, minStaffAgeForCode } from "@/lib/scheduling/code-colors";
-import { listClientAuthorizedCodes } from "@/lib/scheduling/client-codes.functions";
+import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { isDayProgramCode } from "@/lib/service-billing";
 import { rankStaffForShift } from "@/lib/scheduling/eligibility.functions";
 import { createShift } from "@/lib/scheduling/shifts.functions";

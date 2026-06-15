@@ -983,45 +983,31 @@ function CollapsibleCard({
   );
 }
 
-// ─── Care billing codes editor (lifts the DSPD multi-select out of Profile) ──
-function CareBillingCodesEditor({
-  client, onSave, saving,
-}: { client: Client; onSave: (v: ClientFormValues) => void; saving: boolean }) {
-  const [codes, setCodes] = useState<string[]>(client.job_code ?? []);
-  const dirty = JSON.stringify(codes) !== JSON.stringify(client.job_code ?? []);
+// ─── Authorized codes mirror (read-only; source = client_billing_codes) ───────
+function AuthorizedCodesMirror({ codes }: { codes: string[] }) {
   return (
-    <div className="space-y-3">
-      <DspdCodesMultiSelect value={codes} onChange={setCodes} />
-      <p className="text-[11px] text-muted-foreground">
-        Selected codes appear in the caregiver's EVV clock-in service-type dropdown.
-      </p>
-      {dirty && (
-        <Button
-          size="sm"
-          onClick={() => onSave({
-            first_name: client.first_name,
-            last_name: client.last_name,
-            phone_number: client.phone_number ?? "",
-            physical_address: client.physical_address ?? "",
-            pcsp_goals: client.pcsp_goals ?? [],
-            job_code: codes,
-            medicaid_id: client.medicaid_id ?? "",
-            geofence_radius_feet: client.geofence_radius_feet ?? 1000,
-            special_directions: client.special_directions ?? "",
-            date_of_birth: client.date_of_birth ?? "",
-            emergency_contact_name: client.emergency_contact_name ?? "",
-            emergency_contact_phone: client.emergency_contact_phone ?? "",
-            profile_photo_url: client.profile_photo_url ?? "",
-          })}
-          disabled={saving}
-        >
-          {saving && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-          Save codes
-        </Button>
+    <div className="space-y-2">
+      {codes.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No authorized codes yet. Use <span className="font-medium">Open Billing</span> to add one.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {codes.map((code) => (
+            <Badge key={code} variant="outline" className="font-mono text-xs" title={jobCodeLabel(code)}>
+              {code}
+            </Badge>
+          ))}
+        </div>
       )}
+      <p className="text-[11px] text-muted-foreground">
+        Authorized service codes are managed in the Billing editor. This list drives the caregiver's EVV
+        clock-in dropdown, scheduling, and all unit ledgers — one source of truth.
+      </p>
     </div>
   );
 }
+
 
 
 // ─── Rights & safeguards (collapsible link-out card) ─────────────────────────

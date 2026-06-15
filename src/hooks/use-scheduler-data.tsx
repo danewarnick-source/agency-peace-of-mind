@@ -90,7 +90,7 @@ export function useSchedulerData(weekStart: Date) {
             .gte("end_date", weekStart.toISOString().slice(0, 10)),
         ]);
       if (shiftsRes.error) throw shiftsRes.error;
-      const clients = (clientsRes.data ?? []) as SchedClient[];
+      const clients = (clientsRes.data ?? []) as unknown as SchedClient[];
       const teams = (teamsRes.data ?? []) as SchedTeam[];
       const memberIds = Array.from(
         new Set(
@@ -120,7 +120,7 @@ export function useSchedulerData(weekStart: Date) {
           start_date: p.start_date ?? null,
         };
       });
-      const auths = ((authRes.data ?? []) as Array<SchedAuth & { service_end_date: string | null }>)
+      const auths = ((authRes.data ?? []) as unknown as Array<SchedAuth & { service_end_date: string | null }>)
         .filter((r) => !r.service_end_date || r.service_end_date > today)
         .map((r) => ({
           client_id: r.client_id,

@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -14,7 +13,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Trash2, Plus, Truck } from "lucide-react";
-import { RequireRole } from "@/components/rbac-guard";
 import {
   listDayProgramSessions,
   createDayProgramSession,
@@ -24,15 +22,6 @@ import {
   deleteDayProgramSession,
 } from "@/lib/day-program.functions";
 import { RATE_CAPS, dspModeForMinutes, dsiTierForMinutes, MTP_FLAT_RATE } from "@/lib/day-program-billing";
-
-export const Route = createFileRoute("/dashboard/day-program")({
-  head: () => ({ meta: [{ title: "Day Program — HIVE" }] }),
-  component: () => (
-    <RequireRole roles={["admin", "manager", "super_admin"]}>
-      <DayProgramPage />
-    </RequireRole>
-  ),
-});
 
 type DayCode = "DSG" | "DSP" | "DSI" | "SED";
 type Client = { id: string; first_name: string; last_name: string };
@@ -46,7 +35,7 @@ function daysAgo(n: number) {
   return d.toISOString().slice(0, 10);
 }
 
-function DayProgramPage() {
+export function DayProgramPanel() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const orgId = org?.organization_id;
@@ -291,7 +280,6 @@ type AttendanceRow = {
     mtp_block_reason: string | null;
   } | null;
 };
-
 
 function SessionRosterDialog({
   sessionId,

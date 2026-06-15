@@ -47,6 +47,7 @@ import {
   SCHED, font, type Settings, useSettings, type ViewMode,
   shiftAccentHex, shiftTypeLabel, fmtTime, DAY_LABELS,
 } from "@/components/schedule-preview/sched-ui";
+import { DayProgramPanel } from "@/components/scheduling/day-program-panel";
 
 export const Route = createFileRoute("/dashboard/schedule-preview")({
   head: () => ({
@@ -92,6 +93,7 @@ function SchedulePreviewPage() {
   const [timelineCtx, setTimelineCtx] = useState<{ siteId: string; siteName: string; day: Date } | null>(null);
   // Mobile Day view (below md): selected day drives which week is fetched.
   const [mobileDay, setMobileDay] = useState<Date>(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
+  const [schedulerTab, setSchedulerTab] = useState<"shifts" | "day-program">("shifts");
   const openEditor = (ctx: EditorContext) => { setEditorCtx(ctx); setEditorOpen(true); };
 
   useEffect(() => { setView(settings.defaultView); }, [settings.defaultView]);
@@ -494,8 +496,33 @@ function SchedulePreviewPage() {
         </button>
       </div>
 
-      {/* ── Desktop board (md+) — unchanged ───────────────────────────── */}
+      {/* ── Desktop board (md+) ───────────────────────────────────────── */}
       <div className="hidden md:block">
+      {/* ── Tab row ──────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 18, borderBottom: `2px solid ${SCHED.line}` }}>
+        {(["shifts", "day-program"] as const).map((t) => {
+          const active = schedulerTab === t;
+          return (
+            <button
+              key={t}
+              onClick={() => setSchedulerTab(t)}
+              style={{
+                border: "none", background: "transparent", cursor: "pointer",
+                padding: "8px 20px", fontWeight: 700, fontSize: 13.5,
+                color: active ? SCHED.teal : SCHED.muted,
+                borderBottom: active ? `2px solid ${SCHED.teal}` : "2px solid transparent",
+                marginBottom: -2,
+              }}
+            >
+              {t === "shifts" ? "Shifts" : "Day Program"}
+            </button>
+          );
+        })}
+      </div>
+
+      {schedulerTab === "day-program" ? (
+        <DayProgramPanel />
+      ) : (<>
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
         <div>
@@ -656,6 +683,7 @@ function SchedulePreviewPage() {
       <p style={{ marginTop: 14, color: SCHED.muted, fontSize: 12.5, textAlign: "center" }}>
         Site type inferred from shift codes (HHS, RHS, DSG, RL6, RP3–5 = residential). Clients with no team are grouped as “1-on-1 Services”.
       </p>
+      </>)}
       </div>{/* end desktop-only block */}
 
       <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} onChange={setSettings} organizationId={org?.organization_id} />

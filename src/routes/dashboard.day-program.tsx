@@ -318,7 +318,6 @@ function SessionRosterDialog({
         .from("clients")
         .select("id, first_name, last_name")
         .eq("organization_id", orgId)
-        .eq("status", "active")
         .order("last_name");
       if (error) throw error;
       return (data ?? []) as Client[];

@@ -675,7 +675,7 @@ function ClientWorkspace({
 
         {/* PROFILE — the "who": identity, contact, alerts, docs, custom attrs, danger zone */}
         <TabsContent value="profile" className="mt-5 space-y-6">
-          <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
+          <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} billingCodes={billingCodes} />
         </TabsContent>
 
         {/* CARE — the "how": clinical/operational config */}

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { classesForCode, familyForCode, isDailyCode, maxRecommendedHours, minStaffAgeForCode } from "@/lib/scheduling/code-colors";
-import { listClientAuthorizedCodes } from "@/lib/scheduling/client-codes.functions";
+import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { isDayProgramCode } from "@/lib/service-billing";
 import { rankStaffForShift } from "@/lib/scheduling/eligibility.functions";
 import { createShift } from "@/lib/scheduling/shifts.functions";
@@ -120,14 +120,12 @@ export function ShiftCreateDialog({
     }
   }
   const rankCall = useServerFn(rankStaffForShift);
-  const listCodesCall = useServerFn(listClientAuthorizedCodes);
   const listLocCall = useServerFn(listLocations);
 
-  const codesQ = useQuery({
-    enabled: open && !!clientId,
-    queryKey: ["client-auth-codes", organizationId, clientId],
-    queryFn: () => listCodesCall({ data: { organizationId, clientId: clientId! } }),
-  });
+  // Source the picker from the same hook the client profile uses, so the
+  // scheduler always matches the profile's authorized DSPD billing codes
+  // (and shares its query cache — removals propagate immediately).
+  const codesQ = useClientBillingCodes(clientId ?? undefined);
 
   const locsQ = useQuery({
     enabled: open,

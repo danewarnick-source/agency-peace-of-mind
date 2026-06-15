@@ -43,6 +43,7 @@ import { ClientIntakeChecklistCard } from "@/components/clients/client-intake-ch
 import { PerShiftFormsCareSection } from "@/components/clients/per-shift-forms-care-section";
 import { IntakeProgress } from "@/components/clients/intake-progress";
 import { useClientIntakeProgress } from "@/hooks/use-client-intake-progress";
+import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { ClientLoanMarker } from "@/components/loans/client-loan-marker";
 // Smart Import replaces the legacy NECTAR Bulk Importer dialog.
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
@@ -560,6 +561,8 @@ function ClientWorkspace({
   const [activeTab, setActiveTab] = useState("profile");
   const { data: disabledTier } = useDisabledTierFeatures();
   const emarEnabled = isClientFeatureEnabled(client, "emar", disabledTier ?? null);
+  const billingCodesQ = useClientBillingCodes(client.id);
+  const billingCodes = (billingCodesQ.data ?? []).map((b) => b.service_code);
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col space-y-4">
@@ -585,7 +588,7 @@ function ClientWorkspace({
         </div>
       </div>
         <div className="ml-auto flex gap-2">
-          {(client.job_code ?? []).map((code) => (
+          {billingCodes.map((code) => (
             <Badge key={code} variant="outline" className="font-mono text-[10px]">{code}</Badge>
           ))}
           <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
@@ -661,8 +664,8 @@ function ClientWorkspace({
             icon={ClipboardList}
             storageKey={`${client.id}:billing`}
             summary={
-              (client.job_code ?? []).length
-                ? `${(client.job_code ?? []).length} code${(client.job_code ?? []).length === 1 ? "" : "s"} · ${(client.job_code ?? []).join(", ")}`
+              billingCodes.length
+                ? `${billingCodes.length} code${billingCodes.length === 1 ? "" : "s"} · ${billingCodes.join(", ")}`
                 : "No codes"
             }
           >

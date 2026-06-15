@@ -24,6 +24,8 @@ import {
 import { isDaily, type ShiftRow, type ClientRow, type StaffRow } from "@/hooks/use-schedule-preview";
 import { staffHasTimeOffOverlap } from "@/lib/schedule-requests";
 import { AlertTriangle } from "lucide-react";
+import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import { isDayProgramCode } from "@/lib/service-billing";
 
 export type EditorContext = {
   shift?: ShiftRow;        // existing
@@ -140,12 +142,15 @@ export function ShiftEditorDialog({
   }, [starts, editing]);
 
   const selectedClient = eligibleClients.find((c) => c.id === clientId) ?? clients.find((c) => c.id === clientId);
-  const authorizedCodes = selectedClient?.job_code ?? [];
+  const billingCodesQ = useClientBillingCodes(selectedClient?.id);
+  const authorizedCodes = (billingCodesQ.data ?? []).map((b) => b.service_code);
   const codeChoices = useMemo(
-    () =>
-      authorizedCodes.length
-        ? EVV_SERVICE_CODES.filter((c) => authorizedCodes.includes(c.code))
-        : EVV_SERVICE_CODES, // fall back to all codes when the client has none authorized
+    () => {
+      if (!authorizedCodes.length) return []; // no authorized codes — caller will show message
+      return EVV_SERVICE_CODES.filter(
+        (c) => authorizedCodes.includes(c.code) && !isDayProgramCode(c.code),
+      );
+    },
     [authorizedCodes],
   );
 

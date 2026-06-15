@@ -20,8 +20,9 @@ import {
   type ProposedAction,
 } from "@/lib/nectar-schedule-actions.functions";
 import { saveShift } from "@/lib/schedule-preview-mutations";
-import { isDailyServiceCode } from "@/lib/service-billing";
+import { isDailyServiceCode, isDayProgramCode } from "@/lib/service-billing";
 import type { ClientRow, StaffRow, TeamRow, ShiftRow } from "@/hooks/use-schedule-preview";
+import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { SCHED } from "./sched-ui";
 
 const EXAMPLES = [
@@ -66,6 +67,20 @@ export function NectarCommandBar({
   const [importText, setImportText] = useState("");
   const [showExamples, setShowExamples] = useState(false);
 
+  // client_billing_codes as single source of truth for schedulable codes.
+  // Day-program codes (DSG/DSP/DSI) are excluded — they are scheduled through
+  // the day-program module, not the standard shift auto-assign flow.
+  const allBillingCodesQ = useAllClientBillingCodes();
+  const schedulableCodesByClient = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const row of allBillingCodesQ.data ?? []) {
+      if (isDayProgramCode(row.service_code)) continue;
+      if (!map.has(row.client_id)) map.set(row.client_id, []);
+      map.get(row.client_id)!.push(row.service_code);
+    }
+    return map;
+  }, [allBillingCodesQ.data]);
+
   const context = useMemo(() => {
     const teamById = new Map(teams.map((t) => [t.id, t.team_name] as const));
     return {
@@ -76,7 +91,7 @@ export function NectarCommandBar({
         name: `${c.first_name} ${c.last_name}`.trim(),
         team_id: c.team_id,
         team_name: c.team_id ? teamById.get(c.team_id) ?? null : null,
-        schedulable_codes: c.job_code ?? [],
+        schedulable_codes: schedulableCodesByClient.get(c.id) ?? [],
       })),
       staff: staff.map((s) => ({ id: s.id, name: s.name })),
       shifts: shifts.filter((s) => s.staff_id && s.client_id).map((s) => ({
@@ -88,7 +103,7 @@ export function NectarCommandBar({
         ends_at: s.ends_at,
       })),
     };
-  }, [weekStart, clients, staff, teams, shifts]);
+  }, [weekStart, clients, staff, teams, shifts, schedulableCodesByClient]);
 
   const emptyContext = clients.length === 0 || staff.length === 0;
   const emptyReason =

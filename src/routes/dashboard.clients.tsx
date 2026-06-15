@@ -1492,8 +1492,8 @@ function ClientFundsTab({ organizationId, clientId }: { organizationId: string; 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 
 function ProfileTab({
-  client, orgId, onSave, saving,
-}: { client: Client; orgId: string; onSave: (v: ClientFormValues) => void; saving: boolean }) {
+  client, orgId, onSave, saving, billingCodes,
+}: { client: Client; orgId: string; onSave: (v: ClientFormValues) => void; saving: boolean; billingCodes: string[] }) {
   const qc = useQueryClient();
   const [first, setFirst]               = useState(client.first_name);
   const [last, setLast]                 = useState(client.last_name);

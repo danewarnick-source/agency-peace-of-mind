@@ -120,14 +120,12 @@ export function ShiftCreateDialog({
     }
   }
   const rankCall = useServerFn(rankStaffForShift);
-  const listCodesCall = useServerFn(listClientAuthorizedCodes);
   const listLocCall = useServerFn(listLocations);
 
-  const codesQ = useQuery({
-    enabled: open && !!clientId,
-    queryKey: ["client-auth-codes", organizationId, clientId],
-    queryFn: () => listCodesCall({ data: { organizationId, clientId: clientId! } }),
-  });
+  // Source the picker from the same hook the client profile uses, so the
+  // scheduler always matches the profile's authorized DSPD billing codes
+  // (and shares its query cache — removals propagate immediately).
+  const codesQ = useClientBillingCodes(clientId ?? undefined);
 
   const locsQ = useQuery({
     enabled: open,

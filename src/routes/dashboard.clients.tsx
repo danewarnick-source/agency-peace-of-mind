@@ -1043,17 +1043,51 @@ function AuthorizedCodesEditor({
       }
 
       if (added.length) {
-        const rows = added.map((code) => ({
-          organization_id: orgId,
-          client_id: clientId,
-          service_code: code,
-          service_start_date: today,
-        }));
-        const { error } = await supabase
+        const { data: existingRows, error: existingError } = await supabase
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .from("client_billing_codes" as any)
-          .insert(rows);
-        if (error) throw error;
+          .select("id, service_code, service_end_date")
+          .eq("organization_id", orgId)
+          .eq("client_id", clientId)
+          .in("service_code", added);
+        if (existingError) throw existingError;
+
+        const existingByCode = new Map(
+          ((existingRows ?? []) as unknown as Array<{ id: string; service_code: string; service_end_date: string | null }>)
+            .map((row) => [row.service_code, row]),
+        );
+
+        const reopenIds = added
+          .map((code) => existingByCode.get(code))
+          .filter((row): row is { id: string; service_code: string; service_end_date: string | null } => !!row)
+          .filter((row) => !!row.service_end_date)
+          .map((row) => row.id);
+
+        if (reopenIds.length) {
+          const { error } = await supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .from("client_billing_codes" as any)
+            .update({ service_end_date: null })
+            .in("id", reopenIds);
+          if (error) throw error;
+        }
+
+        const rows = added
+          .filter((code) => !existingByCode.has(code))
+          .map((code) => ({
+            organization_id: orgId,
+            client_id: clientId,
+            service_code: code,
+            service_start_date: today,
+          }));
+
+        if (rows.length) {
+          const { error } = await supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .from("client_billing_codes" as any)
+            .insert(rows);
+          if (error) throw error;
+        }
       }
     },
     onSuccess: () => {

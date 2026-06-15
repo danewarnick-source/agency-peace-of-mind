@@ -707,7 +707,12 @@ function ClientWorkspace({
             }
           >
             <LivingArrangementFlag clientId={client.id} />
-            <AuthorizedCodesMirror codes={billingCodes} />
+            <AuthorizedCodesEditor
+              clientId={client.id}
+              orgId={orgId}
+              currentCodes={billingCodes}
+              billingRows={billingCodesQ.data ?? []}
+            />
             <div className="mt-4">
               <BillingCodesDetail
                 clientId={client.id}
@@ -983,28 +988,132 @@ function CollapsibleCard({
   );
 }
 
-// ─── Authorized codes mirror (read-only; source = client_billing_codes) ───────
-function AuthorizedCodesMirror({ codes }: { codes: string[] }) {
+// ─── Authorized codes editor (writes to client_billing_codes; trigger syncs job_code) ─
+function AuthorizedCodesEditor({
+  clientId,
+  orgId,
+  currentCodes,
+  billingRows,
+}: {
+  clientId: string;
+  orgId: string;
+  currentCodes: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  billingRows: any[];
+}) {
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState<string[]>(currentCodes);
+
+  // Re-sync local state whenever the saved set changes (after a save or external edit).
+  const savedKey = [...currentCodes].sort().join(",");
+  useEffect(() => {
+    setSelected(currentCodes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedKey]);
+
+  const dirty = useMemo(() => {
+    const a = [...selected].sort().join(",");
+    return a !== savedKey;
+  }, [selected, savedKey]);
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const currentSet = new Set(currentCodes);
+      const nextSet = new Set(selected);
+      const added = selected.filter((c) => !currentSet.has(c));
+      const removed = currentCodes.filter((c) => !nextSet.has(c));
+
+      // Soft-close removed codes: set service_end_date = today on every active row.
+      const closeIds: string[] = billingRows
+        .filter(
+          (r) =>
+            removed.includes(r.service_code) &&
+            (r.service_end_date == null || r.service_end_date >= today),
+        )
+        .map((r) => r.id);
+
+      const ops: Promise<unknown>[] = [];
+
+      if (closeIds.length) {
+        ops.push(
+          supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .from("client_billing_codes" as any)
+            .update({ service_end_date: today })
+            .in("id", closeIds)
+            .then(({ error }) => {
+              if (error) throw error;
+            }),
+        );
+      }
+
+      if (added.length) {
+        const rows = added.map((code) => ({
+          organization_id: orgId,
+          client_id: clientId,
+          service_code: code,
+          service_start_date: today,
+        }));
+        ops.push(
+          supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .from("client_billing_codes" as any)
+            .insert(rows)
+            .then(({ error }) => {
+              if (error) throw error;
+            }),
+        );
+      }
+
+      await Promise.all(ops);
+    },
+    onSuccess: () => {
+      toast.success("Authorized codes updated");
+      qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
+      qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
+      qc.invalidateQueries({ queryKey: ["clients"] });
+      qc.invalidateQueries({ queryKey: ["client-profile"] });
+    },
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : "Failed to save codes";
+      toast.error(msg);
+    },
+  });
+
   return (
-    <div className="space-y-2">
-      {codes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No authorized codes yet. Use <span className="font-medium">Open Billing</span> to add one.
-        </p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {codes.map((code) => (
-            <Badge key={code} variant="outline" className="font-mono text-xs" title={jobCodeLabel(code)}>
-              {code}
-            </Badge>
-          ))}
+    <RequirePermission perm="manage_users">
+      <div className="space-y-3">
+        <DspdCodesMultiSelect value={selected} onChange={setSelected} />
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] text-muted-foreground">
+            Selected codes are the single source of truth — they drive the EVV clock-in dropdown,
+            scheduling, time clocks, and the Billing tab. Removing a code closes its authorization
+            today; historical billing is preserved.
+          </p>
+          {dirty && (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelected(currentCodes)}
+                disabled={saveMut.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => saveMut.mutate()}
+                disabled={saveMut.isPending}
+              >
+                {saveMut.isPending ? "Saving…" : "Save codes"}
+              </Button>
+            </div>
+          )}
         </div>
-      )}
-      <p className="text-[11px] text-muted-foreground">
-        Authorized service codes are managed in the Billing editor. This list drives the caregiver's EVV
-        clock-in dropdown, scheduling, and all unit ledgers — one source of truth.
-      </p>
-    </div>
+      </div>
+    </RequirePermission>
   );
 }
 

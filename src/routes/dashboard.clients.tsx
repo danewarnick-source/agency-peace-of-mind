@@ -675,7 +675,7 @@ function ClientWorkspace({
 
         {/* PROFILE — the "who": identity, contact, alerts, docs, custom attrs, danger zone */}
         <TabsContent value="profile" className="mt-5 space-y-6">
-          <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} />
+          <ProfileTab client={client} orgId={orgId} onSave={onSave} saving={saving} billingCodes={billingCodes} />
         </TabsContent>
 
         {/* CARE — the "how": clinical/operational config */}
@@ -1492,8 +1492,8 @@ function ClientFundsTab({ organizationId, clientId }: { organizationId: string; 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 
 function ProfileTab({
-  client, orgId, onSave, saving,
-}: { client: Client; orgId: string; onSave: (v: ClientFormValues) => void; saving: boolean }) {
+  client, orgId, onSave, saving, billingCodes,
+}: { client: Client; orgId: string; onSave: (v: ClientFormValues) => void; saving: boolean; billingCodes: string[] }) {
   const qc = useQueryClient();
   const [first, setFirst]               = useState(client.first_name);
   const [last, setLast]                 = useState(client.last_name);
@@ -1892,7 +1892,7 @@ function ProfileTab({
             </div>
             <div className="flex justify-between">
               <span>Service codes</span>
-              <span>{(client.job_code ?? []).join(", ") || "None"}</span>
+              <span>{billingCodes.length ? billingCodes.join(", ") : "None"}</span>
             </div>
             <div className="flex justify-between">
               <span>PCSP goals</span>

@@ -281,11 +281,18 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
                 {visitLabel && <HhsInfoTooltip className="text-muted-foreground" />}
               </h3>
             </div>
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}
-            >
-              {s.status}
-            </span>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {s.is_updated && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                  Updated
+                </span>
+              )}
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}
+              >
+                {s.status}
+              </span>
+            </div>
           </div>
 
           <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground">

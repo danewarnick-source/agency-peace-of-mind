@@ -138,7 +138,7 @@ function QuickActions() {
   const actions: { icon: typeof Upload; label: string; to: string; search?: Record<string, string> }[] = [
     { icon: Upload, label: "Smart Import", to: "/dashboard/smart-import" },
     { icon: UserPlus, label: "Add client", to: "/dashboard/clients" },
-    { icon: CalendarPlus, label: "Create shift", to: "/dashboard/scheduling", search: { tab: "builder" } },
+    { icon: CalendarPlus, label: "Create shift", to: "/dashboard/scheduler" },
     { icon: ClipboardCheck, label: "Review timesheets", to: "/dashboard/timeclock" },
     { icon: BarChart3, label: "Run report", to: "/dashboard/reports" },
   ];

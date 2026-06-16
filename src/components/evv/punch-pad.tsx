@@ -338,6 +338,9 @@ export function PunchPad({
   const behaviorEnabled = behaviorSetting?.enabled ?? true;
   const [behaviorAnswers, setBehaviorAnswers] = useState<BehaviorAnswers>(emptyBehaviorAnswers);
 
+  // ── Per-shift medication observation attestation ──────────────────────────
+  const [medAttestation, setMedAttestation] = useState<MedAttestationValue>(emptyMedAttestation);
+
 
   // ── NECTAR Procedural Q&A (Infusion add-on) ────────────────────────────────
   const [askOpen, setAskOpen]         = useState(false);
@@ -787,7 +790,8 @@ export function PunchPad({
     : 0;
   const isLongShift = liveDurationMs > 16 * 60 * 60 * 1000;
   const longShiftOk = !isLongShift || longShiftAck;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && !busy;
+  const medAttestationOk   = medAttestation.resolved;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && medAttestationOk && !busy;
 
 
   function openCompliance() {

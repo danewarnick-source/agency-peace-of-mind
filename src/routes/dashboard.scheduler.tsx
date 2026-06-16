@@ -283,12 +283,14 @@ function SchedulerBody({
   return (
     <>
       <div className="px-3 sm:px-4 py-4 space-y-3 max-w-[1400px] mx-auto">
-        {/* Ask Nectar — natural-language drafting + auto-fill open shifts */}
+        {/* Ask Nectar — natural-language drafting + auto-fill + repeat shifts */}
         {orgId && (
           <NectarBar
             organizationId={orgId}
             weekStartIso={startOfWeek(anchor).toISOString()}
+            anchor={anchor}
             clientNameById={new Map(data.clients.map((c) => [c.id, `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim()]))}
+            staffNameById={new Map(data.staff.map((s) => [s.id, s.name]))}
           />
         )}
         {/* Requests panel: pending time-off + swaps, with shift-conflict warning */}
@@ -304,20 +306,42 @@ function SchedulerBody({
           <span>· squares = staff, circles = clients</span>
         </div>
 
-        {SECTIONS.map((section) => (
-          <CodeSection
-            key={section.code}
-            code={section.code}
-            label={section.label}
-            view={view}
-            anchor={anchor}
-            data={data}
-            onAdd={openAdd}
-            onOpenShift={(id) => setDetailShiftId(id)}
-            onSetAdminHours={(c) => setHhsClientForHours(c)}
-            onDayJump={(d) => { setAnchor(d); setView("day"); }}
-          />
-        ))}
+        {(() => {
+          // Dynamic sections: only render codes that ≥ 1 current client is
+          // authorized for. Exclude Day Program codes (DSG/DSP). Order known
+          // codes by canonical order, then any remaining codes alphabetically.
+          const authedCodes = new Set<string>();
+          for (const a of data.auths) {
+            const c = (a.service_code ?? "").toUpperCase();
+            if (!c || DAY_PROGRAM_CODES.has(c)) continue;
+            authedCodes.add(c);
+          }
+          const ordered = [
+            ...SECTION_ORDER.filter((c) => authedCodes.has(c)),
+            ...Array.from(authedCodes).filter((c) => !SECTION_ORDER.includes(c)).sort(),
+          ];
+          if (ordered.length === 0) {
+            return (
+              <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground text-center" style={{ borderColor: LINE }}>
+                No clients are authorized for any scheduler-eligible codes yet. Add a code on a client profile to start scheduling.
+              </div>
+            );
+          }
+          return ordered.map((code) => (
+            <CodeSection
+              key={code}
+              code={code}
+              label={sectionLabelFor(code)}
+              view={view}
+              anchor={anchor}
+              data={data}
+              onAdd={openAdd}
+              onOpenShift={(id) => setDetailShiftId(id)}
+              onSetAdminHours={(c) => setHhsClientForHours(c)}
+              onDayJump={(d) => { setAnchor(d); setView("day"); }}
+            />
+          ));
+        })()}
       </div>
 
       {/* Add shift dialog */}

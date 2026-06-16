@@ -399,46 +399,54 @@ function MedicationDirectivesPanel({ med }: { med: Medication }) {
   );
 }
 
-// ─── Administration Log Dialog ────────────────────────────────────────────────
+// ─── Observe & Confirm Dialog ─────────────────────────────────────────────────
 
 function AdminLogDialog({
   pass,
   clientName,
+  serviceContext,
   onClose,
   onSubmit,
 }: {
   pass: { med: Medication; time: string; iso: string; existingLog?: EmarLog } | null;
   clientName: string;
+  serviceContext: string;
   onClose: () => void;
   onSubmit: (payload: {
     status: EmarLog["status"];
-    administeredAt: string;
+    actualTakenAt: string;
     route: string;
-    staffObserverName: string;
     exceptionReason: string | null;
     notes: string | null;
     signatureDataUrl: string | null;
-    pillCountVerified: boolean | null;
     pillCountValue: number | null;
+    pillCountExpected: number | null;
     prnReason: string | null;
     isMedicationError: boolean;
+    errorDescription: string | null;
+    seizureDurationSeconds: number | null;
+    seizureOutcome: string | null;
+    emergencyServicesCalled: boolean;
     attested: boolean;
   }) => Promise<void>;
 }) {
   const { user } = useAuth();
-  const staffDefaultName = user?.user_metadata?.full_name ?? user?.email ?? "";
+  const staffDisplayName =
+    (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
   const [status, setStatus] = useState<EmarLog["status"]>("administered");
-  const [administeredAt, setAdministeredAt] = useState(localDatetimeValue());
+  const [actualTakenAt, setActualTakenAt] = useState(localDatetimeValue());
   const [route, setRoute] = useState(pass?.med.route ?? "");
-  const [staffObserverName, setStaffObserverName] = useState(staffDefaultName);
   const [exceptionReason, setExceptionReason] = useState("");
   const [notes, setNotes] = useState("");
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
-  const [pillVerified, setPillVerified] = useState(false);
   const [pillCount, setPillCount] = useState("");
   const [prnReason, setPrnReason] = useState("");
   const [isMedError, setIsMedError] = useState(false);
+  const [errorDescription, setErrorDescription] = useState("");
+  const [seizureDuration, setSeizureDuration] = useState("");
+  const [seizureOutcome, setSeizureOutcome] = useState("");
+  const [emergencyCalled, setEmergencyCalled] = useState(false);
   const [attested, setAttested] = useState(false);
   const [busy, setBusy] = useState(false);
   const [activeSection, setActiveSection] = useState<"log" | "directives">("log");
@@ -446,15 +454,24 @@ function AdminLogDialog({
   const med = pass?.med;
   const isException = status !== "administered";
 
+  // Late-entry gap: time the Person actually took vs. now (when staff is documenting)
+  const gapMinutes = useMemo(() => {
+    if (!actualTakenAt) return 0;
+    return Math.max(0, Math.round((Date.now() - new Date(actualTakenAt).getTime()) / 60000));
+  }, [actualTakenAt]);
+  const showGapWarning = gapMinutes >= 15 && status === "administered";
+
   const canSubmit =
     !busy &&
     attested &&
     !!sigDataUrl &&
-    !!staffObserverName.trim() &&
     !!route &&
     (!isException || exceptionReason.trim().length >= 3) &&
-    (!med?.is_prn || prnReason.trim().length >= 3) &&
-    (!med?.is_controlled || status !== "administered" || (pillVerified && !!pillCount));
+    (!med?.is_prn || status !== "administered" || prnReason.trim().length >= 3) &&
+    (!med?.is_rescue || status !== "administered" ||
+      (seizureDuration.trim().length > 0 && seizureOutcome.trim().length >= 3)) &&
+    (!med?.is_controlled || status !== "administered" || pillCount.trim().length > 0) &&
+    (!isMedError || errorDescription.trim().length >= 3);
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -462,16 +479,19 @@ function AdminLogDialog({
     try {
       await onSubmit({
         status,
-        administeredAt: new Date(administeredAt).toISOString(),
+        actualTakenAt: new Date(actualTakenAt).toISOString(),
         route,
-        staffObserverName: staffObserverName.trim(),
         exceptionReason: isException ? exceptionReason.trim() : null,
         notes: notes.trim() || null,
         signatureDataUrl: sigDataUrl,
-        pillCountVerified: med?.is_controlled ? pillVerified : null,
         pillCountValue: med?.is_controlled && pillCount ? parseInt(pillCount, 10) : null,
-        prnReason: med?.is_prn ? prnReason.trim() : null,
+        pillCountExpected: med?.pill_count_current ?? null,
+        prnReason: med?.is_prn ? prnReason.trim() || null : null,
         isMedicationError: isMedError,
+        errorDescription: isMedError ? errorDescription.trim() : null,
+        seizureDurationSeconds: med?.is_rescue && seizureDuration ? parseInt(seizureDuration, 10) : null,
+        seizureOutcome: med?.is_rescue ? seizureOutcome.trim() || null : null,
+        emergencyServicesCalled: med?.is_rescue ? emergencyCalled : false,
         attested,
       });
     } finally {

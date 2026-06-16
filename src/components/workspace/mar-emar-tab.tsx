@@ -28,6 +28,11 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
+import {
+  EmarLegalBanner, ClinicalSafetyHeader, EmarEligibilityGate,
+  MedicationChart, useClientSafety,
+} from "./emar-chart";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -595,6 +595,58 @@ function MedFormDialog({
               />
             </div>
 
+            {/* Side effects (everyday) — distinct from adverse reaction signs */}
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold">
+                Everyday Side Effects
+                <span className="ml-1 font-normal text-muted-foreground">(what the Person may experience)</span>
+              </Label>
+              <Textarea
+                rows={2}
+                value={v.side_effects}
+                onChange={(e) => setV({ ...v, side_effects: e.target.value })}
+                placeholder="e.g. dry mouth, drowsiness, dizziness, mild stomach upset…"
+              />
+            </div>
+
+            {/* Pharmacy packaging — DHHS SOW requires licensed-pharmacy dose packaging */}
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold">
+                Pharmacy Packaging *
+                <span className="ml-1 font-normal text-muted-foreground">(SOW: licensed pharmacy, dose packaging)</span>
+              </Label>
+              <select
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                value={v.packaging}
+                onChange={(e) => setV({ ...v, packaging: e.target.value })}
+              >
+                <option value="">— select —</option>
+                <option value="Pharmacy blister pack">Pharmacy blister pack</option>
+                <option value="Pharmacy unit-dose card">Pharmacy unit-dose card</option>
+                <option value="Pharmacy multi-dose pouch">Pharmacy multi-dose pouch</option>
+                <option value="Original pharmacy bottle (single med)">Original pharmacy bottle (single med)</option>
+                <option value="Pharmacy-prepared syringe">Pharmacy-prepared syringe</option>
+                <option value="Manufacturer inhaler/device">Manufacturer inhaler/device</option>
+                <option value="Other (see notes)">Other (see notes)</option>
+              </select>
+            </div>
+
+            {/* Contributes to swallowing difficulty — independent of choking_risk */}
+            <label className="flex items-start gap-2 rounded-lg border p-3 text-sm">
+              <Checkbox
+                className="mt-0.5"
+                checked={v.contributes_to_swallowing_difficulty}
+                onCheckedChange={(c) => setV({ ...v, contributes_to_swallowing_difficulty: !!c })}
+              />
+              <span>
+                <span className="font-semibold">This medication can contribute to swallowing difficulty</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  Flagged at every pass so the supporting staff confirms upright posture and reviews the crushed-med policy.
+                </span>
+              </span>
+            </label>
+
+
             {/* Choking risk — Contract Req. 3 specifically calls this out */}
             <div className={`rounded-lg border-2 p-3 space-y-2 ${v.choking_risk ? "border-rose-500 bg-rose-50 dark:bg-rose-950/20" : "border-border bg-muted/20"}`}>
               <label className="flex cursor-pointer items-center gap-2">

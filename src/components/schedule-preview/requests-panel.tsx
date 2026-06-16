@@ -95,10 +95,23 @@ export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: St
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 14, marginTop: 14, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }} className="sched-weekstrip">
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: expanded ? "220px 1fr" : "1fr",
+        gap: 14, marginTop: 14,
+        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+      }}
+      className="sched-weekstrip"
+    >
       <style>{`@media(max-width:760px){.sched-weekstrip{grid-template-columns:1fr!important}}`}</style>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{
+        display: expanded ? "flex" : "grid",
+        flexDirection: "column",
+        gridTemplateColumns: expanded ? undefined : "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: 12,
+      }}>
         <div
           style={smallCard}
           onClick={() => setExpanded(expanded === "approval" ? null : "approval")}
@@ -111,7 +124,10 @@ export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: St
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={cnt(pendingCount === 0)}>{pendingCount}</span>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown
+              className="h-4 w-4 text-muted-foreground"
+              style={{ transform: expanded === "approval" ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s ease" }}
+            />
           </div>
         </div>
 
@@ -127,7 +143,10 @@ export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: St
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={cnt(true)}>{outThisWeek.length}</span>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown
+              className="h-4 w-4 text-muted-foreground"
+              style={{ transform: expanded === "out" ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s ease" }}
+            />
           </div>
         </div>
       </div>

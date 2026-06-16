@@ -222,8 +222,16 @@ export function NectarBar({
           onClick={() => setRepeatOpen(true)}
           className="min-h-[40px]"
         >
-          <Repeat className="h-4 w-4" />
-          <span className="ml-1.5">Repeat shifts</span>
+          <Copy className="h-4 w-4" />
+          <span className="ml-1.5">Copy shifts</span>
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => setImportOpen(true)}
+          className="min-h-[40px]"
+        >
+          <Upload className="h-4 w-4" />
+          <span className="ml-1.5">Import schedule</span>
         </Button>
       </div>
 
@@ -234,6 +242,18 @@ export function NectarBar({
         anchor={anchor ?? new Date(weekStartIso)}
         clientNameById={clientNameById}
         staffNameById={staffNameById ?? new Map()}
+      />
+
+      <ImportScheduleDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        organizationId={organizationId}
+        weekStartIso={weekStartIso}
+        onDrafts={(d) => {
+          setProposals(null);
+          setDrafts(d);
+          setPicked(new Set(d.map((_, i) => i)));
+        }}
       />
 
       <Dialog

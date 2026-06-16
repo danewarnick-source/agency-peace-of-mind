@@ -1060,8 +1060,10 @@ export function MarEmarTab({
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { data: activeShift } = useActiveShift();
+  const { data: clientSafety, isLoading: safetyLoading } = useClientSafety(clientId);
   const qc = useQueryClient();
   const orgId = org?.organization_id;
+
 
   // ── Realtime: any INSERT to emar_logs for this client refetches every
   //    open dashboard so the MAR stays in sync across all staff/job codes.

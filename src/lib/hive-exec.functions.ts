@@ -320,7 +320,11 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
     return {
       organization_id: org.id,
       name: org.name,
+      legal_name: (org as { legal_name: string | null }).legal_name ?? null,
+      dba_name: (org as { dba_name: string | null }).dba_name ?? null,
+      display_acronym: (org as { display_acronym: string | null }).display_acronym ?? null,
       subscription: sub
+
         ? {
             plan: sub.plan,
             status: sub.status,

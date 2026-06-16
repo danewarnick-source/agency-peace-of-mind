@@ -215,7 +215,24 @@ export function NectarBar({
           )}
           <span className="ml-1.5">Auto-fill open shifts</span>
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => setRepeatOpen(true)}
+          className="min-h-[40px]"
+        >
+          <Repeat className="h-4 w-4" />
+          <span className="ml-1.5">Repeat shifts</span>
+        </Button>
       </div>
+
+      <RepeatShiftsDialog
+        open={repeatOpen}
+        onClose={() => setRepeatOpen(false)}
+        organizationId={organizationId}
+        anchor={anchor ?? new Date(weekStartIso)}
+        clientNameById={clientNameById}
+        staffNameById={staffNameById ?? new Map()}
+      />
 
       <Dialog
         open={open}

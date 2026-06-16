@@ -1205,6 +1205,38 @@ export function PunchPad({
       }
     }
 
+    // Persist the per-shift medication observation attestation. Non-blocking:
+    // shift is already saved. If the table doesn't exist yet, the gate above
+    // auto-resolves and there's nothing to insert.
+    if (
+      medAttestation.resolved &&
+      medAttestation.observed !== null &&
+      medAttestation.signatureDataUrl &&
+      org?.organization_id
+    ) {
+      const { error: medErr } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from("shift_medication_attestations" as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insert({
+          organization_id: org.organization_id,
+          client_id: active.client_id,
+          staff_id: user.id,
+          shift_id: active.id,
+          hhs_daily_record_id: null,
+          observed: medAttestation.observed,
+          reason: medAttestation.observed === false ? medAttestation.reason.trim() : null,
+          signature_data_url: medAttestation.signatureDataUrl,
+          shift_window_start: active.clock_in_timestamp,
+          shift_window_end: clockOut,
+        } as any);
+      if (medErr && !/relation .* does not exist|schema cache/i.test(medErr.message)) {
+        toast.error(`Medication attestation not saved: ${medErr.message}`);
+      }
+    }
+
+
+
 
 
 

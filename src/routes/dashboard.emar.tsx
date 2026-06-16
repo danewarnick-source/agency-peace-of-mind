@@ -34,6 +34,15 @@ type DueRow = {
   time_label: string; // HH:MM
 };
 
+type ClientHeader = {
+  id: string;
+  name: string;
+  allergies: string[];
+  dysphagia: boolean;
+  swallowing_alerts: string[];
+};
+
+
 const EXCEPTION_REASONS = [
   "Client refused",
   "Client unavailable / sleeping",

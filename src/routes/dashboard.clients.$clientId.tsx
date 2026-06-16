@@ -22,15 +22,16 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
-  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil,
+  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users,
 } from "lucide-react";
 
 const search = z.object({
   tab: z
     .enum([
-      "overview", "plan", "codes", "shifts", "logs", "incidents",
+      "overview", "plan", "codes", "caseload", "shifts", "logs", "incidents",
       "summaries", "hhcert", "deadlines", "documents",
     ])
     .optional(),
@@ -107,6 +108,7 @@ function ClientProfileHub() {
           <TabTrigger value="overview" icon={<User className="h-3.5 w-3.5" />} label="Overview" clientId={clientId} />
           <TabTrigger value="plan" icon={<Sparkles className="h-3.5 w-3.5" />} label="Plan & goals" clientId={clientId} />
           <TabTrigger value="codes" icon={<FileText className="h-3.5 w-3.5" />} label="Billing codes" clientId={clientId} />
+          <TabTrigger value="caseload" icon={<Users className="h-3.5 w-3.5" />} label="Caseload" clientId={clientId} />
           <TabTrigger value="shifts" icon={<Clock className="h-3.5 w-3.5" />} label="Shifts" clientId={clientId} />
           <TabTrigger value="logs" icon={<ClipboardList className="h-3.5 w-3.5" />} label="Daily logs" clientId={clientId} />
           <TabTrigger value="incidents" icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Incidents" clientId={clientId} />
@@ -126,6 +128,9 @@ function ClientProfileHub() {
         </TabsContent>
         <TabsContent value="codes" className="mt-6">
           <BillingCodesPanel clientId={clientId} />
+        </TabsContent>
+        <TabsContent value="caseload" className="mt-6">
+          <CaseloadEditor clientId={clientId} />
         </TabsContent>
         <TabsContent value="shifts" className="mt-6">
           <ShiftsPanel clientId={clientId} orgId={orgId} />

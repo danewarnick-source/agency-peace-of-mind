@@ -176,23 +176,18 @@ function EmarPage() {
     }) => {
       await logPass({
         data: {
+          clientId: payload.row.client_id,
           medicationId: payload.row.medication_id,
           scheduledFor: payload.row.scheduled_for,
           scheduledTimeLabel: payload.row.time_label,
           status: payload.status,
-          actualTakenAt: payload.actualTakenAt,
+          route: payload.row.route || "PO",
+          actualTakenAt: payload.actualTakenAt ?? new Date().toISOString(),
           exceptionReason: payload.status === "administered" ? null : payload.reason,
           notes: payload.notes || null,
           signatureDataUrl: payload.signatureDataUrl,
-          attestation: ATTESTATION,
           serviceContext,
-          isPrn: false,
-          prnReason: null,
           isMedicationError: false,
-          medicationErrorDescription: null,
-          rescueEpisodeDurationSec: null,
-          rescueOutcome: null,
-          emergencyServicesContacted: false,
         },
       });
     },

@@ -38,6 +38,7 @@ import {
 import { evvServiceLabel } from "@/lib/evv-codes";
 import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 import { NectarBar } from "@/components/scheduler/nectar-bar";
+import { createRecurringShifts } from "@/lib/scheduler/repeat.functions";
 
 export const Route = createFileRoute("/dashboard/scheduler")({
   head: () => ({

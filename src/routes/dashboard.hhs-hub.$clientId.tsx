@@ -30,6 +30,11 @@ import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { saveDailyRecord, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
 import { useClientFeature } from "@/lib/client-features";
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
+import {
+  ShiftMedAttestation,
+  emptyMedAttestation,
+  type MedAttestationValue,
+} from "@/components/medications/shift-med-attestation";
 
 const hhsSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
@@ -226,6 +231,14 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
   const [triggersResolved, setTriggersResolved] = useState(true);
   // Final attestation — "I attest this note accurately reflects today's support".
   const [finalAttest, setFinalAttest] = useState(false);
+  const [medAttestation, setMedAttestation] = useState<MedAttestationValue>(emptyMedAttestation);
+
+  // Shift window for the daily-note attestation = the local calendar day.
+  const dayWindow = useMemo(() => {
+    const s = new Date(); s.setHours(0, 0, 0, 0);
+    const e = new Date(s); e.setDate(e.getDate() + 1);
+    return { start: s.toISOString(), end: e.toISOString() };
+  }, []);
 
   // Signature canvas
   const canvasRef  = useRef<HTMLCanvasElement | null>(null);
@@ -308,6 +321,10 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
     }
     if (!finalAttest) {
       toast.error("Please attest the note accurately reflects today's support.");
+      return;
+    }
+    if (!medAttestation.resolved) {
+      toast.error("Complete the medication observation attestation before saving.");
       return;
     }
     if (!hasSigRef.current) { toast.error("Please sign the daily note before saving."); return; }

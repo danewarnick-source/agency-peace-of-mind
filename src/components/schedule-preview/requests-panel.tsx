@@ -61,6 +61,7 @@ function isSick(t: string): boolean {
 export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: StaffRow[] }) {
   const { data } = useOrgScheduleRequests();
   const weekEnd = useMemo(() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); return d; }, [weekStart]);
+  const [expanded, setExpanded] = useState<"approval" | "out" | null>(null);
 
   const pendingTimeOff = (data?.timeOff ?? []).filter((r) => r.status === "pending");
   const pendingSwaps = (data?.swaps ?? []).filter((r) => r.status === "pending");
@@ -72,52 +73,115 @@ export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: St
   });
   const pendingCount = pendingTimeOff.length + pendingSwaps.length;
 
+  const smallCard: React.CSSProperties = {
+    background: "#fff", border: `1px solid ${SCHED.line}`, borderRadius: 14,
+    boxShadow: SCHED.shadow, padding: "14px 16px", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+    transition: "box-shadow .15s ease",
+  };
+
+  const detailCard: React.CSSProperties = {
+    background: "#fff", border: `1px solid ${SCHED.line}`, borderRadius: 14,
+    boxShadow: SCHED.shadow, overflow: "hidden", minHeight: 220,
+  };
+
+  const detailHeader: React.CSSProperties = {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    padding: "12px 14px", borderBottom: `1px solid ${SCHED.line}`,
+  };
+
+  const detailBody: React.CSSProperties = {
+    padding: "6px 14px 10px", maxHeight: 360, overflow: "auto",
+  };
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }} className="sched-weekstrip">
+    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 14, marginTop: 14, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }} className="sched-weekstrip">
       <style>{`@media(max-width:760px){.sched-weekstrip{grid-template-columns:1fr!important}}`}</style>
 
-      <div style={wcard}>
-        <div style={wh}>
-          <b style={{ fontSize: 13.5, fontWeight: 800 }}>Needs your approval</b>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div
+          style={smallCard}
+          onClick={() => setExpanded(expanded === "approval" ? null : "approval")}
+          onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.08)"}
+          onMouseLeave={(e) => e.currentTarget.style.boxShadow = SCHED.shadow}
+        >
+          <div>
+            <b style={{ fontSize: 12.5, fontWeight: 800, display: "block" }}>Needs approval</b>
+            <span style={{ fontSize: 11, color: SCHED.muted }}>{pendingCount === 0 ? "All caught up" : `${pendingCount} pending`}</span>
+          </div>
           <span style={cnt(pendingCount === 0)}>{pendingCount}</span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
-        <div style={wbody}>
-          {pendingCount === 0 ? (
-            <div style={wempty}><div style={{ fontSize: 26, marginBottom: 5 }}>✓</div>All caught up — no pending requests</div>
-          ) : (
-            <>
-              {pendingTimeOff.map((r, i) => <TimeOffRow key={r.id} req={r} staff={staff} first={i === 0} />)}
-              {pendingSwaps.map((r) => <SwapRow key={r.id} req={r} staff={staff} />)}
-            </>
-          )}
+
+        <div
+          style={smallCard}
+          onClick={() => setExpanded(expanded === "out" ? null : "out")}
+          onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.08)"}
+          onMouseLeave={(e) => e.currentTarget.style.boxShadow = SCHED.shadow}
+        >
+          <div>
+            <b style={{ fontSize: 12.5, fontWeight: 800, display: "block" }}>Out this week</b>
+            <span style={{ fontSize: 11, color: SCHED.muted }}>{outThisWeek.length === 0 ? "Everyone available" : `${outThisWeek.length} away`}</span>
+          </div>
+          <span style={cnt(true)}>{outThisWeek.length}</span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
       </div>
 
-      <div style={wcard}>
-        <div style={wh}>
-          <b style={{ fontSize: 13.5, fontWeight: 800 }}>Out this week</b>
-          <span style={cnt(true)}>{outThisWeek.length}</span>
+      {expanded === "approval" && (
+        <div style={detailCard}>
+          <div style={detailHeader}>
+            <b style={{ fontSize: 13.5, fontWeight: 800 }}>Needs your approval</b>
+            <button style={{ ...wbtn, padding: 4 }} onClick={() => setExpanded(null)}><X className="h-3.5 w-3.5" /></button>
+          </div>
+          <div style={detailBody}>
+            {pendingCount === 0 ? (
+              <div style={wempty}><div style={{ fontSize: 26, marginBottom: 5 }}>✓</div>All caught up — no pending requests</div>
+            ) : (
+              <>
+                {pendingTimeOff.map((r, i) => <TimeOffRow key={r.id} req={r} staff={staff} first={i === 0} />)}
+                {pendingSwaps.map((r) => <SwapRow key={r.id} req={r} staff={staff} />)}
+              </>
+            )}
+          </div>
         </div>
-        <div style={wbody}>
-          {outThisWeek.length === 0 ? (
-            <div style={wempty}>Everyone available this week</div>
-          ) : (
-            outThisWeek.map((r, i) => {
-              const name = nameOf(r.staff_id, staff);
-              return (
-                <div key={r.id} style={{ ...wrow, ...(i === 0 ? { borderTop: "none" } : null) }}>
-                  <span style={av}>{initials(name)}</span>
-                  <div style={info}>
-                    <b style={infoB}>{name}</b>
-                    <span style={infoS}>{fmtDate(r.start_date)} – {fmtDate(r.end_date)} · {r.type.toUpperCase()}</span>
+      )}
+
+      {expanded === "out" && (
+        <div style={detailCard}>
+          <div style={detailHeader}>
+            <b style={{ fontSize: 13.5, fontWeight: 800 }}>Out this week</b>
+            <button style={{ ...wbtn, padding: 4 }} onClick={() => setExpanded(null)}><X className="h-3.5 w-3.5" /></button>
+          </div>
+          <div style={detailBody}>
+            {outThisWeek.length === 0 ? (
+              <div style={wempty}>Everyone available this week</div>
+            ) : (
+              outThisWeek.map((r, i) => {
+                const name = nameOf(r.staff_id, staff);
+                return (
+                  <div key={r.id} style={{ ...wrow, ...(i === 0 ? { borderTop: "none" } : null) }}>
+                    <span style={av}>{initials(name)}</span>
+                    <div style={info}>
+                      <b style={infoB}>{name}</b>
+                      <span style={infoS}>{fmtDate(r.start_date)} – {fmtDate(r.end_date)} · {r.type.toUpperCase()}</span>
+                    </div>
+                    <span style={tagStyle(isSick(r.type) ? "sick" : "pto")}>Off</span>
                   </div>
-                  <span style={tagStyle(isSick(r.type) ? "sick" : "pto")}>Off</span>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {!expanded && (
+        <div style={{ ...detailCard, display: "grid", placeItems: "center" }}>
+          <div style={{ color: SCHED.muted, textAlign: "center", fontSize: 12.5, fontWeight: 500 }}>
+            Select a box on the left to view details.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Sparkles, Check, X, HandMetal } from "lucide-react";
 import { listOpenShifts, decideClaim, claimOpenShift } from "@/lib/scheduling/open-shifts.functions";
+import { takeOpenShift } from "@/lib/scheduler/setup.functions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ export function OpenShiftsPanel({
   const listFn = useServerFn(listOpenShifts);
   const decideFn = useServerFn(decideClaim);
   const claimFn = useServerFn(claimOpenShift);
+  const takeFn = useServerFn(takeOpenShift);
 
   const q = useQuery({
     queryKey: ["open-shifts", organizationId, startIso, endIso],
@@ -40,6 +42,8 @@ export function OpenShiftsPanel({
     qc.invalidateQueries({ queryKey: ["open-shifts"] });
     qc.invalidateQueries({ queryKey: ["schedule-conflicts"] });
     qc.invalidateQueries({ queryKey: ["shifts-in-range"] });
+    qc.invalidateQueries({ queryKey: ["my-scheduled-shifts"] });
+    qc.invalidateQueries({ queryKey: ["scheduler-data"] });
   };
 
   const decide = useMutation({
@@ -51,6 +55,11 @@ export function OpenShiftsPanel({
     mutationFn: (shiftId: string) => claimFn({ data: { shiftId } }),
     onSuccess: () => { invalidate(); toast.success("Claim submitted — awaiting admin approval"); },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+  const take = useMutation({
+    mutationFn: (shiftId: string) => takeFn({ data: { shift_id: shiftId } }),
+    onSuccess: () => { invalidate(); toast.success("Shift added to your schedule."); },
+    onError: (e: any) => toast.error(e?.message ?? "Couldn't take this shift."),
   });
 
   const rows = q.data ?? [];
@@ -112,15 +121,28 @@ export function OpenShiftsPanel({
                   </>
                 )}
                 {mode === "staff" && s.status === "open" && (
-                  <Button
-                    size="sm"
-                    className="h-10 min-h-[44px] md:min-h-0"
-                    onClick={() => claim.mutate(s.id)}
-                    disabled={claim.isPending}
-                  >
-                    <HandMetal className="mr-1 h-3.5 w-3.5" /> Claim
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      className="h-10 min-h-[44px] md:min-h-0"
+                      onClick={() => take.mutate(s.id)}
+                      disabled={take.isPending || claim.isPending}
+                    >
+                      <HandMetal className="mr-1 h-3.5 w-3.5" /> Take shift
+                    </Button>
+                  </>
                 )}
+                {mode === "staff" && pending && (
+                  <span className="text-[11px] font-medium text-amber-700">Pending</span>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
                 {mode === "staff" && pending && (
                   <span className="text-[11px] font-medium text-amber-700">Pending</span>
                 )}

@@ -143,14 +143,3 @@ export function OpenShiftsPanel({
     </div>
   );
 }
-                {mode === "staff" && pending && (
-                  <span className="text-[11px] font-medium text-amber-700">Pending</span>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}

@@ -43,6 +43,10 @@ export type Medication = {
   prn_instructions: string | null;
   pharmacy: string | null;
   rx_number: string | null;
+  // Self-administration support fields (DHHS SOW b/d)
+  packaging: string | null;
+  side_effects: string | null;
+  contributes_to_swallowing_difficulty: boolean;
 };
 
 type FormVals = {
@@ -63,6 +67,9 @@ type FormVals = {
   prn_instructions: string;
   pharmacy: string;
   rx_number: string;
+  packaging: string;
+  side_effects: string;
+  contributes_to_swallowing_difficulty: boolean;
 };
 
 const EMPTY: FormVals = {
@@ -71,6 +78,8 @@ const EMPTY: FormVals = {
   purpose: "", adverse_effects: "", choking_risk: false,
   choking_risk_details: "", is_controlled: false, is_prn: false,
   prn_instructions: "", pharmacy: "", rx_number: "",
+  packaging: "Pharmacy blister pack", side_effects: "",
+  contributes_to_swallowing_difficulty: false,
 };
 
 function medToForm(m: Medication): FormVals {
@@ -91,8 +100,12 @@ function medToForm(m: Medication): FormVals {
     prn_instructions:   m.prn_instructions ?? "",
     pharmacy:           m.pharmacy ?? "",
     rx_number:          m.rx_number ?? "",
+    packaging:          m.packaging ?? "Pharmacy blister pack",
+    side_effects:       m.side_effects ?? "",
+    contributes_to_swallowing_difficulty: m.contributes_to_swallowing_difficulty ?? false,
   };
 }
+
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
@@ -114,13 +127,15 @@ export function MedicationsManager({
         .select(`id, medication_name, dosage, frequency, route, scheduled_times,
           instructions, prescriber, is_active, discontinued_at,
           purpose, adverse_effects, choking_risk, choking_risk_details,
-          is_controlled, is_prn, prn_instructions, pharmacy, rx_number`)
+          is_controlled, is_prn, prn_instructions, pharmacy, rx_number,
+          packaging, side_effects, contributes_to_swallowing_difficulty`)
         .eq("client_id", clientId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Medication[];
     },
   });
+
 
   const insertMut = useMutation({
     mutationFn: async (v: FormVals) => {
@@ -144,7 +159,11 @@ export function MedicationsManager({
         prn_instructions:    v.prn_instructions.trim() || null,
         pharmacy:            v.pharmacy.trim() || null,
         rx_number:           v.rx_number.trim() || null,
+        packaging:           v.packaging.trim() || null,
+        side_effects:        v.side_effects.trim() || null,
+        contributes_to_swallowing_difficulty: v.contributes_to_swallowing_difficulty,
       });
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -175,7 +194,11 @@ export function MedicationsManager({
         prn_instructions:    v.prn_instructions.trim() || null,
         pharmacy:            v.pharmacy.trim() || null,
         rx_number:           v.rx_number.trim() || null,
+        packaging:           v.packaging.trim() || null,
+        side_effects:        v.side_effects.trim() || null,
+        contributes_to_swallowing_difficulty: v.contributes_to_swallowing_difficulty,
       }).eq("id", id);
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -571,6 +594,58 @@ function MedFormDialog({
                 placeholder="Known side effects, signs of adverse reaction, and what staff should watch for..."
               />
             </div>
+
+            {/* Side effects (everyday) — distinct from adverse reaction signs */}
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold">
+                Everyday Side Effects
+                <span className="ml-1 font-normal text-muted-foreground">(what the Person may experience)</span>
+              </Label>
+              <Textarea
+                rows={2}
+                value={v.side_effects}
+                onChange={(e) => setV({ ...v, side_effects: e.target.value })}
+                placeholder="e.g. dry mouth, drowsiness, dizziness, mild stomach upset…"
+              />
+            </div>
+
+            {/* Pharmacy packaging — DHHS SOW requires licensed-pharmacy dose packaging */}
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold">
+                Pharmacy Packaging *
+                <span className="ml-1 font-normal text-muted-foreground">(SOW: licensed pharmacy, dose packaging)</span>
+              </Label>
+              <select
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                value={v.packaging}
+                onChange={(e) => setV({ ...v, packaging: e.target.value })}
+              >
+                <option value="">— select —</option>
+                <option value="Pharmacy blister pack">Pharmacy blister pack</option>
+                <option value="Pharmacy unit-dose card">Pharmacy unit-dose card</option>
+                <option value="Pharmacy multi-dose pouch">Pharmacy multi-dose pouch</option>
+                <option value="Original pharmacy bottle (single med)">Original pharmacy bottle (single med)</option>
+                <option value="Pharmacy-prepared syringe">Pharmacy-prepared syringe</option>
+                <option value="Manufacturer inhaler/device">Manufacturer inhaler/device</option>
+                <option value="Other (see notes)">Other (see notes)</option>
+              </select>
+            </div>
+
+            {/* Contributes to swallowing difficulty — independent of choking_risk */}
+            <label className="flex items-start gap-2 rounded-lg border p-3 text-sm">
+              <Checkbox
+                className="mt-0.5"
+                checked={v.contributes_to_swallowing_difficulty}
+                onCheckedChange={(c) => setV({ ...v, contributes_to_swallowing_difficulty: !!c })}
+              />
+              <span>
+                <span className="font-semibold">This medication can contribute to swallowing difficulty</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  Flagged at every pass so the supporting staff confirms upright posture and reviews the crushed-med policy.
+                </span>
+              </span>
+            </label>
+
 
             {/* Choking risk — Contract Req. 3 specifically calls this out */}
             <div className={`rounded-lg border-2 p-3 space-y-2 ${v.choking_risk ? "border-rose-500 bg-rose-50 dark:bg-rose-950/20" : "border-border bg-muted/20"}`}>

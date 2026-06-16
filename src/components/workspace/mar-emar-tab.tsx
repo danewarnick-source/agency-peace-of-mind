@@ -28,6 +28,11 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
+import {
+  EmarLegalBanner, ClinicalSafetyHeader, EmarEligibilityGate,
+  MedicationChart, useClientSafety,
+} from "./emar-chart";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1060,8 +1065,10 @@ export function MarEmarTab({
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { data: activeShift } = useActiveShift();
+  const { data: clientSafety, isLoading: safetyLoading } = useClientSafety(clientId);
   const qc = useQueryClient();
   const orgId = org?.organization_id;
+
 
   // ── Realtime: any INSERT to emar_logs for this client refetches every
   //    open dashboard so the MAR stays in sync across all staff/job codes.
@@ -1088,7 +1095,7 @@ export function MarEmarTab({
     iso: string;
   } | null>(null);
 
-  const [activeTab, setActiveTab] = useState("today");
+  const [activeTab, setActiveTab] = useState("chart");
 
   const todayStart = useMemo(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString();
@@ -1292,7 +1299,7 @@ export function MarEmarTab({
     setActivePass(null);
   }
 
-  if (medsLoading) {
+  if (medsLoading || safetyLoading) {
     return (
       <div className="grid place-items-center py-12 text-sm text-muted-foreground">
         <Loader2 className="mb-2 h-5 w-5 animate-spin" />
@@ -1301,8 +1308,20 @@ export function MarEmarTab({
     );
   }
 
+  // Gate: only clients flagged for self-directed self-administration support
+  // see the eMAR. Everyone else gets the eligibility notice + admin toggle.
+  if (clientSafety && !clientSafety.self_admin_med_support) {
+    return <EmarEligibilityGate client={clientSafety} />;
+  }
+
   return (
     <div className="space-y-4">
+
+      {/* Permanent legal/scope banner — required at every eMAR surface */}
+      <EmarLegalBanner />
+
+      {/* Clinical safety header — visible allergies, dysphagia / swallowing alerts */}
+      {clientSafety && <ClinicalSafetyHeader client={clientSafety} />}
 
       {/* Medication error alert */}
       {errorCount > 0 && (
@@ -1325,6 +1344,10 @@ export function MarEmarTab({
       {/* Tab navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full">
+          <TabsTrigger value="chart" className="flex-1">
+            <Pill className="mr-1.5 h-3.5 w-3.5" />
+            Chart
+          </TabsTrigger>
           <TabsTrigger value="today" className="flex-1">
             <Clock className="mr-1.5 h-3.5 w-3.5" />
             Today's Pass
@@ -1346,7 +1369,12 @@ export function MarEmarTab({
           </TabsTrigger>
         </TabsList>
 
-        {/* ── TODAY'S PASS ── */}
+        {/* ── CHART — per-med profile with completeness flags ── */}
+        <TabsContent value="chart" className="space-y-3 pt-2">
+          <MedicationChart clientId={clientId} />
+        </TabsContent>
+
+
         <TabsContent value="today" className="space-y-4 pt-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>

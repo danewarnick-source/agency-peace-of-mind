@@ -2164,6 +2164,7 @@ export type Database = {
           choking_risk: boolean
           choking_risk_details: string | null
           client_id: string
+          contributes_to_swallowing_difficulty: boolean
           created_at: string
           created_by: string | null
           diagnosis: string | null
@@ -2179,6 +2180,7 @@ export type Database = {
           is_prn: boolean
           medication_name: string
           organization_id: string
+          packaging: string | null
           pharmacy: string | null
           pill_count_current: number | null
           pill_count_updated_at: string | null
@@ -2189,6 +2191,7 @@ export type Database = {
           route: string | null
           rx_number: string | null
           scheduled_times: string[]
+          side_effects: string | null
           start_date: string | null
         }
         Insert: {
@@ -2196,6 +2199,7 @@ export type Database = {
           choking_risk?: boolean
           choking_risk_details?: string | null
           client_id: string
+          contributes_to_swallowing_difficulty?: boolean
           created_at?: string
           created_by?: string | null
           diagnosis?: string | null
@@ -2211,6 +2215,7 @@ export type Database = {
           is_prn?: boolean
           medication_name: string
           organization_id: string
+          packaging?: string | null
           pharmacy?: string | null
           pill_count_current?: number | null
           pill_count_updated_at?: string | null
@@ -2221,6 +2226,7 @@ export type Database = {
           route?: string | null
           rx_number?: string | null
           scheduled_times?: string[]
+          side_effects?: string | null
           start_date?: string | null
         }
         Update: {
@@ -2228,6 +2234,7 @@ export type Database = {
           choking_risk?: boolean
           choking_risk_details?: string | null
           client_id?: string
+          contributes_to_swallowing_difficulty?: boolean
           created_at?: string
           created_by?: string | null
           diagnosis?: string | null
@@ -2243,6 +2250,7 @@ export type Database = {
           is_prn?: boolean
           medication_name?: string
           organization_id?: string
+          packaging?: string | null
           pharmacy?: string | null
           pill_count_current?: number | null
           pill_count_updated_at?: string | null
@@ -2253,6 +2261,7 @@ export type Database = {
           route?: string | null
           rx_number?: string | null
           scheduled_times?: string[]
+          side_effects?: string | null
           start_date?: string | null
         }
         Relationships: []
@@ -2584,9 +2593,11 @@ export type Database = {
         Row: {
           account_status: string
           admin_hours_per_week: number | null
+          allergies: string[]
           authorized_dspd_codes: string[]
           created_at: string
           date_of_birth: string | null
+          dysphagia: boolean
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           feature_config: Json | null
@@ -2611,15 +2622,19 @@ export type Database = {
           phone_number: string | null
           physical_address: string | null
           profile_photo_url: string | null
+          self_admin_med_support: boolean
           special_directions: string | null
+          swallowing_alerts: string[]
           team_id: string | null
         }
         Insert: {
           account_status?: string
           admin_hours_per_week?: number | null
+          allergies?: string[]
           authorized_dspd_codes?: string[]
           created_at?: string
           date_of_birth?: string | null
+          dysphagia?: boolean
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           feature_config?: Json | null
@@ -2644,15 +2659,19 @@ export type Database = {
           phone_number?: string | null
           physical_address?: string | null
           profile_photo_url?: string | null
+          self_admin_med_support?: boolean
           special_directions?: string | null
+          swallowing_alerts?: string[]
           team_id?: string | null
         }
         Update: {
           account_status?: string
           admin_hours_per_week?: number | null
+          allergies?: string[]
           authorized_dspd_codes?: string[]
           created_at?: string
           date_of_birth?: string | null
+          dysphagia?: boolean
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           feature_config?: Json | null
@@ -2677,7 +2696,9 @@ export type Database = {
           phone_number?: string | null
           physical_address?: string | null
           profile_photo_url?: string | null
+          self_admin_med_support?: boolean
           special_directions?: string | null
+          swallowing_alerts?: string[]
           team_id?: string | null
         }
         Relationships: [
@@ -12654,9 +12675,11 @@ export type Database = {
         Returns: {
           account_status: string
           admin_hours_per_week: number | null
+          allergies: string[]
           authorized_dspd_codes: string[]
           created_at: string
           date_of_birth: string | null
+          dysphagia: boolean
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           feature_config: Json | null
@@ -12681,7 +12704,9 @@ export type Database = {
           phone_number: string | null
           physical_address: string | null
           profile_photo_url: string | null
+          self_admin_med_support: boolean
           special_directions: string | null
+          swallowing_alerts: string[]
           team_id: string | null
         }[]
         SetofOptions: {

@@ -38,6 +38,7 @@ import {
 import { evvServiceLabel } from "@/lib/evv-codes";
 import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 import { NectarBar } from "@/components/scheduler/nectar-bar";
+import { createRecurringShifts } from "@/lib/scheduler/repeat.functions";
 
 export const Route = createFileRoute("/dashboard/scheduler")({
   head: () => ({
@@ -55,18 +56,31 @@ export const Route = createFileRoute("/dashboard/scheduler")({
   component: SchedulerPage,
 });
 
-// Sections, in order, matching the screenshots.
-// DSG/DSP are day-program (separate tab). DSI is 1:1 and lives here.
-const SECTIONS: { code: string; label: string }[] = [
-  { code: "SLH", label: "Supported Living" },
-  { code: "COM", label: "Companion" },
-  { code: "PAC", label: "Personal Assistance" },
-  { code: "RP2", label: "Respite" },
-  { code: "HHS", label: "Host Home — administrative hours" },
-  { code: "RHS", label: "Residential Hab" },
-  { code: "PM1", label: "Med Monitoring" },
-  { code: "DSI", label: "Individual Day Support" },
-];
+// Canonical ordering + friendly labels for the well-known sections.
+// Codes NOT listed here are still rendered (in the same card format), in the
+// order they appear after the canonical block, using evvServiceLabel for the
+// description. Day-program-only codes (DSG/DSP) are excluded from this tab —
+// they live on the Day Program tab.
+const SECTION_OVERRIDES: Record<string, string> = {
+  SLH: "Supported Living",
+  COM: "Companion",
+  PAC: "Personal Assistance",
+  RP2: "Respite",
+  HHS: "Host Home — administrative hours",
+  RHS: "Residential Hab",
+  PM1: "Med Monitoring",
+  DSI: "Individual Day Support",
+};
+const SECTION_ORDER = ["SLH", "COM", "PAC", "RP2", "HHS", "RHS", "PM1", "DSI"];
+const DAY_PROGRAM_CODES = new Set(["DSG", "DSP"]);
+
+function sectionLabelFor(code: string): string {
+  if (SECTION_OVERRIDES[code]) return SECTION_OVERRIDES[code];
+  // evvServiceLabel returns "CODE — Full Name"; strip the "CODE — " prefix.
+  const full = evvServiceLabel(code);
+  const parts = full.split(" — ");
+  return parts.length > 1 ? parts.slice(1).join(" — ") : full;
+}
 
 const NAVY = "#0d112b";
 const GOLD = "#f59324";
@@ -269,12 +283,14 @@ function SchedulerBody({
   return (
     <>
       <div className="px-3 sm:px-4 py-4 space-y-3 max-w-[1400px] mx-auto">
-        {/* Ask Nectar — natural-language drafting + auto-fill open shifts */}
+        {/* Ask Nectar — natural-language drafting + auto-fill + repeat shifts */}
         {orgId && (
           <NectarBar
             organizationId={orgId}
             weekStartIso={startOfWeek(anchor).toISOString()}
+            anchor={anchor}
             clientNameById={new Map(data.clients.map((c) => [c.id, `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim()]))}
+            staffNameById={new Map(data.staff.map((s) => [s.id, s.name]))}
           />
         )}
         {/* Requests panel: pending time-off + swaps, with shift-conflict warning */}
@@ -290,20 +306,42 @@ function SchedulerBody({
           <span>· squares = staff, circles = clients</span>
         </div>
 
-        {SECTIONS.map((section) => (
-          <CodeSection
-            key={section.code}
-            code={section.code}
-            label={section.label}
-            view={view}
-            anchor={anchor}
-            data={data}
-            onAdd={openAdd}
-            onOpenShift={(id) => setDetailShiftId(id)}
-            onSetAdminHours={(c) => setHhsClientForHours(c)}
-            onDayJump={(d) => { setAnchor(d); setView("day"); }}
-          />
-        ))}
+        {(() => {
+          // Dynamic sections: only render codes that ≥ 1 current client is
+          // authorized for. Exclude Day Program codes (DSG/DSP). Order known
+          // codes by canonical order, then any remaining codes alphabetically.
+          const authedCodes = new Set<string>();
+          for (const a of data.auths) {
+            const c = (a.service_code ?? "").toUpperCase();
+            if (!c || DAY_PROGRAM_CODES.has(c)) continue;
+            authedCodes.add(c);
+          }
+          const ordered = [
+            ...SECTION_ORDER.filter((c) => authedCodes.has(c)),
+            ...Array.from(authedCodes).filter((c) => !SECTION_ORDER.includes(c)).sort(),
+          ];
+          if (ordered.length === 0) {
+            return (
+              <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground text-center" style={{ borderColor: LINE }}>
+                No clients are authorized for any scheduler-eligible codes yet. Add a code on a client profile to start scheduling.
+              </div>
+            );
+          }
+          return ordered.map((code) => (
+            <CodeSection
+              key={code}
+              code={code}
+              label={sectionLabelFor(code)}
+              view={view}
+              anchor={anchor}
+              data={data}
+              onAdd={openAdd}
+              onOpenShift={(id) => setDetailShiftId(id)}
+              onSetAdminHours={(c) => setHhsClientForHours(c)}
+              onDayJump={(d) => { setAnchor(d); setView("day"); }}
+            />
+          ));
+        })()}
       </div>
 
       {/* Add shift dialog */}
@@ -471,6 +509,7 @@ function HomePill({ label, active, onClick }: { label: string; active: boolean; 
   );
 }
 
+const FALLBACK_PALETTE = ["#3b6aa8", "#7d4cdb", "#137182", "#d6438a", "#f59324", "#3a8acc", "#dc3a3a", "#7eb45b", "#4a5b8c", "#a36cd6", "#2e8b75", "#c0593f"];
 function codeColor(code: string): string {
   switch (code) {
     case "SLH": return "#3b6aa8";
@@ -481,7 +520,12 @@ function codeColor(code: string): string {
     case "RHS": return "#3a8acc";
     case "PM1": return "#dc3a3a";
     case "DSI": return "#7eb45b";
-    default: return NAVY;
+    default: {
+      // Stable hash → palette so unknown codes get a consistent color.
+      let h = 0;
+      for (let i = 0; i < code.length; i++) h = (h * 31 + code.charCodeAt(i)) >>> 0;
+      return FALLBACK_PALETTE[h % FALLBACK_PALETTE.length];
+    }
   }
 }
 
@@ -805,6 +849,7 @@ function AddShiftDialog({
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const save = useServerFn(saveShift);
+  const recur = useServerFn(createRecurringShifts);
   const [clientId, setClientId] = useState<string>(prefill?.clientId ?? "");
   const [code, setCode] = useState<string>(prefill?.code ?? "");
   const [staffId, setStaffId] = useState<string>("__open__");
@@ -812,6 +857,15 @@ function AddShiftDialog({
   const [date, setDate] = useState<string>(dayStr(dInit));
   const [start, setStart] = useState<string>("09:00");
   const [end, setEnd] = useState<string>("13:00");
+
+  // Recurrence (off by default)
+  const [repeatOn, setRepeatOn] = useState(false);
+  const [freq, setFreq] = useState<"daily" | "weekly" | "monthly">("weekly");
+  const [weekdays, setWeekdays] = useState<number[]>([]); // 0=Sun..6=Sat
+  const [dayOfMonth, setDayOfMonth] = useState<number>(new Date(dInit).getDate());
+  const [endMode, setEndMode] = useState<"count" | "until">("count");
+  const [count, setCount] = useState<number>(4);
+  const [until, setUntil] = useState<string>("");
 
   // Codes available for selected client
   const clientCodes = useMemo(() => {
@@ -842,11 +896,14 @@ function AddShiftDialog({
     return c ? `${c.first_name} ${c.last_name}`.trim() : "this client";
   }, [sched.clients, clientId]);
 
+  const toggleWeekday = (n: number) =>
+    setWeekdays((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort());
+
   const saveMut = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const starts = new Date(`${date}T${start}:00`).toISOString();
       const ends = new Date(`${date}T${end}:00`).toISOString();
-      return save({
+      const res = await save({
         data: {
           organization_id: org!.organization_id,
           client_id: clientId,
@@ -859,9 +916,23 @@ function AddShiftDialog({
           published: false,
         },
       });
+      if (repeatOn) {
+        await recur({
+          data: {
+            organization_id: org!.organization_id,
+            seed_shift_id: res.id,
+            freq,
+            weekdays: freq === "weekly" && weekdays.length > 0 ? weekdays : undefined,
+            day_of_month: freq === "monthly" ? dayOfMonth : undefined,
+            count: endMode === "count" ? count : undefined,
+            until_date: endMode === "until" && until ? until : null,
+          },
+        });
+      }
+      return res;
     },
     onSuccess: () => {
-      toast.success("Shift saved.");
+      toast.success(repeatOn ? "Shift + recurring series saved." : "Shift saved.");
       qc.invalidateQueries({ queryKey: ["scheduler-data"] });
       onClose();
     },
@@ -870,7 +941,7 @@ function AddShiftDialog({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Plus className="h-4 w-4" /> Add shift</DialogTitle>
         </DialogHeader>
@@ -929,6 +1000,96 @@ function AddShiftDialog({
             <Field label="DATE"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
             <Field label="START"><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
             <Field label="END"><Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
+          </div>
+
+          {/* Recurrence */}
+          <div className="rounded-md border p-3 space-y-2" style={{ borderColor: LINE, background: "#fbfaf6" }}>
+            <label className="inline-flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={repeatOn} onChange={(e) => setRepeatOn(e.target.checked)} className="h-4 w-4" />
+              Repeat this shift
+            </label>
+            {repeatOn && (
+              <div className="space-y-2 pt-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="FREQUENCY">
+                    <Select value={freq} onValueChange={(v) => setFreq(v as "daily" | "weekly" | "monthly")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  {freq === "monthly" && (
+                    <Field label="DAY OF MONTH">
+                      <Input
+                        type="number" min={1} max={31}
+                        value={dayOfMonth}
+                        onChange={(e) => setDayOfMonth(Math.max(1, Math.min(31, Number(e.target.value) || 1)))}
+                      />
+                    </Field>
+                  )}
+                </div>
+
+                {freq === "weekly" && (
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                      DAYS OF WEEK
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, i) => {
+                        const active = weekdays.includes(i);
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => toggleWeekday(i)}
+                            className="text-xs font-semibold rounded-full px-3 py-1.5"
+                            style={{
+                              background: active ? NAVY : "#fff",
+                              color: active ? "#fff" : "#444",
+                              border: `1px solid ${active ? NAVY : LINE}`,
+                              minHeight: 32, minWidth: 44,
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Leave blank to repeat on the same weekday as the seed date.
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="ENDS">
+                    <Select value={endMode} onValueChange={(v) => setEndMode(v as "count" | "until")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="count">After N occurrences</SelectItem>
+                        <SelectItem value="until">On a date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  {endMode === "count" ? (
+                    <Field label="OCCURRENCES">
+                      <Input
+                        type="number" min={1} max={200}
+                        value={count}
+                        onChange={(e) => setCount(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
+                      />
+                    </Field>
+                  ) : (
+                    <Field label="UNTIL DATE">
+                      <Input type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
+                    </Field>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Sparkles, Wand2, AlertTriangle, Loader2, Check } from "lucide-react";
+import { Sparkles, Wand2, AlertTriangle, Loader2, Check, Repeat } from "lucide-react";
 import {
   nectarDraftShifts,
   autoFillOpenShifts,
@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { RepeatShiftsDialog } from "./repeat-shifts-dialog";
 
 type Draft = {
   staff_id: string | null;
@@ -60,13 +61,18 @@ export function NectarBar({
   organizationId,
   weekStartIso,
   clientNameById,
+  staffNameById,
+  anchor,
 }: {
   organizationId: string;
   weekStartIso: string;
   clientNameById: Map<string, string>;
+  staffNameById?: Map<string, string>;
+  anchor?: Date;
 }) {
   const qc = useQueryClient();
   const [prompt, setPrompt] = useState("");
+  const [repeatOpen, setRepeatOpen] = useState(false);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
   const [picked, setPicked] = useState<Set<number>>(new Set());
@@ -209,7 +215,24 @@ export function NectarBar({
           )}
           <span className="ml-1.5">Auto-fill open shifts</span>
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => setRepeatOpen(true)}
+          className="min-h-[40px]"
+        >
+          <Repeat className="h-4 w-4" />
+          <span className="ml-1.5">Repeat shifts</span>
+        </Button>
       </div>
+
+      <RepeatShiftsDialog
+        open={repeatOpen}
+        onClose={() => setRepeatOpen(false)}
+        organizationId={organizationId}
+        anchor={anchor ?? new Date(weekStartIso)}
+        clientNameById={clientNameById}
+        staffNameById={staffNameById ?? new Map()}
+      />
 
       <Dialog
         open={open}

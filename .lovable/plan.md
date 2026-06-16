@@ -1,73 +1,61 @@
+## 1. Copy shifts (replaces "Repeat shifts")
 
-## Goal
+**Button + dialog rename.** `Repeat shifts` → `Copy shifts` in `src/components/scheduler/nectar-bar.tsx` and `src/components/scheduler/repeat-shifts-dialog.tsx` (title, toasts, internal labels). The underlying server fns keep their names.
 
-Make the scheduler's code sections fully driven by real client authorizations, and give admins two ways to repeat a schedule: replay an existing day/week/month, and set up recurring shifts when creating a new one.
+**New flow inside the dialog:**
+- Source picker: `Previous week` / `Previous month` / `Pick a week…` (date input). No more "Day" mode and no "Repeat for next N" counter — target is always the **current visible week** (the `anchor` prop already passed in).
+- **Weekday-aligned mapping.** A source-week Tuesday lands on the target-week Tuesday (not "+7 days from source"). For a previous-month source, copy each shift onto the same weekday in the current week (first matching weekday). Implemented in `repeat.functions.ts` by changing `projectShifts` to compute, per shift, `targetDay = targetWeekStart + ((sourceDate.getDay() - targetWeekStart.getDay() + 7) % 7)` and preserving time-of-day.
+- Each shift's `staff_id`, `client_id`, `service_code`, `starts_at` time-of-day, `ends_at` time-of-day, `is_awake_overnight`, `notes` are preserved verbatim. `keep_staff` defaults on; `skip_if_exists` stays.
+- Drafts land **unpublished** (already the case: `published: false`, `created_from: "copy"`). Preview table gets per-row checkboxes so admins can deselect before Apply, plus a `Publish now` toggle that flips `published: true` on insert for the selected rows (quick-publish path).
+- **Empty state copy.** When the source window has zero shifts, the preview area shows exactly: *"No shifts to repeat from."* Apply button is disabled.
 
-## 1. Dynamic code sections (drop hard-coded list)
+**Files:**
+- edit `src/lib/scheduler/repeat.functions.ts` — replace day-offset projection with weekday-aligned projection; accept `publish_now: boolean`; pass through `include_source_ids` for row-level deselect.
+- edit `src/components/scheduler/repeat-shifts-dialog.tsx` — new source picker, per-row checkboxes, Publish-now toggle, empty-state string.
+- edit `src/components/scheduler/nectar-bar.tsx` — button label + icon stays `Repeat` (lucide) but text is `Copy shifts`.
 
-Today `SECTIONS` in `src/routes/dashboard.scheduler.tsx` is a fixed 8-code list (SLH, COM, PAC, RP2, HHS, RHS, PM1, DSI). Codes outside that list never render, and codes inside it render even when no client is authorized.
+`createRecurringShifts` (used by Add Shift recurrence) is untouched.
 
-Change to:
+## 2. Import schedule (Nectar file ingest)
 
-- Derive the visible code list from `data.auths` (the org's open `client_billing_codes` already loaded by `useSchedulerData`): unique `service_code` values that have ≥ 1 authorized client today.
-- Exclude day-program-only codes (DSG, DSP) — they belong on the Day Program tab, not the Schedule tab.
-- Order: preserve the canonical ordering for known codes (current SECTIONS order), then append any other authorized code alphabetically.
-- Label resolution: use `evvServiceLabel(code)` from `src/lib/evv-codes.ts` so new codes (PM1, future codes) get a real name automatically. Keep a small override map only for the friendlier names already used ("Supported Living", "Host Home — administrative hours", etc.).
-- Color: route unknown codes through a stable fallback in `codeColor()` (hash → palette) so new sections render in the same visual format as the others.
-- Empty state for an authorized-but-currently-clientless code (edge case after a removal): hide instead of showing "No clients authorized…" — the new rule is "show only what real clients have."
+**New button** `Import schedule` next to `Copy shifts` in `nectar-bar.tsx`. Opens a new dialog `src/components/scheduler/import-schedule-dialog.tsx`.
 
-Result: adding PM1 to a client's billing codes makes the PM1 section appear automatically with that client listed; removing the last PM1 client makes the section disappear.
+**Dialog UX:**
+1. File input accepts `*/*` (PDF, image, .docx, .xlsx, .csv, .txt). Single file at a time.
+2. On upload, POSTs to a new server fn `nectarImportSchedule` (in `src/lib/scheduler/import.functions.ts`).
+3. Server returns the same `Draft[]` shape Nectar already produces, so the existing review/apply path in `nectar-bar.tsx` renders the rows. Reuses `applyDrafts` — no new write path.
+4. Anything Nectar can't match returns `staff_id: null` / `client_id: null` with a `flags: ["unmatched staff: 'Jane D.'"]` style note. Hard-unmatched rows (no client) are uncheckable in the existing table (already enforced by `hard` flag).
+5. On read failure (corrupt PDF, unreadable image, oversize), toast the error and close — no partial drafts.
 
-## 2. "Repeat shifts" button (replay existing schedule)
+**Server fn — `nectarImportSchedule`:**
+- `requireSupabaseAuth` middleware.
+- Input: `{ organization_id, file_name, file_mime, file_b64, week_start_iso }`. 10 MB cap.
+- Loads org staff + clients + active authorizations (same query the existing Nectar drafter uses in `setup.functions.ts` — extract to a shared `loadSchedulerCatalog()` helper).
+- Calls Lovable AI Gateway via the same provider helper already in use for `nectarDraftShifts`. Multimodal: PDFs and images go as `image_url`/`file` content blocks per `ai-multimodal-input`; CSV/TXT/XLSX is parsed server-side first (papaparse for CSV, xlsx for spreadsheets, mammoth for .docx) and the extracted text is sent as a normal text prompt. No new dependency if the package is already in the tree — otherwise add `papaparse` and `xlsx` via `bun add`.
+- Prompt instructs Nectar: only emit shifts for staff/client names that match the supplied catalog; for any unmatched name return the shift with `staff_id`/`client_id` null plus a `flag` explaining what wasn't matched. Never invent staff or clients. Codes must be one the matched client is authorized for, else flag.
+- Returns `{ drafts: Draft[] }`.
 
-Add a button next to "Auto-fill open shifts" in `NectarBar` labeled **Repeat shifts**.
+**Wiring:**
+- `nectar-bar.tsx` gets a third mode alongside `drafts` / `proposals`: import results reuse the `drafts` branch (same review table, same Apply button → same `applyDrafts`).
 
-Flow (single dialog):
+**Files:**
+- new `src/components/scheduler/import-schedule-dialog.tsx`
+- new `src/lib/scheduler/import.functions.ts`
+- edit `src/components/scheduler/nectar-bar.tsx` — new button + dialog state.
+- edit `src/lib/scheduler/setup.functions.ts` — export `loadSchedulerCatalog()` helper if needed for reuse.
 
-1. Source range — admin picks Day / Week / Month, then a specific date (defaults to current `anchor`). We show a count of real `scheduled_shifts` in that range so they know what they're about to copy.
-2. Target — Repeat for: N days / N weeks / N months, OR pick specific target dates from a small calendar.
-3. Options: keep staff assignments vs. create as open shifts; skip dates that already have shifts; copy notes/awake-overnight flag.
-4. Preview list (client · code · staff · time · target date) with per-row include checkbox.
-5. Apply → creates draft `scheduled_shifts` rows via the existing `applyDrafts` server fn (or a new `repeatShifts` server fn that wraps the same insert path). Toast with count; invalidate `scheduler-data`.
+## 3. Expandable approval / out-this-week refinement
 
-Backend: new `src/lib/scheduler/repeat.functions.ts` with two server fns, both `requireSupabaseAuth` + admin/manager check:
-- `previewRepeat({ organizationId, sourceStartIso, sourceEndIso, targetDates[] })` → returns the candidate shift rows (no writes).
-- `applyRepeat({ ...same, keepStaff, skipIfExists })` → inserts. Reuses the existing conflict checks already used by `saveShift` so we don't double-book.
+Current `requests-panel.tsx` already renders the two collapsed cards with counts and a right-side detail pane. Small tweaks to match the request wording:
 
-No schema changes — uses existing `scheduled_shifts`.
+- Replace `ChevronRight` with a rotating chevron that visibly turns down when its card is expanded (purely visual cue that "click the arrow expands").
+- When neither card is expanded on desktop, hide the empty placeholder column entirely so the two cards sit compactly at the top of the column instead of next to a "Select a box…" panel.
+- Counts remain visible in the collapsed state (already done).
 
-## 3. Recurrence option inside Add Shift dialog
+**File:** edit `src/components/schedule-preview/requests-panel.tsx` only.
 
-In the existing `AddShiftDialog` add a "Repeat this shift" section:
-
-- Toggle off by default (current behavior unchanged).
-- Frequency: Daily / Weekly / Monthly.
-- Weekly: multi-select days of the week (Sun–Sat checkboxes).
-- Monthly: "on day N of month" or "same weekday of month."
-- End: "after N occurrences" or "until date" (cap at 26 weeks to keep inserts bounded).
-- Time stays whatever the admin entered in the main form; recurrence only varies the date.
-
-On save, the existing `saveShift` mutation runs once for the seed shift, then a new `createRecurringShifts` server fn (same file as above) expands the rule into individual `scheduled_shifts` rows (one insert per occurrence) with the same client/code/staff/time/awake/notes. We persist the rule too, in a new lightweight column on the seed row so admins can later "edit series."
-
-### Schema (one small migration)
-
-Add to `scheduled_shifts`:
-- `recurrence_rule jsonb null` — `{ freq, days?, dayOfMonth?, endsAfter?, endsOn? }` on the seed shift only.
-- `recurrence_parent_id uuid null` — points generated children at the seed; index it.
-
-Self-referencing FK, no new table, RLS already covers it (same org policies). Grants already in place for `scheduled_shifts`.
-
-## Files touched
-
-- `src/routes/dashboard.scheduler.tsx` — dynamic SECTIONS derivation; label/color fallbacks.
-- `src/components/scheduler/nectar-bar.tsx` — add "Repeat shifts" button + dialog mount.
-- `src/components/scheduler/repeat-shifts-dialog.tsx` *(new)* — source/target picker + preview.
-- `src/routes/dashboard.scheduler.tsx` (AddShiftDialog block) — recurrence section.
-- `src/lib/scheduler/repeat.functions.ts` *(new)* — `previewRepeat`, `applyRepeat`, `createRecurringShifts`.
-- `supabase/migrations/<new>.sql` — add `recurrence_rule`, `recurrence_parent_id` to `scheduled_shifts`.
-
-## Out of scope (per your "don't change other parts" rule)
-
-- No layout/visual changes to existing sections; new sections render in the same card format.
-- No changes to Day Program tab, Staff view, billing math, or unit calculations.
-- No edits to caseload editor, Nectar drafting, or take-shift flow.
+## Out of scope
+- No changes to scheduler grid layout, colors, billing math, conflict engine, EVV logic, or caseload tooling.
+- No DB schema changes. No new tables, columns, or RLS policies.
+- No changes to `createRecurringShifts` or the Add Shift recurrence UI.
+- Nothing auto-publishes except the new opt-in "Publish now" toggle inside Copy shifts (admin-driven, one click).

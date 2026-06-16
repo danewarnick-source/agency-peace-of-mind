@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Sparkles, Wand2, AlertTriangle, Loader2, Check, Repeat } from "lucide-react";
+import { Sparkles, Wand2, AlertTriangle, Loader2, Check, Copy, Upload } from "lucide-react";
 import {
   nectarDraftShifts,
   autoFillOpenShifts,
@@ -21,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { RepeatShiftsDialog } from "./repeat-shifts-dialog";
+import { ImportScheduleDialog } from "./import-schedule-dialog";
 
 type Draft = {
   staff_id: string | null;
@@ -73,6 +74,7 @@ export function NectarBar({
   const qc = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [repeatOpen, setRepeatOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
   const [picked, setPicked] = useState<Set<number>>(new Set());
@@ -220,8 +222,16 @@ export function NectarBar({
           onClick={() => setRepeatOpen(true)}
           className="min-h-[40px]"
         >
-          <Repeat className="h-4 w-4" />
-          <span className="ml-1.5">Repeat shifts</span>
+          <Copy className="h-4 w-4" />
+          <span className="ml-1.5">Copy shifts</span>
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => setImportOpen(true)}
+          className="min-h-[40px]"
+        >
+          <Upload className="h-4 w-4" />
+          <span className="ml-1.5">Import schedule</span>
         </Button>
       </div>
 
@@ -232,6 +242,18 @@ export function NectarBar({
         anchor={anchor ?? new Date(weekStartIso)}
         clientNameById={clientNameById}
         staffNameById={staffNameById ?? new Map()}
+      />
+
+      <ImportScheduleDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        organizationId={organizationId}
+        weekStartIso={weekStartIso}
+        onDrafts={(d) => {
+          setProposals(null);
+          setDrafts(d);
+          setPicked(new Set(d.map((_, i) => i)));
+        }}
       />
 
       <Dialog

@@ -55,26 +55,38 @@ async function loadSourceShifts(
   return (data ?? []) as ShiftRow[];
 }
 
+// Weekday-aligned mapping: each source shift lands on the matching weekday
+// in the target week. Time-of-day, duration, staff, client, code preserved.
+// `targetWeekStartIso` is the Sunday of the target week.
 function projectShifts(
   shifts: ShiftRow[],
-  sourceStartIso: string,
-  targetDays: string[], // ISO date-only strings, one per "anchor" date for the source window
+  targetWeekStartIso: string,
 ): Array<ShiftRow & { target_starts_at: string; target_ends_at: string; target_day: string }> {
   const out: Array<ShiftRow & { target_starts_at: string; target_ends_at: string; target_day: string }> = [];
-  const sourceAnchor = startOfDay(sourceStartIso);
-  for (const targetDayIso of targetDays) {
-    const targetAnchor = startOfDay(targetDayIso);
-    const dayOffsetMs = targetAnchor.getTime() - sourceAnchor.getTime();
-    for (const s of shifts) {
-      const ns = new Date(new Date(s.starts_at).getTime() + dayOffsetMs);
-      const ne = new Date(new Date(s.ends_at).getTime() + dayOffsetMs);
-      out.push({
-        ...s,
-        target_starts_at: ns.toISOString(),
-        target_ends_at: ne.toISOString(),
-        target_day: ns.toISOString().slice(0, 10),
-      });
-    }
+  const targetWeekStart = startOfDay(targetWeekStartIso);
+  // Track per-(client, weekday-hh:mm) so a source that has multiple Tuesdays
+  // (i.e. month source) doesn't collapse onto a single target Tuesday slot.
+  const usedKey = new Set<string>();
+  // Sort sources by date so earliest occurrence wins the target slot.
+  const ordered = [...shifts].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  for (const s of ordered) {
+    const srcStart = new Date(s.starts_at);
+    const srcEnd = new Date(s.ends_at);
+    const weekday = srcStart.getDay();
+    const target = new Date(targetWeekStart);
+    target.setDate(target.getDate() + weekday);
+    target.setHours(srcStart.getHours(), srcStart.getMinutes(), srcStart.getSeconds(), 0);
+    const durationMs = srcEnd.getTime() - srcStart.getTime();
+    const targetEnd = new Date(target.getTime() + durationMs);
+    const key = `${s.client_id}|${(s.service_code ?? s.job_code ?? "").toUpperCase()}|${weekday}|${srcStart.getHours()}:${srcStart.getMinutes()}|${s.staff_id ?? ""}`;
+    if (usedKey.has(key)) continue;
+    usedKey.add(key);
+    out.push({
+      ...s,
+      target_starts_at: target.toISOString(),
+      target_ends_at: targetEnd.toISOString(),
+      target_day: target.toISOString().slice(0, 10),
+    });
   }
   return out;
 }
@@ -88,13 +100,13 @@ export const previewRepeat = createServerFn({ method: "POST" })
     organization_id: string;
     source_start_iso: string;
     source_end_iso: string;
-    target_days: string[];
+    target_week_start_iso: string;
   }) =>
     z.object({
       organization_id: z.string().uuid(),
       source_start_iso: z.string().min(8),
       source_end_iso: z.string().min(8),
-      target_days: z.array(z.string().min(8)).max(366),
+      target_week_start_iso: z.string().min(8),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -103,7 +115,7 @@ export const previewRepeat = createServerFn({ method: "POST" })
     const src = await loadSourceShifts(
       supabase, data.organization_id, data.source_start_iso, data.source_end_iso,
     );
-    const projected = projectShifts(src, data.source_start_iso, data.target_days);
+    const projected = projectShifts(src, data.target_week_start_iso);
     return { source_count: src.length, projected };
   });
 
@@ -116,19 +128,20 @@ export const applyRepeat = createServerFn({ method: "POST" })
     organization_id: string;
     source_start_iso: string;
     source_end_iso: string;
-    target_days: string[];
+    target_week_start_iso: string;
     keep_staff: boolean;
     skip_if_exists: boolean;
-    // Optional: subset of source shift ids to include
+    publish_now?: boolean;
     include_source_ids?: string[];
   }) =>
     z.object({
       organization_id: z.string().uuid(),
       source_start_iso: z.string().min(8),
       source_end_iso: z.string().min(8),
-      target_days: z.array(z.string().min(8)).max(366),
+      target_week_start_iso: z.string().min(8),
       keep_staff: z.boolean(),
       skip_if_exists: z.boolean(),
+      publish_now: z.boolean().optional(),
       include_source_ids: z.array(z.string().uuid()).optional(),
     }).parse(d),
   )
@@ -141,7 +154,7 @@ export const applyRepeat = createServerFn({ method: "POST" })
     const filtered = data.include_source_ids
       ? src.filter((s) => data.include_source_ids!.includes(s.id))
       : src;
-    const projected = projectShifts(filtered, data.source_start_iso, data.target_days);
+    const projected = projectShifts(filtered, data.target_week_start_iso);
 
     // Optionally skip if the same client/code/start already exists on the target day.
     let existing: Array<{ client_id: string; service_code: string | null; job_code: string | null; starts_at: string }> = [];
@@ -188,9 +201,9 @@ export const applyRepeat = createServerFn({ method: "POST" })
         is_awake_overnight: p.is_awake_overnight,
         notes: p.notes,
         status: data.keep_staff && p.staff_id ? "pending" : "open",
-        published: false,
+        published: data.publish_now === true,
         created_by: userId,
-        created_from: "repeat",
+        created_from: "copy",
       });
     }
     if (rows.length > 0) {

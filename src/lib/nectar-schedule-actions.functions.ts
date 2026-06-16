@@ -279,8 +279,9 @@ export const proposeSchedulingActions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ConvInput.parse(input))
   .handler(async ({ data }): Promise<NectarProposal> => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("AI gateway is not configured.");
+    // Bedrock credentials are validated inside callBedrockChatCompletions /
+    // getClient(). No LOVABLE_API_KEY check — NECTAR routes to AWS Bedrock.
+    const apiKey = "";
 
     const system = `You are NECTAR, a scheduling assistant for a residential / day-services agency.
 You translate a manager's natural-language request into a STRUCTURED PROPOSAL of
@@ -334,8 +335,9 @@ export const proposeScheduleImport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ImportInput.parse(input))
   .handler(async ({ data }): Promise<NectarProposal> => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("AI gateway is not configured.");
+    // Bedrock credentials are validated inside callBedrockChatCompletions /
+    // getClient(). No LOVABLE_API_KEY check — NECTAR routes to AWS Bedrock.
+    const apiKey = "";
 
     const system = `You are NECTAR, importing a schedule from another scheduler.
 The input is raw text — usually CSV with a header row, sometimes a pasted table.

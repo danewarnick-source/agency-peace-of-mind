@@ -124,18 +124,21 @@ export const autoAssignRange = createServerFn({ method: "POST" })
       arr.push(t.id); trainingsByClient.set(t.client_id, arr);
     }
 
-    // 5) approved PTO blocks
+    // 5) approved PTO blocks — time_off_requests uses start_date/end_date (date columns)
     const { data: ptos } = await sb
       .from("time_off_requests")
-      .select("staff_id, starts_at, ends_at, status")
+      .select("staff_id, start_date, end_date, status")
       .eq("organization_id", orgId)
       .eq("status", "approved")
-      .lt("starts_at", data.endIso)
-      .gt("ends_at", data.startIso);
+      .lte("start_date", data.endIso.slice(0, 10))
+      .gte("end_date", data.startIso.slice(0, 10));
     const ptoByStaff = new Map<string, Array<{ s: number; e: number }>>();
     for (const p of (ptos ?? [])) {
       const arr = ptoByStaff.get(p.staff_id) ?? [];
-      arr.push({ s: new Date(p.starts_at).getTime(), e: new Date(p.ends_at).getTime() });
+      arr.push({
+        s: new Date(p.start_date + "T00:00:00").getTime(),
+        e: new Date(p.end_date + "T23:59:59.999").getTime(),
+      });
       ptoByStaff.set(p.staff_id, arr);
     }
 

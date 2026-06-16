@@ -126,19 +126,63 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
       }
     }
 
-    // 5) client-specific trainings required
+    // 5) client-specific trainings required (published only)
     const { data: clientTrainings } = await supabase
       .from("client_specific_trainings")
       .select("id")
       .eq("organization_id", orgId)
-      .eq("client_id", data.clientId);
-    const requiredClientTrainings = (clientTrainings ?? []).map((c: any) => c.id);
+      .eq("client_id", data.clientId)
+      .eq("status", "published");
+    const requiredClientTrainings = (clientTrainings ?? []).map((c: any) => c.id as string);
 
-    // 6) certifications currency
-    // Simplified: pull each staff's active certifications by type-name; we can't
-    // resolve which certs are "required for code X" without a code→cert map,
-    // so we leave requiredCertKeys empty for now and surface this in Phase 2.
-    const requiredCertKeys: string[] = [];
+    // 6) certifications currency — service code → required cert type keys
+    const SERVICE_CODE_REQUIRED_CERTS: Record<string, string[]> = {
+      HHS: ["cpr-fa", "abuse-neglect"],
+      SLH: ["cpr-fa", "abuse-neglect"],
+      SLN: ["cpr-fa", "abuse-neglect"],
+      RHS: ["cpr-fa", "abuse-neglect"],
+      DSI: ["cpr-fa"],
+      SEI: ["cpr-fa"],
+      CMP: ["cpr-fa"],
+      CMS: ["cpr-fa"],
+    };
+    const requiredCertKeys = SERVICE_CODE_REQUIRED_CERTS[data.serviceCode.toUpperCase()] ?? [];
+
+    // active external certs per staff (approved and not expired)
+    const nowIso = new Date().toISOString();
+    const activeCertsByStaff = new Map<string, Set<string>>();
+    if (staffIds.length) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: certRows } = await (supabase as any)
+        .from("external_certifications")
+        .select("user_id, cert_type, expires_at")
+        .in("user_id", staffIds)
+        .eq("status", "approved");
+      for (const c of (certRows ?? []) as Array<{ user_id: string; cert_type: string; expires_at: string | null }>) {
+        if (c.expires_at && c.expires_at < nowIso) continue;
+        const set = activeCertsByStaff.get(c.user_id) ?? new Set<string>();
+        set.add(c.cert_type);
+        activeCertsByStaff.set(c.user_id, set);
+      }
+    }
+
+    // completed client-specific trainings per staff
+    const completedTrainingsByStaff = new Map<string, Set<string>>();
+    if (requiredClientTrainings.length && staffIds.length) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: completions } = await (supabase as any)
+        .from("training_completions")
+        .select("user_id, ref_id")
+        .eq("topic_kind", "person")
+        .eq("is_current", true)
+        .in("user_id", staffIds)
+        .in("ref_id", requiredClientTrainings);
+      for (const c of (completions ?? []) as Array<{ user_id: string; ref_id: string }>) {
+        const set = completedTrainingsByStaff.get(c.user_id) ?? new Set<string>();
+        set.add(c.ref_id);
+        completedTrainingsByStaff.set(c.user_id, set);
+      }
+    }
 
     const result = rankEligibility({
       serviceCode: data.serviceCode,
@@ -146,8 +190,8 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
       staff: memberRows.map((r) => ({
         ...r,
         weeklyShifts: byStaffShifts.get(r.id) ?? [],
-        activeCertKeys: new Set<string>(),
-        completedClientTrainings: new Set<string>(),
+        activeCertKeys: activeCertsByStaff.get(r.id) ?? new Set<string>(),
+        completedClientTrainings: completedTrainingsByStaff.get(r.id) ?? new Set<string>(),
         assignedToClient: assignedSet.has(r.id),
         isHostForLocation: hostSet.has(r.id),
       })),

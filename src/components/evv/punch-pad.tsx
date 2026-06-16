@@ -817,6 +817,7 @@ export function PunchPad({
     setBehaviorAnswers(emptyBehaviorAnswers);
     setLongShiftAck(false);
     setTriggersResolved(true);
+    setMedAttestation(emptyMedAttestation);
     stopRecording();
     setShowCompliance(true);
   }

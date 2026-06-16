@@ -21,6 +21,8 @@ function CompanyDetailPage() {
   const router = useRouter();
   const detailFn = useServerFn(getCompanyDetail);
   const saveFn = useServerFn(upsertSubscription);
+  const saveNamesFn = useServerFn(updateOrgNames);
+
 
   const detailQ = useQuery({
     queryKey: ["hive-exec-company", orgId],

@@ -2457,6 +2457,21 @@ export function PunchPad({
                   />
                 )}
 
+                {/* Per-shift medication observation attestation */}
+                {active && org?.organization_id && (
+                  <ShiftMedAttestation
+                    organizationId={org.organization_id}
+                    clientId={active.client_id}
+                    clientName={active.client_name ?? "this client"}
+                    windowStart={active.clock_in_timestamp}
+                    windowEnd={new Date(now).toISOString()}
+                    emarHref={`/dashboard/workspace/${active.client_id}?tab=mar-emar`}
+                    value={medAttestation}
+                    onChange={setMedAttestation}
+                  />
+                )}
+
+
                 {/* NECTAR Completeness Check */}
                 <NectarInfusionLock
                   featureName="Pre-submit completeness check"

@@ -1,25 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Pill, CheckCircle2, AlertTriangle, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Pill, CheckCircle2, AlertTriangle, AlertCircle, Eraser, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmarLegalBanner } from "@/components/workspace/emar-chart";
 import { usePermissions } from "@/hooks/use-permissions";
-
+import { logMedicationPass } from "@/lib/emar-pass.functions";
 
 export const Route = createFileRoute("/dashboard/emar")({
-  head: () => ({ meta: [{ title: "eMAR Pass — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Today's Pass — HIVE eMAR" }] }),
   component: EmarPage,
 });
 
@@ -30,8 +33,10 @@ type DueRow = {
   route: string | null;
   client_id: string;
   client_name: string;
-  scheduled_for: string; // ISO
-  time_label: string; // HH:MM
+  scheduled_for: string;
+  time_label: string;
+  is_rescue: boolean;
+  controlled_schedule: string | null;
 };
 
 type ClientHeader = {
@@ -42,30 +47,30 @@ type ClientHeader = {
   swallowing_alerts: string[];
 };
 
-
 const EXCEPTION_REASONS = [
-  "Client refused",
-  "Client unavailable / sleeping",
+  "Person declined",
+  "Person unavailable / sleeping",
   "Held per physician order",
   "NPO (medical hold)",
   "Medication unavailable",
   "Adverse reaction / withheld",
-  "Self-administered (witnessed)",
   "Other (see notes)",
 ];
 
-const ATTESTATION = "I certify under penalty of administrative non-compliance that I have verified the 5 Rights of Medication Administration for this client and that the information logged here is true, accurate, and administered by my hand.";
+const ATTESTATION =
+  "I attest that I observed the Person self-administer this medication, or assisted as documented above. The information logged here is true and accurate.";
 
 function EmarPage() {
   const { data: org } = useCurrentOrg();
   const { user } = useAuth();
+  const { data: activeShift } = useActiveShift();
   const { role } = usePermissions();
   const isAdminLike = role === "admin" || role === "manager" || role === "super_admin";
   const qc = useQueryClient();
   const [selected, setSelected] = useState<DueRow | null>(null);
 
-  // Build today's scheduled doses, scoped to self-admin clients + (for staff)
-  // only the clients the user is on shift with today.
+  const serviceContext = activeShift?.service_type_code || "general";
+
   const { data: pageData, isLoading } = useQuery({
     enabled: !!org && !!user,
     queryKey: ["emar-due", org?.organization_id, user?.id, isAdminLike],
@@ -73,7 +78,6 @@ function EmarPage() {
       const todayStartLocal = new Date(); todayStartLocal.setHours(0, 0, 0, 0);
       const todayEndLocal = new Date(todayStartLocal); todayEndLocal.setDate(todayEndLocal.getDate() + 1);
 
-      // Staff scope: clients they are scheduled with today
       let scopedClientIds: string[] | null = null;
       if (!isAdminLike) {
         const { data: shifts, error: sErr } = await (supabase as any)
@@ -112,7 +116,7 @@ function EmarPage() {
 
       const { data: meds, error } = await (supabase as any)
         .from("client_medications")
-        .select("id, client_id, medication_name, dosage, route, scheduled_times, is_active")
+        .select("id, client_id, medication_name, dosage, route, scheduled_times, is_active, is_rescue, controlled_schedule")
         .eq("organization_id", org!.organization_id)
         .eq("is_active", true)
         .in("client_id", eligibleIds);
@@ -120,7 +124,7 @@ function EmarPage() {
 
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const out: DueRow[] = [];
-      (meds as unknown as Array<{ id: string; client_id: string; medication_name: string; dosage: string | null; route: string | null; scheduled_times: string[] }>).forEach((m) => {
+      (meds as unknown as Array<{ id: string; client_id: string; medication_name: string; dosage: string | null; route: string | null; scheduled_times: string[]; is_rescue: boolean | null; controlled_schedule: string | null }>).forEach((m) => {
         const name = headers[m.client_id]?.name || "Unknown";
         (m.scheduled_times ?? []).forEach((t) => {
           const [hh, mm] = t.split(":").map(Number);
@@ -129,6 +133,7 @@ function EmarPage() {
           out.push({
             medication_id: m.id, medication_name: m.medication_name, dosage: m.dosage, route: m.route,
             client_id: m.client_id, client_name: name, scheduled_for: sched.toISOString(), time_label: t,
+            is_rescue: !!m.is_rescue, controlled_schedule: m.controlled_schedule,
           });
         });
       });
@@ -140,8 +145,6 @@ function EmarPage() {
   const rows = pageData?.rows ?? [];
   const headers = pageData?.headers ?? {};
 
-
-  // Fetch existing logs for today to mark completed
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d.toISOString(); }, []);
   const todayEnd = useMemo(() => { const d = new Date(); d.setHours(24,0,0,0); return d.toISOString(); }, []);
   const { data: doneLogs = [] } = useQuery({
@@ -160,35 +163,41 @@ function EmarPage() {
   const doneKey = (r: DueRow) => `${r.medication_id}|${r.scheduled_for}`;
   const doneSet = useMemo(() => new Set(doneLogs.map((l) => `${l.medication_id}|${l.scheduled_for}`)), [doneLogs]);
 
+  const logPass = useServerFn(logMedicationPass);
+
   const saveMut = useMutation({
     mutationFn: async (payload: {
-      row: DueRow; status: "administered" | "refused" | "omitted" | "missed";
-      reason: string; notes: string;
+      row: DueRow;
+      status: "administered" | "refused" | "omitted" | "missed";
+      reason: string;
+      notes: string;
+      actualTakenAt: string | null;
+      signatureDataUrl: string;
     }) => {
-      const fullName = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
-      const attestation = `${fullName} @ ${new Date().toISOString()} — ${ATTESTATION}`;
-      const { error } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("emar_logs" as any)
-        .insert({
-          organization_id: org!.organization_id,
-          client_id: payload.row.client_id,
-          medication_id: payload.row.medication_id,
-          scheduled_for: payload.row.scheduled_for,
-          scheduled_time_label: payload.row.time_label,
-          administered_at: payload.status === "administered" ? new Date().toISOString() : null,
+      await logPass({
+        data: {
+          medicationId: payload.row.medication_id,
+          scheduledFor: payload.row.scheduled_for,
+          scheduledTimeLabel: payload.row.time_label,
           status: payload.status,
-          exception_reason: payload.status === "administered" ? null : payload.reason,
+          actualTakenAt: payload.actualTakenAt,
+          exceptionReason: payload.status === "administered" ? null : payload.reason,
           notes: payload.notes || null,
-          staff_id: user!.id,
-          staff_name: fullName,
-          signature_attestation: attestation,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
-      if (error) throw error;
+          signatureDataUrl: payload.signatureDataUrl,
+          attestation: ATTESTATION,
+          serviceContext,
+          isPrn: false,
+          prnReason: null,
+          isMedicationError: false,
+          medicationErrorDescription: null,
+          rescueEpisodeDurationSec: null,
+          rescueOutcome: null,
+          emergencyServicesContacted: false,
+        },
+      });
     },
     onSuccess: () => {
-      toast.success("Medication pass logged");
+      toast.success("Pass logged to the audit trail");
       qc.invalidateQueries({ queryKey: ["emar-done-today"] });
       qc.invalidateQueries({ queryKey: ["mar-logs"] });
       setSelected(null);
@@ -196,7 +205,6 @@ function EmarPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Group rows by client so each safety header sits above that client's doses
   const grouped = useMemo(() => {
     const m: Record<string, DueRow[]> = {};
     rows.forEach((r) => { (m[r.client_id] ||= []).push(r); });
@@ -207,13 +215,19 @@ function EmarPage() {
     <div className="space-y-4">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-          <Pill className="h-5 w-5 text-primary" /> Today's Medication Pass
+          <Pill className="h-5 w-5 text-primary" /> Today's Pass
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {isAdminLike
-            ? "All self-administration clients in the organization with doses due today."
-            : "Clients you are scheduled with today who self-administer their medication with staff support."}
+            ? "Every Person on self-administration with doses due today."
+            : "Persons on your shift today who self-administer with staff support."}
         </p>
+        {activeShift && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Logging context: <span className="font-mono">{serviceContext}</span> shift with{" "}
+            <span className="font-semibold">{activeShift.client_name}</span>.
+          </p>
+        )}
       </div>
 
       <EmarLegalBanner />
@@ -224,7 +238,7 @@ function EmarPage() {
         <Card className="p-8 text-center text-sm text-muted-foreground">
           {isAdminLike
             ? "No self-administration doses scheduled today."
-            : "No medication passes for your shifts today. Only clients on your shift who self-administer with staff support appear here."}
+            : "No medication passes for your shifts today."}
         </Card>
       ) : (
         <div className="space-y-5">
@@ -234,7 +248,7 @@ function EmarPage() {
               <section key={clientId} className="space-y-2">
                 <Card className="border-l-4 border-l-rose-500 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-sm font-semibold">{h?.name ?? "Client"}</div>
+                    <div className="text-sm font-semibold">{h?.name ?? "Person"}</div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {(h?.allergies ?? []).length === 0 ? (
                         <Badge className="bg-emerald-100 text-emerald-800 text-[10px] hover:bg-emerald-100">No known allergies</Badge>
@@ -262,11 +276,15 @@ function EmarPage() {
                     const done = doneSet.has(doneKey(r));
                     return (
                       <Card key={`${r.medication_id}-${r.time_label}`}
-                        className={`flex items-center justify-between gap-3 p-3 ${done ? "opacity-60" : ""}`}>
+                        className={`flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between ${done ? "opacity-60" : ""}`}>
                         <div className="flex items-center gap-3">
                           <Badge variant="outline" className="font-mono">{r.time_label}</Badge>
                           <div>
-                            <div className="text-sm font-medium">{r.medication_name}</div>
+                            <div className="text-sm font-medium flex items-center gap-1.5">
+                              {r.medication_name}
+                              {r.is_rescue && <Badge className="bg-rose-500 text-white text-[9px]">Rescue</Badge>}
+                              {r.controlled_schedule && <Badge variant="outline" className="text-[9px]">CII–CV</Badge>}
+                            </div>
                             <div className="text-xs text-muted-foreground">
                               {r.dosage && `${r.dosage}`} {r.route && `· ${r.route}`}
                             </div>
@@ -277,7 +295,7 @@ function EmarPage() {
                             <CheckCircle2 className="mr-1 h-3 w-3" /> Logged
                           </Badge>
                         ) : (
-                          <Button size="sm" onClick={() => setSelected(r)}>Record pass</Button>
+                          <Button size="sm" className="min-h-11" onClick={() => setSelected(r)}>Observe & Confirm</Button>
                         )}
                       </Card>
                     );
@@ -297,33 +315,83 @@ function EmarPage() {
       />
     </div>
   );
-
 }
 
 function PassDialog({
   row, onClose, onSave, pending,
 }: {
-  row: DueRow | null; onClose: () => void;
-  onSave: (p: { row: DueRow; status: "administered" | "refused" | "omitted" | "missed"; reason: string; notes: string }) => void;
+  row: DueRow | null;
+  onClose: () => void;
+  onSave: (p: {
+    row: DueRow;
+    status: "administered" | "refused" | "omitted" | "missed";
+    reason: string;
+    notes: string;
+    actualTakenAt: string | null;
+    signatureDataUrl: string;
+  }) => void;
   pending: boolean;
 }) {
   const [status, setStatus] = useState<"administered" | "refused" | "omitted" | "missed">("administered");
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
+  const [actualTime, setActualTime] = useState<string>("");
   const [attested, setAttested] = useState(false);
+
+  const sigRef = useRef<HTMLCanvasElement | null>(null);
+  const drawing = useRef(false);
+  const hasSig = useRef(false);
+
+  function clearSig() {
+    const c = sigRef.current; const ctx = c?.getContext("2d");
+    if (!c || !ctx) return;
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    hasSig.current = false;
+  }
+  function pos(e: React.PointerEvent<HTMLCanvasElement>) {
+    const c = sigRef.current!; const r = c.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * c.width, y: ((e.clientY - r.top) / r.height) * c.height };
+  }
+  function down(e: React.PointerEvent<HTMLCanvasElement>) {
+    const ctx = sigRef.current?.getContext("2d"); if (!ctx) return;
+    drawing.current = true; const { x, y } = pos(e);
+    ctx.beginPath(); ctx.moveTo(x, y);
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+  }
+  function move(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawing.current) return;
+    const ctx = sigRef.current?.getContext("2d"); if (!ctx) return;
+    const { x, y } = pos(e); ctx.lineTo(x, y); ctx.stroke(); hasSig.current = true;
+  }
+  function up() { drawing.current = false; }
 
   const isException = status !== "administered";
   const notesRequired = isException && notes.trim().length < 10;
   const reasonRequired = isException && !reason;
-  const canSubmit = !!row && attested && !notesRequired && !reasonRequired;
+
+  // Late-entry gap
+  const gapMinutes = useMemo(() => {
+    if (!actualTime || !row) return 0;
+    const [hh, mm] = actualTime.split(":").map(Number);
+    if (isNaN(hh)) return 0;
+    const d = new Date(); d.setHours(hh, mm ?? 0, 0, 0);
+    return Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+  }, [actualTime, row]);
+  const lateEntry = gapMinutes >= 15;
 
   if (!row) return null;
+
+  const canSubmit = !!row && attested && !notesRequired && !reasonRequired;
 
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Record administration</DialogTitle>
+          <DialogTitle>Observe & Confirm self-administration</DialogTitle>
+          <DialogDescription>
+            The Person self-administers; you observe and confirm. Document below.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <Card className="p-3 text-sm bg-secondary/40">
@@ -333,11 +401,11 @@ function PassDialog({
           </Card>
 
           <div className="grid gap-2">
-            <Label>Status</Label>
+            <Label>Outcome</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="administered">✅ Administered</SelectItem>
+                <SelectItem value="administered">✅ Self-administered (observed)</SelectItem>
                 <SelectItem value="refused">🛑 Refused</SelectItem>
                 <SelectItem value="omitted">⚠️ Omitted</SelectItem>
                 <SelectItem value="missed">⏰ Missed</SelectItem>
@@ -345,13 +413,29 @@ function PassDialog({
             </Select>
           </div>
 
+          {status === "administered" && (
+            <div className="grid gap-2">
+              <Label className="text-xs">Time the Person actually took it (optional)</Label>
+              <Input
+                type="time"
+                value={actualTime}
+                onChange={(e) => setActualTime(e.target.value)}
+              />
+              {lateEntry && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                  ⚠️ Late entry — {gapMinutes} min gap will be flagged on the audit trail.
+                </p>
+              )}
+            </div>
+          )}
+
           {isException && (
             <>
               <div className="grid gap-2">
-                <Label>Exception reason *</Label>
+                <Label>Reason *</Label>
                 <Select value={reason} onValueChange={setReason}>
                   <SelectTrigger className={reasonRequired ? "border-rose-400" : ""}>
-                    <SelectValue placeholder="Select a standardized reason" />
+                    <SelectValue placeholder="Select a reason" />
                   </SelectTrigger>
                   <SelectContent>
                     {EXCEPTION_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
@@ -359,17 +443,13 @@ function PassDialog({
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>📋 Detailed Operational Circumstance Notes *</Label>
+                <Label>Circumstances *</Label>
                 <Textarea
                   rows={4} value={notes} onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Describe what happened, the client's affect, attempts made, and any follow-up actions taken."
+                  placeholder="Describe what happened, the Person's affect, attempts made, and any follow-up."
                   className={notesRequired ? "border-rose-400" : ""}
                 />
-                {notesRequired && <p className="text-xs text-rose-600">Required — min 10 characters for compliance audit trail.</p>}
-              </div>
-              <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                <span>Non-administered events trigger a state-level compliance entry. Notify your supervisor per agency policy.</span>
+                {notesRequired && <p className="text-xs text-rose-600">Required — min 10 characters.</p>}
               </div>
             </>
           )}
@@ -377,19 +457,48 @@ function PassDialog({
           {!isException && (
             <div className="grid gap-2">
               <Label>Notes (optional)</Label>
-              <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional observation notes" />
+              <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional observation" />
             </div>
           )}
 
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <Label className="text-xs">Staff signature</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={clearSig} className="h-7 text-[11px]">
+                <Eraser className="mr-1 h-3 w-3" /> Clear
+              </Button>
+            </div>
+            <canvas
+              ref={(el) => { sigRef.current = el; if (el) setTimeout(clearSig, 0); }}
+              width={520} height={120}
+              onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}
+              className="w-full touch-none rounded-md border-2 border-dashed border-border bg-white"
+            />
+          </div>
+
           <label className="flex items-start gap-2 rounded-md border-2 border-primary/30 bg-primary/5 p-3 text-xs cursor-pointer">
             <Checkbox checked={attested} onCheckedChange={(v) => setAttested(v === true)} className="mt-0.5" />
-            <span><span className="font-semibold">✍️ Attestation:</span> {ATTESTATION}</span>
+            <span><span className="font-semibold">Attestation:</span> {ATTESTATION}</span>
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!canSubmit || pending} onClick={() => onSave({ row, status, reason, notes })}>
-            {pending ? "Logging…" : "Sign & submit"}
+          <Button variant="outline" onClick={onClose} disabled={pending}>Cancel</Button>
+          <Button
+            disabled={!canSubmit || pending}
+            onClick={() => {
+              if (!hasSig.current) { toast.error("Sign the pad to confirm."); return; }
+              const sig = sigRef.current?.toDataURL("image/png") ?? "";
+              let actualIso: string | null = null;
+              if (status === "administered" && actualTime) {
+                const [hh, mm] = actualTime.split(":").map(Number);
+                const d = new Date(); d.setHours(hh, mm ?? 0, 0, 0);
+                actualIso = d.toISOString();
+              }
+              onSave({ row: row!, status, reason, notes, actualTakenAt: actualIso, signatureDataUrl: sig });
+            }}
+          >
+            {pending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+            Append to audit trail
           </Button>
         </DialogFooter>
       </DialogContent>

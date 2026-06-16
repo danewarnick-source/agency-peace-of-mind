@@ -2,13 +2,14 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Save, Users, Contact2, Clock, Activity } from "lucide-react";
+import { ArrowLeft, Save, Users, Contact2, Clock, Activity, Pencil, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { getCompanyDetail, upsertSubscription } from "@/lib/hive-exec.functions";
+import { getCompanyDetail, upsertSubscription, updateOrgNames } from "@/lib/hive-exec.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/$orgId")({
   component: CompanyDetailPage,
 });
+
 
 function fmtMoney(cents: number): string {
   return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

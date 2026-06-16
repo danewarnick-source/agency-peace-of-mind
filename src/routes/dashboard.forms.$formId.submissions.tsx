@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
@@ -19,6 +19,7 @@ type SubRow = { id: string; submitted_by: string | null; submitted_at: string; p
 function SubmissionsView() {
   const { formId } = Route.useParams();
   const navigate = useNavigate();
+  const router = useRouter();
   const fetchForm = useServerFn(getForm);
   const fetchSubs = useServerFn(listSubmissions);
   const { data: f } = useQuery({ queryKey: ["form-edit", formId], queryFn: () => fetchForm({ data: { formId } }) });
@@ -78,7 +79,7 @@ function SubmissionsView() {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/dashboard/forms" })}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => window.history.length > 1 ? router.history.back() : navigate({ to: "/dashboard/forms" })}><ChevronLeft className="h-4 w-4" /></Button>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">{f?.form?.name ?? "Submissions"}</h1>
             <p className="text-xs text-muted-foreground">{rows.length} of {(s?.submissions ?? []).length} submissions</p>

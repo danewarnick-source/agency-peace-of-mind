@@ -172,7 +172,7 @@ function ClientWorkspace() {
               className="h-10 w-10 rounded-full object-cover border-2 border-border"
               fallback={
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                  {client.first_name[0]}{client.last_name[0]}
+                  {client.first_name?.[0] ?? ""}{client.last_name?.[0] ?? ""}
                 </span>
               }
             />

@@ -58,7 +58,7 @@ export function ConflictsPanel({ conflicts, onJumpToShift, shiftLabel }: Props) 
           <ChevronDown className="h-3 w-3 opacity-60" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[380px] p-0">
+      <PopoverContent align="end" className="w-[380px] max-w-[calc(100vw-2rem)] p-0">
         <div className="border-b px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {total === 0 ? "No conflicts in view" : (
             <span>

@@ -178,7 +178,7 @@ function RolesPage() {
                         }
                       }}
                     >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="w-full sm:w-auto"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="employee">Employee</SelectItem>
                         <SelectItem value="manager">Manager</SelectItem>

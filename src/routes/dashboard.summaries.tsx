@@ -489,11 +489,11 @@ function SourcePanel({ bundle }: { bundle: SummarySourceBundle }) {
       </Card>
 
       <Card>
-        <CardHeader className="py-2"><CardTitle className="text-sm">PCSP goals ({client.pcsp_goals.length})</CardTitle></CardHeader>
+        <CardHeader className="py-2"><CardTitle className="text-sm">PCSP goals ({client.pcsp_goals?.length ?? 0})</CardTitle></CardHeader>
         <CardContent className="text-xs space-y-1">
-          {client.pcsp_goals.length === 0
+          {(client.pcsp_goals?.length ?? 0) === 0
             ? <div className="text-muted-foreground">No PCSP goals on record.</div>
-            : client.pcsp_goals.map((g, i) => <div key={i}>• {g}</div>)}
+            : (client.pcsp_goals ?? []).map((g, i) => <div key={i}>• {g}</div>)}
         </CardContent>
       </Card>
 

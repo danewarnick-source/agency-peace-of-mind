@@ -457,7 +457,7 @@ export function ClientsPage() {
                       <TableCell className="font-semibold whitespace-nowrap py-2">
                         <div className="flex items-center gap-2">
                           <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                            {c.first_name[0]}{c.last_name[0]}
+                            {c.first_name?.[0] ?? ""}{c.last_name?.[0] ?? ""}
                           </span>
                           <span className="truncate">{c.first_name} {c.last_name}</span>
                         </div>
@@ -466,7 +466,7 @@ export function ClientsPage() {
                         {c.medicaid_id || "—"}
                       </TableCell>
                       <TableCell className="py-2">
-                        <div className="flex items-center gap-1 whitespace-nowrap">
+                        <div className="flex flex-wrap items-center gap-1">
                           {shownCodes.length ? (
                             <>
                               {shownCodes.map((code) => (
@@ -631,7 +631,7 @@ function ClientWorkspace({
         <span className="text-muted-foreground">/</span>
         <div className="flex items-center gap-2">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-            {client.first_name[0]}{client.last_name[0]}
+            {client.first_name?.[0] ?? ""}{client.last_name?.[0] ?? ""}
           </span>
           <div>
             <h2 className="text-lg font-semibold leading-none">
@@ -1753,7 +1753,7 @@ function ProfileTab({
                     className="h-full w-full object-cover"
                     fallback={
                       <span className="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary">
-                        {client.first_name[0]}{client.last_name[0]}
+                        {client.first_name?.[0] ?? ""}{client.last_name?.[0] ?? ""}
                       </span>
                     }
                   />

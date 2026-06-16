@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useParams, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,6 +14,7 @@ export const Route = createFileRoute("/dashboard/tracks/$trackSlug")({
 
 function TrackDetailPage() {
   const { trackSlug } = useParams({ from: "/dashboard/tracks/$trackSlug" });
+  const router = useRouter();
 
   const { data: track, isLoading } = useQuery({
     queryKey: ["track", trackSlug],
@@ -84,7 +85,7 @@ function TrackDetailPage() {
     return (
       <div className="text-center py-16">
         <h2 className="text-xl font-semibold">Track not found</h2>
-        <Link to="/dashboard/tracks"><Button variant="link">Back to tracks</Button></Link>
+        <Button variant="link" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/tracks" })}>Back to tracks</Button>
       </div>
     );
   }
@@ -92,9 +93,9 @@ function TrackDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/dashboard/tracks" className="text-sm text-muted-foreground inline-flex items-center gap-1 hover:text-foreground">
+        <button type="button" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/tracks" })} className="text-sm text-muted-foreground inline-flex items-center gap-1 hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> All tracks
-        </Link>
+        </button>
         <h1 className="text-3xl font-bold tracking-tight mt-2">{track.name}</h1>
         <p className="text-muted-foreground mt-1">{track.description}</p>
         <div className="flex flex-wrap gap-2 mt-3">

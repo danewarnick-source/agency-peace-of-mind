@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,6 +14,7 @@ function TrainingPlayer() {
   const { id } = Route.useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const router = useRouter();
   const qc = useQueryClient();
 
   const { data: mod, isLoading } = useQuery({
@@ -72,10 +73,8 @@ function TrainingPlayer() {
     return (
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">Module not found.</p>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/dashboard/courses">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Back to roadmap
-          </Link>
+        <Button variant="outline" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/courses" })}>
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back to roadmap
         </Button>
       </div>
     );
@@ -92,10 +91,8 @@ function TrainingPlayer() {
       {/* Compact, consistent header — no truncation, title wraps */}
       <header className="border-b border-border bg-card px-4 py-3">
         <div className="flex items-start justify-between gap-3">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0">
-            <Link to="/dashboard/courses">
-              <ArrowLeft className="mr-1 h-4 w-4" /> Roadmap
-            </Link>
+          <Button variant="ghost" size="sm" className="-ml-2 shrink-0" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/courses" })}>
+            <ArrowLeft className="mr-1 h-4 w-4" /> Roadmap
           </Button>
           <Button
             size="sm"

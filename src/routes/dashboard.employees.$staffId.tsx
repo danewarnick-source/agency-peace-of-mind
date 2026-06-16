@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, CalendarDays, Users as UsersIcon, ShieldAlert, FileText, Clock, AlertTriangle, ClipboardList, Upload } from "lucide-react";
@@ -29,6 +29,7 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
 function StaffProfilePage() {
   const { staffId } = Route.useParams();
   const { data: org } = useCurrentOrg();
+  const router = useRouter();
 
   const orgId = org?.organization_id;
 
@@ -132,8 +133,8 @@ function StaffProfilePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/dashboard/employees"><ArrowLeft className="mr-1 h-4 w-4" /> Employees</Link>
+          <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/employees" })}>
+            <ArrowLeft className="mr-1 h-4 w-4" /> Employees
           </Button>
           <div>
             <h1 className="text-xl font-semibold">{name}</h1>
@@ -150,8 +151,8 @@ function StaffProfilePage() {
             </div>
           </div>
         </div>
-        <Button variant="outline" asChild>
-          <Link to="/dashboard/employees">Back to list (quick edit)</Link>
+        <Button variant="outline" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/employees" })}>
+          Back to list (quick edit)
         </Button>
       </div>
 

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
@@ -17,6 +17,7 @@ function fmtMoney(cents: number): string {
 function CompanyDetailPage() {
   const { orgId } = Route.useParams();
   const qc = useQueryClient();
+  const router = useRouter();
   const detailFn = useServerFn(getCompanyDetail);
   const saveFn = useServerFn(upsertSubscription);
 
@@ -71,12 +72,13 @@ function CompanyDetailPage() {
 
   return (
     <div className="space-y-4">
-      <Link
-        to="/dashboard/hive-exec"
+      <button
+        type="button"
+        onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hive-exec" })}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Back to companies
-      </Link>
+      </button>
 
       <header className="rounded-xl border border-border bg-card p-4 shadow-sm">
         <h1 className="font-display text-2xl font-bold text-[#0f1b3d]">{d?.name ?? "Loading…"}</h1>

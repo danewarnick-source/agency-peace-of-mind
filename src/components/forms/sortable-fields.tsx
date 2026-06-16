@@ -247,7 +247,7 @@ function InlineInserter({
             <Plus className="h-3.5 w-3.5 mr-1" /> Add field here
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[320px] p-2 space-y-2">
+        <PopoverContent align="start" className="w-[320px] max-w-[calc(100vw-2rem)] p-2 space-y-2">
           {typeGroups.map((g) => (
             <div key={g.name} className="space-y-1">
               <p className="px-1 text-[10px] uppercase tracking-wide text-muted-foreground">{g.name}</p>

@@ -8,7 +8,7 @@
 // Incidents / Summaries / Host-home cert / Deadlines / Documents.
 
 import { useMemo } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +51,7 @@ function ClientProfileHub() {
   const { clientId } = Route.useParams();
   const { tab } = Route.useSearch();
   const { data: org } = useCurrentOrg();
+  const router = useRouter();
   const orgId = org?.organization_id;
 
   const clientQ = useQuery({
@@ -83,10 +84,8 @@ function ClientProfileHub() {
   return (
     <div className="container mx-auto max-w-7xl px-4 py-6 space-y-6">
       <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/dashboard/hub/clients">
+        <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/clients" })}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Clients
-          </Link>
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold truncate">{fullName}</h1>

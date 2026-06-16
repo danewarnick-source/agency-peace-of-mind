@@ -1481,11 +1481,48 @@ export function MarEmarTab({
   return (
     <div className="space-y-4">
 
+      {/* HIVE eMAR top bar — wordmark + DEMO chip + acting service indicator */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-md text-primary-foreground"
+            style={{ background: "var(--gradient-amber)" }}
+            aria-hidden
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor"><path d="M12 2 3 7v10l9 5 9-5V7z"/></svg>
+          </div>
+          <div className="leading-tight">
+            <p className="text-sm font-bold tracking-wide">HIVE</p>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              eMAR · Medication Support
+            </p>
+          </div>
+          <span
+            className="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+            style={{ background: "color-mix(in oklab, var(--accent-2) 18%, transparent)", color: "var(--accent-2)" }}
+          >
+            Demo
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Acting service</span>
+          <span
+            className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-1 font-mono text-[11px] font-semibold"
+          >
+            {serviceContext.toUpperCase()}
+          </span>
+        </div>
+      </div>
+
       {/* Permanent legal/scope banner — required at every eMAR surface */}
       <EmarLegalBanner />
 
       {/* Clinical safety header — visible allergies, dysphagia / swallowing alerts */}
       {clientSafety && <ClinicalSafetyHeader client={clientSafety} />}
+
+      {/* Nectar AI Compliance Assistant — advisory simulation actions */}
+      <NectarComplianceCard onSelect={() => setActiveTab("nectar")} />
+
 
       {/* Medication error alert */}
       {errorCount > 0 && (

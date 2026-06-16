@@ -28,6 +28,10 @@ export interface ExecKpis {
 export interface CompanyDetail {
   organization_id: string;
   name: string;
+  legal_name: string | null;
+  dba_name: string | null;
+  display_acronym: string | null;
+
   subscription: {
     plan: string;
     status: string;

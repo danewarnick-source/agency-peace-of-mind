@@ -19,21 +19,30 @@ export interface UtahExportLine {
   beginIso: string;
   endIso: string;
   beginAddress: string;
-  beginLat: number;
-  beginLng: number;
+  beginLat: number | null; // null = GPS absent; emits blank in CSV
+  beginLng: number | null;
   endAddress: string;
-  endLat: number;
-  endLng: number;
+  endLat: number | null;
+  endLng: number | null;
   origReceiptId: string; // empty when not a correction
   vendor: string;
 }
 
 function pad2(n: number) { return n < 10 ? `0${n}` : String(n); }
-function fmtDateMDY(iso: string) {
+
+export function isValidIso(iso: string): boolean {
+  if (!iso) return false;
+  return !isNaN(new Date(iso).getTime());
+}
+
+function fmtDateMDY(iso: string): string | null {
+  if (!isValidIso(iso)) return null;
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
-function fmtTimeHMSAmPm(iso: string) {
+
+function fmtTimeHMSAmPm(iso: string): string | null {
+  if (!isValidIso(iso)) return null;
   const d = new Date(iso);
   let h = d.getHours();
   const m = d.getMinutes();
@@ -42,14 +51,47 @@ function fmtTimeHMSAmPm(iso: string) {
   h = h % 12; if (h === 0) h = 12;
   return `${h}:${pad2(m)}:${pad2(s)} ${ampm}`;
 }
+
 function csvEscape(s: string) {
   const v = s ?? "";
   if (v.includes(",") || v.includes('"') || v.includes("\n")) return `"${v.replace(/"/g, '""')}"`;
   return v;
 }
 
-/** Build one CSV row (header + lines built separately). recordId is 1-based. */
-export function buildUtahCsvLine(line: UtahExportLine, recordId: number, batchNumber: number): string {
+/**
+ * Parse a US address string into components for separate CSV columns.
+ * Expected format: "123 Main St, Salt Lake City, UT 84101"
+ * Falls back gracefully: if fewer than 3 comma-separated parts, puts everything in street.
+ */
+function parseUsAddress(address: string): { street: string; city: string; state: string; zip: string } {
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 3) {
+    return { street: address.trim(), city: "", state: "", zip: "" };
+  }
+  // Last part: "UT 84101" → state + zip
+  const stateZipTokens = parts[parts.length - 1].split(/\s+/);
+  const state = stateZipTokens[0] ?? "";
+  const zip = stateZipTokens[1] ?? "";
+  const city = parts[parts.length - 2];
+  const street = parts.slice(0, parts.length - 2).join(", ");
+  return { street, city, state, zip };
+}
+
+/**
+ * Build one CSV row (header + lines built separately). recordId is 1-based.
+ * Returns null if begin or end timestamp is missing or malformed — the caller
+ * must exclude that line from the export and count it as skipped.
+ */
+export function buildUtahCsvLine(line: UtahExportLine, recordId: number, batchNumber: number): string | null {
+  const beginDate = fmtDateMDY(line.beginIso);
+  const beginTime = fmtTimeHMSAmPm(line.beginIso);
+  const endDate = fmtDateMDY(line.endIso);
+  const endTime = fmtTimeHMSAmPm(line.endIso);
+  if (!beginDate || !beginTime || !endDate || !endTime) return null;
+
+  const begin = parseUsAddress(line.beginAddress);
+  const end = parseUsAddress(line.endAddress);
+
   return [
     csvEscape(line.memberId),
     csvEscape(line.firstName),
@@ -59,24 +101,24 @@ export function buildUtahCsvLine(line: UtahExportLine, recordId: number, batchNu
     csvEscape(line.serviceDescription),
     csvEscape(line.providerId),
     csvEscape(line.employeeName),
-    csvEscape(fmtDateMDY(line.beginIso)),
-    csvEscape(fmtTimeHMSAmPm(line.beginIso)),
-    csvEscape(line.beginAddress),
-    "",
-    "",
-    "",
-    "",
-    String(line.beginLat),
-    String(line.beginLng),
-    csvEscape(fmtDateMDY(line.endIso)),
-    csvEscape(fmtTimeHMSAmPm(line.endIso)),
-    csvEscape(line.endAddress),
-    "",
-    "",
-    "",
-    "",
-    String(line.endLat),
-    String(line.endLng),
+    csvEscape(beginDate),
+    csvEscape(beginTime),
+    csvEscape(begin.street),
+    "", // Begin Apt/Suite/Floor
+    csvEscape(begin.city),
+    csvEscape(begin.state),
+    csvEscape(begin.zip),
+    line.beginLat != null ? String(line.beginLat) : "",
+    line.beginLng != null ? String(line.beginLng) : "",
+    csvEscape(endDate),
+    csvEscape(endTime),
+    csvEscape(end.street),
+    "", // End Address2
+    csvEscape(end.city),
+    csvEscape(end.state),
+    csvEscape(end.zip),
+    line.endLat != null ? String(line.endLat) : "",
+    line.endLng != null ? String(line.endLng) : "",
     csvEscape(line.origReceiptId),
     String(batchNumber),
     String(recordId),
@@ -84,8 +126,29 @@ export function buildUtahCsvLine(line: UtahExportLine, recordId: number, batchNu
   ].join(",");
 }
 
-export function buildUtahCsv(lines: UtahExportLine[], batchNumber: number): string {
-  return [UTAH_30_HEADER, ...lines.map((l, i) => buildUtahCsvLine(l, i + 1, batchNumber))].join("\r\n");
+/**
+ * Build a complete CSV string. Lines with invalid timestamps are silently
+ * dropped (counted in skippedCount). The caller should pre-validate with
+ * isValidIso and exclude rows from DB inserts before calling this, but this
+ * acts as a safety net for any that slip through.
+ */
+export function buildUtahCsv(lines: UtahExportLine[], batchNumber: number): { csv: string; skippedCount: number } {
+  let skippedCount = 0;
+  let recordId = 0;
+  const rows: string[] = [];
+  for (const line of lines) {
+    const row = buildUtahCsvLine(line, recordId + 1, batchNumber);
+    if (row === null) {
+      skippedCount += 1;
+    } else {
+      recordId += 1;
+      rows.push(row);
+    }
+  }
+  return {
+    csv: [UTAH_30_HEADER, ...rows].join("\r\n"),
+    skippedCount,
+  };
 }
 
 export function downloadCsv(filename: string, body: string) {

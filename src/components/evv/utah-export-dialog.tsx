@@ -18,7 +18,7 @@ import { Download, AlertTriangle, Loader2, History } from "lucide-react";
 import { toast } from "sonner";
 import { isEvvLockedCode, padMemberId, evvServiceLabel } from "@/lib/evv-codes";
 import {
-  buildUtahCsv, downloadCsv, defaultPreviousWeek, type UtahExportLine,
+  buildUtahCsv, downloadCsv, defaultPreviousWeek, isValidIso, type UtahExportLine,
 } from "@/lib/utah-evv-export";
 
 type Coord = { latitude: number; longitude: number } | null;
@@ -77,6 +77,7 @@ interface CategorizedRow {
   memberId: string;
   excludeReason: null | "missing_member_id" | "out_of_bounds" | "already_exported" | "no_clock_out";
   addressBlank: boolean;
+  gpsAbsent: boolean;
 }
 
 function categorize(rows: TsRow[], exportedIds: Set<string>, addressMap: Map<string, string>): CategorizedRow[] {
@@ -94,7 +95,8 @@ function categorize(rows: TsRow[], exportedIds: Set<string>, addressMap: Map<str
       r.reconciliation_status !== "accepted" &&
       r.reconciliation_status !== "corrected"
     ) excludeReason = "out_of_bounds";
-    return { row: r, address, memberId, excludeReason, addressBlank: !address };
+    const gpsAbsent = !r.gps_in_coordinates?.latitude && !r.gps_in_coordinates?.longitude;
+    return { row: r, address, memberId, excludeReason, addressBlank: !address, gpsAbsent };
   });
 }
 
@@ -257,6 +259,7 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
   const noClockOut = categorized.filter((c) => c.excludeReason === "no_clock_out");
   const alreadyExported = categorized.filter((c) => c.excludeReason === "already_exported");
   const addressBlankCount = eligible.filter((c) => c.addressBlank).length;
+  const gpsAbsentCount = eligible.filter((c) => c.gpsAbsent).length;
 
   const [selectedCorrections, setSelectedCorrections] = useState<Set<string>>(new Set());
   const toggleCorrection = (id: string) =>
@@ -315,11 +318,16 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
       const recordInserts: Array<{ organization_id: string; batch_id: string; timesheet_id: string; record_id: number; is_correction: boolean; orig_record: string | null }> = [];
 
       let recordCounter = 0;
+      let timestampSkipped = 0;
       for (const c of eligible) {
-        recordCounter += 1;
         const r = c.row;
         const beginIso = effIn(r);
         const endIso = effOut(r) ?? beginIso;
+        if (!isValidIso(beginIso) || !isValidIso(endIso)) {
+          timestampSkipped += 1;
+          continue;
+        }
+        recordCounter += 1;
         allLines.push({
           memberId: c.memberId,
           firstName: r.clients?.first_name ?? "",
@@ -330,11 +338,11 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
           employeeName: staffNameMap.get(r.staff_id) ?? "",
           beginIso, endIso,
           beginAddress: c.address,
-          beginLat: r.gps_in_coordinates?.latitude ?? 0,
-          beginLng: r.gps_in_coordinates?.longitude ?? 0,
+          beginLat: r.gps_in_coordinates?.latitude ?? null,
+          beginLng: r.gps_in_coordinates?.longitude ?? null,
           endAddress: c.address,
-          endLat: r.gps_out_coordinates?.latitude ?? 0,
-          endLng: r.gps_out_coordinates?.longitude ?? 0,
+          endLat: r.gps_out_coordinates?.latitude ?? null,
+          endLng: r.gps_out_coordinates?.longitude ?? null,
           origReceiptId: "",
           vendor,
         });
@@ -350,12 +358,16 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
       for (const r of correctionLines) {
         const orig = origByTs.get(r.id);
         if (!orig) continue;
-        recordCounter += 1;
         const memberId = padMemberId(r.clients?.medicaid_id ?? "");
         const locAddr = r.matched_approved_location_id ? (addressMap.get(r.matched_approved_location_id) ?? "") : "";
         const address = (locAddr || r.clients?.physical_address || "").trim();
         const beginIso = effIn(r);
         const endIso = effOut(r) ?? beginIso;
+        if (!isValidIso(beginIso) || !isValidIso(endIso)) {
+          timestampSkipped += 1;
+          continue;
+        }
+        recordCounter += 1;
         allLines.push({
           memberId,
           firstName: r.clients?.first_name ?? "",
@@ -366,11 +378,11 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
           employeeName: staffNameMap.get(r.staff_id) ?? "",
           beginIso, endIso,
           beginAddress: address,
-          beginLat: r.gps_in_coordinates?.latitude ?? 0,
-          beginLng: r.gps_in_coordinates?.longitude ?? 0,
+          beginLat: r.gps_in_coordinates?.latitude ?? null,
+          beginLng: r.gps_in_coordinates?.longitude ?? null,
           endAddress: address,
-          endLat: r.gps_out_coordinates?.latitude ?? 0,
-          endLng: r.gps_out_coordinates?.longitude ?? 0,
+          endLat: r.gps_out_coordinates?.latitude ?? null,
+          endLng: r.gps_out_coordinates?.longitude ?? null,
           origReceiptId: String(orig.record_id),
           vendor,
         });
@@ -392,12 +404,13 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
         if (re) throw re;
       }
 
-      const csv = buildUtahCsv(allLines, batch.batch_number);
+      const { csv, skippedCount: buildSkipped } = buildUtahCsv(allLines, batch.batch_number);
       downloadCsv(`utah_dhhs_evv_batch${String(batch.batch_number).padStart(4, "0")}_${from}_to_${to}.csv`, csv);
-      return { count: allLines.length, batchNumber: batch.batch_number };
+      return { count: allLines.length, batchNumber: batch.batch_number, skipped: timestampSkipped + buildSkipped };
     },
     onSuccess: (res) => {
-      toast.success(`Exported batch #${res.batchNumber} (${res.count} row${res.count === 1 ? "" : "s"}).`);
+      const skipNote = res.skipped > 0 ? ` (${res.skipped} row${res.skipped === 1 ? "" : "s"} skipped — invalid timestamp)` : "";
+      toast.success(`Exported batch #${res.batchNumber} (${res.count} row${res.count === 1 ? "" : "s"})${skipNote}.`);
       qc.invalidateQueries({ queryKey: ["utah-export-batches"] });
       qc.invalidateQueries({ queryKey: ["utah-export-existing"] });
       qc.invalidateQueries({ queryKey: ["utah-export-corrections"] });
@@ -454,7 +467,12 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
               <li className="text-muted-foreground">{missingMember.length} excluded · missing Member ID</li>
               <li className="text-muted-foreground">{outOfBounds.length} excluded · out-of-bounds without an accepted reason</li>
               <li className="text-muted-foreground">{noClockOut.length} excluded · no clock-out yet</li>
-              <li className="text-muted-foreground">{addressBlankCount} exportable row{addressBlankCount === 1 ? "" : "s"} with blank address</li>
+              {addressBlankCount > 0 && (
+                <li className="text-amber-600">{addressBlankCount} row{addressBlankCount === 1 ? "" : "s"} with blank address — city/state/zip will be empty (state may flag)</li>
+              )}
+              {gpsAbsentCount > 0 && (
+                <li className="text-amber-600">{gpsAbsentCount} row{gpsAbsentCount === 1 ? "" : "s"} with no GPS — lat/lng will be blank (state may flag)</li>
+              )}
             </ul>
           )}
           <div className="mt-2 text-[11px] text-muted-foreground">
@@ -683,17 +701,17 @@ export function EvvExportArchiveStrip({
           employeeName: sm.get(t.staff_id) ?? "",
           beginIso, endIso,
           beginAddress: address,
-          beginLat: t.gps_in_coordinates?.latitude ?? 0,
-          beginLng: t.gps_in_coordinates?.longitude ?? 0,
+          beginLat: t.gps_in_coordinates?.latitude ?? null,
+          beginLng: t.gps_in_coordinates?.longitude ?? null,
           endAddress: address,
-          endLat: t.gps_out_coordinates?.latitude ?? 0,
-          endLng: t.gps_out_coordinates?.longitude ?? 0,
+          endLat: t.gps_out_coordinates?.latitude ?? null,
+          endLng: t.gps_out_coordinates?.longitude ?? null,
           origReceiptId: rec.is_correction && rec.orig_record ? String(origMap.get(rec.orig_record) ?? "") : "",
           vendor: (o.evv_vendor_name ?? "Hive") || "Hive",
         };
       });
       const b = batch as unknown as { batch_number: number; range_start: string; range_end: string };
-      const csv = buildUtahCsv(lines, b.batch_number);
+      const { csv } = buildUtahCsv(lines, b.batch_number);
       downloadCsv(`utah_dhhs_evv_batch${String(b.batch_number).padStart(4, "0")}_${b.range_start}_to_${b.range_end}.csv`, csv);
     },
     onError: (e) => toast.error((e as Error).message),

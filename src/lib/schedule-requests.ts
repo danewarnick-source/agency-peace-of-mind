@@ -127,6 +127,55 @@ export async function createTimeOffRequest(input: {
     status: "pending",
   });
   if (error) throw error;
+
+  // Best-effort in-app notification to admins/managers. Failure here must
+  // never block the request itself.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from("notifications").insert({
+      organization_id: input.organization_id,
+      recipient_role: "admin",
+      type: "time_off_requested",
+      urgency: "normal",
+      title: "New time-off request",
+      body: `${fmtRange(input.start_date, input.end_date)} · ${input.type.toUpperCase()}${input.note ? ` — ${input.note.trim()}` : ""}`,
+      link_to: "/dashboard/scheduler",
+      related_type: "time_off_request",
+    });
+  } catch { /* ignore notification failure */ }
+}
+
+function fmtRange(s: string, e: string) {
+  const f = (d: string) => new Date(d + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return s === e ? f(s) : `${f(s)} – ${f(e)}`;
+}
+
+// ─── Conflict check (advisory) ─────────────────────────────────────────────
+/**
+ * Returns PUBLISHED scheduled_shifts for a staff member that overlap the
+ * given inclusive date range. Used by the admin requests panel to warn
+ * before approving time-off that collides with already-published shifts.
+ */
+export async function fetchConflictingShifts(
+  organizationId: string,
+  staffId: string,
+  startDate: string,
+  endDate: string,
+) {
+  const startIso = new Date(startDate + "T00:00:00").toISOString();
+  const endIso = new Date(endDate + "T23:59:59.999").toISOString();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from("scheduled_shifts")
+    .select("id, starts_at, ends_at, job_code, published, status, client_id")
+    .eq("organization_id", organizationId)
+    .eq("staff_id", staffId)
+    .lt("starts_at", endIso)
+    .gt("ends_at", startIso)
+    .order("starts_at", { ascending: true });
+  if (error) throw error;
+  type Row = { id: string; starts_at: string; ends_at: string; job_code: string | null; published: boolean; status: string; client_id: string };
+  return ((data ?? []) as Row[]).filter((s) => s.published && s.status !== "cancelled");
 }
 
 export async function createSwapRequest(input: {

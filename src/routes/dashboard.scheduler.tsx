@@ -849,6 +849,7 @@ function AddShiftDialog({
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const save = useServerFn(saveShift);
+  const recur = useServerFn(createRecurringShifts);
   const [clientId, setClientId] = useState<string>(prefill?.clientId ?? "");
   const [code, setCode] = useState<string>(prefill?.code ?? "");
   const [staffId, setStaffId] = useState<string>("__open__");
@@ -856,6 +857,15 @@ function AddShiftDialog({
   const [date, setDate] = useState<string>(dayStr(dInit));
   const [start, setStart] = useState<string>("09:00");
   const [end, setEnd] = useState<string>("13:00");
+
+  // Recurrence (off by default)
+  const [repeatOn, setRepeatOn] = useState(false);
+  const [freq, setFreq] = useState<"daily" | "weekly" | "monthly">("weekly");
+  const [weekdays, setWeekdays] = useState<number[]>([]); // 0=Sun..6=Sat
+  const [dayOfMonth, setDayOfMonth] = useState<number>(new Date(dInit).getDate());
+  const [endMode, setEndMode] = useState<"count" | "until">("count");
+  const [count, setCount] = useState<number>(4);
+  const [until, setUntil] = useState<string>("");
 
   // Codes available for selected client
   const clientCodes = useMemo(() => {
@@ -886,11 +896,14 @@ function AddShiftDialog({
     return c ? `${c.first_name} ${c.last_name}`.trim() : "this client";
   }, [sched.clients, clientId]);
 
+  const toggleWeekday = (n: number) =>
+    setWeekdays((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort());
+
   const saveMut = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const starts = new Date(`${date}T${start}:00`).toISOString();
       const ends = new Date(`${date}T${end}:00`).toISOString();
-      return save({
+      const res = await save({
         data: {
           organization_id: org!.organization_id,
           client_id: clientId,
@@ -903,9 +916,23 @@ function AddShiftDialog({
           published: false,
         },
       });
+      if (repeatOn) {
+        await recur({
+          data: {
+            organization_id: org!.organization_id,
+            seed_shift_id: res.id,
+            freq,
+            weekdays: freq === "weekly" && weekdays.length > 0 ? weekdays : undefined,
+            day_of_month: freq === "monthly" ? dayOfMonth : undefined,
+            count: endMode === "count" ? count : undefined,
+            until_date: endMode === "until" && until ? until : null,
+          },
+        });
+      }
+      return res;
     },
     onSuccess: () => {
-      toast.success("Shift saved.");
+      toast.success(repeatOn ? "Shift + recurring series saved." : "Shift saved.");
       qc.invalidateQueries({ queryKey: ["scheduler-data"] });
       onClose();
     },

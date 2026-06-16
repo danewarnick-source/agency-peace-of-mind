@@ -1001,6 +1001,96 @@ function AddShiftDialog({
             <Field label="START"><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
             <Field label="END"><Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
           </div>
+
+          {/* Recurrence */}
+          <div className="rounded-md border p-3 space-y-2" style={{ borderColor: LINE, background: "#fbfaf6" }}>
+            <label className="inline-flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={repeatOn} onChange={(e) => setRepeatOn(e.target.checked)} className="h-4 w-4" />
+              Repeat this shift
+            </label>
+            {repeatOn && (
+              <div className="space-y-2 pt-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="FREQUENCY">
+                    <Select value={freq} onValueChange={(v) => setFreq(v as "daily" | "weekly" | "monthly")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  {freq === "monthly" && (
+                    <Field label="DAY OF MONTH">
+                      <Input
+                        type="number" min={1} max={31}
+                        value={dayOfMonth}
+                        onChange={(e) => setDayOfMonth(Math.max(1, Math.min(31, Number(e.target.value) || 1)))}
+                      />
+                    </Field>
+                  )}
+                </div>
+
+                {freq === "weekly" && (
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                      DAYS OF WEEK
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, i) => {
+                        const active = weekdays.includes(i);
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => toggleWeekday(i)}
+                            className="text-xs font-semibold rounded-full px-3 py-1.5"
+                            style={{
+                              background: active ? NAVY : "#fff",
+                              color: active ? "#fff" : "#444",
+                              border: `1px solid ${active ? NAVY : LINE}`,
+                              minHeight: 32, minWidth: 44,
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Leave blank to repeat on the same weekday as the seed date.
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="ENDS">
+                    <Select value={endMode} onValueChange={(v) => setEndMode(v as "count" | "until")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="count">After N occurrences</SelectItem>
+                        <SelectItem value="until">On a date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  {endMode === "count" ? (
+                    <Field label="OCCURRENCES">
+                      <Input
+                        type="number" min={1} max={200}
+                        value={count}
+                        onChange={(e) => setCount(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
+                      />
+                    </Field>
+                  ) : (
+                    <Field label="UNTIL DATE">
+                      <Input type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
+                    </Field>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>

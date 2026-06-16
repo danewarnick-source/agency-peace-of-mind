@@ -16,23 +16,28 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-/** Permanent legal/scope banner shown at the top of every eMAR surface. */
+/** Permanent legal/scope banner shown at the top of every eMAR surface.
+ *  Deep-navy band with amber warning icon — matches the self-administration
+ *  disclaimer in the eMAR design spec. */
 export function EmarLegalBanner({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-[12px] leading-relaxed text-amber-900 dark:border-amber-600 dark:bg-amber-950/30 dark:text-amber-100">
-      <div className="flex items-start gap-2">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-        <div>
-          <p className="font-semibold">Self-directed self-administration support</p>
+    <div
+      className="rounded-lg px-4 py-3 text-[12px] leading-relaxed text-primary-foreground"
+      style={{ background: "var(--primary)" }}
+    >
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--accent-2)" }} />
+        <p>
+          <span className="font-semibold">Self-Directed Administration Support Interface.</span>{" "}
           {!compact && (
-            <p className="mt-0.5">
-              Per Utah DOPL rules and the DHHS Scope of Work, staff are limited to
-              <strong> mechanical assistance, instruction, and direct observation </strong>
-              of the Person's independent self-administration. This is <strong>not</strong>{" "}
-              professional nursing administration.
-            </p>
+            <span className="opacity-90">
+              Per Utah DOPL regulations and DHHS Scope of Work (b) &amp; (d), staff are
+              limited to mechanical assistance, instruction, and direct observation of the
+              Person's independent self-administration — this is not professional nursing
+              administration (PM1/PM2).
+            </span>
           )}
-        </div>
+        </p>
       </div>
     </div>
   );
@@ -42,6 +47,7 @@ type ClientSafety = {
   id: string;
   first_name: string;
   last_name: string;
+  date_of_birth: string | null;
   authorized_dspd_codes: string[] | null;
   allergies: string[];
   dysphagia: boolean;
@@ -58,7 +64,7 @@ export function useClientSafety(clientId: string) {
     queryFn: async (): Promise<ClientSafety> => {
       const { data, error } = await (supabase as any)
         .from("clients")
-        .select("id, first_name, last_name, authorized_dspd_codes, allergies, dysphagia, swallowing_alerts, self_admin_med_support")
+        .select("id, first_name, last_name, date_of_birth, authorized_dspd_codes, allergies, dysphagia, swallowing_alerts, self_admin_med_support")
         .eq("id", clientId)
         .single();
       if (error) throw error;
@@ -67,74 +73,82 @@ export function useClientSafety(clientId: string) {
   });
 }
 
-/** Clinical safety header — allergies (visible chips), active service, swallowing alerts. */
+/** Clinical safety header — name + service chip + DOB on left, allergies pills
+ *  on right, then amber alert lines for swallowing/crushed-med policy. */
 export function ClinicalSafetyHeader({ client }: { client: ClientSafety }) {
   const services = (client.authorized_dspd_codes ?? []).filter(Boolean);
+  const primaryService = services[0];
   const allergies = client.allergies ?? [];
   const alerts = client.swallowing_alerts ?? [];
+  const dob = client.date_of_birth
+    ? new Date(client.date_of_birth + "T00:00:00").toLocaleDateString(undefined, {
+        year: "numeric", month: "2-digit", day: "2-digit",
+      })
+    : null;
   return (
-    <Card className="border-l-4 border-l-rose-500 p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Clinical safety header</p>
+    <Card className="p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <Stethoscope className="h-5 w-5" style={{ color: "var(--accent-2)" }} />
           <h3 className="text-lg font-semibold leading-tight">
             {client.first_name} {client.last_name}
           </h3>
+          {primaryService && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {primaryService} active
+            </span>
+          )}
+          {dob && (
+            <span className="text-xs text-muted-foreground">DOB {dob}</span>
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {services.length === 0 ? (
-            <Badge variant="outline" className="text-[10px]">No active service codes</Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          {allergies.length > 0 && (
+            <span className="text-xs text-muted-foreground">Allergies:</span>
+          )}
+          {allergies.length === 0 ? (
+            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+              No known allergies
+            </Badge>
           ) : (
-            services.map((s) => (
-              <Badge key={s} variant="secondary" className="font-mono text-[10px]">{s}</Badge>
+            allergies.map((a) => (
+              <span
+                key={a}
+                className="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-800 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200"
+              >
+                {a}
+              </span>
             ))
           )}
         </div>
       </div>
 
-      {/* Allergies — render as visible items, never "see chart" */}
-      <div className="mt-3">
-        <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold">
-          <AlertTriangle className="h-3.5 w-3.5 text-rose-600" /> Allergies
-        </div>
-        {allergies.length === 0 ? (
-          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-            No known allergies on file
-          </Badge>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {allergies.map((a) => (
-              <span
-                key={a}
-                className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-900 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-100"
-              >
-                <AlertCircle className="h-3 w-3" /> {a}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Choking / swallowing alerts */}
+      {/* Amber alert lines — one per safety concern */}
       {(client.dysphagia || alerts.length > 0) && (
-        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <p className="font-semibold">
-                {client.dysphagia ? "Dysphagia / swallowing risk on file" : "Swallowing precautions"}
+        <div className="mt-3 space-y-1.5">
+          {client.dysphagia && (
+            <>
+              <p className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span>
+                  Choking / swallow-reflex risk — confirm upright posture for every oral med
+                </span>
               </p>
-              <ul className="ml-4 mt-0.5 list-disc">
-                {client.dysphagia && (
-                  <>
-                    <li>Confirm upright posture for every oral med</li>
-                    <li>Follow the crushed-medication policy in the care plan</li>
-                  </>
-                )}
-                {alerts.map((a) => <li key={a}>{a}</li>)}
-              </ul>
-            </div>
-          </div>
+              <p className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span>
+                  Crushed-med policy per care plan — verify which meds may be crushed
+                </span>
+              </p>
+            </>
+          )}
+          {alerts.map((a) => (
+            <p key={a} className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+              <span>{a}</span>
+            </p>
+          ))}
         </div>
       )}
     </Card>

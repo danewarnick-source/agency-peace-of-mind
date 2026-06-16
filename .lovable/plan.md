@@ -1,62 +1,136 @@
-## Scope (Prompt 1 only)
-Build the **medication record** and **where it lives**. No scheduler/forms changes. No placeholder clients/staff/meds — pull from real `clients` + `client_medications`.
+## eMAR — Prompts 2 & 3
 
-Aligns to DHHS SOW b/d: Person self-administers, staff observe/assist. Only enabled for clients flagged as self-directed self-administration support.
+Builds on the medication record from Prompt 1. All framing stays "Person self-administers; staff observes/assists" — no "administered" wording in the UI.
 
-## 1. Schema additions (single migration)
+---
 
-`clients` — clinical safety fields:
-- `allergies text[] not null default '{}'`
-- `dysphagia boolean not null default false`
-- `swallowing_alerts text[] not null default '{}'` (e.g. "Confirm upright posture", "Crushed-med policy applies")
-- `self_admin_med_support boolean not null default false` — gates whether eMAR applies to this client
+### Schema additions (one migration)
 
-`client_medications` — SOW-required documentation fields:
-- `packaging text` (e.g. "Pharmacy blister pack", "Unit-dose card")
-- `side_effects text` (distinct from `adverse_effects` which already exists; side_effects = everyday, adverse_effects = signs of adverse reaction)
-- `contributes_to_swallowing_difficulty boolean not null default false`
+**`client_medications`** — add:
+- `refill_threshold int not null default 7`
+- `refill_status text not null default 'ok'` — `'ok' | 'pending'`
+- `refill_requested_at timestamptz`, `refill_requested_by uuid`
+- `schedule II–IV` is already represented by `is_controlled`; add `controlled_schedule text` (`II|III|IV`) for the count log header
+- `is_rescue boolean not null default false` (for seizure rescue gel etc.)
 
-Existing fields reused: `purpose`, `adverse_effects`, `choking_risk`, `choking_risk_details`, `dosage`, `route`, `scheduled_times`, `instructions`, `pharmacy`, `rx_number`, `pill_count_current`.
+**`emar_logs`** — rename UI status display only; add columns (no rename of existing):
+- `actual_taken_at timestamptz` — when the Person actually took it (defaults = `administered_at`)
+- `documented_at timestamptz default now()` — when the entry was written
+- `late_entry_gap_minutes int generated`
+- `service_context text` — "HHS" | "DSI" | "SEI" | "RHS" | "SLN" | "SLH" | "Day Program" (sourced from the active shift)
+- `prn_reason` already exists; add `seizure_duration_seconds int`, `seizure_outcome text`, `emergency_services_called boolean`
+- Expand status check to keep `administered|refused|omitted|missed|held` (UI labels them "self-administered / refused / omitted / missed").
+- Make rows append-only at the data layer: drop the existing `managers update emar` / `managers delete emar` policies; logs become immutable. Corrections go in `emar_log_addenda`.
 
-No grant/RLS changes — both tables already configured.
+**`emar_log_addenda`** (new) — dated, signed notes attached to a prior log; never edits the original.
+- `emar_log_id`, `organization_id`, `note text`, `staff_id`, `staff_name`, `signature_data_url`, `created_at`
 
-## 2. Client record: Medications section
+**`controlled_med_counts`** (new) — chain-of-custody count log for Schedule II–IV.
+- `medication_id`, `organization_id`, `client_id`, `expected_count int`, `counted_value int`, `variance int generated`, `context text` (`'pass' | 'shift_change'`), `emar_log_id nullable`, `staff_id`, `signature_data_url`, `flagged bool`, `created_at`
 
-Replace `src/components/workspace/mar-emar-tab.tsx` (already mounted in `dashboard.workspace.$clientId.tsx` and `dashboard.hhs-hub.$clientId.tsx`) with new component composition:
+**`medication_transfers`** (new) — chain of custody between locations.
+- `medication_id`, `client_id`, `organization_id`, `from_location text`, `to_location text`, `quantity int`, `released_by_staff_id`, `released_signature`, `received_by_name text`, `received_signature`, `transferred_at`, `notes`
 
-- **Eligibility gate**: if `client.self_admin_med_support === false`, render a notice: "This client is not on a self-directed self-administration support plan. The eMAR does not apply. Use the nurse-administered medication workflow." + admin toggle to enable.
-- **Permanent legal banner** (top, sticky within tab): "Self-directed administration support — per Utah DOPL & DHHS SOW, staff are limited to mechanical assistance, instruction, and direct observation of the Person's independent self-administration. Not professional nursing administration."
-- **Clinical safety header**: client name, active service (from `authorized_dspd_codes` / current `teams.setting`), allergies as visible chips (red if any, green "No known allergies" if empty array but not null), choking/swallowing alerts panel when `dysphagia || swallowing_alerts.length`.
-- **Medication profile list** — one card per active `client_medications` row showing: name + purpose, route, dosage, schedule (slots), side effects, adverse reaction signs, swallowing-difficulty flag, packaging, pharmacy, rx#, refill/pill-count status.
-- **Completeness flags**: any med missing `purpose`, `packaging`, `adverse_effects`, `route`, or `dosage` shows an amber "Incomplete — admin to complete" pill listing the missing fields. Admins get an inline "Edit" affordance opening the existing medication editor (reuse `medications-manager.tsx` dialog logic; extend its form with the new fields).
-- Keep the existing eMAR-log/today's-pass tab/calendar inside this component — those already work; we're only swapping the **chart** view.
+**Staff med-assist training gate.** Reuse `certifications` (existing). Add a server-side helper `is_med_assist_current(user_id, org_id)` that returns true if the staff has an active certification of a designated type (e.g. cert type code `MED_ASSIST`). Surface used by the logging server fn to block sign-off, and by the UI to disable Confirm.
 
-Edit `clients` editor (existing client intake / about tab) to expose: allergies (chip input), dysphagia toggle, swallowing alerts (multi-line list), `self_admin_med_support` toggle.
+All new tables: GRANT to `authenticated` + `service_role`, RLS via `is_org_member` / `is_org_admin_or_manager`. Inventory decrement happens server-side in the same server fn that inserts the log (transactional).
 
-## 3. Today's Pass (staff daily workflow)
+---
 
-`src/routes/dashboard.emar.tsx` already exists. Refactor:
-- Add the same **permanent legal banner** at the top.
-- Restrict to clients on the staff member's **own caseload + today's scheduled shift**: intersect `scheduled_shifts` for `staff_id = auth.uid()` covering today with the meds query (already org-scoped; add `.in('client_id', todayClientIds)`).
-- Skip clients where `self_admin_med_support !== true`.
-- Group due doses by client with the per-client safety header (allergies chips, choking alert) above that client's doses, so staff see the safety context before recording the pass.
-- Keep existing 5-Rights attestation dialog and `emar_logs` insert untouched.
+### Today's Pass (`dashboard.emar.tsx` + new components)
 
-Admins (managers / org admins) keep the existing "all today's doses" view; staff get the scoped view. Use `is_org_admin_or_manager` check via existing `usePermissions` hook.
+Replace the current flat list with three groups: **Morning / Evening / PRN (as-needed)**. Each med card shows:
+- Time window, medication, dose, route, purpose
+- Color: green = self-administered logged in window, amber = window approaching/missed and undocumented, red = missed
+- Caution chip "May worsen swallowing" when `contributes_to_swallowing_difficulty = true` or `choking_risk = true`
+- Controlled badge with current count + "Refill pending" badge when applicable
 
-## 4. Files
+Group order, PRN section separated. Clinical safety header (allergies, dysphagia, swallowing alerts) from Prompt 1 stays above each client.
 
-New / modified:
-- `supabase/migrations/<ts>_emar_self_admin_fields.sql` — column additions above.
-- `src/components/workspace/mar-emar-tab.tsx` — rewrite to chart described in §2 (keep existing today/calendar subtabs).
-- `src/components/medications-manager.tsx` — extend med editor form with `packaging`, `side_effects`, `contributes_to_swallowing_difficulty`.
-- `src/components/workspace/about-tab.tsx` (or the existing client edit surface) — add allergies / dysphagia / swallowing alerts / self_admin toggle fields.
-- `src/routes/dashboard.emar.tsx` — banner + caseload+self-admin scoping.
+---
 
-Untouched: scheduler, forms, all client/staff table renames or removals.
+### Observe & Confirm logging dialog (replaces existing SignatureDialog)
 
-## 5. Verification
-- Migration applies, types regenerate.
-- Workspace tab renders gate when flag off, full chart when on; allergies visible; incomplete-field flags appear when fields blank.
-- Today's Pass for a staff account only lists clients on today's shift with self-admin flag true; admin account sees all.
-- No console errors; no sample data anywhere (every list driven by real Supabase queries).
+New `<ObserveAndConfirmDialog>` with:
+1. **Outcome** radio: *Self-administered · Refused · Omitted · Missed* (these exact labels)
+2. **Route** (prefilled from med, editable)
+3. **Actual time taken** — time picker, default = now. If chosen time is >15 min before now, show "Late entry — gap will be recorded" and persist both `actual_taken_at` and `documented_at` with `late_entry_gap_minutes`.
+4. **PRN reason** (required if `is_prn`)
+5. **Rescue med fields** (required if `is_rescue` and outcome = self-administered): seizure duration, outcome, 911 called
+6. **Controlled count** (required if `is_controlled`): expected (read-only), counted (input). Mismatch → red alert, inserts a flagged `controlled_med_counts` row.
+7. **Medication-error toggle** — when on: error description required, sets `is_medication_error`, drops a notification to org admins, drafts an `incident_reports` row (existing table) tagged "medication_error".
+8. **Attestation block** — exact self-administration wording (replaces "five rights"):
+   > "I confirm I observed or assisted this Person in self-administering their own prescribed medication, that I verified it matches the prescription's medication, dose, route, and time, and that this record is accurate and complete."
+9. **Signature pad** (existing canvas) — required.
+10. **Signed by** auto-stamped from `auth.user` (name + id), plus `service_context` resolved from the staff's active shift at submit time. Never a typed name field.
+
+Server fn `logMedicationPass` (auth-required) enforces:
+- Caller's med-assist training is current (`is_med_assist_current`). If not → 403 with friendly message; UI disables Confirm and explains why.
+- PRN/rescue/controlled fields present when required.
+- Inserts `emar_logs`, decrements `pill_count_current`, inserts `controlled_med_counts` when applicable, fires refill alert when count <= threshold, drafts incident on med-error, creates notification to admins.
+
+---
+
+### Audit trail (client workspace)
+
+New tab on `emar-chart.tsx` → **History**. Chronological, append-only timeline of all `emar_logs` + `emar_log_addenda` for the client, newest-first toggle. Shows refusal-then-success sequence intact. Each entry: staff name, exact time, service context, status pill, signature thumbnail. "Add addendum" button on each entry opens a small signed-note dialog.
+
+UI never offers Edit or Delete on `emar_logs`. RLS enforces it.
+
+---
+
+### Monthly MAR sheet
+
+New route `dashboard.emar.monthly.$clientId.tsx` (or tab on the chart). Grid: medications rows × days-of-month columns. Cell states: ✓ self-administered, R refused, O omitted, M missed, — not scheduled. Today's column highlighted. Month picker.
+
+---
+
+### Inventory & refill alerts
+
+- Decrement on confirmed self-administration (server fn).
+- Admin refill panel (new component on `dashboard.admin.emar-audit.tsx` and on the client chart): lists meds at/below `refill_threshold`, "Mark ordered" → sets `refill_status='pending'`. Staff dialog shows "Refill pending from pharmacy" badge.
+
+---
+
+### Controlled-substance enforcement
+
+- Pass dialog requires count entry for any `is_controlled` med (every pass).
+- Shift-change prompt: new banner in `today-shift-banner.tsx` flow on shift start/end asking the staff to verify counts for any controlled meds for clients on their caseload; submits `controlled_med_counts` rows.
+- Variance → red alert + row flagged for admin review.
+
+---
+
+### Medication transfers
+
+New `MedicationTransferDialog` + list on client chart "Transfers" sub-tab. Captures from/to, quantity, releaser (auto from auth + signature), receiver (typed name + signature pad for the receiving person on the same device). Records only — no inventory math beyond logging.
+
+---
+
+### Nectar helper (eMAR)
+
+New `<EmarNectarPanel>` on the client chart using the existing `gatewayFetch` / Bedrock setup (same pattern as `medications.functions.ts`). Buttons:
+- "Show refusal → later success timeline" — runs SQL filter over `emar_logs`, asks Nectar to narrate a before/after for a chosen med/day.
+- "Controlled-substance count history" — surfaces `controlled_med_counts` rows with variances highlighted.
+- "Swallowing-risk meds" — lists meds with `contributes_to_swallowing_difficulty` or `choking_risk` and any documented incidents.
+- "Documentation gap check" — flags missed/undocumented scheduled doses in the last 30 days.
+
+All Nectar output is advisory and marked "Draft — review before relying on this," per project rules.
+
+---
+
+### Out of scope (untouched)
+
+Scheduler, forms feature, EVV, billing logic, existing client/staff tables (no renames, no field removals), `medications-manager.tsx` form schema (additions only via Prompt 1's migration are already in place — this plan only adds *new* columns/tables listed above).
+
+---
+
+### Verification
+
+- Migration applies; types regenerate.
+- Today's Pass shows color-coded windows and caution chips against real client/med data.
+- Logging dialog blocks PRN without reason, rescue without seizure details, controlled without count, and untrained staff entirely.
+- Confirmed log creates row + decrements inventory + (when triggered) creates incident + notifies admin.
+- No Edit/Delete on logs in UI or via RLS; addenda are appendable and shown in order.
+- Monthly grid renders all 28–31 days with correct cell states; today highlighted.
+- Transfer log persists with both signatures.
+- Nectar panel returns drafts marked as advisory; no fabricated data.

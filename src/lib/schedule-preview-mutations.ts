@@ -42,6 +42,34 @@ export type ShiftDraft = {
   recurrence_end_date?: string | null;   // ISO or null
 };
 
+async function assertActiveBillingCodeClient(
+  organizationId: string,
+  clientId: string,
+  serviceCode: string,
+): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from("client_billing_codes")
+    .select("id, service_start_date, service_end_date")
+    .eq("organization_id", organizationId)
+    .eq("client_id", clientId)
+    .eq("service_code", serviceCode.toUpperCase());
+  if (error) throw error;
+  const active = (
+    (data as Array<{ service_start_date: string | null; service_end_date: string | null }>) ?? []
+  ).find((r) => {
+    if (r.service_start_date && r.service_start_date > today) return false;
+    if (r.service_end_date && r.service_end_date <= today) return false;
+    return true;
+  });
+  if (!active) {
+    throw new Error(
+      "No active billing code for this client and service. Add one in the client's billing profile before scheduling.",
+    );
+  }
+}
+
 export function validateShiftDraft(d: Partial<ShiftDraft>): string | null {
   if (!d.organization_id) return "Missing organization.";
   if (!d.staff_id) return "Select a staff member.";
@@ -77,6 +105,11 @@ function buildPayload(draft: ShiftDraft): Record<string, unknown> {
 export async function saveShift(draft: ShiftDraft) {
   const err = validateShiftDraft(draft);
   if (err) throw new Error(err);
+
+  // Billing-code authorization — enforced at write layer so Nectar proposals
+  // and bulk recurrence writes cannot create unbillable shifts.
+  await assertActiveBillingCodeClient(draft.organization_id, draft.client_id, draft.job_code);
+
   const payload = buildPayload(draft);
   if (draft.id) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

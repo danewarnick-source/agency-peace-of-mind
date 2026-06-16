@@ -1199,7 +1199,7 @@ function MarCalendarView({
                                 {log.signature_attestation && (
                                   <div className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
                                     <ShieldCheck className="h-3 w-3" />
-                                    <span>Five Rights attested</span>
+                                    <span>Self-admin attested</span>
                                   </div>
                                 )}
                               </PopoverContent>

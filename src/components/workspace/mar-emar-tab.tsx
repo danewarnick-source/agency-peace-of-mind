@@ -1283,87 +1283,67 @@ export function MarEmarTab({
   const pendingCount = passes.filter((p) => !p.isLocked).length;
   const errorCount = todayLogs.filter((l) => l.is_medication_error && !l.admin_reviewed).length;
 
-  // ── Submit administration ────────────────────────────────────────────────────
+  // ── Submit pass via server function (training gate + inventory + incident drafting) ──
+
+  const logPassFn = useServerFn(logMedicationPass);
+  const serviceContext = activeShift?.service_type_code || "general";
 
   async function submitAdmin(payload: {
     status: EmarLog["status"];
-    administeredAt: string;
+    actualTakenAt: string;
     route: string;
-    staffObserverName: string;
     exceptionReason: string | null;
     notes: string | null;
     signatureDataUrl: string | null;
-    pillCountVerified: boolean | null;
     pillCountValue: number | null;
+    pillCountExpected: number | null;
     prnReason: string | null;
     isMedicationError: boolean;
+    errorDescription: string | null;
+    seizureDurationSeconds: number | null;
+    seizureOutcome: string | null;
+    emergencyServicesCalled: boolean;
     attested: boolean;
   }) {
     if (!orgId || !user || !activePass) return;
-    const staffName = payload.staffObserverName || user.user_metadata?.full_name || user.email || "Staff";
-
-    // Stamp the precise active job/service code so every appended entry
-    // carries cross-departmental audit context (HHS, DSI, DSG, RHS, …).
-    const jobCode = activeShift?.service_type_code || "none";
-    const stampedNotes = `[code:${jobCode}]${payload.notes ? " " + payload.notes : ""}`;
-
-    const { data: inserted, error } = await (supabase as any)
-      .from("emar_logs")
-      .insert({
-        organization_id:       orgId,
-        client_id:             clientId,
-        medication_id:         activePass.med.id,
-        scheduled_for:         activePass.iso,
-        scheduled_time_label:  activePass.time,
-        administered_at:       payload.status === "administered" ? payload.administeredAt : null,
-        status:                payload.status,
-        // Store route in exception_reason with prefix so it's queryable
-        exception_reason:      payload.exceptionReason
-          ? `Route: ${payload.route} · ${payload.exceptionReason}`
-          : null,
-        notes:                 stampedNotes,
-        recorded_in:           bucketRecordedIn(activeShift?.service_type_code),
-        staff_id:              user.id,
-        staff_name:            staffName,
-        signature_attestation: payload.attested ? ATTESTATION_TEXT : null,
-        signature_data_url:    payload.signatureDataUrl,
-        is_prn:                activePass.med.is_prn,
-        prn_reason:            payload.prnReason,
-        is_controlled:         activePass.med.is_controlled,
-        pill_count_verified:   payload.pillCountVerified,
-        pill_count_value:      payload.pillCountValue,
-        is_medication_error:   payload.isMedicationError,
-        admin_reviewed:        false,
-      })
-      .select("id")
-      .single();
-
-    if (error) throw error;
-
-    // Notify admin if medication error
-    if (payload.isMedicationError && inserted) {
-      await (supabase as any).rpc("notify_medication_error", {
-        p_organization_id: orgId,
-        p_emar_log_id:     inserted.id,
-        p_client_name:     clientName,
-        p_med_name:        activePass.med.medication_name,
-        p_reporter_name:   staffName,
-        p_description:     payload.exceptionReason ?? payload.notes ?? "Error reported",
+    try {
+      await logPassFn({
+        data: {
+          clientId,
+          medicationId: activePass.med.id,
+          scheduledFor: activePass.iso,
+          scheduledTimeLabel: activePass.time,
+          status: payload.status,
+          route: payload.route,
+          actualTakenAt: payload.actualTakenAt,
+          exceptionReason: payload.exceptionReason,
+          notes: payload.notes,
+          signatureDataUrl: payload.signatureDataUrl ?? "",
+          prnReason: payload.prnReason,
+          seizureDurationSeconds: payload.seizureDurationSeconds,
+          seizureOutcome: payload.seizureOutcome,
+          emergencyServicesCalled: payload.emergencyServicesCalled,
+          controlledCountedValue: payload.pillCountValue,
+          controlledExpected: payload.pillCountExpected,
+          isMedicationError: payload.isMedicationError,
+          errorDescription: payload.errorDescription,
+          serviceContext,
+        },
       });
+      toast.success(
+        payload.isMedicationError
+          ? "Medication error recorded. Administrator notified and incident drafted."
+          : payload.status === "administered"
+          ? "Self-administration confirmed and signed."
+          : "Exception documented.",
+      );
+      qc.invalidateQueries({ queryKey: ["mar-logs-today", clientId, orgId] });
+      qc.invalidateQueries({ queryKey: ["mar-logs-cal", clientId] });
+      qc.invalidateQueries({ queryKey: ["mar-logs-month", clientId, orgId] });
+      setActivePass(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not log medication pass.");
     }
-
-    toast.success(
-      payload.isMedicationError
-        ? "Medication error recorded. Administrator has been notified."
-        : payload.status === "administered"
-        ? "Administration confirmed and signed."
-        : "Exception documented."
-    );
-
-    qc.invalidateQueries({ queryKey: ["mar-logs-today", clientId, orgId] });
-    qc.invalidateQueries({ queryKey: ["mar-logs-cal", clientId] });
-    qc.invalidateQueries({ queryKey: ["mar-logs-month", clientId, orgId] });
-    setActivePass(null);
   }
 
   if (medsLoading || safetyLoading) {

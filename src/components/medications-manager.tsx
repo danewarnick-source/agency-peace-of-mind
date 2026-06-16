@@ -43,6 +43,10 @@ export type Medication = {
   prn_instructions: string | null;
   pharmacy: string | null;
   rx_number: string | null;
+  // Self-administration support fields (DHHS SOW b/d)
+  packaging: string | null;
+  side_effects: string | null;
+  contributes_to_swallowing_difficulty: boolean;
 };
 
 type FormVals = {
@@ -63,6 +67,9 @@ type FormVals = {
   prn_instructions: string;
   pharmacy: string;
   rx_number: string;
+  packaging: string;
+  side_effects: string;
+  contributes_to_swallowing_difficulty: boolean;
 };
 
 const EMPTY: FormVals = {
@@ -71,6 +78,8 @@ const EMPTY: FormVals = {
   purpose: "", adverse_effects: "", choking_risk: false,
   choking_risk_details: "", is_controlled: false, is_prn: false,
   prn_instructions: "", pharmacy: "", rx_number: "",
+  packaging: "Pharmacy blister pack", side_effects: "",
+  contributes_to_swallowing_difficulty: false,
 };
 
 function medToForm(m: Medication): FormVals {
@@ -91,8 +100,12 @@ function medToForm(m: Medication): FormVals {
     prn_instructions:   m.prn_instructions ?? "",
     pharmacy:           m.pharmacy ?? "",
     rx_number:          m.rx_number ?? "",
+    packaging:          m.packaging ?? "Pharmacy blister pack",
+    side_effects:       m.side_effects ?? "",
+    contributes_to_swallowing_difficulty: m.contributes_to_swallowing_difficulty ?? false,
   };
 }
+
 
 // ─── Main component ────────────────────────────────────────────────────────────
 

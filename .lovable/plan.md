@@ -1,77 +1,73 @@
-## Scope rule
-Keep the existing scheduler UI exactly as-is — only fix data/save plumbing and add the new tools/panels below. No DB structure changes beyond what's listed. Real records only.
 
----
+## Goal
 
-## 1. Backend audit (read-only first)
+Make the scheduler's code sections fully driven by real client authorizations, and give admins two ways to repeat a schedule: replay an existing day/week/month, and set up recurring shifts when creating a new one.
 
-Using the Supabase connection, run a checklist query against the live DB for each table the scheduler touches:
+## 1. Dynamic code sections (drop hard-coded list)
 
-`staff_assignments, scheduled_shifts, client_billing_codes, day_program_sessions, day_program_session_staff, day_program_attendance, time_off_requests, notifications, clients, profiles, organization_members, teams`
+Today `SECTIONS` in `src/routes/dashboard.scheduler.tsx` is a fixed 8-code list (SLH, COM, PAC, RP2, HHS, RHS, PM1, DSI). Codes outside that list never render, and codes inside it render even when no client is authorized.
 
-For each, confirm:
-- columns the scheduler reads/writes exist
-- RLS enabled
-- a SELECT policy that admins satisfy (via `has_org_role(org,user,'admin')` / `is_org_admin_or_manager`)
-- an INSERT/UPDATE/DELETE policy admins satisfy, with a `WITH CHECK` that pins `organization_id` to the caller's org
-- `GRANT SELECT, INSERT, UPDATE, DELETE ... TO authenticated` (Lovable Cloud requires explicit grants)
+Change to:
 
-Report findings before changing anything.
+- Derive the visible code list from `data.auths` (the org's open `client_billing_codes` already loaded by `useSchedulerData`): unique `service_code` values that have ≥ 1 authorized client today.
+- Exclude day-program-only codes (DSG, DSP) — they belong on the Day Program tab, not the Schedule tab.
+- Order: preserve the canonical ordering for known codes (current SECTIONS order), then append any other authorized code alphabetically.
+- Label resolution: use `evvServiceLabel(code)` from `src/lib/evv-codes.ts` so new codes (PM1, future codes) get a real name automatically. Keep a small override map only for the friendlier names already used ("Supported Living", "Host Home — administrative hours", etc.).
+- Color: route unknown codes through a stable fallback in `codeColor()` (hash → palette) so new sections render in the same visual format as the others.
+- Empty state for an authorized-but-currently-clientless code (edge case after a removal): hide instead of showing "No clients authorized…" — the new rule is "show only what real clients have."
 
-## 2. RLS / grants migration (only the gaps found)
+Result: adding PM1 to a client's billing codes makes the PM1 section appear automatically with that client listed; removing the last PM1 client makes the section disappear.
 
-Single migration that, for any table missing it, adds:
-- admin/manager read + write policy scoped to `organization_id = (caller's org)`
-- staff read policy where applicable (`scheduled_shifts` where `staff_id = auth.uid()`, `notifications` where `recipient_user_id = auth.uid()`, `time_off_requests` where `staff_id = auth.uid()`, etc. — only if missing)
-- the missing GRANTs
+## 2. "Repeat shifts" button (replay existing schedule)
 
-No new tables, no column changes.
+Add a button next to "Auto-fill open shifts" in `NectarBar` labeled **Repeat shifts**.
 
-## 3. Fix save + refresh for each action
+Flow (single dialog):
 
-For every mutation in `src/lib/scheduler/scheduler.functions.ts` and `src/lib/scheduling/*.functions.ts` confirm:
-- the server fn actually writes (not stubbed), stamps `organization_id`, returns the row
-- the client mutation calls `qc.invalidateQueries({ queryKey: ['scheduler-data'] })` (and `['day-program-data']`, `['my-assignments']` where relevant) in `onSuccess`
+1. Source range — admin picks Day / Week / Month, then a specific date (defaults to current `anchor`). We show a count of real `scheduled_shifts` in that range so they know what they're about to copy.
+2. Target — Repeat for: N days / N weeks / N months, OR pick specific target dates from a small calendar.
+3. Options: keep staff assignments vs. create as open shifts; skip dates that already have shifts; copy notes/awake-overnight flag.
+4. Preview list (client · code · staff · time · target date) with per-row include checkbox.
+5. Apply → creates draft `scheduled_shifts` rows via the existing `applyDrafts` server fn (or a new `repeatShifts` server fn that wraps the same insert path). Toast with count; invalidate `scheduler-data`.
 
-Actions to verify/repair:
-1. Add shift → writes `scheduled_shifts`, unit math redraws from `client_billing_codes` minus sum of shifts (already computed in code — just confirm invalidation).
-2. Drag-resize edges → calls `updateShift` with new `starts_at`/`ends_at` and persists (current edge handler likely only updates local state — wire to `saveShift`/`updateShift`).
-3. Edit / duplicate / delete — confirm each hits server fn + invalidates.
-4. Staff assign on a shift — block in `AddShiftDialog` + `ShiftDetailPanel` if `staff_assignments` for (staff,client) missing; show "<Staff> isn't on <Client>'s caseload" with an "Add to caseload" inline button.
-5. One-click add-to-caseload → `addToCaseload` writes `staff_assignments` row with org, invalidates caseload + scheduler queries.
-6. Publish → `publishShiftsWithNotify` sets `status=published`, inserts `notifications` rows for each staff; staff `/dashboard/schedule` already reads these.
-7. Mark staff off (admin) → `setAdminTimeOff` inserts approved `time_off_requests`; eligibility filter in `AddShiftDialog` excludes those staff for that date.
-8. Staff time-off request appears in RequestsPanel → approve writes `status=approved`, blocks scheduling on those days (same eligibility filter).
-9. Day program: create session, add staff, mark present/absent → writes through `saveDayProgramSession` / `addSessionStaff` / `markAttendance`; present marks already create `evv_timesheets` (prompt 7). Confirm units redraw.
+Backend: new `src/lib/scheduler/repeat.functions.ts` with two server fns, both `requireSupabaseAuth` + admin/manager check:
+- `previewRepeat({ organizationId, sourceStartIso, sourceEndIso, targetDates[] })` → returns the candidate shift rows (no writes).
+- `applyRepeat({ ...same, keepStaff, skipIfExists })` → inserts. Reuses the existing conflict checks already used by `saveShift` so we don't double-book.
 
-## 4. Two missing setup tools
+No schema changes — uses existing `scheduled_shifts`.
 
-A. **Caseload editor on the client row/detail** — new component `CaseloadEditor` opened from `src/routes/dashboard.clients.$clientId.tsx` (and a button on each row in the clients hub). Multi-select staff picker, diff against existing `staff_assignments`, bulk insert/delete in one server fn `setClientCaseload({ clientId, staffIds[] })`.
+## 3. Recurrence option inside Add Shift dialog
 
-B. **Day Program session creator** — "New session" button on the Day Program tab. Dialog: date, start/end, code (DSG/DSP), client roster, staff multi-select. Writes `day_program_sessions` + `day_program_session_staff`.
+In the existing `AddShiftDialog` add a "Repeat this shift" section:
 
-## 5. Nectar additions (new, additive)
+- Toggle off by default (current behavior unchanged).
+- Frequency: Daily / Weekly / Monthly.
+- Weekly: multi-select days of the week (Sun–Sat checkboxes).
+- Monthly: "on day N of month" or "same weekday of month."
+- End: "after N occurrences" or "until date" (cap at 26 weeks to keep inserts bounded).
+- Time stays whatever the admin entered in the main form; recurrence only varies the date.
 
-Add a top strip on the Scheduler tab with three controls. Each opens a drawer with an editable draft grid; nothing writes until admin clicks **Publish drafts**.
+On save, the existing `saveShift` mutation runs once for the seed shift, then a new `createRecurringShifts` server fn (same file as above) expands the rule into individual `scheduled_shifts` rows (one insert per occurrence) with the same client/code/staff/time/awake/notes. We persist the rule too, in a new lightweight column on the seed row so admins can later "edit series."
 
-- **Ask Nectar bar** — free-text "schedule John with Julie DSI Wed+Thu 2–5pm"; server fn `nectarDraftShifts({ prompt, weekStart })` calls Lovable AI (`google/gemini-2.5-flash`) with a system prompt that lists the org's real clients/staff/service codes and returns JSON shift drafts. Resolve names → IDs server-side; unknowns → flagged rows the admin fixes before publish.
-- **Import schedule** — file upload (PDF/CSV/DOCX). Parse via existing doc-parse path (PDF/DOCX → text, CSV directly), feed to same Nectar fn with `mode:'import'`. Same draft grid; rows with unknown staff/client left blank for the admin to fill, never invented.
-- **Auto-fill** — button "Auto-fill open shifts this week": server fn finds `scheduled_shifts` with `status='open'` (no staff), proposes eligible staff (on caseload, no conflict, not on time off, under weekly cap). Draft grid again.
+### Schema (one small migration)
 
-All three reuse one `DraftReviewDrawer` that calls `createShift`/`updateShift` for accepted rows.
+Add to `scheduled_shifts`:
+- `recurrence_rule jsonb null` — `{ freq, days?, dayOfMonth?, endsAfter?, endsOn? }` on the seed shift only.
+- `recurrence_parent_id uuid null` — points generated children at the seed; index it.
 
-## 6. Open shifts for staff
+Self-referencing FK, no new table, RLS already covers it (same org policies). Grants already in place for `scheduled_shifts`.
 
-- Allow admin to create a shift with `staff_id = null` and `status='open'` (already supported by `scheduled_shifts`; just expose "Leave staff blank → Open shift" in AddShiftDialog).
-- Insert a `notifications` row per staff whose caseload includes that client when an open shift is created/published, type `open_shift_available`, link `/dashboard/schedule`.
-- On `/dashboard/schedule`, new "Open shifts" section: staff sees open shifts for their caseload clients with a **Take shift** button.
-- `takeOpenShift` server fn: re-checks no conflict with that staff's other shifts in the window; on conflict throws → UI shows pop-up "Can't take this shift — conflicts with <other shift>". On success sets `staff_id = auth.uid()`, `status='accepted'`, invalidates queries.
+## Files touched
 
-## Deliverable summary
-At the end I'll report: which tables/policies/grants changed, which mutations were stubbed vs. fixed, which queries were missing invalidation, and a confirmation that the caseload editor and day-program session creator save real rows.
+- `src/routes/dashboard.scheduler.tsx` — dynamic SECTIONS derivation; label/color fallbacks.
+- `src/components/scheduler/nectar-bar.tsx` — add "Repeat shifts" button + dialog mount.
+- `src/components/scheduler/repeat-shifts-dialog.tsx` *(new)* — source/target picker + preview.
+- `src/routes/dashboard.scheduler.tsx` (AddShiftDialog block) — recurrence section.
+- `src/lib/scheduler/repeat.functions.ts` *(new)* — `previewRepeat`, `applyRepeat`, `createRecurringShifts`.
+- `supabase/migrations/<new>.sql` — add `recurrence_rule`, `recurrence_parent_id` to `scheduled_shifts`.
 
-## Technical notes
-- All new server fns: `createServerFn` + `requireSupabaseAuth`, stamp `organization_id` from caller membership, validate with Zod.
-- No edits to `src/integrations/supabase/*` auto-gen files.
-- No changes to billing math or unit calculations beyond reading existing helpers (`computeEntryUnits`, day-program math).
-- Nectar drafting uses Lovable AI Gateway (no user key).
+## Out of scope (per your "don't change other parts" rule)
+
+- No layout/visual changes to existing sections; new sections render in the same card format.
+- No changes to Day Program tab, Staff view, billing math, or unit calculations.
+- No edits to caseload editor, Nectar drafting, or take-shift flow.

@@ -37,6 +37,7 @@ import {
 } from "@/lib/scheduler/scheduler.functions";
 import { evvServiceLabel } from "@/lib/evv-codes";
 import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
+import { NectarBar } from "@/components/scheduler/nectar-bar";
 
 export const Route = createFileRoute("/dashboard/scheduler")({
   head: () => ({
@@ -239,6 +240,8 @@ function SchedulerBody({
   data: ReturnType<typeof useSchedulerData>["data"];
   isLoading: boolean;
 }) {
+  const { data: org } = useCurrentOrg();
+  const orgId = org?.organization_id;
   const [addOpen, setAddOpen] = useState(false);
   const [addPrefill, setAddPrefill] = useState<{ clientId?: string; code?: string; day?: Date } | null>(null);
   const [detailShiftId, setDetailShiftId] = useState<string | null>(null);
@@ -266,6 +269,14 @@ function SchedulerBody({
   return (
     <>
       <div className="px-3 sm:px-4 py-4 space-y-3 max-w-[1400px] mx-auto">
+        {/* Ask Nectar — natural-language drafting + auto-fill open shifts */}
+        {orgId && (
+          <NectarBar
+            organizationId={orgId}
+            weekStartIso={startOfWeek(anchor).toISOString()}
+            clientNameById={new Map(data.clients.map((c) => [c.id, c.name]))}
+          />
+        )}
         {/* Requests panel: pending time-off + swaps, with shift-conflict warning */}
         <RequestsPanel
           weekStart={startOfWeek(anchor)}

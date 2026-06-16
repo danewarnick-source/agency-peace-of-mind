@@ -3726,6 +3726,7 @@ export type Database = {
           corrected_clock_in: string | null
           corrected_clock_out: string | null
           created_at: string
+          day_program_session_id: string | null
           denial_reason: string | null
           denied_at: string | null
           denied_by: string | null
@@ -3795,6 +3796,7 @@ export type Database = {
           corrected_clock_in?: string | null
           corrected_clock_out?: string | null
           created_at?: string
+          day_program_session_id?: string | null
           denial_reason?: string | null
           denied_at?: string | null
           denied_by?: string | null
@@ -3864,6 +3866,7 @@ export type Database = {
           corrected_clock_in?: string | null
           corrected_clock_out?: string | null
           created_at?: string
+          day_program_session_id?: string | null
           denial_reason?: string | null
           denied_at?: string | null
           denied_by?: string | null
@@ -3923,6 +3926,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evv_timesheets_day_program_session_id_fkey"
+            columns: ["day_program_session_id"]
+            isOneToOne: false
+            referencedRelation: "day_program_sessions"
             referencedColumns: ["id"]
           },
           {

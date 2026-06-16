@@ -201,7 +201,7 @@ export const upsertDayProgramAttendance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: session, error: sErr } = await context.supabase
       .from("day_program_sessions")
-      .select("organization_id, service_code")
+      .select("organization_id, service_code, start_time, end_time")
       .eq("id", data.sessionId)
       .single();
     if (sErr || !session) throw new Error(sErr?.message ?? "Session not found");
@@ -256,6 +256,82 @@ export const upsertDayProgramAttendance = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+
+    // ─── Mirror present marks into evv_timesheets ─────────────────────────
+    // Each "present" client gets one Day_Program_Attendance row that lands
+    // in the existing billing-review queue (status='Pending'). Toggling
+    // to absent removes the prior row so it stops drawing units.
+    try {
+      const { data: existing } = await context.supabase
+        .from("evv_timesheets")
+        .select("id")
+        .eq("day_program_session_id", data.sessionId)
+        .eq("client_id", data.clientId)
+        .maybeSingle();
+
+      if (!data.attended || billedUnits <= 0) {
+        if (existing?.id) {
+          await context.supabase.from("evv_timesheets").delete().eq("id", existing.id);
+        }
+      } else {
+        const { data: rosterStaff } = await context.supabase
+          .from("day_program_session_staff")
+          .select("staff_id")
+          .eq("session_id", data.sessionId)
+          .limit(1)
+          .maybeSingle();
+        const staffId = rosterStaff?.staff_id ?? context.userId;
+
+        const { data: clientRow } = await context.supabase
+          .from("clients")
+          .select("medicaid_id")
+          .eq("id", data.clientId)
+          .maybeSingle();
+        const memberId = clientRow?.medicaid_id ?? "";
+
+        const providerId = (
+          (session.organization_id.replace(/\D/g, "") + "0000000").slice(0, 7)
+        );
+
+        const payload = {
+          organization_id: session.organization_id,
+          staff_id: staffId,
+          client_id: data.clientId,
+          utah_medicaid_provider_id: providerId,
+          utah_medicaid_member_id: memberId,
+          service_type_code: code,
+          shift_entry_type: "Day_Program_Attendance",
+          status: "Pending",
+          gps_in_coordinates: { latitude: null, longitude: null, accuracy_meters: null },
+          gps_out_coordinates: { latitude: null, longitude: null, accuracy_meters: null },
+          gps_validated: true,
+          is_out_of_bounds: false,
+          clock_in_timestamp: data.arrivalTime ?? session.start_time,
+          clock_out_timestamp: data.departureTime ?? session.end_time,
+          raw_clock_in: data.arrivalTime ?? session.start_time,
+          raw_clock_out: data.departureTime ?? session.end_time,
+          billed_units: Math.round(billedUnits),
+          review_status: "clean",
+          day_program_session_id: data.sessionId,
+          shift_note_text: data.activityNote ?? null,
+        };
+
+        if (existing?.id) {
+          await context.supabase
+            .from("evv_timesheets")
+            .update(payload)
+            .eq("id", existing.id);
+        } else {
+          await context.supabase.from("evv_timesheets").insert(payload);
+        }
+      }
+    } catch (e) {
+      return {
+        ...row,
+        billing_mirror_error: e instanceof Error ? e.message : String(e),
+      };
+    }
+
     return row;
   });
 

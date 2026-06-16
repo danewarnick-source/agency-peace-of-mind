@@ -1118,7 +1118,7 @@ export function MarEmarTab({
       const { data, error } = await (supabase as any)
         .from("client_medications")
         .select(`id, medication_name, dosage, frequency, route, scheduled_times,
-          instructions, prescriber, is_active, is_controlled, is_prn,
+          instructions, prescriber, is_active, is_controlled, is_prn, is_rescue,
           prn_instructions, pharmacy, rx_number, pill_count_current,
           purpose, adverse_effects, choking_risk, choking_risk_details`)
         .eq("client_id", clientId)
@@ -1201,7 +1201,7 @@ export function MarEmarTab({
       // PRN medications get a "log now" entry even without a scheduled time
       if (med.is_prn && med.scheduled_times.length === 0) {
         rows.push({
-          med, time: "PRN", iso: new Date().toISOString(), block: "Morning",
+          med, time: "PRN", iso: new Date().toISOString(), block: "PRN",
           history: [], log: undefined, isLocked: false,
         });
       }
@@ -1210,7 +1210,7 @@ export function MarEmarTab({
   }, [meds, todayLogs]);
 
   const grouped = useMemo(() => {
-    const m: Record<Block, typeof passes> = { Morning: [], Noon: [], Evening: [], Night: [] };
+    const m: Record<Block, typeof passes> = { Morning: [], Evening: [], PRN: [] };
     passes.forEach((p) => m[p.block].push(p));
     (Object.keys(m) as Block[]).forEach((k) =>
       m[k].sort((a, b) => a.time.localeCompare(b.time))

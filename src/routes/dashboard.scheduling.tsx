@@ -1,11 +1,11 @@
 import { createFileRoute, Navigate, redirect } from "@tanstack/react-router";
 
-// Legacy route — the scheduler now lives at /dashboard/schedule-preview.
-// Redirect SSR and client renders so any old links keep working.
+// Legacy route — the scheduler now lives at /dashboard/scheduler.
 export const Route = createFileRoute("/dashboard/scheduling")({
-  head: () => ({ meta: [{ title: "Schedule — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Scheduler — HIVE" }] }),
   loader: () => {
-    throw redirect({ to: "/dashboard/schedule-preview", replace: true });
+    throw redirect({ to: "/dashboard/scheduler", replace: true });
   },
-  component: () => <Navigate to="/dashboard/schedule-preview" replace />,
+  component: () => <Navigate to="/dashboard/scheduler" replace />,
 });
+

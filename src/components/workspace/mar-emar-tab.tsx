@@ -667,27 +667,31 @@ function AdminLogDialog({
               </div>
             )}
 
-            {/* Administration status */}
+            {/* Outcome — Person self-administered, refused, omitted, or missed */}
             <div className="grid gap-2">
               <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Administration Status *
+                Outcome *
               </Label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(["administered", "refused", "omitted", "missed"] as EmarLog["status"][]).map((s) => (
-                  <button
-                    key={s} type="button"
-                    onClick={() => { setStatus(s); if (s === "administered") setIsMedError(false); }}
-                    className={`rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition ${
-                      status === s
-                        ? s === "administered"
-                          ? "border-emerald-500 bg-emerald-600 text-white shadow-sm"
-                          : "border-rose-500 bg-rose-600 text-white shadow-sm"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {(["administered", "refused", "omitted", "missed"] as EmarLog["status"][]).map((s) => {
+                  const label =
+                    s === "administered" ? "Self-administered" :
+                    s === "refused" ? "Refused" :
+                    s === "omitted" ? "Omitted" : "Missed";
+                  return (
+                    <button
+                      key={s} type="button"
+                      onClick={() => { setStatus(s); if (s === "administered") setIsMedError(false); }}
+                      className={`rounded-lg border px-2 py-2 text-xs font-semibold transition ${
+                        status === s
+                          ? s === "administered"
+                            ? "border-emerald-500 bg-emerald-600 text-white shadow-sm"
+                            : "border-rose-500 bg-rose-600 text-white shadow-sm"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                      }`}
+                    >{label}</button>
+                  );
+                })}
               </div>
             </div>
 
@@ -698,9 +702,7 @@ function AdminLogDialog({
                   Exception Reason *
                 </Label>
                 <Select value={exceptionReason} onValueChange={setExceptionReason}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select reason..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select reason..." /></SelectTrigger>
                   <SelectContent>
                     {EXCEPTION_REASONS.map((r) => (
                       <SelectItem key={r} value={r}>{r}</SelectItem>
@@ -710,19 +712,15 @@ function AdminLogDialog({
               </div>
             )}
 
-            {/* Staff observer — Contract: "name of Staff that observed/assisted" */}
-            <div className="grid gap-1.5">
-              <Label className="text-xs font-semibold">
-                Staff Name — Observer / Administrator *
-              </Label>
-              <Input
-                value={staffObserverName}
-                onChange={(e) => setStaffObserverName(e.target.value)}
-                placeholder="Full name of staff who observed or assisted"
-                className="text-sm"
-              />
+            {/* Staff identity — pulled from the signed-in account, not typed */}
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Signing as
+              </p>
+              <p className="text-sm font-semibold">{staffDisplayName}</p>
               <p className="text-[11px] text-muted-foreground">
-                Per contract: name of staff who observed or assisted with medication administration.
+                Identity captured from your account. Logged via{" "}
+                <span className="font-mono">{serviceContext}</span>.
               </p>
             </div>
 
@@ -746,23 +744,28 @@ function AdminLogDialog({
                 onCheckedChange={(c) => setIsMedError(!!c)}
                 className="mt-0.5"
               />
-              <div>
+              <div className="flex-1">
                 <p className="text-xs font-semibold text-rose-800 dark:text-rose-200">
-                  This is a medication error requiring immediate reporting
+                  This pass was a medication error requiring immediate reporting
                 </p>
                 <p className="mt-0.5 text-[11px] text-rose-700 dark:text-rose-300">
-                  Checking this immediately notifies your administrator and flags this record for review.
+                  Checking this notifies the administrator, flags this record for review, and drafts a Critical Event / incident report.
                 </p>
+                {isMedError && (
+                  <Textarea
+                    rows={2}
+                    value={errorDescription}
+                    onChange={(e) => setErrorDescription(e.target.value)}
+                    placeholder="Briefly describe the medication error (what happened, who was notified)..."
+                    className="mt-2 bg-white text-sm dark:bg-slate-900"
+                    maxLength={2000}
+                  />
+                )}
               </div>
             </label>
 
-            {/* Signature pad */}
-            <SigPad
-              onSigned={setSigDataUrl}
-              label="Staff Signature"
-            />
+            <SigPad onSigned={setSigDataUrl} label="Staff Signature" />
 
-            {/* Five Rights attestation */}
             <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
               <Checkbox
                 checked={attested}
@@ -774,16 +777,16 @@ function AdminLogDialog({
               </p>
             </label>
 
-            {/* Submission guard hints */}
             {!canSubmit && (
               <ul className="space-y-0.5 rounded-lg bg-muted/40 p-3 text-[11px] text-muted-foreground">
                 {!sigDataUrl && <li>· Sign the signature field above</li>}
-                {!attested && <li>· Check the Five Rights attestation</li>}
-                {!staffObserverName.trim() && <li>· Enter the staff observer name</li>}
-                {!route && <li>· Select the route of administration</li>}
+                {!attested && <li>· Check the self-administration attestation</li>}
+                {!route && <li>· Select the route</li>}
                 {isException && exceptionReason.trim().length < 3 && <li>· Select an exception reason</li>}
-                {med?.is_prn && prnReason.trim().length < 3 && <li>· Enter the PRN reason</li>}
-                {med?.is_controlled && status === "administered" && !pillVerified && <li>· Verify and record pill count</li>}
+                {med?.is_prn && status === "administered" && prnReason.trim().length < 3 && <li>· Enter the PRN reason</li>}
+                {med?.is_rescue && status === "administered" && (!seizureDuration || seizureOutcome.trim().length < 3) && <li>· Enter seizure duration and outcome</li>}
+                {med?.is_controlled && status === "administered" && pillCount.trim().length === 0 && <li>· Record current pill count</li>}
+                {isMedError && errorDescription.trim().length < 3 && <li>· Describe the medication error</li>}
               </ul>
             )}
           </TabsContent>

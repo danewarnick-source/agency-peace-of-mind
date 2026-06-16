@@ -274,7 +274,7 @@ function SchedulerBody({
           <NectarBar
             organizationId={orgId}
             weekStartIso={startOfWeek(anchor).toISOString()}
-            clientNameById={new Map(data.clients.map((c) => [c.id, c.name]))}
+            clientNameById={new Map(data.clients.map((c) => [c.id, `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim()]))}
           />
         )}
         {/* Requests panel: pending time-off + swaps, with shift-conflict warning */}

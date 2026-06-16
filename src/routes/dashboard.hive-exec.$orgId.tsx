@@ -36,6 +36,14 @@ function CompanyDetailPage() {
   const [trial, setTrial] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Org identifying-info edit state
+  const [nameEdit, setNameEdit] = useState("");
+  const [legalEdit, setLegalEdit] = useState("");
+  const [dbaEdit, setDbaEdit] = useState("");
+  const [acronymEdit, setAcronymEdit] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [attest, setAttest] = useState(false);
+
   useEffect(() => {
     const s = detailQ.data?.subscription;
     if (!s) return;
@@ -46,6 +54,16 @@ function CompanyDetailPage() {
     setTrial(s.trial_ends_at ?? "");
     setNotes(s.notes ?? "");
   }, [detailQ.data?.subscription]);
+
+  useEffect(() => {
+    const d = detailQ.data;
+    if (!d) return;
+    setNameEdit(d.name ?? "");
+    setLegalEdit(d.legal_name ?? "");
+    setDbaEdit(d.dba_name ?? "");
+    setAcronymEdit(d.display_acronym ?? "");
+  }, [detailQ.data]);
+
 
   const save = useMutation({
     mutationFn: () =>

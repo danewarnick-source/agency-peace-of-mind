@@ -1299,7 +1299,7 @@ export function MarEmarTab({
     setActivePass(null);
   }
 
-  if (medsLoading) {
+  if (medsLoading || safetyLoading) {
     return (
       <div className="grid place-items-center py-12 text-sm text-muted-foreground">
         <Loader2 className="mb-2 h-5 w-5 animate-spin" />
@@ -1308,8 +1308,20 @@ export function MarEmarTab({
     );
   }
 
+  // Gate: only clients flagged for self-directed self-administration support
+  // see the eMAR. Everyone else gets the eligibility notice + admin toggle.
+  if (clientSafety && !clientSafety.self_admin_med_support) {
+    return <EmarEligibilityGate client={clientSafety} />;
+  }
+
   return (
     <div className="space-y-4">
+
+      {/* Permanent legal/scope banner — required at every eMAR surface */}
+      <EmarLegalBanner />
+
+      {/* Clinical safety header — visible allergies, dysphagia / swallowing alerts */}
+      {clientSafety && <ClinicalSafetyHeader client={clientSafety} />}
 
       {/* Medication error alert */}
       {errorCount > 0 && (
@@ -1332,6 +1344,36 @@ export function MarEmarTab({
       {/* Tab navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full">
+          <TabsTrigger value="chart" className="flex-1">
+            <Pill className="mr-1.5 h-3.5 w-3.5" />
+            Chart
+          </TabsTrigger>
+          <TabsTrigger value="today" className="flex-1">
+            <Clock className="mr-1.5 h-3.5 w-3.5" />
+            Today's Pass
+            {pendingCount > 0 && (
+              <Badge className="ml-1.5 bg-amber-500 text-white text-[10px]">{pendingCount}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="flex-1">
+            <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+            MAR Sheet
+          </TabsTrigger>
+          <TabsTrigger value="directives" className="flex-1">
+            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+            Directives
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex-1">
+            <History className="mr-1.5 h-3.5 w-3.5" />
+            Compliance
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ── CHART — per-med profile with completeness flags ── */}
+        <TabsContent value="chart" className="space-y-3 pt-2">
+          <MedicationChart clientId={clientId} />
+        </TabsContent>
+
           <TabsTrigger value="today" className="flex-1">
             <Clock className="mr-1.5 h-3.5 w-3.5" />
             Today's Pass

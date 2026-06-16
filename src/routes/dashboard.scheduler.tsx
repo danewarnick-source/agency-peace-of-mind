@@ -56,18 +56,31 @@ export const Route = createFileRoute("/dashboard/scheduler")({
   component: SchedulerPage,
 });
 
-// Sections, in order, matching the screenshots.
-// DSG/DSP are day-program (separate tab). DSI is 1:1 and lives here.
-const SECTIONS: { code: string; label: string }[] = [
-  { code: "SLH", label: "Supported Living" },
-  { code: "COM", label: "Companion" },
-  { code: "PAC", label: "Personal Assistance" },
-  { code: "RP2", label: "Respite" },
-  { code: "HHS", label: "Host Home — administrative hours" },
-  { code: "RHS", label: "Residential Hab" },
-  { code: "PM1", label: "Med Monitoring" },
-  { code: "DSI", label: "Individual Day Support" },
-];
+// Canonical ordering + friendly labels for the well-known sections.
+// Codes NOT listed here are still rendered (in the same card format), in the
+// order they appear after the canonical block, using evvServiceLabel for the
+// description. Day-program-only codes (DSG/DSP) are excluded from this tab —
+// they live on the Day Program tab.
+const SECTION_OVERRIDES: Record<string, string> = {
+  SLH: "Supported Living",
+  COM: "Companion",
+  PAC: "Personal Assistance",
+  RP2: "Respite",
+  HHS: "Host Home — administrative hours",
+  RHS: "Residential Hab",
+  PM1: "Med Monitoring",
+  DSI: "Individual Day Support",
+};
+const SECTION_ORDER = ["SLH", "COM", "PAC", "RP2", "HHS", "RHS", "PM1", "DSI"];
+const DAY_PROGRAM_CODES = new Set(["DSG", "DSP"]);
+
+function sectionLabelFor(code: string): string {
+  if (SECTION_OVERRIDES[code]) return SECTION_OVERRIDES[code];
+  // evvServiceLabel returns "CODE — Full Name"; strip the "CODE — " prefix.
+  const full = evvServiceLabel(code);
+  const parts = full.split(" — ");
+  return parts.length > 1 ? parts.slice(1).join(" — ") : full;
+}
 
 const NAVY = "#0d112b";
 const GOLD = "#f59324";

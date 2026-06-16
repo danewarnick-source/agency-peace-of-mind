@@ -58,6 +58,18 @@ type ScheduledShift = {
   ends_at: string;
   status: string;
   published: boolean;
+  updated_at: string;
+  is_updated?: boolean;
+};
+
+type DayProgramSessionRow = {
+  id: string;
+  session_date: string;
+  service_code: string;
+  location_label: string | null;
+  start_time: string;
+  end_time: string;
+  updated_at: string;
 };
 
 

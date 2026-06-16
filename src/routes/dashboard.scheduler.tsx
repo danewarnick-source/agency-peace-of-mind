@@ -941,7 +941,7 @@ function AddShiftDialog({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Plus className="h-4 w-4" /> Add shift</DialogTitle>
         </DialogHeader>

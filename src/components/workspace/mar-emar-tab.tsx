@@ -1374,28 +1374,7 @@ export function MarEmarTab({
           <MedicationChart clientId={clientId} />
         </TabsContent>
 
-          <TabsTrigger value="today" className="flex-1">
-            <Clock className="mr-1.5 h-3.5 w-3.5" />
-            Today's Pass
-            {pendingCount > 0 && (
-              <Badge className="ml-1.5 bg-amber-500 text-white text-[10px]">{pendingCount}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="calendar" className="flex-1">
-            <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-            MAR Sheet
-          </TabsTrigger>
-          <TabsTrigger value="directives" className="flex-1">
-            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
-            Directives
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex-1">
-            <History className="mr-1.5 h-3.5 w-3.5" />
-            Compliance
-          </TabsTrigger>
-        </TabsList>
 
-        {/* ── TODAY'S PASS ── */}
         <TabsContent value="today" className="space-y-4 pt-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>

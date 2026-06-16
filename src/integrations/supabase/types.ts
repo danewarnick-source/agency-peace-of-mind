@@ -3686,6 +3686,7 @@ export type Database = {
           recorded_in: string
           scheduled_for: string
           scheduled_time_label: string | null
+          second_witness_id: string | null
           seizure_duration_seconds: number | null
           seizure_outcome: string | null
           service_context: string | null
@@ -3725,6 +3726,7 @@ export type Database = {
           recorded_in?: string
           scheduled_for: string
           scheduled_time_label?: string | null
+          second_witness_id?: string | null
           seizure_duration_seconds?: number | null
           seizure_outcome?: string | null
           service_context?: string | null
@@ -3764,6 +3766,7 @@ export type Database = {
           recorded_in?: string
           scheduled_for?: string
           scheduled_time_label?: string | null
+          second_witness_id?: string | null
           seizure_duration_seconds?: number | null
           seizure_outcome?: string | null
           service_context?: string | null
@@ -3787,6 +3790,20 @@ export type Database = {
             columns: ["medication_id"]
             isOneToOne: false
             referencedRelation: "client_medications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emar_logs_second_witness_id_fkey"
+            columns: ["second_witness_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emar_logs_second_witness_id_fkey"
+            columns: ["second_witness_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -8982,6 +8999,7 @@ export type Database = {
           evv_gps_consent_status: string
           first_name: string | null
           full_name: string | null
+          has_passed_launchpad: boolean | null
           hire_date: string | null
           home_address: string | null
           hourly_rate: number | null
@@ -9016,6 +9034,7 @@ export type Database = {
           evv_gps_consent_status?: string
           first_name?: string | null
           full_name?: string | null
+          has_passed_launchpad?: boolean | null
           hire_date?: string | null
           home_address?: string | null
           hourly_rate?: number | null
@@ -9050,6 +9069,7 @@ export type Database = {
           evv_gps_consent_status?: string
           first_name?: string | null
           full_name?: string | null
+          has_passed_launchpad?: boolean | null
           hire_date?: string | null
           home_address?: string | null
           hourly_rate?: number | null

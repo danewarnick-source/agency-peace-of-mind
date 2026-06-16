@@ -40,6 +40,11 @@ import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt"
 import { IncidentReportDialog } from "@/components/incidents/incident-report-dialog";
 import { AlertTriangle as AlertTriangleIcon } from "lucide-react";
 import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import {
+  ShiftMedAttestation,
+  emptyMedAttestation,
+  type MedAttestationValue,
+} from "@/components/medications/shift-med-attestation";
 
 
 
@@ -332,6 +337,9 @@ export function PunchPad({
   const { data: behaviorSetting } = useShiftBehaviorSetting();
   const behaviorEnabled = behaviorSetting?.enabled ?? true;
   const [behaviorAnswers, setBehaviorAnswers] = useState<BehaviorAnswers>(emptyBehaviorAnswers);
+
+  // ── Per-shift medication observation attestation ──────────────────────────
+  const [medAttestation, setMedAttestation] = useState<MedAttestationValue>(emptyMedAttestation);
 
 
   // ── NECTAR Procedural Q&A (Infusion add-on) ────────────────────────────────
@@ -782,7 +790,8 @@ export function PunchPad({
     : 0;
   const isLongShift = liveDurationMs > 16 * 60 * 60 * 1000;
   const longShiftOk = !isLongShift || longShiftAck;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && !busy;
+  const medAttestationOk   = medAttestation.resolved;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && medAttestationOk && !busy;
 
 
   function openCompliance() {
@@ -808,6 +817,7 @@ export function PunchPad({
     setBehaviorAnswers(emptyBehaviorAnswers);
     setLongShiftAck(false);
     setTriggersResolved(true);
+    setMedAttestation(emptyMedAttestation);
     stopRecording();
     setShowCompliance(true);
   }
@@ -1194,6 +1204,38 @@ export function PunchPad({
         toast.error(`Behavior observations not saved: ${behErr.message}`);
       }
     }
+
+    // Persist the per-shift medication observation attestation. Non-blocking:
+    // shift is already saved. If the table doesn't exist yet, the gate above
+    // auto-resolves and there's nothing to insert.
+    if (
+      medAttestation.resolved &&
+      medAttestation.observed !== null &&
+      medAttestation.signatureDataUrl &&
+      org?.organization_id
+    ) {
+      const { error: medErr } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from("shift_medication_attestations" as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insert({
+          organization_id: org.organization_id,
+          client_id: active.client_id,
+          staff_id: user.id,
+          shift_id: active.id,
+          hhs_daily_record_id: null,
+          observed: medAttestation.observed,
+          reason: medAttestation.observed === false ? medAttestation.reason.trim() : null,
+          signature_data_url: medAttestation.signatureDataUrl,
+          shift_window_start: active.clock_in_timestamp,
+          shift_window_end: clockOut,
+        } as any);
+      if (medErr && !/relation .* does not exist|schema cache/i.test(medErr.message)) {
+        toast.error(`Medication attestation not saved: ${medErr.message}`);
+      }
+    }
+
+
 
 
 
@@ -2414,6 +2456,21 @@ export function PunchPad({
                     onOpenIncident={() => navigate({ to: "/dashboard/command-center" })}
                   />
                 )}
+
+                {/* Per-shift medication observation attestation */}
+                {active && org?.organization_id && (
+                  <ShiftMedAttestation
+                    organizationId={org.organization_id}
+                    clientId={active.client_id}
+                    clientName={active.client_name ?? "this client"}
+                    windowStart={active.clock_in_timestamp}
+                    windowEnd={new Date(now).toISOString()}
+                    emarHref={`/dashboard/workspace/${active.client_id}?tab=mar-emar`}
+                    value={medAttestation}
+                    onChange={setMedAttestation}
+                  />
+                )}
+
 
                 {/* NECTAR Completeness Check */}
                 <NectarInfusionLock

@@ -179,3 +179,80 @@ create policy "org managers write hhs certifications"
 month" button becomes enabled for admins/managers; certifying stores the
 snapshot and the tab then shows "Certified by … on … · N present / N away /
 N unbillable". Uncertified past months show an amber "Needs certification" chip.
+
+---
+
+## 6. Shift medication observation attestations (2026-06-16)
+
+Before staff finalize clock-out (EVV punch-pad) and before host homes submit
+the daily progress note, the app forces a Yes/No attestation that they
+observed and supported the client with self-administration of their active
+medications during the shift / day. This new table is the per-shift /
+per-daily-note audit record.
+
+Until this table exists, the in-app attestation card auto-renders an amber
+"Pending database update — attestation will resume once the table is created"
+banner and **does not block submit**, so existing clock-out and daily-note
+flows keep working. After this SQL runs, the attestation becomes a hard
+prerequisite for any client who has at least one active medication on file.
+
+```sql
+create table if not exists public.shift_medication_attestations (
+  id                     uuid primary key default gen_random_uuid(),
+  organization_id        uuid not null references public.organizations(id) on delete cascade,
+  client_id              uuid not null references public.clients(id) on delete cascade,
+  staff_id               uuid not null references auth.users(id) on delete restrict,
+
+  -- Exactly one of these is set; the other stays NULL.
+  shift_id               uuid references public.evv_timesheets(id) on delete set null,
+  hhs_daily_record_id    uuid,  -- nullable, no FK (hhs_daily_records is via view in some tenants)
+
+  observed               boolean not null,
+  reason                 text,                 -- required when observed=false
+  signature_data_url     text not null,        -- staff signature
+  attested_at            timestamptz not null default now(),
+
+  shift_window_start     timestamptz not null,
+  shift_window_end       timestamptz not null,
+
+  created_at             timestamptz not null default now()
+);
+
+-- One attestation per (client, shift) or per (client, hhs_daily_record_id).
+create unique index if not exists shift_med_attest_per_shift
+  on public.shift_medication_attestations (client_id, shift_id)
+  where shift_id is not null;
+create unique index if not exists shift_med_attest_per_daily_record
+  on public.shift_medication_attestations (client_id, hhs_daily_record_id)
+  where hhs_daily_record_id is not null;
+
+grant select, insert ON public.shift_medication_attestations to authenticated;
+grant all on public.shift_medication_attestations to service_role;
+
+alter table public.shift_medication_attestations enable row level security;
+
+-- Staff can insert their own attestations within an org they belong to.
+create policy "staff insert own med attestations"
+  on public.shift_medication_attestations
+  for insert to authenticated
+  with check (
+    staff_id = auth.uid()
+    and public.is_org_member(organization_id, auth.uid())
+  );
+
+-- Staff can read their own; org admins/managers (and Hive execs) can read all in org.
+create policy "read own or org-admin med attestations"
+  on public.shift_medication_attestations
+  for select to authenticated
+  using (
+    staff_id = auth.uid()
+    or public.is_org_admin_or_manager(organization_id, auth.uid())
+    or public.is_hive_executive(auth.uid())
+  );
+```
+
+**What you'll see:** "Success". The Clock-Out form (EVV) and the HHS Daily
+Note form both gain a new "Medication observation" card. If the client has
+active medications, the staff member must answer Yes/No, log any unlogged
+scheduled passes (Yes path), or enter a reason (No path), then sign and
+attest before submitting. Without active medications, the card stays hidden.

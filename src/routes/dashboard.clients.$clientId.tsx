@@ -22,9 +22,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
-  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil,
+  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users,
 } from "lucide-react";
 
 const search = z.object({

@@ -829,6 +829,15 @@ function AdminLogDialog({
 // Contract requirement (4): documentation of compliance with medication administration
 
 function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[] }) {
+  const qc = useQueryClient();
+  const addAddendum = useServerFn(addEmarAddendum);
+  const [addendumLog, setAddendumLog] = useState<EmarLog | null>(null);
+  const [addendumNote, setAddendumNote] = useState("");
+  const sigCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sigDrawing = useRef(false);
+  const sigHas = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
+
   const medMap = useMemo(() => {
     const m = new Map<string, string>();
     meds.forEach((med) => m.set(med.id, med.medication_name));
@@ -838,6 +847,48 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
   const total = logs.length;
   const administered = logs.filter((l) => l.status === "administered").length;
   const rate = total > 0 ? Math.round((administered / total) * 100) : 0;
+
+  function clearSig() {
+    const c = sigCanvasRef.current; const ctx = c?.getContext("2d");
+    if (!c || !ctx) return;
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    sigHas.current = false;
+  }
+  function sigPos(e: React.PointerEvent<HTMLCanvasElement>) {
+    const c = sigCanvasRef.current!; const r = c.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * c.width, y: ((e.clientY - r.top) / r.height) * c.height };
+  }
+  function sigDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    const ctx = sigCanvasRef.current?.getContext("2d"); if (!ctx) return;
+    sigDrawing.current = true; const { x, y } = sigPos(e);
+    ctx.beginPath(); ctx.moveTo(x, y);
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+  }
+  function sigMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!sigDrawing.current) return;
+    const ctx = sigCanvasRef.current?.getContext("2d"); if (!ctx) return;
+    const { x, y } = sigPos(e); ctx.lineTo(x, y); ctx.stroke(); sigHas.current = true;
+  }
+  function sigUp() { sigDrawing.current = false; }
+
+  async function submitAddendum() {
+    if (!addendumLog) return;
+    if (addendumNote.trim().length < 3) { toast.error("Add a note (min 3 characters)."); return; }
+    if (!sigHas.current) { toast.error("Sign the pad to confirm."); return; }
+    setSubmitting(true);
+    try {
+      const sig = sigCanvasRef.current?.toDataURL("image/png") ?? "";
+      await addAddendum({ data: { logId: addendumLog.id, note: addendumNote.trim(), signatureDataUrl: sig } });
+      toast.success("Addendum added to the audit trail");
+      qc.invalidateQueries({ queryKey: ["mar-logs"] });
+      setAddendumLog(null); setAddendumNote("");
+    } catch (e) {
+      toast.error((e as Error).message || "Could not add addendum");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   if (logs.length === 0) {
     return (
@@ -850,7 +901,6 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
 
   return (
     <div className="space-y-3">
-      {/* Compliance summary */}
       <div className="grid grid-cols-3 gap-2">
         <div className="rounded-lg border border-border bg-card p-3 text-center">
           <p className="text-2xl font-bold text-foreground">{total}</p>
@@ -858,7 +908,7 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
         </div>
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-50 p-3 text-center dark:bg-emerald-950/20">
           <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{administered}</p>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400">Administered</p>
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400">Self-administered</p>
         </div>
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-center">
           <p className="text-2xl font-bold text-primary">{rate}%</p>
@@ -866,21 +916,24 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
         </div>
       </div>
 
-      {/* Log table */}
+      <p className="text-[11px] text-muted-foreground">
+        This is an append-only audit trail. Earlier entries cannot be edited — use "Add note" to append a correction or clarification.
+      </p>
+
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-muted/40">
               <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Date & Time</th>
               <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Medication</th>
-              <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Route</th>
               <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Status</th>
               <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Staff</th>
               <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Attested</th>
+              <th className="px-3 py-2 text-right font-semibold text-muted-foreground">Addendum</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {logs.slice(0, 30).map((l) => (
+            {logs.slice(0, 60).map((l) => (
               <tr key={l.id} className="hover:bg-muted/30">
                 <td className="px-3 py-2 font-mono">
                   {fmtDateTime(l.administered_at ?? l.scheduled_for)}
@@ -888,10 +941,6 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
                 <td className="px-3 py-2">
                   {medMap.get(l.medication_id) ?? "—"}
                   {l.is_prn && <Badge className="ml-1 bg-amber-100 text-amber-800 text-[9px] dark:bg-amber-950/40 dark:text-amber-200">PRN</Badge>}
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  {/* Route stored in notes prefix or exception_reason */}
-                  {l.exception_reason?.startsWith("Route:") ? l.exception_reason.replace("Route:", "").trim() : "—"}
                 </td>
                 <td className="px-3 py-2">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
@@ -901,7 +950,7 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
                       ? "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
                       : "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
                   }`}>
-                    {l.status}
+                    {l.status === "administered" ? "self-administered" : l.status}
                   </span>
                   {l.is_medication_error && (
                     <Badge className="ml-1 bg-rose-500 text-white text-[9px]">Error</Badge>
@@ -913,14 +962,75 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
                     ? <ShieldCheck className="h-4 w-4 text-emerald-500" />
                     : <span className="text-muted-foreground/40">—</span>}
                 </td>
+                <td className="px-3 py-2 text-right">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => { setAddendumLog(l); setAddendumNote(""); }}
+                  >
+                    <FilePlus2 className="mr-1 h-3 w-3" /> Add note
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <Dialog open={!!addendumLog} onOpenChange={(o) => { if (!o && !submitting) { setAddendumLog(null); setAddendumNote(""); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Append note to audit trail</DialogTitle>
+            <DialogDescription>
+              The original entry stays unchanged. Your note is appended with timestamp and signature.
+            </DialogDescription>
+          </DialogHeader>
+          {addendumLog && (
+            <div className="space-y-3">
+              <div className="rounded-md border border-border bg-muted/30 p-2 text-xs">
+                <div className="font-mono">{fmtDateTime(addendumLog.administered_at ?? addendumLog.scheduled_for)}</div>
+                <div>{medMap.get(addendumLog.medication_id) ?? "—"} — <span className="font-semibold">{addendumLog.status}</span></div>
+              </div>
+              <div>
+                <Label className="text-xs">Note / clarification</Label>
+                <Textarea
+                  rows={4}
+                  value={addendumNote}
+                  onChange={(e) => setAddendumNote(e.target.value)}
+                  placeholder="e.g., Client took dose 10 minutes after refusal entry. Documenting follow-up."
+                  maxLength={2000}
+                />
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <Label className="text-xs">Signature</Label>
+                  <Button type="button" variant="ghost" size="sm" onClick={clearSig} className="h-6 text-[11px]">
+                    <Eraser className="mr-1 h-3 w-3" /> Clear
+                  </Button>
+                </div>
+                <canvas
+                  ref={(el) => { sigCanvasRef.current = el; if (el) setTimeout(clearSig, 0); }}
+                  width={520} height={120}
+                  onPointerDown={sigDown} onPointerMove={sigMove} onPointerUp={sigUp} onPointerLeave={sigUp}
+                  className="w-full touch-none rounded-md border-2 border-dashed border-border bg-white"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" disabled={submitting} onClick={() => { setAddendumLog(null); setAddendumNote(""); }}>Cancel</Button>
+            <Button disabled={submitting} onClick={submitAddendum}>
+              {submitting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+              Append to record
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 // ─── MAR Calendar ─────────────────────────────────────────────────────────────
 

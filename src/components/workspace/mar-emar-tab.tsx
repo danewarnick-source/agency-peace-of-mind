@@ -1557,7 +1557,7 @@ export function MarEmarTab({
               )}
               {passes.filter((p) => p.log?.status === "administered").length > 0 && (
                 <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-                  {passes.filter((p) => p.log?.status === "administered").length} administered
+                  {passes.filter((p) => p.log?.status === "administered").length} self-administered
                 </Badge>
               )}
             </div>

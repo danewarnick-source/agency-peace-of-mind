@@ -1626,11 +1626,11 @@ export function MarEmarTab({
                             <div className="mt-1.5 flex items-center gap-1.5">
                               <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
                                 <CheckCircle2 className="mr-1 h-3 w-3" />
-                                Administered {p.log?.administered_at ? fmtTime(p.log.administered_at) : ""}
+                                Self-administered {p.log?.administered_at ? fmtTime(p.log.administered_at) : ""}
                               </Badge>
                               {p.log?.signature_attestation && (
                                 <Badge variant="outline" className="gap-1 text-[10px]">
-                                  <ShieldCheck className="h-3 w-3 text-emerald-500" /> Five Rights Signed
+                                  <ShieldCheck className="h-3 w-3 text-emerald-500" /> Self-admin attested
                                 </Badge>
                               )}
                             </div>

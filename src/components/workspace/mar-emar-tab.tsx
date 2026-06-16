@@ -25,7 +25,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, Eraser, Loader2,
   Moon, Sun, Sunset, CalendarDays, ChevronLeft,
   ChevronRight, ShieldCheck, Pill, BookOpen, History,
-  AlertOctagon, Settings2, Sparkles, FilePlus2, Siren,
+  AlertOctagon, Settings2, Sparkles, FilePlus2, Siren, Pencil,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -149,11 +149,57 @@ const ROUTES = [
   "Other",
 ];
 
-const BLOCK_META: Record<Block, { icon: typeof Sun; tone: string; bg: string; label: string }> = {
-  Morning: { icon: Sun,    tone: "text-amber-600",   bg: "bg-amber-50 dark:bg-amber-950/20",   label: "Morning" },
-  Evening: { icon: Sunset, tone: "text-rose-500",    bg: "bg-rose-50 dark:bg-rose-950/20",     label: "Evening" },
-  PRN:     { icon: Pill,   tone: "text-indigo-600",  bg: "bg-indigo-50 dark:bg-indigo-950/20", label: "As-needed (PRN)" },
+const BLOCK_META: Record<Block, { label: string; subtitle: (firstTime?: string) => string }> = {
+  Morning: { label: "Morning", subtitle: (t) => t ? `${fmtTimeLabel(t)}` : "" },
+  Evening: { label: "Evening", subtitle: (t) => t ? `${fmtTimeLabel(t)}` : "" },
+  PRN:     { label: "As needed (PRN)", subtitle: () => "" },
 };
+
+function fmtTimeLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
+  const d = new Date();
+  d.setHours(h ?? 0, m ?? 0, 0, 0);
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+// ─── Nectar AI Compliance card ────────────────────────────────────────────────
+
+const NECTAR_ACTIONS = [
+  "Simulate a 9 AM refusal → 11 AM success",
+  "Run Schedule II–IV narcotic audit",
+  "Simulate critical low inventory",
+  "Flag meds that worsen swallowing",
+];
+
+function NectarComplianceCard({ onSelect }: { onSelect: (action: string) => void }) {
+  return (
+    <div
+      className="rounded-lg border p-4"
+      style={{
+        background: "color-mix(in oklab, var(--accent-2) 12%, var(--card))",
+        borderColor: "color-mix(in oklab, var(--accent-2) 35%, transparent)",
+      }}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <Sparkles className="h-4 w-4" style={{ color: "var(--accent-2)" }} />
+        <h3 className="text-sm font-semibold">Nectar AI Compliance Assistant</h3>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {NECTAR_ACTIONS.map((a) => (
+          <button
+            key={a}
+            type="button"
+            onClick={() => onSelect(a)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/60"
+          >
+            <Sparkles className="h-3 w-3" style={{ color: "var(--accent-2)" }} />
+            {a}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1474,11 +1520,48 @@ export function MarEmarTab({
   return (
     <div className="space-y-4">
 
+      {/* HIVE eMAR top bar — wordmark + DEMO chip + acting service indicator */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-md text-primary-foreground"
+            style={{ background: "var(--gradient-amber)" }}
+            aria-hidden
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor"><path d="M12 2 3 7v10l9 5 9-5V7z"/></svg>
+          </div>
+          <div className="leading-tight">
+            <p className="text-sm font-bold tracking-wide">HIVE</p>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              eMAR · Medication Support
+            </p>
+          </div>
+          <span
+            className="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+            style={{ background: "color-mix(in oklab, var(--accent-2) 18%, transparent)", color: "var(--accent-2)" }}
+          >
+            Demo
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Acting service</span>
+          <span
+            className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-1 font-mono text-[11px] font-semibold"
+          >
+            {serviceContext.toUpperCase()}
+          </span>
+        </div>
+      </div>
+
       {/* Permanent legal/scope banner — required at every eMAR surface */}
       <EmarLegalBanner />
 
       {/* Clinical safety header — visible allergies, dysphagia / swallowing alerts */}
       {clientSafety && <ClinicalSafetyHeader client={clientSafety} />}
+
+      {/* Nectar AI Compliance Assistant — advisory simulation actions */}
+      <NectarComplianceCard onSelect={() => setActiveTab("nectar")} />
+
 
       {/* Medication error alert */}
       {errorCount > 0 && (
@@ -1575,134 +1658,159 @@ export function MarEmarTab({
             const items = grouped[block];
             if (!items.length) return null;
             const Meta = BLOCK_META[block];
-            const Icon = Meta.icon;
+            const firstTime = block === "PRN" ? "" : items[0]?.time;
+            const subtitle = Meta.subtitle(firstTime);
             return (
-              <Card key={block} className="overflow-hidden">
-                <div className={`flex items-center gap-2 border-b border-border px-5 py-3 ${Meta.bg}`}>
-                  <Icon className={`h-4 w-4 ${Meta.tone}`} />
-                  <h3 className={`text-sm font-semibold ${Meta.tone}`}>{Meta.label}</h3>
+              <section key={block} className="space-y-2">
+                <div className="flex items-baseline gap-2 px-1">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    {Meta.label}
+                  </h3>
+                  {subtitle && (
+                    <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                      · {subtitle}
+                    </span>
+                  )}
                   <span className="ml-auto text-[11px] text-muted-foreground">
                     {items.filter((i) => i.log?.status === "administered").length}/{items.length} documented
                   </span>
                 </div>
-                <ul className="divide-y divide-border">
+                <ul className="space-y-2">
                   {items.map((p) => {
                     const isLocked = p.isLocked;
                     const hasHistory = p.history.length > 0;
                     const passed = p.log?.status === "administered";
                     const errored = p.log?.is_medication_error;
                     const overdue = !isLocked && new Date(p.iso).getTime() < Date.now() - 60 * 60 * 1000 && p.time !== "PRN";
+                    const upcoming = !isLocked && !overdue && p.time !== "PRN";
+                    const isPrnControlled = p.med.is_prn && p.med.is_controlled;
 
                     return (
-                      <li key={`${p.med.id}-${p.time}`}
-                        className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-center ${errored ? "bg-rose-50/50 dark:bg-rose-950/10" : ""}`}>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs text-muted-foreground">
-                              <Clock className="mr-0.5 inline h-3 w-3" />{p.time}
-                            </span>
-                            <p className="font-semibold text-sm">{p.med.medication_name}</p>
-                            {p.med.dosage && <span className="text-xs text-muted-foreground">{p.med.dosage}</span>}
-                            {p.med.route && <span className="text-xs text-muted-foreground">· {p.med.route}</span>}
-                            {p.med.is_controlled && (
-                              <Badge className="bg-purple-100 text-purple-800 text-[10px] dark:bg-purple-950/40 dark:text-purple-200">Controlled</Badge>
+                      <li key={`${p.med.id}-${p.time}`}>
+                        <Card className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-center ${errored ? "border-rose-300 bg-rose-50/40 dark:bg-rose-950/10" : ""}`}>
+                          {/* Pill icon tile */}
+                          <div
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                              isPrnControlled
+                                ? "bg-rose-100 dark:bg-rose-950/30"
+                                : "bg-amber-100 dark:bg-amber-950/30"
+                            }`}
+                          >
+                            <Pill className={`h-5 w-5 ${
+                              isPrnControlled ? "text-rose-600" : "text-amber-600"
+                            }`} />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-baseline gap-x-2">
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {p.time === "PRN" ? "PRN" : p.time.replace(":", ":")}
+                              </span>
+                              <p className="text-sm font-semibold">{p.med.medication_name}</p>
+                              {p.med.dosage && (
+                                <span className="text-xs text-muted-foreground">{p.med.dosage}</span>
+                              )}
+                              {p.med.route && (
+                                <span className="text-xs text-muted-foreground">· {p.med.route}</span>
+                              )}
+                              {p.med.is_prn && (
+                                <span className="ml-1 inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
+                                  PRN{p.med.is_controlled ? " · Schedule IV" : ""}
+                                </span>
+                              )}
+                              {p.med.choking_risk && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                                  <AlertTriangle className="h-3 w-3" /> Choking risk
+                                </span>
+                              )}
+                            </div>
+
+                            {p.med.purpose && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{p.med.purpose}</p>
                             )}
-                            {p.med.is_prn && (
-                              <Badge className="bg-amber-100 text-amber-800 text-[10px] dark:bg-amber-950/40 dark:text-amber-200">PRN</Badge>
-                            )}
-                            {p.med.choking_risk && (
-                              <Badge className="bg-rose-100 text-rose-800 text-[10px] dark:bg-rose-950/40 dark:text-rose-200">
-                                Choking Risk
-                              </Badge>
+
+                            {/* Status chip */}
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                              {passed && !errored && (
+                                <>
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Self-administered {p.log?.administered_at ? fmtTime(p.log.administered_at) : ""}
+                                  </span>
+                                  {p.log?.signature_attestation && (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                                      <ShieldCheck className="h-3 w-3 text-emerald-500" /> Self-admin attested
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                              {p.log && !passed && (
+                                <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
+                                  {p.log?.status}
+                                  {p.log?.exception_reason ? ` — ${p.log.exception_reason.replace(/^Route:[^·]+·\s*/, "")}` : ""}
+                                </span>
+                              )}
+                              {errored && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+                                  <AlertOctagon className="h-3 w-3" /> Medication error filed
+                                </span>
+                              )}
+                              {overdue && !p.log && (
+                                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                                  Window passed — documentation required
+                                </span>
+                              )}
+                              {upcoming && !p.log && (
+                                <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                  Upcoming
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Chronological immutable history */}
+                            {hasHistory && (
+                              <ul className="mt-2 space-y-0.5 border-l border-border pl-2 text-[11px] text-muted-foreground">
+                                {p.history.map((h) => {
+                                  const code = parseJobCode(h);
+                                  const when = h.created_at ? fmtTime(h.created_at) : "";
+                                  const cleanNotes = stripJobCodePrefix(h.notes);
+                                  const isAdmin = h.status === "administered";
+                                  return (
+                                    <li key={h.id} className="flex flex-wrap items-center gap-1.5">
+                                      <span className="font-mono">{when}</span>
+                                      <span className={`capitalize ${isAdmin ? "text-emerald-700 dark:text-emerald-300 font-medium" : ""}`}>
+                                        {h.status}{isAdmin ? " ✓" : ""}
+                                      </span>
+                                      <span>— {h.staff_name || "Staff"}</span>
+                                      <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono">{code}</Badge>
+                                      {cleanNotes && <span className="opacity-80">· {cleanNotes}</span>}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
                             )}
                           </div>
 
-                          {p.med.instructions && (
-                            <p className="mt-0.5 text-xs text-muted-foreground">{p.med.instructions}</p>
+                          {!isLocked && (
+                            <Button
+                              size="sm"
+                              onClick={() => setActivePass({ med: p.med, time: p.time, iso: p.iso })}
+                              className="h-10 shrink-0 gap-1.5 text-primary-foreground"
+                              style={{ background: "var(--gradient-amber)" }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              {p.time === "PRN" ? "Log PRN" : hasHistory ? "Add update" : "Observe & Confirm"}
+                            </Button>
                           )}
-
-                          {/* Status */}
-                          {passed && !errored && (
-                            <div className="mt-1.5 flex items-center gap-1.5">
-                              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-                                <CheckCircle2 className="mr-1 h-3 w-3" />
-                                Self-administered {p.log?.administered_at ? fmtTime(p.log.administered_at) : ""}
-                              </Badge>
-                              {p.log?.signature_attestation && (
-                                <Badge variant="outline" className="gap-1 text-[10px]">
-                                  <ShieldCheck className="h-3 w-3 text-emerald-500" /> Self-admin attested
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                          {p.log && !passed && (
-                            <Badge variant="secondary" className="mt-1.5 capitalize">
-                              {p.log?.status}
-                              {p.log?.exception_reason ? ` — ${p.log.exception_reason.replace(/^Route:[^·]+·\s*/, "")}` : ""}
-                            </Badge>
-                          )}
-                          {errored && (
-                            <Badge className="mt-1.5 animate-pulse bg-rose-500 text-white">
-                              <AlertOctagon className="mr-1 h-3 w-3" /> Medication Error Filed
-                            </Badge>
-                          )}
-                          {overdue && !p.log && (
-                            <Badge className="mt-1.5 animate-pulse bg-amber-500 text-white">
-                              Window Passed — Documentation Required
-                            </Badge>
-                          )}
-
-                          {/* Chronological immutable history — visible to every dashboard */}
-                          {hasHistory && (
-                            <ul className="mt-2 space-y-0.5 border-l border-border pl-2 text-[11px] text-muted-foreground">
-                              {p.history.map((h) => {
-                                const code = parseJobCode(h);
-                                const when = h.created_at ? fmtTime(h.created_at) : "";
-                                const cleanNotes = stripJobCodePrefix(h.notes);
-                                const isAdmin = h.status === "administered";
-                                return (
-                                  <li key={h.id} className="flex flex-wrap items-center gap-1.5">
-                                    <span className="font-mono">{when}</span>
-                                    <span className={`capitalize ${isAdmin ? "text-emerald-700 dark:text-emerald-300 font-medium" : ""}`}>
-                                      {h.status}{isAdmin ? " ✓" : ""}
-                                    </span>
-                                    <span>— {h.staff_name || "Staff"}</span>
-                                    <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono">{code}</Badge>
-                                    {cleanNotes && <span className="opacity-80">· {cleanNotes}</span>}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
-
-                        {!isLocked && (
-                          <Button
-                            size="sm"
-                            onClick={() => setActivePass({ med: p.med, time: p.time, iso: p.iso })}
-                            className={`h-11 shrink-0 gap-1.5 ${
-                              overdue
-                                ? "bg-amber-600 hover:bg-amber-700 text-white"
-                                : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                            }`}
-                          >
-                            <Pill className="h-4 w-4" />
-                            {overdue
-                              ? "Document Now"
-                              : p.time === "PRN"
-                              ? "Log PRN"
-                              : hasHistory
-                              ? "Add update"
-                              : "Observe & Confirm"}
-                          </Button>
-                        )}
+                        </Card>
                       </li>
                     );
                   })}
                 </ul>
-              </Card>
+              </section>
             );
           })}
+
         </TabsContent>
 
         {/* ── MAR CALENDAR ── */}

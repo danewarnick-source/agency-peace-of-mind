@@ -198,13 +198,6 @@ export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: St
         </div>
       )}
 
-      {!expanded && (
-        <div style={{ ...detailCard, display: "grid", placeItems: "center" }}>
-          <div style={{ color: SCHED.muted, textAlign: "center", fontSize: 12.5, fontWeight: 500 }}>
-            Select a box on the left to view details.
-          </div>
-        </div>
-      )}
     </div>
   );
 }

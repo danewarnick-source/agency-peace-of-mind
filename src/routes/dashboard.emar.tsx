@@ -163,6 +163,7 @@ function EmarPage() {
   const doneKey = (r: DueRow) => `${r.medication_id}|${r.scheduled_for}`;
   const doneSet = useMemo(() => new Set(doneLogs.map((l) => `${l.medication_id}|${l.scheduled_for}`)), [doneLogs]);
 
+  const submittingRef = useRef(false);
   const logPass = useServerFn(logMedicationPass);
 
   const saveMut = useMutation({
@@ -199,6 +200,16 @@ function EmarPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  async function handleSave(p: Parameters<typeof saveMut.mutate>[0]) {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await saveMut.mutateAsync(p);
+    } finally {
+      submittingRef.current = false;
+    }
+  }
 
   const grouped = useMemo(() => {
     const m: Record<string, DueRow[]> = {};
@@ -305,7 +316,7 @@ function EmarPage() {
       <PassDialog
         row={selected}
         onClose={() => setSelected(null)}
-        onSave={(p) => saveMut.mutate(p)}
+        onSave={handleSave}
         pending={saveMut.isPending}
       />
     </div>

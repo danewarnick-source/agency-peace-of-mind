@@ -1692,8 +1692,8 @@ export function MarEmarTab({
                               : p.time === "PRN"
                               ? "Log PRN"
                               : hasHistory
-                              ? "Update Status"
-                              : "Record Pass"}
+                              ? "Add update"
+                              : "Observe & Confirm"}
                           </Button>
                         )}
                       </li>

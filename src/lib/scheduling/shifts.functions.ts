@@ -2,8 +2,66 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isDailyCode } from "./code-colors";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 
 const CreatedFromZ = z.enum(["manual", "template", "nectar", "import", "rotation"]).optional();
+
+// Fields that may be updated on an existing shift. Excludes organization_id,
+// parent_shift_id, created_from, and auto-managed columns to prevent
+// cross-org tampering and segment-tree corruption.
+const SHIFT_PATCH_ALLOWLIST = new Set([
+  "starts_at", "ends_at",
+  "staff_id", "client_id", "service_code", "job_code",
+  "location_id", "is_awake_overnight",
+  "status", "published",
+  "notes", "override_reason", "callout_reason", "shift_type",
+]);
+
+async function assertActiveBillingCode(
+  supabase: SupabaseClient<Database>,
+  organizationId: string,
+  clientId: string,
+  serviceCode: string,
+): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("client_billing_codes")
+    .select("id, service_start_date, service_end_date")
+    .eq("organization_id", organizationId)
+    .eq("client_id", clientId)
+    .eq("service_code", serviceCode.toUpperCase());
+  if (error) throw error;
+  const active = (data ?? []).find((r) => {
+    if (r.service_start_date && r.service_start_date > today) return false;
+    if (r.service_end_date && r.service_end_date <= today) return false;
+    return true;
+  });
+  if (!active) {
+    throw new Error(
+      "No active billing code for this client and service. Add one in the client's billing profile before scheduling.",
+    );
+  }
+}
+
+// FLAGGED: profiles.has_passed_launchpad — this column does not exist in the
+// generated types (types.ts). Verify it exists in the live DB before relying
+// on this block. Until the column is present, data.has_passed_launchpad will
+// be undefined (not false), so the guard will not fire.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function assertLaunchpadPassed(supabase: any, staffId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("has_passed_launchpad")
+    .eq("id", staffId)
+    .maybeSingle();
+  if (error) throw error;
+  if (data && data.has_passed_launchpad === false) {
+    throw new Error(
+      "This staff member has not completed Launchpad and cannot be assigned as a sole worker.",
+    );
+  }
+}
 
 export const listShiftsInRange = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -82,6 +140,18 @@ export const createShift = createServerFn({ method: "POST" })
       }
     }
 
+    // Billing-code authorization — enforced at write layer for all entry points
+    // (Nectar proposals, auto-assign, CSV import, and UI all flow through here).
+    await assertActiveBillingCode(
+      context.supabase,
+      data.organizationId,
+      data.clientId,
+      data.serviceCode,
+    );
+
+    // Launchpad gate — blocks sole-worker assignment until training is complete.
+    await assertLaunchpadPassed(context.supabase, data.staffId);
+
     const insert = {
       organization_id: data.organizationId,
       staff_id: data.staffId,
@@ -111,11 +181,51 @@ export const updateShift = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; patch: Record<string, unknown> }) =>
     z.object({ id: z.string().uuid(), patch: z.record(z.unknown()) }).parse(d))
   .handler(async ({ data, context }) => {
+    // Allowlist guard — rejects writes to org-scoping, segment-tree, and audit
+    // fields that must never be client-writable.
+    const forbidden = Object.keys(data.patch).filter(k => !SHIFT_PATCH_ALLOWLIST.has(k));
+    if (forbidden.length > 0) {
+      throw new Error(`Cannot update field(s): ${forbidden.join(", ")}`);
+    }
+
+    // When billing-affecting or staff fields change, fetch the current row so
+    // we can resolve the effective values and re-validate.
+    const needsBillingCheck =
+      "service_code" in data.patch || "job_code" in data.patch || "client_id" in data.patch;
+    const needsLaunchpadCheck = "staff_id" in data.patch;
+
+    if (needsBillingCheck || needsLaunchpadCheck) {
+      const { data: current, error: fetchErr } = await context.supabase
+        .from("scheduled_shifts")
+        .select("organization_id, client_id, service_code, staff_id")
+        .eq("id", data.id)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      if (needsBillingCheck) {
+        const effectiveClientId = (data.patch.client_id as string) ?? current.client_id;
+        const effectiveCode =
+          ((data.patch.service_code ?? data.patch.job_code) as string) ?? current.service_code;
+        await assertActiveBillingCode(
+          context.supabase,
+          current.organization_id,
+          effectiveClientId,
+          effectiveCode,
+        );
+      }
+
+      if (needsLaunchpadCheck) {
+        await assertLaunchpadPassed(context.supabase, data.patch.staff_id as string);
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: row, error } = await context.supabase
       .from("scheduled_shifts")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .update(data.patch as any)
-      .eq("id", data.id).select("*").single();
+      .eq("id", data.id)
+      .select("*")
+      .single();
     if (error) throw error;
     return row;
   });

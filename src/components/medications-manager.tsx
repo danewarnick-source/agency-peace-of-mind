@@ -194,7 +194,11 @@ export function MedicationsManager({
         prn_instructions:    v.prn_instructions.trim() || null,
         pharmacy:            v.pharmacy.trim() || null,
         rx_number:           v.rx_number.trim() || null,
+        packaging:           v.packaging.trim() || null,
+        side_effects:        v.side_effects.trim() || null,
+        contributes_to_swallowing_difficulty: v.contributes_to_swallowing_difficulty,
       }).eq("id", id);
+
       if (error) throw error;
     },
     onSuccess: () => {

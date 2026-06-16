@@ -167,7 +167,7 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
       const { data, error } = await supabase
         .from("scheduled_shifts")
         .select(
-          "id, client_id, job_code, starts_at, ends_at, status, published, clients:client_id(first_name, last_name, team_id, teams:team_id(team_name, setting))",
+          "id, client_id, job_code, starts_at, ends_at, status, published, updated_at, clients:client_id(first_name, last_name, team_id, teams:team_id(team_name, setting))",
         )
         .eq("staff_id", user!.id)
         .eq("organization_id", org!.organization_id)
@@ -191,7 +191,48 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
         ends_at: r.ends_at,
         status: r.status,
         published: r.published,
+        updated_at: r.updated_at,
       }));
+    },
+  });
+}
+
+// Day-program sessions where the current user is on the session staff roster.
+// Staff see DSG/DSP/SED/DSI sessions they're running in the same schedule view.
+function useMyDayProgramSessions(view: ViewMode, anchor: Date) {
+  const { user } = useAuth();
+  const { data: org } = useCurrentOrg();
+  const { from, to } = rangeFor(view, anchor);
+
+  return useQuery({
+    enabled: !!user?.id && !!org?.organization_id,
+    queryKey: [
+      "my-day-program-sessions",
+      user?.id,
+      org?.organization_id,
+      from.toISOString(),
+      to.toISOString(),
+    ],
+    queryFn: async (): Promise<DayProgramSessionRow[]> => {
+      const { data: staffRows, error: staffErr } = await supabase
+        .from("day_program_session_staff")
+        .select("session_id")
+        .eq("staff_id", user!.id);
+      if (staffErr) throw staffErr;
+      const ids = (staffRows ?? []).map((r: any) => r.session_id);
+      if (ids.length === 0) return [];
+      const fromDate = from.toISOString().slice(0, 10);
+      const toDate = to.toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("day_program_sessions")
+        .select("id, session_date, service_code, location_label, start_time, end_time, updated_at")
+        .in("id", ids)
+        .eq("organization_id", org!.organization_id)
+        .gte("session_date", fromDate)
+        .lte("session_date", toDate)
+        .order("start_time", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as DayProgramSessionRow[];
     },
   });
 }

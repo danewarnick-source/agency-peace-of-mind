@@ -31,6 +31,7 @@ import { GeneralTimeClock } from "@/components/staff-mobile/general-time-clock";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { RequestTimeOffDialog } from "@/components/schedule-preview/request-time-off-dialog";
 import { RequestSwapDialog } from "@/components/schedule-preview/request-swap-dialog";
+import { useMyScheduleRequests } from "@/lib/schedule-requests";
 import { CalendarOff, ArrowLeftRight } from "lucide-react";
 import { hhsVisitLabel, hostHomeRowLabel } from "@/lib/scheduling/hhs-visit";
 import { HhsInfoTooltip } from "@/components/scheduling/hhs-info-tooltip";
@@ -644,6 +645,8 @@ function SchedulePage() {
         />
       </div>
 
+      <MyTimeOffPanel />
+
       {org?.organization_id && (
         <OpenShiftsPanel
           organizationId={org.organization_id}
@@ -860,6 +863,62 @@ function CollapsibleGeneralClock() {
           </CollapsibleContent>
         </div>
       </Collapsible>
+    </section>
+  );
+}
+
+function MyTimeOffPanel() {
+  const { data } = useMyScheduleRequests();
+  const rows = (data?.timeOff ?? []).slice(0, 6);
+  if (rows.length === 0) return null;
+  const fmt = (d: string) =>
+    new Date(d + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const tone = (s: string) =>
+    s === "approved"
+      ? "bg-emerald-100 text-emerald-800"
+      : s === "denied"
+      ? "bg-rose-100 text-rose-800"
+      : s === "cancelled"
+      ? "bg-muted text-muted-foreground"
+      : "bg-amber-100 text-amber-900";
+  return (
+    <section className="rounded-lg border border-border bg-card p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-foreground">My time-off requests</h2>
+        <span className="text-[11px] text-muted-foreground">
+          {rows.filter((r) => r.status === "pending").length} pending
+        </span>
+      </div>
+      <ul className="space-y-1.5">
+        {rows.map((r) => (
+          <li
+            key={r.id}
+            className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-background px-2.5 py-1.5"
+          >
+            <div className="min-w-0">
+              <p className="text-[13px] font-medium text-foreground">
+                {fmt(r.start_date)}
+                {r.end_date !== r.start_date ? ` – ${fmt(r.end_date)}` : ""}{" "}
+                <span className="text-[11px] uppercase text-muted-foreground">
+                  {r.type}
+                </span>
+              </p>
+              {r.note && (
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {r.note}
+                </p>
+              )}
+            </div>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase ${tone(
+                r.status,
+              )}`}
+            >
+              {r.status}
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

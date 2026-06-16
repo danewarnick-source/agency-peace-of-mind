@@ -36,6 +36,7 @@ import {
   saveDayProgramSession, markAttendance, addSessionStaff,
 } from "@/lib/scheduler/scheduler.functions";
 import { evvServiceLabel } from "@/lib/evv-codes";
+import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 
 export const Route = createFileRoute("/dashboard/scheduler")({
   head: () => ({
@@ -265,6 +266,12 @@ function SchedulerBody({
   return (
     <>
       <div className="px-3 sm:px-4 py-4 space-y-3 max-w-[1400px] mx-auto">
+        {/* Requests panel: pending time-off + swaps, with shift-conflict warning */}
+        <RequestsPanel
+          weekStart={startOfWeek(anchor)}
+          staff={data.staff.map((s) => ({ id: s.id, name: s.name }))}
+        />
+
         {/* Legend */}
         <div className="flex items-center gap-3 text-xs text-muted-foreground px-1">
           <span className="inline-flex items-center gap-1.5"><span style={{ width: 14, height: 14, borderRadius: 4, background: GOLD }} /> Staff</span>

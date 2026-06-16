@@ -58,6 +58,7 @@ type Medication = {
   pharmacy: string | null;
   rx_number: string | null;
   pill_count_current: number | null;
+  refill_date: string | null;
   // Contract compliance fields
   purpose: string | null;
   adverse_effects: string | null;
@@ -631,16 +632,36 @@ function AdminLogDialog({
               <Label className="text-xs font-semibold text-purple-800 dark:text-purple-200">
                 Controlled Substance — Current count *
               </Label>
+              {med.pill_count_current !== null && (
+                <p className="text-[11px] text-purple-700 dark:text-purple-300">
+                  Last recorded count: <span className="font-semibold">{med.pill_count_current}</span> pills
+                  {" → "}expected after this dose: <span className="font-semibold">{med.pill_count_current - 1}</span>
+                </p>
+              )}
               <Input
                 type="number" min="0"
                 value={pillCount}
                 onChange={(e) => setPillCount(e.target.value)}
-                placeholder={med.pill_count_current != null ? `Expected ${med.pill_count_current}` : "e.g., 28"}
+                placeholder={med.pill_count_current != null ? `Expected ${med.pill_count_current - 1}` : "e.g., 28"}
                 className="h-9 bg-white dark:bg-slate-900"
               />
               <p className="text-[11px] text-purple-700 dark:text-purple-300">
                 Count remaining after this dose. Variance from the expected count is flagged on the audit trail.
               </p>
+              {/* Discrepancy alert */}
+              {pillCount !== "" &&
+                med.pill_count_current !== null &&
+                parseInt(pillCount, 10) !== med.pill_count_current - 1 && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-400 bg-amber-50 px-3 py-2 dark:bg-amber-950/30">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <div className="text-xs text-amber-800 dark:text-amber-200">
+                    <p className="font-semibold">
+                      Count entered: {pillCount} — expected: {med.pill_count_current - 1}
+                    </p>
+                    <p className="mt-0.5">Document the variance reason in Clinical Notes before confirming.</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1236,6 +1257,8 @@ export function MarEmarTab({
     return () => { supabase.removeChannel(channel); };
   }, [clientId, orgId, qc]);
 
+  const submittingRef = useRef(false);
+
   const [activePass, setActivePass] = useState<{
     med: Medication;
     time: string;
@@ -1261,7 +1284,7 @@ export function MarEmarTab({
         .from("client_medications")
         .select(`id, medication_name, dosage, frequency, route, scheduled_times,
           instructions, prescriber, is_active, is_controlled, is_prn, is_rescue,
-          prn_instructions, pharmacy, rx_number, pill_count_current,
+          prn_instructions, pharmacy, rx_number, pill_count_current, refill_date,
           purpose, adverse_effects, choking_risk, choking_risk_details`)
         .eq("client_id", clientId)
         .eq("is_active", true)
@@ -1385,8 +1408,10 @@ export function MarEmarTab({
     emergencyServicesCalled: boolean;
     attested: boolean;
   }) {
-    if (!orgId || !user || !activePass) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
+      if (!orgId || !user || !activePass) return;
       await logPassFn({
         data: {
           clientId,
@@ -1410,6 +1435,22 @@ export function MarEmarTab({
           serviceContext,
         },
       });
+
+      // Optimistically update pill_count_current in the meds cache.
+      // pillCountValue = post-dose remaining count entered by staff.
+      // Phase 2B will persist this to the DB via the server function.
+      if (activePass.med.is_controlled && payload.pillCountValue !== null && payload.status === "administered") {
+        qc.setQueryData(
+          ["mar-meds", clientId, orgId],
+          (old: Medication[] | undefined) =>
+            (old ?? []).map((m) =>
+              m.id === activePass.med.id
+                ? { ...m, pill_count_current: payload.pillCountValue! }
+                : m
+            )
+        );
+      }
+
       toast.success(
         payload.isMedicationError
           ? "Medication error recorded. Administrator notified and incident drafted."
@@ -1423,6 +1464,8 @@ export function MarEmarTab({
       setActivePass(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not log medication pass.");
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -1652,6 +1695,27 @@ export function MarEmarTab({
                             {p.med.purpose && (
                               <p className="mt-0.5 text-xs text-muted-foreground">{p.med.purpose}</p>
                             )}
+
+                            {/* Refill alerts */}
+                            {p.med.is_controlled && p.med.pill_count_current !== null && p.med.pill_count_current <= 5 && (
+                              <div className="mt-1.5 flex items-center gap-1.5 rounded-md border border-amber-400 bg-amber-50 px-2 py-1 dark:bg-amber-950/20">
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                                <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-200">
+                                  Refill needed — {p.med.pill_count_current} dose{p.med.pill_count_current !== 1 ? "s" : ""} remaining
+                                </p>
+                              </div>
+                            )}
+                            {p.med.refill_date && (() => {
+                              const daysUntil = Math.ceil((new Date(p.med.refill_date!).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                              return daysUntil <= 7 ? (
+                                <div className="mt-1.5 flex items-center gap-1.5 rounded-md border border-blue-400 bg-blue-50 px-2 py-1 dark:bg-blue-950/20">
+                                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+                                  <p className="text-[11px] font-semibold text-blue-800 dark:text-blue-200">
+                                    Refill due {new Date(p.med.refill_date!).toLocaleDateString()} — confirm supply is on hand
+                                  </p>
+                                </div>
+                              ) : null;
+                            })()}
 
                             {/* Status chip */}
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

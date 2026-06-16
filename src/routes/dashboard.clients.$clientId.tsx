@@ -129,6 +129,9 @@ function ClientProfileHub() {
         <TabsContent value="codes" className="mt-6">
           <BillingCodesPanel clientId={clientId} />
         </TabsContent>
+        <TabsContent value="caseload" className="mt-6">
+          <CaseloadEditor clientId={clientId} />
+        </TabsContent>
         <TabsContent value="shifts" className="mt-6">
           <ShiftsPanel clientId={clientId} orgId={orgId} />
         </TabsContent>

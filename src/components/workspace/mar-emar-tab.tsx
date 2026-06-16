@@ -492,7 +492,7 @@ function AdminLogDialog({
 
   // Load org staff for second-witness selector (controlled substances only)
   const { data: orgMembers = [] } = useQuery({
-    enabled: !!org && !!med?.is_controlled,
+    enabled: !!org && !!pass?.med?.is_controlled,
     queryKey: ["org-members-simple", org?.organization_id],
     queryFn: async () => {
       const { data: members } = await supabase

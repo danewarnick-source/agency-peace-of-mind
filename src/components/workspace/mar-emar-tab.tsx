@@ -162,6 +162,45 @@ function fmtTimeLabel(hhmm: string): string {
   return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+// ─── Nectar AI Compliance card ────────────────────────────────────────────────
+
+const NECTAR_ACTIONS = [
+  "Simulate a 9 AM refusal → 11 AM success",
+  "Run Schedule II–IV narcotic audit",
+  "Simulate critical low inventory",
+  "Flag meds that worsen swallowing",
+];
+
+function NectarComplianceCard({ onSelect }: { onSelect: (action: string) => void }) {
+  return (
+    <div
+      className="rounded-lg border p-4"
+      style={{
+        background: "color-mix(in oklab, var(--accent-2) 12%, var(--card))",
+        borderColor: "color-mix(in oklab, var(--accent-2) 35%, transparent)",
+      }}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <Sparkles className="h-4 w-4" style={{ color: "var(--accent-2)" }} />
+        <h3 className="text-sm font-semibold">Nectar AI Compliance Assistant</h3>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {NECTAR_ACTIONS.map((a) => (
+          <button
+            key={a}
+            type="button"
+            onClick={() => onSelect(a)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/60"
+          >
+            <Sparkles className="h-3 w-3" style={{ color: "var(--accent-2)" }} />
+            {a}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function blockFor(time: string): Block {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -24,7 +25,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, Eraser, Loader2,
   Moon, Sun, Sunset, CalendarDays, ChevronLeft,
   ChevronRight, ShieldCheck, Pill, BookOpen, History,
-  AlertOctagon, Settings2, Sparkles,
+  AlertOctagon, Settings2, Sparkles, FilePlus2, Siren,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ import {
 } from "./emar-chart";
 import { EmarOpsPanel } from "./emar-ops-panel";
 import { EmarNectarPanel } from "./emar-nectar-panel";
+import { logMedicationPass, addEmarAddendum } from "@/lib/emar-pass.functions";
 
 
 
@@ -51,6 +53,7 @@ type Medication = {
   is_active: boolean;
   is_controlled: boolean;
   is_prn: boolean;
+  is_rescue: boolean;
   prn_instructions: string | null;
   pharmacy: string | null;
   rx_number: string | null;
@@ -67,6 +70,8 @@ type EmarLog = {
   medication_id: string;
   scheduled_for: string;
   administered_at: string | null;
+  actual_taken_at: string | null;
+  late_entry_gap_minutes: number | null;
   status: "administered" | "refused" | "omitted" | "missed";
   exception_reason: string | null;
   notes: string | null;
@@ -80,6 +85,7 @@ type EmarLog = {
   is_prn: boolean;
   prn_reason: string | null;
   admin_reviewed: boolean;
+  service_context: string | null;
   created_at?: string;
   recorded_in?: string | null;
 };
@@ -106,24 +112,23 @@ function bucketRecordedIn(code: string | null | undefined): "dsi" | "hhs" | "gen
   return "general";
 }
 
-type Block = "Morning" | "Noon" | "Evening" | "Night";
+type Block = "Morning" | "Evening" | "PRN";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ATTESTATION_TEXT =
-  "I attest that I have verified the Five Rights of Medication Administration: " +
-  "(1) Right Resident, (2) Right Medication, (3) Right Dose, (4) Right Route, (5) Right Time " +
-  "— and that this record is accurate and complete.";
+  "I confirm I observed or assisted this Person in self-administering their own prescribed medication, " +
+  "that I verified it matches the prescription's medication, dose, route, and time, " +
+  "and that this record is accurate and complete.";
 
 const EXCEPTION_REASONS = [
-  "Individual refused",
-  "Individual unavailable / sleeping",
+  "Person declined / refused",
+  "Person unavailable / sleeping",
   "Held per physician order",
   "NPO — medical hold",
   "Medication unavailable / out of stock",
   "Adverse reaction — withheld",
-  "Self-administered (witnessed by staff)",
-  "Appointment — administered by provider",
+  "Appointment — taken with provider",
   "Other (see notes)",
 ];
 
@@ -146,19 +151,16 @@ const ROUTES = [
 
 const BLOCK_META: Record<Block, { icon: typeof Sun; tone: string; bg: string; label: string }> = {
   Morning: { icon: Sun,    tone: "text-amber-600",   bg: "bg-amber-50 dark:bg-amber-950/20",   label: "Morning" },
-  Noon:    { icon: Sunset, tone: "text-orange-600",  bg: "bg-orange-50 dark:bg-orange-950/20", label: "Noon"    },
   Evening: { icon: Sunset, tone: "text-rose-500",    bg: "bg-rose-50 dark:bg-rose-950/20",     label: "Evening" },
-  Night:   { icon: Moon,   tone: "text-indigo-600",  bg: "bg-indigo-50 dark:bg-indigo-950/20", label: "Night"   },
+  PRN:     { icon: Pill,   tone: "text-indigo-600",  bg: "bg-indigo-50 dark:bg-indigo-950/20", label: "As-needed (PRN)" },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function blockFor(time: string): Block {
   const h = parseInt(time.split(":")[0] ?? "0", 10);
-  if (h < 11) return "Morning";
-  if (h < 14) return "Noon";
-  if (h < 18) return "Evening";
-  return "Night";
+  if (h < 14) return "Morning";
+  return "Evening";
 }
 
 function isoForToday(timeHHMM: string): string {
@@ -397,46 +399,54 @@ function MedicationDirectivesPanel({ med }: { med: Medication }) {
   );
 }
 
-// ─── Administration Log Dialog ────────────────────────────────────────────────
+// ─── Observe & Confirm Dialog ─────────────────────────────────────────────────
 
 function AdminLogDialog({
   pass,
   clientName,
+  serviceContext,
   onClose,
   onSubmit,
 }: {
   pass: { med: Medication; time: string; iso: string; existingLog?: EmarLog } | null;
   clientName: string;
+  serviceContext: string;
   onClose: () => void;
   onSubmit: (payload: {
     status: EmarLog["status"];
-    administeredAt: string;
+    actualTakenAt: string;
     route: string;
-    staffObserverName: string;
     exceptionReason: string | null;
     notes: string | null;
     signatureDataUrl: string | null;
-    pillCountVerified: boolean | null;
     pillCountValue: number | null;
+    pillCountExpected: number | null;
     prnReason: string | null;
     isMedicationError: boolean;
+    errorDescription: string | null;
+    seizureDurationSeconds: number | null;
+    seizureOutcome: string | null;
+    emergencyServicesCalled: boolean;
     attested: boolean;
   }) => Promise<void>;
 }) {
   const { user } = useAuth();
-  const staffDefaultName = user?.user_metadata?.full_name ?? user?.email ?? "";
+  const staffDisplayName =
+    (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
   const [status, setStatus] = useState<EmarLog["status"]>("administered");
-  const [administeredAt, setAdministeredAt] = useState(localDatetimeValue());
+  const [actualTakenAt, setActualTakenAt] = useState(localDatetimeValue());
   const [route, setRoute] = useState(pass?.med.route ?? "");
-  const [staffObserverName, setStaffObserverName] = useState(staffDefaultName);
   const [exceptionReason, setExceptionReason] = useState("");
   const [notes, setNotes] = useState("");
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
-  const [pillVerified, setPillVerified] = useState(false);
   const [pillCount, setPillCount] = useState("");
   const [prnReason, setPrnReason] = useState("");
   const [isMedError, setIsMedError] = useState(false);
+  const [errorDescription, setErrorDescription] = useState("");
+  const [seizureDuration, setSeizureDuration] = useState("");
+  const [seizureOutcome, setSeizureOutcome] = useState("");
+  const [emergencyCalled, setEmergencyCalled] = useState(false);
   const [attested, setAttested] = useState(false);
   const [busy, setBusy] = useState(false);
   const [activeSection, setActiveSection] = useState<"log" | "directives">("log");
@@ -444,15 +454,24 @@ function AdminLogDialog({
   const med = pass?.med;
   const isException = status !== "administered";
 
+  // Late-entry gap: time the Person actually took vs. now (when staff is documenting)
+  const gapMinutes = useMemo(() => {
+    if (!actualTakenAt) return 0;
+    return Math.max(0, Math.round((Date.now() - new Date(actualTakenAt).getTime()) / 60000));
+  }, [actualTakenAt]);
+  const showGapWarning = gapMinutes >= 15 && status === "administered";
+
   const canSubmit =
     !busy &&
     attested &&
     !!sigDataUrl &&
-    !!staffObserverName.trim() &&
     !!route &&
     (!isException || exceptionReason.trim().length >= 3) &&
-    (!med?.is_prn || prnReason.trim().length >= 3) &&
-    (!med?.is_controlled || status !== "administered" || (pillVerified && !!pillCount));
+    (!med?.is_prn || status !== "administered" || prnReason.trim().length >= 3) &&
+    (!med?.is_rescue || status !== "administered" ||
+      (seizureDuration.trim().length > 0 && seizureOutcome.trim().length >= 3)) &&
+    (!med?.is_controlled || status !== "administered" || pillCount.trim().length > 0) &&
+    (!isMedError || errorDescription.trim().length >= 3);
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -460,16 +479,19 @@ function AdminLogDialog({
     try {
       await onSubmit({
         status,
-        administeredAt: new Date(administeredAt).toISOString(),
+        actualTakenAt: new Date(actualTakenAt).toISOString(),
         route,
-        staffObserverName: staffObserverName.trim(),
         exceptionReason: isException ? exceptionReason.trim() : null,
         notes: notes.trim() || null,
         signatureDataUrl: sigDataUrl,
-        pillCountVerified: med?.is_controlled ? pillVerified : null,
         pillCountValue: med?.is_controlled && pillCount ? parseInt(pillCount, 10) : null,
-        prnReason: med?.is_prn ? prnReason.trim() : null,
+        pillCountExpected: med?.pill_count_current ?? null,
+        prnReason: med?.is_prn ? prnReason.trim() || null : null,
         isMedicationError: isMedError,
+        errorDescription: isMedError ? errorDescription.trim() : null,
+        seizureDurationSeconds: med?.is_rescue && seizureDuration ? parseInt(seizureDuration, 10) : null,
+        seizureOutcome: med?.is_rescue ? seizureOutcome.trim() || null : null,
+        emergencyServicesCalled: med?.is_rescue ? emergencyCalled : false,
         attested,
       });
     } finally {
@@ -520,18 +542,28 @@ function AdminLogDialog({
               </div>
             )}
 
-            {/* Date & Time — Contract: "time and date the medication was taken" */}
+            {/* Time the Person ACTUALLY took the medication — distinct from documentation time */}
             <div className="grid gap-1.5">
-              <Label className="text-xs font-semibold">Date & Time of Administration *</Label>
+              <Label className="text-xs font-semibold">Time the Person actually took this medication *</Label>
               <Input
                 type="datetime-local"
-                value={administeredAt}
-                onChange={(e) => setAdministeredAt(e.target.value)}
+                value={actualTakenAt}
+                onChange={(e) => setActualTakenAt(e.target.value)}
                 className="text-sm"
               />
               <p className="text-[11px] text-muted-foreground">
-                Defaults to current session time. Adjust only if documenting retroactively.
+                Defaults to now. If you're documenting after the fact, set the earlier time the Person actually
+                took it — both the actual time and the time you're documenting will be stored.
               </p>
+              {showGapWarning && (
+                <div className="flex items-start gap-1.5 rounded-md border border-amber-400 bg-amber-50 p-2 text-[11px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                  <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Late entry — you're documenting {gapMinutes} minute{gapMinutes === 1 ? "" : "s"} after the Person
+                    took it. Both timestamps will be recorded and the gap flagged on the audit trail.
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Medication — pre-filled, shown for confirmation */}
@@ -581,52 +613,85 @@ function AdminLogDialog({
 
             {/* Controlled substance pill count */}
             {med?.is_controlled && (
-              <div className="rounded-lg border border-purple-500/40 bg-purple-50 p-3 dark:bg-purple-950/20 space-y-3">
+              <div className="rounded-lg border border-purple-500/40 bg-purple-50 p-3 dark:bg-purple-950/20 space-y-2">
                 <Label className="text-xs font-semibold text-purple-800 dark:text-purple-200">
-                  Controlled Substance — Pill Count *
+                  Controlled Substance — Current count *
                 </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Count before administration</Label>
-                    <Input
-                      type="number" min="0"
-                      value={pillCount}
-                      onChange={(e) => setPillCount(e.target.value)}
-                      placeholder="e.g., 28"
-                      className="h-9 bg-white dark:bg-slate-900"
-                    />
-                  </div>
-                  <div className="flex items-end pb-2">
-                    <label className="flex cursor-pointer items-center gap-2 text-xs">
-                      <Checkbox checked={pillVerified} onCheckedChange={(c) => setPillVerified(!!c)} />
-                      <span>Count verified by second witness</span>
-                    </label>
-                  </div>
-                </div>
+                <Input
+                  type="number" min="0"
+                  value={pillCount}
+                  onChange={(e) => setPillCount(e.target.value)}
+                  placeholder={med.pill_count_current != null ? `Expected ${med.pill_count_current}` : "e.g., 28"}
+                  className="h-9 bg-white dark:bg-slate-900"
+                />
+                <p className="text-[11px] text-purple-700 dark:text-purple-300">
+                  Count remaining after this dose. Variance from the expected count is flagged on the audit trail.
+                </p>
               </div>
             )}
 
-            {/* Administration status */}
+            {/* Rescue medication — seizure capture */}
+            {med?.is_rescue && status === "administered" && (
+              <div className="rounded-lg border-2 border-rose-500/60 bg-rose-50 p-3 dark:bg-rose-950/20 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Siren className="h-4 w-4 text-rose-600" />
+                  <Label className="text-xs font-semibold text-rose-800 dark:text-rose-200">
+                    Rescue medication — seizure details *
+                  </Label>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-1">
+                    <Label className="text-[11px]">Seizure duration (seconds)</Label>
+                    <Input
+                      type="number" min="0"
+                      value={seizureDuration}
+                      onChange={(e) => setSeizureDuration(e.target.value)}
+                      placeholder="e.g., 120"
+                      className="h-9 bg-white dark:bg-slate-900"
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-[11px]">Response / outcome</Label>
+                    <Input
+                      value={seizureOutcome}
+                      onChange={(e) => setSeizureOutcome(e.target.value)}
+                      placeholder="e.g., resolved, slept, transported"
+                      className="h-9 bg-white dark:bg-slate-900"
+                    />
+                  </div>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-xs">
+                  <Checkbox checked={emergencyCalled} onCheckedChange={(c) => setEmergencyCalled(!!c)} />
+                  <span>Emergency services (911) were called</span>
+                </label>
+              </div>
+            )}
+
+            {/* Outcome — Person self-administered, refused, omitted, or missed */}
             <div className="grid gap-2">
               <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Administration Status *
+                Outcome *
               </Label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(["administered", "refused", "omitted", "missed"] as EmarLog["status"][]).map((s) => (
-                  <button
-                    key={s} type="button"
-                    onClick={() => { setStatus(s); if (s === "administered") setIsMedError(false); }}
-                    className={`rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition ${
-                      status === s
-                        ? s === "administered"
-                          ? "border-emerald-500 bg-emerald-600 text-white shadow-sm"
-                          : "border-rose-500 bg-rose-600 text-white shadow-sm"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {(["administered", "refused", "omitted", "missed"] as EmarLog["status"][]).map((s) => {
+                  const label =
+                    s === "administered" ? "Self-administered" :
+                    s === "refused" ? "Refused" :
+                    s === "omitted" ? "Omitted" : "Missed";
+                  return (
+                    <button
+                      key={s} type="button"
+                      onClick={() => { setStatus(s); if (s === "administered") setIsMedError(false); }}
+                      className={`rounded-lg border px-2 py-2 text-xs font-semibold transition ${
+                        status === s
+                          ? s === "administered"
+                            ? "border-emerald-500 bg-emerald-600 text-white shadow-sm"
+                            : "border-rose-500 bg-rose-600 text-white shadow-sm"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                      }`}
+                    >{label}</button>
+                  );
+                })}
               </div>
             </div>
 
@@ -637,9 +702,7 @@ function AdminLogDialog({
                   Exception Reason *
                 </Label>
                 <Select value={exceptionReason} onValueChange={setExceptionReason}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select reason..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select reason..." /></SelectTrigger>
                   <SelectContent>
                     {EXCEPTION_REASONS.map((r) => (
                       <SelectItem key={r} value={r}>{r}</SelectItem>
@@ -649,19 +712,15 @@ function AdminLogDialog({
               </div>
             )}
 
-            {/* Staff observer — Contract: "name of Staff that observed/assisted" */}
-            <div className="grid gap-1.5">
-              <Label className="text-xs font-semibold">
-                Staff Name — Observer / Administrator *
-              </Label>
-              <Input
-                value={staffObserverName}
-                onChange={(e) => setStaffObserverName(e.target.value)}
-                placeholder="Full name of staff who observed or assisted"
-                className="text-sm"
-              />
+            {/* Staff identity — pulled from the signed-in account, not typed */}
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Signing as
+              </p>
+              <p className="text-sm font-semibold">{staffDisplayName}</p>
               <p className="text-[11px] text-muted-foreground">
-                Per contract: name of staff who observed or assisted with medication administration.
+                Identity captured from your account. Logged via{" "}
+                <span className="font-mono">{serviceContext}</span>.
               </p>
             </div>
 
@@ -685,23 +744,28 @@ function AdminLogDialog({
                 onCheckedChange={(c) => setIsMedError(!!c)}
                 className="mt-0.5"
               />
-              <div>
+              <div className="flex-1">
                 <p className="text-xs font-semibold text-rose-800 dark:text-rose-200">
-                  This is a medication error requiring immediate reporting
+                  This pass was a medication error requiring immediate reporting
                 </p>
                 <p className="mt-0.5 text-[11px] text-rose-700 dark:text-rose-300">
-                  Checking this immediately notifies your administrator and flags this record for review.
+                  Checking this notifies the administrator, flags this record for review, and drafts a Critical Event / incident report.
                 </p>
+                {isMedError && (
+                  <Textarea
+                    rows={2}
+                    value={errorDescription}
+                    onChange={(e) => setErrorDescription(e.target.value)}
+                    placeholder="Briefly describe the medication error (what happened, who was notified)..."
+                    className="mt-2 bg-white text-sm dark:bg-slate-900"
+                    maxLength={2000}
+                  />
+                )}
               </div>
             </label>
 
-            {/* Signature pad */}
-            <SigPad
-              onSigned={setSigDataUrl}
-              label="Staff Signature"
-            />
+            <SigPad onSigned={setSigDataUrl} label="Staff Signature" />
 
-            {/* Five Rights attestation */}
             <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
               <Checkbox
                 checked={attested}
@@ -713,16 +777,16 @@ function AdminLogDialog({
               </p>
             </label>
 
-            {/* Submission guard hints */}
             {!canSubmit && (
               <ul className="space-y-0.5 rounded-lg bg-muted/40 p-3 text-[11px] text-muted-foreground">
                 {!sigDataUrl && <li>· Sign the signature field above</li>}
-                {!attested && <li>· Check the Five Rights attestation</li>}
-                {!staffObserverName.trim() && <li>· Enter the staff observer name</li>}
-                {!route && <li>· Select the route of administration</li>}
+                {!attested && <li>· Check the self-administration attestation</li>}
+                {!route && <li>· Select the route</li>}
                 {isException && exceptionReason.trim().length < 3 && <li>· Select an exception reason</li>}
-                {med?.is_prn && prnReason.trim().length < 3 && <li>· Enter the PRN reason</li>}
-                {med?.is_controlled && status === "administered" && !pillVerified && <li>· Verify and record pill count</li>}
+                {med?.is_prn && status === "administered" && prnReason.trim().length < 3 && <li>· Enter the PRN reason</li>}
+                {med?.is_rescue && status === "administered" && (!seizureDuration || seizureOutcome.trim().length < 3) && <li>· Enter seizure duration and outcome</li>}
+                {med?.is_controlled && status === "administered" && pillCount.trim().length === 0 && <li>· Record current pill count</li>}
+                {isMedError && errorDescription.trim().length < 3 && <li>· Describe the medication error</li>}
               </ul>
             )}
           </TabsContent>
@@ -1116,7 +1180,7 @@ export function MarEmarTab({
       const { data, error } = await (supabase as any)
         .from("client_medications")
         .select(`id, medication_name, dosage, frequency, route, scheduled_times,
-          instructions, prescriber, is_active, is_controlled, is_prn,
+          instructions, prescriber, is_active, is_controlled, is_prn, is_rescue,
           prn_instructions, pharmacy, rx_number, pill_count_current,
           purpose, adverse_effects, choking_risk, choking_risk_details`)
         .eq("client_id", clientId)
@@ -1199,7 +1263,7 @@ export function MarEmarTab({
       // PRN medications get a "log now" entry even without a scheduled time
       if (med.is_prn && med.scheduled_times.length === 0) {
         rows.push({
-          med, time: "PRN", iso: new Date().toISOString(), block: "Morning",
+          med, time: "PRN", iso: new Date().toISOString(), block: "PRN",
           history: [], log: undefined, isLocked: false,
         });
       }
@@ -1208,7 +1272,7 @@ export function MarEmarTab({
   }, [meds, todayLogs]);
 
   const grouped = useMemo(() => {
-    const m: Record<Block, typeof passes> = { Morning: [], Noon: [], Evening: [], Night: [] };
+    const m: Record<Block, typeof passes> = { Morning: [], Evening: [], PRN: [] };
     passes.forEach((p) => m[p.block].push(p));
     (Object.keys(m) as Block[]).forEach((k) =>
       m[k].sort((a, b) => a.time.localeCompare(b.time))
@@ -1219,87 +1283,67 @@ export function MarEmarTab({
   const pendingCount = passes.filter((p) => !p.isLocked).length;
   const errorCount = todayLogs.filter((l) => l.is_medication_error && !l.admin_reviewed).length;
 
-  // ── Submit administration ────────────────────────────────────────────────────
+  // ── Submit pass via server function (training gate + inventory + incident drafting) ──
+
+  const logPassFn = useServerFn(logMedicationPass);
+  const serviceContext = activeShift?.service_type_code || "general";
 
   async function submitAdmin(payload: {
     status: EmarLog["status"];
-    administeredAt: string;
+    actualTakenAt: string;
     route: string;
-    staffObserverName: string;
     exceptionReason: string | null;
     notes: string | null;
     signatureDataUrl: string | null;
-    pillCountVerified: boolean | null;
     pillCountValue: number | null;
+    pillCountExpected: number | null;
     prnReason: string | null;
     isMedicationError: boolean;
+    errorDescription: string | null;
+    seizureDurationSeconds: number | null;
+    seizureOutcome: string | null;
+    emergencyServicesCalled: boolean;
     attested: boolean;
   }) {
     if (!orgId || !user || !activePass) return;
-    const staffName = payload.staffObserverName || user.user_metadata?.full_name || user.email || "Staff";
-
-    // Stamp the precise active job/service code so every appended entry
-    // carries cross-departmental audit context (HHS, DSI, DSG, RHS, …).
-    const jobCode = activeShift?.service_type_code || "none";
-    const stampedNotes = `[code:${jobCode}]${payload.notes ? " " + payload.notes : ""}`;
-
-    const { data: inserted, error } = await (supabase as any)
-      .from("emar_logs")
-      .insert({
-        organization_id:       orgId,
-        client_id:             clientId,
-        medication_id:         activePass.med.id,
-        scheduled_for:         activePass.iso,
-        scheduled_time_label:  activePass.time,
-        administered_at:       payload.status === "administered" ? payload.administeredAt : null,
-        status:                payload.status,
-        // Store route in exception_reason with prefix so it's queryable
-        exception_reason:      payload.exceptionReason
-          ? `Route: ${payload.route} · ${payload.exceptionReason}`
-          : null,
-        notes:                 stampedNotes,
-        recorded_in:           bucketRecordedIn(activeShift?.service_type_code),
-        staff_id:              user.id,
-        staff_name:            staffName,
-        signature_attestation: payload.attested ? ATTESTATION_TEXT : null,
-        signature_data_url:    payload.signatureDataUrl,
-        is_prn:                activePass.med.is_prn,
-        prn_reason:            payload.prnReason,
-        is_controlled:         activePass.med.is_controlled,
-        pill_count_verified:   payload.pillCountVerified,
-        pill_count_value:      payload.pillCountValue,
-        is_medication_error:   payload.isMedicationError,
-        admin_reviewed:        false,
-      })
-      .select("id")
-      .single();
-
-    if (error) throw error;
-
-    // Notify admin if medication error
-    if (payload.isMedicationError && inserted) {
-      await (supabase as any).rpc("notify_medication_error", {
-        p_organization_id: orgId,
-        p_emar_log_id:     inserted.id,
-        p_client_name:     clientName,
-        p_med_name:        activePass.med.medication_name,
-        p_reporter_name:   staffName,
-        p_description:     payload.exceptionReason ?? payload.notes ?? "Error reported",
+    try {
+      await logPassFn({
+        data: {
+          clientId,
+          medicationId: activePass.med.id,
+          scheduledFor: activePass.iso,
+          scheduledTimeLabel: activePass.time,
+          status: payload.status,
+          route: payload.route,
+          actualTakenAt: payload.actualTakenAt,
+          exceptionReason: payload.exceptionReason,
+          notes: payload.notes,
+          signatureDataUrl: payload.signatureDataUrl ?? "",
+          prnReason: payload.prnReason,
+          seizureDurationSeconds: payload.seizureDurationSeconds,
+          seizureOutcome: payload.seizureOutcome,
+          emergencyServicesCalled: payload.emergencyServicesCalled,
+          controlledCountedValue: payload.pillCountValue,
+          controlledExpected: payload.pillCountExpected,
+          isMedicationError: payload.isMedicationError,
+          errorDescription: payload.errorDescription,
+          serviceContext,
+        },
       });
+      toast.success(
+        payload.isMedicationError
+          ? "Medication error recorded. Administrator notified and incident drafted."
+          : payload.status === "administered"
+          ? "Self-administration confirmed and signed."
+          : "Exception documented.",
+      );
+      qc.invalidateQueries({ queryKey: ["mar-logs-today", clientId, orgId] });
+      qc.invalidateQueries({ queryKey: ["mar-logs-cal", clientId] });
+      qc.invalidateQueries({ queryKey: ["mar-logs-month", clientId, orgId] });
+      setActivePass(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not log medication pass.");
     }
-
-    toast.success(
-      payload.isMedicationError
-        ? "Medication error recorded. Administrator has been notified."
-        : payload.status === "administered"
-        ? "Administration confirmed and signed."
-        : "Exception documented."
-    );
-
-    qc.invalidateQueries({ queryKey: ["mar-logs-today", clientId, orgId] });
-    qc.invalidateQueries({ queryKey: ["mar-logs-cal", clientId] });
-    qc.invalidateQueries({ queryKey: ["mar-logs-month", clientId, orgId] });
-    setActivePass(null);
   }
 
   if (medsLoading || safetyLoading) {

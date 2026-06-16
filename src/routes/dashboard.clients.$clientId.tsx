@@ -30,7 +30,7 @@ import {
 const search = z.object({
   tab: z
     .enum([
-      "overview", "plan", "codes", "shifts", "logs", "incidents",
+      "overview", "plan", "codes", "caseload", "shifts", "logs", "incidents",
       "summaries", "hhcert", "deadlines", "documents",
     ])
     .optional(),

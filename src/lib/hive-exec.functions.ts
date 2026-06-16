@@ -497,3 +497,93 @@ export const updateTicket = createServerFn({ method: "POST" })
     );
     return { ok: true };
   });
+
+// ───── Organization name fields update (HIVE Executive only) ───────────────
+
+function normName(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t === "" ? null : t;
+}
+
+function validateOrgNamesInput(input: unknown): {
+  organizationId: string;
+  attestation: boolean;
+  patch: {
+    name?: string;
+    legal_name?: string | null;
+    dba_name?: string | null;
+    display_acronym?: string | null;
+  };
+} {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const organizationId = typeof i.organizationId === "string" ? i.organizationId : "";
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id.");
+  if (i.attestation !== true) {
+    throw new Error("Approval attestation required to change organization identifying information.");
+  }
+  const p = (i.patch ?? {}) as Record<string, unknown>;
+  const out: ReturnType<typeof validateOrgNamesInput>["patch"] = {};
+  const name = normName(p.name);
+  if (name === null) throw new Error("Company name cannot be empty.");
+  if (typeof name === "string") {
+    if (name.length > 200) throw new Error("Company name too long.");
+    out.name = name;
+  }
+  const legal = normName(p.legal_name);
+  if (legal !== undefined) out.legal_name = legal;
+  const dba = normName(p.dba_name);
+  if (dba !== undefined) out.dba_name = dba;
+  const acr = normName(p.display_acronym);
+  if (acr !== undefined) {
+    if (acr && acr.length > 12) throw new Error("Display acronym must be 12 characters or fewer.");
+    out.display_acronym = acr;
+  }
+  return { organizationId, attestation: true, patch: out };
+}
+
+export const updateOrgNames = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validateOrgNamesInput)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await ensureExecutive(supabase, userId);
+
+    const { data: before, error: bErr } = await supabase
+      .from("organizations")
+      .select("id, name, legal_name, dba_name, display_acronym")
+      .eq("id", data.organizationId)
+      .maybeSingle();
+    if (bErr) throw bErr;
+    if (!before) throw new Error("Organization not found.");
+
+    type Row = { name: string; legal_name: string | null; dba_name: string | null; display_acronym: string | null };
+    const b = before as unknown as Row;
+    const updates: Record<string, unknown> = {};
+    const diffs: Array<{ field: string; old: string | null; new: string | null }> = [];
+    const fields: Array<keyof Row> = ["name", "legal_name", "dba_name", "display_acronym"];
+    for (const f of fields) {
+      if (f in data.patch) {
+        const next = (data.patch as Record<string, string | null | undefined>)[f] ?? null;
+        const prev = b[f] ?? null;
+        if (next !== prev) {
+          updates[f] = next;
+          diffs.push({ field: f, old: prev, new: next });
+        }
+      }
+    }
+    if (!diffs.length) return { ok: true, changed: 0 };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: uErr } = await supabase.from("organizations").update(updates as any).eq("id", data.organizationId);
+    if (uErr) throw uErr;
+
+    const summary =
+      "Org identifying info updated (with approval attestation): " +
+      diffs.map((d) => `${d.field}: ${JSON.stringify(d.old)} → ${JSON.stringify(d.new)}`).join("; ");
+    await audit(supabase, userId, "update_org_names", data.organizationId, summary);
+
+    return { ok: true, changed: diffs.length };
+  });

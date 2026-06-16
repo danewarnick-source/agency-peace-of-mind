@@ -542,18 +542,28 @@ function AdminLogDialog({
               </div>
             )}
 
-            {/* Date & Time — Contract: "time and date the medication was taken" */}
+            {/* Time the Person ACTUALLY took the medication — distinct from documentation time */}
             <div className="grid gap-1.5">
-              <Label className="text-xs font-semibold">Date & Time of Administration *</Label>
+              <Label className="text-xs font-semibold">Time the Person actually took this medication *</Label>
               <Input
                 type="datetime-local"
-                value={administeredAt}
-                onChange={(e) => setAdministeredAt(e.target.value)}
+                value={actualTakenAt}
+                onChange={(e) => setActualTakenAt(e.target.value)}
                 className="text-sm"
               />
               <p className="text-[11px] text-muted-foreground">
-                Defaults to current session time. Adjust only if documenting retroactively.
+                Defaults to now. If you're documenting after the fact, set the earlier time the Person actually
+                took it — both the actual time and the time you're documenting will be stored.
               </p>
+              {showGapWarning && (
+                <div className="flex items-start gap-1.5 rounded-md border border-amber-400 bg-amber-50 p-2 text-[11px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                  <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Late entry — you're documenting {gapMinutes} minute{gapMinutes === 1 ? "" : "s"} after the Person
+                    took it. Both timestamps will be recorded and the gap flagged on the audit trail.
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Medication — pre-filled, shown for confirmation */}
@@ -603,28 +613,57 @@ function AdminLogDialog({
 
             {/* Controlled substance pill count */}
             {med?.is_controlled && (
-              <div className="rounded-lg border border-purple-500/40 bg-purple-50 p-3 dark:bg-purple-950/20 space-y-3">
+              <div className="rounded-lg border border-purple-500/40 bg-purple-50 p-3 dark:bg-purple-950/20 space-y-2">
                 <Label className="text-xs font-semibold text-purple-800 dark:text-purple-200">
-                  Controlled Substance — Pill Count *
+                  Controlled Substance — Current count *
                 </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Count before administration</Label>
+                <Input
+                  type="number" min="0"
+                  value={pillCount}
+                  onChange={(e) => setPillCount(e.target.value)}
+                  placeholder={med.pill_count_current != null ? `Expected ${med.pill_count_current}` : "e.g., 28"}
+                  className="h-9 bg-white dark:bg-slate-900"
+                />
+                <p className="text-[11px] text-purple-700 dark:text-purple-300">
+                  Count remaining after this dose. Variance from the expected count is flagged on the audit trail.
+                </p>
+              </div>
+            )}
+
+            {/* Rescue medication — seizure capture */}
+            {med?.is_rescue && status === "administered" && (
+              <div className="rounded-lg border-2 border-rose-500/60 bg-rose-50 p-3 dark:bg-rose-950/20 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Siren className="h-4 w-4 text-rose-600" />
+                  <Label className="text-xs font-semibold text-rose-800 dark:text-rose-200">
+                    Rescue medication — seizure details *
+                  </Label>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-1">
+                    <Label className="text-[11px]">Seizure duration (seconds)</Label>
                     <Input
                       type="number" min="0"
-                      value={pillCount}
-                      onChange={(e) => setPillCount(e.target.value)}
-                      placeholder="e.g., 28"
+                      value={seizureDuration}
+                      onChange={(e) => setSeizureDuration(e.target.value)}
+                      placeholder="e.g., 120"
                       className="h-9 bg-white dark:bg-slate-900"
                     />
                   </div>
-                  <div className="flex items-end pb-2">
-                    <label className="flex cursor-pointer items-center gap-2 text-xs">
-                      <Checkbox checked={pillVerified} onCheckedChange={(c) => setPillVerified(!!c)} />
-                      <span>Count verified by second witness</span>
-                    </label>
+                  <div className="grid gap-1">
+                    <Label className="text-[11px]">Response / outcome</Label>
+                    <Input
+                      value={seizureOutcome}
+                      onChange={(e) => setSeizureOutcome(e.target.value)}
+                      placeholder="e.g., resolved, slept, transported"
+                      className="h-9 bg-white dark:bg-slate-900"
+                    />
                   </div>
                 </div>
+                <label className="flex cursor-pointer items-center gap-2 text-xs">
+                  <Checkbox checked={emergencyCalled} onCheckedChange={(c) => setEmergencyCalled(!!c)} />
+                  <span>Emergency services (911) were called</span>
+                </label>
               </div>
             )}
 

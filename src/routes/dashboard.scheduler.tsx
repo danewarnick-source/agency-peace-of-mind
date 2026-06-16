@@ -36,6 +36,7 @@ import {
   saveDayProgramSession, markAttendance, addSessionStaff,
 } from "@/lib/scheduler/scheduler.functions";
 import { evvServiceLabel } from "@/lib/evv-codes";
+import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 
 export const Route = createFileRoute("/dashboard/scheduler")({
   head: () => ({

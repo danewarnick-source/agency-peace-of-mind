@@ -74,6 +74,7 @@ export function NectarBar({
   const qc = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [repeatOpen, setRepeatOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
   const [picked, setPicked] = useState<Set<number>>(new Set());

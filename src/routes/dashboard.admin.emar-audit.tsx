@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Download, ShieldAlert } from "lucide-react";
+import { type EmarStatus, normalizeEmarStatus, EMAR_STATUS_LABELS } from "@/lib/emar-status";
 
 export const Route = createFileRoute("/dashboard/admin/emar-audit")({
   head: () => ({ meta: [{ title: "eMAR Audit — HIVE" }] }),
@@ -23,14 +24,14 @@ export const Route = createFileRoute("/dashboard/admin/emar-audit")({
 type Row = {
   id: string; client_id: string; medication_id: string;
   scheduled_for: string; administered_at: string | null;
-  status: "administered" | "refused" | "omitted" | "missed";
+  status: EmarStatus;
   exception_reason: string | null; notes: string | null;
   staff_id: string | null; staff_name: string | null; signature_attestation: string | null;
   client_name?: string; medication_name?: string; dosage?: string | null; team_name?: string | null;
 };
 
-const STATUS_COLOR: Record<Row["status"], string> = {
-  administered: "bg-emerald-100 text-emerald-800",
+const STATUS_COLOR: Record<EmarStatus, string> = {
+  self_administered: "bg-emerald-100 text-emerald-800",
   refused: "bg-rose-100 text-rose-800",
   omitted: "bg-rose-100 text-rose-800",
   missed: "bg-amber-100 text-amber-800",
@@ -60,16 +61,17 @@ function AuditPage() {
       );
       const medMap = new Map((meds as unknown as Array<{ id: string; medication_name: string; dosage: string | null }> ?? []).map((m) => [m.id, m]));
       const teamMap = new Map((teams as unknown as Array<{ id: string; team_name: string }> ?? []).map((t) => [t.id, t.team_name]));
-      return ((logs ?? []) as unknown as Row[]).map((l) => {
+      return ((logs ?? []) as unknown as Array<Omit<Row, "status"> & { status: string }>).map((l) => {
         const c = clientMap.get(l.client_id);
         const m = medMap.get(l.medication_id);
         return {
           ...l,
+          status: normalizeEmarStatus(l.status),
           client_name: c ? `${c.first_name} ${c.last_name}` : "—",
           medication_name: m?.medication_name ?? "—",
           dosage: m?.dosage ?? null,
           team_name: c?.team_id ? teamMap.get(c.team_id) ?? null : null,
-        };
+        } as Row;
       });
     },
   });
@@ -163,7 +165,7 @@ function AuditPage() {
               <TableBody>
                 {filtered.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell><Badge className={STATUS_COLOR[r.status]}>{r.status}</Badge></TableCell>
+                    <TableCell><Badge className={STATUS_COLOR[r.status]}>{EMAR_STATUS_LABELS[r.status]}</Badge></TableCell>
                     <TableCell className="font-medium">{r.client_name}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{r.team_name ?? "—"}</TableCell>
                     <TableCell className="text-xs">{r.medication_name}{r.dosage && ` · ${r.dosage}`}</TableCell>

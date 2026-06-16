@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const StatusEnum = z.enum(["administered", "refused", "omitted", "missed"]);
+const StatusEnum = z.enum(["self_administered", "refused", "omitted", "missed"]);
 
 const PassInput = z.object({
   clientId: z.string().uuid(),
@@ -28,6 +28,8 @@ const PassInput = z.object({
   errorDescription: z.string().max(2000).optional().nullable(),
   // Service context resolved on the client (HHS, DSI, etc.)
   serviceContext: z.string().max(40).optional().nullable(),
+  // Controlled-substance second-witness identity (profile UUID)
+  secondWitnessId: z.string().uuid().optional().nullable(),
 });
 
 export const logMedicationPass = createServerFn({ method: "POST" })
@@ -77,15 +79,15 @@ export const logMedicationPass = createServerFn({ method: "POST" })
     };
     const m = med as MedRow;
 
-    if (m.is_prn && data.status === "administered" && !data.prnReason?.trim()) {
+    if (m.is_prn && data.status === "self_administered" && !data.prnReason?.trim()) {
       throw new Error("PRN reason is required.");
     }
-    if (m.is_rescue && data.status === "administered") {
+    if (m.is_rescue && data.status === "self_administered") {
       if (data.seizureDurationSeconds == null || !data.seizureOutcome?.trim()) {
         throw new Error("Rescue medication requires seizure duration and outcome.");
       }
     }
-    if (m.is_controlled && data.status === "administered") {
+    if (m.is_controlled && data.status === "self_administered") {
       if (data.controlledCountedValue == null) {
         throw new Error("Controlled-substance count is required.");
       }
@@ -115,16 +117,27 @@ export const logMedicationPass = createServerFn({ method: "POST" })
           ? "dsi"
           : "general";
 
+    // Dedupe guard: reject if a terminal-status row already exists for this dose
+    const { data: existingLog } = await supabase
+      .from("emar_logs")
+      .select("id")
+      .eq("medication_id", data.medicationId)
+      .eq("scheduled_for", data.scheduledFor)
+      .in("status", ["self_administered", "refused", "omitted", "missed"])
+      .maybeSingle();
+    if (existingLog) throw new Error("This dose has already been documented.");
+
     const insertPayload = {
       organization_id: orgId,
       client_id: data.clientId,
       medication_id: data.medicationId,
       scheduled_for: data.scheduledFor,
       scheduled_time_label: data.scheduledTimeLabel ?? null,
-      administered_at: data.status === "administered" ? data.actualTakenAt : null,
-      actual_taken_at: data.status === "administered" ? data.actualTakenAt : null,
+      administered_at: data.status === "self_administered" ? data.actualTakenAt : null,
+      actual_taken_at: data.status === "self_administered" ? data.actualTakenAt : null,
       status: data.status,
-      exception_reason: data.status === "administered" ? null : (data.exceptionReason ?? null),
+      route: data.route ?? null,
+      exception_reason: data.status === "self_administered" ? null : (data.exceptionReason ?? null),
       notes: data.notes ?? null,
       staff_id: userId,
       staff_name: fullName,
@@ -143,6 +156,7 @@ export const logMedicationPass = createServerFn({ method: "POST" })
       emergency_services_called: data.emergencyServicesCalled ?? null,
       service_context: data.serviceContext ?? null,
       recorded_in: recordedIn,
+      second_witness_id: data.secondWitnessId ?? null,
     };
 
     const { data: inserted, error: insErr } = await supabase
@@ -175,7 +189,7 @@ export const logMedicationPass = createServerFn({ method: "POST" })
     }
 
     // Inventory decrement on confirmed self-administration
-    if (data.status === "administered" && typeof m.pill_count_current === "number") {
+    if (data.status === "self_administered" && typeof m.pill_count_current === "number") {
       const next = Math.max(0, m.pill_count_current - 1);
       const refillStatus =
         next <= (m.refill_threshold ?? 7) && m.refill_status === "ok" ? "pending" : m.refill_status;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+
 import { Pill, AlertTriangle, CheckCircle2, Eraser, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -262,11 +262,12 @@ export function ShiftMedAttestation({
                       <CheckCircle2 className="h-3 w-3" /> Logged
                     </span>
                   ) : (
-                    <Button asChild type="button" size="sm" variant="outline" className="h-8 gap-1 text-[11px]">
-                      <Link to={emarHref}>
-                        <ExternalLink className="h-3 w-3" /> Log pass
-                      </Link>
-                    </Button>
+                    <a
+                      href={emarHref}
+                      className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2.5 text-[11px] font-medium hover:bg-secondary"
+                    >
+                      <ExternalLink className="h-3 w-3" /> Log pass
+                    </a>
                   )}
                 </li>
               ))}

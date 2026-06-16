@@ -552,8 +552,6 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           value={medAttestation}
           onChange={setMedAttestation}
         />
-          <span>I attest this note accurately reflects today's support.</span>
-        </label>
 
         {/* Action buttons */}
         <div className="space-y-2"

@@ -509,6 +509,7 @@ function HomePill({ label, active, onClick }: { label: string; active: boolean; 
   );
 }
 
+const FALLBACK_PALETTE = ["#3b6aa8", "#7d4cdb", "#137182", "#d6438a", "#f59324", "#3a8acc", "#dc3a3a", "#7eb45b", "#4a5b8c", "#a36cd6", "#2e8b75", "#c0593f"];
 function codeColor(code: string): string {
   switch (code) {
     case "SLH": return "#3b6aa8";
@@ -519,7 +520,12 @@ function codeColor(code: string): string {
     case "RHS": return "#3a8acc";
     case "PM1": return "#dc3a3a";
     case "DSI": return "#7eb45b";
-    default: return NAVY;
+    default: {
+      // Stable hash → palette so unknown codes get a consistent color.
+      let h = 0;
+      for (let i = 0; i < code.length; i++) h = (h * 31 + code.charCodeAt(i)) >>> 0;
+      return FALLBACK_PALETTE[h % FALLBACK_PALETTE.length];
+    }
   }
 }
 

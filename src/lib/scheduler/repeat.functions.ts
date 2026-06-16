@@ -100,13 +100,13 @@ export const previewRepeat = createServerFn({ method: "POST" })
     organization_id: string;
     source_start_iso: string;
     source_end_iso: string;
-    target_days: string[];
+    target_week_start_iso: string;
   }) =>
     z.object({
       organization_id: z.string().uuid(),
       source_start_iso: z.string().min(8),
       source_end_iso: z.string().min(8),
-      target_days: z.array(z.string().min(8)).max(366),
+      target_week_start_iso: z.string().min(8),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -115,7 +115,7 @@ export const previewRepeat = createServerFn({ method: "POST" })
     const src = await loadSourceShifts(
       supabase, data.organization_id, data.source_start_iso, data.source_end_iso,
     );
-    const projected = projectShifts(src, data.source_start_iso, data.target_days);
+    const projected = projectShifts(src, data.target_week_start_iso);
     return { source_count: src.length, projected };
   });
 
@@ -128,19 +128,20 @@ export const applyRepeat = createServerFn({ method: "POST" })
     organization_id: string;
     source_start_iso: string;
     source_end_iso: string;
-    target_days: string[];
+    target_week_start_iso: string;
     keep_staff: boolean;
     skip_if_exists: boolean;
-    // Optional: subset of source shift ids to include
+    publish_now?: boolean;
     include_source_ids?: string[];
   }) =>
     z.object({
       organization_id: z.string().uuid(),
       source_start_iso: z.string().min(8),
       source_end_iso: z.string().min(8),
-      target_days: z.array(z.string().min(8)).max(366),
+      target_week_start_iso: z.string().min(8),
       keep_staff: z.boolean(),
       skip_if_exists: z.boolean(),
+      publish_now: z.boolean().optional(),
       include_source_ids: z.array(z.string().uuid()).optional(),
     }).parse(d),
   )
@@ -153,7 +154,7 @@ export const applyRepeat = createServerFn({ method: "POST" })
     const filtered = data.include_source_ids
       ? src.filter((s) => data.include_source_ids!.includes(s.id))
       : src;
-    const projected = projectShifts(filtered, data.source_start_iso, data.target_days);
+    const projected = projectShifts(filtered, data.target_week_start_iso);
 
     // Optionally skip if the same client/code/start already exists on the target day.
     let existing: Array<{ client_id: string; service_code: string | null; job_code: string | null; starts_at: string }> = [];
@@ -200,9 +201,9 @@ export const applyRepeat = createServerFn({ method: "POST" })
         is_awake_overnight: p.is_awake_overnight,
         notes: p.notes,
         status: data.keep_staff && p.staff_id ? "pending" : "open",
-        published: false,
+        published: data.publish_now === true,
         created_by: userId,
-        created_from: "repeat",
+        created_from: "copy",
       });
     }
     if (rows.length > 0) {

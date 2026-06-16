@@ -61,13 +61,18 @@ export function NectarBar({
   organizationId,
   weekStartIso,
   clientNameById,
+  staffNameById,
+  anchor,
 }: {
   organizationId: string;
   weekStartIso: string;
   clientNameById: Map<string, string>;
+  staffNameById?: Map<string, string>;
+  anchor?: Date;
 }) {
   const qc = useQueryClient();
   const [prompt, setPrompt] = useState("");
+  const [repeatOpen, setRepeatOpen] = useState(false);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
   const [picked, setPicked] = useState<Set<number>>(new Set());

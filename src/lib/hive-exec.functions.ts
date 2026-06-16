@@ -257,11 +257,12 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
 
     const { data: org, error: orgErr } = await supabase
       .from("organizations")
-      .select("id, name")
+      .select("id, name, legal_name, dba_name, display_acronym")
       .eq("id", data.organizationId)
       .maybeSingle();
     if (orgErr) throw orgErr;
     if (!org) throw new Error("Organization not found.");
+
 
     const { data: sub } = await supabase
       .from("org_subscriptions")

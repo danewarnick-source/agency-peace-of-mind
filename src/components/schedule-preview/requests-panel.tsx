@@ -109,8 +109,10 @@ export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: St
             <b style={{ fontSize: 12.5, fontWeight: 800, display: "block" }}>Needs approval</b>
             <span style={{ fontSize: 11, color: SCHED.muted }}>{pendingCount === 0 ? "All caught up" : `${pendingCount} pending`}</span>
           </div>
-          <span style={cnt(pendingCount === 0)}>{pendingCount}</span>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={cnt(pendingCount === 0)}>{pendingCount}</span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </div>
         </div>
 
         <div
@@ -123,8 +125,10 @@ export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: St
             <b style={{ fontSize: 12.5, fontWeight: 800, display: "block" }}>Out this week</b>
             <span style={{ fontSize: 11, color: SCHED.muted }}>{outThisWeek.length === 0 ? "Everyone available" : `${outThisWeek.length} away`}</span>
           </div>
-          <span style={cnt(true)}>{outThisWeek.length}</span>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={cnt(true)}>{outThisWeek.length}</span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </div>
         </div>
       </div>
 

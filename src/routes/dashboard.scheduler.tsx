@@ -386,7 +386,7 @@ function CodeSection({
   onSetAdminHours: (c: SchedClient) => void;
   onDayJump: (d: Date) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   // Clients authorized for this code
   const authedClients = useMemo(() => {
     const ids = new Set(

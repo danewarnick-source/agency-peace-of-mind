@@ -571,19 +571,50 @@ function EmptyState() {
   );
 }
 
+const LAST_SEEN_KEY = "hive.schedule.lastSeenAt";
+
 function SchedulePage() {
   const [view, setView] = useState<ViewMode>("day");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const { settings } = useTimePaySettings();
-  const { data: shifts, isLoading } = useMyScheduledShifts(view, anchor);
+  const { data: rawShifts, isLoading } = useMyScheduledShifts(view, anchor);
+  const { data: dpSessions } = useMyDayProgramSessions(view, anchor);
   const { data: org } = useCurrentOrg();
   const range = rangeFor(view, anchor);
+  const { user } = useAuth();
+
+  // "Updated" badge: anything whose updated_at is newer than the last time
+  // the staff member opened this page. First visit = no badges (everything
+  // is "new"). We only flip the stored marker AFTER the user acknowledges
+  // or after a short delay, so the badge doesn't disappear on first paint.
+  const lastSeenAt = useMemo(() => {
+    if (typeof window === "undefined" || !user?.id) return 0;
+    const v = window.localStorage.getItem(`${LAST_SEEN_KEY}:${user.id}`);
+    return v ? Number(v) : 0;
+  }, [user?.id]);
+
+  const shifts = useMemo(() => {
+    if (!rawShifts) return rawShifts;
+    return rawShifts.map((s) => ({
+      ...s,
+      is_updated: lastSeenAt > 0 && new Date(s.updated_at).getTime() > lastSeenAt,
+    }));
+  }, [rawShifts, lastSeenAt]);
+
+  const acknowledge = () => {
+    if (typeof window === "undefined" || !user?.id) return;
+    window.localStorage.setItem(`${LAST_SEEN_KEY}:${user.id}`, String(Date.now()));
+    toast.success("Marked as seen.");
+    // Cheap refresh so badges clear without a manual reload.
+    window.setTimeout(() => window.location.reload(), 250);
+  };
 
   const goPrev = () => setAnchor((a) => shiftAnchor(view, a, -1));
   const goNext = () => setAnchor((a) => shiftAnchor(view, a, 1));
   const goToday = () => setAnchor(new Date());
 
   const hasHhsVisit = (shifts ?? []).some((s) => !!hhsVisitLabel(s.job_code, s.is_host_home));
+  const updatedCount = (shifts ?? []).filter((s) => s.is_updated).length;
 
   return (
     <div className="mx-auto w-full max-w-xl space-y-5">
@@ -596,7 +627,14 @@ function SchedulePage() {
 
       {hasHhsVisit && <HhsExplainerBanner />}
 
-      <div className="flex justify-end">
+      <div className="flex justify-between gap-2">
+        {updatedCount > 0 ? (
+          <Button variant="ghost" size="sm" className="min-h-[40px]" onClick={acknowledge}>
+            Mark {updatedCount} update{updatedCount === 1 ? "" : "s"} as seen
+          </Button>
+        ) : (
+          <span />
+        )}
         <RequestTimeOffDialog
           trigger={
             <Button variant="outline" size="sm" className="min-h-[40px]">
@@ -675,6 +713,43 @@ function SchedulePage() {
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
+
+      {/* Day program sessions I'm running (DSG/DSP/SED/DSI groups) */}
+      {dpSessions && dpSessions.length > 0 && (
+        <section aria-label="Day program sessions" className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Day Program — sessions you're leading
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {dpSessions.map((sess) => (
+              <li key={sess.id}>
+                <Link
+                  to="/dashboard/scheduler"
+                  className="block rounded-xl border border-border bg-card p-3 shadow-sm hover:border-[color:var(--amber-600,#f59324)]/60"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {sess.location_label ?? "Day Program"}
+                      </p>
+                      <h3 className="text-sm font-semibold text-foreground">
+                        {sess.service_code} session · {fmtDayHeader(sess.session_date)}
+                      </h3>
+                      <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span className="tabular-nums">{fmtTimeRange(sess.start_time, sess.end_time)}</span>
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-[color:var(--amber-600,#f59324)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,#d97a1c)]">
+                      One clock-in · roster
+                    </span>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Shift list */}
       <section aria-label="Scheduled shifts">

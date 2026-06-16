@@ -497,25 +497,16 @@ function AdminLogDialog({
   const [directivesOpen, setDirectivesOpen] = useState(false);
 
   const med = pass?.med;
-  const isException = status !== "administered";
-
-  // Late-entry gap: time the Person actually took vs. now (when staff is documenting)
-  const gapMinutes = useMemo(() => {
-    if (!actualTakenAt) return 0;
-    return Math.max(0, Math.round((Date.now() - new Date(actualTakenAt).getTime()) / 60000));
-  }, [actualTakenAt]);
-  const showGapWarning = gapMinutes >= 15 && status === "administered";
 
   const canSubmit =
     !busy &&
     attested &&
     !!sigDataUrl &&
     !!route &&
-    (!isException || exceptionReason.trim().length >= 3) &&
-    (!med?.is_prn || status !== "administered" || prnReason.trim().length >= 3) &&
-    (!med?.is_rescue || status !== "administered" ||
+    (!med?.is_prn || prnReason.trim().length >= 3) &&
+    (!med?.is_rescue ||
       (seizureDuration.trim().length > 0 && seizureOutcome.trim().length >= 3)) &&
-    (!med?.is_controlled || status !== "administered" || pillCount.trim().length > 0) &&
+    (!med?.is_controlled || pillCount.trim().length > 0) &&
     (!isMedError || errorDescription.trim().length >= 3);
 
   async function handleSubmit() {
@@ -526,7 +517,7 @@ function AdminLogDialog({
         status,
         actualTakenAt: new Date(actualTakenAt).toISOString(),
         route,
-        exceptionReason: isException ? exceptionReason.trim() : null,
+        exceptionReason: null,
         notes: notes.trim() || null,
         signatureDataUrl: sigDataUrl,
         pillCountValue: med?.is_controlled && pillCount ? parseInt(pillCount, 10) : null,
@@ -543,6 +534,7 @@ function AdminLogDialog({
       setBusy(false);
     }
   }
+
 
   if (!pass) return null;
 

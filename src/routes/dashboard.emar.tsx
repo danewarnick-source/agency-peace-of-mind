@@ -12,8 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Pill, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Pill, CheckCircle2, AlertTriangle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { EmarLegalBanner } from "@/components/workspace/emar-chart";
+import { usePermissions } from "@/hooks/use-permissions";
+
 
 export const Route = createFileRoute("/dashboard/emar")({
   head: () => ({ meta: [{ title: "eMAR Pass — HIVE" }] }),

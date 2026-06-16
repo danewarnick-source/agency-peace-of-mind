@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Sparkles, Wand2, AlertTriangle, Loader2, Check } from "lucide-react";
+import { Sparkles, Wand2, AlertTriangle, Loader2, Check, Repeat } from "lucide-react";
 import {
   nectarDraftShifts,
   autoFillOpenShifts,
@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { RepeatShiftsDialog } from "./repeat-shifts-dialog";
 
 type Draft = {
   staff_id: string | null;

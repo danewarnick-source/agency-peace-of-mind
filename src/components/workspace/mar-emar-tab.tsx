@@ -480,10 +480,9 @@ function AdminLogDialog({
   const staffDisplayName =
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
-  const [status, setStatus] = useState<EmarLog["status"]>("administered");
-  const [actualTakenAt, setActualTakenAt] = useState(localDatetimeValue());
+  const status: EmarLog["status"] = "administered";
+  const [actualTakenAt] = useState(localDatetimeValue());
   const [route, setRoute] = useState(pass?.med.route ?? "");
-  const [exceptionReason, setExceptionReason] = useState("");
   const [notes, setNotes] = useState("");
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
   const [pillCount, setPillCount] = useState("");
@@ -495,7 +494,7 @@ function AdminLogDialog({
   const [emergencyCalled, setEmergencyCalled] = useState(false);
   const [attested, setAttested] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [activeSection, setActiveSection] = useState<"log" | "directives">("log");
+  const [directivesOpen, setDirectivesOpen] = useState(false);
 
   const med = pass?.med;
   const isException = status !== "administered";

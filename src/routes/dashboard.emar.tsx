@@ -59,31 +59,69 @@ const ATTESTATION = "I certify under penalty of administrative non-compliance th
 function EmarPage() {
   const { data: org } = useCurrentOrg();
   const { user } = useAuth();
+  const { role } = usePermissions();
+  const isAdminLike = role === "admin" || role === "manager" || role === "super_admin";
   const qc = useQueryClient();
   const [selected, setSelected] = useState<DueRow | null>(null);
 
-  // Build today's scheduled doses from active meds × scheduled_times
-  const { data: rows = [], isLoading } = useQuery({
-    enabled: !!org,
-    queryKey: ["emar-due", org?.organization_id],
-    queryFn: async (): Promise<DueRow[]> => {
-      const { data: clients } = await supabase
-        .from("clients").select("id, first_name, last_name")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .eq("organization_id", org!.organization_id) as any;
-      const clientMap = new Map<string, string>((clients ?? []).map((c: { id: string; first_name: string; last_name: string }) => [c.id, `${c.first_name} ${c.last_name}`]));
-      const { data: meds, error } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("client_medications" as any)
+  // Build today's scheduled doses, scoped to self-admin clients + (for staff)
+  // only the clients the user is on shift with today.
+  const { data: pageData, isLoading } = useQuery({
+    enabled: !!org && !!user,
+    queryKey: ["emar-due", org?.organization_id, user?.id, isAdminLike],
+    queryFn: async (): Promise<{ rows: DueRow[]; headers: Record<string, ClientHeader> }> => {
+      const todayStartLocal = new Date(); todayStartLocal.setHours(0, 0, 0, 0);
+      const todayEndLocal = new Date(todayStartLocal); todayEndLocal.setDate(todayEndLocal.getDate() + 1);
+
+      // Staff scope: clients they are scheduled with today
+      let scopedClientIds: string[] | null = null;
+      if (!isAdminLike) {
+        const { data: shifts, error: sErr } = await (supabase as any)
+          .from("scheduled_shifts")
+          .select("client_id, starts_at, ends_at")
+          .eq("organization_id", org!.organization_id)
+          .eq("staff_id", user!.id)
+          .lt("starts_at", todayEndLocal.toISOString())
+          .gte("ends_at", todayStartLocal.toISOString());
+        if (sErr) throw sErr;
+        scopedClientIds = Array.from(new Set((shifts ?? []).map((s: { client_id: string }) => s.client_id)));
+        if (scopedClientIds.length === 0) return { rows: [], headers: {} };
+      }
+
+      let clientsQ = (supabase as any)
+        .from("clients")
+        .select("id, first_name, last_name, allergies, dysphagia, swallowing_alerts, self_admin_med_support")
+        .eq("organization_id", org!.organization_id)
+        .eq("self_admin_med_support", true);
+      if (scopedClientIds) clientsQ = clientsQ.in("id", scopedClientIds);
+      const { data: clients, error: cErr } = await clientsQ;
+      if (cErr) throw cErr;
+      const eligibleIds = (clients ?? []).map((c: { id: string }) => c.id);
+      if (eligibleIds.length === 0) return { rows: [], headers: {} };
+
+      const headers: Record<string, ClientHeader> = {};
+      (clients as Array<{ id: string; first_name: string; last_name: string; allergies: string[] | null; dysphagia: boolean; swallowing_alerts: string[] | null }>).forEach((c) => {
+        headers[c.id] = {
+          id: c.id,
+          name: `${c.first_name} ${c.last_name}`,
+          allergies: c.allergies ?? [],
+          dysphagia: c.dysphagia,
+          swallowing_alerts: c.swallowing_alerts ?? [],
+        };
+      });
+
+      const { data: meds, error } = await (supabase as any)
+        .from("client_medications")
         .select("id, client_id, medication_name, dosage, route, scheduled_times, is_active")
         .eq("organization_id", org!.organization_id)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .in("client_id", eligibleIds);
       if (error) throw error;
 
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const out: DueRow[] = [];
       (meds as unknown as Array<{ id: string; client_id: string; medication_name: string; dosage: string | null; route: string | null; scheduled_times: string[] }>).forEach((m) => {
-        const name = clientMap.get(m.client_id) || "Unknown";
+        const name = headers[m.client_id]?.name || "Unknown";
         (m.scheduled_times ?? []).forEach((t) => {
           const [hh, mm] = t.split(":").map(Number);
           if (isNaN(hh)) return;
@@ -94,9 +132,14 @@ function EmarPage() {
           });
         });
       });
-      return out.sort((a, b) => a.scheduled_for.localeCompare(b.scheduled_for));
+      out.sort((a, b) => a.scheduled_for.localeCompare(b.scheduled_for));
+      return { rows: out, headers };
     },
   });
+
+  const rows = pageData?.rows ?? [];
+  const headers = pageData?.headers ?? {};
+
 
   // Fetch existing logs for today to mark completed
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d.toISOString(); }, []);

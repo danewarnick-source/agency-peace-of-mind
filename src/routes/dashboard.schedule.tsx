@@ -645,6 +645,8 @@ function SchedulePage() {
         />
       </div>
 
+      <MyTimeOffPanel />
+
       {org?.organization_id && (
         <OpenShiftsPanel
           organizationId={org.organization_id}

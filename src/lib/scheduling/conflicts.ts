@@ -18,7 +18,9 @@ export type PolicyRuleCode =
   | "under_8h_rest"
   | "over_ot_threshold"
   | "dsi_over_6h"
-  | "sl_overnight_no_awake";
+  | "sl_overnight_no_awake"
+  | "cmp_cms_over_8h_day"
+  | "cmp_cms_over_40h_week";
 
 export const POLICY_RULES: Array<{
   code: PolicyRuleCode;
@@ -35,6 +37,8 @@ export const POLICY_RULES: Array<{
   { code: "over_ot_threshold",       label: "Projected week over OT threshold",         description: "Scheduled hours this week exceed the configured threshold.",        default: "warn" },
   { code: "dsi_over_6h",             label: "DSI shift longer than 6 hours",            description: "DSI is an atomic 1:1 visit; long blocks are unusual.",              default: "warn" },
   { code: "sl_overnight_no_awake",   label: "SL overnight without awake support",       description: "Asleep time isn't billable on SLH/SLN — confirm awake support.",   default: "warn" },
+  { code: "cmp_cms_over_8h_day",     label: "CMP/CMS exceeds 8h in a day",              description: "CMP and CMS codes cap at 8 hours per day per DHHS91172.",              default: "warn" },
+  { code: "cmp_cms_over_40h_week",   label: "CMP/CMS exceeds 40h in a week",            description: "CMP and CMS codes cap at 40 hours per week per DHHS91172.",            default: "warn" },
 ];
 
 export type Shift = {
@@ -177,13 +181,17 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
         out.push({ shiftId: b.id, severity: "hard", code: "client_double_book", message: msg });
       }
 
-      // 2:1 ratio (policy) — same client+time, different staff
+      // 2:1 ratio (policy) — same client+time, different staff.
+      // Nested segment ↔ parent pairs are legitimate; skip them.
       if (a.client_id === b.client_id && a.staff_id !== b.staff_id) {
-        const sev = policySeverity(mode(ctx, "two_to_one_ratio"));
-        if (sev) {
-          const msg = "Second staff on same client + time — 2:1 staffing requires a documented rights modification.";
-          out.push({ shiftId: a.id, severity: sev, code: "two_to_one_ratio", message: msg });
-          out.push({ shiftId: b.id, severity: sev, code: "two_to_one_ratio", message: msg });
+        const isSegmentPair = a.parent_shift_id === b.id || b.parent_shift_id === a.id;
+        if (!isSegmentPair) {
+          const sev = policySeverity(mode(ctx, "two_to_one_ratio"));
+          if (sev) {
+            const msg = "Second staff on same client + time — 2:1 staffing requires a documented rights modification.";
+            out.push({ shiftId: a.id, severity: sev, code: "two_to_one_ratio", message: msg });
+            out.push({ shiftId: b.id, severity: sev, code: "two_to_one_ratio", message: msg });
+          }
         }
       }
     }
@@ -231,9 +239,12 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
         message: `DSI shift is ${dur.toFixed(1)}h — typical max is 6h.` });
     }
     // SL overnight without awake confirmation
+    // Use local Mountain Time (America/Denver) — UTC is 6-7 hours off for Utah.
     if ((code === "SLH" || code === "SLN") && !s.is_awake_overnight) {
-      const sh = new Date(s.starts_at).getUTCHours();
-      const eh = new Date(s.ends_at).getUTCHours();
+      const localHour = (iso: string) =>
+        parseInt(new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: "America/Denver" }).format(new Date(iso)), 10);
+      const sh = localHour(s.starts_at);
+      const eh = localHour(s.ends_at);
       const touchesOvernight = sh >= 23 || sh < 6 || eh >= 23 || eh < 6 || dur >= 8;
       if (touchesOvernight) {
         const sev = policySeverity(mode(ctx, "sl_overnight_no_awake"));
@@ -284,6 +295,37 @@ export function evaluateShifts(shifts: Shift[], ctx: ConflictContext): Conflict[
         const sev = policySeverity(mode(ctx, "over_ot_threshold"));
         if (sev) out.push({ shiftId: s.id, severity: sev, code: "over_ot_threshold",
           message: `Projected ${total.toFixed(1)}h this week (threshold ${ctx.otThresholdHours}h).` });
+      }
+    }
+
+    // CMP/CMS per-day cap (8h) and per-week cap (40h)
+    const cmpCmsArr = arr.filter(s => {
+      const c = (s.service_code ?? "").toUpperCase();
+      return (c === "CMP" || c === "CMS") && !s.parent_shift_id;
+    });
+    if (cmpCmsArr.length) {
+      const hoursByDay = new Map<string, number>();
+      const cmpCmsWeekHours = new Map<string, number>();
+      for (const s of cmpCmsArr) {
+        const dayKey = s.starts_at.slice(0, 10);
+        const weekKey = isoWeekKey(s.starts_at);
+        const h = hoursBetween(s.starts_at, s.ends_at);
+        hoursByDay.set(dayKey, (hoursByDay.get(dayKey) ?? 0) + h);
+        cmpCmsWeekHours.set(weekKey, (cmpCmsWeekHours.get(weekKey) ?? 0) + h);
+      }
+      for (const s of cmpCmsArr) {
+        const dayTotal = hoursByDay.get(s.starts_at.slice(0, 10)) ?? 0;
+        if (dayTotal > 8) {
+          const sev = policySeverity(mode(ctx, "cmp_cms_over_8h_day"));
+          if (sev) out.push({ shiftId: s.id, severity: sev, code: "cmp_cms_over_8h_day",
+            message: `CMP/CMS scheduled ${dayTotal.toFixed(1)}h on this day (max 8h).` });
+        }
+        const weekTotal = cmpCmsWeekHours.get(isoWeekKey(s.starts_at)) ?? 0;
+        if (weekTotal > 40) {
+          const sev = policySeverity(mode(ctx, "cmp_cms_over_40h_week"));
+          if (sev) out.push({ shiftId: s.id, severity: sev, code: "cmp_cms_over_40h_week",
+            message: `CMP/CMS scheduled ${weekTotal.toFixed(1)}h this week (max 40h).` });
+        }
       }
     }
   }

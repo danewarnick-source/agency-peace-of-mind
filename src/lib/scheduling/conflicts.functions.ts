@@ -88,8 +88,23 @@ export const evaluateRange = createServerFn({ method: "POST" })
       .eq("organization_id", data.organizationId)
       .maybeSingle();
 
-    // 3) staff DOBs + active flags
+    // 3) staff DOBs + active flags + cert data + client training gaps
     const staffIds = Array.from(new Set(shiftRows.map(s => s.staff_id).filter((x): x is string => !!x)));
+    const clientIds = Array.from(new Set(shiftRows.map(s => s.client_id)));
+    const serviceCodes = Array.from(new Set(shiftRows.map(s => (s.service_code ?? "").toUpperCase()).filter(Boolean)));
+
+    // service code → required cert keys (DHHS91172 minimums)
+    const SERVICE_CODE_REQUIRED_CERTS: Record<string, string[]> = {
+      HHS: ["cpr-fa", "abuse-neglect"],
+      SLH: ["cpr-fa", "abuse-neglect"],
+      SLN: ["cpr-fa", "abuse-neglect"],
+      RHS: ["cpr-fa", "abuse-neglect"],
+      DSI: ["cpr-fa"],
+      SEI: ["cpr-fa"],
+      CMP: ["cpr-fa"],
+      CMS: ["cpr-fa"],
+    };
+
     const staffCtx: ConflictContext["staff"] = {};
     if (staffIds.length) {
       const { data: members } = await supabase
@@ -104,10 +119,87 @@ export const evaluateRange = createServerFn({ method: "POST" })
       const dobById = new Map<string, string | null>(
         (profs ?? []).map((p: any) => [p.id as string, (p.date_of_birth ?? null) as string | null]),
       );
+
+      // active external certs per staff (approved and not expired)
+      const nowIso = new Date().toISOString();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: activeCerts } = await (supabase as any)
+        .from("external_certifications")
+        .select("user_id, cert_type, expires_at")
+        .in("user_id", staffIds)
+        .eq("status", "approved");
+      const activeCertsByStaff = new Map<string, Set<string>>();
+      for (const c of (activeCerts ?? []) as Array<{ user_id: string; cert_type: string; expires_at: string | null }>) {
+        if (c.expires_at && c.expires_at < nowIso) continue; // expired
+        const set = activeCertsByStaff.get(c.user_id) ?? new Set<string>();
+        set.add(c.cert_type);
+        activeCertsByStaff.set(c.user_id, set);
+      }
+
+      // compute expiredCertCodes: service codes where a required cert is missing/expired
+      const expiredCertCodesByStaff = new Map<string, string[]>();
+      for (const staffId of staffIds) {
+        const staffCerts = activeCertsByStaff.get(staffId) ?? new Set<string>();
+        const missingCodes: string[] = [];
+        for (const code of serviceCodes) {
+          const required = SERVICE_CODE_REQUIRED_CERTS[code] ?? [];
+          if (required.some(k => !staffCerts.has(k))) {
+            missingCodes.push(code);
+          }
+        }
+        if (missingCodes.length) expiredCertCodesByStaff.set(staffId, missingCodes);
+      }
+
+      // client-specific training gaps per staff
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: cstRows } = await (supabase as any)
+        .from("client_specific_trainings")
+        .select("id, client_id")
+        .in("client_id", clientIds)
+        .eq("organization_id", data.organizationId)
+        .eq("status", "published");
+      const cstByClient = new Map<string, string[]>();
+      for (const r of (cstRows ?? []) as Array<{ id: string; client_id: string }>) {
+        const arr = cstByClient.get(r.client_id) ?? [];
+        arr.push(r.id);
+        cstByClient.set(r.client_id, arr);
+      }
+      const allCstIds = (cstRows ?? []).map((r: any) => r.id as string);
+      const completedByStaff = new Map<string, Set<string>>();
+      if (allCstIds.length && staffIds.length) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: completions } = await (supabase as any)
+          .from("training_completions")
+          .select("user_id, ref_id")
+          .eq("topic_kind", "person")
+          .eq("is_current", true)
+          .in("user_id", staffIds)
+          .in("ref_id", allCstIds);
+        for (const c of (completions ?? []) as Array<{ user_id: string; ref_id: string }>) {
+          const set = completedByStaff.get(c.user_id) ?? new Set<string>();
+          set.add(c.ref_id);
+          completedByStaff.set(c.user_id, set);
+        }
+      }
+      // missingTrainingClientIds: clients for which a staff hasn't completed the published CST
+      const missingClientsByStaff = new Map<string, string[]>();
+      for (const staffId of staffIds) {
+        const completed = completedByStaff.get(staffId) ?? new Set<string>();
+        const missingClients: string[] = [];
+        for (const [clientId, cstIds] of cstByClient) {
+          if (cstIds.some(id => !completed.has(id))) {
+            missingClients.push(clientId);
+          }
+        }
+        if (missingClients.length) missingClientsByStaff.set(staffId, missingClients);
+      }
+
       for (const m of (members ?? []) as Array<{ user_id: string; active: boolean }>) {
         staffCtx[m.user_id] = {
           active: !!m.active,
           dob: dobById.get(m.user_id) ?? null,
+          expiredCertCodes: expiredCertCodesByStaff.get(m.user_id),
+          missingTrainingClientIds: missingClientsByStaff.get(m.user_id),
         };
       }
     }

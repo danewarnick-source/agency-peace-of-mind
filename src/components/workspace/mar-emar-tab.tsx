@@ -1109,7 +1109,7 @@ function MarCalendarView({
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 border-b border-border px-4 py-2 text-[11px]">
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Administered</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Self-administered</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> Refused</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Missed</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border border-border bg-muted" /> Scheduled</span>
@@ -1199,7 +1199,7 @@ function MarCalendarView({
                                 {log.signature_attestation && (
                                   <div className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
                                     <ShieldCheck className="h-3 w-3" />
-                                    <span>Five Rights attested</span>
+                                    <span>Self-admin attested</span>
                                   </div>
                                 )}
                               </PopoverContent>
@@ -1557,7 +1557,7 @@ export function MarEmarTab({
               )}
               {passes.filter((p) => p.log?.status === "administered").length > 0 && (
                 <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-                  {passes.filter((p) => p.log?.status === "administered").length} administered
+                  {passes.filter((p) => p.log?.status === "administered").length} self-administered
                 </Badge>
               )}
             </div>
@@ -1626,11 +1626,11 @@ export function MarEmarTab({
                             <div className="mt-1.5 flex items-center gap-1.5">
                               <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
                                 <CheckCircle2 className="mr-1 h-3 w-3" />
-                                Administered {p.log?.administered_at ? fmtTime(p.log.administered_at) : ""}
+                                Self-administered {p.log?.administered_at ? fmtTime(p.log.administered_at) : ""}
                               </Badge>
                               {p.log?.signature_attestation && (
                                 <Badge variant="outline" className="gap-1 text-[10px]">
-                                  <ShieldCheck className="h-3 w-3 text-emerald-500" /> Five Rights Signed
+                                  <ShieldCheck className="h-3 w-3 text-emerald-500" /> Self-admin attested
                                 </Badge>
                               )}
                             </div>
@@ -1692,8 +1692,8 @@ export function MarEmarTab({
                               : p.time === "PRN"
                               ? "Log PRN"
                               : hasHistory
-                              ? "Update Status"
-                              : "Record Pass"}
+                              ? "Add update"
+                              : "Observe & Confirm"}
                           </Button>
                         )}
                       </li>

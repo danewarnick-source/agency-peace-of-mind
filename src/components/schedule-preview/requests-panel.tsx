@@ -125,9 +125,22 @@ export function RequestsPanel({ weekStart, staff }: { weekStart: Date; staff: St
 function TimeOffRow({ req, staff, first }: { req: TimeOffRequest; staff: StaffRow[]; first: boolean }) {
   const qc = useQueryClient();
   const { user } = useAuth();
+
+  const { data: conflicts } = useQuery({
+    queryKey: ["time-off-conflicts", req.id, req.staff_id, req.start_date, req.end_date],
+    queryFn: () => fetchConflictingShifts(req.organization_id, req.staff_id, req.start_date, req.end_date),
+  });
+  const conflictCount = conflicts?.length ?? 0;
+
   const decide = useMutation({
     mutationFn: async (d: "approved" | "denied") => {
       if (!user?.id) throw new Error("Sign in required.");
+      if (d === "approved" && conflictCount > 0) {
+        const ok = window.confirm(
+          `This staff member has ${conflictCount} published shift${conflictCount === 1 ? "" : "s"} during these dates. Approve anyway? The shifts will need to be reassigned manually.`,
+        );
+        if (!ok) return;
+      }
       await decideTimeOff(req, d, user.id);
     },
     onSuccess: () => { toast.success("Updated."); qc.invalidateQueries({ queryKey: ["schedule-requests"] }); },
@@ -135,11 +148,16 @@ function TimeOffRow({ req, staff, first }: { req: TimeOffRequest; staff: StaffRo
   });
   const name = nameOf(req.staff_id, staff);
   return (
-    <div style={{ ...wrow, ...(first ? { borderTop: "none" } : null) }}>
+    <div style={{ ...wrow, ...(first ? { borderTop: "none" } : null), flexWrap: "wrap" }}>
       <span style={av}>{initials(name)}</span>
       <div style={info}>
         <b style={infoB}>{name}</b>
         <span style={infoS}>Time off · {fmtDate(req.start_date)} – {fmtDate(req.end_date)}{req.note ? ` · ${req.note}` : ""}</span>
+        {conflictCount > 0 && (
+          <span style={{ display: "block", marginTop: 4, fontSize: 11.5, fontWeight: 700, color: SCHED.warn }}>
+            ⚠ Conflicts with {conflictCount} published shift{conflictCount === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
       <span style={tagStyle(isSick(req.type) ? "sick" : "pto")}>{req.type.toUpperCase()}</span>
       <div style={acts}>

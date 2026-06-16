@@ -223,6 +223,22 @@ export async function decideTimeOff(
     decided_by: deciderId,
     decided_at: new Date().toISOString(),
   });
+  // In-app notification back to the requesting staff member.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from("notifications").insert({
+      organization_id: req.organization_id,
+      recipient_role: "staff",
+      recipient_user_id: req.staff_id,
+      type: "time_off_decided",
+      urgency: "normal",
+      title: decision === "approved" ? "Time off approved" : "Time off denied",
+      body: `${fmtRange(req.start_date, req.end_date)} · ${req.type.toUpperCase()}`,
+      link_to: "/dashboard/schedule",
+      related_id: req.id,
+      related_type: "time_off_request",
+    });
+  } catch { /* ignore */ }
 }
 
 /**

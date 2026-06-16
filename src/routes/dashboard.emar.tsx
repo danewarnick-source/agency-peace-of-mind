@@ -196,45 +196,94 @@ function EmarPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Group rows by client so each safety header sits above that client's doses
+  const grouped = useMemo(() => {
+    const m: Record<string, DueRow[]> = {};
+    rows.forEach((r) => { (m[r.client_id] ||= []).push(r); });
+    return m;
+  }, [rows]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-          <Pill className="h-5 w-5 text-primary" /> Electronic Medication Administration
+          <Pill className="h-5 w-5 text-primary" /> Today's Medication Pass
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Today's med-pass schedule. Tap a dose to record administration with 5-Rights attestation.
+          {isAdminLike
+            ? "All self-administration clients in the organization with doses due today."
+            : "Clients you are scheduled with today who self-administer their medication with staff support."}
         </p>
       </div>
+
+      <EmarLegalBanner />
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : !rows.length ? (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No medications scheduled.</Card>
+        <Card className="p-8 text-center text-sm text-muted-foreground">
+          {isAdminLike
+            ? "No self-administration doses scheduled today."
+            : "No medication passes for your shifts today. Only clients on your shift who self-administer with staff support appear here."}
+        </Card>
       ) : (
-        <div className="grid gap-2">
-          {rows.map((r) => {
-            const done = doneSet.has(doneKey(r));
+        <div className="space-y-5">
+          {Object.entries(grouped).map(([clientId, items]) => {
+            const h = headers[clientId];
             return (
-              <Card key={`${r.medication_id}-${r.time_label}`}
-                className={`flex items-center justify-between gap-3 p-3 ${done ? "opacity-60" : ""}`}>
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="font-mono">{r.time_label}</Badge>
-                  <div>
-                    <div className="text-sm font-medium">{r.client_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {r.medication_name} {r.dosage && `· ${r.dosage}`} {r.route && `· ${r.route}`}
+              <section key={clientId} className="space-y-2">
+                <Card className="border-l-4 border-l-rose-500 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-semibold">{h?.name ?? "Client"}</div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {(h?.allergies ?? []).length === 0 ? (
+                        <Badge className="bg-emerald-100 text-emerald-800 text-[10px] hover:bg-emerald-100">No known allergies</Badge>
+                      ) : (
+                        (h?.allergies ?? []).map((a) => (
+                          <span key={a} className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-900">
+                            <AlertCircle className="h-3 w-3" /> {a}
+                          </span>
+                        ))
+                      )}
                     </div>
                   </div>
+                  {(h?.dysphagia || (h?.swallowing_alerts ?? []).length > 0) && (
+                    <div className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-1.5 text-[11px] text-amber-900">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <div>
+                        {h?.dysphagia && <div>Dysphagia on file — confirm upright posture; verify crushed-med policy.</div>}
+                        {(h?.swallowing_alerts ?? []).map((a) => <div key={a}>{a}</div>)}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+                <div className="grid gap-2">
+                  {items.map((r) => {
+                    const done = doneSet.has(doneKey(r));
+                    return (
+                      <Card key={`${r.medication_id}-${r.time_label}`}
+                        className={`flex items-center justify-between gap-3 p-3 ${done ? "opacity-60" : ""}`}>
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="font-mono">{r.time_label}</Badge>
+                          <div>
+                            <div className="text-sm font-medium">{r.medication_name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {r.dosage && `${r.dosage}`} {r.route && `· ${r.route}`}
+                            </div>
+                          </div>
+                        </div>
+                        {done ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                            <CheckCircle2 className="mr-1 h-3 w-3" /> Logged
+                          </Badge>
+                        ) : (
+                          <Button size="sm" onClick={() => setSelected(r)}>Record pass</Button>
+                        )}
+                      </Card>
+                    );
+                  })}
                 </div>
-                {done ? (
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-                    <CheckCircle2 className="mr-1 h-3 w-3" /> Logged
-                  </Badge>
-                ) : (
-                  <Button size="sm" onClick={() => setSelected(r)}>Record pass</Button>
-                )}
-              </Card>
+              </section>
             );
           })}
         </div>
@@ -248,6 +297,7 @@ function EmarPage() {
       />
     </div>
   );
+
 }
 
 function PassDialog({

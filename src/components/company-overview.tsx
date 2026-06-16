@@ -438,7 +438,7 @@ export function CompanyOverview() {
   // the gauges for compliance/credentials/etc., so we never re-list those here.
   const needsToday: QueueItem[] = att
     ? [
-        { icon: CalendarClock, label: "Published shifts not yet accepted", count: att.unacceptedShifts, to: "/dashboard/scheduling", search: { tab: "builder" }, urgent: true },
+        { icon: CalendarClock, label: "Published shifts not yet accepted", count: att.unacceptedShifts, to: "/dashboard/scheduler", urgent: true },
         { icon: BadgeCheck, label: "Certifications expiring within 30 days", count: att.expiringCredentials, to: "/dashboard/hub/employees", search: { tab: "compliance" }, urgent: true },
         { icon: Stethoscope, label: "Incident reports pending review", count: att.pendingIncidents, to: "/dashboard/hub/documentation", search: { tab: "records" }, urgent: true },
         { icon: ClipboardX, label: "Daily logs returned for revision", count: att.missingDailyLogs, to: "/dashboard/hub/documentation", search: { tab: "records" } },

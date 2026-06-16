@@ -24,7 +24,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, Eraser, Loader2,
   Moon, Sun, Sunset, CalendarDays, ChevronLeft,
   ChevronRight, ShieldCheck, Pill, BookOpen, History,
-  AlertOctagon,
+  AlertOctagon, Settings2, Sparkles,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -32,6 +32,9 @@ import {
   EmarLegalBanner, ClinicalSafetyHeader, EmarEligibilityGate,
   MedicationChart, useClientSafety,
 } from "./emar-chart";
+import { EmarOpsPanel } from "./emar-ops-panel";
+import { EmarNectarPanel } from "./emar-nectar-panel";
+
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1367,7 +1370,16 @@ export function MarEmarTab({
             <History className="mr-1.5 h-3.5 w-3.5" />
             Compliance
           </TabsTrigger>
+          <TabsTrigger value="ops" className="flex-1">
+            <Settings2 className="mr-1.5 h-3.5 w-3.5" />
+            Refills & Transfers
+          </TabsTrigger>
+          <TabsTrigger value="nectar" className="flex-1">
+            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+            Nectar
+          </TabsTrigger>
         </TabsList>
+
 
         {/* ── CHART — per-med profile with completeness flags ── */}
         <TabsContent value="chart" className="space-y-3 pt-2">
@@ -1602,7 +1614,18 @@ export function MarEmarTab({
           </div>
           <ComplianceHistory logs={monthLogs} meds={meds} />
         </TabsContent>
+
+        {/* ── OPS — refills, shift counts, transfers ── */}
+        <TabsContent value="ops" className="space-y-3 pt-2">
+          <EmarOpsPanel clientId={clientId} />
+        </TabsContent>
+
+        {/* ── NECTAR — advisory helper ── */}
+        <TabsContent value="nectar" className="space-y-3 pt-2">
+          <EmarNectarPanel clientId={clientId} />
+        </TabsContent>
       </Tabs>
+
 
       {/* Administration log dialog */}
       <AdminLogDialog

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -24,7 +25,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, Eraser, Loader2,
   Moon, Sun, Sunset, CalendarDays, ChevronLeft,
   ChevronRight, ShieldCheck, Pill, BookOpen, History,
-  AlertOctagon, Settings2, Sparkles,
+  AlertOctagon, Settings2, Sparkles, FilePlus2, Siren,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ import {
 } from "./emar-chart";
 import { EmarOpsPanel } from "./emar-ops-panel";
 import { EmarNectarPanel } from "./emar-nectar-panel";
+import { logMedicationPass, addEmarAddendum } from "@/lib/emar-pass.functions";
 
 
 
@@ -51,6 +53,7 @@ type Medication = {
   is_active: boolean;
   is_controlled: boolean;
   is_prn: boolean;
+  is_rescue: boolean;
   prn_instructions: string | null;
   pharmacy: string | null;
   rx_number: string | null;
@@ -67,6 +70,8 @@ type EmarLog = {
   medication_id: string;
   scheduled_for: string;
   administered_at: string | null;
+  actual_taken_at: string | null;
+  late_entry_gap_minutes: number | null;
   status: "administered" | "refused" | "omitted" | "missed";
   exception_reason: string | null;
   notes: string | null;
@@ -80,6 +85,7 @@ type EmarLog = {
   is_prn: boolean;
   prn_reason: string | null;
   admin_reviewed: boolean;
+  service_context: string | null;
   created_at?: string;
   recorded_in?: string | null;
 };
@@ -106,24 +112,23 @@ function bucketRecordedIn(code: string | null | undefined): "dsi" | "hhs" | "gen
   return "general";
 }
 
-type Block = "Morning" | "Noon" | "Evening" | "Night";
+type Block = "Morning" | "Evening" | "PRN";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ATTESTATION_TEXT =
-  "I attest that I have verified the Five Rights of Medication Administration: " +
-  "(1) Right Resident, (2) Right Medication, (3) Right Dose, (4) Right Route, (5) Right Time " +
-  "— and that this record is accurate and complete.";
+  "I confirm I observed or assisted this Person in self-administering their own prescribed medication, " +
+  "that I verified it matches the prescription's medication, dose, route, and time, " +
+  "and that this record is accurate and complete.";
 
 const EXCEPTION_REASONS = [
-  "Individual refused",
-  "Individual unavailable / sleeping",
+  "Person declined / refused",
+  "Person unavailable / sleeping",
   "Held per physician order",
   "NPO — medical hold",
   "Medication unavailable / out of stock",
   "Adverse reaction — withheld",
-  "Self-administered (witnessed by staff)",
-  "Appointment — administered by provider",
+  "Appointment — taken with provider",
   "Other (see notes)",
 ];
 
@@ -146,19 +151,16 @@ const ROUTES = [
 
 const BLOCK_META: Record<Block, { icon: typeof Sun; tone: string; bg: string; label: string }> = {
   Morning: { icon: Sun,    tone: "text-amber-600",   bg: "bg-amber-50 dark:bg-amber-950/20",   label: "Morning" },
-  Noon:    { icon: Sunset, tone: "text-orange-600",  bg: "bg-orange-50 dark:bg-orange-950/20", label: "Noon"    },
   Evening: { icon: Sunset, tone: "text-rose-500",    bg: "bg-rose-50 dark:bg-rose-950/20",     label: "Evening" },
-  Night:   { icon: Moon,   tone: "text-indigo-600",  bg: "bg-indigo-50 dark:bg-indigo-950/20", label: "Night"   },
+  PRN:     { icon: Pill,   tone: "text-indigo-600",  bg: "bg-indigo-50 dark:bg-indigo-950/20", label: "As-needed (PRN)" },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function blockFor(time: string): Block {
   const h = parseInt(time.split(":")[0] ?? "0", 10);
-  if (h < 11) return "Morning";
-  if (h < 14) return "Noon";
-  if (h < 18) return "Evening";
-  return "Night";
+  if (h < 14) return "Morning";
+  return "Evening";
 }
 
 function isoForToday(timeHHMM: string): string {

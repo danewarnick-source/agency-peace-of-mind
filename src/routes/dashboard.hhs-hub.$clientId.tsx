@@ -371,10 +371,33 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           signatureDataUrl: signature,
         },
       });
+      // Persist the medication observation attestation (non-blocking).
+      if (medAttestation.observed !== null && medAttestation.signatureDataUrl) {
+        const { error: medErr } = await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from("shift_medication_attestations" as any)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .insert({
+            organization_id: orgId,
+            client_id: client.id,
+            staff_id: user?.id,
+            shift_id: null,
+            hhs_daily_record_id: null,
+            observed: medAttestation.observed,
+            reason: medAttestation.observed === false ? medAttestation.reason.trim() : null,
+            signature_data_url: medAttestation.signatureDataUrl,
+            shift_window_start: dayWindow.start,
+            shift_window_end: dayWindow.end,
+          } as any);
+        if (medErr && !/relation .* does not exist|schema cache/i.test(medErr.message)) {
+          toast.error(`Medication attestation not saved: ${medErr.message}`);
+        }
+      }
       setSuccess(true);
       toast.success("Daily progress note saved.");
       setNote(""); setGoals([]); setCoach(null); setAiIterations(0);
       setAiFlagCount(0); setAllowException(false); setShowNarrativeError(false);
+      setMedAttestation(emptyMedAttestation);
       hasSigRef.current = false; clearCanvas();
     } catch (e) {
       toast.error((e as Error).message || "Could not save note.");
@@ -515,6 +538,20 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
         {/* Final attestation — required, parity with punch-pad clock-out form. */}
         <label className="flex items-start gap-2 rounded-md border bg-muted/30 p-2 text-xs">
           <Checkbox checked={finalAttest} onCheckedChange={(c) => setFinalAttest(!!c)} />
+          <span>I attest this note accurately reflects today's support.</span>
+        </label>
+
+        {/* Medication observation attestation — blocks save if active meds exist */}
+        <ShiftMedAttestation
+          organizationId={orgId}
+          clientId={client.id}
+          clientName={client.first_name}
+          windowStart={dayWindow.start}
+          windowEnd={dayWindow.end}
+          emarHref={`/dashboard/hhs-hub/${client.id}?tab=mar`}
+          value={medAttestation}
+          onChange={setMedAttestation}
+        />
           <span>I attest this note accurately reflects today's support.</span>
         </label>
 

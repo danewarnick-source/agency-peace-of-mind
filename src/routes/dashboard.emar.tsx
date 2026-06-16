@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { EmarLegalBanner } from "@/components/workspace/emar-chart";
 import { usePermissions } from "@/hooks/use-permissions";
 import { logMedicationPass } from "@/lib/emar-pass.functions";
+import { type EmarStatus, normalizeEmarStatus } from "@/lib/emar-status";
 
 export const Route = createFileRoute("/dashboard/emar")({
   head: () => ({ meta: [{ title: "Today's Pass — HIVE eMAR" }] }),
@@ -169,7 +170,7 @@ function EmarPage() {
   const saveMut = useMutation({
     mutationFn: async (payload: {
       row: DueRow;
-      status: "administered" | "refused" | "omitted" | "missed";
+      status: EmarStatus;
       reason: string;
       notes: string;
       actualTakenAt: string | null;
@@ -184,7 +185,7 @@ function EmarPage() {
           status: payload.status,
           route: payload.row.route || "PO",
           actualTakenAt: payload.actualTakenAt ?? new Date().toISOString(),
-          exceptionReason: payload.status === "administered" ? null : payload.reason,
+          exceptionReason: payload.status === "self_administered" ? null : payload.reason,
           notes: payload.notes || null,
           signatureDataUrl: payload.signatureDataUrl,
           serviceContext,
@@ -330,7 +331,7 @@ function PassDialog({
   onClose: () => void;
   onSave: (p: {
     row: DueRow;
-    status: "administered" | "refused" | "omitted" | "missed";
+    status: EmarStatus;
     reason: string;
     notes: string;
     actualTakenAt: string | null;
@@ -338,7 +339,7 @@ function PassDialog({
   }) => void;
   pending: boolean;
 }) {
-  const [status, setStatus] = useState<"administered" | "refused" | "omitted" | "missed">("administered");
+  const [status, setStatus] = useState<EmarStatus>("self_administered");
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [actualTime, setActualTime] = useState<string>("");
@@ -372,7 +373,7 @@ function PassDialog({
   }
   function up() { drawing.current = false; }
 
-  const isException = status !== "administered";
+  const isException = status !== "self_administered";
   const notesRequired = isException && notes.trim().length < 10;
   const reasonRequired = isException && !reason;
 
@@ -411,7 +412,7 @@ function PassDialog({
             <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="administered">✅ Self-administered (observed)</SelectItem>
+                <SelectItem value="self_administered">✅ Self-administered (observed)</SelectItem>
                 <SelectItem value="refused">🛑 Refused</SelectItem>
                 <SelectItem value="omitted">⚠️ Omitted</SelectItem>
                 <SelectItem value="missed">⏰ Missed</SelectItem>
@@ -419,7 +420,7 @@ function PassDialog({
             </Select>
           </div>
 
-          {status === "administered" && (
+          {status === "self_administered" && (
             <div className="grid gap-2">
               <Label className="text-xs">Time the Person actually took it (optional)</Label>
               <Input
@@ -495,7 +496,7 @@ function PassDialog({
               if (!hasSig.current) { toast.error("Sign the pad to confirm."); return; }
               const sig = sigRef.current?.toDataURL("image/png") ?? "";
               let actualIso: string | null = null;
-              if (status === "administered" && actualTime) {
+              if (status === "self_administered" && actualTime) {
                 const [hh, mm] = actualTime.split(":").map(Number);
                 const d = new Date(); d.setHours(hh, mm ?? 0, 0, 0);
                 actualIso = d.toISOString();

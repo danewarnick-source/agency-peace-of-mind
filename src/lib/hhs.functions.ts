@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
+import type { EmarStatus } from "@/lib/emar-status";
 
 // ---------- Schemas ----------
 const OrgInput = z.object({ organizationId: z.string().uuid() });
@@ -100,17 +101,16 @@ export const saveEmarLog = createServerFn({ method: "POST" })
 
 
     // Map HHS status enum → unified emar_logs status enum.
-    // Held is a first-class status (clinically distinct from omitted).
-    const statusMap: Record<typeof data.status, "administered" | "refused" | "missed" | "held"> = {
-      Passed: "administered",
+    const statusMap: Record<typeof data.status, EmarStatus> = {
+      Passed: "self_administered",
       Refused: "refused",
       Missed: "missed",
-      Held: "held",
+      Held:   "omitted",
     };
     const unifiedStatus = statusMap[data.status];
 
-    // Cross-hub dedupe: if another hub already recorded this exact dose
-    // (same client + medication + scheduled_for), return that row instead of
+    // Cross-hub dedupe: if a terminal-status row already exists for this exact
+    // dose (same client + medication + scheduled_for), return it instead of
     // inserting a duplicate.
     if (data.medicationId) {
       const { data: existing } = await supabase
@@ -119,6 +119,7 @@ export const saveEmarLog = createServerFn({ method: "POST" })
         .eq("client_id", data.clientId)
         .eq("medication_id", data.medicationId)
         .eq("scheduled_for", data.scheduledFor)
+        .in("status", ["self_administered", "refused", "omitted", "missed"])
         .maybeSingle();
       if (existing) return existing;
     }
@@ -130,7 +131,7 @@ export const saveEmarLog = createServerFn({ method: "POST" })
         client_id:             data.clientId,
         medication_id:         data.medicationId ?? null,
         scheduled_for:         data.scheduledFor,
-        administered_at:       unifiedStatus === "administered" ? new Date().toISOString() : null,
+        administered_at:       unifiedStatus === "self_administered" ? new Date().toISOString() : null,
         status:                unifiedStatus,
         is_prn:                data.isPrn,
         prn_reason:            data.prnReason ?? null,

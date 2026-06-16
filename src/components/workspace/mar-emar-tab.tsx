@@ -36,6 +36,7 @@ import {
 import { EmarOpsPanel } from "./emar-ops-panel";
 import { EmarNectarPanel } from "./emar-nectar-panel";
 import { logMedicationPass, addEmarAddendum } from "@/lib/emar-pass.functions";
+import { type EmarStatus, normalizeEmarStatus, EMAR_STATUS_LABELS } from "@/lib/emar-status";
 
 
 
@@ -73,7 +74,7 @@ type EmarLog = {
   administered_at: string | null;
   actual_taken_at: string | null;
   late_entry_gap_minutes: number | null;
-  status: "administered" | "refused" | "omitted" | "missed";
+  status: EmarStatus;
   exception_reason: string | null;
   notes: string | null;
   staff_name: string | null;
@@ -475,15 +476,40 @@ function AdminLogDialog({
     seizureOutcome: string | null;
     emergencyServicesCalled: boolean;
     attested: boolean;
+    secondWitnessId: string | null;
   }) => Promise<void>;
 }) {
   const { user } = useAuth();
+  const { data: org } = useCurrentOrg();
   const staffDisplayName =
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
-  const status: EmarLog["status"] = "administered";
+  const status: EmarLog["status"] = "self_administered";
   const [actualTakenAt] = useState(localDatetimeValue());
-  const [route, setRoute] = useState(pass?.med.route ?? "");
+  const route = pass?.med.route ?? "";
+  const [secondWitnessId, setSecondWitnessId] = useState<string | null>(null);
+  const [noSecondWitness, setNoSecondWitness] = useState(false);
+
+  // Load org staff for second-witness selector (controlled substances only)
+  const { data: orgMembers = [] } = useQuery({
+    enabled: !!org && !!med?.is_controlled,
+    queryKey: ["org-members-simple", org?.organization_id],
+    queryFn: async () => {
+      const { data: members } = await supabase
+        .from("organization_members" as never)
+        .select("user_id")
+        .eq("organization_id", org!.organization_id);
+      const ids = ((members ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
+      if (!ids.length) return [];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", ids);
+      return ((profiles ?? []) as Array<{ id: string; full_name: string | null }>).filter(
+        (p) => p.id !== user?.id,
+      );
+    },
+  });
   const [notes, setNotes] = useState("");
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
   const [pillCount, setPillCount] = useState("");
@@ -530,6 +556,7 @@ function AdminLogDialog({
         seizureOutcome: med?.is_rescue ? seizureOutcome.trim() || null : null,
         emergencyServicesCalled: med?.is_rescue ? emergencyCalled : false,
         attested,
+        secondWitnessId: med?.is_controlled ? (secondWitnessId ?? null) : null,
       });
     } finally {
       setBusy(false);
@@ -609,21 +636,21 @@ function AdminLogDialog({
             </div>
           )}
 
-          {/* Route of Administration */}
+          {/* Route of Administration — read-only from medication profile */}
           <div className="grid gap-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Route of Administration *
+              Route of Administration
             </Label>
-            <Select value={route} onValueChange={setRoute}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select route..." />
-              </SelectTrigger>
-              <SelectContent>
-                {ROUTES.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {route ? (
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
+                <span className="font-medium">{route}</span>
+                <span className="text-[10px] text-muted-foreground">(from medication profile)</span>
+              </div>
+            ) : (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+                No route on file — set it on this medication's profile.
+              </div>
+            )}
           </div>
 
           {/* Controlled substance pill count */}
@@ -768,6 +795,45 @@ function AdminLogDialog({
             </p>
           </label>
 
+          {/* Second-witness confirmation — required protocol for controlled substances */}
+          {med?.is_controlled && (
+            <div className="rounded-lg border border-purple-500/40 bg-purple-50 p-3 dark:bg-purple-950/20 space-y-2">
+              <p className="text-xs font-semibold text-purple-800 dark:text-purple-200">
+                Controlled Substance — Second Witness Required
+              </p>
+              <p className="text-[11px] text-purple-700 dark:text-purple-300">
+                A second staff member must verify this administration. Select the witness from the list, or mark unavailable to flag for later confirmation.
+              </p>
+              {!noSecondWitness && (
+                <Select
+                  value={secondWitnessId ?? ""}
+                  onValueChange={(v) => setSecondWitnessId(v || null)}
+                >
+                  <SelectTrigger className="bg-white dark:bg-slate-900">
+                    <SelectValue placeholder="Select second witness..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {orgMembers.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.full_name ?? m.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-purple-700 dark:text-purple-300">
+                <Checkbox
+                  checked={noSecondWitness}
+                  onCheckedChange={(c) => {
+                    setNoSecondWitness(!!c);
+                    if (c) setSecondWitnessId(null);
+                  }}
+                />
+                No second witness available — flag record as pending confirmation
+              </label>
+            </div>
+          )}
+
           <p className="text-[11px] text-muted-foreground">
             Complete the required (*) items to confirm: status, route, time, signature, attestation.
           </p>
@@ -836,7 +902,7 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
   }, [meds]);
 
   const total = logs.length;
-  const administered = logs.filter((l) => l.status === "administered").length;
+  const administered = logs.filter((l) => normalizeEmarStatus(l.status) === "self_administered").length;
   const rate = total > 0 ? Math.round((administered / total) * 100) : 0;
 
   function clearSig() {
@@ -935,13 +1001,13 @@ function ComplianceHistory({ logs, meds }: { logs: EmarLog[]; meds: Medication[]
                 </td>
                 <td className="px-3 py-2">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                    l.status === "administered"
+                    normalizeEmarStatus(l.status) === "self_administered"
                       ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
-                      : l.status === "refused"
+                      : normalizeEmarStatus(l.status) === "refused"
                       ? "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
                       : "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
                   }`}>
-                    {l.status === "administered" ? "self-administered" : l.status}
+                    {EMAR_STATUS_LABELS[normalizeEmarStatus(l.status)]}
                   </span>
                   {l.is_medication_error && (
                     <Badge className="ml-1 bg-rose-500 text-white text-[9px]">Error</Badge>
@@ -1071,9 +1137,10 @@ function MarCalendarView({
   }, [logs]);
 
   const statusColor = (l: EmarLog) => {
-    if (l.status === "administered") return "bg-emerald-500";
-    if (l.status === "refused") return "bg-rose-600";
-    if (l.status === "missed") return "bg-amber-400";
+    const s = normalizeEmarStatus(l.status);
+    if (s === "self_administered") return "bg-emerald-500";
+    if (s === "refused") return "bg-rose-600";
+    if (s === "missed") return "bg-amber-400";
     return "bg-rose-400";
   };
 
@@ -1170,13 +1237,13 @@ function MarCalendarView({
                                 <p className="font-semibold">{med.medication_name} · {time}</p>
                                 <div className="flex gap-1.5">
                                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                                    log.status === "administered"
+                                    normalizeEmarStatus(log.status) === "self_administered"
                                       ? "bg-emerald-100 text-emerald-800"
-                                      : log.status === "refused"
+                                      : normalizeEmarStatus(log.status) === "refused"
                                       ? "bg-rose-100 text-rose-800"
                                       : "bg-amber-100 text-amber-800"
                                   }`}>
-                                    {log.status}
+                                    {EMAR_STATUS_LABELS[normalizeEmarStatus(log.status)]}
                                   </span>
                                   {log.is_medication_error && (
                                     <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-semibold text-white">Error Filed</span>
@@ -1360,7 +1427,7 @@ export function MarEmarTab({
         const latest = history[history.length - 1];
         rows.push({
           med, time: t, iso, block: blockFor(t),
-          history, log: latest, isLocked: latest?.status === "administered",
+          history, log: latest, isLocked: normalizeEmarStatus(latest?.status ?? "") === "self_administered",
         });
       });
       // PRN medications get a "log now" entry even without a scheduled time
@@ -1407,6 +1474,7 @@ export function MarEmarTab({
     seizureOutcome: string | null;
     emergencyServicesCalled: boolean;
     attested: boolean;
+    secondWitnessId: string | null;
   }) {
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -1433,13 +1501,14 @@ export function MarEmarTab({
           isMedicationError: payload.isMedicationError,
           errorDescription: payload.errorDescription,
           serviceContext,
+          secondWitnessId: payload.secondWitnessId,
         },
       });
 
       // Optimistically update pill_count_current in the meds cache.
       // pillCountValue = post-dose remaining count entered by staff.
       // Phase 2B will persist this to the DB via the server function.
-      if (activePass.med.is_controlled && payload.pillCountValue !== null && payload.status === "administered") {
+      if (activePass.med.is_controlled && payload.pillCountValue !== null && payload.status === "self_administered") {
         qc.setQueryData(
           ["mar-meds", clientId, orgId],
           (old: Medication[] | undefined) =>
@@ -1454,7 +1523,7 @@ export function MarEmarTab({
       toast.success(
         payload.isMedicationError
           ? "Medication error recorded. Administrator notified and incident drafted."
-          : payload.status === "administered"
+          : payload.status === "self_administered"
           ? "Self-administration confirmed and signed."
           : "Exception documented.",
       );
@@ -1605,9 +1674,9 @@ export function MarEmarTab({
                   {pendingCount} pending
                 </Badge>
               )}
-              {passes.filter((p) => p.log?.status === "administered").length > 0 && (
+              {passes.filter((p) => normalizeEmarStatus(p.log?.status ?? "") === "self_administered").length > 0 && (
                 <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-                  {passes.filter((p) => p.log?.status === "administered").length} self-administered
+                  {passes.filter((p) => normalizeEmarStatus(p.log?.status ?? "") === "self_administered").length} self-administered
                 </Badge>
               )}
             </div>
@@ -1639,14 +1708,14 @@ export function MarEmarTab({
                     </span>
                   )}
                   <span className="ml-auto text-[11px] text-muted-foreground">
-                    {items.filter((i) => i.log?.status === "administered").length}/{items.length} documented
+                    {items.filter((i) => normalizeEmarStatus(i.log?.status ?? "") === "self_administered").length}/{items.length} documented
                   </span>
                 </div>
                 <ul className="space-y-2">
                   {items.map((p) => {
                     const isLocked = p.isLocked;
                     const hasHistory = p.history.length > 0;
-                    const passed = p.log?.status === "administered";
+                    const passed = normalizeEmarStatus(p.log?.status ?? "") === "self_administered";
                     const errored = p.log?.is_medication_error;
                     const overdue = !isLocked && new Date(p.iso).getTime() < Date.now() - 60 * 60 * 1000 && p.time !== "PRN";
                     const upcoming = !isLocked && !overdue && p.time !== "PRN";
@@ -1735,7 +1804,7 @@ export function MarEmarTab({
                               {p.log && !passed && (
                                 <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
                                   {p.log?.status}
-                                  {p.log?.exception_reason ? ` — ${p.log.exception_reason.replace(/^Route:[^·]+·\s*/, "")}` : ""}
+                                  {p.log?.exception_reason ? ` — ${p.log.exception_reason}` : ""}
                                 </span>
                               )}
                               {errored && (
@@ -1762,7 +1831,7 @@ export function MarEmarTab({
                                   const code = parseJobCode(h);
                                   const when = h.created_at ? fmtTime(h.created_at) : "";
                                   const cleanNotes = stripJobCodePrefix(h.notes);
-                                  const isAdmin = h.status === "administered";
+                                  const isAdmin = normalizeEmarStatus(h.status) === "self_administered";
                                   return (
                                     <li key={h.id} className="flex flex-wrap items-center gap-1.5">
                                       <span className="font-mono">{when}</span>

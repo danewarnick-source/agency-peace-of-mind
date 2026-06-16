@@ -127,13 +127,15 @@ export function MedicationsManager({
         .select(`id, medication_name, dosage, frequency, route, scheduled_times,
           instructions, prescriber, is_active, discontinued_at,
           purpose, adverse_effects, choking_risk, choking_risk_details,
-          is_controlled, is_prn, prn_instructions, pharmacy, rx_number`)
+          is_controlled, is_prn, prn_instructions, pharmacy, rx_number,
+          packaging, side_effects, contributes_to_swallowing_difficulty`)
         .eq("client_id", clientId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Medication[];
     },
   });
+
 
   const insertMut = useMutation({
     mutationFn: async (v: FormVals) => {

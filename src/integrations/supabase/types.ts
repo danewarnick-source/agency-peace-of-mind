@@ -2165,6 +2165,7 @@ export type Database = {
           choking_risk_details: string | null
           client_id: string
           contributes_to_swallowing_difficulty: boolean
+          controlled_schedule: string | null
           created_at: string
           created_by: string | null
           diagnosis: string | null
@@ -2178,6 +2179,7 @@ export type Database = {
           is_active: boolean
           is_controlled: boolean
           is_prn: boolean
+          is_rescue: boolean
           medication_name: string
           organization_id: string
           packaging: string | null
@@ -2188,6 +2190,10 @@ export type Database = {
           prn_instructions: string | null
           purpose: string | null
           refill_date: string | null
+          refill_requested_at: string | null
+          refill_requested_by: string | null
+          refill_status: string
+          refill_threshold: number
           route: string | null
           rx_number: string | null
           scheduled_times: string[]
@@ -2200,6 +2206,7 @@ export type Database = {
           choking_risk_details?: string | null
           client_id: string
           contributes_to_swallowing_difficulty?: boolean
+          controlled_schedule?: string | null
           created_at?: string
           created_by?: string | null
           diagnosis?: string | null
@@ -2213,6 +2220,7 @@ export type Database = {
           is_active?: boolean
           is_controlled?: boolean
           is_prn?: boolean
+          is_rescue?: boolean
           medication_name: string
           organization_id: string
           packaging?: string | null
@@ -2223,6 +2231,10 @@ export type Database = {
           prn_instructions?: string | null
           purpose?: string | null
           refill_date?: string | null
+          refill_requested_at?: string | null
+          refill_requested_by?: string | null
+          refill_status?: string
+          refill_threshold?: number
           route?: string | null
           rx_number?: string | null
           scheduled_times?: string[]
@@ -2235,6 +2247,7 @@ export type Database = {
           choking_risk_details?: string | null
           client_id?: string
           contributes_to_swallowing_difficulty?: boolean
+          controlled_schedule?: string | null
           created_at?: string
           created_by?: string | null
           diagnosis?: string | null
@@ -2248,6 +2261,7 @@ export type Database = {
           is_active?: boolean
           is_controlled?: boolean
           is_prn?: boolean
+          is_rescue?: boolean
           medication_name?: string
           organization_id?: string
           packaging?: string | null
@@ -2258,6 +2272,10 @@ export type Database = {
           prn_instructions?: string | null
           purpose?: string | null
           refill_date?: string | null
+          refill_requested_at?: string | null
+          refill_requested_by?: string | null
+          refill_status?: string
+          refill_threshold?: number
           route?: string | null
           rx_number?: string | null
           scheduled_times?: string[]
@@ -2809,6 +2827,75 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      controlled_med_counts: {
+        Row: {
+          client_id: string
+          context: string
+          counted_value: number
+          created_at: string
+          emar_log_id: string | null
+          expected_count: number | null
+          flagged: boolean
+          id: string
+          medication_id: string
+          notes: string | null
+          organization_id: string
+          signature_data_url: string | null
+          staff_id: string
+          staff_name: string | null
+          variance: number | null
+        }
+        Insert: {
+          client_id: string
+          context: string
+          counted_value: number
+          created_at?: string
+          emar_log_id?: string | null
+          expected_count?: number | null
+          flagged?: boolean
+          id?: string
+          medication_id: string
+          notes?: string | null
+          organization_id: string
+          signature_data_url?: string | null
+          staff_id: string
+          staff_name?: string | null
+          variance?: number | null
+        }
+        Update: {
+          client_id?: string
+          context?: string
+          counted_value?: number
+          created_at?: string
+          emar_log_id?: string | null
+          expected_count?: number | null
+          flagged?: boolean
+          id?: string
+          medication_id?: string
+          notes?: string | null
+          organization_id?: string
+          signature_data_url?: string | null
+          staff_id?: string
+          staff_name?: string | null
+          variance?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "controlled_med_counts_emar_log_id_fkey"
+            columns: ["emar_log_id"]
+            isOneToOne: false
+            referencedRelation: "emar_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "controlled_med_counts_medication_id_fkey"
+            columns: ["medication_id"]
+            isOneToOne: false
+            referencedRelation: "client_medications"
             referencedColumns: ["id"]
           },
         ]
@@ -3528,8 +3615,50 @@ export type Database = {
         }
         Relationships: []
       }
+      emar_log_addenda: {
+        Row: {
+          created_at: string
+          emar_log_id: string
+          id: string
+          note: string
+          organization_id: string
+          signature_data_url: string | null
+          staff_id: string
+          staff_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          emar_log_id: string
+          id?: string
+          note: string
+          organization_id: string
+          signature_data_url?: string | null
+          staff_id: string
+          staff_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          emar_log_id?: string
+          id?: string
+          note?: string
+          organization_id?: string
+          signature_data_url?: string | null
+          staff_id?: string
+          staff_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emar_log_addenda_emar_log_id_fkey"
+            columns: ["emar_log_id"]
+            isOneToOne: false
+            referencedRelation: "emar_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       emar_logs: {
         Row: {
+          actual_taken_at: string | null
           admin_review_notes: string | null
           admin_reviewed: boolean
           admin_reviewed_at: string | null
@@ -3538,12 +3667,15 @@ export type Database = {
           attestation_signed: boolean
           client_id: string
           created_at: string
+          documented_at: string
+          emergency_services_called: boolean | null
           error_description: string | null
           exception_reason: string | null
           id: string
           is_controlled: boolean
           is_medication_error: boolean
           is_prn: boolean
+          late_entry_gap_minutes: number | null
           medication_id: string
           notes: string | null
           organization_id: string
@@ -3554,6 +3686,9 @@ export type Database = {
           recorded_in: string
           scheduled_for: string
           scheduled_time_label: string | null
+          seizure_duration_seconds: number | null
+          seizure_outcome: string | null
+          service_context: string | null
           signature_attestation: string | null
           signature_data_url: string | null
           staff_id: string | null
@@ -3562,6 +3697,7 @@ export type Database = {
           variance_note: string | null
         }
         Insert: {
+          actual_taken_at?: string | null
           admin_review_notes?: string | null
           admin_reviewed?: boolean
           admin_reviewed_at?: string | null
@@ -3570,12 +3706,15 @@ export type Database = {
           attestation_signed?: boolean
           client_id: string
           created_at?: string
+          documented_at?: string
+          emergency_services_called?: boolean | null
           error_description?: string | null
           exception_reason?: string | null
           id?: string
           is_controlled?: boolean
           is_medication_error?: boolean
           is_prn?: boolean
+          late_entry_gap_minutes?: number | null
           medication_id: string
           notes?: string | null
           organization_id: string
@@ -3586,6 +3725,9 @@ export type Database = {
           recorded_in?: string
           scheduled_for: string
           scheduled_time_label?: string | null
+          seizure_duration_seconds?: number | null
+          seizure_outcome?: string | null
+          service_context?: string | null
           signature_attestation?: string | null
           signature_data_url?: string | null
           staff_id?: string | null
@@ -3594,6 +3736,7 @@ export type Database = {
           variance_note?: string | null
         }
         Update: {
+          actual_taken_at?: string | null
           admin_review_notes?: string | null
           admin_reviewed?: boolean
           admin_reviewed_at?: string | null
@@ -3602,12 +3745,15 @@ export type Database = {
           attestation_signed?: boolean
           client_id?: string
           created_at?: string
+          documented_at?: string
+          emergency_services_called?: boolean | null
           error_description?: string | null
           exception_reason?: string | null
           id?: string
           is_controlled?: boolean
           is_medication_error?: boolean
           is_prn?: boolean
+          late_entry_gap_minutes?: number | null
           medication_id?: string
           notes?: string | null
           organization_id?: string
@@ -3618,6 +3764,9 @@ export type Database = {
           recorded_in?: string
           scheduled_for?: string
           scheduled_time_label?: string | null
+          seizure_duration_seconds?: number | null
+          seizure_outcome?: string | null
+          service_context?: string | null
           signature_attestation?: string | null
           signature_data_url?: string | null
           staff_id?: string | null
@@ -7331,6 +7480,68 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medication_transfers: {
+        Row: {
+          client_id: string
+          created_at: string
+          from_location: string
+          id: string
+          medication_id: string
+          notes: string | null
+          organization_id: string
+          quantity: number
+          received_by_name: string
+          received_signature: string | null
+          released_by_name: string | null
+          released_by_staff_id: string
+          released_signature: string | null
+          to_location: string
+          transferred_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          from_location: string
+          id?: string
+          medication_id: string
+          notes?: string | null
+          organization_id: string
+          quantity: number
+          received_by_name: string
+          received_signature?: string | null
+          released_by_name?: string | null
+          released_by_staff_id: string
+          released_signature?: string | null
+          to_location: string
+          transferred_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          from_location?: string
+          id?: string
+          medication_id?: string
+          notes?: string | null
+          organization_id?: string
+          quantity?: number
+          received_by_name?: string
+          received_signature?: string | null
+          released_by_name?: string | null
+          released_by_staff_id?: string
+          released_signature?: string | null
+          to_location?: string
+          transferred_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medication_transfers_medication_id_fkey"
+            columns: ["medication_id"]
+            isOneToOne: false
+            referencedRelation: "client_medications"
             referencedColumns: ["id"]
           },
         ]
@@ -12866,6 +13077,10 @@ export type Database = {
       }
       is_hive_executive: { Args: { _user: string }; Returns: boolean }
       is_hrc_committee_member: {
+        Args: { _org: string; _user: string }
+        Returns: boolean
+      }
+      is_med_assist_current: {
         Args: { _org: string; _user: string }
         Returns: boolean
       }

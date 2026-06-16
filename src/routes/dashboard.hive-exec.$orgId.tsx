@@ -89,7 +89,41 @@ function CompanyDetailPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Save failed"),
   });
 
+  const saveNames = useMutation({
+    mutationFn: () =>
+      saveNamesFn({
+        data: {
+          organizationId: orgId,
+          attestation: true,
+          patch: {
+            name: nameEdit,
+            legal_name: legalEdit,
+            dba_name: dbaEdit,
+            display_acronym: acronymEdit,
+          },
+        },
+      }),
+    onSuccess: (r) => {
+      toast.success(r.changed ? `Saved — ${r.changed} field(s) updated, logged.` : "No changes to save");
+      setConfirmOpen(false);
+      setAttest(false);
+      qc.invalidateQueries({ queryKey: ["hive-exec-company", orgId] });
+      qc.invalidateQueries({ queryKey: ["hive-exec-companies"] });
+      qc.invalidateQueries({ queryKey: ["current-org"] });
+      qc.invalidateQueries({ queryKey: ["my-memberships"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Save failed"),
+  });
+
   const d = detailQ.data;
+  const nameDirty =
+    !!d &&
+    ((nameEdit.trim() || "") !== (d.name ?? "") ||
+      (legalEdit.trim() || "") !== (d.legal_name ?? "") ||
+      (dbaEdit.trim() || "") !== (d.dba_name ?? "") ||
+      (acronymEdit.trim() || "") !== (d.display_acronym ?? ""));
+
+
 
   return (
     <div className="space-y-4">

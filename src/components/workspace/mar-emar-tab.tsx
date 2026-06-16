@@ -25,7 +25,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, Eraser, Loader2,
   Moon, Sun, Sunset, CalendarDays, ChevronLeft,
   ChevronRight, ShieldCheck, Pill, BookOpen, History,
-  AlertOctagon, Settings2, Sparkles, FilePlus2, Siren,
+  AlertOctagon, Settings2, Sparkles, FilePlus2, Siren, Pencil,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";

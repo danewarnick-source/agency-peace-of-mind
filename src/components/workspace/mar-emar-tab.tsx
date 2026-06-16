@@ -149,11 +149,18 @@ const ROUTES = [
   "Other",
 ];
 
-const BLOCK_META: Record<Block, { icon: typeof Sun; tone: string; bg: string; label: string }> = {
-  Morning: { icon: Sun,    tone: "text-amber-600",   bg: "bg-amber-50 dark:bg-amber-950/20",   label: "Morning" },
-  Evening: { icon: Sunset, tone: "text-rose-500",    bg: "bg-rose-50 dark:bg-rose-950/20",     label: "Evening" },
-  PRN:     { icon: Pill,   tone: "text-indigo-600",  bg: "bg-indigo-50 dark:bg-indigo-950/20", label: "As-needed (PRN)" },
+const BLOCK_META: Record<Block, { label: string; subtitle: (firstTime?: string) => string }> = {
+  Morning: { label: "Morning", subtitle: (t) => t ? `${fmtTimeLabel(t)}` : "" },
+  Evening: { label: "Evening", subtitle: (t) => t ? `${fmtTimeLabel(t)}` : "" },
+  PRN:     { label: "As needed (PRN)", subtitle: () => "" },
 };
+
+function fmtTimeLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
+  const d = new Date();
+  d.setHours(h ?? 0, m ?? 0, 0, 0);
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

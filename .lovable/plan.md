@@ -1,35 +1,46 @@
-# Restyle the eMAR to match the mockups
+## Goal
 
-Pure visual/layout restyle of the Today's Pass surface and its confirm modal. No data, no schema, no business logic changes. All colors come from Hive semantic tokens — no hardcoded hex.
+Restyle the "Medication Administration Record" dialog in `src/components/workspace/mar-emar-tab.tsx` so it matches the simplified mockup exactly: a single scrollable form, no tabs, only the fields shown in the screenshot.
 
-## Scope (files touched)
+## Final dialog layout (top → bottom)
 
-- `src/components/workspace/mar-emar-tab.tsx` — header bar, disclaimer banner, client header card, Nectar panel, tab strip, time-block sections, pass rows, confirm modal
-- `src/components/workspace/emar-chart.tsx` — only the small subcomponents reused by MarEmarTab (`EmarLegalBanner`, `ClinicalSafetyHeader`) get their visuals re-skinned to match
-- `src/styles.css` — add any missing semantic tokens needed (e.g. amber "honey" surface, soft pill-icon tile, status-chip tints) so components stay token-driven
+1. Header: pill icon + "Medication Administration Record", subtitle `{client} · {med} · Scheduled {time}`. Small text-link in header row: "View directives" (opens directives in a secondary lightweight sheet, since the tab is being removed).
+2. Choking-risk alert (only when applicable) — kept, unchanged.
+3. **Route of Administration *** — Select.
+4. **Clinical Notes / Observations** — Textarea, placeholder "Observations, reactions, posture, anything relevant…".
+5. **Medication-error checkbox** in red-tinted card: "This is a medication error requiring immediate reporting." Helper: "Notifies your administrator and flags this record for review (SOW c4)." Expand-on-check textarea kept.
+6. **Staff Signature *** — SigPad, helper "Sign with mouse, finger, or stylus." with right-aligned "Clear".
+7. **Attestation checkbox** in honey-tinted card with the existing `ATTESTATION_TEXT` referencing the client by name.
+8. Helper line (muted): "Complete the required (*) items to confirm: status, route, time, signature, attestation."
+9. Footer: `Cancel` (ghost) | primary amber **`Observe & Confirm Self-Administration`** with shield-check icon. Disabled until valid.
 
-Out of scope: `/dashboard/emar` route, MAR Sheet calendar, Directives, Controlled & Inventory, History/audit tab, scheduler, forms, medication CRUD.
+## Removed from this dialog
 
-## Visual targets (from screenshots)
+- The `Tabs` wrapper (Administration Log / Medication Directives). Directives move to a "View directives" link in the header that opens a secondary `Sheet`/`Dialog` rendering the existing `MedicationDirectivesPanel`. No content lost.
+- "Time the Person actually took this medication" input + late-entry warning block. `actualTakenAt` still defaults to `now()` in state and is sent on submit; UI just hidden in this view.
+- "Medication Confirmed" summary card (med name + dose already in the dialog subtitle).
+- Outcome chip grid (Self-administered / Refused / Omitted / Missed). This dialog is the self-administration confirm path only — `status` is locked to `"administered"`. Refused / Omitted / Missed remain reachable from the row-level "Update Status" menu that already exists in the pass list.
+- "Signing as {staff}" card (identity still captured silently from the account on submit).
+- Exception Reason block (only appeared with non-administered statuses, which this dialog no longer offers).
 
-1. **Top app bar** — hex/honey HIVE mark on left, "HIVE" wordmark, small-caps subtitle `eMAR · MEDICATION SUPPORT`, amber `DEMO` pill, right-aligned `Acting service [HHS]` chip.
-2. **Self-directed disclaimer banner** — full-width deep navy band, amber ⚠️ icon, bold lede `Self-Directed Administration Support Interface.` followed by the DOPL/DHHS clause.
-3. **Client header card** — stethoscope icon, client name, green `HHS active` chip, DOB on left; right side `Allergies:` label + each allergen as a soft-red rounded pill.
-4. **Safety alerts** — amber ⚠️ lines for "Choking / swallow-reflex risk…" and "Crushed-med policy per care plan…".
-5. **Nectar AI Compliance Assistant** — honey-tinted card, sparkle icon + title, simulation actions as outlined chip-buttons with sparkle prefix ("Simulate a 9 AM refusal → 11 AM success", "Run Schedule II–IV narcotic audit", "Simulate critical low inventory", "Flag meds that worsen swallowing").
-6. **Tab strip** — underlined active tab in primary amber, icons before labels: Today's Pass (clock), MAR Sheet (calendar), Directives (doc), Controlled & Inventory (shield-check), Compliance & Audit (history).
-7. **Time-block headers** — small-caps muted label `MORNING · 8:00 AM`, `EVENING · 8:00 PM`, `AS NEEDED (PRN)`.
-8. **Pass rows** — white card, soft-amber rounded tile with pill icon (syringe for PRN, red-tinted tile for controlled PRN), `HH:MM  MedName  dose · route` line, muted purpose subtitle, status chip underneath (`Window passed — documentation required` amber, `Upcoming` muted, `PRN · Schedule IV` red), primary amber `Observe & Confirm` button on the right.
-9. **Confirm modal** — sections in order: Route of Administration select, Clinical Notes / Observations textarea, red-tinted "This is a medication error requiring immediate reporting" checkbox card, Staff Signature pad with Clear link, attestation checkbox in soft surface card, helper line "Complete the required (\*) items…", footer with `Cancel` + filled `Observe & Confirm Self-Administration` CTA (shield icon).
+## Conditional blocks kept (render inline only when applicable)
 
-## Implementation notes
+- PRN reason card (when `med.is_prn`).
+- Controlled-substance pill count (when `med.is_controlled`).
+- Rescue/seizure capture (when `med.is_rescue`).
 
-- Add to `src/styles.css` only what's missing: `--honey-surface`, `--honey-surface-foreground`, `--pill-tile`, `--pill-tile-foreground`, `--status-chip-warn`, `--status-chip-danger`, `--status-chip-muted`. Reuse existing primary/destructive/muted tokens where they fit.
-- All chips/buttons use shadcn variants — no inline `bg-[#...]` or `text-white`.
-- Keep every existing prop, query, server-fn call, and handler — only JSX/className changes.
-- Re-verify build is clean after the rewrite.
+These keep the same validators they have today, so `canSubmit` and the helper bullet list continue to work.
 
-## Risks
+## Implementation notes (single file)
 
-- `mar-emar-tab.tsx` is ~1.8k lines; the restyle is class/JSX-only but spans many sections. I'll do it in one focused pass and re-typecheck.
-- The "Acting service" selector currently exists as functional state; I'll keep it wired and just restyle the trigger to match the chip in the mockup.
+- File: `src/components/workspace/mar-emar-tab.tsx`.
+- Inside the `EmarLogDialog` component (around lines 550–845): remove the `<Tabs>`/`<TabsList>`/`<TabsContent>` wrappers and the four removed blocks listed above. Keep all state, handlers, server-fn calls, and validators untouched — only JSX and classNames change.
+- Hard-set `status = "administered"` on mount and drop the chip grid; remove `isException` branches in JSX (state can stay or be deleted along with `EXCEPTION_REASONS` import if unused).
+- Add a small "View directives" trigger in `DialogHeader` that opens a second `Dialog` rendering `<MedicationDirectivesPanel med={med} />`. No new files.
+- Footer becomes a `DialogFooter` with two buttons; primary uses the Hive amber gradient already wired (`bg-gradient-amber` / primary variant) and shows `ShieldCheck` + "Observe & Confirm Self-Administration".
+- Re-run typecheck after the edit; fix any unused-import warnings (`Tabs*`, `EXCEPTION_REASONS`, etc.).
+
+## Out of scope
+
+- Pass-list rows, time-block headers, Nectar card, top app bar — already restyled in the previous turn, untouched here.
+- Schema, server functions, billing logic — no changes.

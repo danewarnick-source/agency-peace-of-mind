@@ -214,11 +214,27 @@ export const publishWeek = createServerFn({ method: "POST" })
       .not("staff_id", "is", null)
       .select("id, staff_id");
     if (error) throw error;
-    const staffIds = new Set<string>(
-      (rows ?? []).map((r: { staff_id: string | null }) => r.staff_id ?? ""),
-    );
-    staffIds.delete("");
-    return { shifts: rows?.length ?? 0, staff: staffIds.size };
+    const byStaff = new Map<string, number>();
+    for (const r of rows ?? []) {
+      const sid = (r as any).staff_id as string | null;
+      if (!sid) continue;
+      byStaff.set(sid, (byStaff.get(sid) ?? 0) + 1);
+    }
+    if (byStaff.size > 0) {
+      const weekLabel = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const notifs = Array.from(byStaff.entries()).map(([staffId, count]) => ({
+        organization_id: data.organization_id,
+        recipient_role: "staff",
+        recipient_user_id: staffId,
+        type: "shift_published",
+        urgency: "normal",
+        title: "Your schedule was published",
+        body: `You have ${count} new or updated shift${count === 1 ? "" : "s"} for the week of ${weekLabel}.`,
+        link_to: "/dashboard/schedule",
+      }));
+      await supabase.from("notifications").insert(notifs);
+    }
+    return { shifts: rows?.length ?? 0, staff: byStaff.size };
   });
 
 export const addToCaseload = createServerFn({ method: "POST" })

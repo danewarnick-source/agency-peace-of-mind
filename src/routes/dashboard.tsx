@@ -49,7 +49,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/hub/employees", label: "Employees", icon: Users },
   { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2 },
-  { to: "/dashboard/schedule-preview", label: "Scheduler", icon: CalendarDays },
+  { to: "/dashboard/scheduler", label: "Scheduler", icon: CalendarDays },
   { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck },
   { to: "/dashboard/deadlines", label: "Deadlines", icon: AlarmClock },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },

@@ -170,7 +170,7 @@ function RevenuePage() {
               setYear(y);
               setInputsMonth(y === nowYear ? nowMonth : 1);
             }}>
-              <SelectTrigger className="h-9 w-[120px]">
+              <SelectTrigger className="h-9 w-full sm:w-[120px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -294,7 +294,7 @@ function RevenuePage() {
               value={String(inputsMonth)}
               onValueChange={(v) => setInputsMonth(Number(v))}
             >
-              <SelectTrigger className="h-9 w-[140px]">
+              <SelectTrigger className="h-9 w-full sm:w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

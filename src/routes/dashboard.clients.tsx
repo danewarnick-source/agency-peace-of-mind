@@ -206,6 +206,24 @@ async function resolveCoords(addr: string): Promise<{ lat: number | null; lng: n
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
+function ClientsError({ error }: { error: Error; reset: () => void }) {
+  return (
+    <div className="flex items-start justify-center p-8">
+      <div className="max-w-md rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-center">
+        <h2 className="text-base font-semibold">Something went wrong in Client Directory</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <div className="mt-4 flex justify-center gap-3">
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >Reload</button>
+          <a href="/dashboard" className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground">Dashboard home</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/dashboard/clients")({
   head: () => ({ meta: [{ title: "Client Directory — HIVE" }] }),
   component: () => (
@@ -213,6 +231,7 @@ export const Route = createFileRoute("/dashboard/clients")({
       <ClientsPage />
     </RequirePermission>
   ),
+  errorComponent: ClientsError,
 });
 
 // ─── Clients Page ─────────────────────────────────────────────────────────────
@@ -438,7 +457,7 @@ export function ClientsPage() {
                       <TableCell className="font-semibold whitespace-nowrap py-2">
                         <div className="flex items-center gap-2">
                           <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                            {c.first_name[0]}{c.last_name[0]}
+                            {c.first_name?.[0] ?? ""}{c.last_name?.[0] ?? ""}
                           </span>
                           <span className="truncate">{c.first_name} {c.last_name}</span>
                         </div>
@@ -447,7 +466,7 @@ export function ClientsPage() {
                         {c.medicaid_id || "—"}
                       </TableCell>
                       <TableCell className="py-2">
-                        <div className="flex items-center gap-1 whitespace-nowrap">
+                        <div className="flex flex-wrap items-center gap-1">
                           {shownCodes.length ? (
                             <>
                               {shownCodes.map((code) => (
@@ -612,7 +631,7 @@ function ClientWorkspace({
         <span className="text-muted-foreground">/</span>
         <div className="flex items-center gap-2">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-            {client.first_name[0]}{client.last_name[0]}
+            {client.first_name?.[0] ?? ""}{client.last_name?.[0] ?? ""}
           </span>
           <div>
             <h2 className="text-lg font-semibold leading-none">
@@ -1734,7 +1753,7 @@ function ProfileTab({
                     className="h-full w-full object-cover"
                     fallback={
                       <span className="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary">
-                        {client.first_name[0]}{client.last_name[0]}
+                        {client.first_name?.[0] ?? ""}{client.last_name?.[0] ?? ""}
                       </span>
                     }
                   />

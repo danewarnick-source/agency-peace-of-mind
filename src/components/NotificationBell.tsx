@@ -220,7 +220,7 @@ export function NotificationBell() {
       urgency: "urgent",
       title: `${ceBehind} staff behind on Continuing Education`,
       body: "DSPD requires 12 CE hours per staff per year (Year 2+). Open Training Records to see who's behind.",
-      link_to: "/dashboard/records-desk?tab=training-records",
+      link_to: "/dashboard/hub/employees?tab=compliance",
       related_id: null,
       related_type: null,
       read_at: null,
@@ -240,7 +240,14 @@ export function NotificationBell() {
 
   function handleClick(n: AppNotification) {
     if (n.id !== "__ce_synthetic__" && n.id !== "__ce_behind__" && !n.read_at) markReadMut.mutate(n.id);
-    if (n.link_to) { setOpen(false); navigate({ to: n.link_to as never }); }
+    if (n.link_to) {
+      if (!n.link_to.startsWith("/dashboard/")) {
+        console.warn("[NotificationBell] skipping navigation — unexpected link_to:", n.link_to);
+        return;
+      }
+      setOpen(false);
+      navigate({ to: n.link_to });
+    }
   }
 
   return (

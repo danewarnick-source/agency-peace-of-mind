@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +49,7 @@ function ProgramPlayer() {
   const { data: org } = useCurrentOrg();
   const { role, can, isLoading: permissionsLoading } = usePermissions();
   const qc = useQueryClient();
+  const router = useRouter();
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
 
   const isPrivilegedViewer = role === "admin" || role === "manager" || role === "super_admin" || can("manage_programs");
@@ -321,8 +322,8 @@ function ProgramPlayer() {
 
   return (
     <div className="space-y-6">
-      <Button asChild variant="ghost" size="sm" className="-ml-2">
-        <Link to="/dashboard/programs"><ArrowLeft className="mr-1 h-4 w-4" /> Programs</Link>
+      <Button variant="ghost" size="sm" className="-ml-2" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/programs" })}>
+        <ArrowLeft className="mr-1 h-4 w-4" /> Programs
       </Button>
 
       <header className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ function BehaviorSupportClientPage() {
   const { clientId } = Route.useParams();
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
+  const router = useRouter();
   const orgRole = org?.role;
   const orgId = org?.organization_id;
 
@@ -69,12 +70,13 @@ function BehaviorSupportClientPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
-      <Link
-        to={backTo}
+      <button
+        type="button"
+        onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: backTo })}
         className="inline-flex h-11 items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Back
-      </Link>
+      </button>
 
       <div className="flex flex-wrap items-center gap-3">
         <Brain className="h-5 w-5 text-[color:var(--teal-700,#137182)]" />

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -35,6 +35,7 @@ type Draft = Partial<ClientBillingCode> & { service_code: string };
 function ClientBillingDetail() {
   const { clientId } = Route.useParams();
   const { data: org } = useCurrentOrg();
+  const router = useRouter();
   const { data: allCodes, refetch } = useAllClientBillingCodes();
   const { data: budgets } = useClientBudget(clientId);
 
@@ -121,10 +122,8 @@ function ClientBillingDetail() {
           </BreadcrumbList>
         </Breadcrumb>
         <div>
-          <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground">
-            <Link to="/dashboard/billing">
-              <ArrowLeft className="mr-1 h-4 w-4" /> Back to Billing
-            </Link>
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/billing" })}>
+            <ArrowLeft className="mr-1 h-4 w-4" /> Back to Billing
           </Button>
         </div>
       </div>

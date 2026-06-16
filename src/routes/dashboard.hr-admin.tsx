@@ -154,7 +154,7 @@ export function HrAdminPage() {
               className="md:max-w-xs"
             />
             <Select value={team} onValueChange={setTeam}>
-              <SelectTrigger className="md:w-[200px]">
+              <SelectTrigger className="w-full sm:w-auto md:w-[200px]">
                 <SelectValue placeholder="Team" />
               </SelectTrigger>
               <SelectContent>
@@ -167,7 +167,7 @@ export function HrAdminPage() {
               </SelectContent>
             </Select>
             <Select value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-              <SelectTrigger className="md:w-[200px]">
+              <SelectTrigger className="w-full sm:w-auto md:w-[200px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

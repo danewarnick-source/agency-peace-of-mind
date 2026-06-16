@@ -387,7 +387,7 @@ function RoleGranterStub({ orgId }: { orgId: string | null }) {
         onChange={(e) => setSearch(e.target.value)}
       />
       <Select value={selectedUser} onValueChange={setSelectedUser}>
-        <SelectTrigger className="min-w-[220px]">
+        <SelectTrigger className="w-full sm:w-auto min-w-[220px]">
           <SelectValue placeholder="Select a user" />
         </SelectTrigger>
         <SelectContent>
@@ -403,7 +403,7 @@ function RoleGranterStub({ orgId }: { orgId: string | null }) {
         </SelectContent>
       </Select>
       <Select value={action} onValueChange={(v) => setAction(v as "grant" | "revoke")}>
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-full sm:w-[140px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

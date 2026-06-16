@@ -658,9 +658,9 @@ function DailyLogDialog({
               {/* PCSP goals */}
               <div>
                 <Label className="mb-2 block text-sm font-medium">PCSP Goals Addressed Today</Label>
-                {client.pcsp_goals?.length ? (
+                {(client.pcsp_goals?.length ?? 0) > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {client.pcsp_goals.map((g) => {
+                    {(client.pcsp_goals ?? []).map((g) => {
                       const on = goals.includes(g);
                       return (
                         <button key={g} type="button" onClick={() => toggleGoal(g)}

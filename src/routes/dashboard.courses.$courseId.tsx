@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,6 +71,7 @@ function CoursePlayer() {
   const { data: org } = useCurrentOrg();
   const { can } = usePermissions();
   const qc = useQueryClient();
+  const router = useRouter();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -348,10 +349,8 @@ function CoursePlayer() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <Button asChild variant="ghost" size="sm" className="-ml-2">
-          <Link to="/dashboard/courses">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Library
-          </Link>
+        <Button variant="ghost" size="sm" className="-ml-2" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/courses" })}>
+          <ArrowLeft className="mr-1 h-4 w-4" /> Library
         </Button>
         {can("edit_courses") && (
           <Button asChild variant="outline" size="sm">
@@ -395,7 +394,7 @@ function CoursePlayer() {
               <ListTree className="mr-2 h-4 w-4" /> Browse modules
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[320px] p-0">
+          <SheetContent side="left" className="w-[320px] max-w-[calc(100vw-2rem)] p-0">
             <SheetHeader className="border-b border-border p-4">
               <SheetTitle>{course.title}</SheetTitle>
             </SheetHeader>

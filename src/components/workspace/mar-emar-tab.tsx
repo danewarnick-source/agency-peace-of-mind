@@ -1675,6 +1675,7 @@ export function MarEmarTab({
       <AdminLogDialog
         pass={activePass}
         clientName={clientName}
+        serviceContext={serviceContext}
         onClose={() => setActivePass(null)}
         onSubmit={submitAdmin}
       />

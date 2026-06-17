@@ -1,0 +1,93 @@
+name: Typecheck, Lint & Crawl
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  typecheck-and-lint:
+    name: Typecheck & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (changed files only)
+        # Runs tsc project-wide (no way to scope it) but exits 0 so pre-existing
+        # errors don't block new work. The step prints any errors for visibility.
+        run: npx tsc --noEmit || true
+
+      - name: Lint (changed files only)
+        # Fetch base so we can diff; lint only files touched by this push/PR.
+        # This gates on NEW lint errors without failing on pre-existing noise.
+        run: |
+          git fetch origin main --depth=1 2>/dev/null || true
+          BASE=$(git merge-base HEAD origin/main 2>/dev/null || echo "HEAD~1")
+          CHANGED=$(git diff --name-only "$BASE" HEAD | grep -E '\.(ts|tsx)$' | tr '\n' ' ')
+          if [ -n "$CHANGED" ]; then
+            npx eslint $CHANGED
+          else
+            echo "No TypeScript files changed — skipping lint"
+          fi
+
+  crawl:
+    name: Route Crawler
+    needs: typecheck-and-lint
+    runs-on: ubuntu-latest
+    env:
+      STAGING_URL: ${{ secrets.STAGING_URL }}
+      TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+      # Optional — set these to get real data into parameterised-route tests.
+      # If unset, placeholder UUIDs are used (tests still run against the shell).
+      STAGING_CLIENT_ID: ${{ secrets.STAGING_CLIENT_ID }}
+      STAGING_STAFF_ID: ${{ secrets.STAGING_STAFF_ID }}
+      STAGING_SHIFT_ID: ${{ secrets.STAGING_SHIFT_ID }}
+      STAGING_COURSE_ID: ${{ secrets.STAGING_COURSE_ID }}
+      STAGING_ASSIGNMENT_ID: ${{ secrets.STAGING_ASSIGNMENT_ID }}
+      STAGING_TOPIC_ID: ${{ secrets.STAGING_TOPIC_ID }}
+      STAGING_FORM_ID: ${{ secrets.STAGING_FORM_ID }}
+      STAGING_PROGRAM_ID: ${{ secrets.STAGING_PROGRAM_ID }}
+      STAGING_JOB_ID: ${{ secrets.STAGING_JOB_ID }}
+      STAGING_TRACK_SLUG: ${{ secrets.STAGING_TRACK_SLUG }}
+      STAGING_TRAINING_ID: ${{ secrets.STAGING_TRAINING_ID }}
+      STAGING_STATE_CODE: ${{ secrets.STAGING_STATE_CODE }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run crawler
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

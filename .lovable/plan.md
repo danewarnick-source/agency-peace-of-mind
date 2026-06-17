@@ -1,28 +1,36 @@
-## Diagnosis
+## Scope
 
-I checked the actual state of the project and found nothing broken:
+Replace the public `/pricing` page contents with the DSPD-specific pricing page described. **Only touch `src/routes/pricing.tsx`** plus one new self-contained component file for the page body. Do not modify the landing page, login, header, footer, or anything in the authenticated app. The nav link to `/pricing` already exists in `SiteHeader` — no nav changes needed.
 
-- `bun run build:dev` completed successfully (`✓ built in 38.41s`, no errors, full SSR + client bundles emitted).
-- The dev server at `http://localhost:8080/` returns **HTTP 200** with a fully rendered landing page (HIVE marketing site).
-- Dev-server logs contain only deprecation warnings (`inputValidator` → `validator`) — no errors, no failed compilations, no exceptions.
+Note: no `hive-conventions` or `dspd-domain` skill files exist in `.workspace/skills/`. I'll apply the equivalent in-repo conventions instead: the project-knowledge brain (DSPD vocabulary — DSPD, DHHS EVV CSV, NECTAR, eMAR, etc.) and the existing design tokens in `src/styles.css` (`--navy-*`, `--amber-*`, `--gradient-amber`, `bg-gradient-hero`) used by the landing pages. Same chrome as the current pricing route: `<SiteHeader />` + `<Footer />`.
 
-There is no current build failure or runtime error to fix. The "preview not built" label is coming from Lovable's preview chrome, not from the app itself.
+## Files
 
-## Most likely cause
+1. **New** `src/components/landing/dspd-pricing.tsx` — the entire pricing page body as one self-contained client component. Keeps `pricing.tsx` route file thin. Sections inside:
+   - Header: H1 "Simple, transparent pricing" + subhead "One plan. Every feature. Price drops as your agency grows."
+   - Monthly/Annual toggle (segmented control, amber-accented). Annual shows a "Save 20%" badge.
+   - Two plan cards (Hive Standard — amber border, highlighted; Enterprise — neutral). All copy and feature lists exactly as specified. Prices recompute when annual is selected.
+   - Volume pricing callout: three tiers ($125 / $109 / $99) recomputed under annual.
+   - Cost estimator: single staff slider (1–500), live monthly + annual side by side, $500 floor, "saves $X/year" annotation.
+   - "Staff training" section label + two training cards (Full program $300; À la carte with three rows — CPR $75, Mandt $200, DSPD $100 — plus savings note). Training prices are NOT affected by the monthly/annual toggle (one-time fees).
+   - FAQ accordion with the 5 exact Q/A items.
+   - Closing CTA strip: navy gradient band, headline + "Book a demo" (amber primary) and "Get started" (outline) buttons.
 
-A transient Vite dev-server state (stale module graph or a wedged preview after recent edits to `routeTree.gen.ts` / `types.ts` / migration churn). The fix in that case is to bounce the dev server — not to change code.
+2. **Edit** `src/routes/pricing.tsx` — swap the body for `<DspdPricing />`, refresh `head()` meta (title/description/og to match the new positioning, e.g. title "Pricing — HIVE", description "One plan. Every feature. Volume pricing drops your per-staff rate automatically as your agency grows.").
 
-## Plan
+## Technical details
 
-1. **Restart the Vite dev server** in the sandbox (using `code--restart_dev_server`). This re-runs the TanStack Router plugin, re-generates `routeTree.gen.ts`, and re-mounts the preview without touching any files.
-2. **Re-probe** `http://localhost:8080/` to confirm it still returns 200 after restart.
-3. **Report back** with the result. If after restart you still see "preview not built", I'll need one more piece of info from you to go further:
-   - exact text shown on the preview, and
-   - the route you're on when it appears.
-   That tells me whether it's the Lovable preview chrome, a blank SSR response, a 500 error page, or stale published content — each has a different fix and I shouldn't guess.
+- All state local to `DspdPricing` (`useState` for billing cycle and staff count). No data fetches, no server functions, no mocks — copy is hardcoded as instructed.
+- Price math in a single helper: `const rate = annual ? base * 0.8 : base;` formatted via `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })`. Annual estimator total = `max(monthly, 500) * 12 * 0.8`; savings = `monthlyTotal * 12 - annualTotal`.
+- Tier rates table: `[{minClients:1,maxClients:19,rate:125},{...20-49,109},{...50+,99}]` — annual variants derived, not hardcoded twice.
+- Use shadcn primitives already in the project: `Button`, `Card`, `Slider`, `Accordion`, `Badge`, `Switch` or a simple two-button toggle. Buttons route via `<Link to="/signup">` and `<Link to="/contact">` (both routes exist).
+- Styling: dark navy hero band reusing `bg-gradient-hero` for the top, white/soft-surface body for the rest to match `landing/pricing.tsx` aesthetic. Amber accent uses `var(--amber-500)` / `var(--amber-600)` tokens and `border-[color:var(--amber-500)]` for the highlighted Hive card. No hard-coded colors; only design tokens.
+- Mobile: cards stack via `grid grid-cols-1 md:grid-cols-2 gap-6`. Tap targets ≥44px. Toggle and slider both ≥44px on mobile per core memory rule.
+- SEO: keep single H1, semantic `<section>` blocks with sr-only headings where needed, FAQ wrapped in JSON-LD `FAQPage` script for richer indexing.
 
-## What I will NOT do in this step
+## What I will NOT do
 
-- No code edits. The build is green; editing files to "fix" a non-existent build error risks breaking the things that currently work (recent attestation feature, `mar-emar-tab.tsx` scope fix, HIVE-exec org-name edit).
-- No migration changes, no `routeTree.gen.ts` edits, no `types.ts` edits.
-- No republish (the project is currently unpublished per project info).
+- Not touching `src/components/landing/pricing.tsx` (the old reusable section) — leaving it in place in case the landing page or other routes still reference it. (`rg` confirms only the current `pricing.tsx` route uses it.)
+- Not editing `SiteHeader`, `Footer`, `hero.tsx`, or anything outside the pricing route.
+- No new dependencies.
+- No price changes from the brief — all numbers verbatim.

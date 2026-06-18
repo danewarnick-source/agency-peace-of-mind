@@ -15,7 +15,7 @@ const tiers = [
       "Verifiable certificate links",
       "Priority email support",
     ],
-    cta: "Start free trial",
+    cta: "Get started",
     featured: true,
   },
   {

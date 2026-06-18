@@ -28,15 +28,15 @@ export function Hero() {
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90">
-              <Link to="/signup">Start free trial <ArrowRight className="ml-1 h-4 w-4" /></Link>
+              <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">Book a demo <ArrowRight className="ml-1 h-4 w-4" /></a>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-white/30 bg-white/5 text-white hover:bg-white/15 hover:text-white">
-              <Link to="/pricing">See pricing</Link>
+              <Link to="/signup">Get started</Link>
             </Button>
           </div>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/70">
-            {["14-day free trial", "No credit card", "Cancel anytime"].map((t) => (
+            {["No credit card", "Cancel anytime"].map((t) => (
               <span key={t} className="inline-flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-[oklch(0.85_0.12_200)]" /> {t}
               </span>

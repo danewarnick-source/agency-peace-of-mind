@@ -1055,41 +1055,55 @@ function Step6Payment({
       const orgId = orgs?.[0]?.id;
       if (!orgId) throw new Error("Your workspace wasn't ready — please refresh and try again.");
 
-      const next = new Date();
-      next.setDate(next.getDate() + 30);
+      const nowIso = new Date().toISOString();
+      const periodEnd = new Date();
+      periodEnd.setDate(periodEnd.getDate() + (form.interval === "annual" ? 365 : 30));
 
-      // Stash subscription + mock transaction + training inside the
-      // existing `notes` JSON to avoid a schema change. Full structured tables
-      // can be migrated in later without touching this flow.
-      const payload = {
-        signup_completed_at: new Date().toISOString(),
-        staff_count: form.staffCount,
-        billing_interval: form.interval,
-        next_billing_date: next.toISOString().slice(0, 10),
-        training: form.training,
-        mock_transaction: {
-          status: "test_succeeded",
-          amount_cents: todayTotal,
-          created_at: new Date().toISOString(),
-          // Card data is intentionally NOT stored — even in test mode we
-          // treat PAN, cardholder name, CVC, expiry, and ZIP as sensitive
-          // and never persist or log them. A real Stripe integration would
-          // hand back a non-sensitive payment_method_id to store here.
-        },
-      };
-
+      // Subscription row — shape matches Stripe's data model so a real
+      // integration only needs to populate the stripe_* ids via webhooks.
+      // Card details are intentionally never stored.
       await supabase.from("org_subscriptions").upsert(
         {
           organization_id: orgId,
-          plan: "pro",
+          plan: "pro", // matches TIER_CATALOG key in src/lib/hive-tiers.ts
           status: "active",
           mrr_cents: monthly * 100,
-          renewal_date: next.toISOString().slice(0, 10),
-          started_at: new Date().toISOString(),
-          notes: JSON.stringify(payload),
+          staff_count: form.staffCount,
+          billing_interval: form.interval,
+          current_period_start: nowIso,
+          current_period_end: periodEnd.toISOString(),
+          cancel_at_period_end: false,
+          renewal_date: periodEnd.toISOString().slice(0, 10),
+          started_at: nowIso,
+          stripe_customer_id: null,
+          stripe_subscription_id: null,
+          stripe_payment_method_id: null,
         },
         { onConflict: "organization_id" },
       );
+
+      // Training order — separate table so a Stripe PaymentIntent webhook
+      // can flip status to 'paid' and attach stripe_payment_intent_id.
+      const trainingType: "full" | "alacarte" | "none" = form.training.kind;
+      const selectedModules: string[] =
+        form.training.kind === "alacarte"
+          ? (["cpr", "mandt", "dspd"] as const).filter(
+              (m) => (form.training as { cpr?: boolean; mandt?: boolean; dspd?: boolean })[m] === true,
+            )
+          : form.training.kind === "full"
+            ? ["cpr", "mandt", "dspd"]
+            : [];
+
+      await supabase.from("org_training_orders").insert({
+        organization_id: orgId,
+        training_type: trainingType,
+        selected_modules: selectedModules,
+        staff_count: form.staffCount,
+        amount_cents: trainingCharge,
+        status: trainingCharge > 0 ? "paid" : "pending",
+        stripe_payment_intent_id: null,
+      });
+
 
       toast.success("Welcome to Hive!");
       await onComplete();

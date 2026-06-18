@@ -1070,11 +1070,11 @@ function Step6Payment({
         mock_transaction: {
           status: "test_succeeded",
           amount_cents: todayTotal,
-          cardholder: name,
-          card_brand: brand,
-          card_last4: card.replace(/\s/g, "").slice(-4),
-          zip,
           created_at: new Date().toISOString(),
+          // Card data is intentionally NOT stored — even in test mode we
+          // treat PAN, cardholder name, CVC, expiry, and ZIP as sensitive
+          // and never persist or log them. A real Stripe integration would
+          // hand back a non-sensitive payment_method_id to store here.
         },
       };
 

@@ -80,8 +80,11 @@ export function SiteHeader() {
               <Button asChild variant="outline" size="sm" className="h-11 flex-1">
                 <Link to="/login">Sign in</Link>
               </Button>
+              <Button asChild variant="outline" size="sm" className="h-11 flex-1">
+                <Link to="/demo">Book a demo</Link>
+              </Button>
               <Button asChild size="sm" className="h-11 flex-1">
-                <Link to="/signup">Book a demo</Link>
+                <Link to="/signup">Get started</Link>
               </Button>
             </div>
           </div>

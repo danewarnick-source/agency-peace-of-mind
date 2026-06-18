@@ -460,8 +460,8 @@ function validateSubPatch(input: unknown): {
   if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id.");
   const patch = (i.patch ?? {}) as Record<string, unknown>;
   const out: ReturnType<typeof validateSubPatch>["patch"] = {};
-  const plans = ["starter", "pro", "enterprise", "custom"];
-  const statuses = ["trial", "active", "past_due", "canceled", "paused"];
+  const plans = ["hive_standard", "enterprise"];
+  const statuses = ["active", "past_due", "locked", "cancelled", "canceled"];
   if (typeof patch.plan === "string" && plans.includes(patch.plan)) out.plan = patch.plan;
   if (typeof patch.status === "string" && statuses.includes(patch.status)) out.status = patch.status;
   if (typeof patch.mrr_cents === "number" && patch.mrr_cents >= 0 && patch.mrr_cents < 100_000_000)

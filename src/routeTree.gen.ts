@@ -170,6 +170,7 @@ import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public
 import { Route as ApiPublicHooksSmartImportRemindersRouteImport } from './routes/api/public/hooks/smart-import-reminders'
 import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
 import { Route as ApiPublicHooksGmailIngestRouteImport } from './routes/api/public/hooks/gmail-ingest'
+import { Route as ApiPublicHooksBillingDailyCheckRouteImport } from './routes/api/public/hooks/billing-daily-check'
 import { Route as DashboardHiveExecStatesStateCodeOnboardingRouteImport } from './routes/dashboard.hive-exec.states.$stateCode.onboarding'
 import { Route as ApiPublicOauthGmailCallbackRouteImport } from './routes/api/public/oauth/gmail/callback'
 
@@ -1039,6 +1040,12 @@ const ApiPublicHooksGmailIngestRoute =
     path: '/api/public/hooks/gmail-ingest',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBillingDailyCheckRoute =
+  ApiPublicHooksBillingDailyCheckRouteImport.update({
+    id: '/api/public/hooks/billing-daily-check',
+    path: '/api/public/hooks/billing-daily-check',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DashboardHiveExecStatesStateCodeOnboardingRoute =
   DashboardHiveExecStatesStateCodeOnboardingRouteImport.update({
     id: '/onboarding',
@@ -1201,6 +1208,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
+  '/api/public/hooks/billing-daily-check': typeof ApiPublicHooksBillingDailyCheckRoute
   '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
@@ -1360,6 +1368,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
   '/dashboard/smart-import': typeof DashboardSmartImportIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
+  '/api/public/hooks/billing-daily-check': typeof ApiPublicHooksBillingDailyCheckRoute
   '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
@@ -1526,6 +1535,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
   '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
+  '/api/public/hooks/billing-daily-check': typeof ApiPublicHooksBillingDailyCheckRoute
   '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
@@ -1693,6 +1703,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/'
     | '/dashboard/smart-import/'
     | '/dashboard/training/'
+    | '/api/public/hooks/billing-daily-check'
     | '/api/public/hooks/gmail-ingest'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
@@ -1852,6 +1863,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec'
     | '/dashboard/smart-import'
     | '/dashboard/training'
+    | '/api/public/hooks/billing-daily-check'
     | '/api/public/hooks/gmail-ingest'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
@@ -2017,6 +2029,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/'
     | '/dashboard/smart-import/'
     | '/dashboard/training/'
+    | '/api/public/hooks/billing-daily-check'
     | '/api/public/hooks/gmail-ingest'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
@@ -2053,6 +2066,7 @@ export interface RootRouteChildren {
   UnauthorizedRoute: typeof UnauthorizedRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
+  ApiPublicHooksBillingDailyCheckRoute: typeof ApiPublicHooksBillingDailyCheckRoute
   ApiPublicHooksGmailIngestRoute: typeof ApiPublicHooksGmailIngestRoute
   ApiPublicHooksNectarSchedulesRoute: typeof ApiPublicHooksNectarSchedulesRoute
   ApiPublicHooksSmartImportRemindersRoute: typeof ApiPublicHooksSmartImportRemindersRoute
@@ -3189,6 +3203,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksGmailIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/billing-daily-check': {
+      id: '/api/public/hooks/billing-daily-check'
+      path: '/api/public/hooks/billing-daily-check'
+      fullPath: '/api/public/hooks/billing-daily-check'
+      preLoaderRoute: typeof ApiPublicHooksBillingDailyCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/hive-exec/states/$stateCode/onboarding': {
       id: '/dashboard/hive-exec/states/$stateCode/onboarding'
       path: '/onboarding'
@@ -3647,6 +3668,7 @@ const rootRouteChildren: RootRouteChildren = {
   UnauthorizedRoute: UnauthorizedRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
+  ApiPublicHooksBillingDailyCheckRoute: ApiPublicHooksBillingDailyCheckRoute,
   ApiPublicHooksGmailIngestRoute: ApiPublicHooksGmailIngestRoute,
   ApiPublicHooksNectarSchedulesRoute: ApiPublicHooksNectarSchedulesRoute,
   ApiPublicHooksSmartImportRemindersRoute:

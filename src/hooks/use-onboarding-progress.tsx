@@ -47,35 +47,56 @@ export function useOnboardingProgress() {
   const q = useQuery({
     enabled: !!orgId,
     queryKey: ["nectar-onboarding-progress", orgId],
-    queryFn: async () => {
-      const [authDocs, attestations, members, clients, codes, allDocs] = await Promise.all([
-        supabase
-          .from("nectar_documents")
-          .select("id, authoritative_kind", { count: "exact" })
-          .eq("organization_id", orgId!)
-          .eq("is_authoritative_source", true),
-        supabase
-          .from("nectar_attestations")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId!)
-          .eq("scope", "document_upload"),
-        supabase
-          .from("organization_members")
-          .select("user_id", { count: "exact", head: true })
-          .eq("organization_id", orgId!),
-        supabase
-          .from("clients")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId!),
-        supabase
-          .from("service_codes")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId!),
-        supabase
-          .from("nectar_documents")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId!),
-      ]);
+    queryFn: async (): Promise<{
+      authSourcesCount: number;
+      sowCount: number;
+      attestationCount: number;
+      memberCount: number;
+      clientCount: number;
+      serviceCodeCount: number;
+      serviceCodesCount: number;
+      docsCount: number;
+      profileSaved: boolean;
+    }> => {
+      const [authDocs, attestations, members, clients, codes, allDocs, activeCodes, orgProfile] =
+        await Promise.all([
+          supabase
+            .from("nectar_documents")
+            .select("id, authoritative_kind", { count: "exact" })
+            .eq("organization_id", orgId!)
+            .eq("is_authoritative_source", true),
+          supabase
+            .from("nectar_attestations")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", orgId!)
+            .eq("scope", "document_upload"),
+          supabase
+            .from("organization_members")
+            .select("user_id", { count: "exact", head: true })
+            .eq("organization_id", orgId!),
+          supabase
+            .from("clients")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", orgId!),
+          supabase
+            .from("service_codes")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", orgId!),
+          supabase
+            .from("nectar_documents")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", orgId!),
+          supabase
+            .from("service_codes")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", orgId!)
+            .eq("is_active", true),
+          supabase
+            .from("organizations")
+            .select("nectar_profile_saved_at")
+            .eq("id", orgId!)
+            .maybeSingle(),
+        ]);
       const authRows = (authDocs.data ?? []) as Array<{ authoritative_kind: string | null }>;
       const sowCount = authRows.filter((r) => r.authoritative_kind === "state_sow").length;
       return {
@@ -85,7 +106,9 @@ export function useOnboardingProgress() {
         memberCount: members.count ?? 0,
         clientCount: clients.count ?? 0,
         serviceCodeCount: codes.count ?? 0,
+        serviceCodesCount: activeCodes.count ?? 0,
         docsCount: allDocs.count ?? 0,
+        profileSaved: !!(orgProfile.data as any)?.nectar_profile_saved_at,
       };
     },
     refetchOnWindowFocus: true,
@@ -99,16 +122,17 @@ export function useOnboardingProgress() {
     memberCount: 0,
     clientCount: 0,
     serviceCodeCount: 0,
+    serviceCodesCount: 0,
     docsCount: 0,
+    profileSaved: false,
   };
 
   const step1 = c.sowCount > 0 && c.attestationCount > 0;
-  // step 5 unlocks via either localStorage flag OR a real service_codes row
-  const step5 = servicesVisited || c.serviceCodeCount > 0;
+  const step5 = c.serviceCodesCount > 0;
 
   const steps = {
     1: step1,
-    2: profileSaved,
+    2: c.profileSaved || profileSaved,
     3: c.memberCount > 1,
     4: c.clientCount > 0,
     5: step5,

@@ -36,10 +36,31 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
       POST: async ({ request }) => {
         const raw = await request.text();
 
-        // TODO(prod): verify Stripe signature here.
-        // const sig = request.headers.get("stripe-signature");
-        // const secret = process.env.STRIPE_WEBHOOK_SECRET;
-        // const event = Stripe.webhooks.constructEvent(raw, sig, secret);
+        // SECURITY: Until Stripe signature verification is wired with the live
+        // STRIPE_WEBHOOK_SECRET, this endpoint must NOT mutate billing state from
+        // unverified payloads. A forged event could lock out a real org or fake a
+        // payment. Reject everything unless the secret is configured AND the
+        // signature verifies.
+        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+        const sig = request.headers.get("stripe-signature");
+
+        if (!webhookSecret) {
+          console.warn("[stripe-webhook] STRIPE_WEBHOOK_SECRET not configured — rejecting unverified event");
+          return new Response("Webhook not configured", { status: 503 });
+        }
+
+        if (!sig) {
+          return new Response("Missing signature", { status: 400 });
+        }
+
+        // TODO(prod): when the stripe SDK is added, replace the line below with:
+        //   let event: StripeEvent;
+        //   try {
+        //     event = Stripe.webhooks.constructEvent(raw, sig, webhookSecret) as StripeEvent;
+        //   } catch { return new Response("Invalid signature", { status: 400 }); }
+        // For now, because we cannot verify without the SDK + secret, reject.
+        console.warn("[stripe-webhook] signature verification not implemented — rejecting");
+        return new Response("Signature verification not implemented", { status: 501 });
 
         let event: StripeEvent;
         try {

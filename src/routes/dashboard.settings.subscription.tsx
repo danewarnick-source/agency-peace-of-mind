@@ -42,6 +42,8 @@ import {
   adminUnlockAccountFn,
   adminSimulateCardExpiryFn,
 } from "@/lib/billing-admin.functions";
+import { getBillingSmsPhone, updateBillingSmsPhone } from "@/lib/billing-sms.functions";
+import { formatUSPhonePretty, isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
 
 export const Route = createFileRoute("/dashboard/settings/subscription")({
   head: () => ({ meta: [{ title: "HIVE Subscription — HIVE" }] }),

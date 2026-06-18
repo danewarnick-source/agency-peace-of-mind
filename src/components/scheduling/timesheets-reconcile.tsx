@@ -187,9 +187,14 @@ export function TimesheetsReconcile() {
           // Skip discrete carve-outs for the "continuous coverage" line.
           if (ac?.carve_out) continue;
           const ci = new Date(p.clock_in_timestamp).getTime();
+          const punchDayEnd = (() => {
+            const d = new Date(p.clock_in_timestamp);
+            d.setHours(23, 59, 59, 999);
+            return d.getTime();
+          })();
           const co = p.clock_out_timestamp
             ? new Date(p.clock_out_timestamp).getTime()
-            : Math.min(Date.now(), dayEnd);
+            : Math.min(Date.now(), punchDayEnd);
           const s = Math.max(ci, dayStart);
           const e = Math.min(co, dayEnd);
           if (e > s) segs.push([s, e]);

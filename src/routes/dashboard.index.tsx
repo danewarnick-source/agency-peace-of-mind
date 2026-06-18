@@ -13,6 +13,14 @@ import { DeadlinesHomeCard } from "./dashboard.deadlines";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
+import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
+
+export const Route = createFileRoute("/dashboard/")({
+  component: Overview,
+  validateSearch: (s: Record<string, unknown>) => ({
+    welcome: s.welcome === "1" || s.welcome === 1 || s.welcome === true ? true : undefined,
+  }),
+});
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 

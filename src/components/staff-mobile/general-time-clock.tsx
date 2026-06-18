@@ -124,7 +124,7 @@ export function GeneralTimeClock() {
       return;
     }
     if (!window.confirm(`End ${shift.category} shift?`)) return;
-    stop({ note: trimmedNote });
+    stop(shift!.id, { note: trimmedNote });
     setNote("");
     setShowNoteError(false);
     toast.success("General shift ended");
@@ -220,7 +220,7 @@ export function GeneralTimeClock() {
           onChange={(e) => {
             setNote(e.target.value);
             setShowNoteError(false);
-            if (running) updateNote(e.target.value);
+            if (running) updateNote(shift!.id, e.target.value);
           }}
           placeholder={
             running

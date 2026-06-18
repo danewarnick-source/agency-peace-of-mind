@@ -362,6 +362,10 @@ export async function checkCardExpiryWarnings(): Promise<{ warned: number; org_i
       kind,
       data: { daysRemaining: daysUntil, cardExpiresOn: String(row.card_expires_at) },
     });
+    // Card-expiring-in-7-days is urgent enough for SMS too.
+    if (tier === "7") {
+      await sendBillingSms({ orgId: row.organization_id, kind: "card_expiring_7" });
+    }
     warned.push(row.organization_id);
   }
 

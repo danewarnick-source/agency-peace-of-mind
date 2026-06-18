@@ -122,6 +122,13 @@ export async function recordPaymentFailure(
     data: { reason },
   });
 
+  // SMS day-0 declined notice (highest urgency).
+  await sendBillingSms({
+    orgId,
+    kind: "payment_declined_day0",
+    amountCents: sub.mrr_cents ?? null,
+  });
+
   return { ok: true, failure_count: nextFailureCount };
 }
 

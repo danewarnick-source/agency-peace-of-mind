@@ -36,10 +36,31 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
       POST: async ({ request }) => {
         const raw = await request.text();
 
-        // TODO(prod): verify Stripe signature here.
-        // const sig = request.headers.get("stripe-signature");
-        // const secret = process.env.STRIPE_WEBHOOK_SECRET;
-        // const event = Stripe.webhooks.constructEvent(raw, sig, secret);
+        // SECURITY: Until Stripe signature verification is wired with the live
+        // STRIPE_WEBHOOK_SECRET, this endpoint must NOT mutate billing state from
+        // unverified payloads. A forged event could lock out a real org or fake a
+        // payment. Reject everything unless the secret is configured AND the
+        // signature verifies.
+        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+        const sig = request.headers.get("stripe-signature");
+
+        if (!webhookSecret) {
+          console.warn("[stripe-webhook] STRIPE_WEBHOOK_SECRET not configured — rejecting unverified event");
+          return new Response("Webhook not configured", { status: 503 });
+        }
+
+        if (!sig) {
+          return new Response("Missing signature", { status: 400 });
+        }
+
+        // TODO(prod): when the stripe SDK is added, replace the line below with:
+        //   let event: StripeEvent;
+        //   try {
+        //     event = Stripe.webhooks.constructEvent(raw, sig, webhookSecret) as StripeEvent;
+        //   } catch { return new Response("Invalid signature", { status: 400 }); }
+        // For now, because we cannot verify without the SDK + secret, reject.
+        console.warn("[stripe-webhook] signature verification not implemented — rejecting");
+        return new Response("Signature verification not implemented", { status: 501 });
 
         let event: StripeEvent;
         try {
@@ -62,12 +83,12 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             // -----------------------------------------------------------------
             case "invoice.payment_succeeded": {
               const orgId = await resolveOrgIdFromCustomer(customerId);
-              if (!orgId) break;
+              if (orgId === null) break;
               const amount = Number(obj.amount_paid ?? obj.amount_due ?? 0);
               const { recordPaymentSuccess } = await import(
                 "@/lib/billing-lockout.server"
               );
-              await recordPaymentSuccess(orgId, amount, eventId);
+              await recordPaymentSuccess(orgId as string, amount, eventId);
               break;
             }
 
@@ -76,14 +97,14 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             // -----------------------------------------------------------------
             case "invoice.payment_failed": {
               const orgId = await resolveOrgIdFromCustomer(customerId);
-              if (!orgId) break;
+              if (orgId === null) break;
               const reason =
                 (obj.last_finalization_error as { message?: string } | undefined)?.message ??
                 "invoice.payment_failed";
               const { recordPaymentFailure } = await import(
                 "@/lib/billing-lockout.server"
               );
-              await recordPaymentFailure(orgId, reason, eventId);
+              await recordPaymentFailure(orgId as string, reason, eventId);
               break;
             }
 
@@ -92,14 +113,14 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             // -----------------------------------------------------------------
             case "payment_intent.payment_failed": {
               const orgId = await resolveOrgIdFromCustomer(customerId);
-              if (!orgId) break;
+              if (orgId === null) break;
               const reason =
                 (obj.last_payment_error as { message?: string } | undefined)?.message ??
                 "payment_intent.payment_failed";
               const { recordPaymentFailure } = await import(
                 "@/lib/billing-lockout.server"
               );
-              await recordPaymentFailure(orgId, reason, eventId);
+              await recordPaymentFailure(orgId as string, reason, eventId);
               break;
             }
 
@@ -108,9 +129,9 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             // -----------------------------------------------------------------
             case "customer.subscription.deleted": {
               const orgId = await resolveOrgIdFromCustomer(customerId);
-              if (!orgId) break;
+              if (orgId === null) break;
               const { lockAccount } = await import("@/lib/billing-lockout.server");
-              await lockAccount(orgId, "Subscription cancelled in Stripe");
+              await lockAccount(orgId as string, "Subscription cancelled in Stripe");
               break;
             }
 
@@ -120,15 +141,15 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             // -----------------------------------------------------------------
             case "payment_method.expiring_soon": {
               const orgId = await resolveOrgIdFromCustomer(customerId);
-              if (!orgId) break;
+              if (orgId === null) break;
               const card = (obj.card ?? {}) as { exp_month?: number; exp_year?: number };
               if (card.exp_month && card.exp_year) {
-                const lastDay = new Date(Date.UTC(card.exp_year, card.exp_month, 0));
+                const lastDay = new Date(Date.UTC(card.exp_year as number, card.exp_month as number, 0));
                 const iso = lastDay.toISOString().slice(0, 10);
                 const { updateCardExpiry } = await import(
                   "@/lib/billing-lockout.server"
                 );
-                await updateCardExpiry(orgId, iso);
+                await updateCardExpiry(orgId as string, iso);
               }
               break;
             }

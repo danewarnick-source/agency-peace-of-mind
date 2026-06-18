@@ -57,6 +57,22 @@ function StandardReports() {
     },
   });
 
+  const { data: moduleProgress } = useQuery({
+    enabled: !!org,
+    queryKey: ["report-module-progress", org?.organization_id],
+    queryFn: async () => {
+      // NOTE: user_training_progress RLS currently returns only the
+      // authenticated user's own rows. Full org-wide reporting requires
+      // a widened RLS policy — tracked as a future improvement.
+      const { data } = await supabase
+        .from("user_training_progress")
+        .select("user_id, module_id, is_completed, completed_at, training_modules(title, category)")
+        .eq("is_completed", true)
+        .order("completed_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+
   // …while Certification Renewals comes from external_certifications (uploaded
   // staff credentials with an expiry), a completely different dataset.
   const { data: certs } = useQuery({
@@ -76,6 +92,11 @@ function StandardReports() {
     (a.courses as { title: string } | null)?.title ?? "";
   const courseCategory = (a: { courses: unknown }) =>
     (a.courses as { category: string } | null)?.category ?? "";
+
+  const moduleTitle = (m: { training_modules: unknown }) =>
+    (m.training_modules as { title: string } | null)?.title ?? "";
+  const moduleCategory = (m: { training_modules: unknown }) =>
+    (m.training_modules as { category: string } | null)?.category ?? "";
 
   const download = (
     filename: string,
@@ -142,7 +163,20 @@ function StandardReports() {
     );
   };
 
-  // 4) Certification Renewals — external certs expiring within the next 90 days.
+  // 4) Module Completions — completions recorded in user_training_progress.
+  const exportModuleCompletions = () => {
+    const list = moduleProgress ?? [];
+    if (!list.length) return toast.error("No module completions to export yet");
+    download(
+      "module-completions",
+      ["user_id", "module_id", "module_title", "category", "completed_at"],
+      list.map((m) => [
+        m.user_id, m.module_id, moduleTitle(m), moduleCategory(m), m.completed_at ?? "",
+      ]),
+    );
+  };
+
+  // 5) Certification Renewals — external certs expiring within the next 90 days.
   const exportCertificationRenewals = () => {
     const startMs = Date.now();
     const horizonMs = startMs + 90 * 24 * 60 * 60 * 1000;
@@ -164,6 +198,7 @@ function StandardReports() {
   const reports = [
     { name: "Compliance Summary", desc: "All training assignments with status and progress.", onExport: exportComplianceSummary },
     { name: "Training Completion", desc: "Completed courses across the organization.", onExport: exportTrainingCompletion },
+    { name: "Module Completions", desc: "Individual module completions recorded during training.", onExport: exportModuleCompletions },
     { name: "Overdue Training", desc: "Assignments past their due date.", onExport: exportOverdueTraining },
     { name: "Certification Renewals", desc: "Certificates expiring in the next 90 days.", onExport: exportCertificationRenewals },
   ];

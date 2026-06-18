@@ -457,7 +457,7 @@ function Step1Account({
         onNext={submit}
         loading={busy}
         nextDisabled={!emailValid || !lenOk || !numOk || !matchOk || !!emailErr}
-        nextLabel="Send verification code"
+        nextLabel="Create account"
       />
     </>
   );

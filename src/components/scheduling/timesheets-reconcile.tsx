@@ -73,6 +73,21 @@ export function TimesheetsReconcile() {
   const [homeFilter, setHomeFilter] = useState<string>("all");
   const [editPunch, setEditPunch] = useState<Punch | null>(null);
 
+  const { data: ytdPunches } = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["evv-ytd", org?.organization_id],
+    queryFn: async () => {
+      const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+      const { data: rows } = await supabase
+        .from("evv_timesheets")
+        .select("id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+        .eq("organization_id", org!.organization_id)
+        .gte("clock_in_timestamp", yearStart)
+        .not("clock_out_timestamp", "is", null);
+      return (rows ?? []) as Punch[];
+    },
+  });
+
   const { data, isLoading } = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["ts-reconcile", org?.organization_id, periodStart.toISOString()],
@@ -202,6 +217,8 @@ export function TimesheetsReconcile() {
       authorized: number; used: number; remaining: number;
       onPacePct: number; pacePct: number; rate: number;
     }> = [];
+
+    // Week hours — used only for the "Hours" and "Units" display columns.
     const totalsByKey = new Map<string, number>();
     for (const p of punches) {
       if (!p.clock_out_timestamp) continue;
@@ -210,13 +227,25 @@ export function TimesheetsReconcile() {
       const key = `${p.client_id}|${p.service_type_code}`;
       totalsByKey.set(key, (totalsByKey.get(key) ?? 0) + h);
     }
+
+    // YTD hours — used for the burn-down (remaining / pace) calculation.
+    const ytdByKey = new Map<string, number>();
+    for (const p of (ytdPunches ?? [])) {
+      if (!p.clock_out_timestamp) continue;
+      const h = hoursBetween(p.clock_in_timestamp, p.clock_out_timestamp);
+      if (h <= 0) continue;
+      const key = `${p.client_id}|${p.service_type_code}`;
+      ytdByKey.set(key, (ytdByKey.get(key) ?? 0) + h);
+    }
+
     for (const [key, hours] of totalsByKey) {
       const [client_id, service_code] = key.split("|");
       const c = clientById.get(client_id);
       const b = billingByKey.get(key);
       const authorized = b?.annual_unit_authorization ?? 0;
-      const units = unitsForHours(b?.unit_type ?? "hour", hours);
-      const used = units;
+      const units = unitsForHours(b?.unit_type ?? "hour", hours); // this week — display only
+      const ytdHours = ytdByKey.get(key) ?? hours;
+      const used = unitsForHours(b?.unit_type ?? "hour", ytdHours); // YTD — burn-down
       const remaining = Math.max(0, authorized - used);
       // Pace: weeks elapsed of 52
       const elapsedWeeks = Math.max(1, Math.ceil(((periodStart.getTime() - new Date(periodStart.getFullYear(), 0, 1).getTime()) / 86_400_000) / 7));
@@ -284,7 +313,7 @@ export function TimesheetsReconcile() {
     const paceWarnings = billingRows.filter((r) => r.authorized > 0 && (r.pacePct > r.onPacePct + 10 || r.pacePct < r.onPacePct - 25));
 
     return { coverage, billingRows, payrollRows, openPunches, gaps, overlaps, paceWarnings, homes: Array.from(homes.entries()) };
-  }, [data, periodStart]);
+  }, [data, periodStart, ytdPunches]);
 
   const visibleCoverage = useMemo(() => {
     if (!computed) return [];

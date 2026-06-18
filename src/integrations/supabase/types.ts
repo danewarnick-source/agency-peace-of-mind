@@ -8845,7 +8845,6 @@ export type Database = {
           account_contact_email: string | null
           account_contact_name: string | null
           additional_state_codes: string[]
-          approx_client_count: number | null
           billing_sms_phone: string | null
           created_at: string
           created_by: string | null
@@ -8859,10 +8858,7 @@ export type Database = {
           legal_name: string | null
           logo_url: string | null
           name: string
-          nectar_profile_saved_at: string | null
-          services_offered: string[] | null
           slug: string
-          specializations: string | null
           state_code: string | null
           updated_at: string
         }
@@ -8870,7 +8866,6 @@ export type Database = {
           account_contact_email?: string | null
           account_contact_name?: string | null
           additional_state_codes?: string[]
-          approx_client_count?: number | null
           billing_sms_phone?: string | null
           created_at?: string
           created_by?: string | null
@@ -8884,10 +8879,7 @@ export type Database = {
           legal_name?: string | null
           logo_url?: string | null
           name: string
-          nectar_profile_saved_at?: string | null
-          services_offered?: string[] | null
           slug: string
-          specializations?: string | null
           state_code?: string | null
           updated_at?: string
         }
@@ -8895,7 +8887,6 @@ export type Database = {
           account_contact_email?: string | null
           account_contact_name?: string | null
           additional_state_codes?: string[]
-          approx_client_count?: number | null
           billing_sms_phone?: string | null
           created_at?: string
           created_by?: string | null
@@ -8909,10 +8900,7 @@ export type Database = {
           legal_name?: string | null
           logo_url?: string | null
           name?: string
-          nectar_profile_saved_at?: string | null
-          services_offered?: string[] | null
           slug?: string
-          specializations?: string | null
           state_code?: string | null
           updated_at?: string
         }

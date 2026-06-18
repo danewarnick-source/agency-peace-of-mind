@@ -44,10 +44,13 @@ export function SiteHeader() {
           <Button asChild variant="ghost" size="sm">
             <Link to="/login">Sign in</Link>
           </Button>
-          <Button asChild size="sm">
-            <Link to="/signup">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/demo">
               Book a demo <ArrowRight className="h-4 w-4" />
             </Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link to="/signup">Get started</Link>
           </Button>
         </div>
 

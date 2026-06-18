@@ -27,6 +27,7 @@ import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getInboxUnreadCount } from "@/lib/inbox-messages.functions";
+import { BillingBanner } from "@/components/billing/billing-banner";
 
 
 function DashboardShellError({ error }: { error: Error; reset: () => void }) {
@@ -496,7 +497,12 @@ function DashboardLayout() {
             </div>
           )}
 
+          {isAdminCapable && effectiveView === "admin" && org?.organization_id && (
+            <BillingBanner organizationId={org.organization_id} isAdmin />
+          )}
+
           <main className={isMobilePreview ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40" : "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40 px-4 py-6 md:px-8"}>
+
             {isStatePreview && !stateCode ? (
               <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
                 Select a state from the sidebar to load the platform configured as that state.

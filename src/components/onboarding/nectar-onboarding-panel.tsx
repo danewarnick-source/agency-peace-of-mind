@@ -79,11 +79,15 @@ export function NectarOnboardingPanel({
   welcomeFlag?: boolean;
 }) {
   const { data: org } = useCurrentOrg();
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const orgId = org?.organization_id;
-  const orgName = org?.organization_name ?? org?.organizations?.name ?? "your agency";
+  const orgName = org?.organization_name ?? "your agency";
+  const userMeta = (user?.user_metadata ?? {}) as { first_name?: string; full_name?: string };
   const adminFirstName =
-    (profile as { first_name?: string | null } | null)?.first_name ?? "there";
+    userMeta.first_name ||
+    userMeta.full_name?.split(" ")[0] ||
+    user?.email?.split("@")[0] ||
+    "there";
 
   // --- Persistent local state -----------------------------------------------
   const [dismissed, setDismissed] = useState(false);

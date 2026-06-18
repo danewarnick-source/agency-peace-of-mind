@@ -679,7 +679,7 @@ function Billing520Page() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link to="/dashboard/billing">Billing</Link>
+                <Link to="/dashboard/billing" search={{ focus: undefined }}>Billing</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -690,7 +690,7 @@ function Billing520Page() {
         </Breadcrumb>
         <div>
           <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground">
-            <Link to="/dashboard/billing">
+            <Link to="/dashboard/billing" search={{ focus: undefined }}>
               <ArrowLeft className="mr-1 h-4 w-4" /> Back to Billing
             </Link>
           </Button>

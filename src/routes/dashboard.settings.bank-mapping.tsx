@@ -99,8 +99,8 @@ function BankMappingPage() {
       // into real tables — doing so contaminates client rep-payee ledgers.
       throw new Error("Bank connection is not available yet — Plaid integration is pending.");
     },
-    onSuccess: (r) => {
-      toast.success(`🔗 Plaid handshake complete — ${r.added} sub-accounts discovered`);
+    onSuccess: () => {
+      toast.success("🔗 Plaid handshake complete");
       qc.invalidateQueries({ queryKey: ["agency_bank_accounts"] });
       setPlaidStep("success");
     },
@@ -146,8 +146,8 @@ function BankMappingPage() {
       // into the real PBA ledger.
       throw new Error("Deposit sync is not available yet — bank feed integration is pending.");
     },
-    onSuccess: (r) => {
-      toast.success(`⚡ ${r.posted} SSI deposits auto-reconciled & pushed to QuickBooks Online`);
+    onSuccess: () => {
+      toast.success("⚡ SSI deposits auto-reconciled & pushed to QuickBooks Online");
       qc.invalidateQueries({ queryKey: ["pba-accounts-min"] });
     },
     onError: (e: Error) => toast.error(e.message),

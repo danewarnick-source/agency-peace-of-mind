@@ -1,5 +1,7 @@
 import { Outlet, createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +13,7 @@ import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 import { CelebrationSettings } from "@/components/celebrations/celebration-settings";
 import { ShiftBehaviorToggleCard } from "@/components/evv/shift-behavior-toggle-card";
+import { getAccountContact, updateAccountContact } from "@/lib/hive-exec.functions";
 
 export const Route = createFileRoute("/dashboard/settings")({ component: SettingsPage });
 
@@ -130,6 +133,10 @@ function SettingsPage() {
             <Button type="submit" disabled={busy}>Save organization</Button>
           </div>
         </form>
+      )}
+
+      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && org?.organization_id && (
+        <AccountContactCard organizationId={org.organization_id} />
       )}
       {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
         <CompanyOverviewSettings />
@@ -278,5 +285,90 @@ function SettingsPage() {
 
 
     </div>
+  );
+}
+
+function AccountContactCard({ organizationId }: { organizationId: string }) {
+  const qc = useQueryClient();
+  const getFn = useServerFn(getAccountContact);
+  const saveFn = useServerFn(updateAccountContact);
+
+  const q = useQuery({
+    queryKey: ["account-contact", organizationId],
+    queryFn: () => getFn({ data: { organizationId } }),
+    refetchInterval: 30_000,
+  });
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
+  useEffect(() => {
+    if (!q.data) return;
+    setName(q.data.name ?? "");
+    setEmail(q.data.email ?? "");
+    setPhone(q.data.phone ?? "");
+  }, [q.data]);
+
+  const save = useMutation({
+    mutationFn: () =>
+      saveFn({
+        data: {
+          organizationId,
+          patch: {
+            name: name.trim() || null,
+            email: email.trim() || null,
+            phone: phone.trim() || null,
+          },
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Account contact updated");
+      qc.invalidateQueries({ queryKey: ["account-contact", organizationId] });
+      qc.invalidateQueries({ queryKey: ["hive-exec-company", organizationId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Save failed"),
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+      className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+    >
+      <h2 className="text-base font-semibold">Account contact</h2>
+      <p className="text-sm text-muted-foreground">
+        Who Hive should contact for urgent billing or account issues. Changes here are visible to the
+        Hive operations team and stay in sync with their records.
+      </p>
+      <div className="mt-5 grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="ac_name">Main contact</Label>
+          <Input id="ac_name" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="ac_email">Email</Label>
+          <Input id="ac_email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={320} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="ac_phone">Mobile phone</Label>
+          <Input
+            id="ac_phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="(801) 555-0123"
+          />
+          <p className="text-xs text-muted-foreground">
+            Used for urgent billing SMS only. Never used for marketing.
+          </p>
+        </div>
+        <Button type="submit" disabled={save.isPending || q.isLoading}>
+          {save.isPending ? "Saving…" : "Save account contact"}
+        </Button>
+      </div>
+    </form>
   );
 }

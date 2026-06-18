@@ -8842,6 +8842,8 @@ export type Database = {
       }
       organizations: {
         Row: {
+          account_contact_email: string | null
+          account_contact_name: string | null
           additional_state_codes: string[]
           billing_sms_phone: string | null
           created_at: string
@@ -8861,6 +8863,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_contact_email?: string | null
+          account_contact_name?: string | null
           additional_state_codes?: string[]
           billing_sms_phone?: string | null
           created_at?: string
@@ -8880,6 +8884,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_contact_email?: string | null
+          account_contact_name?: string | null
           additional_state_codes?: string[]
           billing_sms_phone?: string | null
           created_at?: string

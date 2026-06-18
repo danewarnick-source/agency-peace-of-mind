@@ -625,6 +625,8 @@ function Step3Business({
               name: form.agencyName,
               state_code: "UT",
               dhhs_provider_id: form.providerNumber || null,
+              account_contact_name: form.contactName || null,
+              account_contact_email: userResp.user?.email ?? null,
             })
             .eq("id", orgId);
           // Persist required billing SMS phone (server-side, E.164 normalized).

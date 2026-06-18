@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
 import { ArrowLeft, Save, Users, Contact2, Clock, Activity, Pencil, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { getCompanyDetail, upsertSubscription, updateOrgNames } from "@/lib/hive-exec.functions";
+import { getCompanyDetail, upsertSubscription, updateOrgNames, updateAccountContact } from "@/lib/hive-exec.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/$orgId")({
   component: CompanyDetailPage,
@@ -22,6 +22,7 @@ function CompanyDetailPage() {
   const detailFn = useServerFn(getCompanyDetail);
   const saveFn = useServerFn(upsertSubscription);
   const saveNamesFn = useServerFn(updateOrgNames);
+  const saveContactFn = useServerFn(updateAccountContact);
 
 
   const detailQ = useQuery({
@@ -44,6 +45,11 @@ function CompanyDetailPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [attest, setAttest] = useState(false);
 
+  // Account contact edit state
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+
   useEffect(() => {
     const s = detailQ.data?.subscription;
     if (!s) return;
@@ -61,7 +67,30 @@ function CompanyDetailPage() {
     setLegalEdit(d.legal_name ?? "");
     setDbaEdit(d.dba_name ?? "");
     setAcronymEdit(d.display_acronym ?? "");
+    setContactName(d.signup?.contact_name ?? "");
+    setContactEmail(d.signup?.contact_email ?? "");
+    setContactPhone(d.signup?.contact_phone ?? "");
   }, [detailQ.data]);
+
+  const saveContact = useMutation({
+    mutationFn: () =>
+      saveContactFn({
+        data: {
+          organizationId: orgId,
+          patch: {
+            name: contactName.trim() || null,
+            email: contactEmail.trim() || null,
+            phone: contactPhone.trim() || null,
+          },
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Account contact updated");
+      qc.invalidateQueries({ queryKey: ["hive-exec-company", orgId] });
+      qc.invalidateQueries({ queryKey: ["account-contact", orgId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Save failed"),
+  });
 
 
   const save = useMutation({
@@ -179,13 +208,51 @@ function CompanyDetailPage() {
           </Field>
         </div>
         <div className="mt-4 border-t border-border pt-3">
-          <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-            Account contact · captured at signup
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Account contact
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              Synced with the provider&apos;s Settings page
+            </span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3 text-sm">
-            <ReadOnly label="Main contact" value={d?.signup?.contact_name ?? "—"} />
-            <ReadOnly label="Email" value={d?.signup?.contact_email ?? "—"} mono />
-            <ReadOnly label="Mobile phone" value={d?.signup?.contact_phone ?? "—"} mono />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Main contact">
+              <input
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                maxLength={200}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              />
+            </Field>
+            <Field label="Email">
+              <input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                maxLength={320}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm font-mono"
+              />
+            </Field>
+            <Field label="Mobile phone">
+              <input
+                type="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="(801) 555-0123"
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm font-mono"
+              />
+            </Field>
+          </div>
+          <div className="mt-2 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => saveContact.mutate()}
+              disabled={saveContact.isPending}
+              className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
+            >
+              <Save className="h-3.5 w-3.5" /> Save account contact
+            </button>
           </div>
         </div>
 

@@ -348,20 +348,6 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
     }
   };
 
-  const simulateMock = (m: { merchant_name: string; total_amount: number; transaction_date: string; preview: string }) => {
-    setReceiptPreview(m.preview);
-    setParsing(true);
-    setTimeout(() => {
-      setAmount(String(m.total_amount));
-      setCounterparty(m.merchant_name);
-      setDate(m.transaction_date);
-      setMemo((prev) => prev || `Mock receipt — ${m.merchant_name}`);
-      flagAutoFilled({ amount: true, counterparty: true, date: true }, true);
-      setParsing(false);
-      toast.success(`Simulated NECTAR extraction · ${m.merchant_name}`);
-    }, 900);
-  };
-
   const addTx = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("pba_transactions" as never).insert({
@@ -499,9 +485,6 @@ function AccountLedgerDialog({ account, clientName }: { account: PbaAccount; cli
         </div>
       </div>
 
-      <MockReceiptDeck onSimulate={simulateMock} />
-
-
       <div className="rounded-lg border border-border">
         <Table>
           <TableHeader>
@@ -550,88 +533,4 @@ function AutoBadge({ green }: { green?: boolean }) {
   );
 }
 
-type MockReceipt = {
-  id: string;
-  title: string;
-  merchant_name: string;
-  total_amount: number;
-  transaction_date: string;
-  items: string[];
-  preview: string;
-};
-
-const MOCK_RECEIPTS: MockReceipt[] = [
-  {
-    id: "A",
-    title: "Groceries & Hygiene",
-    merchant_name: "Walmart Supercenter",
-    total_amount: 64.32,
-    transaction_date: new Date().toISOString().slice(0, 10),
-    items: ["Personal deodorant", "Shaving cream", "Toothbrush", "Sensory-friendly snack pack"],
-    preview: mockReceiptSvg("WALMART SUPERCENTER", 64.32, ["DEODORANT 6.49", "SHAVE CREAM 4.99", "TOOTHBRUSH 3.29", "SNACK PACK 14.55"]),
-  },
-  {
-    id: "B",
-    title: "Community Integration Activity",
-    merchant_name: "Megaplex Theatres",
-    total_amount: 24.50,
-    transaction_date: new Date().toISOString().slice(0, 10),
-    items: ["1x Adult Matinee ticket", "Water bottle — community socialization outing"],
-    preview: mockReceiptSvg("MEGAPLEX THEATRES", 24.50, ["ADULT MATINEE 19.50", "WATER BOTTLE 5.00"]),
-  },
-  {
-    id: "C",
-    title: "Medical & Specialized Equipment",
-    merchant_name: "Walgreens Pharmacy",
-    total_amount: 18.95,
-    transaction_date: new Date().toISOString().slice(0, 10),
-    items: ["Daily pill organizer box", "Thickener solution for swallowing support"],
-    preview: mockReceiptSvg("WALGREENS PHARMACY", 18.95, ["PILL ORGANIZER 7.49", "THICKENER SOLN 11.46"]),
-  },
-];
-
-function mockReceiptSvg(merchant: string, total: number, lines: string[]) {
-  const rows = lines.map((l, i) => `<text x='12' y='${78 + i * 16}' font-family='ui-monospace,Menlo,monospace' font-size='11' fill='%23374151'>${encodeURIComponent(l)}</text>`).join("");
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 240' width='220' height='240'>
-    <defs><pattern id='p' width='2' height='4' patternUnits='userSpaceOnUse'><rect width='2' height='4' fill='%23fefce8'/><rect width='2' height='1' fill='%23fef3c7'/></pattern></defs>
-    <rect width='220' height='240' fill='url(%23p)' stroke='%23d6d3d1'/>
-    <text x='110' y='28' text-anchor='middle' font-family='ui-monospace,Menlo,monospace' font-size='12' font-weight='700' fill='%23111827'>${encodeURIComponent(merchant)}</text>
-    <text x='110' y='44' text-anchor='middle' font-family='ui-monospace,Menlo,monospace' font-size='9' fill='%236b7280'>--- ITEMIZED ---</text>
-    ${rows}
-    <line x1='12' y1='${78 + lines.length * 16 + 4}' x2='208' y2='${78 + lines.length * 16 + 4}' stroke='%239ca3af' stroke-dasharray='2 2'/>
-    <text x='12' y='${78 + lines.length * 16 + 22}' font-family='ui-monospace,Menlo,monospace' font-size='12' font-weight='700' fill='%23111827'>TOTAL  $${total.toFixed(2)}</text>
-    <g transform='translate(12,${78 + lines.length * 16 + 34})'>
-      ${Array.from({ length: 30 }).map((_, i) => `<rect x='${i * 6}' y='0' width='${(i % 3) + 1}' height='22' fill='%23111827'/>`).join("")}
-    </g>
-  </svg>`.replace(/\n\s+/g, "");
-  return `data:image/svg+xml;utf8,${svg}`;
-}
-
-function MockReceiptDeck({ onSimulate }: { onSimulate: (m: MockReceipt) => void }) {
-  return (
-    <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h4 className="text-sm font-semibold">🧪 Review Sample Testing Receipts</h4>
-        <Badge variant="outline" className="text-[10px]">Sandbox demo</Badge>
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        {MOCK_RECEIPTS.map((m) => (
-          <div key={m.id} className="flex flex-col gap-2 rounded-md border border-border bg-card p-3">
-            <img src={m.preview} alt={`Mock receipt ${m.title}`} className="h-40 w-full rounded border border-border object-contain bg-yellow-50" />
-            <div>
-              <p className="text-xs font-semibold">{m.title}</p>
-              <p className="text-[11px] text-muted-foreground">{m.merchant_name} · ${m.total_amount.toFixed(2)}</p>
-              <ul className="mt-1 list-disc pl-4 text-[10px] text-muted-foreground">
-                {m.items.map((it) => <li key={it}>{it}</li>)}
-              </ul>
-            </div>
-            <Button size="sm" variant="outline" className="mt-auto" onClick={() => onSimulate(m)}>
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> 🤖 Test NECTAR Extraction
-            </Button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 

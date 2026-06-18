@@ -45,6 +45,11 @@ function CompanyDetailPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [attest, setAttest] = useState(false);
 
+  // Account contact edit state
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+
   useEffect(() => {
     const s = detailQ.data?.subscription;
     if (!s) return;

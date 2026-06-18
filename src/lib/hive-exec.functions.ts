@@ -92,6 +92,25 @@ export interface TicketRow {
 
 // ───── Helpers ─────────────────────────────────────────────────────────────
 
+/**
+ * Hive Standard volume pricing — single rate table, $500 monthly minimum.
+ * Mirrors signup.tsx pricing so MRR is consistent between the provider's
+ * own billing page and the executive overview without a round-trip to Stripe.
+ */
+function ratePerStaff(staff: number): number {
+  if (staff >= 50) return 99;
+  if (staff >= 20) return 109;
+  return 125;
+}
+function liveMonthlyCents(staffCount: number | null | undefined, plan: string | null | undefined): number {
+  // Enterprise plans are operator-priced — fall back to whatever mrr_cents is
+  // recorded on the subscription row (set manually by Hive Exec).
+  if (plan === "enterprise") return -1; // sentinel: caller uses recorded mrr_cents
+  const n = Math.max(0, Math.floor(staffCount ?? 0));
+  if (n <= 0) return 0;
+  return Math.max(500, n * ratePerStaff(n)) * 100;
+}
+
 async function ensureExecutive(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,

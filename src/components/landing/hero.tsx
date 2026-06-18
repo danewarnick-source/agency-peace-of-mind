@@ -28,7 +28,7 @@ export function Hero() {
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90">
-              <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">Book a demo <ArrowRight className="ml-1 h-4 w-4" /></a>
+              <Link to="/demo">Book a demo <ArrowRight className="ml-1 h-4 w-4" /></Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-white/30 bg-white/5 text-white hover:bg-white/15 hover:text-white">
               <Link to="/signup">Get started</Link>

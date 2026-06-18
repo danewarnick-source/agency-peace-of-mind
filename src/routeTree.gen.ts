@@ -18,6 +18,7 @@ import { Route as ManagerRouteImport } from './routes/manager'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as EmployeeRouteImport } from './routes/employee'
+import { Route as DemoRouteImport } from './routes/demo'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AuditorRouteImport } from './routes/auditor'
@@ -213,6 +214,11 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
 const EmployeeRoute = EmployeeRouteImport.update({
   id: '/employee',
   path: '/employee',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoRoute = DemoRouteImport.update({
+  id: '/demo',
+  path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -1040,6 +1046,7 @@ export interface FileRoutesByFullPath {
   '/auditor': typeof AuditorRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -1201,6 +1208,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
   '/contact': typeof ContactRoute
+  '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -1359,6 +1367,7 @@ export interface FileRoutesById {
   '/auditor': typeof AuditorRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -1523,6 +1532,7 @@ export interface FileRouteTypes {
     | '/auditor'
     | '/contact'
     | '/dashboard'
+    | '/demo'
     | '/employee'
     | '/forgot-password'
     | '/login'
@@ -1684,6 +1694,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auditor'
     | '/contact'
+    | '/demo'
     | '/employee'
     | '/forgot-password'
     | '/login'
@@ -1841,6 +1852,7 @@ export interface FileRouteTypes {
     | '/auditor'
     | '/contact'
     | '/dashboard'
+    | '/demo'
     | '/employee'
     | '/forgot-password'
     | '/login'
@@ -2004,6 +2016,7 @@ export interface RootRouteChildren {
   AuditorRoute: typeof AuditorRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRouteWithChildren
+  DemoRoute: typeof DemoRoute
   EmployeeRoute: typeof EmployeeRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
@@ -2084,6 +2097,13 @@ declare module '@tanstack/react-router' {
       path: '/employee'
       fullPath: '/employee'
       preLoaderRoute: typeof EmployeeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo': {
+      id: '/demo'
+      path: '/demo'
+      fullPath: '/demo'
+      preLoaderRoute: typeof DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -3574,6 +3594,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuditorRoute: AuditorRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRouteWithChildren,
+  DemoRoute: DemoRoute,
   EmployeeRoute: EmployeeRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,

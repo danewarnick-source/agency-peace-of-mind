@@ -21,9 +21,9 @@ export function CTA() {
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button asChild size="lg">
-                <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">
+                <Link to="/demo">
                   Book a demo <ArrowRight className="ml-1 h-4 w-4" />
-                </a>
+                </Link>
               </Button>
               <Button asChild size="lg" variant="ghostOnDark">
                 <Link to="/signup">Get started</Link>

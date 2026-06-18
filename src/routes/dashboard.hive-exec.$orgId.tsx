@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
 import { ArrowLeft, Save, Users, Contact2, Clock, Activity, Pencil, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { getCompanyDetail, upsertSubscription, updateOrgNames } from "@/lib/hive-exec.functions";
+import { getCompanyDetail, upsertSubscription, updateOrgNames, updateAccountContact } from "@/lib/hive-exec.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/$orgId")({
   component: CompanyDetailPage,

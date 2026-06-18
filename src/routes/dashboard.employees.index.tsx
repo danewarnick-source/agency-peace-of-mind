@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal } from "lucide-react";
+import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
@@ -73,7 +73,6 @@ export function EmployeesPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [assignOpen, setAssignOpen] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [resetUser, setResetUser] = useState<{ id: string; name: string } | null>(null);
   const [tempPassword, setTempPassword] = useState(() => genPassword());
@@ -169,17 +168,6 @@ export function EmployeesPage() {
   });
 
 
-  const assignMutation = useMutation({
-    mutationFn: async (input: { userId: string; courseId: string; dueDate: string | null }) => {
-      const { error } = await supabase.from("course_assignments").insert({
-        course_id: input.courseId, user_id: input.userId, organization_id: org!.organization_id,
-        assigned_by: user!.id, due_date: input.dueDate || null,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Course assigned"); setAssignOpen(null); },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const manualMutation = useMutation({
     mutationFn: async (input: {
@@ -471,9 +459,6 @@ export function EmployeesPage() {
                             <DropdownMenuItem onSelect={openEdit}>
                               <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setAssignOpen(m.user_id)}>
-                              <BookOpen className="mr-2 h-3.5 w-3.5" /> Assign course
-                            </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setResetUser({ id: m.user_id, name })}>
                               <KeyRound className="mr-2 h-3.5 w-3.5" /> Reset password
                             </DropdownMenuItem>
@@ -501,26 +486,6 @@ export function EmployeesPage() {
         </div>
       </div>
 
-      <Dialog open={!!assignOpen} onOpenChange={(o) => !o && setAssignOpen(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Assign a course</DialogTitle></DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const fd = new FormData(e.currentTarget);
-            assignMutation.mutate({ userId: assignOpen!, courseId: String(fd.get("course_id")), dueDate: String(fd.get("due_date") || "") });
-          }} className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Course</Label>
-              <Select name="course_id" required>
-                <SelectTrigger><SelectValue placeholder="Select a course" /></SelectTrigger>
-                <SelectContent>{courses?.map((c) => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2"><Label htmlFor="due_date">Due date (optional)</Label><Input type="date" id="due_date" name="due_date" /></div>
-            <DialogFooter><Button type="submit" disabled={assignMutation.isPending}>Assign</Button></DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Add manually */}
       <Dialog open={manualOpen} onOpenChange={setManualOpen}>

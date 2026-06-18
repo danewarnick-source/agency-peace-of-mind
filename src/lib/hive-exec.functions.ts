@@ -418,7 +418,9 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       billing_sms_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
       signup: {
         contact_name: contactName,
+        contact_email: contactEmail,
         contact_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
+
         staff_count_at_signup: subStaff,
         billing_interval: (sub as { billing_interval: string | null } | null)?.billing_interval ?? null,
         signup_date:

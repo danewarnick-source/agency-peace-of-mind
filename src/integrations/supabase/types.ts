@@ -8590,13 +8590,21 @@ export type Database = {
           billing_interval: string | null
           cancel_at_period_end: boolean
           canceled_at: string | null
+          card_expires_at: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          failure_count: number
           id: string
+          last_payment_attempt_at: string | null
+          last_payment_error: string | null
+          lock_reason: string | null
+          locked_at: string | null
           mrr_cents: number
+          next_retry_at: string | null
           notes: string | null
           organization_id: string
+          past_due_since: string | null
           plan: Database["public"]["Enums"]["sub_plan"]
           renewal_date: string | null
           staff_count: number | null
@@ -8612,13 +8620,21 @@ export type Database = {
           billing_interval?: string | null
           cancel_at_period_end?: boolean
           canceled_at?: string | null
+          card_expires_at?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          failure_count?: number
           id?: string
+          last_payment_attempt_at?: string | null
+          last_payment_error?: string | null
+          lock_reason?: string | null
+          locked_at?: string | null
           mrr_cents?: number
+          next_retry_at?: string | null
           notes?: string | null
           organization_id: string
+          past_due_since?: string | null
           plan?: Database["public"]["Enums"]["sub_plan"]
           renewal_date?: string | null
           staff_count?: number | null
@@ -8634,13 +8650,21 @@ export type Database = {
           billing_interval?: string | null
           cancel_at_period_end?: boolean
           canceled_at?: string | null
+          card_expires_at?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          failure_count?: number
           id?: string
+          last_payment_attempt_at?: string | null
+          last_payment_error?: string | null
+          lock_reason?: string | null
+          locked_at?: string | null
           mrr_cents?: number
+          next_retry_at?: string | null
           notes?: string | null
           organization_id?: string
+          past_due_since?: string | null
           plan?: Database["public"]["Enums"]["sub_plan"]
           renewal_date?: string | null
           staff_count?: number | null
@@ -8878,6 +8902,47 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "platform_states"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      payment_events: {
+        Row: {
+          amount_cents: number | null
+          created_at: string
+          event_type: string
+          failure_reason: string | null
+          id: string
+          metadata: Json | null
+          org_id: string
+          stripe_event_id: string | null
+        }
+        Insert: {
+          amount_cents?: number | null
+          created_at?: string
+          event_type: string
+          failure_reason?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id: string
+          stripe_event_id?: string | null
+        }
+        Update: {
+          amount_cents?: number | null
+          created_at?: string
+          event_type?: string
+          failure_reason?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string
+          stripe_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }

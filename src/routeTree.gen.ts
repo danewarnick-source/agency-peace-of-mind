@@ -21,6 +21,7 @@ import { Route as EmployeeRouteImport } from './routes/employee'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as BillingLockedRouteImport } from './routes/billing-locked'
 import { Route as AuditorRouteImport } from './routes/auditor'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -229,6 +230,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BillingLockedRoute = BillingLockedRouteImport.update({
+  id: '/billing-locked',
+  path: '/billing-locked',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuditorRoute = AuditorRouteImport.update({
@@ -1044,6 +1050,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
+  '/billing-locked': typeof BillingLockedRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
@@ -1207,6 +1214,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
+  '/billing-locked': typeof BillingLockedRoute
   '/contact': typeof ContactRoute
   '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
@@ -1365,6 +1373,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
+  '/billing-locked': typeof BillingLockedRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
@@ -1530,6 +1539,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auditor'
+    | '/billing-locked'
     | '/contact'
     | '/dashboard'
     | '/demo'
@@ -1693,6 +1703,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auditor'
+    | '/billing-locked'
     | '/contact'
     | '/demo'
     | '/employee'
@@ -1850,6 +1861,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auditor'
+    | '/billing-locked'
     | '/contact'
     | '/dashboard'
     | '/demo'
@@ -2014,6 +2026,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AuditorRoute: typeof AuditorRoute
+  BillingLockedRoute: typeof BillingLockedRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   DemoRoute: typeof DemoRoute
@@ -2118,6 +2131,13 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/billing-locked': {
+      id: '/billing-locked'
+      path: '/billing-locked'
+      fullPath: '/billing-locked'
+      preLoaderRoute: typeof BillingLockedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auditor': {
@@ -3592,6 +3612,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AuditorRoute: AuditorRoute,
+  BillingLockedRoute: BillingLockedRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRouteWithChildren,
   DemoRoute: DemoRoute,

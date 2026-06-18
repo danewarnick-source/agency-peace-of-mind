@@ -166,6 +166,7 @@ import { Route as DashboardFormsFormIdEditRouteImport } from './routes/dashboard
 import { Route as DashboardCoursesTopicTopicIdRouteImport } from './routes/dashboard.courses.topic.$topicId'
 import { Route as DashboardCoursesPersonModuleAssignmentIdRouteImport } from './routes/dashboard.courses.person-module.$assignmentId'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
+import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
 import { Route as ApiPublicHooksSmartImportRemindersRouteImport } from './routes/api/public/hooks/smart-import-reminders'
 import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
 import { Route as ApiPublicHooksGmailIngestRouteImport } from './routes/api/public/hooks/gmail-ingest'
@@ -1015,6 +1016,11 @@ const DashboardCoursesCourseIdEditRoute =
     path: '/edit',
     getParentRoute: () => DashboardCoursesCourseIdRoute,
   } as any)
+const ApiPublicWebhooksStripeRoute = ApiPublicWebhooksStripeRouteImport.update({
+  id: '/api/public/webhooks/stripe',
+  path: '/api/public/webhooks/stripe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksSmartImportRemindersRoute =
   ApiPublicHooksSmartImportRemindersRouteImport.update({
     id: '/api/public/hooks/smart-import-reminders',
@@ -1198,6 +1204,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
+  '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
@@ -1356,6 +1363,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
+  '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
@@ -1521,6 +1529,7 @@ export interface FileRoutesById {
   '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
+  '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
@@ -1687,6 +1696,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/gmail-ingest'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
+    | '/api/public/webhooks/stripe'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
@@ -1845,6 +1855,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/gmail-ingest'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
+    | '/api/public/webhooks/stripe'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
@@ -2009,6 +2020,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/gmail-ingest'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
+    | '/api/public/webhooks/stripe'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/topic/$topicId'
@@ -2044,6 +2056,7 @@ export interface RootRouteChildren {
   ApiPublicHooksGmailIngestRoute: typeof ApiPublicHooksGmailIngestRoute
   ApiPublicHooksNectarSchedulesRoute: typeof ApiPublicHooksNectarSchedulesRoute
   ApiPublicHooksSmartImportRemindersRoute: typeof ApiPublicHooksSmartImportRemindersRoute
+  ApiPublicWebhooksStripeRoute: typeof ApiPublicWebhooksStripeRoute
   ApiPublicOauthGmailCallbackRoute: typeof ApiPublicOauthGmailCallbackRoute
 }
 
@@ -3148,6 +3161,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdEditRouteImport
       parentRoute: typeof DashboardCoursesCourseIdRoute
     }
+    '/api/public/webhooks/stripe': {
+      id: '/api/public/webhooks/stripe'
+      path: '/api/public/webhooks/stripe'
+      fullPath: '/api/public/webhooks/stripe'
+      preLoaderRoute: typeof ApiPublicWebhooksStripeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/smart-import-reminders': {
       id: '/api/public/hooks/smart-import-reminders'
       path: '/api/public/hooks/smart-import-reminders'
@@ -3631,6 +3651,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksNectarSchedulesRoute: ApiPublicHooksNectarSchedulesRoute,
   ApiPublicHooksSmartImportRemindersRoute:
     ApiPublicHooksSmartImportRemindersRoute,
+  ApiPublicWebhooksStripeRoute: ApiPublicWebhooksStripeRoute,
   ApiPublicOauthGmailCallbackRoute: ApiPublicOauthGmailCallbackRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import {
   CheckCircle2,
   Lock,
@@ -29,6 +28,7 @@ import { Progress } from "@/components/ui/progress";
 import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
 import { AttestationBanner } from "@/components/nectar/attestation-banner";
 import { OnboardingPipelineCard } from "@/components/company-overview/onboarding-pipeline-card";
+import { useOnboardingProgress } from "@/hooks/use-onboarding-progress";
 import { cn } from "@/lib/utils";
 
 const SERVICE_OPTIONS = ["HHS", "SLN", "SLH", "SEI", "DSI", "RHS"] as const;
@@ -104,64 +104,15 @@ export function NectarOnboardingPanel({
     setProfileDraft(readLS<ProfileDraft>(lsKey(orgId, "profile"), EMPTY_PROFILE));
   }, [orgId]);
 
-  // --- Detection queries ----------------------------------------------------
-  const { data: counts, refetch: refetchCounts } = useQuery({
-    enabled: !!orgId,
-    queryKey: ["nectar-onboarding", orgId],
-    queryFn: async () => {
-      const [authDocs, attestations, members, clients, allDocs] = await Promise.all([
-        supabase
-          .from("nectar_documents")
-          .select("id, authoritative_kind", { count: "exact" })
-          .eq("organization_id", orgId!)
-          .eq("is_authoritative_source", true),
-        supabase
-          .from("nectar_attestations")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId!)
-          .eq("scope", "document_upload"),
-        supabase
-          .from("organization_members")
-          .select("user_id", { count: "exact", head: true })
-          .eq("organization_id", orgId!),
-        supabase
-          .from("clients")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId!),
-        supabase
-          .from("nectar_documents")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId!),
-      ]);
-      const authRows = (authDocs.data ?? []) as Array<{ authoritative_kind: string | null }>;
-      const sowCount = authRows.filter((r) => r.authoritative_kind === "state_sow").length;
-      return {
-        authSourcesCount: authDocs.count ?? authRows.length,
-        sowCount,
-        attestationCount: attestations.count ?? 0,
-        memberCount: members.count ?? 0,
-        clientCount: clients.count ?? 0,
-        docsCount: allDocs.count ?? 0,
-      };
-    },
-    refetchOnWindowFocus: true,
-  });
-
-  const c = counts ?? {
-    authSourcesCount: 0,
-    sowCount: 0,
-    attestationCount: 0,
-    memberCount: 0,
-    clientCount: 0,
-    docsCount: 0,
-  };
+  // --- Detection queries (shared hook — single source of truth) -------------
+  const { counts: c, refetch: refetchCounts } = useOnboardingProgress();
 
   // --- Step completion ------------------------------------------------------
   const step1Complete = c.sowCount > 0 && c.attestationCount > 0;
   const step2Complete = profileSavedLocal;
   const step3Complete = c.memberCount > 1; // beyond the founding owner
   const step4Complete = c.clientCount > 0;
-  const step5Complete = servicesVisited;
+  const step5Complete = servicesVisited || c.serviceCodeCount > 0;
   const step6Complete = c.docsCount > 0;
 
   const steps = useMemo(
@@ -207,11 +158,26 @@ export function NectarOnboardingPanel({
     setDismissed(true);
   };
 
-  const saveProfile = () => {
+  const saveProfile = async () => {
     writeLS(lsKey(orgId, "profile"), profileDraft);
     writeLS(lsKey(orgId, "profile_saved"), true);
     setProfileSavedLocal(true);
     setActiveStepOverride(3);
+    // Persist to DB — columns added via SQL migration; fails silently until then.
+    try {
+      await supabase
+        .from("organizations")
+        .update({
+          nectar_services: profileDraft.services,
+          nectar_approx_client_count: profileDraft.clientCount || null,
+          nectar_approx_staff_count: profileDraft.staffCount || null,
+          nectar_service_area: profileDraft.serviceArea || null,
+          nectar_specializations: profileDraft.specializations || null,
+        } as any)
+        .eq("id", orgId!);
+    } catch {
+      // graceful failure until migration is applied
+    }
   };
 
   const markServicesVisited = () => {

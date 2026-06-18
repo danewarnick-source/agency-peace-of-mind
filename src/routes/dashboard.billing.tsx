@@ -2,6 +2,7 @@ import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-r
 import { RequireRole } from "@/components/rbac-guard";
 import { Receipt, Users, FileSpreadsheet, Upload, Sparkles } from "lucide-react";
 import { NectarBillingReadinessBar } from "@/components/billing/nectar-billing-readiness-bar";
+import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Permission } from "@/lib/rbac";
 
@@ -26,6 +27,9 @@ function BillingError({ error }: { error: Error; reset: () => void }) {
 
 export const Route = createFileRoute("/dashboard/billing")({
   head: () => ({ meta: [{ title: "Billing — HIVE" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
   component: () => (
     <RequireRole roles={["admin", "manager", "super_admin"]}>
       <BillingLayout />
@@ -48,6 +52,7 @@ function BillingLayout() {
 
   return (
     <div className="finance-dense space-y-4">
+      <NectarFocusBanner />
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

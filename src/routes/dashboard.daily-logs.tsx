@@ -34,9 +34,13 @@ import {
 } from "@/lib/ai-coach.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
+import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
   head: () => ({ meta: [{ title: "Daily Logs — HIVE" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
   component: DailyLogsPage,
 });
 
@@ -176,6 +180,7 @@ function StaffDailyJournal() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      <NectarFocusBanner />
       <StaffPageHeader
         eyebrow="Host Home · Daily Compliance Journal"
         eyebrowIcon={ClipboardCheck}

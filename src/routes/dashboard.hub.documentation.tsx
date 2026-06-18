@@ -8,10 +8,12 @@ import { AuditZone } from "@/components/audit-zone/audit-zone";
 import { HrcPage } from "./dashboard.hrc";
 import { AdminIncidentsSection } from "@/components/incidents/admin-incidents-section";
 import { RecordsTab } from "@/components/records/records-tab";
+import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 
 const search = z.object({
   tab: z.enum(["records", "incidents", "forms", "audit", "hrc"]).catch("records").optional(),
   client: z.string().optional(),
+  focus: z.string().optional(),
 });
 
 export const Route = createFileRoute("/dashboard/hub/documentation")({
@@ -24,9 +26,11 @@ export const Route = createFileRoute("/dashboard/hub/documentation")({
 function DocumentationHub() {
   const { client } = Route.useSearch();
   return (
-    <HubShell
-      title="Documentation"
-      basePath="/dashboard/hub/documentation"
+    <>
+      <NectarFocusBanner />
+      <HubShell
+        title="Documentation"
+        basePath="/dashboard/hub/documentation"
       tabs={[
         { key: "records", label: "Records", render: () => <RecordsTab /> },
         {
@@ -72,6 +76,7 @@ function DocumentationHub() {
         },
         { key: "hrc", label: "Human Rights Committee", render: () => <HrcPage /> },
       ]}
-    />
+      />
+    </>
   );
 }

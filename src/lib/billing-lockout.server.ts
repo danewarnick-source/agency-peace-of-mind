@@ -118,7 +118,7 @@ export async function recordPaymentFailure(
   await sendBillingEmail({
     orgId,
     kind: "payment_failed",
-    data: { reason, failure_count: nextFailureCount, next_retry_at: nextRetryAt.toISOString() },
+    data: { reason },
   });
 
   return { ok: true, failure_count: nextFailureCount };

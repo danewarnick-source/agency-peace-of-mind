@@ -456,6 +456,9 @@ function Billing520Page() {
   const pendingCount = warnings.filter((w) => w.status === "pending").length;
   const allActed = warnings.length > 0 && pendingCount === 0;
 
+  // Set to true ONLY after counsel-approved attestation copy replaces the placeholder.
+  const ATTESTATION_COPY_APPROVED = false;
+
   const [signatureName, setSignatureName] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -903,9 +906,16 @@ function Billing520Page() {
                         disabled={!allActed}
                       />
                     </div>
+                    {!ATTESTATION_COPY_APPROVED && (
+                      <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+                        Form 520 submission is temporarily disabled. The provider attestation
+                        language is pending legal review and must be finalized before forms can
+                        be signed and submitted.
+                      </div>
+                    )}
                     <Button
                       onClick={submitToState}
-                      disabled={busy || !allActed || !agreed || !signatureName.trim()}
+                      disabled={!ATTESTATION_COPY_APPROVED || busy || !allActed || !agreed || !signatureName.trim()}
                       className="gap-1.5"
                     >
                       <ShieldCheck className="h-4 w-4" />

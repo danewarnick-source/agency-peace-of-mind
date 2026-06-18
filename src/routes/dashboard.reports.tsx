@@ -41,6 +41,14 @@ function ReportsPage() {
   );
 }
 
+type ModuleProgressRow = {
+  user_id: string;
+  module_id: string;
+  is_completed: boolean;
+  completed_at: string | null;
+  training_modules: { title: string; category: string | null } | null;
+};
+
 function StandardReports() {
   const { data: org } = useCurrentOrg();
 

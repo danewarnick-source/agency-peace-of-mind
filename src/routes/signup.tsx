@@ -1084,10 +1084,20 @@ function Step6Payment({
 
       // Training order — separate table so a Stripe PaymentIntent webhook
       // can flip status to 'paid' and attach stripe_payment_intent_id.
+      const trainingType: "full" | "alacarte" | "none" = form.training.kind;
+      const selectedModules: string[] =
+        form.training.kind === "alacarte"
+          ? (["cpr", "mandt", "dspd"] as const).filter(
+              (m) => (form.training as { cpr?: boolean; mandt?: boolean; dspd?: boolean })[m] === true,
+            )
+          : form.training.kind === "full"
+            ? ["cpr", "mandt", "dspd"]
+            : [];
+
       await supabase.from("org_training_orders").insert({
         organization_id: orgId,
-        training_type: form.training.type,
-        selected_modules: form.training.modules ?? [],
+        training_type: trainingType,
+        selected_modules: selectedModules,
         staff_count: form.staffCount,
         amount_cents: trainingCharge,
         status: trainingCharge > 0 ? "paid" : "pending",

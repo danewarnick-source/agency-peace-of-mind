@@ -22,6 +22,7 @@ function CompanyDetailPage() {
   const detailFn = useServerFn(getCompanyDetail);
   const saveFn = useServerFn(upsertSubscription);
   const saveNamesFn = useServerFn(updateOrgNames);
+  const saveContactFn = useServerFn(updateAccountContact);
 
 
   const detailQ = useQuery({

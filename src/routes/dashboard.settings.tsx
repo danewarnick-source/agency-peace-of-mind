@@ -134,6 +134,10 @@ function SettingsPage() {
           </div>
         </form>
       )}
+
+      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && org?.organization_id && (
+        <AccountContactCard organizationId={org.organization_id} />
+      )}
       {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
         <CompanyOverviewSettings />
       )}

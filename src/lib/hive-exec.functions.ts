@@ -177,20 +177,36 @@ export const getExecKpis = createServerFn({ method: "GET" })
 
     const { data: subs } = await supabase
       .from("org_subscriptions")
-      .select("status, mrr_cents");
+      .select("status, mrr_cents, staff_count, plan");
     const { count: ticketCount } = await supabase
       .from("org_support_tickets")
       .select("id", { count: "exact", head: true })
       .in("status", ["submitted", "in_progress", "waiting_customer"]);
 
-    const rows = (subs ?? []) as Array<{ status: string; mrr_cents: number }>;
+    const rows = (subs ?? []) as Array<{
+      status: string;
+      mrr_cents: number | null;
+      staff_count: number | null;
+      plan: string | null;
+    }>;
+
+    // MRR is computed live from current staff_count + volume tier — falls
+    // back to the recorded mrr_cents only for Enterprise (operator-priced)
+    // or when staff_count is somehow missing on legacy rows.
+    const mrr_cents = rows
+      .filter((r) => r.status === "active" || r.status === "past_due")
+      .reduce((sum, r) => {
+        const live = liveMonthlyCents(r.staff_count, r.plan);
+        const value = live >= 0 ? live : (r.mrr_cents ?? 0);
+        return sum + value;
+      }, 0);
+
     return {
       active_companies: rows.filter((r) => r.status === "active").length,
-      trial_companies: rows.filter((r) => r.status === "trial").length,
+      trial_companies: 0, // no trial state in Hive — providers pay at signup
       past_due_companies: rows.filter((r) => r.status === "past_due").length,
-      mrr_cents: rows
-        .filter((r) => r.status === "active" || r.status === "past_due")
-        .reduce((s, r) => s + (r.mrr_cents || 0), 0),
+      locked_companies: rows.filter((r) => r.status === "locked").length,
+      mrr_cents,
       open_tickets: ticketCount ?? 0,
     };
   });

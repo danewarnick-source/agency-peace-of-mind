@@ -24,6 +24,9 @@ function ReportsPage() {
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <h2 className="text-base font-semibold">Audit-ready reports</h2>
         <p className="text-sm text-muted-foreground">Export compliance evidence as CSV or PDF anytime.</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Includes completions from both the Courses module and the Training module.
+        </p>
       </div>
       <Tabs defaultValue="standard">
         <TabsList>
@@ -127,30 +130,65 @@ function StandardReports() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1) Compliance Summary — every training assignment.
+  // 1) Compliance Summary — every training assignment + module completions.
   const exportComplianceSummary = () => {
     const list = assigns ?? [];
-    if (!list.length) return toast.error("No training assignments to export yet");
+    const courseRows = list.map((a) => [
+      a.user_id, courseTitle(a), courseCategory(a),
+      a.status, a.progress, a.due_date ?? "", a.completed_at ?? "", "Courses module",
+    ]);
+    const moduleRows = (moduleProgress ?? []).map((r) => {
+      const row = r as ModuleProgressRow;
+      return [
+        row.user_id,
+        row.training_modules?.title ?? row.module_id,
+        row.training_modules?.category ?? "",
+        "completed",
+        100,
+        "",
+        row.completed_at ?? "",
+        "Training module",
+      ];
+    });
+    const allRows = [...courseRows, ...moduleRows];
+    if (!allRows.length) return toast.error("No training assignments to export yet");
     download(
       "compliance-summary",
-      ["user_id", "course", "category", "status", "progress", "due_date", "completed_at"],
-      list.map((a) => [
-        a.user_id, courseTitle(a), courseCategory(a),
-        a.status, a.progress, a.due_date ?? "", a.completed_at ?? "",
-      ]),
+      ["user_id", "course", "category", "status", "progress", "due_date", "completed_at", "source"],
+      allRows,
     );
   };
 
   // 2) Training Completion — only completed assignments.
   const exportTrainingCompletion = () => {
     const list = (assigns ?? []).filter((a) => a.status === "completed" || !!a.completed_at);
-    if (!list.length) return toast.error("No completed training to export yet");
+    const fromCourses = list
+      .filter((a) => a.status === "completed")
+      .map((a) => ({
+        source: "Courses module",
+        title: courseTitle(a),
+        category: courseCategory(a),
+        completed_at: a.completed_at ?? "",
+        user_id: a.user_id ?? "",
+      }));
+
+    const fromModules = (moduleProgress ?? []).map((r) => {
+      const row = r as ModuleProgressRow;
+      return {
+        source: "Training module",
+        title: row.training_modules?.title ?? row.module_id,
+        category: row.training_modules?.category ?? "",
+        completed_at: row.completed_at ?? "",
+        user_id: row.user_id,
+      };
+    });
+
+    const all = [...fromCourses, ...fromModules];
+    if (!all.length) return toast.error("No completed training to export yet.");
     download(
       "training-completion",
-      ["user_id", "course", "category", "completed_at", "progress"],
-      list.map((a) => [
-        a.user_id, courseTitle(a), courseCategory(a), a.completed_at ?? "", a.progress,
-      ]),
+      ["source", "title", "category", "completed_at", "user_id"],
+      all.map((r) => [r.source, r.title, r.category, r.completed_at, r.user_id]),
     );
   };
 

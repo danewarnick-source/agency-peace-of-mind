@@ -324,6 +324,7 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       legal_name: (org as { legal_name: string | null }).legal_name ?? null,
       dba_name: (org as { dba_name: string | null }).dba_name ?? null,
       display_acronym: (org as { display_acronym: string | null }).display_acronym ?? null,
+      billing_sms_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
       subscription: sub
 
         ? {

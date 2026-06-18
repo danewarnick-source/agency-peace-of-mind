@@ -21,7 +21,7 @@ export function OnboardingReturnBar() {
     <div className="sticky top-0 z-40 -mx-4 mb-3 border-b border-amber-300/40 bg-[#0b1733]/95 px-4 py-2 text-amber-50 shadow-sm backdrop-blur sm:-mx-6 sm:px-6">
       <Link
         to="/dashboard"
-        search={{ welcome: 1 } as never}
+        search={{ welcome: true } as never}
         className="flex items-center justify-between gap-3 text-sm"
       >
         <span className="inline-flex items-center gap-2">

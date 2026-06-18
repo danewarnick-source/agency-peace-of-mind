@@ -1,18 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Day Program is accessed via the Scheduler's "Day Program" tab, not a standalone route.
+// Redirect any stray links here so users land somewhere useful.
 export const Route = createFileRoute("/dashboard/day-program")({
-  head: () => ({ meta: [{ title: "Day Program — HIVE" }] }),
-  component: DayProgramPage,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  loader: () => { throw redirect({ to: "/dashboard/scheduler", replace: true } as any); },
+  component: () => null,
 });
-
-function DayProgramPage() {
-  return (
-    <div className="container mx-auto max-w-3xl px-4 py-10 space-y-3">
-      <h1 className="text-2xl font-bold">Day Program</h1>
-      <p className="text-sm text-muted-foreground">
-        This page hasn't been built yet.{" "}
-        <Link to="/dashboard" className="underline">Return to dashboard</Link>.
-      </p>
-    </div>
-  );
-}

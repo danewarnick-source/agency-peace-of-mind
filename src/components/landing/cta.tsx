@@ -17,16 +17,16 @@ export function CTA() {
               Ready to retire the spreadsheet?
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-white/70">
-              Start a free 14-day trial. Invite your team in minutes. No credit card required.
+              Book a demo with someone who has actually billed a Medicaid waiver — not a sales script.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button asChild size="lg">
-                <Link to="/signup">
-                  Start free trial <ArrowRight className="ml-1 h-4 w-4" />
-                </Link>
+                <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">
+                  Book a demo <ArrowRight className="ml-1 h-4 w-4" />
+                </a>
               </Button>
               <Button asChild size="lg" variant="ghostOnDark">
-                <Link to="/contact">Talk to sales</Link>
+                <Link to="/signup">Get started</Link>
               </Button>
             </div>
           </div>

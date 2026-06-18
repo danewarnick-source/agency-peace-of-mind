@@ -208,12 +208,19 @@ export function DspdPricing() {
                 ))}
               </ul>
 
-              <Button
-                asChild
-                className="mt-8 min-h-11 w-full bg-[image:var(--gradient-amber)] text-[color:var(--navy-900)] hover:opacity-90"
-              >
-                <Link to="/signup">Get started</Link>
-              </Button>
+              <div className="mt-8 flex flex-col gap-3">
+                <Button
+                  asChild
+                  className="min-h-11 w-full bg-[image:var(--gradient-amber)] text-[color:var(--navy-900)] hover:opacity-90"
+                >
+                  <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">
+                    Book a demo
+                  </a>
+                </Button>
+                <Button asChild variant="outline" className="min-h-11 w-full">
+                  <Link to="/signup">Get started</Link>
+                </Button>
+              </div>
             </div>
 
             {/* Enterprise */}
@@ -440,7 +447,9 @@ export function DspdPricing() {
               asChild
               className="min-h-11 bg-[image:var(--gradient-amber)] px-6 text-[color:var(--navy-900)] hover:opacity-90"
             >
-              <Link to="/contact">Book a demo</Link>
+              <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">
+                Book a demo
+              </a>
             </Button>
             <Button
               asChild

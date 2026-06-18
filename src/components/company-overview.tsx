@@ -246,29 +246,29 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
     {
       icon: ShieldCheck, label: "Audit readiness", value: metrics.audit,
       nextAction: auditGaps ? `Review ${auditGaps} record${auditGaps === 1 ? "" : "s"}` : "Open Records Desk",
-      to: "/dashboard/hub/documentation", search: { tab: "audit" },
+      to: "/dashboard/hub/documentation", search: { tab: "audit", focus: "audit-readiness" },
     },
     {
       icon: MapPin, label: "EVV match", value: metrics.evv,
       nextAction: evvOut ? `Investigate ${evvOut} clock-in${evvOut === 1 ? "" : "s"}` : "Open EVV & timesheets",
-      to: "/dashboard/hub/documentation", search: { tab: "records" },
+      to: "/dashboard/compliance-desk", search: { focus: "evv-out-of-bounds" },
     },
     {
       icon: FileCheck2, label: "Documentation", value: metrics.docs,
       nextAction: docGaps ? `Review ${docGaps} doc${docGaps === 1 ? "" : "s"}` : "Open Documentation",
-      to: "/dashboard/hub/documentation", search: { tab: "records" },
+      to: "/dashboard/hub/documentation", search: { tab: "records", focus: "doc-gaps" },
     },
     {
       icon: BadgeCheck, label: "Credentials current", value: metrics.creds,
       nextAction: staffMissingCreds
         ? `Review ${staffMissingCreds} staff`
         : "Open Compliance",
-      to: "/dashboard/hub/employees", search: { tab: "compliance" },
+      to: "/dashboard/certifications", search: { focus: "creds-expiring" },
     },
     {
       icon: Activity, label: "Overall compliance", value: metrics.overall,
       nextAction: "Open compliance overview",
-      to: "/dashboard/compliance-desk",
+      to: "/dashboard/compliance-desk", search: { focus: "compliance-overview" },
     },
   ];
   return (
@@ -356,14 +356,14 @@ function BillingSnapshotCard({ claimsReadyAmount, payrollGross }: { claimsReadyA
         </span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link to="/dashboard/billing" className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
+        <Link to="/dashboard/billing" search={{ focus: "claims-ready" }} className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
           <p className="text-xs font-medium text-muted-foreground">Claims ready to submit</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{fmtUSD(claimsReadyAmount)}</p>
           <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary">
             Open Billing <ArrowRight className="h-3 w-3" />
           </p>
         </Link>
-        <Link to="/dashboard/timeclock" className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
+        <Link to="/dashboard/compliance-desk" search={{ focus: "payroll-review" }} className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
           <p className="text-xs font-medium text-muted-foreground">Payroll this period (gross)</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{fmtUSD(payrollGross)}</p>
           <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary">
@@ -438,19 +438,19 @@ export function CompanyOverview() {
   // the gauges for compliance/credentials/etc., so we never re-list those here.
   const needsToday: QueueItem[] = att
     ? [
-        { icon: CalendarClock, label: "Published shifts not yet accepted", count: att.unacceptedShifts, to: "/dashboard/scheduler", urgent: true },
-        { icon: BadgeCheck, label: "Certifications expiring within 30 days", count: att.expiringCredentials, to: "/dashboard/hub/employees", search: { tab: "compliance" }, urgent: true },
-        { icon: Stethoscope, label: "Incident reports pending review", count: att.pendingIncidents, to: "/dashboard/hub/documentation", search: { tab: "records" }, urgent: true },
-        { icon: ClipboardX, label: "Daily logs returned for revision", count: att.missingDailyLogs, to: "/dashboard/hub/documentation", search: { tab: "records" } },
-        { icon: FileSignature, label: "Notes awaiting signature (last 7 days)", count: att.unsignedNotes, to: "/dashboard/hub/documentation", search: { tab: "records" } },
+        { icon: CalendarClock, label: "Published shifts not yet accepted", count: att.unacceptedShifts, to: "/dashboard/scheduler", search: { focus: "unaccepted-shifts" }, urgent: true },
+        { icon: BadgeCheck, label: "Certifications expiring within 30 days", count: att.expiringCredentials, to: "/dashboard/certifications", search: { focus: "expiring-30" }, urgent: true },
+        { icon: Stethoscope, label: "Incident reports pending review", count: att.pendingIncidents, to: "/dashboard/hub/documentation", search: { tab: "incidents", focus: "incidents-pending-review" }, urgent: true },
+        { icon: ClipboardX, label: "Daily logs returned for revision", count: att.missingDailyLogs, to: "/dashboard/daily-logs", search: { focus: "daily-logs-returned" } },
+        { icon: FileSignature, label: "Notes awaiting signature (last 7 days)", count: att.unsignedNotes, to: "/dashboard/hub/documentation", search: { tab: "records", focus: "unsigned-notes" } },
       ]
     : [];
 
   // Setup & backlog — configuration reviews that don't belong in the daily queue.
   const backlog: QueueItem[] = att
     ? [
-        { icon: BookOpen, label: "Authoritative requirements needing review", count: att.requirementsNeedingReview, to: "/dashboard/authoritative-sources" },
-        { icon: Network, label: "Requirement mappings flagged for review", count: att.engineMappingGaps, to: "/dashboard/authoritative-sources" },
+        { icon: BookOpen, label: "Authoritative requirements needing review", count: att.requirementsNeedingReview, to: "/dashboard/authoritative-sources", search: { focus: "req-review" } },
+        { icon: Network, label: "Requirement mappings flagged for review", count: att.engineMappingGaps, to: "/dashboard/authoritative-sources", search: { focus: "mapping-gaps" } },
       ]
     : [];
 

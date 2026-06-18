@@ -38,6 +38,7 @@ import {
 import { evvServiceLabel } from "@/lib/evv-codes";
 import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 import { NectarBar } from "@/components/scheduler/nectar-bar";
+import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { createRecurringShifts } from "@/lib/scheduler/repeat.functions";
 
 export const Route = createFileRoute("/dashboard/scheduler")({
@@ -52,6 +53,9 @@ export const Route = createFileRoute("/dashboard/scheduler")({
         href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap",
       },
     ],
+  }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
   }),
   component: SchedulerPage,
 });
@@ -152,6 +156,7 @@ function SchedulerPage() {
       className="min-h-screen"
       style={{ background: "#faf9f5", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
     >
+      <div className="px-4 pt-4"><NectarFocusBanner /></div>
       {/* Brand bar with tabs */}
       <div style={{ background: NAVY, color: "#fff", padding: "10px 16px" }} className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">

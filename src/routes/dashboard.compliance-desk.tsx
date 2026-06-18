@@ -34,6 +34,7 @@ import { ResidentialDailyTab } from "@/components/residential/residential-daily-
 import { useNavigate } from "@tanstack/react-router";
 import { Home as HomeIcon } from "lucide-react";
 import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
+import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
 // the Pending Approvals Ledger and the Approved Timesheets Archive.
@@ -124,6 +125,9 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
 
 export const Route = createFileRoute("/dashboard/compliance-desk")({
   head: () => ({ meta: [{ title: "EVV & Timesheet Control — HIVE" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
   component: () => (
     <RequirePermission perm="manage_users">
       <ComplianceDeskPage />
@@ -664,6 +668,7 @@ function ComplianceDeskPage() {
 
   return (
     <div className="space-y-4">
+      <NectarFocusBanner />
       <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">EVV & Timesheet Control</h1>

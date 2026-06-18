@@ -5,8 +5,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Award, ExternalLink, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 
-export const Route = createFileRoute("/dashboard/certifications")({ component: CertificationsPage });
+export const Route = createFileRoute("/dashboard/certifications")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
+  component: CertificationsPage,
+});
 
 function CertificationsPage() {
   const { user } = useAuth();
@@ -28,6 +34,7 @@ function CertificationsPage() {
 
   return (
     <div className="space-y-6">
+      <NectarFocusBanner />
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <h2 className="text-base font-semibold">{isManager ? "Team certifications" : "My certifications"}</h2>
         <p className="text-sm text-muted-foreground">Each certificate has a public verification URL anyone can use to confirm authenticity.</p>

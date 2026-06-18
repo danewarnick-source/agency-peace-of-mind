@@ -57,6 +57,7 @@ import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
 import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
+import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { ingestDocument } from "@/lib/nectar-documents.functions";
 import {
   listAuthoritativeSources,
@@ -108,6 +109,9 @@ export const Route = createFileRoute("/dashboard/authoritative-sources")({
           "Upload your State SOW, contracts, and DSPD/DHS requirement documents. NECTAR reads from these as the source of truth.",
       },
     ],
+  }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
   }),
   component: AuthoritativeSourcesPage,
 });
@@ -198,7 +202,9 @@ export function AuthoritativeSourcesPage() {
     <div className="space-y-6">
       <OnboardingReturnBar />
       <OnboardingGuidanceBanner step={1} />
+      <NectarFocusBanner />
       <header className="flex flex-col gap-3">
+
 
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <ShieldCheck className="h-4 w-4" />

@@ -319,7 +319,7 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
 
     const { data: org, error: orgErr } = await supabase
       .from("organizations")
-      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, created_by, created_at")
+      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, account_contact_name, account_contact_email, created_by, created_at")
       .eq("id", data.organizationId)
       .maybeSingle();
     if (orgErr) throw orgErr;
@@ -333,23 +333,33 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       .eq("organization_id", data.organizationId)
       .maybeSingle();
 
-    // Signup contact info comes from the org creator's profile + auth user.
-    const createdBy = (org as { created_by: string | null }).created_by;
-    let contactName: string | null = null;
-    let contactEmail: string | null = null;
-    if (createdBy) {
-      const { data: creator } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", createdBy)
-        .maybeSingle();
-      contactName = (creator as { full_name: string | null } | null)?.full_name ?? null;
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(createdBy);
-        contactEmail = authUser?.user?.email ?? null;
-      } catch (e) {
-        console.warn("[hive-exec] could not fetch creator email", e);
+    // Account contact: prefer the org-level editable fields. Fall back to the
+    // org creator's profile/auth-email for legacy orgs where these fields were
+    // never populated, so older mock accounts still show something.
+    const orgRow = org as {
+      created_by: string | null;
+      account_contact_name: string | null;
+      account_contact_email: string | null;
+    };
+    let contactName: string | null = orgRow.account_contact_name ?? null;
+    let contactEmail: string | null = orgRow.account_contact_email ?? null;
+    if ((!contactName || !contactEmail) && orgRow.created_by) {
+      if (!contactName) {
+        const { data: creator } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", orgRow.created_by)
+          .maybeSingle();
+        contactName = (creator as { full_name: string | null } | null)?.full_name ?? null;
+      }
+      if (!contactEmail) {
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(orgRow.created_by);
+          contactEmail = authUser?.user?.email ?? null;
+        } catch (e) {
+          console.warn("[hive-exec] could not fetch creator email", e);
+        }
       }
     }
 

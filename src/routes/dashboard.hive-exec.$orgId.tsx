@@ -27,13 +27,13 @@ function CompanyDetailPage() {
   const detailQ = useQuery({
     queryKey: ["hive-exec-company", orgId],
     queryFn: () => detailFn({ data: { organizationId: orgId } }),
+    refetchInterval: 30_000,
   });
 
-  const [plan, setPlan] = useState("starter");
-  const [status, setStatus] = useState("trial");
+  const [plan, setPlan] = useState("hive_standard");
+  const [status, setStatus] = useState("active");
   const [mrr, setMrr] = useState("0");
   const [renewal, setRenewal] = useState("");
-  const [trial, setTrial] = useState("");
   const [notes, setNotes] = useState("");
 
   // Org identifying-info edit state
@@ -51,7 +51,6 @@ function CompanyDetailPage() {
     setStatus(s.status);
     setMrr(String((s.mrr_cents / 100).toFixed(2)));
     setRenewal(s.renewal_date ?? "");
-    setTrial(s.trial_ends_at ?? "");
     setNotes(s.notes ?? "");
   }, [detailQ.data?.subscription]);
 
@@ -75,7 +74,6 @@ function CompanyDetailPage() {
             status,
             mrr_cents: Math.round(parseFloat(mrr || "0") * 100),
             renewal_date: renewal || null,
-            trial_ends_at: trial || null,
             notes: notes || null,
           },
         },
@@ -274,37 +272,59 @@ function CompanyDetailPage() {
         <UsageTile icon={Clock} label="Hours logged · 30d" value={d ? d.usage.hours_last_30d.toFixed(1) : "—"} />
       </div>
 
+      {d?.signup ? (
+        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="font-display text-lg font-semibold">Submitted at signup</h2>
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Read-only · provider self-reported</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+            <ReadOnly label="Contact name" value={d.signup.contact_name ?? "—"} />
+            <ReadOnly label="Contact phone" value={d.signup.contact_phone ?? "—"} mono />
+            <ReadOnly
+              label="Signup date"
+              value={d.signup.signup_date ? new Date(d.signup.signup_date).toLocaleDateString() : "—"}
+            />
+            <ReadOnly label="Staff count at signup" value={d.signup.staff_count_at_signup ?? "—"} />
+            <ReadOnly
+              label="Billing interval"
+              value={d.signup.billing_interval ? d.signup.billing_interval : "—"}
+            />
+          </div>
+        </section>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-          <h2 className="mb-3 font-display text-lg font-semibold">Subscription</h2>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="font-display text-lg font-semibold">Operator controls</h2>
+            <StatusPill status={status} />
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Plan">
               <select value={plan} onChange={(e) => setPlan(e.target.value)} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm">
-                <option value="starter">Starter</option>
-                <option value="pro">Pro</option>
+                <option value="hive_standard">HIVE Standard</option>
                 <option value="enterprise">Enterprise</option>
-                <option value="custom">Custom</option>
               </select>
             </Field>
             <Field label="Status">
               <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm">
-                <option value="trial">Trial</option>
                 <option value="active">Active</option>
                 <option value="past_due">Past due</option>
-                <option value="paused">Paused</option>
-                <option value="canceled">Canceled</option>
+                <option value="locked">Locked</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </Field>
-            <Field label="MRR (USD)">
-              <input type="number" step="0.01" min="0" value={mrr} onChange={(e) => setMrr(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm" />
+            <Field label="MRR (USD) — Enterprise override only">
+              <input
+                type="number" step="0.01" min="0" value={mrr}
+                disabled={plan !== "enterprise"}
+                onChange={(e) => setMrr(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm disabled:bg-muted disabled:text-muted-foreground"
+              />
             </Field>
             <Field label="Renewal date">
               <input type="date" value={renewal} onChange={(e) => setRenewal(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm" />
-            </Field>
-            <Field label="Trial ends">
-              <input type="date" value={trial} onChange={(e) => setTrial(e.target.value)}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm" />
             </Field>
             <Field label="Notes">
@@ -312,12 +332,31 @@ function CompanyDetailPage() {
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm" />
             </Field>
           </div>
-          <div className="mt-3 flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">
-              {d?.subscription
-                ? `Active since ${new Date(d.subscription.started_at).toLocaleDateString()} · ${fmtMoney(d.subscription.mrr_cents)} MRR`
-                : "No subscription on file yet."}
+
+          {d?.subscription ? (
+            <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+              <div>
+                Active since{" "}
+                <span className="text-foreground">{new Date(d.subscription.started_at).toLocaleDateString()}</span>
+                {" · "}
+                <span className="text-foreground">{fmtMoney(d.subscription.mrr_cents)}</span> MRR (live)
+              </div>
+              {d.subscription.past_due_since ? (
+                <div className="mt-1 text-amber-700">
+                  Past due since {new Date(d.subscription.past_due_since).toLocaleDateString()}
+                </div>
+              ) : null}
+              {d.subscription.locked_at ? (
+                <div className="mt-1 text-red-700">
+                  Locked at {new Date(d.subscription.locked_at).toLocaleString()}
+                </div>
+              ) : null}
             </div>
+          ) : (
+            <div className="mt-3 text-xs text-muted-foreground">No subscription on file yet.</div>
+          )}
+
+          <div className="mt-3 flex items-center justify-end">
             <button
               type="button"
               onClick={() => save.mutate()}
@@ -353,6 +392,29 @@ function CompanyDetailPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+function ReadOnly({ label, value, mono }: { label: string; value: string | number; mono?: boolean }) {
+  return (
+    <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`mt-0.5 text-sm text-foreground ${mono ? "font-mono" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    active: "bg-emerald-100 text-emerald-700",
+    past_due: "bg-amber-100 text-amber-700",
+    locked: "bg-red-100 text-red-700",
+    cancelled: "bg-gray-100 text-gray-600",
+  };
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] ?? "bg-muted"}`}>
+      {status.replace("_", " ")}
+    </span>
   );
 }
 

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Shield, Building2, LifeBuoy, ShieldAlert, CreditCard, Activity, ArrowRightLeft, Plus, UserCog, MapPin, Mail } from "lucide-react";
+import { Shield, ShieldAlert } from "lucide-react";
 import { RequireHiveExecutive } from "@/components/hive-executive-guard";
+import { EXEC_NAV } from "@/lib/exec-nav";
 
 export const Route = createFileRoute("/dashboard/hive-exec")({
   head: () => ({ meta: [{ title: "HIVE Executive — Platform Oversight" }] }),
@@ -10,18 +11,6 @@ export const Route = createFileRoute("/dashboard/hive-exec")({
     </RequireHiveExecutive>
   ),
 });
-
-const TABS = [
-  { to: "/dashboard/hive-exec", label: "Companies", icon: Building2, exact: true },
-  { to: "/dashboard/hive-exec/new-company", label: "Add Company", icon: Plus },
-  { to: "/dashboard/hive-exec/states", label: "States", icon: MapPin },
-  { to: "/dashboard/hive-exec/permissions", label: "Permissions & Roles", icon: UserCog },
-  { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
-  { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },
-  { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },
-  { to: "/dashboard/hive-exec/company-migration", label: "Company Migration", icon: ArrowRightLeft },
-  { to: "/dashboard/hive-exec/messages", label: "Message Center", icon: Mail },
-];
 
 function HiveExecLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -48,7 +37,7 @@ function HiveExecLayout() {
       </header>
 
       <nav className="flex flex-wrap gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
-        {TABS.map((t) => {
+        {EXEC_NAV.map((t) => {
           const active = t.exact ? pathname === t.to : pathname.startsWith(t.to);
           const Icon = t.icon;
           return (

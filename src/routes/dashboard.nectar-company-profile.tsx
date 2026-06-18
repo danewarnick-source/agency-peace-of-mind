@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { ArrowRight, Building2 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
@@ -76,8 +77,24 @@ function NectarCompanyProfilePage() {
     }));
   };
 
-  const save = () => {
+  // Both this route and the onboarding panel write to the same org columns; keep them in sync.
+  const save = async () => {
     if (!orgId) return;
+    try {
+      const specializations = [
+        draft.specializations?.trim(),
+        draft.serviceArea?.trim() ? `Service area: ${draft.serviceArea.trim()}` : "",
+      ].filter(Boolean).join("\n") || null;
+
+      await (supabase.from("organizations") as any).update({
+        services_offered: draft.services ?? [],
+        approx_client_count: Number(draft.clientCount) || null,
+        specializations,
+        nectar_profile_saved_at: new Date().toISOString(),
+      }).eq("id", orgId);
+    } catch (err) {
+      console.warn("[nectar-profile] DB write pending; localStorage fallback active", err);
+    }
     try {
       window.localStorage.setItem(onboardingLSKey(orgId, "profile"), JSON.stringify(draft));
       window.localStorage.setItem(onboardingLSKey(orgId, "profile_saved"), JSON.stringify(true));
@@ -178,8 +195,8 @@ function NectarCompanyProfilePage() {
 
         <div className="flex items-center justify-end gap-2 pt-1">
           <Button
-            onClick={() => {
-              save();
+            onClick={async () => {
+              await save();
               navigate({ to: "/dashboard", search: { welcome: true } });
             }}
           >

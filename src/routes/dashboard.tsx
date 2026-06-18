@@ -15,6 +15,7 @@ import {
   LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search, AlarmClock,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
+import { EXEC_NAV } from "@/lib/exec-nav";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -238,18 +239,7 @@ function DashboardLayout() {
     isHiveExecView ? "hive_exec"
     : isStatePreview ? (subView === "staff" ? "staff" : "admin")
     : (rawView === "admin" ? "admin" : "staff");
-  const execNav: NavItem[] = [
-    { to: "/dashboard/hive-exec", label: "HIVE Overview", icon: LayoutDashboard, exact: true },
-    { to: "/dashboard/hive-exec/new-company", label: "Add Company", icon: Plus },
-    { to: "/dashboard/hive-exec/states", label: "States", icon: MapPin },
-    { to: "/dashboard/hive-exec/approvals", label: "Extraction Approvals", icon: ShieldCheck },
-    { to: "/dashboard/hive-exec/permissions", label: "Permissions & Roles", icon: UserCog },
-    { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
-    { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },
-    { to: "/dashboard/hive-exec/tickets", label: "Support Queue", icon: LifeBuoy },
-    { to: "/dashboard/hive-exec/company-migration", label: "Company Migration", icon: ArrowRightLeft },
-    { to: "/dashboard/hive-exec/nectar", label: "NECTAR", icon: Hexagon },
-  ];
+  const execNav: NavItem[] = EXEC_NAV as NavItem[];
   const COMMITTEE_NAV: NavItem[] = [
     { to: "/dashboard/hrc", label: "Human Rights Committee", icon: Scale, exact: true },
   ];

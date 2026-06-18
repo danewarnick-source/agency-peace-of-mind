@@ -393,7 +393,7 @@ function Step1Account({
 
   return (
     <>
-      <Header title="Create your account" subtitle="Start with a few quick details. We'll send a code to verify your email." />
+      <Header title="Create your account" subtitle="Start with a few quick details to get your workspace ready." />
       <div className="grid gap-4">
         <Field
           label="Email address"

@@ -565,12 +565,13 @@ export function HomesTeamsBoard() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <Home className="h-4 w-4 shrink-0 text-primary" />
-                        <button
-                          onClick={() => setEditing(t)}
+                        <Link
+                          to="/dashboard/homes/$teamId"
+                          params={{ teamId: t.id }}
                           className="truncate font-display text-base font-semibold tracking-tight hover:underline"
                         >
                           {t.team_name}
-                        </button>
+                        </Link>
                       </div>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         <Badge variant="outline" className="gap-1">

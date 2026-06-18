@@ -19,8 +19,9 @@ export interface CompanyRow {
 
 export interface ExecKpis {
   active_companies: number;
-  trial_companies: number;
+  trial_companies: number; // kept for back-compat; always 0 — no trial state
   past_due_companies: number;
+  locked_companies: number;
   mrr_cents: number;
   open_tickets: number;
 }
@@ -33,6 +34,15 @@ export interface CompanyDetail {
   display_acronym: string | null;
   billing_sms_phone: string | null;
 
+  /** Provider-submitted fields captured during signup. Read-only in exec UI. */
+  signup: {
+    contact_name: string | null;
+    contact_phone: string | null;
+    staff_count_at_signup: number | null;
+    billing_interval: string | null; // 'monthly' | 'annual'
+    signup_date: string | null;
+  };
+
   subscription: {
     plan: string;
     status: string;
@@ -42,6 +52,11 @@ export interface CompanyDetail {
     started_at: string;
     canceled_at: string | null;
     notes: string | null;
+    staff_count: number | null;
+    billing_interval: string | null;
+    current_period_end: string | null;
+    past_due_since: string | null;
+    locked_at: string | null;
   } | null;
   usage: {
     staff_count: number;

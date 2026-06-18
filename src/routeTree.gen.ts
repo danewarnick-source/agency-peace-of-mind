@@ -110,6 +110,7 @@ import { Route as DashboardHubEmployeesRouteImport } from './routes/dashboard.hu
 import { Route as DashboardHubDocumentationRouteImport } from './routes/dashboard.hub.documentation'
 import { Route as DashboardHubClientsRouteImport } from './routes/dashboard.hub.clients'
 import { Route as DashboardHrAdminSettingsRouteImport } from './routes/dashboard.hr-admin.settings'
+import { Route as DashboardHomesTeamIdRouteImport } from './routes/dashboard.homes.$teamId'
 import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
 import { Route as DashboardHiveExecStatesRouteImport } from './routes/dashboard.hive-exec.states'
 import { Route as DashboardHiveExecPlansRouteImport } from './routes/dashboard.hive-exec.plans'
@@ -701,6 +702,11 @@ const DashboardHrAdminSettingsRoute =
     path: '/settings',
     getParentRoute: () => DashboardHrAdminRoute,
   } as any)
+const DashboardHomesTeamIdRoute = DashboardHomesTeamIdRouteImport.update({
+  id: '/$teamId',
+  path: '/$teamId',
+  getParentRoute: () => DashboardHomesRoute,
+} as any)
 const DashboardHiveExecTicketsRoute =
   DashboardHiveExecTicketsRouteImport.update({
     id: '/tickets',
@@ -1108,7 +1114,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
-  '/dashboard/homes': typeof DashboardHomesRoute
+  '/dashboard/homes': typeof DashboardHomesRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/hrc': typeof DashboardHrcRoute
@@ -1187,6 +1193,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/homes/$teamId': typeof DashboardHomesTeamIdRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
   '/dashboard/hub/clients': typeof DashboardHubClientsRoute
   '/dashboard/hub/documentation': typeof DashboardHubDocumentationRoute
@@ -1270,7 +1277,7 @@ export interface FileRoutesByTo {
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/help': typeof DashboardHelpRoute
-  '/dashboard/homes': typeof DashboardHomesRoute
+  '/dashboard/homes': typeof DashboardHomesRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/hrc': typeof DashboardHrcRoute
@@ -1348,6 +1355,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/homes/$teamId': typeof DashboardHomesTeamIdRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
   '/dashboard/hub/clients': typeof DashboardHubClientsRoute
   '/dashboard/hub/documentation': typeof DashboardHubDocumentationRoute
@@ -1437,7 +1445,7 @@ export interface FileRoutesById {
   '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
-  '/dashboard/homes': typeof DashboardHomesRoute
+  '/dashboard/homes': typeof DashboardHomesRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
   '/dashboard/hrc': typeof DashboardHrcRoute
@@ -1516,6 +1524,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/homes/$teamId': typeof DashboardHomesTeamIdRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
   '/dashboard/hub/clients': typeof DashboardHubClientsRoute
   '/dashboard/hub/documentation': typeof DashboardHubDocumentationRoute
@@ -1685,6 +1694,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/homes/$teamId'
     | '/dashboard/hr-admin/settings'
     | '/dashboard/hub/clients'
     | '/dashboard/hub/documentation'
@@ -1846,6 +1856,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/homes/$teamId'
     | '/dashboard/hr-admin/settings'
     | '/dashboard/hub/clients'
     | '/dashboard/hub/documentation'
@@ -2013,6 +2024,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/homes/$teamId'
     | '/dashboard/hr-admin/settings'
     | '/dashboard/hub/clients'
     | '/dashboard/hub/documentation'
@@ -2796,6 +2808,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHrAdminSettingsRouteImport
       parentRoute: typeof DashboardHrAdminRoute
     }
+    '/dashboard/homes/$teamId': {
+      id: '/dashboard/homes/$teamId'
+      path: '/$teamId'
+      fullPath: '/dashboard/homes/$teamId'
+      preLoaderRoute: typeof DashboardHomesTeamIdRouteImport
+      parentRoute: typeof DashboardHomesRoute
+    }
     '/dashboard/hive-exec/tickets': {
       id: '/dashboard/hive-exec/tickets'
       path: '/tickets'
@@ -3408,6 +3427,18 @@ const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
 const DashboardHiveExecRouteWithChildren =
   DashboardHiveExecRoute._addFileChildren(DashboardHiveExecRouteChildren)
 
+interface DashboardHomesRouteChildren {
+  DashboardHomesTeamIdRoute: typeof DashboardHomesTeamIdRoute
+}
+
+const DashboardHomesRouteChildren: DashboardHomesRouteChildren = {
+  DashboardHomesTeamIdRoute: DashboardHomesTeamIdRoute,
+}
+
+const DashboardHomesRouteWithChildren = DashboardHomesRoute._addFileChildren(
+  DashboardHomesRouteChildren,
+)
+
 interface DashboardHrAdminRouteChildren {
   DashboardHrAdminSettingsRoute: typeof DashboardHrAdminSettingsRoute
 }
@@ -3525,7 +3556,7 @@ interface DashboardRouteChildren {
   DashboardFormsRoute: typeof DashboardFormsRouteWithChildren
   DashboardHelpRoute: typeof DashboardHelpRoute
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
-  DashboardHomesRoute: typeof DashboardHomesRoute
+  DashboardHomesRoute: typeof DashboardHomesRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
   DashboardHrAdminRoute: typeof DashboardHrAdminRouteWithChildren
   DashboardHrcRoute: typeof DashboardHrcRoute
@@ -3608,7 +3639,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardFormsRoute: DashboardFormsRouteWithChildren,
   DashboardHelpRoute: DashboardHelpRoute,
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
-  DashboardHomesRoute: DashboardHomesRoute,
+  DashboardHomesRoute: DashboardHomesRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,
   DashboardHrAdminRoute: DashboardHrAdminRouteWithChildren,
   DashboardHrcRoute: DashboardHrcRoute,
@@ -3701,13 +3732,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

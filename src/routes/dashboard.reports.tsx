@@ -138,7 +138,7 @@ function StandardReports() {
       a.status, a.progress, a.due_date ?? "", a.completed_at ?? "", "Courses module",
     ]);
     const moduleRows = (moduleProgress ?? []).map((r) => {
-      const row = r as ModuleProgressRow;
+      const row = r as unknown as ModuleProgressRow;
       return [
         row.user_id,
         row.training_modules?.title ?? row.module_id,
@@ -173,7 +173,7 @@ function StandardReports() {
       }));
 
     const fromModules = (moduleProgress ?? []).map((r) => {
-      const row = r as ModuleProgressRow;
+      const row = r as unknown as ModuleProgressRow;
       return {
         source: "Training module",
         title: row.training_modules?.title ?? row.module_id,

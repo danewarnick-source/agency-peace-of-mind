@@ -6,8 +6,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Scale, CalendarDays, ClipboardList, Users, UserPlus, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import type { Role } from "@/lib/rbac";
@@ -73,7 +76,7 @@ export function HrcPage() {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
-            No data wiring yet — placeholder for the flagged-client list.
+            No clients currently flagged for review.
           </div>
         </CardContent>
       </Card>
@@ -165,6 +168,11 @@ export function HrcPage() {
 
 function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string | null }) {
   const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [meetingDate, setMeetingDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attendees, setAttendees] = useState("");
+  const [decisions, setDecisions] = useState("");
+
   const { data, isLoading } = useQuery({
     enabled: !!orgId,
     queryKey: ["hrc-meetings", orgId],
@@ -181,18 +189,24 @@ function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string 
   });
 
   const add = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (values: { meeting_date: string; attendees: string; decisions: string }) => {
+      if (!values.meeting_date) throw new Error("Meeting date is required.");
+      if (!values.attendees.trim()) throw new Error("Attendees are required.");
       const { error } = await supabase.from("hrc_meetings").insert({
         organization_id: orgId!,
-        meeting_date: new Date().toISOString().slice(0, 10),
-        attendees: "(placeholder)",
-        decisions: "(placeholder)",
+        meeting_date: values.meeting_date,
+        attendees: values.attendees.trim(),
+        decisions: values.decisions.trim() || null,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Placeholder meeting added");
+      toast.success("Meeting recorded");
       qc.invalidateQueries({ queryKey: ["hrc-meetings", orgId] });
+      setOpen(false);
+      setMeetingDate(new Date().toISOString().slice(0, 10));
+      setAttendees("");
+      setDecisions("");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -208,19 +222,65 @@ function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string 
       ) : (
         <ul className="divide-y divide-border rounded-md border border-border">
           {data.map((m) => (
-            <li key={m.id} className="flex items-center justify-between px-3 py-2 text-sm">
-              <span className="font-medium">{m.meeting_date ?? "(no date)"}</span>
-              <span className="text-xs text-muted-foreground truncate ml-3">
-                {m.attendees ?? ""}
-              </span>
+            <li key={m.id} className="flex flex-col gap-0.5 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{m.meeting_date ?? "(no date)"}</span>
+                <span className="text-xs text-muted-foreground truncate ml-3">
+                  {m.attendees ?? ""}
+                </span>
+              </div>
+              {m.decisions && (
+                <p className="text-xs text-muted-foreground">{m.decisions}</p>
+              )}
             </li>
           ))}
         </ul>
       )}
       {canManage && (
-        <Button size="sm" variant="outline" disabled={add.isPending} onClick={() => add.mutate()}>
-          Add placeholder meeting
-        </Button>
+        <>
+          <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+            Add meeting
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Record HRC meeting</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>Meeting date</Label>
+                  <Input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Attendees</Label>
+                  <Input
+                    value={attendees}
+                    onChange={(e) => setAttendees(e.target.value)}
+                    placeholder="Names of committee members present"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Decisions / minutes</Label>
+                  <Textarea
+                    value={decisions}
+                    onChange={(e) => setDecisions(e.target.value)}
+                    placeholder="Decisions made and action items"
+                    rows={4}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button
+                  disabled={add.isPending}
+                  onClick={() => add.mutate({ meeting_date: meetingDate, attendees, decisions })}
+                >
+                  Save meeting
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
     </div>
   );
@@ -228,6 +288,10 @@ function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string 
 
 function ReviewsStub({ canManage, orgId }: { canManage: boolean; orgId: string | null }) {
   const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [restrictionSummary, setRestrictionSummary] = useState("");
+  const [status, setStatus] = useState("pending_review");
+
   const { data, isLoading } = useQuery({
     enabled: !!orgId,
     queryKey: ["hrc-reviews", orgId],
@@ -244,17 +308,21 @@ function ReviewsStub({ canManage, orgId }: { canManage: boolean; orgId: string |
   });
 
   const add = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (values: { restriction_summary: string; status: string }) => {
+      if (!values.restriction_summary.trim()) throw new Error("Restriction summary is required.");
       const { error } = await supabase.from("hrc_reviews").insert({
         organization_id: orgId!,
-        restriction_summary: "(placeholder restriction)",
-        status: "pending_review",
+        restriction_summary: values.restriction_summary.trim(),
+        status: values.status,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Placeholder review added");
+      toast.success("Review recorded");
       qc.invalidateQueries({ queryKey: ["hrc-reviews", orgId] });
+      setOpen(false);
+      setRestrictionSummary("");
+      setStatus("pending_review");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -280,9 +348,50 @@ function ReviewsStub({ canManage, orgId }: { canManage: boolean; orgId: string |
         </ul>
       )}
       {canManage && (
-        <Button size="sm" variant="outline" disabled={add.isPending} onClick={() => add.mutate()}>
-          Add placeholder review
-        </Button>
+        <>
+          <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+            Add review
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Record rights restriction review</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>Restriction summary</Label>
+                  <Textarea
+                    value={restrictionSummary}
+                    onChange={(e) => setRestrictionSummary(e.target.value)}
+                    placeholder="Describe the rights restriction being reviewed"
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Status</Label>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending_review">Pending review</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="denied">Denied</SelectItem>
+                      <SelectItem value="needs_revision">Needs revision</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button
+                  disabled={add.isPending}
+                  onClick={() => add.mutate({ restriction_summary: restrictionSummary, status })}
+                >
+                  Save review
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
     </div>
   );

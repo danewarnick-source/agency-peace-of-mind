@@ -19,8 +19,9 @@ export interface CompanyRow {
 
 export interface ExecKpis {
   active_companies: number;
-  trial_companies: number;
+  trial_companies: number; // kept for back-compat; always 0 — no trial state
   past_due_companies: number;
+  locked_companies: number;
   mrr_cents: number;
   open_tickets: number;
 }
@@ -33,6 +34,15 @@ export interface CompanyDetail {
   display_acronym: string | null;
   billing_sms_phone: string | null;
 
+  /** Provider-submitted fields captured during signup. Read-only in exec UI. */
+  signup: {
+    contact_name: string | null;
+    contact_phone: string | null;
+    staff_count_at_signup: number | null;
+    billing_interval: string | null; // 'monthly' | 'annual'
+    signup_date: string | null;
+  };
+
   subscription: {
     plan: string;
     status: string;
@@ -42,6 +52,11 @@ export interface CompanyDetail {
     started_at: string;
     canceled_at: string | null;
     notes: string | null;
+    staff_count: number | null;
+    billing_interval: string | null;
+    current_period_end: string | null;
+    past_due_since: string | null;
+    locked_at: string | null;
   } | null;
   usage: {
     staff_count: number;
@@ -76,6 +91,25 @@ export interface TicketRow {
 }
 
 // ───── Helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Hive Standard volume pricing — single rate table, $500 monthly minimum.
+ * Mirrors signup.tsx pricing so MRR is consistent between the provider's
+ * own billing page and the executive overview without a round-trip to Stripe.
+ */
+function ratePerStaff(staff: number): number {
+  if (staff >= 50) return 99;
+  if (staff >= 20) return 109;
+  return 125;
+}
+function liveMonthlyCents(staffCount: number | null | undefined, plan: string | null | undefined): number {
+  // Enterprise plans are operator-priced — fall back to whatever mrr_cents is
+  // recorded on the subscription row (set manually by Hive Exec).
+  if (plan === "enterprise") return -1; // sentinel: caller uses recorded mrr_cents
+  const n = Math.max(0, Math.floor(staffCount ?? 0));
+  if (n <= 0) return 0;
+  return Math.max(500, n * ratePerStaff(n)) * 100;
+}
 
 async function ensureExecutive(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -143,20 +177,36 @@ export const getExecKpis = createServerFn({ method: "GET" })
 
     const { data: subs } = await supabase
       .from("org_subscriptions")
-      .select("status, mrr_cents");
+      .select("status, mrr_cents, staff_count, plan");
     const { count: ticketCount } = await supabase
       .from("org_support_tickets")
       .select("id", { count: "exact", head: true })
       .in("status", ["submitted", "in_progress", "waiting_customer"]);
 
-    const rows = (subs ?? []) as Array<{ status: string; mrr_cents: number }>;
+    const rows = (subs ?? []) as Array<{
+      status: string;
+      mrr_cents: number | null;
+      staff_count: number | null;
+      plan: string | null;
+    }>;
+
+    // MRR is computed live from current staff_count + volume tier — falls
+    // back to the recorded mrr_cents only for Enterprise (operator-priced)
+    // or when staff_count is somehow missing on legacy rows.
+    const mrr_cents = rows
+      .filter((r) => r.status === "active" || r.status === "past_due")
+      .reduce((sum, r) => {
+        const live = liveMonthlyCents(r.staff_count, r.plan);
+        const value = live >= 0 ? live : (r.mrr_cents ?? 0);
+        return sum + value;
+      }, 0);
+
     return {
       active_companies: rows.filter((r) => r.status === "active").length,
-      trial_companies: rows.filter((r) => r.status === "trial").length,
+      trial_companies: 0, // no trial state in Hive — providers pay at signup
       past_due_companies: rows.filter((r) => r.status === "past_due").length,
-      mrr_cents: rows
-        .filter((r) => r.status === "active" || r.status === "past_due")
-        .reduce((s, r) => s + (r.mrr_cents || 0), 0),
+      locked_companies: rows.filter((r) => r.status === "locked").length,
+      mrr_cents,
       open_tickets: ticketCount ?? 0,
     };
   });
@@ -177,7 +227,7 @@ export const listCompanies = createServerFn({ method: "GET" })
 
     const { data: subs } = await supabase
       .from("org_subscriptions")
-      .select("organization_id, plan, status, mrr_cents, renewal_date, trial_ends_at");
+      .select("organization_id, plan, status, mrr_cents, renewal_date, trial_ends_at, staff_count, billing_interval");
     const subByOrg = new Map<string, NonNullable<typeof subs>[number]>(
       (subs ?? []).map((s) => [s.organization_id, s]),
     );
@@ -215,18 +265,27 @@ export const listCompanies = createServerFn({ method: "GET" })
     return ((orgs ?? []) as Array<{ id: string; name: string }>).map((o) => {
       const sub = subByOrg.get(o.id);
       const c = countByOrg.get(o.id);
-      const status = sub?.status ?? "trial";
+      // No subscription row → show as inactive (was 'trial' before — Hive has
+      // no trial state). For accounts with a sub, surface the real status.
+      const status = sub?.status ?? "inactive";
       const tickets = c?.tickets ?? 0;
       let health: CompanyRow["health"] = "good";
-      if (status === "past_due" || tickets >= 3) health = "risk";
-      else if (status === "trial" || tickets >= 1) health = "warn";
+      if (status === "locked" || status === "past_due" || tickets >= 3) health = "risk";
+      else if (status === "inactive" || tickets >= 1) health = "warn";
+
+      // Live MRR — recompute from current sub.staff_count + volume tier so
+      // the exec overview reflects today's billable basis, not a signup snapshot.
+      const subStaff = (sub as { staff_count: number | null } | null)?.staff_count ?? null;
+      const live = liveMonthlyCents(subStaff, sub?.plan ?? null);
+      const mrr_cents =
+        sub == null ? 0 : live >= 0 ? live : (sub.mrr_cents ?? 0);
 
       return {
         organization_id: o.id,
         name: o.name,
-        plan: sub?.plan ?? "starter",
+        plan: sub?.plan ?? "hive_standard",
         status,
-        mrr_cents: sub?.mrr_cents ?? 0,
+        mrr_cents,
         renewal_date: sub?.renewal_date ?? null,
         trial_ends_at: sub?.trial_ends_at ?? null,
         staff_count: c?.staff ?? 0,
@@ -258,18 +317,31 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
 
     const { data: org, error: orgErr } = await supabase
       .from("organizations")
-      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone")
+      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, created_by, created_at")
       .eq("id", data.organizationId)
       .maybeSingle();
     if (orgErr) throw orgErr;
     if (!org) throw new Error("Organization not found.");
 
-
     const { data: sub } = await supabase
       .from("org_subscriptions")
-      .select("plan, status, mrr_cents, renewal_date, trial_ends_at, started_at, canceled_at, notes")
+      .select(
+        "plan, status, mrr_cents, renewal_date, trial_ends_at, started_at, canceled_at, notes, staff_count, billing_interval, current_period_end, past_due_since, locked_at",
+      )
       .eq("organization_id", data.organizationId)
       .maybeSingle();
+
+    // Signup contact name comes from the org creator's profile.
+    const createdBy = (org as { created_by: string | null }).created_by;
+    let contactName: string | null = null;
+    if (createdBy) {
+      const { data: creator } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", createdBy)
+        .maybeSingle();
+      contactName = (creator as { full_name: string | null } | null)?.full_name ?? null;
+    }
 
     const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const since7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
@@ -318,6 +390,14 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       ((activeStaffRes.data ?? []) as Array<{ staff_id: string }>).map((r) => r.staff_id),
     );
 
+    // Live MRR override: when the subscription is on Hive Standard, the
+    // operator should see what the provider is currently billable for today,
+    // not whatever was stamped at signup. Enterprise plans keep the stored value.
+    const subStaff = (sub as { staff_count: number | null } | null)?.staff_count ?? null;
+    const subPlan = (sub as { plan: string | null } | null)?.plan ?? null;
+    const live = liveMonthlyCents(subStaff, subPlan);
+    const liveMrr = live >= 0 ? live : (sub?.mrr_cents ?? 0);
+
     return {
       organization_id: org.id,
       name: org.name,
@@ -325,17 +405,31 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       dba_name: (org as { dba_name: string | null }).dba_name ?? null,
       display_acronym: (org as { display_acronym: string | null }).display_acronym ?? null,
       billing_sms_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
+      signup: {
+        contact_name: contactName,
+        contact_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
+        staff_count_at_signup: subStaff,
+        billing_interval: (sub as { billing_interval: string | null } | null)?.billing_interval ?? null,
+        signup_date:
+          (sub as { started_at: string | null } | null)?.started_at ??
+          (org as { created_at: string | null }).created_at ??
+          null,
+      },
       subscription: sub
-
         ? {
             plan: sub.plan,
             status: sub.status,
-            mrr_cents: sub.mrr_cents,
+            mrr_cents: liveMrr,
             renewal_date: sub.renewal_date,
             trial_ends_at: sub.trial_ends_at,
             started_at: sub.started_at,
             canceled_at: sub.canceled_at,
             notes: sub.notes,
+            staff_count: subStaff,
+            billing_interval: (sub as { billing_interval: string | null }).billing_interval,
+            current_period_end: (sub as { current_period_end: string | null }).current_period_end,
+            past_due_since: (sub as { past_due_since: string | null }).past_due_since,
+            locked_at: (sub as { locked_at: string | null }).locked_at,
           }
         : null,
       usage: {
@@ -366,8 +460,8 @@ function validateSubPatch(input: unknown): {
   if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id.");
   const patch = (i.patch ?? {}) as Record<string, unknown>;
   const out: ReturnType<typeof validateSubPatch>["patch"] = {};
-  const plans = ["starter", "pro", "enterprise", "custom"];
-  const statuses = ["trial", "active", "past_due", "canceled", "paused"];
+  const plans = ["hive_standard", "enterprise"];
+  const statuses = ["active", "past_due", "locked", "cancelled", "canceled"];
   if (typeof patch.plan === "string" && plans.includes(patch.plan)) out.plan = patch.plan;
   if (typeof patch.status === "string" && statuses.includes(patch.status)) out.status = patch.status;
   if (typeof patch.mrr_cents === "number" && patch.mrr_cents >= 0 && patch.mrr_cents < 100_000_000)

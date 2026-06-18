@@ -1098,7 +1098,8 @@ function Step6Payment({
       // Subscription row — shape matches Stripe's data model so a real
       // integration only needs to populate the stripe_* ids via webhooks.
       // Card details are intentionally never stored.
-      await supabase.from("org_subscriptions").upsert(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from("org_subscriptions") as any).upsert(
         {
           organization_id: orgId,
           plan: "hive_standard", // single standard plan; "enterprise" is operator-set later

@@ -39,19 +39,6 @@ type Mapping = { id: string; bank_account_id: string; client_id: string };
 type Client = { id: string; first_name: string; last_name: string };
 type PbaAccount = { id: string; client_id: string };
 
-const MOCK_PLAID_ACCOUNTS: Omit<BankAccount, "id">[] = [
-  { bank_name: "Chase Business", account_type: "Checking", mask: "4892", plaid_account_id: "plaid_acct_001", institution_logo: "🏦" },
-  { bank_name: "Wells Fargo Commercial", account_type: "Operating", mask: "1107", plaid_account_id: "plaid_acct_002", institution_logo: "🏛️" },
-  { bank_name: "Bank of America Trust", account_type: "Fiduciary Sub-Account", mask: "8821", plaid_account_id: "plaid_acct_003", institution_logo: "🏦" },
-  { bank_name: "Mountain America CU", account_type: "Sub-Trust Pool", mask: "0455", plaid_account_id: "plaid_acct_004", institution_logo: "🏔️" },
-];
-
-const SSI_DEPOSIT_FEED = [
-  { memo: "SSA TREAS 310 XXSOC SEC", amount: 943.00, counterparty: "Social Security Administration" },
-  { memo: "SOC SEC SSI DIRECT DEP", amount: 1023.50, counterparty: "SSA Direct Deposit" },
-  { memo: "SSA TREAS 310 BENEFIT", amount: 877.25, counterparty: "Social Security Administration" },
-  { memo: "SSI DIRECT FED BENEFIT", amount: 794.00, counterparty: "SSI Federal Benefit" },
-];
 
 function BankMappingPage() {
   const { data: org } = useCurrentOrg();
@@ -108,16 +95,9 @@ function BankMappingPage() {
 
   const linkBank = useMutation({
     mutationFn: async () => {
-      // Simulated Plaid Link token exchange
-      await new Promise((r) => setTimeout(r, 1400));
-      const existing = new Set((banks.data ?? []).map((b) => b.plaid_account_id));
-      const fresh = MOCK_PLAID_ACCOUNTS.filter((a) => !existing.has(a.plaid_account_id));
-      if (!fresh.length) return { added: 0 };
-      const { error } = await sb.from("agency_bank_accounts").insert(
-        fresh.map((a) => ({ ...a, organization_id: orgId, linked_by: user?.id })),
-      );
-      if (error) throw error;
-      return { added: fresh.length };
+      // Plaid integration is not yet live. Refuse to insert simulated accounts
+      // into real tables — doing so contaminates client rep-payee ledgers.
+      throw new Error("Bank connection is not available yet — Plaid integration is pending.");
     },
     onSuccess: (r) => {
       toast.success(`🔗 Plaid handshake complete — ${r.added} sub-accounts discovered`);
@@ -162,33 +142,9 @@ function BankMappingPage() {
 
   const sync = useMutation({
     mutationFn: async () => {
-      const liveMaps = mappings.data ?? [];
-      if (!liveMaps.length) throw new Error("No mapped accounts to sync");
-      await new Promise((r) => setTimeout(r, 1200));
-      let posted = 0;
-      for (const map of liveMaps) {
-        const feed = SSI_DEPOSIT_FEED[Math.floor(Math.random() * SSI_DEPOSIT_FEED.length)];
-        const isSSI = /(SSA TREAS|SOC SEC|SSI DIRECT)/i.test(feed.memo);
-        if (!isSSI) continue;
-        const acctId = await ensurePbaAccount(map.client_id);
-        const { error } = await sb.from("pba_transactions").insert({
-          organization_id: orgId,
-          account_id: acctId,
-          txn_type: "deposit",
-          amount: feed.amount,
-          occurred_on: new Date().toISOString().slice(0, 10),
-          counterparty: feed.counterparty,
-          memo: feed.memo,
-          auto_reconciled: true,
-          source: "bank_feed_ssi",
-          created_by: user?.id,
-        });
-        if (error) throw error;
-        posted++;
-        // Simulated QuickBooks Online push (IDs only — never log amounts/memos)
-        console.info("[QBO Bridge] Deposit posted", { client_id: map.client_id });
-      }
-      return { posted };
+      // SSI deposit sync is not yet live. Refuse to write simulated deposits
+      // into the real PBA ledger.
+      throw new Error("Deposit sync is not available yet — bank feed integration is pending.");
     },
     onSuccess: (r) => {
       toast.success(`⚡ ${r.posted} SSI deposits auto-reconciled & pushed to QuickBooks Online`);
@@ -234,6 +190,11 @@ function BankMappingPage() {
       />
 
       {/* Mapping grid */}
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+        Bank connection and deposit sync are coming soon. This area is not yet
+        connected to a live bank feed — no transactions will be imported.
+      </div>
+
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">

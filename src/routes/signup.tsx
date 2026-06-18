@@ -382,7 +382,7 @@ function Step1Account({
         setBusy(false);
         return;
       }
-      toast.success("Verification code sent — check your inbox.");
+      toast.success("Account created — let's set up your business.");
       setBusy(false);
       onNext();
     } catch (e) {

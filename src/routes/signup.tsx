@@ -306,7 +306,7 @@ function SignupPage() {
                 form={form}
                 onBack={goBack}
                 onComplete={async () => {
-                  await navigate({ to: "/dashboard", search: { welcome: "1" } as never });
+                  await navigate({ to: "/dashboard", search: { welcome: "1" } as never }).catch(() => navigate({ to: "/dashboard" }));
                 }}
               />
             )}

@@ -3,6 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
+import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
 import {
   Database,
   FileText,
@@ -149,6 +151,9 @@ export function NectarDocsPage() {
 
   return (
     <div className="space-y-4">
+      <OnboardingReturnBar />
+      <OnboardingGuidanceBanner step={6} />
+
       <header className="space-y-1">
         <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
           <Database className="h-3.5 w-3.5" /> NECTAR · Client &amp; Staff Documents

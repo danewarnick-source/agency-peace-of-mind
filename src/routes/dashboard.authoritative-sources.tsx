@@ -55,6 +55,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
+import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
+import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
 import { ingestDocument } from "@/lib/nectar-documents.functions";
 import {
   listAuthoritativeSources,
@@ -194,7 +196,10 @@ export function AuthoritativeSourcesPage() {
 
   const content = (
     <div className="space-y-6">
+      <OnboardingReturnBar />
+      <OnboardingGuidanceBanner step={1} />
       <header className="flex flex-col gap-3">
+
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <ShieldCheck className="h-4 w-4" />
           Foundation · Authoritative Sources

@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
+import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
 
 import { RequirePermission } from "@/components/rbac-guard";
 // Smart Import replaces the legacy NECTAR Bulk Importer dialog.
@@ -281,6 +283,9 @@ export function EmployeesPage() {
 
   return (
     <div className="space-y-6">
+      <OnboardingReturnBar />
+      <OnboardingGuidanceBanner step={3} />
+
       <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <div>
           <h2 className="text-base font-semibold">Team members</h2>

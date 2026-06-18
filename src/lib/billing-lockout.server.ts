@@ -9,6 +9,7 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { sendBillingEmail } from "./billing-notifications.server";
+import { sendBillingSms } from "./billing-sms.server";
 
 export type PaymentEventType =
   | "payment_failed"

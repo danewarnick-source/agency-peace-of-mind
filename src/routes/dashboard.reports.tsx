@@ -173,7 +173,7 @@ function StandardReports() {
       }));
 
     const fromModules = (moduleProgress ?? []).map((r) => {
-      const row = r as ModuleProgressRow;
+      const row = r as unknown as ModuleProgressRow;
       return {
         source: "Training module",
         title: row.training_modules?.title ?? row.module_id,

@@ -207,6 +207,7 @@ export async function lockAccount(orgId: string, reason: string): Promise<{ ok: 
   await Promise.all([
     sendBillingEmail({ orgId, kind: "account_locked", data: { reason } }),
     sendBillingEmail({ orgId, kind: "account_locked_staff", data: { reason } }),
+    sendBillingSms({ orgId, kind: "account_locked" }),
   ]);
 
   return { ok: true };

@@ -166,15 +166,16 @@ export function NectarOnboardingPanel({
 
   const steps = useMemo(
     () => [
-      { n: 1, key: "sources", title: "Upload your authoritative sources", done: step1Complete, locked: false },
-      { n: 2, key: "profile", title: "Tell NECTAR about your agency", done: step2Complete, locked: !step1Complete },
-      { n: 3, key: "staff", title: "Add your staff", done: step3Complete, locked: !step1Complete },
-      { n: 4, key: "clients", title: "Add your clients", done: step4Complete, locked: !step1Complete },
-      { n: 5, key: "services", title: "Configure your service codes", done: step5Complete, locked: !step1Complete },
-      { n: 6, key: "docs", title: "Company Documents hub", done: step6Complete, locked: !step1Complete },
+      { n: 1, key: "sources", title: "Upload your authoritative sources", done: step1Complete, locked: false, href: "/dashboard/authoritative-sources" as const },
+      { n: 2, key: "profile", title: "Tell NECTAR about your agency", done: step2Complete, locked: !step1Complete, href: "/dashboard/nectar-company-profile" as const },
+      { n: 3, key: "staff", title: "Add your staff", done: step3Complete, locked: !step1Complete, href: "/dashboard/employees" as const },
+      { n: 4, key: "clients", title: "Add your clients", done: step4Complete, locked: !step1Complete, href: "/dashboard/clients" as const },
+      { n: 5, key: "services", title: "Configure your service codes", done: step5Complete, locked: !step1Complete, href: "/dashboard/settings/service-codes" as const },
+      { n: 6, key: "docs", title: "Company Documents hub", done: step6Complete, locked: !step1Complete, href: "/dashboard/nectar-docs" as const },
     ],
     [step1Complete, step2Complete, step3Complete, step4Complete, step5Complete, step6Complete],
   );
+
 
   const completedCount = steps.filter((s) => s.done).length;
   const allComplete = completedCount === steps.length;

@@ -102,7 +102,7 @@ function HiveLandingPage() {
             </a>
             <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               Pricing
-            </a>
+            </Link>
             <a href="#faq" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               FAQ
             </a>

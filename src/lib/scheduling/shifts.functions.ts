@@ -44,10 +44,6 @@ async function assertActiveBillingCode(
   }
 }
 
-// FLAGGED: profiles.has_passed_launchpad — this column does not exist in the
-// generated types (types.ts). Verify it exists in the live DB before relying
-// on this block. Until the column is present, data.has_passed_launchpad will
-// be undefined (not false), so the guard will not fire.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function assertLaunchpadPassed(supabase: any, staffId: string): Promise<void> {
   const { data, error } = await supabase
@@ -56,7 +52,7 @@ async function assertLaunchpadPassed(supabase: any, staffId: string): Promise<vo
     .eq("id", staffId)
     .maybeSingle();
   if (error) throw error;
-  if (data && data.has_passed_launchpad === false) {
+  if (!data?.has_passed_launchpad) {
     throw new Error(
       "This staff member has not completed Launchpad and cannot be assigned as a sole worker.",
     );

@@ -112,7 +112,7 @@ export function useGeneralShift() {
   );
 
   const stop = useCallback(
-    (opts?: { note?: string }) => {
+    (shiftId: string, opts?: { note?: string }) => {
       if (!userId) return;
       (async () => {
         const patch: Record<string, unknown> = {
@@ -122,8 +122,8 @@ export function useGeneralShift() {
         const { error } = await db
           .from("general_shifts")
           .update(patch)
-          .eq("user_id", userId)
-          .is("clock_out_timestamp", null);
+          .eq("id", shiftId)
+          .eq("user_id", userId);
         if (error) console.error("[general-shift] stop failed", error);
         invalidate();
       })().catch((e) => console.error("[general-shift] stop failed", e));
@@ -134,7 +134,7 @@ export function useGeneralShift() {
   // Debounced so typing in the note box doesn't hit the server per keystroke;
   // the final note is also persisted on stop().
   const updateNote = useCallback(
-    (note: string) => {
+    (shiftId: string, note: string) => {
       if (!userId) return;
       // Optimistic local update so the UI reflects the note immediately.
       qc.setQueryData<GeneralShift | null>(["general-shift", userId], (prev) =>
@@ -146,8 +146,8 @@ export function useGeneralShift() {
           db
             .from("general_shifts")
             .update({ note: note.trim() })
-            .eq("user_id", userId)
-            .is("clock_out_timestamp", null),
+            .eq("id", shiftId)
+            .eq("user_id", userId),
         ).catch((e) => console.error("[general-shift] note update failed", e));
       }, 700);
     },

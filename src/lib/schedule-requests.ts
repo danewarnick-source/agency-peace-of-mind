@@ -252,6 +252,7 @@ export async function approveSwap(
   shift: {
     client_id: string;
     job_code: string | null;
+    service_code?: string | null;
     shift_type: string;
     starts_at: string;
     ends_at: string;
@@ -267,6 +268,7 @@ export async function approveSwap(
     staff_id: resolvedToStaffId,
     client_id: shift.client_id,
     job_code: shift.job_code ?? "",
+    service_code: shift.service_code ?? shift.job_code ?? "",
     shift_type: shift.shift_type,
     starts_at: shift.starts_at,
     ends_at: shift.ends_at,

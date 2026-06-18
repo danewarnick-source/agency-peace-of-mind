@@ -109,10 +109,10 @@ export function NectarOnboardingPanel({
 
   // --- Step completion ------------------------------------------------------
   const step1Complete = c.sowCount > 0 && c.attestationCount > 0;
-  const step2Complete = profileSavedLocal;
+  const step2Complete = (c as any).profileSaved || profileSavedLocal;
   const step3Complete = c.memberCount > 1; // beyond the founding owner
   const step4Complete = c.clientCount > 0;
-  const step5Complete = servicesVisited || c.serviceCodeCount > 0;
+  const step5Complete = (c as any).serviceCodesCount > 0;
   const step6Complete = c.docsCount > 0;
 
   const steps = useMemo(
@@ -159,25 +159,23 @@ export function NectarOnboardingPanel({
   };
 
   const saveProfile = async () => {
-    writeLS(lsKey(orgId, "profile"), profileDraft);
-    writeLS(lsKey(orgId, "profile_saved"), true);
-    setProfileSavedLocal(true);
-    setActiveStepOverride(3);
-    // Persist to DB — columns added via SQL migration; fails silently until then.
     try {
       await supabase
         .from("organizations")
         .update({
-          nectar_services: profileDraft.services,
-          nectar_approx_client_count: profileDraft.clientCount || null,
-          nectar_approx_staff_count: profileDraft.staffCount || null,
-          nectar_service_area: profileDraft.serviceArea || null,
-          nectar_specializations: profileDraft.specializations || null,
+          services_offered: profileDraft.services ?? [],
+          approx_client_count: Number(profileDraft.clientCount) || null,
+          specializations: profileDraft.specializations?.trim() || null,
+          nectar_profile_saved_at: new Date().toISOString(),
         } as any)
-        .eq("id", orgId!);
-    } catch {
-      // graceful failure until migration is applied
+        .eq("id", orgId);
+    } catch (err) {
+      console.warn("[onboarding] nectar profile DB write failed — localStorage fallback active", err);
     }
+    writeLS(lsKey(orgId, "profile"), profileDraft);
+    writeLS(lsKey(orgId, "profile_saved"), true);
+    setProfileSavedLocal(true);
+    setActiveStepOverride(3);
   };
 
   const markServicesVisited = () => {

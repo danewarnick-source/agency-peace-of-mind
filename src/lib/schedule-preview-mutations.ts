@@ -29,6 +29,7 @@ export type ShiftDraft = {
   staff_id: string;
   client_id: string;
   job_code: string;
+  service_code?: string;
   shift_type: string;
   starts_at: string; // ISO
   ends_at: string;   // ISO
@@ -89,6 +90,7 @@ function buildPayload(draft: ShiftDraft): Record<string, unknown> {
     staff_id: draft.staff_id,
     client_id: draft.client_id,
     job_code: draft.job_code,
+    service_code: draft.service_code ?? draft.job_code,
     shift_type: draft.shift_type,
     starts_at: draft.starts_at,
     ends_at: draft.ends_at,
@@ -311,7 +313,7 @@ export async function updateSeries(
   // Bulk simple-fields update (everything except per-row time-of-day).
   const flat: Record<string, unknown> = {};
   if (patch.staff_id) flat.staff_id = patch.staff_id;
-  if (patch.job_code) flat.job_code = patch.job_code;
+  if (patch.job_code) { flat.job_code = patch.job_code; flat.service_code = patch.job_code; }
   if (patch.shift_type) flat.shift_type = patch.shift_type;
   if (patch.notes !== undefined) flat.notes = patch.notes?.toString().trim() || null;
   if (patch.published !== undefined) flat.published = patch.published;

@@ -230,6 +230,8 @@ function SubscriptionPage() {
         onUpdate={() => setModalOpen(true)}
       />
 
+      <ContactAlertsCard orgId={orgId} />
+
       <BillingHistoryCard events={events} loading={eventsQuery.isLoading} />
 
       {import.meta.env.DEV && <DevPanel orgId={orgId} onAfter={refreshAll} />}

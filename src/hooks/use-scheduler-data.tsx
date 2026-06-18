@@ -144,7 +144,7 @@ export function useSchedulerData(weekStart: Date) {
 export function startOfWeek(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
-  x.setDate(x.getDate() - x.getDay());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); // Monday-aligned (Mon=0)
   return x;
 }
 export function startOfDay(d: Date): Date {

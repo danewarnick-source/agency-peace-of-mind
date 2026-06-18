@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, BookOpenCheck } from "lucide-react";
 import { fmtUSD } from "@/lib/billing-units";
+import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
+import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
 
 export const Route = createFileRoute("/dashboard/settings/service-codes")({
   head: () => ({ meta: [{ title: "Service Code Registry — Settings" }] }),
@@ -86,6 +88,9 @@ function ServiceCodeRegistryPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      <OnboardingReturnBar />
+      <OnboardingGuidanceBanner step={5} />
+
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">

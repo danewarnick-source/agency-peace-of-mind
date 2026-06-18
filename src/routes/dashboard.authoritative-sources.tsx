@@ -55,6 +55,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
+import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
+import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
 import { ingestDocument } from "@/lib/nectar-documents.functions";
 import {
   listAuthoritativeSources,

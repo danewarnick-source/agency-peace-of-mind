@@ -149,6 +149,9 @@ export function NectarDocsPage() {
 
   return (
     <div className="space-y-4">
+      <OnboardingReturnBar />
+      <OnboardingGuidanceBanner step={6} />
+
       <header className="space-y-1">
         <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
           <Database className="h-3.5 w-3.5" /> NECTAR · Client &amp; Staff Documents

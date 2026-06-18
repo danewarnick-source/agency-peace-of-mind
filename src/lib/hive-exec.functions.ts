@@ -706,3 +706,158 @@ export const updateOrgNames = createServerFn({ method: "POST" })
 
     return { ok: true, changed: diffs.length };
   });
+
+// ───── Account contact (editable from exec view + provider settings) ───────
+
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import { normalizeUSPhoneToE164 } from "@/lib/us-phone";
+
+function validateAccountContactInput(input: unknown): {
+  organizationId: string;
+  patch: { name?: string | null; email?: string | null; phone?: string | null };
+} {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const organizationId = typeof i.organizationId === "string" ? i.organizationId : "";
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id.");
+  const p = (i.patch ?? {}) as Record<string, unknown>;
+  const out: { name?: string | null; email?: string | null; phone?: string | null } = {};
+
+  if ("name" in p) {
+    if (p.name === null || p.name === "") out.name = null;
+    else if (typeof p.name === "string") {
+      const t = p.name.trim();
+      if (!t) out.name = null;
+      else if (t.length > 200) throw new Error("Contact name too long.");
+      else out.name = t;
+    }
+  }
+  if ("email" in p) {
+    if (p.email === null || p.email === "") out.email = null;
+    else if (typeof p.email === "string") {
+      const t = p.email.trim();
+      if (!t) out.email = null;
+      else {
+        if (t.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) {
+          throw new Error("Enter a valid email address.");
+        }
+        out.email = t;
+      }
+    }
+  }
+  if ("phone" in p) {
+    if (p.phone === null || p.phone === "") out.phone = null;
+    else if (typeof p.phone === "string") {
+      const t = p.phone.trim();
+      if (!t) out.phone = null;
+      else {
+        const e164 = normalizeUSPhoneToE164(t);
+        if (!e164) throw new Error("Enter a valid 10-digit US phone number.");
+        out.phone = e164;
+      }
+    }
+  }
+  return { organizationId, patch: out };
+}
+
+/**
+ * Update the org's account contact (name, email, phone).
+ * Authorized for either: (a) a HIVE Executive, or (b) an admin/manager of
+ * the target organization. Phone is stored on `billing_sms_phone` so the
+ * billing SMS pipeline keeps working; name/email live on the new
+ * `account_contact_*` columns.
+ */
+export const updateAccountContact = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validateAccountContactInput)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    // AuthZ: exec OR org admin/manager.
+    const { data: execRow } = await supabase
+      .from("hive_executives")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .maybeSingle();
+    const isExec = !!execRow;
+    if (!isExec) {
+      await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+    }
+
+    const updates: Record<string, unknown> = {};
+    if ("name" in data.patch) updates.account_contact_name = data.patch.name ?? null;
+    if ("email" in data.patch) updates.account_contact_email = data.patch.email ?? null;
+    if ("phone" in data.patch) updates.billing_sms_phone = data.patch.phone ?? null;
+
+    if (Object.keys(updates).length === 0) return { ok: true, changed: 0 };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from("organizations").update(updates as any).eq("id", data.organizationId);
+    if (error) throw error;
+
+    if (isExec) {
+      await audit(
+        supabase,
+        userId,
+        "update_account_contact",
+        data.organizationId,
+        `Updated account contact: ${Object.keys(updates).join(", ")}`,
+      );
+    }
+    return { ok: true, changed: Object.keys(updates).length };
+  });
+
+/**
+ * Read the org's account contact (name, email, phone). Available to any
+ * member of the organization so the provider settings page can show it.
+ */
+export const getAccountContact = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    const i = (input ?? {}) as Record<string, unknown>;
+    const organizationId = typeof i.organizationId === "string" ? i.organizationId : "";
+    if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id.");
+    return { organizationId };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: execRow } = await supabase
+      .from("hive_executives").select("id").eq("user_id", userId).eq("active", true).maybeSingle();
+    if (!execRow) {
+      await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    }
+    const { data: org, error } = await supabase
+      .from("organizations")
+      .select("account_contact_name, account_contact_email, billing_sms_phone, created_by")
+      .eq("id", data.organizationId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!org) throw new Error("Organization not found.");
+    const row = org as {
+      account_contact_name: string | null;
+      account_contact_email: string | null;
+      billing_sms_phone: string | null;
+      created_by: string | null;
+    };
+    // Backfill display values from creator on the fly for legacy orgs.
+    let name = row.account_contact_name;
+    let email = row.account_contact_email;
+    if ((!name || !email) && row.created_by) {
+      if (!name) {
+        const { data: p } = await supabase.from("profiles").select("full_name").eq("id", row.created_by).maybeSingle();
+        name = (p as { full_name: string | null } | null)?.full_name ?? null;
+      }
+      if (!email) {
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: au } = await supabaseAdmin.auth.admin.getUserById(row.created_by);
+          email = au?.user?.email ?? null;
+        } catch { /* ignore */ }
+      }
+    }
+    return {
+      name: name ?? null,
+      email: email ?? null,
+      phone: row.billing_sms_phone ?? null,
+    };
+  });

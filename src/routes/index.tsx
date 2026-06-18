@@ -93,19 +93,19 @@ function HiveLandingPage() {
           <div className="hidden items-center gap-8 md:flex">
             <a href="#modules" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               Platform
-            </Link>
+            </a>
             <a href="#nectar" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               NECTAR™
-            </Link>
+            </a>
             <a href="#compliance" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               Compliance
-            </Link>
+            </a>
             <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               Pricing
-            </Link>
+            </a>
             <a href="#faq" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               FAQ
-            </Link>
+            </a>
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
@@ -151,7 +151,7 @@ function HiveLandingPage() {
                   className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-surface-warm"
                 >
                   {label}
-                </Link>
+                </a>
               ))}
               <Link
                 to="/pricing"
@@ -159,10 +159,10 @@ function HiveLandingPage() {
                 className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-surface-warm"
               >
                 Pricing
-              </Link>
+              </a>
               <div className="mt-2 flex gap-2 pt-2">
                 <Button asChild variant="outline" size="sm" className="flex-1">
-                  <Link to="/login">Sign in</Link>
+                  <Link to="/login">Sign in</a>
                 </Button>
                 <Button
                   asChild

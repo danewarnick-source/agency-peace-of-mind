@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,9 +73,11 @@ function StandardReports() {
     enabled: !!org,
     queryKey: ["report-module-progress", org?.organization_id],
     queryFn: async () => {
-      // NOTE: user_training_progress RLS currently returns only the
-      // authenticated user's own rows. Full org-wide reporting requires
-      // a widened RLS policy — tracked as a future improvement.
+      // Org admins/managers can read training progress for all active members of
+      // their org via RLS policy "org admins read member training progress"
+      // (user_training_progress.user_id -> organization_members). Employees read
+      // only their own rows. No org filter is applied here — the table has no
+      // organization_id column; scoping is enforced entirely by RLS.
       const { data } = await supabase
         .from("user_training_progress")
         .select("user_id, module_id, is_completed, completed_at, training_modules(title, category)")
@@ -83,6 +86,34 @@ function StandardReports() {
       return data ?? [];
     },
   });
+
+  const progressUserIds = useMemo(
+    () => [...new Set((moduleProgress ?? []).map((r: any) => r.user_id))],
+    [moduleProgress],
+  );
+
+  const { data: progressProfiles } = useQuery({
+    enabled: progressUserIds.length > 0,
+    queryKey: ["report-progress-profiles", progressUserIds],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", progressUserIds);
+      return data ?? [];
+    },
+  });
+
+  const progressNameMap = useMemo(
+    () =>
+      new Map(
+        (progressProfiles ?? []).map((p) => [
+          p.id,
+          p.full_name ?? p.email ?? p.id.slice(0, 8),
+        ]),
+      ),
+    [progressProfiles],
+  );
 
   // …while Certification Renewals comes from external_certifications (uploaded
   // staff credentials with an expiry), a completely different dataset.
@@ -140,7 +171,7 @@ function StandardReports() {
     const moduleRows = (moduleProgress ?? []).map((r) => {
       const row = r as unknown as ModuleProgressRow;
       return [
-        row.user_id,
+        progressNameMap.get(row.user_id) ?? row.user_id,
         row.training_modules?.title ?? row.module_id,
         row.training_modules?.category ?? "",
         "completed",
@@ -179,7 +210,7 @@ function StandardReports() {
         title: row.training_modules?.title ?? row.module_id,
         category: row.training_modules?.category ?? "",
         completed_at: row.completed_at ?? "",
-        user_id: row.user_id,
+        user_id: progressNameMap.get(row.user_id) ?? row.user_id,
       };
     });
 
@@ -215,9 +246,9 @@ function StandardReports() {
     if (!list.length) return toast.error("No module completions to export yet");
     download(
       "module-completions",
-      ["user_id", "module_id", "module_title", "category", "completed_at"],
+      ["staff", "module_id", "module_title", "category", "completed_at"],
       list.map((m) => [
-        m.user_id, m.module_id, moduleTitle(m), moduleCategory(m), m.completed_at ?? "",
+        progressNameMap.get(m.user_id) ?? m.user_id, m.module_id, moduleTitle(m), moduleCategory(m), m.completed_at ?? "",
       ]),
     );
   };

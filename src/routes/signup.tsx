@@ -48,7 +48,6 @@ const inputStyle: React.CSSProperties = {
 
 const STEPS = [
   "Account",
-  "Verify email",
   "Your business",
   "Team & pricing",
   "Staff training",

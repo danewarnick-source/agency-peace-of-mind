@@ -9,6 +9,7 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { sendBillingEmail } from "./billing-notifications.server";
+import { sendBillingSms } from "./billing-sms.server";
 
 export type PaymentEventType =
   | "payment_failed"
@@ -121,6 +122,13 @@ export async function recordPaymentFailure(
     data: { reason },
   });
 
+  // SMS day-0 declined notice (highest urgency).
+  await sendBillingSms({
+    orgId,
+    kind: "payment_declined_day0",
+    amountCents: sub.mrr_cents ?? null,
+  });
+
   return { ok: true, failure_count: nextFailureCount };
 }
 
@@ -199,6 +207,7 @@ export async function lockAccount(orgId: string, reason: string): Promise<{ ok: 
   await Promise.all([
     sendBillingEmail({ orgId, kind: "account_locked", data: { reason } }),
     sendBillingEmail({ orgId, kind: "account_locked_staff", data: { reason } }),
+    sendBillingSms({ orgId, kind: "account_locked" }),
   ]);
 
   return { ok: true };
@@ -224,28 +233,49 @@ export async function unlockAccount(orgId: string): Promise<{ ok: boolean }> {
 }
 
 // ───── checkAndLockPastDueAccounts ───────────────────────────────────────
-export async function checkAndLockPastDueAccounts(): Promise<{ locked: number; org_ids: string[] }> {
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+export async function checkAndLockPastDueAccounts(): Promise<{
+  locked: number;
+  org_ids: string[];
+  warned_9day: number;
+}> {
+  const now = Date.now();
+  const cutoff = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabaseAdmin
     .from("org_subscriptions")
     .select("id, organization_id, past_due_since")
     .is("locked_at", null)
-    .not("past_due_since", "is", null)
-    .lt("past_due_since", cutoff);
+    .not("past_due_since", "is", null);
   if (error) throw new Error(error.message);
 
-  const rows = data ?? [];
+  const rows = (data ?? []) as Array<{ organization_id: string; past_due_since: string }>;
   const lockedIds: string[] = [];
+  let warned9day = 0;
   for (const row of rows) {
-    try {
-      await lockAccount(row.organization_id, "Payment past due > 30 days");
-      lockedIds.push(row.organization_id);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("[checkAndLockPastDueAccounts] failed to lock", row.organization_id, err);
+    const pastDueMs = new Date(row.past_due_since).getTime();
+    const daysPastDue = Math.floor((now - pastDueMs) / 86_400_000);
+
+    if (row.past_due_since < cutoff) {
+      try {
+        await lockAccount(row.organization_id, "Payment past due > 30 days");
+        lockedIds.push(row.organization_id);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("[checkAndLockPastDueAccounts] failed to lock", row.organization_id, err);
+      }
+      continue;
+    }
+
+    // Day-21 SMS — 9 days before lockout. Send once in the 21-22 day window;
+    // sendBillingSms dedupes via payment_events so re-running the cron is safe.
+    if (daysPastDue >= 21 && daysPastDue < 23) {
+      const r = await sendBillingSms({
+        orgId: row.organization_id,
+        kind: "payment_declined_day21",
+      });
+      if (r.sent) warned9day += 1;
     }
   }
-  return { locked: lockedIds.length, org_ids: lockedIds };
+  return { locked: lockedIds.length, org_ids: lockedIds, warned_9day: warned9day };
 }
 
 // ───── updateCardExpiry ──────────────────────────────────────────────────
@@ -332,6 +362,10 @@ export async function checkCardExpiryWarnings(): Promise<{ warned: number; org_i
       kind,
       data: { daysRemaining: daysUntil, cardExpiresOn: String(row.card_expires_at) },
     });
+    // Card-expiring-in-7-days is urgent enough for SMS too.
+    if (tier === "7") {
+      await sendBillingSms({ orgId: row.organization_id, kind: "card_expiring_7" });
+    }
     warned.push(row.organization_id);
   }
 

@@ -140,6 +140,16 @@ function CompanyDetailPage() {
         <p className="text-xs text-muted-foreground">
           Account &amp; billing only — no client records or PHI accessible from this view.
         </p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            <span className="font-semibold text-foreground">Billing contact phone: </span>
+            {d?.billing_sms_phone ? (
+              <span className="font-mono text-foreground">{d.billing_sms_phone}</span>
+            ) : (
+              <span className="text-amber-600">none on file</span>
+            )}
+          </span>
+        </div>
       </header>
 
       <section className="rounded-xl border border-border bg-card p-4 shadow-sm">

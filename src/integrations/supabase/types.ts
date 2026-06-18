@@ -8843,6 +8843,7 @@ export type Database = {
       organizations: {
         Row: {
           additional_state_codes: string[]
+          billing_sms_phone: string | null
           created_at: string
           created_by: string | null
           dba_name: string | null
@@ -8861,6 +8862,7 @@ export type Database = {
         }
         Insert: {
           additional_state_codes?: string[]
+          billing_sms_phone?: string | null
           created_at?: string
           created_by?: string | null
           dba_name?: string | null
@@ -8879,6 +8881,7 @@ export type Database = {
         }
         Update: {
           additional_state_codes?: string[]
+          billing_sms_phone?: string | null
           created_at?: string
           created_by?: string | null
           dba_name?: string | null

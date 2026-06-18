@@ -42,6 +42,8 @@ import {
   adminUnlockAccountFn,
   adminSimulateCardExpiryFn,
 } from "@/lib/billing-admin.functions";
+import { getBillingSmsPhone, updateBillingSmsPhone } from "@/lib/billing-sms.functions";
+import { formatUSPhonePretty, isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
 
 export const Route = createFileRoute("/dashboard/settings/subscription")({
   head: () => ({ meta: [{ title: "HIVE Subscription — HIVE" }] }),
@@ -227,6 +229,8 @@ function SubscriptionPage() {
         cardExpiresAt={sub?.card_expires_at ?? null}
         onUpdate={() => setModalOpen(true)}
       />
+
+      <ContactAlertsCard orgId={orgId} />
 
       <BillingHistoryCard events={events} loading={eventsQuery.isLoading} />
 
@@ -805,5 +809,118 @@ function UpdatePaymentMethodModal({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============================================================================
+// Contact and billing alerts (SMS phone)
+// ============================================================================
+
+function ContactAlertsCard({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const getFn = useServerFn(getBillingSmsPhone);
+  const updateFn = useServerFn(updateBillingSmsPhone);
+
+  const phoneQ = useQuery({
+    queryKey: ["billing-sms-phone", orgId],
+    queryFn: () => getFn({ data: { organizationId: orgId } }),
+  });
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const current = phoneQ.data?.phone ?? null;
+  const draftValid = isValidUSPhone(draft);
+
+  const startEdit = () => {
+    setDraft(current ?? "");
+    setEditing(true);
+  };
+
+  const save = async () => {
+    if (!draftValid) {
+      toast.error("Enter a valid US mobile number.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateFn({ data: { organizationId: orgId, phone: draft } });
+      toast.success("Mobile number updated");
+      setEditing(false);
+      await qc.invalidateQueries({ queryKey: ["billing-sms-phone", orgId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update number");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Contact and billing alerts</h2>
+          <p className="text-sm text-muted-foreground">
+            Mobile number for urgent billing texts. Required — a number must always be on file.
+          </p>
+        </div>
+        {!editing ? (
+          <Button variant="outline" size="sm" onClick={startEdit}>
+            {current ? "Update number" : "Add number"}
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="mt-4">
+        {!editing ? (
+          <div className="text-sm">
+            {phoneQ.isLoading ? (
+              <span className="text-muted-foreground">Loading…</span>
+            ) : current ? (
+              <span className="font-medium">{formatUSPhonePretty(current)}</span>
+            ) : (
+              <span className="text-amber-600">No mobile number on file — add one now.</span>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="billing-sms-phone">Mobile number</Label>
+              <Input
+                id="billing-sms-phone"
+                type="tel"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="(801) 555-0123"
+                autoComplete="tel"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used only for urgent billing alerts. Never marketing.
+              </p>
+              {draft && !draftValid ? (
+                <p className="text-xs text-destructive">Enter a valid 10-digit US mobile number.</p>
+              ) : draftValid ? (
+                <p className="text-xs text-muted-foreground">
+                  We'll text: {normalizeUSPhoneToE164(draft)}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setEditing(false)}
+                disabled={busy}
+              >
+                Cancel
+              </Button>
+              <Button onClick={save} disabled={busy || !draftValid}>
+                {busy ? "Saving…" : "Save number"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }

@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { checkEmailExists } from "@/lib/signup-checks.functions";
+import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
+import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({
@@ -585,9 +587,17 @@ function Step3Business({
   onNext: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const canContinue = form.agencyName.trim() && form.contactName.trim() && form.phone.trim();
+  const setSmsPhoneFn = useServerFn(setBillingSmsPhoneAtSignup);
+  const phoneOk = isValidUSPhone(form.phone);
+  const canContinue =
+    !!form.agencyName.trim() && !!form.contactName.trim() && phoneOk;
+  const showPhoneError = form.phone.trim().length > 0 && !phoneOk;
 
   const save = async () => {
+    if (!phoneOk) {
+      toast.error("Enter a valid US mobile number to continue.");
+      return;
+    }
     setBusy(true);
     // The org row is auto-created by the handle_new_user trigger using the
     // metadata we sent during signUp. Update the org name/contact details now
@@ -617,6 +627,15 @@ function Step3Business({
               dhhs_provider_id: form.providerNumber || null,
             })
             .eq("id", orgId);
+          // Persist required billing SMS phone (server-side, E.164 normalized).
+          try {
+            await setSmsPhoneFn({ data: { organizationId: orgId, phone: form.phone } });
+          } catch (e) {
+            console.warn("[signup] sms phone save failed", e);
+            toast.error("Could not save your mobile number. Please try again.");
+            setBusy(false);
+            return;
+          }
         }
       }
     } catch (e) {
@@ -636,8 +655,25 @@ function Step3Business({
         <Field label="Primary contact (full name)">
           <TextInput value={form.contactName} onChange={(v) => update("contactName", v)} placeholder="Jane Doe" />
         </Field>
-        <Field label="Phone number">
-          <TextInput value={form.phone} onChange={(v) => update("phone", v)} placeholder="(801) 555-0123" type="tel" />
+        <Field
+          label="Mobile number"
+          hint="Required — we use this to reach you about urgent billing issues and account status. We will never use it for marketing."
+        >
+          <TextInput
+            value={form.phone}
+            onChange={(v) => update("phone", v)}
+            placeholder="(801) 555-0123"
+            type="tel"
+          />
+          {showPhoneError ? (
+            <div className="mt-1 text-xs" style={{ color: "#fda4af" }}>
+              Enter a valid 10-digit US mobile number.
+            </div>
+          ) : phoneOk ? (
+            <div className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+              We'll text this number: {normalizeUSPhoneToE164(form.phone)}
+            </div>
+          ) : null}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="State" hint="Hive is currently Utah DSPD only.">

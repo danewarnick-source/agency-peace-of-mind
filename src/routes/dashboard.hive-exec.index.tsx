@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Building2, Search, AlertTriangle, TrendingUp, Users, Contact2, DollarSign } from "lucide-react";
+import { Building2, Search, AlertTriangle, Lock, Users, Contact2, DollarSign } from "lucide-react";
 import { getExecKpis, listCompanies, type CompanyRow } from "@/lib/hive-exec.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/")({
@@ -16,8 +16,8 @@ function fmtMoney(cents: number): string {
 function CompaniesPage() {
   const kpisFn = useServerFn(getExecKpis);
   const listFn = useServerFn(listCompanies);
-  const kpisQ = useQuery({ queryKey: ["hive-exec-kpis"], queryFn: () => kpisFn() });
-  const listQ = useQuery({ queryKey: ["hive-exec-companies"], queryFn: () => listFn() });
+  const kpisQ = useQuery({ queryKey: ["hive-exec-kpis"], queryFn: () => kpisFn(), refetchInterval: 30_000 });
+  const listQ = useQuery({ queryKey: ["hive-exec-companies"], queryFn: () => listFn(), refetchInterval: 30_000 });
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -38,8 +38,8 @@ function CompaniesPage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi icon={Building2} label="Active companies" value={k?.active_companies ?? "—"} />
         <Kpi icon={DollarSign} label="MRR" value={k ? fmtMoney(k.mrr_cents) : "—"} />
-        <Kpi icon={TrendingUp} label="Trials" value={k?.trial_companies ?? "—"} />
         <Kpi icon={AlertTriangle} label="Past due" value={k?.past_due_companies ?? "—"} tone="warn" />
+        <Kpi icon={Lock} label="Locked" value={k?.locked_companies ?? "—"} tone="warn" />
       </div>
 
       <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -62,10 +62,10 @@ function CompaniesPage() {
             >
               <option value="all">All statuses</option>
               <option value="active">Active</option>
-              <option value="trial">Trial</option>
               <option value="past_due">Past due</option>
-              <option value="canceled">Canceled</option>
-              <option value="paused">Paused</option>
+              <option value="locked">Locked</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
         </div>
@@ -134,21 +134,21 @@ function Kpi({
 
 function PlanBadge({ plan }: { plan: string }) {
   const map: Record<string, string> = {
-    starter: "bg-slate-100 text-slate-700",
-    pro: "bg-[#fff7ed] text-[#9a3412]",
+    hive_standard: "bg-[#fff7ed] text-[#9a3412]",
     enterprise: "bg-[#0f1b3d] text-white",
-    custom: "bg-purple-100 text-purple-700",
   };
-  return <span className={`rounded px-2 py-0.5 text-xs font-medium ${map[plan] ?? "bg-muted"}`}>{plan}</span>;
+  const label = plan === "hive_standard" ? "Standard" : plan === "enterprise" ? "Enterprise" : plan;
+  return <span className={`rounded px-2 py-0.5 text-xs font-medium ${map[plan] ?? "bg-muted"}`}>{label}</span>;
 }
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     active: "bg-emerald-100 text-emerald-700",
-    trial: "bg-blue-100 text-blue-700",
-    past_due: "bg-red-100 text-red-700",
+    past_due: "bg-amber-100 text-amber-700",
+    locked: "bg-red-100 text-red-700",
+    cancelled: "bg-gray-100 text-gray-600",
     canceled: "bg-gray-100 text-gray-600",
-    paused: "bg-amber-100 text-amber-700",
+    inactive: "bg-slate-100 text-slate-600",
   };
   return <span className={`rounded px-2 py-0.5 text-xs ${map[status] ?? "bg-muted"}`}>{status.replace("_", " ")}</span>;
 }

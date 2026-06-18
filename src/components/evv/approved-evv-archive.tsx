@@ -29,7 +29,6 @@ const searchSchema = z.object({
 });
 
 const PAGE_SIZE = 100;
-const EXPORT_CAP = 10000;
 
 type Row = {
   id: string;
@@ -113,6 +112,7 @@ export function EvvArchivePage() {
   const [to, setTo] = useState<string>(defaultTo());
   const [billing, setBilling] = useState<"all" | "billed" | "unbilled" | "held">("all");
   const [page, setPage] = useState<number>(1);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // No-op stub kept for future URL syncing — currently we just navigate to self.
   const syncUrl = (_next: Partial<z.infer<typeof searchSchema>>) => {
@@ -203,25 +203,22 @@ export function EvvArchivePage() {
 
   const handleCsv = async () => {
     if (!orgId) return;
-    const full = await fetchArchive({
-      orgId,
-      staff,
-      client,
-      code,
-      team,
-      from,
-      to,
-      billing,
-      limit: EXPORT_CAP,
-      offset: 0,
-      clientLookup: clientOptionsQ.data ?? [],
-      teamLookup: teamOptionsQ.data ?? [],
-      staffLookup: staffOptionsQ.data ?? [],
-    });
-    if (full.rows.length >= EXPORT_CAP) {
-      toast.warning(`Export capped at ${EXPORT_CAP.toLocaleString()} rows — narrow your filters for the full set.`);
-    }
-    const header = [
+    setExportLoading(true);
+    try {
+      const allDerived = await fetchArchiveForExport({
+        orgId,
+        staff,
+        client,
+        code,
+        team,
+        from,
+        to,
+        clientLookup: clientOptionsQ.data ?? [],
+        teamLookup: teamOptionsQ.data ?? [],
+        staffLookup: staffOptionsQ.data ?? [],
+      });
+      const exportRows = billing === "all" ? allDerived : allDerived.filter((r) => r.billing === billing);
+      const header = [
       "Caregiver",
       "Client",
       "Member ID",
@@ -235,31 +232,37 @@ export function EvvArchivePage() {
       "Billing status",
       "Home/Team",
     ];
-    const esc = (s: string) =>
-      /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    const body = [header.join(",")]
-      .concat(
-        full.rows.map((r) =>
-          [
-            r.staff_name,
-            r.client_name,
-            r.utah_medicaid_member_id ?? "",
-            r.service_type_code,
-            fmtDate(r.clock_in_timestamp),
-            fmtTs(r.corrected_clock_in ?? r.clock_in_timestamp),
-            fmtTs(r.corrected_clock_out ?? r.clock_out_timestamp),
-            String(r.duration_min),
-            r.is_edited_by_admin ? "yes" : "no",
-            r.is_out_of_bounds ? "out-of-bounds" : "in-bounds",
-            r.billing,
-            r.team_name ?? "",
-          ]
-            .map((v) => esc(String(v)))
-            .join(","),
-        ),
-      )
-      .join("\r\n");
-    downloadCsv(`approved-evv-archive_${from}_${to}.csv`, body);
+      const esc = (s: string) =>
+        /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      const body = [header.join(",")]
+        .concat(
+          exportRows.map((r) =>
+            [
+              r.staff_name,
+              r.client_name,
+              r.utah_medicaid_member_id ?? "",
+              r.service_type_code,
+              fmtDate(r.clock_in_timestamp),
+              fmtTs(r.corrected_clock_in ?? r.clock_in_timestamp),
+              fmtTs(r.corrected_clock_out ?? r.clock_out_timestamp),
+              String(r.duration_min),
+              r.is_edited_by_admin ? "yes" : "no",
+              r.is_out_of_bounds ? "out-of-bounds" : "in-bounds",
+              r.billing,
+              r.team_name ?? "",
+            ]
+              .map((v) => esc(String(v)))
+              .join(","),
+          ),
+        )
+        .join("\r\n");
+      downloadCsv(`approved-evv-archive_${from}_${to}.csv`, body);
+    } catch (err) {
+      toast.error("Export failed. Please try again.");
+      console.error(err);
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   if (!isAdmin) {
@@ -390,10 +393,10 @@ export function EvvArchivePage() {
             size="sm"
             variant="outline"
             onClick={handleCsv}
-            disabled={rowsQ.isLoading || total === 0}
+            disabled={rowsQ.isLoading || total === 0 || exportLoading}
             className="gap-2"
           >
-            <Download className="h-4 w-4" /> Download CSV
+            <Download className="h-4 w-4" /> {exportLoading ? "Exporting…" : "Download CSV"}
           </Button>
         </div>
       </div>
@@ -636,6 +639,104 @@ async function fetchArchive(args: {
   const total = filtered.length; // approximate when fetchLimit caps; UI shows "of fetched"
   const paged = filtered.slice(args.offset, args.offset + args.limit);
   return { rows: paged, total };
+}
+
+// Export-only fetch: pages through ALL matching rows in batches, applies no cap.
+async function fetchArchiveForExport(args: {
+  orgId: string;
+  staff: string[];
+  client: string[];
+  code: string[];
+  team: string[];
+  from: string;
+  to: string;
+  clientLookup: { value: string; label: string }[];
+  teamLookup: { value: string; label: string }[];
+  staffLookup: { value: string; label: string }[];
+}): Promise<Derived[]> {
+  // Resolve team filter to client IDs — identical logic to fetchArchive
+  let clientIds = args.client.slice();
+  if (args.team.length > 0) {
+    const { data } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("organization_id", args.orgId)
+      .in("team_id", args.team);
+    const teamClientIds = (data ?? []).map((c) => c.id);
+    clientIds = clientIds.length
+      ? clientIds.filter((id) => teamClientIds.includes(id))
+      : teamClientIds;
+    if (clientIds.length === 0) return [];
+  }
+
+  const fromIso = new Date(`${args.from}T00:00:00`).toISOString();
+  const toIso = new Date(`${args.to}T23:59:59.999`).toISOString();
+
+  // Factory returns a fresh base query on each call (same select/filters as fetchArchive)
+  const buildQuery = () => {
+    let q = supabase
+      .from("evv_timesheets")
+      .select(
+        "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, raw_clock_in, raw_clock_out, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, gps_validated, review_status, incident_flag, denial_reason, utah_medicaid_member_id, clients:client_id(first_name, last_name, team_id)",
+      )
+      .eq("organization_id", args.orgId)
+      .eq("status", "Approved")
+      .gte("clock_in_timestamp", fromIso)
+      .lte("clock_in_timestamp", toIso)
+      .order("clock_in_timestamp", { ascending: false });
+    if (args.staff.length) q = q.in("staff_id", args.staff);
+    if (args.code.length) q = q.in("service_type_code", args.code);
+    if (clientIds.length) q = q.in("client_id", clientIds);
+    return q;
+  };
+
+  // Page until exhausted
+  const BATCH = 1000;
+  let offset = 0;
+  const allRows: Row[] = [];
+  for (;;) {
+    const { data, error } = await buildQuery().range(offset, offset + BATCH - 1);
+    if (error) throw error;
+    const rows = (data as unknown as Row[]) ?? [];
+    allRows.push(...rows);
+    if (rows.length < BATCH) break;
+    offset += BATCH;
+    if (offset > 200_000) break; // safety valve against pathological data
+  }
+
+  if (allRows.length === 0) return [];
+
+  // Resolve export status — chunk .in() to avoid URL length limits
+  const ids = allRows.map((r) => r.id);
+  const exportSet = new Set<string>();
+  const ID_CHUNK = 500;
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const chunk = ids.slice(i, i + ID_CHUNK);
+    const { data: er } = await supabase
+      .from("evv_export_records")
+      .select("timesheet_id")
+      .in("timesheet_id", chunk);
+    (er ?? []).forEach((r) => exportSet.add(r.timesheet_id));
+  }
+
+  const staffMap = new Map(args.staffLookup.map((s) => [s.value, s.label]));
+  const teamMap = new Map(args.teamLookup.map((t) => [t.value, t.label]));
+
+  return allRows.map((r) => {
+    const billing = deriveBilling(r, exportSet.has(r.id));
+    const inTs = r.corrected_clock_in ?? r.clock_in_timestamp;
+    const outTs = r.corrected_clock_out ?? r.clock_out_timestamp;
+    return {
+      ...r,
+      staff_name: staffMap.get(r.staff_id) ?? r.staff_id.slice(0, 8),
+      client_name: r.clients
+        ? `${r.clients.first_name ?? ""} ${r.clients.last_name ?? ""}`.trim()
+        : r.client_id.slice(0, 8),
+      team_name: r.clients?.team_id ? teamMap.get(r.clients.team_id) ?? null : null,
+      billing,
+      duration_min: durationMin(inTs, outTs),
+    };
+  });
 }
 
 function defaultFrom(): string {

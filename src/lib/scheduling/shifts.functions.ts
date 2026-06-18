@@ -228,23 +228,31 @@ export const updateShift = createServerFn({ method: "POST" })
 
 export const deleteShift = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: { id: string; organization_id: string }) =>
+    z.object({ id: z.string().uuid(), organization_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
-      .from("scheduled_shifts").delete().eq("id", data.id);
+      .from("scheduled_shifts")
+      .delete()
+      .eq("id", data.id)
+      .eq("organization_id", data.organization_id);
     if (error) throw error;
     return { ok: true };
   });
 
 export const publishShifts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { ids: string[] }) =>
-    z.object({ ids: z.array(z.string().uuid()).min(1) }).parse(d))
+  .inputValidator((d: { ids: string[]; organization_id: string }) =>
+    z.object({
+      ids: z.array(z.string().uuid()).min(1),
+      organization_id: z.string().uuid(),
+    }).parse(d))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("scheduled_shifts")
       .update({ status: "published", published: true })
-      .in("id", data.ids);
+      .in("id", data.ids)
+      .eq("organization_id", data.organization_id);
     if (error) throw error;
     return { ok: true, count: data.ids.length };
   });

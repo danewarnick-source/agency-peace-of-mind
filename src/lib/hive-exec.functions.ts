@@ -308,18 +308,31 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
 
     const { data: org, error: orgErr } = await supabase
       .from("organizations")
-      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone")
+      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, created_by, created_at")
       .eq("id", data.organizationId)
       .maybeSingle();
     if (orgErr) throw orgErr;
     if (!org) throw new Error("Organization not found.");
 
-
     const { data: sub } = await supabase
       .from("org_subscriptions")
-      .select("plan, status, mrr_cents, renewal_date, trial_ends_at, started_at, canceled_at, notes")
+      .select(
+        "plan, status, mrr_cents, renewal_date, trial_ends_at, started_at, canceled_at, notes, staff_count, billing_interval, current_period_end, past_due_since, locked_at",
+      )
       .eq("organization_id", data.organizationId)
       .maybeSingle();
+
+    // Signup contact name comes from the org creator's profile.
+    const createdBy = (org as { created_by: string | null }).created_by;
+    let contactName: string | null = null;
+    if (createdBy) {
+      const { data: creator } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", createdBy)
+        .maybeSingle();
+      contactName = (creator as { full_name: string | null } | null)?.full_name ?? null;
+    }
 
     const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const since7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
@@ -368,6 +381,14 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       ((activeStaffRes.data ?? []) as Array<{ staff_id: string }>).map((r) => r.staff_id),
     );
 
+    // Live MRR override: when the subscription is on Hive Standard, the
+    // operator should see what the provider is currently billable for today,
+    // not whatever was stamped at signup. Enterprise plans keep the stored value.
+    const subStaff = (sub as { staff_count: number | null } | null)?.staff_count ?? null;
+    const subPlan = (sub as { plan: string | null } | null)?.plan ?? null;
+    const live = liveMonthlyCents(subStaff, subPlan);
+    const liveMrr = live >= 0 ? live : (sub?.mrr_cents ?? 0);
+
     return {
       organization_id: org.id,
       name: org.name,
@@ -375,17 +396,31 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       dba_name: (org as { dba_name: string | null }).dba_name ?? null,
       display_acronym: (org as { display_acronym: string | null }).display_acronym ?? null,
       billing_sms_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
+      signup: {
+        contact_name: contactName,
+        contact_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
+        staff_count_at_signup: subStaff,
+        billing_interval: (sub as { billing_interval: string | null } | null)?.billing_interval ?? null,
+        signup_date:
+          (sub as { started_at: string | null } | null)?.started_at ??
+          (org as { created_at: string | null }).created_at ??
+          null,
+      },
       subscription: sub
-
         ? {
             plan: sub.plan,
             status: sub.status,
-            mrr_cents: sub.mrr_cents,
+            mrr_cents: liveMrr,
             renewal_date: sub.renewal_date,
             trial_ends_at: sub.trial_ends_at,
             started_at: sub.started_at,
             canceled_at: sub.canceled_at,
             notes: sub.notes,
+            staff_count: subStaff,
+            billing_interval: (sub as { billing_interval: string | null }).billing_interval,
+            current_period_end: (sub as { current_period_end: string | null }).current_period_end,
+            past_due_since: (sub as { past_due_since: string | null }).past_due_since,
+            locked_at: (sub as { locked_at: string | null }).locked_at,
           }
         : null,
       usage: {

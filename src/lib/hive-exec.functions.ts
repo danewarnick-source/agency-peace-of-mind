@@ -258,7 +258,7 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
 
     const { data: org, error: orgErr } = await supabase
       .from("organizations")
-      .select("id, name, legal_name, dba_name, display_acronym")
+      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone")
       .eq("id", data.organizationId)
       .maybeSingle();
     if (orgErr) throw orgErr;

@@ -13369,8 +13369,15 @@ export type Database = {
       provider_training_kind: "policies" | "person"
       provider_training_status: "draft" | "published"
       report_cadence: "weekly" | "monthly"
-      sub_plan: "starter" | "pro" | "enterprise" | "custom"
-      sub_status: "trial" | "active" | "past_due" | "canceled" | "paused"
+      sub_plan: "starter" | "pro" | "enterprise" | "custom" | "hive_standard"
+      sub_status:
+        | "trial"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "paused"
+        | "locked"
+        | "cancelled"
       ticket_severity: "low" | "normal" | "high" | "urgent"
       ticket_status:
         | "submitted"
@@ -13550,8 +13557,16 @@ export const Constants = {
       provider_training_kind: ["policies", "person"],
       provider_training_status: ["draft", "published"],
       report_cadence: ["weekly", "monthly"],
-      sub_plan: ["starter", "pro", "enterprise", "custom"],
-      sub_status: ["trial", "active", "past_due", "canceled", "paused"],
+      sub_plan: ["starter", "pro", "enterprise", "custom", "hive_standard"],
+      sub_status: [
+        "trial",
+        "active",
+        "past_due",
+        "canceled",
+        "paused",
+        "locked",
+        "cancelled",
+      ],
       ticket_severity: ["low", "normal", "high", "urgent"],
       ticket_status: [
         "submitted",

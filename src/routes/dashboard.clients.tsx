@@ -34,6 +34,8 @@ import {
   ExternalLink, Stethoscope, Gavel,
 } from "lucide-react";
 import { toast } from "sonner";
+import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
+import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselect";
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";

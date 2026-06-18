@@ -145,10 +145,32 @@ function HhsClientHub() {
               <strong>Choking / Swallow Reflex:</strong> Confirm upright posture and crushed-med policy per care plan.
             </div>
             <div className="flex flex-wrap gap-1.5 pt-1">
-              <Button size="sm" variant="outline" className="h-8 text-[11px]">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-[11px]"
+                onClick={() =>
+                  navigate({
+                    to: "/dashboard/clients/$clientId",
+                    params: { clientId },
+                    search: { tab: "documents" },
+                  })
+                }
+              >
                 <FileText className="mr-1 h-3.5 w-3.5" /> Emergency Med Auth
               </Button>
-              <Button size="sm" variant="outline" className="h-8 text-[11px]">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-[11px]"
+                onClick={() =>
+                  navigate({
+                    to: "/dashboard/clients/$clientId",
+                    params: { clientId },
+                    search: { tab: "documents" },
+                  })
+                }
+              >
                 <FileText className="mr-1 h-3.5 w-3.5" /> Advanced Directives
               </Button>
             </div>

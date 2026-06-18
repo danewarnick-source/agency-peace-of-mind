@@ -14,16 +14,18 @@ export const checkEmailExists = createServerFn({ method: "POST" })
     return { email };
   })
   .handler(async ({ data }) => {
+    // We avoid auth.admin.listUsers — it can 500 with "Scan error on column
+    // confirmation_token: converting NULL to string is unsupported" (GoTrue
+    // bug when any user row has a NULL confirmation_token). Query profiles
+    // by email instead; every signup creates a profile row.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // listUsers doesn't support direct email filter; iterate small pages.
-    // For a brand-new signup flow this is fine; switch to a server-side index later.
-    const { data: page, error } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 200,
-    });
+    const { data: row, error } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .ilike("email", data.email)
+      .limit(1)
+      .maybeSingle();
     if (error) throw error;
-    const exists = page.users.some(
-      (u) => (u.email ?? "").toLowerCase() === data.email,
-    );
-    return { exists };
+    return { exists: !!row };
   });
+

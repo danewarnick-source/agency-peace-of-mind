@@ -93,7 +93,7 @@ export function TimesheetsReconcile() {
     queryKey: ["ts-reconcile", org?.organization_id, periodStart.toISOString()],
     queryFn: async () => {
       const orgId = org!.organization_id;
-      const [punches, clients, teams, staff, authCodes, billing] = await Promise.all([
+      const [punches, clients, teams, authCodes, billing] = await Promise.all([
         supabase.from("evv_timesheets")
           .select("id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
           .eq("organization_id", orgId)
@@ -102,7 +102,6 @@ export function TimesheetsReconcile() {
           .order("clock_in_timestamp"),
         supabase.from("clients").select("id, first_name, last_name, team_id").eq("organization_id", orgId),
         supabase.from("teams").select("id, team_name").eq("organization_id", orgId),
-        supabase.from("profiles").select("id, full_name, email"),
         (supabase as any).from("provider_authorized_codes")
           .select("code, carve_out, kind, unit").eq("organization_id", orgId),
         (supabase as any).from("client_billing_codes")
@@ -114,10 +113,27 @@ export function TimesheetsReconcile() {
         punches: (punches.data ?? []) as Punch[],
         clients: (clients.data ?? []) as Client[],
         teams: (teams.data ?? []) as Team[],
-        staff: (staff.data ?? []) as Staff[],
         authCodes: (authCodes.data ?? []) as AuthCode[],
         billing: (billing.data ?? []) as ClientBilling[],
       };
+    },
+  });
+
+  // Fetch profiles only for staff IDs that appear in the period punches.
+  // Avoids a full-table scan — profiles has no FK to organization_members.
+  const staffIds = useMemo(
+    () => [...new Set((data?.punches ?? []).map((p) => p.staff_id))],
+    [data?.punches],
+  );
+  const { data: staffProfiles } = useQuery({
+    enabled: staffIds.length > 0,
+    queryKey: ["timesheet-profiles", staffIds],
+    queryFn: async () => {
+      const { data: rows } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", staffIds);
+      return (rows ?? []) as Staff[];
     },
   });
 
@@ -143,9 +159,9 @@ export function TimesheetsReconcile() {
 
   const computed = useMemo(() => {
     if (!data) return null;
-    const { punches, clients, authCodes, billing, staff } = data;
+    const { punches, clients, authCodes, billing } = data;
     const clientById = new Map(clients.map((c) => [c.id, c]));
-    const staffById = new Map(staff.map((s) => [s.id, s]));
+    const staffById = new Map((staffProfiles ?? []).map((s) => [s.id, s]));
     const authByCode = new Map(authCodes.map((a) => [a.code, a]));
     const billingByKey = new Map(billing.map((b) => [`${b.client_id}|${b.service_code}`, b]));
 
@@ -318,7 +334,7 @@ export function TimesheetsReconcile() {
     const paceWarnings = billingRows.filter((r) => r.authorized > 0 && (r.pacePct > r.onPacePct + 10 || r.pacePct < r.onPacePct - 25));
 
     return { coverage, billingRows, payrollRows, openPunches, gaps, overlaps, paceWarnings, homes: Array.from(homes.entries()) };
-  }, [data, periodStart, ytdPunches]);
+  }, [data, staffProfiles, periodStart, ytdPunches]);
 
   const visibleCoverage = useMemo(() => {
     if (!computed) return [];
@@ -562,7 +578,7 @@ export function TimesheetsReconcile() {
                   </div>
                   <ul className="divide-y text-sm">
                     {computed.openPunches.map((p) => {
-                      const s = data!.staff.find((x) => x.id === p.staff_id);
+                      const s = (staffProfiles ?? []).find((x) => x.id === p.staff_id);
                       const c = data!.clients.find((x) => x.id === p.client_id);
                       return (
                         <li key={p.id} className="py-2 flex items-center justify-between gap-2">

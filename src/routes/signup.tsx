@@ -48,7 +48,6 @@ const inputStyle: React.CSSProperties = {
 
 const STEPS = [
   "Account",
-  "Verify email",
   "Your business",
   "Team & pricing",
   "Staff training",
@@ -288,22 +287,15 @@ function SignupPage() {
               />
             )}
             {step === 1 && (
-              <Step2Verify
-                email={form.email}
-                onBack={goBack}
-                onNext={() => setStep(2)}
-              />
+              <Step3Business form={form} update={update} onBack={goBack} onNext={() => setStep(2)} />
             )}
             {step === 2 && (
-              <Step3Business form={form} update={update} onBack={goBack} onNext={() => setStep(3)} />
+              <Step4Pricing form={form} update={update} onBack={goBack} onNext={() => setStep(3)} />
             )}
             {step === 3 && (
-              <Step4Pricing form={form} update={update} onBack={goBack} onNext={() => setStep(4)} />
+              <Step5Training form={form} update={update} onBack={goBack} onNext={() => setStep(4)} />
             )}
             {step === 4 && (
-              <Step5Training form={form} update={update} onBack={goBack} onNext={() => setStep(5)} />
-            )}
-            {step === 5 && (
               <Step6Payment
                 form={form}
                 onBack={goBack}
@@ -390,7 +382,7 @@ function Step1Account({
         setBusy(false);
         return;
       }
-      toast.success("Verification code sent — check your inbox.");
+      toast.success("Account created — let's set up your business.");
       setBusy(false);
       onNext();
     } catch (e) {
@@ -401,7 +393,7 @@ function Step1Account({
 
   return (
     <>
-      <Header title="Create your account" subtitle="Start with a few quick details. We'll send a code to verify your email." />
+      <Header title="Create your account" subtitle="Start with a few quick details to get your workspace ready." />
       <div className="grid gap-4">
         <Field
           label="Email address"
@@ -465,7 +457,7 @@ function Step1Account({
         onNext={submit}
         loading={busy}
         nextDisabled={!emailValid || !lenOk || !numOk || !matchOk || !!emailErr}
-        nextLabel="Send verification code"
+        nextLabel="Create account"
       />
     </>
   );

@@ -42,7 +42,8 @@ async function writePaymentEvent(input: EventInput): Promise<boolean> {
       .maybeSingle();
     if (existing) return false;
   }
-  const { error } = await supabaseAdmin.from("payment_events").insert({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabaseAdmin as any).from("payment_events").insert({
     org_id: input.org_id,
     event_type: input.event_type,
     amount_cents: input.amount_cents ?? null,

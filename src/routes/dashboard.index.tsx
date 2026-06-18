@@ -22,7 +22,7 @@ export const Route = createFileRoute("/dashboard/")({
   }),
 });
 
-export const Route = createFileRoute("/dashboard/")({ component: Overview });
+
 
 function ComplianceInbox() {
   const { user } = useAuth();

@@ -178,7 +178,19 @@ function CompanyDetailPage() {
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm" />
           </Field>
         </div>
+        <div className="mt-4 border-t border-border pt-3">
+          <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+            Account contact · captured at signup
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 text-sm">
+            <ReadOnly label="Main contact" value={d?.signup?.contact_name ?? "—"} />
+            <ReadOnly label="Email" value={d?.signup?.contact_email ?? "—"} mono />
+            <ReadOnly label="Mobile phone" value={d?.signup?.contact_phone ?? "—"} mono />
+          </div>
+        </div>
+
         <div className="mt-3 flex items-center justify-end gap-2">
+
           <button
             type="button"
             disabled={!d || saveNames.isPending}

@@ -37,11 +37,13 @@ export interface CompanyDetail {
   /** Provider-submitted fields captured during signup. Read-only in exec UI. */
   signup: {
     contact_name: string | null;
+    contact_email: string | null;
     contact_phone: string | null;
     staff_count_at_signup: number | null;
     billing_interval: string | null; // 'monthly' | 'annual'
     signup_date: string | null;
   };
+
 
   subscription: {
     plan: string;
@@ -331,9 +333,10 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       .eq("organization_id", data.organizationId)
       .maybeSingle();
 
-    // Signup contact name comes from the org creator's profile.
+    // Signup contact info comes from the org creator's profile + auth user.
     const createdBy = (org as { created_by: string | null }).created_by;
     let contactName: string | null = null;
+    let contactEmail: string | null = null;
     if (createdBy) {
       const { data: creator } = await supabase
         .from("profiles")
@@ -341,7 +344,15 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
         .eq("id", createdBy)
         .maybeSingle();
       contactName = (creator as { full_name: string | null } | null)?.full_name ?? null;
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(createdBy);
+        contactEmail = authUser?.user?.email ?? null;
+      } catch (e) {
+        console.warn("[hive-exec] could not fetch creator email", e);
+      }
     }
+
 
     const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const since7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
@@ -407,7 +418,9 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       billing_sms_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
       signup: {
         contact_name: contactName,
+        contact_email: contactEmail,
         contact_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
+
         staff_count_at_signup: subStaff,
         billing_interval: (sub as { billing_interval: string | null } | null)?.billing_interval ?? null,
         signup_date:

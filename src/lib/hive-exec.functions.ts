@@ -227,7 +227,7 @@ export const listCompanies = createServerFn({ method: "GET" })
 
     const { data: subs } = await supabase
       .from("org_subscriptions")
-      .select("organization_id, plan, status, mrr_cents, renewal_date, trial_ends_at");
+      .select("organization_id, plan, status, mrr_cents, renewal_date, trial_ends_at, staff_count, billing_interval");
     const subByOrg = new Map<string, NonNullable<typeof subs>[number]>(
       (subs ?? []).map((s) => [s.organization_id, s]),
     );
@@ -265,18 +265,27 @@ export const listCompanies = createServerFn({ method: "GET" })
     return ((orgs ?? []) as Array<{ id: string; name: string }>).map((o) => {
       const sub = subByOrg.get(o.id);
       const c = countByOrg.get(o.id);
-      const status = sub?.status ?? "trial";
+      // No subscription row → show as inactive (was 'trial' before — Hive has
+      // no trial state). For accounts with a sub, surface the real status.
+      const status = sub?.status ?? "inactive";
       const tickets = c?.tickets ?? 0;
       let health: CompanyRow["health"] = "good";
-      if (status === "past_due" || tickets >= 3) health = "risk";
-      else if (status === "trial" || tickets >= 1) health = "warn";
+      if (status === "locked" || status === "past_due" || tickets >= 3) health = "risk";
+      else if (status === "inactive" || tickets >= 1) health = "warn";
+
+      // Live MRR — recompute from current sub.staff_count + volume tier so
+      // the exec overview reflects today's billable basis, not a signup snapshot.
+      const subStaff = (sub as { staff_count: number | null } | null)?.staff_count ?? null;
+      const live = liveMonthlyCents(subStaff, sub?.plan ?? null);
+      const mrr_cents =
+        sub == null ? 0 : live >= 0 ? live : (sub.mrr_cents ?? 0);
 
       return {
         organization_id: o.id,
         name: o.name,
-        plan: sub?.plan ?? "starter",
+        plan: sub?.plan ?? "hive_standard",
         status,
-        mrr_cents: sub?.mrr_cents ?? 0,
+        mrr_cents,
         renewal_date: sub?.renewal_date ?? null,
         trial_ends_at: sub?.trial_ends_at ?? null,
         staff_count: c?.staff ?? 0,

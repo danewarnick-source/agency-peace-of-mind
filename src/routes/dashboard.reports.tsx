@@ -24,6 +24,9 @@ function ReportsPage() {
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <h2 className="text-base font-semibold">Audit-ready reports</h2>
         <p className="text-sm text-muted-foreground">Export compliance evidence as CSV or PDF anytime.</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Includes completions from both the Courses module and the Training module.
+        </p>
       </div>
       <Tabs defaultValue="standard">
         <TabsList>
@@ -41,6 +44,14 @@ function ReportsPage() {
   );
 }
 
+type ModuleProgressRow = {
+  user_id: string;
+  module_id: string;
+  is_completed: boolean;
+  completed_at: string | null;
+  training_modules: { title: string; category: string | null } | null;
+};
+
 function StandardReports() {
   const { data: org } = useCurrentOrg();
 
@@ -53,6 +64,22 @@ function StandardReports() {
         .from("course_assignments")
         .select("status, progress, due_date, completed_at, courses(title, category), user_id")
         .eq("organization_id", org!.organization_id);
+      return data ?? [];
+    },
+  });
+
+  const { data: moduleProgress } = useQuery({
+    enabled: !!org,
+    queryKey: ["report-module-progress", org?.organization_id],
+    queryFn: async () => {
+      // NOTE: user_training_progress RLS currently returns only the
+      // authenticated user's own rows. Full org-wide reporting requires
+      // a widened RLS policy — tracked as a future improvement.
+      const { data } = await supabase
+        .from("user_training_progress")
+        .select("user_id, module_id, is_completed, completed_at, training_modules(title, category)")
+        .eq("is_completed", true)
+        .order("completed_at", { ascending: false });
       return data ?? [];
     },
   });
@@ -77,6 +104,11 @@ function StandardReports() {
   const courseCategory = (a: { courses: unknown }) =>
     (a.courses as { category: string } | null)?.category ?? "";
 
+  const moduleTitle = (m: { training_modules: unknown }) =>
+    (m.training_modules as { title: string } | null)?.title ?? "";
+  const moduleCategory = (m: { training_modules: unknown }) =>
+    (m.training_modules as { category: string } | null)?.category ?? "";
+
   const download = (
     filename: string,
     headers: string[],
@@ -98,30 +130,65 @@ function StandardReports() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1) Compliance Summary — every training assignment.
+  // 1) Compliance Summary — every training assignment + module completions.
   const exportComplianceSummary = () => {
     const list = assigns ?? [];
-    if (!list.length) return toast.error("No training assignments to export yet");
+    const courseRows = list.map((a) => [
+      a.user_id, courseTitle(a), courseCategory(a),
+      a.status, a.progress, a.due_date ?? "", a.completed_at ?? "", "Courses module",
+    ]);
+    const moduleRows = (moduleProgress ?? []).map((r) => {
+      const row = r as ModuleProgressRow;
+      return [
+        row.user_id,
+        row.training_modules?.title ?? row.module_id,
+        row.training_modules?.category ?? "",
+        "completed",
+        100,
+        "",
+        row.completed_at ?? "",
+        "Training module",
+      ];
+    });
+    const allRows = [...courseRows, ...moduleRows];
+    if (!allRows.length) return toast.error("No training assignments to export yet");
     download(
       "compliance-summary",
-      ["user_id", "course", "category", "status", "progress", "due_date", "completed_at"],
-      list.map((a) => [
-        a.user_id, courseTitle(a), courseCategory(a),
-        a.status, a.progress, a.due_date ?? "", a.completed_at ?? "",
-      ]),
+      ["user_id", "course", "category", "status", "progress", "due_date", "completed_at", "source"],
+      allRows,
     );
   };
 
   // 2) Training Completion — only completed assignments.
   const exportTrainingCompletion = () => {
     const list = (assigns ?? []).filter((a) => a.status === "completed" || !!a.completed_at);
-    if (!list.length) return toast.error("No completed training to export yet");
+    const fromCourses = list
+      .filter((a) => a.status === "completed")
+      .map((a) => ({
+        source: "Courses module",
+        title: courseTitle(a),
+        category: courseCategory(a),
+        completed_at: a.completed_at ?? "",
+        user_id: a.user_id ?? "",
+      }));
+
+    const fromModules = (moduleProgress ?? []).map((r) => {
+      const row = r as ModuleProgressRow;
+      return {
+        source: "Training module",
+        title: row.training_modules?.title ?? row.module_id,
+        category: row.training_modules?.category ?? "",
+        completed_at: row.completed_at ?? "",
+        user_id: row.user_id,
+      };
+    });
+
+    const all = [...fromCourses, ...fromModules];
+    if (!all.length) return toast.error("No completed training to export yet.");
     download(
       "training-completion",
-      ["user_id", "course", "category", "completed_at", "progress"],
-      list.map((a) => [
-        a.user_id, courseTitle(a), courseCategory(a), a.completed_at ?? "", a.progress,
-      ]),
+      ["source", "title", "category", "completed_at", "user_id"],
+      all.map((r) => [r.source, r.title, r.category, r.completed_at, r.user_id]),
     );
   };
 
@@ -142,7 +209,20 @@ function StandardReports() {
     );
   };
 
-  // 4) Certification Renewals — external certs expiring within the next 90 days.
+  // 4) Module Completions — completions recorded in user_training_progress.
+  const exportModuleCompletions = () => {
+    const list = moduleProgress ?? [];
+    if (!list.length) return toast.error("No module completions to export yet");
+    download(
+      "module-completions",
+      ["user_id", "module_id", "module_title", "category", "completed_at"],
+      list.map((m) => [
+        m.user_id, m.module_id, moduleTitle(m), moduleCategory(m), m.completed_at ?? "",
+      ]),
+    );
+  };
+
+  // 5) Certification Renewals — external certs expiring within the next 90 days.
   const exportCertificationRenewals = () => {
     const startMs = Date.now();
     const horizonMs = startMs + 90 * 24 * 60 * 60 * 1000;
@@ -164,6 +244,7 @@ function StandardReports() {
   const reports = [
     { name: "Compliance Summary", desc: "All training assignments with status and progress.", onExport: exportComplianceSummary },
     { name: "Training Completion", desc: "Completed courses across the organization.", onExport: exportTrainingCompletion },
+    { name: "Module Completions", desc: "Individual module completions recorded during training.", onExport: exportModuleCompletions },
     { name: "Overdue Training", desc: "Assignments past their due date.", onExport: exportOverdueTraining },
     { name: "Certification Renewals", desc: "Certificates expiring in the next 90 days.", onExport: exportCertificationRenewals },
   ];

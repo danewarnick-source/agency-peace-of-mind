@@ -53,6 +53,22 @@ export const updateRuleSettings = createServerFn({ method: "POST" })
 
 // ---------- Conflict evaluation over a range ----------
 
+function computeWeeklyTargetPct(
+  shifts: Parameters<typeof evaluateShifts>[0],
+  targets: Record<string, number>, // key: `${clientId}|${code}`
+): Record<string, number> {
+  const weekly: Record<string, number> = {};
+  for (const s of shifts) {
+    if (!s.service_code) continue;
+    const key = `${s.client_id}|${s.service_code.toUpperCase()}`;
+    const target = targets[key];
+    if (!target) continue;
+    const hrs = (new Date(s.ends_at).getTime() - new Date(s.starts_at).getTime()) / 3_600_000;
+    weekly[key] = (weekly[key] ?? 0) + hrs / target;
+  }
+  return weekly;
+}
+
 export const evaluateRange = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
@@ -60,11 +76,13 @@ export const evaluateRange = createServerFn({ method: "POST" })
     startIso: string;
     endIso: string;
     locationId?: string;
+    targetHoursByClientCode?: Record<string, number>;
   }) => z.object({
     organizationId: z.string().uuid(),
     startIso: z.string(),
     endIso: z.string(),
     locationId: z.string().uuid().optional(),
+    targetHoursByClientCode: z.record(z.number()).optional(),
   }).parse(d))
   .handler(async ({ data, context }): Promise<Conflict[]> => {
     const { supabase } = context;
@@ -221,10 +239,16 @@ export const evaluateRange = createServerFn({ method: "POST" })
       }
     }
 
+    const weeklyTargetPctByClientCode = computeWeeklyTargetPct(
+      shiftRows,
+      data.targetHoursByClientCode ?? {},
+    );
+
     return evaluateShifts(shiftRows, {
       rules: (cfg?.rule_settings ?? {}) as Partial<Record<PolicyRuleCode, RuleMode>>,
       otThresholdHours: Number(cfg?.ot_threshold_hours ?? 40),
       staff: staffCtx,
+      weeklyTargetPctByClientCode,
     });
   });
 

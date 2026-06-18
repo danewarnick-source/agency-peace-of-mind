@@ -287,22 +287,15 @@ function SignupPage() {
               />
             )}
             {step === 1 && (
-              <Step2Verify
-                email={form.email}
-                onBack={goBack}
-                onNext={() => setStep(2)}
-              />
+              <Step3Business form={form} update={update} onBack={goBack} onNext={() => setStep(2)} />
             )}
             {step === 2 && (
-              <Step3Business form={form} update={update} onBack={goBack} onNext={() => setStep(3)} />
+              <Step4Pricing form={form} update={update} onBack={goBack} onNext={() => setStep(3)} />
             )}
             {step === 3 && (
-              <Step4Pricing form={form} update={update} onBack={goBack} onNext={() => setStep(4)} />
+              <Step5Training form={form} update={update} onBack={goBack} onNext={() => setStep(4)} />
             )}
             {step === 4 && (
-              <Step5Training form={form} update={update} onBack={goBack} onNext={() => setStep(5)} />
-            )}
-            {step === 5 && (
               <Step6Payment
                 form={form}
                 onBack={goBack}

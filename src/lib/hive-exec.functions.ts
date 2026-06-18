@@ -31,6 +31,7 @@ export interface CompanyDetail {
   legal_name: string | null;
   dba_name: string | null;
   display_acronym: string | null;
+  billing_sms_phone: string | null;
 
   subscription: {
     plan: string;

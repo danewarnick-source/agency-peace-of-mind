@@ -38,7 +38,7 @@ type Shift = {
   ends_at: string;
   status: string;
   notes: string | null;
-  client: { first_name: string | null; last_name: string | null; profile_photo_url: string | null; date_of_birth: string | null; phone_number: string | null; physical_address: string | null; special_directions: string | null; pcsp_goals: string | null; emergency_contact_name: string | null; emergency_contact_phone: string | null } | null;
+  client: { first_name: string | null; last_name: string | null; profile_photo_url: string | null; date_of_birth: string | null; phone_number: string | null; physical_address: string | null; special_directions: string | null; pcsp_goals: string | null; emergency_contact_name: string | null; emergency_contact_phone: string | null; medicaid_id: string | null } | null;
   code: { id: string; code: string; label: string | null; kind: string } | null;
 };
 
@@ -53,7 +53,7 @@ function ShiftOverviewPage() {
       const { data, error } = await supabase
         .from("scheduled_shifts")
         .select(
-          "id, organization_id, staff_id, client_id, code_id, job_code, starts_at, ends_at, status, notes, client:client_id(first_name,last_name,profile_photo_url,date_of_birth,phone_number,physical_address,special_directions,pcsp_goals,emergency_contact_name,emergency_contact_phone), code:code_id(id,code,label,kind)",
+          "id, organization_id, staff_id, client_id, code_id, job_code, starts_at, ends_at, status, notes, client:client_id(first_name,last_name,profile_photo_url,date_of_birth,phone_number,physical_address,special_directions,pcsp_goals,emergency_contact_name,emergency_contact_phone,medicaid_id), code:code_id(id,code,label,kind)",
         )
         .eq("id", shiftId)
         .maybeSingle();
@@ -202,10 +202,36 @@ function ClientProfileCard({ shift, clientName }: { shift: Shift; clientName: st
   );
 }
 
+const getGPS = (): Promise<{ lat: number; lng: number; accuracy?: number }> =>
+  new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve({ lat: 0, lng: 0 });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+      () => resolve({ lat: 0, lng: 0 }),
+      { timeout: 5000, maximumAge: 30000 },
+    );
+  });
+
 function ActiveClockPanel({ shift, userId }: { shift: Shift; userId?: string }) {
   const qc = useQueryClient();
   const code = shift.code?.code ?? shift.job_code ?? "";
   const isContinuous = shift.code?.kind === "continuous";
+
+  const { data: org } = useQuery({
+    enabled: !!shift.organization_id,
+    queryKey: ["org-evv", shift.organization_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("organizations")
+        .select("dhhs_provider_id")
+        .eq("id", shift.organization_id)
+        .maybeSingle();
+      return data as { dhhs_provider_id: string | null } | null;
+    },
+  });
 
   const { data: activePunch } = useQuery({
     enabled: !!userId,
@@ -224,14 +250,15 @@ function ActiveClockPanel({ shift, userId }: { shift: Shift; userId?: string }) 
 
   const clockIn = useMutation({
     mutationFn: async () => {
+      const gps = await getGPS();
       const { data, error } = await (supabase as any).from("evv_timesheets").insert({
         organization_id: shift.organization_id,
         staff_id: userId,
         client_id: shift.client_id,
-        utah_medicaid_provider_id: "PENDING",
-        utah_medicaid_member_id: "PENDING",
+        utah_medicaid_provider_id: org?.dhhs_provider_id ?? "PENDING",
+        utah_medicaid_member_id: shift.client?.medicaid_id ?? "PENDING",
         service_type_code: code || "RHS",
-        gps_in_coordinates: { lat: 0, lng: 0, advisory: true },
+        gps_in_coordinates: { lat: gps.lat, lng: gps.lng, ...(gps.accuracy !== undefined && { accuracy: gps.accuracy }), advisory: gps.lat === 0 && gps.lng === 0 },
         shift_entry_type: "Client_Profile_Pass",
         status: "Active",
       }).select().single();
@@ -246,9 +273,10 @@ function ActiveClockPanel({ shift, userId }: { shift: Shift; userId?: string }) 
     mutationFn: async () => {
       if (!activePunch) return;
       const outIso = new Date().toISOString();
+      const gps = await getGPS();
       const { error } = await (supabase as any).from("evv_timesheets").update({
         clock_out_timestamp: outIso,
-        gps_out_coordinates: { lat: 0, lng: 0, advisory: true },
+        gps_out_coordinates: { lat: gps.lat, lng: gps.lng, ...(gps.accuracy !== undefined && { accuracy: gps.accuracy }), advisory: gps.lat === 0 && gps.lng === 0 },
         status: "Pending",
         // Per-entry quarter-hour units (round-to-NEAREST); raw timestamps untouched.
         billed_units: computeEntryUnits((activePunch as any).clock_in_timestamp, outIso),

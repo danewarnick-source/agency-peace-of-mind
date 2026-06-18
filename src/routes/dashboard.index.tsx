@@ -13,8 +13,16 @@ import { DeadlinesHomeCard } from "./dashboard.deadlines";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
+import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
 
-export const Route = createFileRoute("/dashboard/")({ component: Overview });
+export const Route = createFileRoute("/dashboard/")({
+  component: Overview,
+  validateSearch: (s: Record<string, unknown>) => ({
+    welcome: s.welcome === "1" || s.welcome === 1 || s.welcome === true ? true : undefined,
+  }),
+});
+
+
 
 function ComplianceInbox() {
   const { user } = useAuth();
@@ -122,15 +130,10 @@ function ComplianceInbox() {
 function Overview() {
   const { data: org } = useCurrentOrg();
   const { view, subView, hasStoredView } = usePortalView();
+  const { welcome } = Route.useSearch();
 
   const isManager = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
-  // Default admin-capable users to the admin Home when they haven't explicitly
-  // picked a portal view — otherwise a fresh admin lands on the empty staff
-  // "My Caseload". An admin who deliberately chose Staff View keeps it.
   const effectiveView = hasStoredView ? view : isManager ? "admin" : "staff";
-  // State (Build/Preview) renders the REAL admin/staff surfaces parameterized by the
-  // selected state's template. When Admin sub-view is selected, show the real
-  // Company Overview (not the staff caseload).
   const isStatePreviewAdmin = effectiveView === "state_preview" && subView === "admin";
   const showAdmin = (isManager && effectiveView === "admin") || isStatePreviewAdmin;
 
@@ -139,6 +142,7 @@ function Overview() {
     <div className="space-y-8">
       {showAdmin && (
         <>
+          <NectarOnboardingPanel welcomeFlag={!!welcome} />
           <DeadlinesHomeCard />
           <CompanyOverview />
         </>

@@ -8587,44 +8587,68 @@ export type Database = {
       }
       org_subscriptions: {
         Row: {
+          billing_interval: string | null
+          cancel_at_period_end: boolean
           canceled_at: string | null
           created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
           id: string
           mrr_cents: number
           notes: string | null
           organization_id: string
           plan: Database["public"]["Enums"]["sub_plan"]
           renewal_date: string | null
+          staff_count: number | null
           started_at: string
           status: Database["public"]["Enums"]["sub_status"]
+          stripe_customer_id: string | null
+          stripe_payment_method_id: string | null
+          stripe_subscription_id: string | null
           trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
           canceled_at?: string | null
           created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
           id?: string
           mrr_cents?: number
           notes?: string | null
           organization_id: string
           plan?: Database["public"]["Enums"]["sub_plan"]
           renewal_date?: string | null
+          staff_count?: number | null
           started_at?: string
           status?: Database["public"]["Enums"]["sub_status"]
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
+          stripe_subscription_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
           canceled_at?: string | null
           created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
           id?: string
           mrr_cents?: number
           notes?: string | null
           organization_id?: string
           plan?: Database["public"]["Enums"]["sub_plan"]
           renewal_date?: string | null
+          staff_count?: number | null
           started_at?: string
           status?: Database["public"]["Enums"]["sub_status"]
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
+          stripe_subscription_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
         }
@@ -8687,6 +8711,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "org_support_tickets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_training_orders: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          id: string
+          organization_id: string
+          selected_modules: Json
+          staff_count: number
+          status: string
+          stripe_payment_intent_id: string | null
+          training_type: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number
+          created_at?: string
+          id?: string
+          organization_id: string
+          selected_modules?: Json
+          staff_count?: number
+          status?: string
+          stripe_payment_intent_id?: string | null
+          training_type: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          id?: string
+          organization_id?: string
+          selected_modules?: Json
+          staff_count?: number
+          status?: string
+          stripe_payment_intent_id?: string | null
+          training_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_training_orders_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

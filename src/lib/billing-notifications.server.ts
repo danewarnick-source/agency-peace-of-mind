@@ -1,68 +1,88 @@
-// Billing email notifications.
+// Billing email dispatch.
 //
-// Part 2 stub: structured helper invoked by lockout/payment logic.
-// Part 3 will flesh out templates and actual delivery via the shared
-// `send-email` edge function. For now we resolve recipients and record
-// the intent so callers wire correctly.
+// Renders Hive-branded templates from src/lib/billing-emails.ts and sends
+// via the existing `send-email` edge function when the org has a verified
+// sender configured in `org_email_settings`. If no sender is configured,
+// the call logs and returns gracefully — billing state changes must never
+// fail because email infrastructure is unavailable (the payment_events row
+// is the durable record of truth).
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { renderBillingEmail, type BillingEmailKind, type BillingEmailVars } from "./billing-emails";
 
-export type BillingEmailKind =
-  | "payment_failed"
-  | "account_locked"
-  | "account_locked_staff"
-  | "account_restored"
-  | "card_expiry_60"
-  | "card_expiry_30"
-  | "card_expiry_7";
+export type { BillingEmailKind } from "./billing-emails";
 
 export interface BillingEmailContext {
   orgId: string;
   kind: BillingEmailKind;
-  data?: Record<string, unknown>;
+  data?: BillingEmailVars;
 }
 
 async function getOrgAdminEmails(orgId: string): Promise<string[]> {
-  const { data: members } = await supabaseAdmin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: members } = await (supabaseAdmin as any)
     .from("organization_members")
     .select("user_id")
     .eq("organization_id", orgId)
     .eq("active", true)
     .in("role", ["admin", "super_admin"]);
-  const ids = (members ?? []).map((m) => m.user_id);
+  const ids = (members ?? []).map((m: { user_id: string }) => m.user_id);
   if (ids.length === 0) return [];
-  const { data: profiles } = await supabaseAdmin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profiles } = await (supabaseAdmin as any)
     .from("profiles")
     .select("email")
     .in("id", ids);
-  return (profiles ?? []).map((p) => p.email).filter((e): e is string => !!e);
+  return (profiles ?? [])
+    .map((p: { email: string | null }) => p.email)
+    .filter((e: string | null): e is string => !!e);
 }
 
 async function getOrgStaffEmails(orgId: string): Promise<string[]> {
-  const { data: members } = await supabaseAdmin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: members } = await (supabaseAdmin as any)
     .from("organization_members")
     .select("user_id")
     .eq("organization_id", orgId)
     .eq("active", true);
-  const ids = (members ?? []).map((m) => m.user_id);
+  const ids = (members ?? []).map((m: { user_id: string }) => m.user_id);
   if (ids.length === 0) return [];
-  const { data: profiles } = await supabaseAdmin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profiles } = await (supabaseAdmin as any)
     .from("profiles")
     .select("email")
     .in("id", ids);
-  return (profiles ?? []).map((p) => p.email).filter((e): e is string => !!e);
+  return (profiles ?? [])
+    .map((p: { email: string | null }) => p.email)
+    .filter((e: string | null): e is string => !!e);
 }
 
-/**
- * Resolve recipients and dispatch a billing email. Part 3 will replace the
- * console.log + edge-function shape with branded templates. Until then,
- * callers can rely on the recipient resolution and the fact that any send
- * failure will not throw — billing state changes must succeed even if email
- * fails (the payment_events row is the durable record).
- */
+async function getAgencyName(orgId: string): Promise<string | undefined> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabaseAdmin as any)
+    .from("organizations")
+    .select("name")
+    .eq("id", orgId)
+    .maybeSingle();
+  return data?.name ?? undefined;
+}
+
+async function getSenderFor(orgId: string): Promise<{ from: string } | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabaseAdmin as any)
+    .from("org_email_settings")
+    .select("from_name, from_address, verified")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  if (!data || !data.verified || !data.from_address) return null;
+  const name = String(data.from_name || "").trim();
+  return { from: name ? `${name} <${data.from_address}>` : String(data.from_address) };
+}
+
 export async function sendBillingEmail(ctx: BillingEmailContext): Promise<{
   sent: boolean;
   recipients: string[];
+  reason?: string;
 }> {
   try {
     const recipients =
@@ -71,16 +91,40 @@ export async function sendBillingEmail(ctx: BillingEmailContext): Promise<{
         : await getOrgAdminEmails(ctx.orgId);
 
     if (recipients.length === 0) {
-      return { sent: false, recipients: [] };
+      return { sent: false, recipients: [], reason: "no_recipients" };
     }
 
-    // Part 3: render template + invoke send-email. Until then we log only.
-    // eslint-disable-next-line no-console
-    console.log("[billing-email]", ctx.kind, ctx.orgId, recipients.length, "recipient(s)");
+    const agencyName = ctx.data?.agencyName ?? (await getAgencyName(ctx.orgId));
+    const rendered = renderBillingEmail(ctx.kind, { ...ctx.data, agencyName });
+
+    const sender = await getSenderFor(ctx.orgId);
+    if (!sender) {
+      // No verified sender configured — log only. Templates are ready; once
+      // an email domain is set up this branch will switch to sending.
+      // eslint-disable-next-line no-console
+      console.log("[billing-email:no-sender]", ctx.kind, ctx.orgId, recipients.length, "recipient(s)");
+      return { sent: false, recipients, reason: "no_sender_configured" };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: invoke, error } = await (supabaseAdmin as any).functions.invoke("send-email", {
+      body: {
+        from: sender.from,
+        to: recipients,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+      },
+    });
+    if (error || !invoke?.ok) {
+      // eslint-disable-next-line no-console
+      console.error("[billing-email:send-failed]", ctx.kind, ctx.orgId, error?.message || invoke?.error);
+      return { sent: false, recipients, reason: "send_failed" };
+    }
     return { sent: true, recipients };
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error("[billing-email] failed", ctx.kind, ctx.orgId, err);
-    return { sent: false, recipients: [] };
+    console.error("[billing-email:exception]", ctx.kind, ctx.orgId, err);
+    return { sent: false, recipients: [], reason: "exception" };
   }
 }

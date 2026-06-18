@@ -118,7 +118,7 @@ export async function recordPaymentFailure(
   await sendBillingEmail({
     orgId,
     kind: "payment_failed",
-    data: { reason, failure_count: nextFailureCount, next_retry_at: nextRetryAt.toISOString() },
+    data: { reason },
   });
 
   return { ok: true, failure_count: nextFailureCount };
@@ -330,7 +330,7 @@ export async function checkCardExpiryWarnings(): Promise<{ warned: number; org_i
     await sendBillingEmail({
       orgId: row.organization_id,
       kind,
-      data: { days_until: daysUntil, expires_at: row.card_expires_at },
+      data: { daysRemaining: daysUntil, cardExpiresOn: String(row.card_expires_at) },
     });
     warned.push(row.organization_id);
   }

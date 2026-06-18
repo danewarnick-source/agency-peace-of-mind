@@ -1101,8 +1101,8 @@ function Step6Payment({
       await supabase.from("org_subscriptions").upsert(
         {
           organization_id: orgId,
-          plan: "pro", // matches TIER_CATALOG key in src/lib/hive-tiers.ts
-          status: "active",
+          plan: "hive_standard", // single standard plan; "enterprise" is operator-set later
+          status: "active", // providers pay at signup — no trial state
           mrr_cents: monthly * 100,
           staff_count: form.staffCount,
           billing_interval: form.interval,
@@ -1111,6 +1111,11 @@ function Step6Payment({
           cancel_at_period_end: false,
           renewal_date: periodEnd.toISOString().slice(0, 10),
           started_at: nowIso,
+          past_due_since: null,
+          locked_at: null,
+          lock_reason: null,
+          failure_count: 0,
+          last_payment_error: null,
           stripe_customer_id: null,
           stripe_subscription_id: null,
           stripe_payment_method_id: null,

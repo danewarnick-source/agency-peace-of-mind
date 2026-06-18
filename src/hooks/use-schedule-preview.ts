@@ -154,6 +154,6 @@ export function dayCoverageMinutes(day: Date, shifts: ShiftRow[]): number {
 export function startOfWeek(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
-  x.setDate(x.getDate() - x.getDay()); // Sunday
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); // Monday-aligned (Mon=0)
   return x;
 }

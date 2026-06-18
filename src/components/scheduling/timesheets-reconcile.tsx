@@ -73,12 +73,27 @@ export function TimesheetsReconcile() {
   const [homeFilter, setHomeFilter] = useState<string>("all");
   const [editPunch, setEditPunch] = useState<Punch | null>(null);
 
+  const { data: ytdPunches } = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["evv-ytd", org?.organization_id],
+    queryFn: async () => {
+      const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+      const { data: rows } = await supabase
+        .from("evv_timesheets")
+        .select("id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+        .eq("organization_id", org!.organization_id)
+        .gte("clock_in_timestamp", yearStart)
+        .not("clock_out_timestamp", "is", null);
+      return (rows ?? []) as Punch[];
+    },
+  });
+
   const { data, isLoading } = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["ts-reconcile", org?.organization_id, periodStart.toISOString()],
     queryFn: async () => {
       const orgId = org!.organization_id;
-      const [punches, clients, teams, staff, authCodes, billing] = await Promise.all([
+      const [punches, clients, teams, authCodes, billing] = await Promise.all([
         supabase.from("evv_timesheets")
           .select("id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
           .eq("organization_id", orgId)
@@ -87,7 +102,6 @@ export function TimesheetsReconcile() {
           .order("clock_in_timestamp"),
         supabase.from("clients").select("id, first_name, last_name, team_id").eq("organization_id", orgId),
         supabase.from("teams").select("id, team_name").eq("organization_id", orgId),
-        supabase.from("profiles").select("id, full_name, email"),
         (supabase as any).from("provider_authorized_codes")
           .select("code, carve_out, kind, unit").eq("organization_id", orgId),
         (supabase as any).from("client_billing_codes")
@@ -99,10 +113,27 @@ export function TimesheetsReconcile() {
         punches: (punches.data ?? []) as Punch[],
         clients: (clients.data ?? []) as Client[],
         teams: (teams.data ?? []) as Team[],
-        staff: (staff.data ?? []) as Staff[],
         authCodes: (authCodes.data ?? []) as AuthCode[],
         billing: (billing.data ?? []) as ClientBilling[],
       };
+    },
+  });
+
+  // Fetch profiles only for staff IDs that appear in the period punches.
+  // Avoids a full-table scan — profiles has no FK to organization_members.
+  const staffIds = useMemo(
+    () => [...new Set((data?.punches ?? []).map((p) => p.staff_id))],
+    [data?.punches],
+  );
+  const { data: staffProfiles } = useQuery({
+    enabled: staffIds.length > 0,
+    queryKey: ["timesheet-profiles", staffIds],
+    queryFn: async () => {
+      const { data: rows } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", staffIds);
+      return (rows ?? []) as Staff[];
     },
   });
 
@@ -128,9 +159,9 @@ export function TimesheetsReconcile() {
 
   const computed = useMemo(() => {
     if (!data) return null;
-    const { punches, clients, authCodes, billing, staff } = data;
+    const { punches, clients, authCodes, billing } = data;
     const clientById = new Map(clients.map((c) => [c.id, c]));
-    const staffById = new Map(staff.map((s) => [s.id, s]));
+    const staffById = new Map((staffProfiles ?? []).map((s) => [s.id, s]));
     const authByCode = new Map(authCodes.map((a) => [a.code, a]));
     const billingByKey = new Map(billing.map((b) => [`${b.client_id}|${b.service_code}`, b]));
 
@@ -172,9 +203,14 @@ export function TimesheetsReconcile() {
           // Skip discrete carve-outs for the "continuous coverage" line.
           if (ac?.carve_out) continue;
           const ci = new Date(p.clock_in_timestamp).getTime();
+          const punchDayEnd = (() => {
+            const d = new Date(p.clock_in_timestamp);
+            d.setHours(23, 59, 59, 999);
+            return d.getTime();
+          })();
           const co = p.clock_out_timestamp
             ? new Date(p.clock_out_timestamp).getTime()
-            : Math.min(Date.now(), dayEnd);
+            : Math.min(Date.now(), punchDayEnd);
           const s = Math.max(ci, dayStart);
           const e = Math.min(co, dayEnd);
           if (e > s) segs.push([s, e]);
@@ -202,6 +238,8 @@ export function TimesheetsReconcile() {
       authorized: number; used: number; remaining: number;
       onPacePct: number; pacePct: number; rate: number;
     }> = [];
+
+    // Week hours — used only for the "Hours" and "Units" display columns.
     const totalsByKey = new Map<string, number>();
     for (const p of punches) {
       if (!p.clock_out_timestamp) continue;
@@ -210,13 +248,25 @@ export function TimesheetsReconcile() {
       const key = `${p.client_id}|${p.service_type_code}`;
       totalsByKey.set(key, (totalsByKey.get(key) ?? 0) + h);
     }
+
+    // YTD hours — used for the burn-down (remaining / pace) calculation.
+    const ytdByKey = new Map<string, number>();
+    for (const p of (ytdPunches ?? [])) {
+      if (!p.clock_out_timestamp) continue;
+      const h = hoursBetween(p.clock_in_timestamp, p.clock_out_timestamp);
+      if (h <= 0) continue;
+      const key = `${p.client_id}|${p.service_type_code}`;
+      ytdByKey.set(key, (ytdByKey.get(key) ?? 0) + h);
+    }
+
     for (const [key, hours] of totalsByKey) {
       const [client_id, service_code] = key.split("|");
       const c = clientById.get(client_id);
       const b = billingByKey.get(key);
       const authorized = b?.annual_unit_authorization ?? 0;
-      const units = unitsForHours(b?.unit_type ?? "hour", hours);
-      const used = units;
+      const units = unitsForHours(b?.unit_type ?? "hour", hours); // this week — display only
+      const ytdHours = ytdByKey.get(key) ?? hours;
+      const used = unitsForHours(b?.unit_type ?? "hour", ytdHours); // YTD — burn-down
       const remaining = Math.max(0, authorized - used);
       // Pace: weeks elapsed of 52
       const elapsedWeeks = Math.max(1, Math.ceil(((periodStart.getTime() - new Date(periodStart.getFullYear(), 0, 1).getTime()) / 86_400_000) / 7));
@@ -284,7 +334,7 @@ export function TimesheetsReconcile() {
     const paceWarnings = billingRows.filter((r) => r.authorized > 0 && (r.pacePct > r.onPacePct + 10 || r.pacePct < r.onPacePct - 25));
 
     return { coverage, billingRows, payrollRows, openPunches, gaps, overlaps, paceWarnings, homes: Array.from(homes.entries()) };
-  }, [data, periodStart]);
+  }, [data, staffProfiles, periodStart, ytdPunches]);
 
   const visibleCoverage = useMemo(() => {
     if (!computed) return [];
@@ -528,7 +578,7 @@ export function TimesheetsReconcile() {
                   </div>
                   <ul className="divide-y text-sm">
                     {computed.openPunches.map((p) => {
-                      const s = data!.staff.find((x) => x.id === p.staff_id);
+                      const s = (staffProfiles ?? []).find((x) => x.id === p.staff_id);
                       const c = data!.clients.find((x) => x.id === p.client_id);
                       return (
                         <li key={p.id} className="py-2 flex items-center justify-between gap-2">

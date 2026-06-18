@@ -27,6 +27,7 @@ export type SchedShift = {
   ends_at: string;
   status: string;
   published: boolean;
+  parent_shift_id: string | null;
 };
 export type SchedAuth = {
   client_id: string;
@@ -66,7 +67,7 @@ export function useSchedulerData(weekStart: Date) {
           supabase
             .from("scheduled_shifts")
             .select(
-              "id, staff_id, client_id, job_code, service_code, starts_at, ends_at, status, published",
+              "id, staff_id, client_id, job_code, service_code, starts_at, ends_at, status, published, parent_shift_id",
             )
             .eq("organization_id", orgId!)
             .gte("starts_at", weekStart.toISOString())
@@ -144,7 +145,7 @@ export function useSchedulerData(weekStart: Date) {
 export function startOfWeek(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
-  x.setDate(x.getDate() - x.getDay());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); // Monday-aligned (Mon=0)
   return x;
 }
 export function startOfDay(d: Date): Date {

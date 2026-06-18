@@ -172,6 +172,7 @@ export function ShiftEditorDialog({
         staff_id: staffId,
         client_id: clientId,
         job_code: jobCode,
+        service_code: jobCode,
         shift_type: isDaily(jobCode) ? "daily_host_home" : "hourly",
         starts_at: starts ? fromLocalInput(starts) : "",
         ends_at: ends ? fromLocalInput(ends) : "",

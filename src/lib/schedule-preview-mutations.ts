@@ -29,6 +29,7 @@ export type ShiftDraft = {
   staff_id: string;
   client_id: string;
   job_code: string;
+  service_code?: string;
   shift_type: string;
   starts_at: string; // ISO
   ends_at: string;   // ISO
@@ -89,7 +90,7 @@ function buildPayload(draft: ShiftDraft): Record<string, unknown> {
     staff_id: draft.staff_id,
     client_id: draft.client_id,
     job_code: draft.job_code,
-    service_code: draft.job_code,
+    service_code: draft.service_code ?? draft.job_code,
     shift_type: draft.shift_type,
     starts_at: draft.starts_at,
     ends_at: draft.ends_at,

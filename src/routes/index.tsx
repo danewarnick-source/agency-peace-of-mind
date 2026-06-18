@@ -93,19 +93,19 @@ function HiveLandingPage() {
           <div className="hidden items-center gap-8 md:flex">
             <a href="#modules" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               Platform
-            </a>
+            </Link>
             <a href="#nectar" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               NECTAR™
-            </a>
+            </Link>
             <a href="#compliance" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               Compliance
-            </a>
+            </Link>
             <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               Pricing
             </Link>
             <a href="#faq" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               FAQ
-            </a>
+            </Link>
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
@@ -117,9 +117,9 @@ function HiveLandingPage() {
               size="sm"
               className="bg-nectar-gold-500 text-hive-navy-800 hover:bg-nectar-gold-600"
             >
-              <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">
+              <Link to="/demo">
                 Book a demo <ArrowRight className="h-4 w-4" />
-              </a>
+              </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link to="/signup">Get started</Link>
@@ -151,7 +151,7 @@ function HiveLandingPage() {
                   className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-surface-warm"
                 >
                   {label}
-                </a>
+                </Link>
               ))}
               <Link
                 to="/pricing"
@@ -169,9 +169,9 @@ function HiveLandingPage() {
                   size="sm"
                   className="flex-1 bg-nectar-gold-500 text-hive-navy-800 hover:bg-nectar-gold-600"
                 >
-                  <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">
+                  <Link to="/demo">
                     Book a demo
-                  </a>
+                  </Link>
                 </Button>
                 <Button asChild variant="outline" size="sm" className="flex-1">
                   <Link to="/signup">Get started</Link>
@@ -206,9 +206,9 @@ function HiveLandingPage() {
                 size="lg"
                 className="bg-nectar-gold-500 text-hive-navy-800 hover:bg-nectar-gold-600 shadow-glow"
               >
-                <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">
+                <Link to="/demo">
                   Book a demo <ArrowRight className="h-4 w-4" />
-                </a>
+                </Link>
               </Button>
               <Button
                 asChild
@@ -598,9 +598,9 @@ function HiveLandingPage() {
               size="lg"
               className="bg-hive-navy-800 text-white hover:bg-hive-navy-700"
             >
-              <a href="https://calendly.com/hive-booking" target="_blank" rel="noopener noreferrer">
+              <Link to="/demo">
                 Book a demo <ArrowRight className="h-4 w-4" />
-              </a>
+              </Link>
             </Button>
             <Button
               asChild

@@ -67,7 +67,30 @@ function CompanyDetailPage() {
     setLegalEdit(d.legal_name ?? "");
     setDbaEdit(d.dba_name ?? "");
     setAcronymEdit(d.display_acronym ?? "");
+    setContactName(d.signup?.contact_name ?? "");
+    setContactEmail(d.signup?.contact_email ?? "");
+    setContactPhone(d.signup?.contact_phone ?? "");
   }, [detailQ.data]);
+
+  const saveContact = useMutation({
+    mutationFn: () =>
+      saveContactFn({
+        data: {
+          organizationId: orgId,
+          patch: {
+            name: contactName.trim() || null,
+            email: contactEmail.trim() || null,
+            phone: contactPhone.trim() || null,
+          },
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Account contact updated");
+      qc.invalidateQueries({ queryKey: ["hive-exec-company", orgId] });
+      qc.invalidateQueries({ queryKey: ["account-contact", orgId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Save failed"),
+  });
 
 
   const save = useMutation({

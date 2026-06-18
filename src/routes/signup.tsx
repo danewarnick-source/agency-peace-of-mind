@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { checkEmailExists } from "@/lib/signup-checks.functions";
+import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
+import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({

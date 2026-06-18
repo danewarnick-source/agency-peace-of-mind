@@ -49,6 +49,52 @@ function DashboardShellError({ error }: { error: Error; reset: () => void }) {
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — HIVE" }] }),
+  // Lockout gate — runs on every dashboard navigation. If the user's active
+  // org has org_subscriptions.locked_at set, redirect to /billing-locked.
+  // Admins keep access to the billing/subscription page so they can pay.
+  beforeLoad: async ({ location }) => {
+    if (typeof window === "undefined") return; // SSR has no session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) return;
+
+    // Resolve active org (matches use-org.ts contract).
+    let activeOrgId: string | null = null;
+    try { activeOrgId = window.localStorage.getItem("hive.activeOrgId"); } catch { /* ignore */ }
+
+    // Fetch the caller's memberships once — we need role too.
+    const { data: memberships } = await supabase
+      .from("organization_members")
+      .select("organization_id, role")
+      .eq("user_id", session.user.id)
+      .eq("active", true);
+    if (!memberships || memberships.length === 0) return;
+
+    const membership =
+      memberships.find((m) => m.organization_id === activeOrgId) ?? memberships[0];
+    const orgId = membership.organization_id;
+    const isAdmin = membership.role === "admin" || membership.role === "super_admin";
+
+    const { data: sub } = await supabase
+      .from("org_subscriptions")
+      .select("locked_at")
+      .eq("organization_id", orgId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!sub?.locked_at) return;
+
+    // Locked. Allow admins on the billing/subscription page so they can pay.
+    const path = location.pathname;
+    const billingAllowlist = [
+      "/dashboard/billing/subscription",
+      "/dashboard/settings/subscription",
+    ];
+    if (isAdmin && billingAllowlist.some((p) => path === p || path.startsWith(p + "/"))) {
+      return;
+    }
+    throw redirect({ to: "/billing-locked" });
+  },
   component: DashboardLayout,
   errorComponent: DashboardShellError,
 });

@@ -27,13 +27,13 @@ function CompanyDetailPage() {
   const detailQ = useQuery({
     queryKey: ["hive-exec-company", orgId],
     queryFn: () => detailFn({ data: { organizationId: orgId } }),
+    refetchInterval: 30_000,
   });
 
-  const [plan, setPlan] = useState("starter");
-  const [status, setStatus] = useState("trial");
+  const [plan, setPlan] = useState("hive_standard");
+  const [status, setStatus] = useState("active");
   const [mrr, setMrr] = useState("0");
   const [renewal, setRenewal] = useState("");
-  const [trial, setTrial] = useState("");
   const [notes, setNotes] = useState("");
 
   // Org identifying-info edit state
@@ -51,7 +51,6 @@ function CompanyDetailPage() {
     setStatus(s.status);
     setMrr(String((s.mrr_cents / 100).toFixed(2)));
     setRenewal(s.renewal_date ?? "");
-    setTrial(s.trial_ends_at ?? "");
     setNotes(s.notes ?? "");
   }, [detailQ.data?.subscription]);
 
@@ -75,7 +74,6 @@ function CompanyDetailPage() {
             status,
             mrr_cents: Math.round(parseFloat(mrr || "0") * 100),
             renewal_date: renewal || null,
-            trial_ends_at: trial || null,
             notes: notes || null,
           },
         },

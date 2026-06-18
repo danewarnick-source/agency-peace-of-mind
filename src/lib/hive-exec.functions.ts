@@ -37,11 +37,13 @@ export interface CompanyDetail {
   /** Provider-submitted fields captured during signup. Read-only in exec UI. */
   signup: {
     contact_name: string | null;
+    contact_email: string | null;
     contact_phone: string | null;
     staff_count_at_signup: number | null;
     billing_interval: string | null; // 'monthly' | 'annual'
     signup_date: string | null;
   };
+
 
   subscription: {
     plan: string;

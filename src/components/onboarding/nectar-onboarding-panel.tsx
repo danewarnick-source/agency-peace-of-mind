@@ -472,40 +472,44 @@ function Step1Sources({
       <AuthoritativeSourceDrop orgId={orgId} onUploaded={onChanged}>
         <ul className="space-y-2">
           {DOC_TYPES.map((dt) => (
-            <li
-              key={dt.kind}
-              className={cn(
-                "flex items-start gap-3 rounded-xl border px-3 py-2.5",
-                dt.required && !sowUploaded
-                  ? "border-[color:var(--amber-400,#f4a93a)]/50 bg-amber-400/5"
-                  : "border-white/10 bg-white/[0.03]",
-              )}
-            >
-              <span
+            <li key={dt.kind}>
+              <Link
+                to="/dashboard/authoritative-sources"
+                search={{ from: "onboarding", step: 1, type: dt.kind } as never}
                 className={cn(
-                  "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-                  dt.kind === "state_sow" && sowUploaded
-                    ? "bg-emerald-500/20 text-emerald-200"
-                    : "bg-white/10 text-amber-200",
+                  "flex items-start gap-3 rounded-xl border px-3 py-2.5 transition hover:border-[color:var(--amber-400,#f4a93a)]/60 hover:bg-amber-400/10",
+                  dt.required && !sowUploaded
+                    ? "border-[color:var(--amber-400,#f4a93a)]/50 bg-amber-400/5"
+                    : "border-white/10 bg-white/[0.03]",
                 )}
               >
-                {dt.kind === "state_sow" && sowUploaded ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                ) : (
-                  <Upload className="h-3.5 w-3.5" />
-                )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-amber-50">{dt.label}</span>
-                  {dt.required && (
-                    <span className="rounded-full bg-[color:var(--amber-500,#f4a93a)]/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
-                      Required
-                    </span>
+                <span
+                  className={cn(
+                    "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                    dt.kind === "state_sow" && sowUploaded
+                      ? "bg-emerald-500/20 text-emerald-200"
+                      : "bg-white/10 text-amber-200",
                   )}
+                >
+                  {dt.kind === "state_sow" && sowUploaded ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-amber-50">{dt.label}</span>
+                    {dt.required && (
+                      <span className="rounded-full bg-[color:var(--amber-500,#f4a93a)]/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+                        Required
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-amber-100/70">{dt.hint}</p>
                 </div>
-                <p className="text-xs text-amber-100/70">{dt.hint}</p>
-              </div>
+                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-amber-100/40" />
+              </Link>
             </li>
           ))}
         </ul>
@@ -514,6 +518,7 @@ function Step1Sources({
           you confirm, and it joins the source-of-truth set.
         </p>
       </AuthoritativeSourceDrop>
+
 
       {sowUploaded && (
         <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-3 text-sm text-emerald-100">

@@ -671,6 +671,12 @@ export function PunchPad({
         isFinite(homeCoords.lat) &&
         isFinite(homeCoords.lng)
       ) {
+        // Low-confidence fixes can't auto-pass the geofence or match approved locations.
+        if (!gpsConfident) {
+          setVariance({ distanceFeet: undefined, limitFeet: mapRadiusFeet, pos });
+          setVarianceReason("");
+          return;
+        }
         // Approved locations skip the variance prompt — actual GPS still captured.
         const matched = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
         const dist = haversineFeet(homeCoords, { lat: pos.lat, lng: pos.lng });

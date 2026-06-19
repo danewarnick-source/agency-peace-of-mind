@@ -859,6 +859,7 @@ export function IncidentReportDialog({
 
   const submit = useMutation({
     mutationFn: async () => {
+      if (!canManageIncidents) throw new Error("You don't have permission to report incidents.");
       if (!pickedClientId) throw new Error("Pick the individual involved.");
       if (!category) throw new Error("Pick an incident category.");
 

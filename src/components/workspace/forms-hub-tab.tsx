@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, CalendarClock, CheckCircle2, AlertTriangle } from "lucide-react";
 import { IncidentReportDialog } from "@/components/incidents/incident-report-dialog";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { usePermissions } from "@/hooks/use-permissions";
 
 type FormRow = {
   id: string;

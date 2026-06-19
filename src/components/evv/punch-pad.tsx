@@ -157,6 +157,8 @@ export function PunchPad({
   const [gpsAcquiring, setGpsAcquiring] = useState(true);
   const [awaitingGps, setAwaitingGps] = useState(false);
 
+  const gpsConfident = !!livePos && isFinite(livePos.acc) && livePos.acc <= MAX_GPS_ACCURACY_METERS;
+
   useEffect(() => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
       setHardwareDenied(true);

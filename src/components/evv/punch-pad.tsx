@@ -518,9 +518,11 @@ export function PunchPad({
       : null;
 
   const insideZone =
-    homeCoords && livePos
+    homeCoords && livePos && gpsConfident
       ? haversineFeet(homeCoords, livePos) <= mapRadiusFeet
-      : true;
+      : homeCoords && livePos
+        ? false
+        : true;
 
   // ── Readiness guard ─────────────────────────────────────────────────────────
   const requireFacility = entryType === "General_Sidebar_Unscheduled";

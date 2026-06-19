@@ -64,7 +64,13 @@ export function FormsHubTab({ clientId, clientName }: { clientId: string; client
             </div>
           </div>
           <div className="mt-3 flex justify-end">
-            <Button size="sm" className="min-h-[44px]" onClick={() => setIncidentOpen(true)}>
+            <Button
+              size="sm"
+              className="min-h-[44px]"
+              onClick={() => setIncidentOpen(true)}
+              disabled={!canManageIncidents}
+              title={!canManageIncidents ? "You don't have permission to report incidents." : undefined}
+            >
               Open Incident Report
             </Button>
           </div>

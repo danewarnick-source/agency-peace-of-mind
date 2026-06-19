@@ -145,7 +145,7 @@ function ClientProfileHub() {
           <IncidentsPanel clientId={clientId} orgId={orgId} />
         </TabsContent>
         <TabsContent value="summaries" className="mt-6">
-          <SummariesPanel clientId={clientId} orgId={orgId} />
+          <SummariesPanel clientId={clientId} orgId={orgId} client={client} />
         </TabsContent>
         {isHostHome ? (
           <TabsContent value="hhcert" className="mt-6">

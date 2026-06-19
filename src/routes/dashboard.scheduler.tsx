@@ -1114,7 +1114,7 @@ function AddShiftDialog({
           <Button
             onClick={() => saveMut.mutate()}
             disabled={!clientId || !code || saveMut.isPending || !canManageSchedule}
-            disabled={!clientId || !code || saveMut.isPending}
+            
             style={{ background: GOLD, color: NAVY }}
           >
             {saveMut.isPending ? "Saving…" : "Add shift"}

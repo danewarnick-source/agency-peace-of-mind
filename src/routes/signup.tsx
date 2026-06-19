@@ -591,49 +591,66 @@ function Step3Business({
       return;
     }
     setBusy(true);
-    // The org row is auto-created by the handle_new_user trigger using the
-    // metadata we sent during signUp. Update the org name/contact details now
-    // that the user has filled them in (and ensure profile is up to date).
     try {
       const { data: userResp } = await supabase.auth.getUser();
       const uid = userResp.user?.id;
-      if (uid) {
+      if (!uid) {
+        toast.error("Your workspace isn't ready yet — please refresh and try again.");
+        setBusy(false);
+        return;
+      }
+
+      // Best-effort profile update — don't block on failure.
+      try {
         await supabase.from("profiles").update({
           full_name: form.contactName,
           agency_name: form.agencyName,
         }).eq("id", uid);
+      } catch {
+        /* non-blocking */
+      }
 
-        // Find the org this user owns (created_by) and update name/provider id
-        const { data: orgs } = await supabase
-          .from("organizations")
-          .select("id")
-          .eq("created_by", uid)
-          .limit(1);
-        const orgId = orgs?.[0]?.id;
-        if (orgId) {
-          await supabase
-            .from("organizations")
-            .update({
-              name: form.agencyName,
-              state_code: "UT",
-              dhhs_provider_id: form.providerNumber || null,
-              account_contact_name: form.contactName || null,
-              account_contact_email: userResp.user?.email ?? null,
-            })
-            .eq("id", orgId);
-          // Persist required billing SMS phone (server-side, E.164 normalized).
-          try {
-            await setSmsPhoneFn({ data: { organizationId: orgId, phone: form.phone } });
-          } catch (e) {
-            console.warn("[signup] sms phone save failed", e);
-            toast.error("Could not save your mobile number. Please try again.");
-            setBusy(false);
-            return;
-          }
-        }
+      const { data: orgs } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("created_by", uid)
+        .limit(1);
+      const orgId = orgs?.[0]?.id;
+      if (!orgId) {
+        toast.error("Your workspace isn't ready yet — please refresh and try again.");
+        setBusy(false);
+        return;
+      }
+
+      const { error: orgErr } = await supabase
+        .from("organizations")
+        .update({
+          name: form.agencyName,
+          state_code: "UT",
+          dhhs_provider_id: form.providerNumber || null,
+          account_contact_name: form.contactName || null,
+          account_contact_email: userResp.user?.email ?? null,
+        })
+        .eq("id", orgId);
+      if (orgErr) {
+        toast.error("Couldn't save your business details — please try again.");
+        setBusy(false);
+        return;
+      }
+
+      try {
+        await setSmsPhoneFn({ data: { organizationId: orgId, phone: form.phone } });
+      } catch (e) {
+        console.warn("[signup] sms phone save failed", e);
+        toast.error("Could not save your mobile number. Please try again.");
+        setBusy(false);
+        return;
       }
     } catch (e) {
-      console.warn("[signup] business save failed (non-fatal)", e);
+      console.warn("[signup] business save failed", e);
+      toast.error("Couldn't save your business details — please try again.");
+      setBusy(false);
+      return;
     }
     setBusy(false);
     onNext();
@@ -1093,7 +1110,7 @@ function Step6Payment({
       // integration only needs to populate the stripe_* ids via webhooks.
       // Card details are intentionally never stored.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from("org_subscriptions") as any).upsert(
+      const { error: subErr } = await (supabase.from("org_subscriptions") as any).upsert(
         {
           organization_id: orgId,
           plan: "hive_standard", // single standard plan; "enterprise" is operator-set later
@@ -1117,6 +1134,7 @@ function Step6Payment({
         },
         { onConflict: "organization_id" },
       );
+      if (subErr) throw subErr;
 
       // Training order — separate table so a Stripe PaymentIntent webhook
       // can flip status to 'paid' and attach stripe_payment_intent_id.
@@ -1130,7 +1148,7 @@ function Step6Payment({
             ? ["cpr", "mandt", "dspd"]
             : [];
 
-      await supabase.from("org_training_orders").insert({
+      const { error: trainErr } = await supabase.from("org_training_orders").insert({
         organization_id: orgId,
         training_type: trainingType,
         selected_modules: selectedModules,
@@ -1139,6 +1157,7 @@ function Step6Payment({
         status: trainingCharge > 0 ? "paid" : "pending",
         stripe_payment_intent_id: null,
       });
+      if (trainErr) throw trainErr;
 
 
       toast.success("Welcome to Hive!");

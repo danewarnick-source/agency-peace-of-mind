@@ -35,6 +35,7 @@ import {
   saveShift, deleteShift, publishWeek, addToCaseload, setAdminTimeOff,
   saveDayProgramSession, markAttendance, addSessionStaff,
 } from "@/lib/scheduler/scheduler.functions";
+import { isClockableServiceCode } from "@/lib/service-billing";
 import { evvServiceLabel } from "@/lib/evv-codes";
 import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 import { NectarBar } from "@/components/scheduler/nectar-bar";
@@ -70,12 +71,11 @@ const SECTION_OVERRIDES: Record<string, string> = {
   COM: "Companion",
   PAC: "Personal Assistance",
   RP2: "Respite",
-  HHS: "Host Home — administrative hours",
   RHS: "Residential Hab",
   PM1: "Med Monitoring",
   DSI: "Individual Day Support",
 };
-const SECTION_ORDER = ["SLH", "COM", "PAC", "RP2", "HHS", "RHS", "PM1", "DSI"];
+const SECTION_ORDER = ["SLH", "COM", "PAC", "RP2", "RHS", "PM1", "DSI"];
 const DAY_PROGRAM_CODES = new Set(["DSG", "DSP"]);
 
 function sectionLabelFor(code: string): string {
@@ -319,6 +319,7 @@ function SchedulerBody({
           for (const a of data.auths) {
             const c = (a.service_code ?? "").toUpperCase();
             if (!c || DAY_PROGRAM_CODES.has(c)) continue;
+            if (!isClockableServiceCode(c)) continue; // HHS/PPS/MTP are daily-rate non-clockable
             authedCodes.add(c);
           }
           const ordered = [
@@ -328,7 +329,7 @@ function SchedulerBody({
           if (ordered.length === 0) {
             return (
               <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground text-center" style={{ borderColor: LINE }}>
-                No clients are authorized for any scheduler-eligible codes yet. Add a code on a client profile to start scheduling.
+                No clients are scheduled for clocked shifts yet. Clients with only daily-rate services (like Host Home) don't appear here — manage them through their profile, daily logs, eMAR, and billing. Add a clocked code (e.g. DSI, SEI) to a client to schedule shifts.
               </div>
             );
           }

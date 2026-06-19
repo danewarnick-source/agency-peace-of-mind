@@ -275,7 +275,7 @@ function RowAction({ item }: { item: DeadlineItem }) {
 /** Compact card for the Home dashboard. */
 export function DeadlinesHomeCard() {
   const { overdue, dueSoon, isLoading } = useDeadlines();
-  const counts = useMemo(() => ({ overdue: overdueF.length, dueSoon: dueSoonF.length }), [overdue, dueSoon]);
+  const counts = useMemo(() => ({ overdue: overdue.length, dueSoon: dueSoon.length }), [overdue, dueSoon]);
   return (
     <Link to="/dashboard/deadlines" className="block">
       <Card className="transition hover:border-[#137182]/40 hover:shadow-[var(--shadow-card)]">

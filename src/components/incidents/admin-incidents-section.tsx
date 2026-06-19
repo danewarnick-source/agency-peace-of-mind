@@ -523,31 +523,35 @@ function IncidentCard({
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          {!closed && !ir.upi_initiated_at && (
-            <Button size="sm" onClick={() => onInitiate(ir.id)}>
-              <FileCheck2 className="mr-1 h-3.5 w-3.5" />Mark initiated in UPI
+        {canManageIncidents ? (
+          <div className="flex flex-wrap gap-2">
+            {!closed && !ir.upi_initiated_at && (
+              <Button size="sm" onClick={() => onInitiate(ir.id)}>
+                <FileCheck2 className="mr-1 h-3.5 w-3.5" />Mark initiated in UPI
+              </Button>
+            )}
+            {!closed && !isOwnGuardian && !ir.guardian_notified_at && (
+              <Button size="sm" variant="outline" onClick={() => onNotify(ir)}>
+                <Phone className="mr-1 h-3.5 w-3.5" />Log guardian notification
+              </Button>
+            )}
+            {!closed && !ir.upi_completed_at && (
+              <Button size="sm" variant="outline" onClick={() => onComplete(ir.id)}>
+                <CheckCircle2 className="mr-1 h-3.5 w-3.5" />Mark detailed report completed
+              </Button>
+            )}
+            {!ir.sc_update_signed_at && (
+              <Button size="sm" variant="outline" onClick={() => onScUpdate(ir.id)}>
+                <UserCheck className="mr-1 h-3.5 w-3.5" />Log SC update
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => onLogSc(ir.id)}>
+              <MessageSquare className="mr-1 h-3.5 w-3.5" />Log SC information request
             </Button>
-          )}
-          {!closed && !isOwnGuardian && !ir.guardian_notified_at && (
-            <Button size="sm" variant="outline" onClick={() => onNotify(ir)}>
-              <Phone className="mr-1 h-3.5 w-3.5" />Log guardian notification
-            </Button>
-          )}
-          {!closed && !ir.upi_completed_at && (
-            <Button size="sm" variant="outline" onClick={() => onComplete(ir.id)}>
-              <CheckCircle2 className="mr-1 h-3.5 w-3.5" />Mark detailed report completed
-            </Button>
-          )}
-          {!ir.sc_update_signed_at && (
-            <Button size="sm" variant="outline" onClick={() => onScUpdate(ir.id)}>
-              <UserCheck className="mr-1 h-3.5 w-3.5" />Log SC update
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => onLogSc(ir.id)}>
-            <MessageSquare className="mr-1 h-3.5 w-3.5" />Log SC information request
-          </Button>
-        </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">View only — you don't have permission to edit incidents.</p>
+        )}
       </CardContent>
     </Card>
   );

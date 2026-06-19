@@ -11,7 +11,7 @@ import { useEffectiveView } from "@/hooks/use-effective-view";
 import { useCaseload } from "@/hooks/use-caseload";
 import {
   listForms, listMyForms, archiveForm, saveForm,
-  getMyFormNotifications, markFormNotificationsRead,
+  getMyFormNotifications, markFormNotificationsRead, seedIntakeForms,
 } from "@/lib/forms.functions";
 import {
   periodKeyFor, dueDateFor, formatDue, describeFrequency, isOverdue,

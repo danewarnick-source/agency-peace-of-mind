@@ -296,6 +296,23 @@ export function ClientsPage() {
         guardian_email:       isOwn ? null : (input.guardian_email?.trim() || null),
       }).select("id").single();
       if (error) throw error;
+
+      const codes = (input.job_code ?? []).map((c) => c.toUpperCase()).filter(Boolean);
+      if (codes.length) {
+        const stubRows = codes.map((service_code) => ({
+          organization_id: org!.organization_id,
+          client_id: data!.id,
+          service_code,
+          unit_type: isDailyServiceCode(service_code) ? "day" : "unit",
+          annual_unit_authorization: 0,
+          rate_per_unit: 0,
+        }));
+        const { error: bcErr } = await (supabase as any)
+          .from("client_billing_codes")
+          .upsert(stubRows, { onConflict: "organization_id,client_id,service_code" });
+        if (bcErr) throw bcErr;
+      }
+
       return { id: data!.id as string, mode: input.intake_mode };
     },
     onSuccess: ({ id, mode }) => {

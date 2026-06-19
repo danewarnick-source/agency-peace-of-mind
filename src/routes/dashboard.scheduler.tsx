@@ -262,12 +262,18 @@ function SchedulerBody({
 }) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
+  const { can } = usePermissions();
+  const canManageSchedule = can("manage_schedule");
   const [addOpen, setAddOpen] = useState(false);
   const [addPrefill, setAddPrefill] = useState<{ clientId?: string; code?: string; day?: Date } | null>(null);
   const [detailShiftId, setDetailShiftId] = useState<string | null>(null);
   const [hhsClientForHours, setHhsClientForHours] = useState<SchedClient | null>(null);
 
   function openAdd(prefill?: { clientId?: string; code?: string; day?: Date }) {
+    if (!canManageSchedule) {
+      toast.error("You don't have permission to create or edit shifts.");
+      return;
+    }
     setAddPrefill(prefill ?? null);
     setAddOpen(true);
   }

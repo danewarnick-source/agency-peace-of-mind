@@ -85,6 +85,8 @@ const TIMEZONES = [
   { v: "America/New_York",    l: "Eastern" },
 ];
 
+const MAX_GPS_ACCURACY_METERS = 100; // readings worse (larger) than this are too coarse to trust
+
 import { haversineFeet as _sharedHaversineFeet } from "@/lib/geo";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

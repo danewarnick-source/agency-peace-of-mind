@@ -80,6 +80,8 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   view_referrals: "View referrals (CRM)",
   manage_referrals: "Manage referrals (CRM)",
   send_emails: "Send emails (Resend rail)",
+  manage_schedule: "Manage schedule (create/edit shifts)",
+  manage_incidents: "Manage incidents (report/edit)",
 };
 
 

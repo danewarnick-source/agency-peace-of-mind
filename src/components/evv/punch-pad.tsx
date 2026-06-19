@@ -542,7 +542,9 @@ export function PunchPad({
       return { text: "📍 GPS confirmed. Select a service code above.", color: "neutral" as const };
     if (!isEvvLockedCode(serviceCode))
       return { text: `🛈 ${serviceCode} — GPS logged passively, geofence not enforced for this code.`, color: "neutral" as const };
-    const matchedHere = livePos ? matchApprovedLocation({ lat: livePos.lat, lng: livePos.lng }) : null;
+    if (livePos && !gpsConfident)
+      return { text: `📡 GPS signal is too weak to confirm your location (±${Math.round(livePos.acc)} m). A written variance will be required when you clock in.`, color: "amber" as const };
+    const matchedHere = livePos && gpsConfident ? matchApprovedLocation({ lat: livePos.lat, lng: livePos.lng }) : null;
     if (matchedHere)
       return { text: `🟢 GPS confirmed — inside approved location "${matchedHere.label}". No variance required.`, color: "green" as const };
     if (insideZone)

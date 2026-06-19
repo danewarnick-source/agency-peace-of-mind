@@ -598,9 +598,10 @@ export function PunchPad({
     if (!user || !org || !clientForPunch) return;
     const nowIso = new Date().toISOString();
     const isOutOfBounds = !!args.outsideReason;
-    const matched = args.pos
-      ? matchApprovedLocation({ lat: args.pos.lat, lng: args.pos.lng })
-      : null;
+    const matched =
+      args.pos && isFinite(args.pos.acc) && args.pos.acc <= MAX_GPS_ACCURACY_METERS
+        ? matchApprovedLocation({ lat: args.pos.lat, lng: args.pos.lng })
+        : null;
 
     const payload = {
       organization_id:             org.organization_id,

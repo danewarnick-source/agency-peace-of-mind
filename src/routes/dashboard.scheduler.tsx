@@ -26,6 +26,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   useSchedulerData, startOfWeek, startOfDay, startOfMonth,
   type SchedClient, type SchedStaff, type SchedShift,

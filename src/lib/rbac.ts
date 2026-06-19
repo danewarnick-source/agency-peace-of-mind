@@ -45,6 +45,8 @@ export const ALL_PERMISSIONS = [
   "view_referrals",
   "manage_referrals",
   "send_emails",
+  "manage_schedule",
+  "manage_incidents",
 ] as const;
 
 

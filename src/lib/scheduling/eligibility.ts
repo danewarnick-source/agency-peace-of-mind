@@ -71,7 +71,7 @@ export function rankEligibility(inputs: EligibilityInputs): EligibilityResult[] 
       // Host staff never appear in the picker for shifts at their own home.
       return {
         staffId: s.id, rank: 0, blocked: true,
-        warnings: [], blockers: ["Host of this home — excluded from shift scheduling"],
+        warnings: [], blockers: ["Host provider for this client — excluded from their shifts"],
         projectedWeeklyHours: 0, durationHours: shiftDuration,
       };
     }

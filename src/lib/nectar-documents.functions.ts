@@ -259,21 +259,53 @@ export const ingestDocument = createServerFn({ method: "POST" })
       }
 
       const ai = await callLovableAI(text, `documentType=${data.documentType}`);
-      const rows = (ai.fields ?? []).map((f) => ({
-        organization_id: data.organizationId,
-        document_id: doc.id,
-        field_key: f.field_key,
-        field_group: f.field_group ?? null,
-        value_text: f.value_text ?? null,
-        value_number: f.value_number ?? null,
-        value_date: f.value_date ?? null,
-        value_json: f.value_json ?? null,
-        source_locator: f.source_locator ?? null,
-        confidence: f.confidence ?? null,
-        status: "proposed" as const,
-      }));
+      const rows = (ai.fields ?? []).map((f) => {
+        // Fold value_bool / value_array into value_json so they persist (the
+        // table has no boolean/array columns).
+        let value_json = f.value_json ?? null;
+        if (f.value_bool !== undefined && f.value_bool !== null) {
+          value_json = { ...(value_json ?? {}), bool: f.value_bool };
+        }
+        if (f.value_array && f.value_array.length) {
+          value_json = { ...(value_json ?? {}), array: f.value_array };
+        }
+        return {
+          organization_id: data.organizationId,
+          document_id: doc.id,
+          field_key: f.field_key,
+          field_group: f.field_group ?? null,
+          value_text: f.value_text ?? null,
+          value_number: f.value_number ?? null,
+          value_date: f.value_date ?? null,
+          value_json,
+          source_locator: f.source_locator ?? null,
+          confidence: f.confidence ?? null,
+          status: "proposed" as const,
+        };
+      });
       if (rows.length) {
         await supabase.from("nectar_extracted_fields").insert(rows);
+      }
+
+      // ─── Autofill the client record from extracted fields ───────────
+      let autofillResult: { autofilled: string[]; suggested: string[] } = {
+        autofilled: [],
+        suggested: [],
+      };
+      let autofillError: string | null = null;
+      const effectiveDocType = (ai.document_type ?? data.documentType ?? "").toLowerCase();
+      const AUTOFILL_TYPES = new Set(["pcsp", "1056_budget", "intake", "assessment"]);
+      if (data.clientId && AUTOFILL_TYPES.has(effectiveDocType)) {
+        try {
+          autofillResult = await applyClientAutofill({
+            supabase,
+            organizationId: data.organizationId,
+            clientId: data.clientId,
+            fields: ai.fields ?? [],
+          });
+        } catch (err) {
+          autofillError = (err as Error).message;
+        }
       }
 
       await supabase
@@ -282,13 +314,19 @@ export const ingestDocument = createServerFn({ method: "POST" })
           parse_status: "parsed",
           parsed_at: new Date().toISOString(),
           raw_text: text.slice(0, 50000),
+          parse_error: autofillError ? `autofill: ${autofillError}` : null,
           // Backfill any fields the parser identified more confidently than the user input
           fiscal_year: data.fiscalYear ?? ai.fiscal_year ?? null,
           medicaid_id: data.medicaidId ?? ai.medicaid_id ?? null,
         })
         .eq("id", doc.id);
 
-      return { document: doc, extracted: rows };
+      return {
+        document: doc,
+        extracted: rows,
+        autofilled: autofillResult.autofilled,
+        suggested: autofillResult.suggested,
+      };
     } catch (err) {
       await supabase
         .from("nectar_documents")

@@ -234,7 +234,7 @@ export function PunchPad({
 
   // ── Clock-out variance state ────────────────────────────────────────────────
   const [outVariance, setOutVariance] = useState<null | {
-    distanceFeet: number;
+    distanceFeet?: number;
     limitFeet: number;
     pos: { lat: number; lng: number; acc: number };
   }>(null);

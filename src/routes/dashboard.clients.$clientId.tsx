@@ -381,7 +381,7 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                     onClick={() => removeAt(i)}
                     aria-label="Remove goal"
                   >
-                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </li>
               ))}

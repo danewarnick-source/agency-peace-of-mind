@@ -1113,6 +1113,7 @@ function AddShiftDialog({
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             onClick={() => saveMut.mutate()}
+            disabled={!clientId || !code || saveMut.isPending || !canManageSchedule}
             disabled={!clientId || !code || saveMut.isPending}
             style={{ background: GOLD, color: NAVY }}
           >

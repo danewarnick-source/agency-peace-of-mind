@@ -2971,6 +2971,11 @@ function AddClientDialog({
             special_directions: "", date_of_birth: "",
             emergency_contact_name: "", emergency_contact_phone: "",
             profile_photo_url: "",
+            is_own_guardian: isOwnGuardian,
+            guardian_name: isOwnGuardian ? "" : gName.trim(),
+            guardian_phone: isOwnGuardian ? "" : gPhone.trim(),
+            guardian_relationship: isOwnGuardian ? "" : gRel.trim(),
+            guardian_email: isOwnGuardian ? "" : gEmail.trim(),
             intake_mode: mode,
           })}
           disabled={!canSubmit || pending}

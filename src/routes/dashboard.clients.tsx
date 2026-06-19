@@ -2929,6 +2929,37 @@ function AddClientDialog({
             </SelectContent>
           </Select>
         </div>
+
+        <div className="rounded-lg border border-border p-3 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+            <Checkbox checked={isOwnGuardian} onCheckedChange={(v) => setIsOwnGuardian(!!v)} />
+            Client is their own guardian
+          </label>
+          {!isOwnGuardian && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Guardian Name *</Label>
+                  <Input value={gName} onChange={(e) => setGName(e.target.value)} maxLength={150} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Guardian Phone *</Label>
+                  <Input value={gPhone} onChange={(e) => setGPhone(e.target.value)} maxLength={30} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Relationship</Label>
+                  <Input value={gRel} onChange={(e) => setGRel(e.target.value)} maxLength={100} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Guardian Email</Label>
+                  <Input value={gEmail} onChange={(e) => setGEmail(e.target.value)} maxLength={150} type="email" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       <DialogFooter>
         <Button

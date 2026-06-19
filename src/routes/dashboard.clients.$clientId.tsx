@@ -127,7 +127,7 @@ function ClientProfileHub() {
           <OverviewPanel client={client} clientId={clientId} isHostHome={isHostHome} orgId={orgId} />
         </TabsContent>
         <TabsContent value="plan" className="mt-6">
-          <PlanGoalsPanel client={client} />
+          <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
         </TabsContent>
         <TabsContent value="codes" className="mt-6">
           <BillingCodesPanel clientId={clientId} />

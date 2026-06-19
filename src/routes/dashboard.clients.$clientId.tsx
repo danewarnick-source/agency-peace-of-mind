@@ -145,7 +145,7 @@ function ClientProfileHub() {
           <IncidentsPanel clientId={clientId} orgId={orgId} />
         </TabsContent>
         <TabsContent value="summaries" className="mt-6">
-          <SummariesPanel clientId={clientId} orgId={orgId} />
+          <SummariesPanel clientId={clientId} orgId={orgId} client={client} />
         </TabsContent>
         {isHostHome ? (
           <TabsContent value="hhcert" className="mt-6">
@@ -578,14 +578,16 @@ function IncidentsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
   );
 }
 
-function SummariesPanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
+function SummariesPanel({ clientId, orgId, client }: { clientId: string; orgId?: string; client: ClientRow }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
   const q = useQuery({
     enabled: !!orgId,
     queryKey: ["client-profile-summaries", orgId, clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_progress_summaries")
-        .select("id, summary_kind, period_kind, period_label, period_start, period_end, status, finalized_at")
+        .select("id, summary_kind, period_kind, period_label, period_start, period_end, status, finalized_at, due_date")
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
         .order("period_end", { ascending: false })
@@ -595,9 +597,19 @@ function SummariesPanel({ clientId, orgId }: { clientId: string; orgId?: string 
       return (data ?? []) as any[];
     },
   });
+
+  const codes = Array.isArray(client?.authorized_dspd_codes)
+    ? (client!.authorized_dspd_codes as string[])
+    : [];
+
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Progress summaries</CardTitle></CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">Progress summaries</CardTitle>
+        <Button size="sm" onClick={() => setOpen(true)} disabled={!orgId}>
+          New summary
+        </Button>
+      </CardHeader>
       <CardContent className="p-0">
         <ReadOnlyTable
           loading={q.isLoading}
@@ -609,12 +621,186 @@ function SummariesPanel({ clientId, orgId }: { clientId: string; orgId?: string 
             { header: "Period", cell: (r) => r.period_label ?? `${r.period_start ?? "—"} → ${r.period_end ?? "—"}` },
             { header: "Status", cell: (r) => r.status ?? "—" },
             { header: "Finalized", cell: (r) => r.finalized_at ? new Date(r.finalized_at).toLocaleDateString() : "—" },
+            {
+              header: "",
+              cell: (r) => (
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/dashboard/summaries" search={{ open: r.id }}>
+                    {r.status === "finalized" ? "View" : "Open editor"}
+                  </Link>
+                </Button>
+              ),
+            },
           ]}
         />
       </CardContent>
+      {open ? (
+        <NewSummaryDialog
+          clientId={clientId}
+          orgId={orgId!}
+          serviceCodes={codes}
+          onClose={() => setOpen(false)}
+          onCreated={() => {
+            qc.invalidateQueries({ queryKey: ["client-profile-summaries", orgId, clientId] });
+            qc.invalidateQueries({ queryKey: ["deadlines", "summaries", orgId] });
+            setOpen(false);
+          }}
+        />
+      ) : null}
     </Card>
   );
 }
+
+function NewSummaryDialog({
+  clientId, orgId, serviceCodes, onClose, onCreated,
+}: {
+  clientId: string;
+  orgId: string;
+  serviceCodes: string[];
+  onClose: () => void;
+  onCreated: (summaryId: string) => void;
+}) {
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const defaultQuarter = `${now.getFullYear()}-Q${Math.floor(now.getMonth() / 3) + 1}`;
+  const [periodKind, setPeriodKind] = useState<"monthly" | "quarterly">("quarterly");
+  const [month, setMonth] = useState(defaultMonth);
+  const [quarter, setQuarter] = useState(defaultQuarter);
+  const [summaryKind, setSummaryKind] = useState<"narrative" | "financial_statement">("narrative");
+  const [requiresUpi, setRequiresUpi] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const computePeriod = () => {
+    if (periodKind === "monthly") {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(Date.UTC(y, m - 1, 1));
+      const end = new Date(Date.UTC(y, m, 0));
+      const due = new Date(Date.UTC(y, m, 15));
+      return {
+        period_label: month,
+        period_start: start.toISOString().slice(0, 10),
+        period_end: end.toISOString().slice(0, 10),
+        due_date: due.toISOString().slice(0, 10),
+      };
+    }
+    const match = /^(\d{4})-Q([1-4])$/.exec(quarter);
+    if (!match) throw new Error("Invalid quarter (use YYYY-Q1..Q4)");
+    const y = Number(match[1]);
+    const qIdx = Number(match[2]) - 1;
+    const startMonth = qIdx * 3;
+    const start = new Date(Date.UTC(y, startMonth, 1));
+    const end = new Date(Date.UTC(y, startMonth + 3, 0));
+    // Quarter due 15 days after quarter end
+    const due = new Date(end);
+    due.setUTCDate(due.getUTCDate() + 15);
+    return {
+      period_label: `${y}-Q${qIdx + 1}`,
+      period_start: start.toISOString().slice(0, 10),
+      period_end: end.toISOString().slice(0, 10),
+      due_date: due.toISOString().slice(0, 10),
+    };
+  };
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const p = computePeriod();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("client_progress_summaries")
+        .insert({
+          organization_id: orgId,
+          client_id: clientId,
+          summary_kind: summaryKind,
+          period_kind: periodKind,
+          period_label: p.period_label,
+          period_start: p.period_start,
+          period_end: p.period_end,
+          due_date: p.due_date,
+          status: "pending",
+          service_codes: serviceCodes,
+          include_goal_progress: summaryKind === "narrative",
+          requires_upi_attestation: requiresUpi,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      if (!data?.id) throw new Error("Summary not created — record not returned.");
+      toast.success("Summary created — open the editor to draft.");
+      onCreated(data.id);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to create summary";
+      if (/duplicate|unique/i.test(msg)) {
+        toast.error("A summary for that period already exists.");
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="bg-background rounded-lg shadow-lg w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h3 className="text-base font-semibold">New progress summary</h3>
+          <p className="text-xs text-muted-foreground">Creates a draft row; open the editor to pre-fill from logs and finalize.</p>
+        </div>
+        <div className="space-y-3 text-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1">
+              <span className="text-xs font-medium">Cadence</span>
+              <select
+                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={periodKind}
+                onChange={(e) => setPeriodKind(e.target.value as "monthly" | "quarterly")}
+              >
+                <option value="quarterly">Quarterly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs font-medium">Kind</span>
+              <select
+                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={summaryKind}
+                onChange={(e) => setSummaryKind(e.target.value as "narrative" | "financial_statement")}
+              >
+                <option value="narrative">Narrative (progress)</option>
+                <option value="financial_statement">Financial statement</option>
+              </select>
+            </label>
+          </div>
+          {periodKind === "monthly" ? (
+            <label className="block space-y-1">
+              <span className="text-xs font-medium">Month</span>
+              <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+            </label>
+          ) : (
+            <label className="block space-y-1">
+              <span className="text-xs font-medium">Quarter (YYYY-Q#)</span>
+              <Input value={quarter} onChange={(e) => setQuarter(e.target.value)} placeholder="2026-Q1" />
+            </label>
+          )}
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={requiresUpi}
+              onChange={(e) => setRequiresUpi(e.target.checked)}
+            />
+            Requires UPI attestation (SEI)
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving ? "Creating…" : "Create draft"}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function HostHomeCertPanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
   const q = useQuery({

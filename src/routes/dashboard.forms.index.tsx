@@ -42,8 +42,10 @@ function AdminList() {
   const fetchList = useServerFn(listForms);
   const save = useServerFn(saveForm);
   const archive = useServerFn(archiveForm);
+  const seed = useServerFn(seedIntakeForms);
   const { data, isLoading } = useQuery({ queryKey: ["forms-admin"], queryFn: () => fetchList() });
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   async function createBlank() {
     const out = await save({ data: {
@@ -54,6 +56,23 @@ function AdminList() {
     if (out.form?.id) navigate({ to: "/dashboard/forms/$formId/edit", params: { formId: out.form.id } });
   }
 
+  async function restoreIntakeDefaults() {
+    setRestoring(true);
+    try {
+      const res = await seed();
+      if (res?.seeded && res.seeded > 0) {
+        toast.success(`Restored ${res.seeded} default intake forms.`);
+        qc.invalidateQueries({ queryKey: ["forms-admin"] });
+      } else {
+        toast.message("Intake forms already exist — nothing to restore.");
+      }
+    } catch (e) {
+      toast.error((e as Error).message || "Could not restore intake forms.");
+    } finally {
+      setRestoring(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -61,10 +80,14 @@ function AdminList() {
           <h1 className="text-2xl font-semibold tracking-tight">Forms</h1>
           <p className="text-sm text-muted-foreground">Build custom intake forms for your staff. Submissions land in Records → Forms.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={restoreIntakeDefaults} disabled={restoring}>
+            {restoring ? "Restoring…" : "Restore default intake forms"}
+          </Button>
           <Button onClick={createBlank}><Plus className="mr-1.5 h-4 w-4" /> New form</Button>
         </div>
       </div>
+
 
       {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

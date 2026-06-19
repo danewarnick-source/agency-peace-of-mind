@@ -269,6 +269,7 @@ export function ClientsPage() {
   const addMutation = useMutation({
     mutationFn: async (input: ClientFormValues & { intake_mode: "intake" | "profile-only" }) => {
       const coords = await resolveCoords(input.physical_address);
+      const isOwn = input.is_own_guardian ?? true;
       const { data, error } = await (supabase as any).from("clients").insert({
         organization_id:      org!.organization_id,
         first_name:           input.first_name,
@@ -287,6 +288,11 @@ export function ClientsPage() {
         home_latitude:        coords.lat,
         home_longitude:       coords.lng,
         intake_status:        input.intake_mode === "intake" ? "in_progress" : "pending",
+        is_own_guardian:      isOwn,
+        guardian_name:        isOwn ? null : (input.guardian_name?.trim() || null),
+        guardian_phone:       isOwn ? null : (input.guardian_phone?.trim() || null),
+        guardian_relationship:isOwn ? null : (input.guardian_relationship?.trim() || null),
+        guardian_email:       isOwn ? null : (input.guardian_email?.trim() || null),
       }).select("id").single();
       if (error) throw error;
       return { id: data!.id as string, mode: input.intake_mode };

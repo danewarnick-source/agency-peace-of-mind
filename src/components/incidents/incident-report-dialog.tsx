@@ -33,6 +33,7 @@ import {
 import { useCaseload } from "@/hooks/use-caseload";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { supabase } from "@/integrations/supabase/client";
 
 type Props = {
@@ -207,6 +208,8 @@ export function IncidentReportDialog({
   const createFn = useServerFn(createIncident);
   const draftFn = useServerFn(draftIncidentNarrative);
   const reviewFn = useServerFn(reviewIncidentReport);
+  const { can } = usePermissions();
+  const canManageIncidents = can("manage_incidents");
 
   const initialDiscovered = useMemo(
     () => toLocalInput(defaultDiscoveredAt ?? new Date().toISOString()),
@@ -859,6 +862,7 @@ export function IncidentReportDialog({
 
   const submit = useMutation({
     mutationFn: async () => {
+      if (!canManageIncidents) throw new Error("You don't have permission to report incidents.");
       if (!pickedClientId) throw new Error("Pick the individual involved.");
       if (!category) throw new Error("Pick an incident category.");
 

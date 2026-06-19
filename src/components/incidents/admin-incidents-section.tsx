@@ -13,6 +13,7 @@ import {
 } from "@/lib/incidents.functions";
 import { INCIDENT_CATEGORIES, GUARDIAN_METHODS, type GuardianMethod } from "./incident-categories";
 import { useCaseload } from "@/hooks/use-caseload";
+import { usePermissions } from "@/hooks/use-permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -371,6 +372,8 @@ function IncidentCard({
   onRespondSc: (scRequestId: string) => void;
   onScUpdate: (id: string) => void;
 }) {
+  const { can } = usePermissions();
+  const canManageIncidents = can("manage_incidents");
   const discovered = ir.discovered_at ? new Date(ir.discovered_at) : new Date(ir.created_at);
   const upiDeadline = new Date(discovered.getTime() + 24 * 3_600_000);
   const guardianDeadline = new Date(discovered.getTime() + 24 * 3_600_000);
@@ -507,7 +510,7 @@ function IncidentCard({
                 ) : (
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <span className="text-amber-700 dark:text-amber-300">Awaiting SC response.</span>
-                    <Button size="sm" variant="outline" onClick={() => onRespondSc(s.id)}>
+                    <Button size="sm" variant="outline" onClick={() => onRespondSc(s.id)} disabled={!canManageIncidents}>
                       Mark responded
                     </Button>
                   </div>
@@ -520,31 +523,35 @@ function IncidentCard({
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          {!closed && !ir.upi_initiated_at && (
-            <Button size="sm" onClick={() => onInitiate(ir.id)}>
-              <FileCheck2 className="mr-1 h-3.5 w-3.5" />Mark initiated in UPI
+        {canManageIncidents ? (
+          <div className="flex flex-wrap gap-2">
+            {!closed && !ir.upi_initiated_at && (
+              <Button size="sm" onClick={() => onInitiate(ir.id)}>
+                <FileCheck2 className="mr-1 h-3.5 w-3.5" />Mark initiated in UPI
+              </Button>
+            )}
+            {!closed && !isOwnGuardian && !ir.guardian_notified_at && (
+              <Button size="sm" variant="outline" onClick={() => onNotify(ir)}>
+                <Phone className="mr-1 h-3.5 w-3.5" />Log guardian notification
+              </Button>
+            )}
+            {!closed && !ir.upi_completed_at && (
+              <Button size="sm" variant="outline" onClick={() => onComplete(ir.id)}>
+                <CheckCircle2 className="mr-1 h-3.5 w-3.5" />Mark detailed report completed
+              </Button>
+            )}
+            {!ir.sc_update_signed_at && (
+              <Button size="sm" variant="outline" onClick={() => onScUpdate(ir.id)}>
+                <UserCheck className="mr-1 h-3.5 w-3.5" />Log SC update
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => onLogSc(ir.id)}>
+              <MessageSquare className="mr-1 h-3.5 w-3.5" />Log SC information request
             </Button>
-          )}
-          {!closed && !isOwnGuardian && !ir.guardian_notified_at && (
-            <Button size="sm" variant="outline" onClick={() => onNotify(ir)}>
-              <Phone className="mr-1 h-3.5 w-3.5" />Log guardian notification
-            </Button>
-          )}
-          {!closed && !ir.upi_completed_at && (
-            <Button size="sm" variant="outline" onClick={() => onComplete(ir.id)}>
-              <CheckCircle2 className="mr-1 h-3.5 w-3.5" />Mark detailed report completed
-            </Button>
-          )}
-          {!ir.sc_update_signed_at && (
-            <Button size="sm" variant="outline" onClick={() => onScUpdate(ir.id)}>
-              <UserCheck className="mr-1 h-3.5 w-3.5" />Log SC update
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => onLogSc(ir.id)}>
-            <MessageSquare className="mr-1 h-3.5 w-3.5" />Log SC information request
-          </Button>
-        </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">View only — you don't have permission to edit incidents.</p>
+        )}
       </CardContent>
     </Card>
   );

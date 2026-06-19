@@ -252,6 +252,132 @@ export const archiveForm = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ─── ADMIN: seed canonical intake forms (idempotent) ──────────────────────
+// Inserts the five starter intake forms for the caller's org IFF the org has
+// zero category='intake' forms. Safe to call repeatedly — re-running on an
+// org that already has any intake forms returns { seeded: 0 } and inserts
+// nothing. Surfaces five published forms ordered by settings.subcategory.
+const INTAKE_FORM_SEEDS: ReadonlyArray<{
+  name: string;
+  description: string;
+  subcategory: string;
+  fields: ReadonlyArray<{
+    id: string;
+    type: "short_text" | "paragraph" | "date" | "dropdown" | "yes_no";
+    label: string;
+    required?: boolean;
+    options?: string[];
+  }>;
+}> = [
+  {
+    name: "Client Application & Demographics",
+    description: "Identifying information, contacts, diagnosis, and guardian status.",
+    subcategory: "application",
+    fields: [
+      { id: "full_name", type: "short_text", label: "Full name", required: true },
+      { id: "date_of_birth", type: "date", label: "Date of birth", required: true },
+      { id: "medicaid_id", type: "short_text", label: "Medicaid ID", required: true },
+      { id: "ssn_last4", type: "short_text", label: "SSN (last 4)" },
+      { id: "home_address", type: "short_text", label: "Home address", required: true },
+      { id: "phone", type: "short_text", label: "Phone" },
+      { id: "emergency_contact_name", type: "short_text", label: "Emergency contact name", required: true },
+      { id: "emergency_contact_phone", type: "short_text", label: "Emergency contact phone", required: true },
+      { id: "primary_diagnosis", type: "short_text", label: "Primary diagnosis" },
+      { id: "guardian_status", type: "dropdown", label: "Guardian status", required: true, options: ["self", "parent", "legal_guardian"] },
+    ],
+  },
+  {
+    name: "Independence & Self-Determination",
+    description: "Preferences, routines, supports, and rights restrictions screen.",
+    subcategory: "independence",
+    fields: [
+      { id: "preferred_communication", type: "short_text", label: "Preferred communication" },
+      { id: "daily_routine_preferences", type: "paragraph", label: "Daily routine preferences" },
+      { id: "decision_making_supports", type: "paragraph", label: "Decision-making supports" },
+      { id: "community_goals", type: "paragraph", label: "Community goals" },
+      { id: "rights_restrictions_present", type: "dropdown", label: "Rights restrictions present?", required: true, options: ["yes", "no"] },
+    ],
+  },
+  {
+    name: "Consents & Authorizations",
+    description: "Consent to services, ROI, photo/media, and emergency medical authorization.",
+    subcategory: "consent",
+    fields: [
+      { id: "consent_to_services", type: "yes_no", label: "Consent to services", required: true },
+      { id: "release_of_information", type: "yes_no", label: "Release of information", required: true },
+      { id: "photo_media_consent", type: "dropdown", label: "Photo / media consent", required: true, options: ["yes", "no"] },
+      { id: "emergency_medical_consent", type: "yes_no", label: "Emergency medical consent", required: true },
+      { id: "signature_name", type: "short_text", label: "Signature (printed name)", required: true },
+      { id: "signature_date", type: "date", label: "Signature date", required: true },
+    ],
+  },
+  {
+    name: "Policies & Procedures Attestation",
+    description: "Acknowledges review of client rights, grievance process, and abuse/neglect reporting.",
+    subcategory: "pnp_attestation",
+    fields: [
+      { id: "reviewed_client_rights", type: "yes_no", label: "Reviewed client rights", required: true },
+      { id: "reviewed_grievance_process", type: "yes_no", label: "Reviewed grievance process", required: true },
+      { id: "reviewed_abuse_neglect_reporting", type: "yes_no", label: "Reviewed abuse / neglect reporting", required: true },
+      { id: "attestation_signature", type: "short_text", label: "Attestation signature (printed name)", required: true },
+      { id: "attestation_date", type: "date", label: "Attestation date", required: true },
+    ],
+  },
+  {
+    name: "Additional Intake Notes",
+    description: "Free-form notes and attachments received during intake.",
+    subcategory: "other",
+    fields: [
+      { id: "notes", type: "paragraph", label: "Notes" },
+      { id: "attachments_received", type: "paragraph", label: "Attachments received" },
+    ],
+  },
+];
+
+export const seedIntakeForms = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+
+    // Idempotency gate: any existing intake form (any status) blocks seeding.
+    const { count, error: countErr } = await supabase
+      .from("forms")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", m.organization_id)
+      .eq("category", "intake");
+    if (countErr) throw new Error(countErr.message);
+    if ((count ?? 0) > 0) return { seeded: 0, skipped: true };
+
+    const nowIso = new Date().toISOString();
+    const rows = INTAKE_FORM_SEEDS.map((seed) => ({
+      organization_id: m.organization_id,
+      name: seed.name,
+      description: seed.description,
+      category: "intake",
+      status: "published",
+      all_clients: true,
+      assigned_clients: [],
+      assigned_groups: [],
+      assigned_users: [],
+      frequency: "once",
+      schedule: {},
+      fields: seed.fields,
+      settings: { subcategory: seed.subcategory },
+      created_by: userId,
+      published_at: nowIso,
+    }));
+
+    const { data: inserted, error: insErr } = await supabase
+      .from("forms")
+      .insert(rows)
+      .select("id");
+    if (insErr) throw new Error(insErr.message);
+    return { seeded: inserted?.length ?? 0, skipped: false };
+  });
+
+
 // ─── ADMIN: count ties before hard-delete ──────────────────────────────────
 // Server-side recount so the destructive confirmation can show real numbers
 // and require type-to-confirm when ties exist.

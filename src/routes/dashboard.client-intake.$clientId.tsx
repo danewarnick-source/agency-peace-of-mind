@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { RequirePermission } from "@/components/rbac-guard";
-import { listIntakeFormsForClient } from "@/lib/forms.functions";
+import { listIntakeFormsForClient, seedIntakeForms } from "@/lib/forms.functions";
 
 export const Route = createFileRoute("/dashboard/client-intake/$clientId")({
   head: () => ({ meta: [{ title: "New Client Intake — HIVE" }] }),
@@ -59,6 +60,9 @@ type IntakeSub = {
 function IntakeRunner() {
   const { clientId } = Route.useParams();
   const fetchForms = useServerFn(listIntakeFormsForClient);
+  const seed = useServerFn(seedIntakeForms);
+  const qc = useQueryClient();
+  const seededRef = useRef(false);
 
   const clientQ = useQuery({
     queryKey: ["client-intake-header", clientId],
@@ -78,6 +82,28 @@ function IntakeRunner() {
     queryFn: () => fetchForms({ data: { clientId } }),
     retry: false,
   });
+
+  // One-time backfill per org: if the runner loads with zero intake forms,
+  // seed the canonical five. The server function is itself idempotent — this
+  // ref just avoids a second attempt within the same mount.
+  useEffect(() => {
+    if (seededRef.current) return;
+    if (intakeQ.isLoading || intakeQ.error) return;
+    const forms = (intakeQ.data?.forms as unknown[] | undefined) ?? [];
+    if (forms.length > 0) return;
+    seededRef.current = true;
+    void seed()
+      .then((res) => {
+        if (res?.seeded && res.seeded > 0) {
+          qc.invalidateQueries({ queryKey: ["intake-forms", clientId] });
+          qc.invalidateQueries({ queryKey: ["forms-admin"] });
+        }
+      })
+      .catch(() => {
+        // Non-blocking: empty state still renders below if seeding fails.
+      });
+  }, [intakeQ.isLoading, intakeQ.error, intakeQ.data, seed, qc, clientId]);
+
 
   const client = clientQ.data;
   const name = client

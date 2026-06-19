@@ -58,6 +58,8 @@ const FieldOut = z.object({
   value_text: z.string().max(2000).optional().nullable(),
   value_number: z.number().optional().nullable(),
   value_date: z.string().max(40).optional().nullable(),
+  value_bool: z.boolean().optional().nullable(),
+  value_array: z.array(z.string().max(500)).max(50).optional().nullable(),
   value_json: z.any().optional().nullable(),
   source_locator: z.string().max(200).optional().nullable(),
   confidence: z.number().min(0).max(1).optional().nullable(),
@@ -70,7 +72,7 @@ const ParseOut = z.object({
   effective_end: z.string().max(40).optional().nullable(),
   medicaid_id: z.string().max(50).optional().nullable(),
   title: z.string().max(200).optional().nullable(),
-  fields: z.array(FieldOut).max(200).default([]),
+  fields: z.array(FieldOut).max(300).default([]),
 });
 
 const SYSTEM_PROMPT = `You are NECTAR, an extraction engine for a Utah DSPD provider compliance platform (HIVE).
@@ -83,10 +85,27 @@ fiscal_year: e.g. "FY26"
 effective_start / effective_end: ISO yyyy-mm-dd
 medicaid_id: digits only if present
 
+Each extracted field has: field_key, field_group, optional value_text / value_number / value_date / value_bool / value_array / value_json, source_locator, confidence (0..1).
+- Dates in value_date as ISO yyyy-mm-dd.
+- Booleans in value_bool.
+- Short string lists (allergies, swallowing alerts) in value_array.
+- Structured rows (a billing-code authorization row) in value_json.
+
 Common field_key values you should extract when present (use field_group to bucket related fields):
-  Billing (group "billing_code"): service_code, rate, max_units, unit_type, weekly_cap_units, plan_start, plan_end, financial_eligibility
+  Person (group "person"): first_name, last_name, dob (value_date), medicaid_id, phone, plan_year
+  Address (group "address"): physical_address  -- the client's service/home street address
+  Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone
+  Guardian (group "guardian"): is_own_guardian (value_bool), guardian_name, guardian_phone,
+    guardian_relationship, guardian_email, guardian_address
+  Goals (group "goals"): pcsp_goal  -- emit ONE field per distinct goal/objective in value_text
+  Health (group "health"): allergies (value_array), dysphagia (value_bool),
+    swallowing_alerts (value_array), self_admin_med_support (value_bool),
+    clinical_alert (value_text — any high-priority safety/clinical notice, e.g. choking risk),
+    special_directions (value_text — care/access notes)
+  Billing (group "billing_code"): emit ONE field per authorized service code with
+    field_key = "billing_code_row" and value_json = { service_code, rate, max_units, unit_type,
+    weekly_cap_units, plan_start, plan_end, financial_eligibility }.
   SOW (group "sow_clause"): clause_number, required_document, obligation, deadline
-  Person (group "person"): first_name, last_name, dob, medicaid_id, plan_year
   Certification (group "cert"): cert_name, issued_at, expires_at, issuing_body
 
 For each field include source_locator (e.g. "page 3", "§4.2", "row 12 of budget table") and a confidence 0..1.`;

@@ -34,6 +34,27 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
     return runJobCommit(context.supabase, context.userId, data.jobId);
   });
 
+// Explicit retry entry point for the Done page. Same engine as the auto-run,
+// but verifies the caller is an org admin first so we can safely expose it as
+// a manual button. Idempotent: subjects already committed are skipped.
+export const recommitSmartImportJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => JobId.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: job, error } = await sb
+      .from("import_jobs")
+      .select("id, org_id, target_org_id, source")
+      .eq("id", data.jobId)
+      .single();
+    if (error || !job) throw new Error("Job not found");
+    const orgId = (job.source === "white_glove" ? job.target_org_id : job.org_id) as string;
+    if (!orgId) throw new Error("Job has no organization to commit into.");
+    await requireOrgMembership(sb, context.userId, orgId, "admin");
+    return runJobCommit(sb, context.userId, data.jobId);
+  });
+
 // Internal helper — usable from other server fns (e.g. submitForSetup) so
 // the self-service path can commit in one shot without re-entering the
 // server-fn boundary.

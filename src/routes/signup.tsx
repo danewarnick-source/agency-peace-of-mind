@@ -265,7 +265,7 @@ function SignupPage() {
     <div className="relative min-h-screen overflow-hidden text-white" style={{ background: NAVY_BG, fontFamily: JAKARTA }}>
       <HexPattern />
       <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-5 py-8 md:py-12">
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Brand />
           <Link to="/login" className="text-sm text-white/60 hover:text-white">
             Already have an account? <span className="font-medium text-[#f4a93a]">Sign in</span>

@@ -126,6 +126,48 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
       }
     }
 
+    // 4b) Client-scoped host exclusion (HHS conflict-of-interest).
+    // The location-based block only fires when a host_home locationId is passed.
+    // Admin-hours and other clockable shifts for an HHS client don't pass one, so
+    // resolve the client's OWN host-home team here and union its designations into
+    // hostSet — excluding the host regardless of locationId. Gated to host_home
+    // arrangements so group-home designated staff aren't blocked.
+    {
+      const { data: clientRow } = await supabase
+        .from("clients")
+        .select("team_id")
+        .eq("id", data.clientId)
+        .maybeSingle();
+      const clientTeamId = (clientRow as { team_id: string | null } | null)?.team_id ?? null;
+      if (clientTeamId) {
+        const { data: t } = await supabase
+          .from("teams")
+          .select("team_name")
+          .eq("id", clientTeamId)
+          .maybeSingle();
+        const teamName = (t as { team_name: string | null } | null)?.team_name ?? null;
+        if (teamName) {
+          const { data: loc } = await supabase
+            .from("locations")
+            .select("id")
+            .eq("organization_id", orgId)
+            .eq("name", teamName)
+            .eq("type", "host_home")
+            .maybeSingle();
+          if (loc) {
+            const { data: clientHosts } = await supabase
+              .from("home_staff_designations")
+              .select("staff_id")
+              .eq("team_id", clientTeamId)
+              .eq("active", true);
+            for (const h of (clientHosts ?? []) as Array<{ staff_id: string | null }>) {
+              if (h.staff_id) hostSet.add(h.staff_id);
+            }
+          }
+        }
+      }
+    }
+
     // 5) client-specific trainings required (published only)
     const { data: clientTrainings } = await supabase
       .from("client_specific_trainings")

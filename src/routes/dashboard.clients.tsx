@@ -2817,8 +2817,14 @@ function AddClientDialog({
   const [jobCodes, setJobCodes]   = useState<string[]>([]);
   const [radius, setRadius]       = useState(1000);
   const [pinning, setPinning]     = useState(false);
+  const [isOwnGuardian, setIsOwnGuardian] = useState(true);
+  const [gName, setGName]         = useState("");
+  const [gPhone, setGPhone]       = useState("");
+  const [gRel, setGRel]           = useState("");
+  const [gEmail, setGEmail]       = useState("");
 
-  const canSubmit = first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim();
+  const guardianInvalid = !isOwnGuardian && (!gName.trim() || !gPhone.trim());
+  const canSubmit = first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim() && !guardianInvalid;
 
   if (!mode) {
     return (

@@ -638,7 +638,7 @@ function Billing520Page() {
 
   const exportPdf = () => {
     const monthLabel = periodStart.toLocaleString("en-US", { month: "long", year: "numeric" });
-    const win = window.open("", "_blank", "noopener,noreferrer");
+    const win = window.open("", "_blank");
     if (!win) return toast.error("Pop-up blocked — allow pop-ups to export PDF.");
     const rowsHtml = rows
       .map(

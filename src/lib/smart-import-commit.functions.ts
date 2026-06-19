@@ -519,12 +519,12 @@ export const getDoneReadout = createServerFn({ method: "POST" })
     if (!job) throw new Error("Job not found");
 
     const { data: subjects } = await sb.from("import_subjects")
-      .select("id, display_name, subject_type, match_status, review_decision, committed_at, committed_record_id, commit_error")
+      .select("id, display_name, subject_type, match_status, review_decision, review_status, committed_at, committed_record_id, commit_error")
       .eq("import_job_id", data.jobId).order("created_at");
 
     const subjectSummaries: Array<{
       id: string; display_name: string; subject_type: string; committed: boolean;
-      record_id: string | null; error: string | null;
+      record_id: string | null; error: string | null; review_status: string;
       requirements_met: number; requirements_total: number; gaps: string[];
     }> = [];
 
@@ -547,6 +547,7 @@ export const getDoneReadout = createServerFn({ method: "POST" })
         committed: !!s.committed_at,
         record_id: s.committed_record_id,
         error: s.commit_error,
+        review_status: s.review_status ?? "pending",
         requirements_met: met,
         requirements_total: total,
         gaps,

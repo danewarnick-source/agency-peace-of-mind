@@ -207,6 +207,8 @@ export function IncidentReportDialog({
   const createFn = useServerFn(createIncident);
   const draftFn = useServerFn(draftIncidentNarrative);
   const reviewFn = useServerFn(reviewIncidentReport);
+  const { can } = usePermissions();
+  const canManageIncidents = can("manage_incidents");
 
   const initialDiscovered = useMemo(
     () => toLocalInput(defaultDiscoveredAt ?? new Date().toISOString()),

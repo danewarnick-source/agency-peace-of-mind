@@ -7,15 +7,18 @@
 // Tabs: Overview / Plan & goals / Billing codes / Shifts / Daily logs /
 // Incidents / Summaries / Host-home cert / Deadlines / Documents.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { z } from "zod";
-import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { RequirePermission } from "@/components/rbac-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -27,6 +30,7 @@ import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users,
 } from "lucide-react";
+import { saveAdminHours } from "@/lib/scheduler/scheduler.functions";
 
 const search = z.object({
   tab: z
@@ -61,7 +65,7 @@ function ClientProfileHub() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week" as any)
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -120,7 +124,7 @@ function ClientProfileHub() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
-          <OverviewPanel client={client} clientId={clientId} />
+          <OverviewPanel client={client} clientId={clientId} isHostHome={isHostHome} orgId={orgId} />
         </TabsContent>
         <TabsContent value="plan" className="mt-6">
           <PlanGoalsPanel client={client} />
@@ -181,7 +185,7 @@ function TabTrigger({
 
 type ClientRow = Record<string, unknown> | null | undefined;
 
-function OverviewPanel({ client, clientId }: { client: ClientRow; clientId: string }) {
+function OverviewPanel({ client, clientId, isHostHome, orgId }: { client: ClientRow; clientId: string; isHostHome: boolean; orgId?: string }) {
   if (!client) return <SkeletonCard />;
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -200,6 +204,14 @@ function OverviewPanel({ client, clientId }: { client: ClientRow; clientId: stri
           <Field label="Phone" value={client.emergency_contact_phone as string | null} />
         </CardContent>
       </Card>
+      {isHostHome && (
+        <Card className="md:col-span-2">
+          <CardHeader><CardTitle className="text-base">Administrative hours</CardTitle></CardHeader>
+          <CardContent>
+            <AdminHoursCard clientId={clientId} orgId={orgId} client={client} />
+          </CardContent>
+        </Card>
+      )}
       <Card className="md:col-span-2">
         <CardHeader><CardTitle className="text-base">Special directions</CardTitle></CardHeader>
         <CardContent className="text-sm whitespace-pre-wrap">
@@ -216,6 +228,74 @@ function OverviewPanel({ client, clientId }: { client: ClientRow; clientId: stri
           <QuickLink to="/dashboard/client-training/$clientId" params={{ clientId }} label="Client-specific training" />
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function AdminHoursCard({ clientId, orgId, client }: { clientId: string; orgId?: string; client: ClientRow }) {
+  const qc = useQueryClient();
+  const save = useServerFn(saveAdminHours);
+  const current: number | null = typeof client?.admin_hours_per_week === "number" ? client.admin_hours_per_week as number : null;
+  const [val, setVal] = useState<string>(current != null ? String(current) : "");
+
+  const saveMut = useMutation({
+    mutationFn: (hours: number | null) => {
+      if (!orgId) throw new Error("No organization");
+      return (save as any)({ data: { organization_id: orgId, client_id: clientId, hours } });
+    },
+    onSuccess: () => {
+      toast.success("Administrative hours updated.");
+      qc.invalidateQueries({ queryKey: ["client-profile"] });
+      qc.invalidateQueries({ queryKey: ["scheduler-data"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const trimmed = val.trim();
+  const parsed: number | null = trimmed === "" ? null : Number(trimmed);
+  const isValid = parsed === null || (Number.isFinite(parsed) && parsed >= 0 && parsed <= 168);
+
+  return (
+    <div className="space-y-3 max-w-sm">
+      <p className="text-sm text-muted-foreground">
+        Set the weekly administrative hours for this host-home client. Clients with administrative hours (&gt; 0) appear in the scheduler's admin-hours flow. HHS direct care is daily-rate and is not scheduled here.
+      </p>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          min={0}
+          max={168}
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          placeholder="e.g. 10"
+          className="w-28 text-center"
+        />
+        <span className="text-sm text-muted-foreground">hrs / week</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          onClick={() => saveMut.mutate(parsed)}
+          disabled={saveMut.isPending || !isValid || !orgId}
+        >
+          {saveMut.isPending ? "Saving…" : "Save"}
+        </Button>
+        {(current != null && current > 0) && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { setVal(""); saveMut.mutate(null); }}
+            disabled={saveMut.isPending || !orgId}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {(current != null && current > 0)
+          ? `Currently ${current} hrs/week — this client appears in the admin-hours scheduling flow.`
+          : "Not currently scheduled for administrative hours."}
+      </p>
     </div>
   );
 }

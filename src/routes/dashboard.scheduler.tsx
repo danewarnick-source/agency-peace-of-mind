@@ -912,8 +912,12 @@ function AddShiftDialog({
   const toggleWeekday = (n: number) =>
     setWeekdays((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort());
 
+  const { can } = usePermissions();
+  const canManageSchedule = can("manage_schedule");
+
   const saveMut = useMutation({
     mutationFn: async () => {
+      if (!canManageSchedule) throw new Error("You don't have permission to create or edit shifts.");
       const starts = new Date(`${date}T${start}:00`).toISOString();
       const ends = new Date(`${date}T${end}:00`).toISOString();
       const res = await save({

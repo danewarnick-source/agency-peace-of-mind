@@ -1162,9 +1162,13 @@ function ShiftDetailPanel({
     ? sched.staff.filter((s) => s.name.toLowerCase().includes(search.toLowerCase())).slice(0, 8)
     : [];
 
+  const { can } = usePermissions();
+  const canManageSchedule = can("manage_schedule");
+
   const assign = useMutation({
-    mutationFn: (newStaffId: string | null) =>
-      save({
+    mutationFn: (newStaffId: string | null) => {
+      if (!canManageSchedule) throw new Error("You don't have permission to edit shifts.");
+      return save({
         data: {
           id: shift.id,
           organization_id: org!.organization_id,

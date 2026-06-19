@@ -97,7 +97,7 @@ function DeadlinesPage() {
             value={selectedClient ?? ""}
             onChange={(e) => {
               const v = e.target.value;
-              navigate({ search: (prev) => ({ ...prev, client: v ? v : undefined }) });
+              navigate({ search: (prev: { client?: string }) => ({ ...prev, client: v ? v : undefined }) });
             }}
           >
             <option value="">All clients</option>

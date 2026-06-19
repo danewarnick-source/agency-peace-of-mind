@@ -263,7 +263,17 @@ function StandardReports() {
       };
     });
 
-    const all = [...fromCourses, ...fromModules];
+    const fromStaff = (staffTraining ?? [])
+      .filter((a: any) => a.status === "completed" || !!a.completed_at)
+      .map((a: any) => ({
+        source: "Staff record",
+        title: a.title,
+        category: "Staff training",
+        completed_at: a.completed_at ?? "",
+        user_id: staffTrainingNameMap.get(a.staff_id) ?? a.staff_id,
+      }));
+
+    const all = [...fromCourses, ...fromModules, ...fromStaff];
     if (!all.length) return toast.error("No completed training to export yet.");
     download(
       "training-completion",

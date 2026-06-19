@@ -220,7 +220,17 @@ function StandardReports() {
         "Training module",
       ];
     });
-    const allRows = [...courseRows, ...moduleRows];
+    const staffRows = (staffTraining ?? []).map((a: any) => [
+      staffTrainingNameMap.get(a.staff_id) ?? a.staff_id,
+      a.title,
+      "Staff training",
+      a.status,
+      a.status === "completed" ? 100 : 0,
+      a.due_date ?? "",
+      a.completed_at ?? "",
+      "Staff record",
+    ]);
+    const allRows = [...courseRows, ...moduleRows, ...staffRows];
     if (!allRows.length) return toast.error("No training assignments to export yet");
     download(
       "compliance-summary",

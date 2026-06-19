@@ -1416,6 +1416,12 @@ export function PunchPad({
         typeof lat === "number" && typeof lng === "number" &&
         isFinite(lat) && isFinite(lng)
       ) {
+        // Low-confidence fixes can't auto-pass the geofence or match approved locations.
+        if (!gpsConfident) {
+          setOutVariance({ distanceFeet: undefined, limitFeet: radius, pos });
+          setOutVarianceReason("");
+          return;
+        }
         // Approved locations suppress the variance prompt on clock-out too.
         const matchedOut = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
         const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });

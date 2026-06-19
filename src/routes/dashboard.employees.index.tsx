@@ -225,7 +225,7 @@ export function EmployeesPage() {
       if (input.startDate && input.endDate && input.endDate < input.startDate) {
         throw new Error("End date must be on or after Start date.");
       }
-      const { error: pErr } = await supabase
+      const { data: pRows, error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({
@@ -240,8 +240,12 @@ export function EmployeesPage() {
           hire_date: input.startDate || null,
           ce_suggested_topics: input.ceSuggestedTopics ?? [],
         } as any)
-        .eq("id", input.userId);
+        .eq("id", input.userId)
+        .select("id");
       if (pErr) throw pErr;
+      if (!pRows || pRows.length === 0) {
+        throw new Error("Profile not updated — record not found or you don't have permission to edit it.");
+      }
 
       // Rates are PII-gated: route through the server fn so the
       // can_view_staff_pii() check applies on writes too.
@@ -254,11 +258,15 @@ export function EmployeesPage() {
         },
       });
 
-      const { error: mErr } = await supabase
+      const { data: mRows, error: mErr } = await supabase
         .from("organization_members")
         .update({ role: input.role, active: input.active })
-        .eq("id", input.membershipId);
+        .eq("id", input.membershipId)
+        .select("id");
       if (mErr) throw mErr;
+      if (!mRows || mRows.length === 0) {
+        throw new Error("Membership not updated — record not found or you don't have permission to change role/status.");
+      }
     },
     onSuccess: () => {
       toast.success("Employee updated");

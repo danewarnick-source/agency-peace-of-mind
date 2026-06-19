@@ -43,6 +43,7 @@ function describeUndo(r: unknown): string {
 function DonePage() {
   const { jobId } = Route.useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const search = (typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null);
   // TanStack's typed search serializes "1" as the JSON string `"1"`, so the
   // URL ends up `?commit=%221%22`. Strip surrounding quotes before comparing.
@@ -50,6 +51,7 @@ function DonePage() {
   const autoRun = rawCommit === "1";
 
   const commit = useServerFn(commitSmartImportJob);
+  const recommit = useServerFn(recommitSmartImportJob);
   const readout = useServerFn(getDoneReadout);
   const generateReminders = useServerFn(generateSmartImportReminders);
   const preview = useServerFn(previewUndoImport);
@@ -71,11 +73,36 @@ function DonePage() {
     enabled: undoOpen,
   });
 
+  // Refresh every cache that should reflect freshly-created records so the
+  // user sees them without a manual reload.
+  function invalidateAfterCommit() {
+    qc.invalidateQueries({ queryKey: ["clients"] });
+    qc.invalidateQueries({ queryKey: ["smart-import-history"] });
+    qc.invalidateQueries({ queryKey: ["smart-import-done", jobId] });
+    qc.invalidateQueries({ queryKey: ["clients-uncommitted-imports"] });
+  }
+
   const undoM = useMutation({
     mutationFn: () => undoFn({ data: { jobId } }),
     onSuccess: (res) => {
       toast.success(`Undone — ${res.removed.length} item(s) removed${res.skipped.length ? `, ${res.skipped.length} preserved` : ""}.`);
       setUndoOpen(false);
+      invalidateAfterCommit();
+      q.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const retryM = useMutation({
+    mutationFn: () => recommit({ data: { jobId } }),
+    onSuccess: (res) => {
+      const newlyCommitted = (res.results ?? []).filter((r) => r.committed && r.record_id).length;
+      if (newlyCommitted > 0) {
+        toast.success(`Imported ${newlyCommitted} record${newlyCommitted === 1 ? "" : "s"} into your directory.`);
+      } else {
+        toast.info("Nothing new to commit — everything ready was already saved.");
+      }
+      invalidateAfterCommit();
       q.refetch();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -86,10 +113,17 @@ function DonePage() {
     let cancelled = false;
     (async () => {
       try {
-        await commit({ data: { jobId } });
+        const res = await commit({ data: { jobId } });
         // After commit, seed persistent reminders for any leftovers/gaps.
         try { await generateReminders({ data: {} }); } catch { /* non-fatal */ }
-        if (!cancelled) setRunState("done");
+        if (!cancelled) {
+          const newlyCommitted = (res?.results ?? []).filter((r) => r.committed && r.record_id).length;
+          if (newlyCommitted > 0) {
+            toast.success(`Imported ${newlyCommitted} record${newlyCommitted === 1 ? "" : "s"} into your directory.`);
+          }
+          invalidateAfterCommit();
+          setRunState("done");
+        }
       } catch (e) {
         if (!cancelled) {
           setRunError((e as Error).message);
@@ -105,7 +139,8 @@ function DonePage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [autoRun, runState, commit, jobId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, runState, jobId]);
 
   if (runState === "running") {
     return (

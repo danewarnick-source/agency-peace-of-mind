@@ -5,6 +5,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 
 const JobId = z.object({ jobId: z.string().uuid() });
@@ -31,6 +32,27 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
     return runJobCommit(context.supabase, context.userId, data.jobId);
+  });
+
+// Explicit retry entry point for the Done page. Same engine as the auto-run,
+// but verifies the caller is an org admin first so we can safely expose it as
+// a manual button. Idempotent: subjects already committed are skipped.
+export const recommitSmartImportJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => JobId.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: job, error } = await sb
+      .from("import_jobs")
+      .select("id, org_id, target_org_id, source")
+      .eq("id", data.jobId)
+      .single();
+    if (error || !job) throw new Error("Job not found");
+    const orgId = (job.source === "white_glove" ? job.target_org_id : job.org_id) as string;
+    if (!orgId) throw new Error("Job has no organization to commit into.");
+    await requireOrgMembership(sb, context.userId, orgId, "admin");
+    return runJobCommit(sb, context.userId, data.jobId);
   });
 
 // Internal helper — usable from other server fns (e.g. submitForSetup) so
@@ -497,12 +519,12 @@ export const getDoneReadout = createServerFn({ method: "POST" })
     if (!job) throw new Error("Job not found");
 
     const { data: subjects } = await sb.from("import_subjects")
-      .select("id, display_name, subject_type, match_status, review_decision, committed_at, committed_record_id, commit_error")
+      .select("id, display_name, subject_type, match_status, review_decision, review_status, committed_at, committed_record_id, commit_error")
       .eq("import_job_id", data.jobId).order("created_at");
 
     const subjectSummaries: Array<{
       id: string; display_name: string; subject_type: string; committed: boolean;
-      record_id: string | null; error: string | null;
+      record_id: string | null; error: string | null; review_status: string;
       requirements_met: number; requirements_total: number; gaps: string[];
     }> = [];
 
@@ -525,6 +547,7 @@ export const getDoneReadout = createServerFn({ method: "POST" })
         committed: !!s.committed_at,
         record_id: s.committed_record_id,
         error: s.commit_error,
+        review_status: s.review_status ?? "pending",
         requirements_met: met,
         requirements_total: total,
         gaps,

@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, Sparkles, Loader2, FileText,
-  Users, ExternalLink, Undo2,
+  Users, ExternalLink, Undo2, RotateCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequirePermission } from "@/components/rbac-guard";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { getDoneReadout, commitSmartImportJob } from "@/lib/smart-import-commit.functions";
+import { getDoneReadout, commitSmartImportJob, recommitSmartImportJob } from "@/lib/smart-import-commit.functions";
 import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-history.functions";
 
@@ -43,6 +43,7 @@ function describeUndo(r: unknown): string {
 function DonePage() {
   const { jobId } = Route.useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const search = (typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null);
   // TanStack's typed search serializes "1" as the JSON string `"1"`, so the
   // URL ends up `?commit=%221%22`. Strip surrounding quotes before comparing.
@@ -50,6 +51,7 @@ function DonePage() {
   const autoRun = rawCommit === "1";
 
   const commit = useServerFn(commitSmartImportJob);
+  const recommit = useServerFn(recommitSmartImportJob);
   const readout = useServerFn(getDoneReadout);
   const generateReminders = useServerFn(generateSmartImportReminders);
   const preview = useServerFn(previewUndoImport);
@@ -71,11 +73,36 @@ function DonePage() {
     enabled: undoOpen,
   });
 
+  // Refresh every cache that should reflect freshly-created records so the
+  // user sees them without a manual reload.
+  function invalidateAfterCommit() {
+    qc.invalidateQueries({ queryKey: ["clients"] });
+    qc.invalidateQueries({ queryKey: ["smart-import-history"] });
+    qc.invalidateQueries({ queryKey: ["smart-import-done", jobId] });
+    qc.invalidateQueries({ queryKey: ["clients-uncommitted-imports"] });
+  }
+
   const undoM = useMutation({
     mutationFn: () => undoFn({ data: { jobId } }),
     onSuccess: (res) => {
       toast.success(`Undone — ${res.removed.length} item(s) removed${res.skipped.length ? `, ${res.skipped.length} preserved` : ""}.`);
       setUndoOpen(false);
+      invalidateAfterCommit();
+      q.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const retryM = useMutation({
+    mutationFn: () => recommit({ data: { jobId } }),
+    onSuccess: (res) => {
+      const newlyCommitted = (res.results ?? []).filter((r) => r.committed && r.record_id).length;
+      if (newlyCommitted > 0) {
+        toast.success(`Imported ${newlyCommitted} record${newlyCommitted === 1 ? "" : "s"} into your directory.`);
+      } else {
+        toast.info("Nothing new to commit — everything ready was already saved.");
+      }
+      invalidateAfterCommit();
       q.refetch();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -86,10 +113,17 @@ function DonePage() {
     let cancelled = false;
     (async () => {
       try {
-        await commit({ data: { jobId } });
+        const res = await commit({ data: { jobId } });
         // After commit, seed persistent reminders for any leftovers/gaps.
         try { await generateReminders({ data: {} }); } catch { /* non-fatal */ }
-        if (!cancelled) setRunState("done");
+        if (!cancelled) {
+          const newlyCommitted = (res?.results ?? []).filter((r) => r.committed && r.record_id).length;
+          if (newlyCommitted > 0) {
+            toast.success(`Imported ${newlyCommitted} record${newlyCommitted === 1 ? "" : "s"} into your directory.`);
+          }
+          invalidateAfterCommit();
+          setRunState("done");
+        }
       } catch (e) {
         if (!cancelled) {
           setRunError((e as Error).message);
@@ -105,7 +139,8 @@ function DonePage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [autoRun, runState, commit, jobId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, runState, jobId]);
 
   if (runState === "running") {
     return (
@@ -124,6 +159,9 @@ function DonePage() {
 
   const { job, subjects, audit } = q.data;
   const committedCount = subjects.filter((s) => s.committed).length;
+  const pendingCommit = subjects.filter(
+    (s) => !s.committed && s.review_status === "ready",
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -146,9 +184,22 @@ function DonePage() {
             {committedCount} of {subjects.length} {job.mode === "client" ? "client" : "staff"} profile{subjects.length === 1 ? "" : "s"} live.
             Gaps below are advisory — reminders queued, never blocking.
           </p>
+          {pendingCommit > 0 && (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+              {pendingCommit} marked-ready {pendingCommit === 1 ? "subject was" : "subjects were"} not saved — click <strong>Retry commit</strong> to finish.
+            </p>
+          )}
           {runError && <p className="mt-1 text-xs text-destructive">{runError}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
+          {pendingCommit > 0 && (
+            <Button onClick={() => retryM.mutate()} disabled={retryM.isPending}>
+              {retryM.isPending
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <RotateCw className="mr-2 h-4 w-4" />}
+              Retry commit
+            </Button>
+          )}
           <Button asChild variant="outline">
             <Link to={job.mode === "client" ? "/dashboard/clients" : "/dashboard/employees"}>
               <Users className="mr-2 h-4 w-4" /> Open {job.mode === "client" ? "clients" : "employees"}
@@ -164,6 +215,7 @@ function DonePage() {
           )}
         </div>
       </div>
+
 
       {/* Readiness / gap readout per subject */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">

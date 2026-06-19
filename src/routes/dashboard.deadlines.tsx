@@ -53,17 +53,59 @@ function fmtDue(d: Date): string {
 function DeadlinesPage() {
   const { overdue, dueSoon, upcoming, isLoading } = useDeadlines();
   const [showUpcoming, setShowUpcoming] = useState(false);
+  const { client: selectedClient } = Route.useSearch();
+  const navigate = useNavigate({ from: "/dashboard/deadlines" });
+
+  const clientOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const it of [...overdue, ...dueSoon, ...upcoming]) {
+      if (it.subjectKind === "client" && it.clientId && !seen.has(it.clientId)) {
+        seen.set(it.clientId, it.subject);
+      }
+    }
+    return [...seen.entries()]
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [overdue, dueSoon, upcoming]);
+
+  const applyFilter = (items: DeadlineItem[]) =>
+    selectedClient ? items.filter((i) => i.clientId === selectedClient) : items;
+
+  const overdueF = applyFilter(overdue);
+  const dueSoonF = applyFilter(dueSoon);
+  const upcomingF = applyFilter(upcoming);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <AlarmClock className="h-6 w-6 text-[#137182]" />
-          Deadlines
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          One view of every compliance clock for your agency — what's late, what's due this week.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <AlarmClock className="h-6 w-6 text-[#137182]" />
+            Deadlines
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            One view of every compliance clock for your agency — what's late, what's due this week.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="client-filter">
+            Client
+          </label>
+          <select
+            id="client-filter"
+            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            value={selectedClient ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              navigate({ search: (prev) => ({ ...prev, client: v ? v : undefined }) });
+            }}
+          >
+            <option value="">All clients</option>
+            {clientOptions.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Overdue strip */}

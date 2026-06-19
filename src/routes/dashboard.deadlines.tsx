@@ -113,16 +113,16 @@ function DeadlinesPage() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base text-rose-800 dark:text-rose-200">
             <AlertTriangle className="h-5 w-5" />
-            Overdue ({overdue.length})
+            Overdue ({overdueF.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : overdue.length === 0 ? (
+          ) : overdueF.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing is overdue right now. Stay sharp.</p>
           ) : (
-            <ItemList items={overdue} tone="overdue" />
+            <ItemList items={overdueF} tone="overdue" />
           )}
         </CardContent>
       </Card>
@@ -132,16 +132,16 @@ function DeadlinesPage() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base text-amber-800 dark:text-amber-200">
             <Clock className="h-5 w-5" />
-            Due this week ({dueSoon.length})
+            Due this week ({dueSoonF.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : dueSoon.length === 0 ? (
+          ) : dueSoonF.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing due in the next 7 days.</p>
           ) : (
-            <ItemList items={dueSoon} tone="due_soon" />
+            <ItemList items={dueSoonF} tone="due_soon" />
           )}
         </CardContent>
       </Card>
@@ -149,17 +149,17 @@ function DeadlinesPage() {
       {/* Upcoming */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Upcoming (next 30 days) — {upcoming.length}</CardTitle>
+          <CardTitle className="text-base">Upcoming (next 30 days) — {upcomingF.length}</CardTitle>
           <Button variant="ghost" size="sm" onClick={() => setShowUpcoming((v) => !v)}>
             {showUpcoming ? "Hide" : "Show"}
           </Button>
         </CardHeader>
         {showUpcoming && (
           <CardContent>
-            {upcoming.length === 0 ? (
+            {upcomingF.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing in the next 30 days.</p>
             ) : (
-              <ItemList items={upcoming.filter((i) => i.dueAt.getTime() - Date.now() <= 30 * 86_400_000)} tone="upcoming" />
+              <ItemList items={upcomingF.filter((i) => i.dueAt.getTime() - Date.now() <= 30 * 86_400_000)} tone="upcoming" />
             )}
           </CardContent>
         )}
@@ -275,7 +275,7 @@ function RowAction({ item }: { item: DeadlineItem }) {
 /** Compact card for the Home dashboard. */
 export function DeadlinesHomeCard() {
   const { overdue, dueSoon, isLoading } = useDeadlines();
-  const counts = useMemo(() => ({ overdue: overdue.length, dueSoon: dueSoon.length }), [overdue, dueSoon]);
+  const counts = useMemo(() => ({ overdue: overdueF.length, dueSoon: dueSoonF.length }), [overdue, dueSoon]);
   return (
     <Link to="/dashboard/deadlines" className="block">
       <Card className="transition hover:border-[#137182]/40 hover:shadow-[var(--shadow-card)]">

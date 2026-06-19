@@ -1181,7 +1181,8 @@ function ShiftDetailPanel({
           status: shift.status,
           published: shift.published,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Updated.");
       qc.invalidateQueries({ queryKey: ["scheduler-data"] });

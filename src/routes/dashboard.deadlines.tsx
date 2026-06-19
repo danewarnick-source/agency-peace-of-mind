@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { z } from "zod";
 import { AlarmClock, AlertTriangle, Clock, ShieldCheck, FileSignature, Activity, ExternalLink, Home } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +12,10 @@ import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { attestSummaryUpiEntered } from "@/lib/progress-summaries.functions";
 
+const searchSchema = z.object({ client: z.string().uuid().optional() });
 
 export const Route = createFileRoute("/dashboard/deadlines")({
+  validateSearch: searchSchema,
   head: () => ({ meta: [{ title: "Deadlines — HIVE" }] }),
   component: DeadlinesPage,
 });
@@ -50,17 +53,59 @@ function fmtDue(d: Date): string {
 function DeadlinesPage() {
   const { overdue, dueSoon, upcoming, isLoading } = useDeadlines();
   const [showUpcoming, setShowUpcoming] = useState(false);
+  const { client: selectedClient } = Route.useSearch();
+  const navigate = useNavigate({ from: "/dashboard/deadlines" });
+
+  const clientOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const it of [...overdue, ...dueSoon, ...upcoming]) {
+      if (it.subjectKind === "client" && it.clientId && !seen.has(it.clientId)) {
+        seen.set(it.clientId, it.subject);
+      }
+    }
+    return [...seen.entries()]
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [overdue, dueSoon, upcoming]);
+
+  const applyFilter = (items: DeadlineItem[]) =>
+    selectedClient ? items.filter((i) => i.clientId === selectedClient) : items;
+
+  const overdueF = applyFilter(overdue);
+  const dueSoonF = applyFilter(dueSoon);
+  const upcomingF = applyFilter(upcoming);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <AlarmClock className="h-6 w-6 text-[#137182]" />
-          Deadlines
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          One view of every compliance clock for your agency — what's late, what's due this week.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <AlarmClock className="h-6 w-6 text-[#137182]" />
+            Deadlines
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            One view of every compliance clock for your agency — what's late, what's due this week.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="client-filter">
+            Client
+          </label>
+          <select
+            id="client-filter"
+            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            value={selectedClient ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              navigate({ search: (prev: { client?: string }) => ({ ...prev, client: v ? v : undefined }) });
+            }}
+          >
+            <option value="">All clients</option>
+            {clientOptions.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Overdue strip */}
@@ -68,16 +113,16 @@ function DeadlinesPage() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base text-rose-800 dark:text-rose-200">
             <AlertTriangle className="h-5 w-5" />
-            Overdue ({overdue.length})
+            Overdue ({overdueF.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : overdue.length === 0 ? (
+          ) : overdueF.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing is overdue right now. Stay sharp.</p>
           ) : (
-            <ItemList items={overdue} tone="overdue" />
+            <ItemList items={overdueF} tone="overdue" />
           )}
         </CardContent>
       </Card>
@@ -87,16 +132,16 @@ function DeadlinesPage() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base text-amber-800 dark:text-amber-200">
             <Clock className="h-5 w-5" />
-            Due this week ({dueSoon.length})
+            Due this week ({dueSoonF.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : dueSoon.length === 0 ? (
+          ) : dueSoonF.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing due in the next 7 days.</p>
           ) : (
-            <ItemList items={dueSoon} tone="due_soon" />
+            <ItemList items={dueSoonF} tone="due_soon" />
           )}
         </CardContent>
       </Card>
@@ -104,17 +149,17 @@ function DeadlinesPage() {
       {/* Upcoming */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Upcoming (next 30 days) — {upcoming.length}</CardTitle>
+          <CardTitle className="text-base">Upcoming (next 30 days) — {upcomingF.length}</CardTitle>
           <Button variant="ghost" size="sm" onClick={() => setShowUpcoming((v) => !v)}>
             {showUpcoming ? "Hide" : "Show"}
           </Button>
         </CardHeader>
         {showUpcoming && (
           <CardContent>
-            {upcoming.length === 0 ? (
+            {upcomingF.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing in the next 30 days.</p>
             ) : (
-              <ItemList items={upcoming.filter((i) => i.dueAt.getTime() - Date.now() <= 30 * 86_400_000)} tone="upcoming" />
+              <ItemList items={upcomingF.filter((i) => i.dueAt.getTime() - Date.now() <= 30 * 86_400_000)} tone="upcoming" />
             )}
           </CardContent>
         )}

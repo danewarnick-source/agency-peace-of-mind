@@ -269,6 +269,7 @@ export function ClientsPage() {
   const addMutation = useMutation({
     mutationFn: async (input: ClientFormValues & { intake_mode: "intake" | "profile-only" }) => {
       const coords = await resolveCoords(input.physical_address);
+      const isOwn = input.is_own_guardian ?? true;
       const { data, error } = await (supabase as any).from("clients").insert({
         organization_id:      org!.organization_id,
         first_name:           input.first_name,
@@ -287,6 +288,11 @@ export function ClientsPage() {
         home_latitude:        coords.lat,
         home_longitude:       coords.lng,
         intake_status:        input.intake_mode === "intake" ? "in_progress" : "pending",
+        is_own_guardian:      isOwn,
+        guardian_name:        isOwn ? null : (input.guardian_name?.trim() || null),
+        guardian_phone:       isOwn ? null : (input.guardian_phone?.trim() || null),
+        guardian_relationship:isOwn ? null : (input.guardian_relationship?.trim() || null),
+        guardian_email:       isOwn ? null : (input.guardian_email?.trim() || null),
       }).select("id").single();
       if (error) throw error;
       return { id: data!.id as string, mode: input.intake_mode };
@@ -2811,8 +2817,14 @@ function AddClientDialog({
   const [jobCodes, setJobCodes]   = useState<string[]>([]);
   const [radius, setRadius]       = useState(1000);
   const [pinning, setPinning]     = useState(false);
+  const [isOwnGuardian, setIsOwnGuardian] = useState(true);
+  const [gName, setGName]         = useState("");
+  const [gPhone, setGPhone]       = useState("");
+  const [gRel, setGRel]           = useState("");
+  const [gEmail, setGEmail]       = useState("");
 
-  const canSubmit = first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim();
+  const guardianInvalid = !isOwnGuardian && (!gName.trim() || !gPhone.trim());
+  const canSubmit = first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim() && !guardianInvalid;
 
   if (!mode) {
     return (
@@ -2917,6 +2929,37 @@ function AddClientDialog({
             </SelectContent>
           </Select>
         </div>
+
+        <div className="rounded-lg border border-border p-3 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+            <Checkbox checked={isOwnGuardian} onCheckedChange={(v) => setIsOwnGuardian(!!v)} />
+            Client is their own guardian
+          </label>
+          {!isOwnGuardian && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Guardian Name *</Label>
+                  <Input value={gName} onChange={(e) => setGName(e.target.value)} maxLength={150} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Guardian Phone *</Label>
+                  <Input value={gPhone} onChange={(e) => setGPhone(e.target.value)} maxLength={30} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Relationship</Label>
+                  <Input value={gRel} onChange={(e) => setGRel(e.target.value)} maxLength={100} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Guardian Email</Label>
+                  <Input value={gEmail} onChange={(e) => setGEmail(e.target.value)} maxLength={150} type="email" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       <DialogFooter>
         <Button
@@ -2928,6 +2971,11 @@ function AddClientDialog({
             special_directions: "", date_of_birth: "",
             emergency_contact_name: "", emergency_contact_phone: "",
             profile_photo_url: "",
+            is_own_guardian: isOwnGuardian,
+            guardian_name: isOwnGuardian ? "" : gName.trim(),
+            guardian_phone: isOwnGuardian ? "" : gPhone.trim(),
+            guardian_relationship: isOwnGuardian ? "" : gRel.trim(),
+            guardian_email: isOwnGuardian ? "" : gEmail.trim(),
             intake_mode: mode,
           })}
           disabled={!canSubmit || pending}

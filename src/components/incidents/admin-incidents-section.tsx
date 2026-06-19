@@ -372,6 +372,8 @@ function IncidentCard({
   onRespondSc: (scRequestId: string) => void;
   onScUpdate: (id: string) => void;
 }) {
+  const { can } = usePermissions();
+  const canManageIncidents = can("manage_incidents");
   const discovered = ir.discovered_at ? new Date(ir.discovered_at) : new Date(ir.created_at);
   const upiDeadline = new Date(discovered.getTime() + 24 * 3_600_000);
   const guardianDeadline = new Date(discovered.getTime() + 24 * 3_600_000);

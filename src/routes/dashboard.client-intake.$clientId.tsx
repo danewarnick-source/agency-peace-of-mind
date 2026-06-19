@@ -60,6 +60,9 @@ type IntakeSub = {
 function IntakeRunner() {
   const { clientId } = Route.useParams();
   const fetchForms = useServerFn(listIntakeFormsForClient);
+  const seed = useServerFn(seedIntakeForms);
+  const qc = useQueryClient();
+  const seededRef = useRef(false);
 
   const clientQ = useQuery({
     queryKey: ["client-intake-header", clientId],
@@ -79,6 +82,28 @@ function IntakeRunner() {
     queryFn: () => fetchForms({ data: { clientId } }),
     retry: false,
   });
+
+  // One-time backfill per org: if the runner loads with zero intake forms,
+  // seed the canonical five. The server function is itself idempotent — this
+  // ref just avoids a second attempt within the same mount.
+  useEffect(() => {
+    if (seededRef.current) return;
+    if (intakeQ.isLoading || intakeQ.error) return;
+    const forms = (intakeQ.data?.forms as unknown[] | undefined) ?? [];
+    if (forms.length > 0) return;
+    seededRef.current = true;
+    void seed()
+      .then((res) => {
+        if (res?.seeded && res.seeded > 0) {
+          qc.invalidateQueries({ queryKey: ["intake-forms", clientId] });
+          qc.invalidateQueries({ queryKey: ["forms-admin"] });
+        }
+      })
+      .catch(() => {
+        // Non-blocking: empty state still renders below if seeding fails.
+      });
+  }, [intakeQ.isLoading, intakeQ.error, intakeQ.data, seed, qc, clientId]);
+
 
   const client = clientQ.data;
   const name = client

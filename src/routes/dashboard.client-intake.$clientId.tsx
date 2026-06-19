@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { RequirePermission } from "@/components/rbac-guard";
-import { listIntakeFormsForClient } from "@/lib/forms.functions";
+import { listIntakeFormsForClient, seedIntakeForms } from "@/lib/forms.functions";
 
 export const Route = createFileRoute("/dashboard/client-intake/$clientId")({
   head: () => ({ meta: [{ title: "New Client Intake — HIVE" }] }),

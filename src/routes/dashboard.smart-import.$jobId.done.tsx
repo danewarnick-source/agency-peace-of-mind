@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, Sparkles, Loader2, FileText,
-  Users, ExternalLink, Undo2,
+  Users, ExternalLink, Undo2, RotateCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequirePermission } from "@/components/rbac-guard";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { getDoneReadout, commitSmartImportJob } from "@/lib/smart-import-commit.functions";
+import { getDoneReadout, commitSmartImportJob, recommitSmartImportJob } from "@/lib/smart-import-commit.functions";
 import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-history.functions";
 

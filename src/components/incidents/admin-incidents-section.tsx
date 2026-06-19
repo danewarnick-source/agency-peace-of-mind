@@ -510,7 +510,7 @@ function IncidentCard({
                 ) : (
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <span className="text-amber-700 dark:text-amber-300">Awaiting SC response.</span>
-                    <Button size="sm" variant="outline" onClick={() => onRespondSc(s.id)}>
+                    <Button size="sm" variant="outline" onClick={() => onRespondSc(s.id)} disabled={!canManageIncidents}>
                       Mark responded
                     </Button>
                   </div>

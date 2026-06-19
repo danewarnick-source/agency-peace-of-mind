@@ -1253,11 +1253,15 @@ function ShiftDetailPanel({
       </div>
 
       <div className="p-4 space-y-4 overflow-y-auto">
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled><Edit2 className="h-3.5 w-3.5 mr-1" /> Edit</Button>
-          <Button size="sm" variant="outline" onClick={() => dupMut.mutate()} disabled={dupMut.isPending}><Copy className="h-3.5 w-3.5 mr-1" /> Duplicate</Button>
-          <Button size="sm" variant="outline" onClick={() => { if (confirm("Delete this shift?")) delMut.mutate(); }} disabled={delMut.isPending}><Trash2 className="h-3.5 w-3.5 mr-1" /> Delete</Button>
-        </div>
+        {canManageSchedule ? (
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled><Edit2 className="h-3.5 w-3.5 mr-1" /> Edit</Button>
+            <Button size="sm" variant="outline" onClick={() => dupMut.mutate()} disabled={dupMut.isPending}><Copy className="h-3.5 w-3.5 mr-1" /> Duplicate</Button>
+            <Button size="sm" variant="outline" onClick={() => { if (confirm("Delete this shift?")) delMut.mutate(); }} disabled={delMut.isPending}><Trash2 className="h-3.5 w-3.5 mr-1" /> Delete</Button>
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground">View only — you don't have permission to edit shifts.</div>
+        )}
 
         <div className="text-sm">
           <div className="font-semibold">{start.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
@@ -1268,6 +1272,7 @@ function ShiftDetailPanel({
           <Select
             value={shift.staff_id ?? "__open__"}
             onValueChange={(v) => assign.mutate(v === "__open__" ? null : v)}
+            disabled={!canManageSchedule}
           >
             <SelectTrigger>
               <SelectValue>

@@ -454,6 +454,7 @@ export function RecordsTab() {
                 type="button" size="sm" variant="outline"
                 onClick={handleMasterCsv}
                 disabled={rowsQ.isLoading || total === 0}
+                title={total === 0 ? "No records in the current view to export" : undefined}
                 className="gap-2"
               >
                 <Download className="h-4 w-4" /> Export Master Agency Ledger CSV

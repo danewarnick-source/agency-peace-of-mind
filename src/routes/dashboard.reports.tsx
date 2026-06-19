@@ -115,6 +115,45 @@ function StandardReports() {
     [progressProfiles],
   );
 
+  const { data: staffTraining } = useQuery({
+    enabled: !!org,
+    queryKey: ["report-staff-training", org?.organization_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("staff_other_assignments")
+        .select("staff_id, title, status, completed_at, due_date, assignment_type")
+        .eq("organization_id", org!.organization_id)
+        .eq("assignment_type", "training");
+      return data ?? [];
+    },
+  });
+
+  const staffTrainingUserIds = useMemo(
+    () => [...new Set((staffTraining ?? []).map((r: any) => r.staff_id).filter(Boolean))],
+    [staffTraining],
+  );
+  const { data: staffTrainingProfiles } = useQuery({
+    enabled: staffTrainingUserIds.length > 0,
+    queryKey: ["report-staff-training-profiles", staffTrainingUserIds],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", staffTrainingUserIds as string[]);
+      return data ?? [];
+    },
+  });
+  const staffTrainingNameMap = useMemo(
+    () =>
+      new Map(
+        (staffTrainingProfiles ?? []).map((p) => [
+          p.id,
+          p.full_name ?? p.email ?? p.id.slice(0, 8),
+        ]),
+      ),
+    [staffTrainingProfiles],
+  );
+
   // …while Certification Renewals comes from external_certifications (uploaded
   // staff credentials with an expiry), a completely different dataset.
   const { data: certs } = useQuery({

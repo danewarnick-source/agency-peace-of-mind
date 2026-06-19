@@ -10,10 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Landmark, Link2, Loader2, Save, RefreshCw, Zap, ArrowLeft, CheckCircle2, BookOpen, Lock, ShieldCheck, X } from "lucide-react";
+import { Landmark, Link2, Loader2, Save, RefreshCw, Zap, ArrowLeft, CheckCircle2, BookOpen } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/dashboard/settings/bank-mapping")({
   head: () => ({ meta: [{ title: "Bank Mapping — HIVE" }] }),
@@ -46,11 +44,6 @@ function BankMappingPage() {
   const qc = useQueryClient();
   const orgId = org?.organization_id;
 
-  const [plaidOpen, setPlaidOpen] = useState(false);
-  const [plaidStep, setPlaidStep] = useState<"institution" | "credentials" | "linking" | "success">("institution");
-  const [chosenInstitution, setChosenInstitution] = useState<string | null>(null);
-  const [creds, setCreds] = useState({ user: "demo_user", pass: "••••••••" });
-  
   const [draftMap, setDraftMap] = useState<Record<string, string>>({});
 
   const banks = useQuery({
@@ -91,20 +84,6 @@ function BankMappingPage() {
       if (error) throw error;
       return data ?? [];
     },
-  });
-
-  const linkBank = useMutation({
-    mutationFn: async () => {
-      // Plaid integration is not yet live. Refuse to insert simulated accounts
-      // into real tables — doing so contaminates client rep-payee ledgers.
-      throw new Error("Bank connection is not available yet — Plaid integration is pending.");
-    },
-    onSuccess: () => {
-      toast.success("🔗 Plaid handshake complete");
-      qc.invalidateQueries({ queryKey: ["agency_bank_accounts"] });
-      setPlaidStep("success");
-    },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   const commit = useMutation({
@@ -158,6 +137,9 @@ function BankMappingPage() {
   const mapByBank = new Map((mappings.data ?? []).map((m) => [m.bank_account_id, m.client_id]));
   const stagedCount = Object.values(draftMap).filter(Boolean).length;
 
+  // suppress unused-var warning until ensurePbaAccount is wired to UI
+  void ensurePbaAccount;
+
   return (
     <div className="space-y-6 pb-24">
       <div className="flex items-center justify-between gap-3">
@@ -167,27 +149,13 @@ function BankMappingPage() {
           </Button>
           <h2 className="text-2xl font-semibold tracking-tight">🏦 Institutional Client Banking Registry</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Authenticate your corporate bank, map sub-accounts to client trust profiles, and let the SSI/SSDI feed auto-reconcile into the PBA ledger.
+            Map agency sub-accounts to client trust profiles and let the SSI/SSDI feed auto-reconcile into the PBA ledger once bank connection is live.
           </p>
         </div>
-        <Button size="lg" onClick={() => { setPlaidStep("institution"); setChosenInstitution(null); setPlaidOpen(true); }} disabled={linkBank.isPending}>
-          {linkBank.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
-          🔗 Authenticate Agency Bank Portal
+        <Button size="lg" disabled title="Bank connection is not available yet">
+          <Link2 className="mr-2 h-4 w-4" /> Connect bank (coming soon)
         </Button>
       </div>
-
-      <PlaidLinkDialog
-        open={plaidOpen}
-        onOpenChange={setPlaidOpen}
-        step={plaidStep}
-        setStep={setPlaidStep}
-        chosenInstitution={chosenInstitution}
-        setChosenInstitution={setChosenInstitution}
-        creds={creds}
-        setCreds={setCreds}
-        isLinking={linkBank.isPending}
-        onCommit={() => linkBank.mutate()}
-      />
 
       {/* Mapping grid */}
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
@@ -211,7 +179,7 @@ function BankMappingPage() {
         {!bankList.length ? (
           <div className="grid place-items-center gap-2 rounded-xl border border-dashed border-border/70 py-16 text-center text-sm text-muted-foreground">
             <Landmark className="h-8 w-8 text-muted-foreground/60" />
-            No bank streams linked yet. Click <span className="font-medium">Authenticate Agency Bank Portal</span> to pull your sub-accounts via Plaid.
+            Bank connection is coming soon.
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-border">
@@ -230,7 +198,7 @@ function BankMappingPage() {
                     <div className="grid h-10 w-10 place-items-center rounded-md bg-muted text-lg">{b.institution_logo ?? "🏦"}</div>
                     <div>
                       <div className="text-sm font-semibold">{b.bank_name} <span className="font-mono text-muted-foreground">— *{b.mask}</span></div>
-                      <div className="text-xs text-muted-foreground">{b.account_type} · Plaid {b.plaid_account_id}</div>
+                      <div className="text-xs text-muted-foreground">{b.account_type} · Account {b.plaid_account_id}</div>
                     </div>
                   </div>
                   <div className="col-span-6 flex items-center gap-2">
@@ -282,8 +250,8 @@ function Pipeline() {
     <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex items-center gap-2">
         <Zap className="h-4 w-4 text-amber-500" />
-        <h3 className="text-base font-semibold">Live Auto-Ledger Pipeline</h3>
-        <Badge variant="outline" className="border-emerald-500/40 text-emerald-600">Active</Badge>
+        <h3 className="text-base font-semibold">Auto-Ledger Pipeline (Coming Soon)</h3>
+        <Badge variant="outline" className="border-amber-500/40 text-amber-600">Pending</Badge>
       </div>
       <ol className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
         <li className="rounded-lg border border-border/70 bg-muted/20 p-3">
@@ -300,134 +268,5 @@ function Pipeline() {
         </li>
       </ol>
     </div>
-  );
-}
-
-const PLAID_INSTITUTIONS = [
-  { id: "chase", name: "Chase Business", logo: "🏦", color: "bg-blue-600" },
-  { id: "wells", name: "Wells Fargo Commercial", logo: "🏛️", color: "bg-red-600" },
-  { id: "bofa", name: "Bank of America Trust", logo: "🏦", color: "bg-rose-700" },
-  { id: "mtnamerica", name: "Mountain America CU", logo: "🏔️", color: "bg-emerald-700" },
-  { id: "citi", name: "Citi Commercial", logo: "🏙️", color: "bg-sky-700" },
-  { id: "usbank", name: "U.S. Bank Business", logo: "🇺🇸", color: "bg-indigo-700" },
-];
-
-type PlaidStep = "institution" | "credentials" | "linking" | "success";
-
-function PlaidLinkDialog({
-  open, onOpenChange, step, setStep, chosenInstitution, setChosenInstitution,
-  creds, setCreds, isLinking, onCommit,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  step: PlaidStep;
-  setStep: (s: PlaidStep) => void;
-  chosenInstitution: string | null;
-  setChosenInstitution: (v: string | null) => void;
-  creds: { user: string; pass: string };
-  setCreds: (v: { user: string; pass: string }) => void;
-  isLinking: boolean;
-  onCommit: () => void;
-}) {
-  const inst = PLAID_INSTITUTIONS.find((i) => i.id === chosenInstitution);
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-0 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-slate-900 to-slate-800 px-5 py-3 text-white">
-          <div className="flex items-center gap-2">
-            <div className="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-xs font-bold">P</div>
-            <div>
-              <div className="text-sm font-semibold">Plaid Link · Sandbox</div>
-              <div className="text-[10px] uppercase tracking-wider text-white/60">Secure Bank Authentication</div>
-            </div>
-          </div>
-          <button onClick={() => onOpenChange(false)} className="rounded p-1 text-white/70 hover:bg-white/10 hover:text-white">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="p-5">
-          {step === "institution" && (
-            <>
-              <DialogHeader className="space-y-1">
-                <DialogTitle className="text-base">Select your institution</DialogTitle>
-                <DialogDescription className="text-xs">
-                  Choose the bank where your agency's operating & trust sub-accounts are held.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {PLAID_INSTITUTIONS.map((i) => (
-                  <button
-                    key={i.id}
-                    onClick={() => { setChosenInstitution(i.id); setStep("credentials"); }}
-                    className="flex items-center gap-2 rounded-lg border border-border p-3 text-left text-sm transition hover:border-primary hover:bg-muted/40"
-                  >
-                    <div className={`grid h-9 w-9 place-items-center rounded-md text-lg text-white ${i.color}`}>{i.logo}</div>
-                    <span className="font-medium leading-tight">{i.name}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <ShieldCheck className="h-3 w-3" /> 256-bit TLS · Read-only access · Tokenized credentials
-              </div>
-            </>
-          )}
-
-          {step === "credentials" && inst && (
-            <>
-              <DialogHeader className="space-y-1">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className={`grid h-9 w-9 place-items-center rounded-md text-lg text-white ${inst.color}`}>{inst.logo}</div>
-                  <div>
-                    <DialogTitle className="text-base">{inst.name}</DialogTitle>
-                    <DialogDescription className="text-xs">Enter your online banking credentials</DialogDescription>
-                  </div>
-                </div>
-              </DialogHeader>
-              <div className="mt-3 space-y-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Username</label>
-                  <Input value={creds.user} onChange={(e) => setCreds({ ...creds, user: e.target.value })} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Password</label>
-                  <Input type="password" value={creds.pass} onChange={(e) => setCreds({ ...creds, pass: e.target.value })} />
-                </div>
-                <div className="flex items-start gap-1.5 rounded-md bg-muted/40 p-2 text-[11px] text-muted-foreground">
-                  <Lock className="mt-0.5 h-3 w-3 shrink-0" />
-                  Demo sandbox — no real credentials are transmitted. Pre-seeded test data will load.
-                </div>
-              </div>
-              <DialogFooter className="mt-4 gap-2 sm:gap-2">
-                <Button variant="ghost" onClick={() => setStep("institution")}>Back</Button>
-                <Button onClick={() => { setStep("linking"); onCommit(); }} disabled={isLinking}>
-                  {isLinking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
-                  Authenticate
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {step === "linking" && (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <div className="mt-4 text-sm font-medium">Establishing secure handshake…</div>
-              <div className="mt-1 text-xs text-muted-foreground">Discovering sub-accounts & trust fiduciary pools</div>
-            </div>
-          )}
-
-          {step === "success" && (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-500/15 text-emerald-600">
-                <CheckCircle2 className="h-7 w-7" />
-              </div>
-              <div className="mt-3 text-sm font-semibold">Bank portal authenticated</div>
-              <div className="mt-1 text-xs text-muted-foreground">Sub-accounts now appear in the Channel Mapping Grid.</div>
-              <Button className="mt-5" onClick={() => onOpenChange(false)}>Done</Button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -28,7 +28,7 @@ import { ClientDocumentsCard } from "@/components/clients/client-documents-card"
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
-  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users,
+  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
 } from "lucide-react";
 import { saveAdminHours } from "@/lib/scheduler/scheduler.functions";
 
@@ -127,7 +127,7 @@ function ClientProfileHub() {
           <OverviewPanel client={client} clientId={clientId} isHostHome={isHostHome} orgId={orgId} />
         </TabsContent>
         <TabsContent value="plan" className="mt-6">
-          <PlanGoalsPanel client={client} />
+          <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
         </TabsContent>
         <TabsContent value="codes" className="mt-6">
           <BillingCodesPanel clientId={clientId} />
@@ -300,22 +300,109 @@ function AdminHoursCard({ clientId, orgId, client }: { clientId: string; orgId?:
   );
 }
 
-function PlanGoalsPanel({ client }: { client: ClientRow }) {
+function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; clientId: string; orgId?: string }) {
+  const qc = useQueryClient();
+  const initial = Array.isArray(client?.pcsp_goals) ? (client!.pcsp_goals as string[]) : [];
+  const [draft, setDraft] = useState<string[]>(initial);
+  const [adding, setAdding] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const codes = Array.isArray(client?.authorized_dspd_codes) ? (client!.authorized_dspd_codes as string[]) : [];
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const cleaned = draft.map((g) => g.trim()).filter((g) => g.length > 0);
+      const { data, error } = await supabase
+        .from("clients")
+        .update({ pcsp_goals: cleaned })
+        .eq("id", clientId)
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Goals not saved — record not found or you don't have permission.");
+      }
+      return cleaned;
+    },
+    onSuccess: (cleaned) => {
+      toast.success("PCSP goals saved");
+      setDraft(cleaned);
+      setDirty(false);
+      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client", clientId] });
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save goals"),
+  });
+
+  const updateAt = (i: number, val: string) => {
+    setDraft((d) => d.map((g, idx) => (idx === i ? val : g)));
+    setDirty(true);
+  };
+  const removeAt = (i: number) => {
+    setDraft((d) => d.filter((_, idx) => idx !== i));
+    setDirty(true);
+  };
+  const addGoal = () => {
+    const v = adding.trim();
+    if (!v) return;
+    setDraft((d) => [...d, v]);
+    setAdding("");
+    setDirty(true);
+  };
+
   if (!client) return <SkeletonCard />;
-  const goals = Array.isArray(client.pcsp_goals) ? (client.pcsp_goals as string[]) : [];
-  const codes = Array.isArray(client.authorized_dspd_codes) ? (client.authorized_dspd_codes as string[]) : [];
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
-        <CardHeader><CardTitle className="text-base">PCSP goals</CardTitle></CardHeader>
-        <CardContent className="text-sm">
-          {goals.length === 0 ? (
-            <span className="text-muted-foreground">No goals recorded.</span>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">PCSP goals</CardTitle>
+          <Button
+            size="sm"
+            onClick={() => saveMut.mutate()}
+            disabled={!dirty || saveMut.isPending}
+          >
+            {saveMut.isPending ? "Saving…" : "Save goals"}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {draft.length === 0 ? (
+            <p className="text-muted-foreground">No goals yet — add one below.</p>
           ) : (
-            <ul className="list-disc pl-5 space-y-1">
-              {goals.map((g, i) => <li key={i}>{g}</li>)}
+            <ul className="space-y-2">
+              {draft.map((g, i) => (
+                <li key={i} className="flex gap-2 items-start">
+                  <textarea
+                    className="flex-1 min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={g}
+                    onChange={(e) => updateAt(i, e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => removeAt(i)}
+                    aria-label="Remove goal"
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </li>
+              ))}
             </ul>
           )}
+          <div className="flex gap-2 pt-2 border-t">
+            <Input
+              placeholder="Add a PCSP goal…"
+              value={adding}
+              onChange={(e) => setAdding(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addGoal();
+                }
+              }}
+            />
+            <Button type="button" variant="outline" onClick={addGoal} disabled={!adding.trim()}>
+              Add goal
+            </Button>
+          </div>
         </CardContent>
       </Card>
       <Card>

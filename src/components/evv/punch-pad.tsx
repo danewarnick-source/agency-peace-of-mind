@@ -2012,10 +2012,19 @@ export function PunchPad({
             </DialogHeader>
             {outVariance && (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
-                Measured distance:{" "}
-                <span className="font-mono font-semibold">{outVariance.distanceFeet.toLocaleString()} ft</span>
-                {" "}· Allowed:{" "}
-                <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
+                {typeof outVariance.distanceFeet === "number" ? (
+                  <>
+                    Measured distance:{" "}
+                    <span className="font-mono font-semibold">{outVariance.distanceFeet.toLocaleString()} ft</span>
+                    {" "}· Allowed:{" "}
+                    <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
+                  </>
+                ) : (
+                  <>
+                    GPS accuracy too low to confirm location. A written variance is required. · Allowed:{" "}
+                    <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
+                  </>
+                )}
               </div>
             )}
             <NectarInfusionLock

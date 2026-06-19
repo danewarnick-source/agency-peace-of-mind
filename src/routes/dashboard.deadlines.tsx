@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { z } from "zod";
 import { AlarmClock, AlertTriangle, Clock, ShieldCheck, FileSignature, Activity, ExternalLink, Home } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +12,10 @@ import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { attestSummaryUpiEntered } from "@/lib/progress-summaries.functions";
 
+const searchSchema = z.object({ client: z.string().uuid().optional() });
 
 export const Route = createFileRoute("/dashboard/deadlines")({
+  validateSearch: searchSchema,
   head: () => ({ meta: [{ title: "Deadlines — HIVE" }] }),
   component: DeadlinesPage,
 });

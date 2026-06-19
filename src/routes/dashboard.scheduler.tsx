@@ -1191,8 +1191,9 @@ function ShiftDetailPanel({
   });
 
   const dupMut = useMutation({
-    mutationFn: () =>
-      save({
+    mutationFn: () => {
+      if (!canManageSchedule) throw new Error("You don't have permission to create shifts.");
+      return save({
         data: {
           organization_id: org!.organization_id,
           client_id: shift.client_id,
@@ -1204,7 +1205,8 @@ function ShiftDetailPanel({
           status: "pending",
           published: false,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Duplicated.");
       qc.invalidateQueries({ queryKey: ["scheduler-data"] });
@@ -1213,7 +1215,10 @@ function ShiftDetailPanel({
   });
 
   const delMut = useMutation({
-    mutationFn: () => del({ data: { id: shift.id, organization_id: org!.organization_id } }),
+    mutationFn: () => {
+      if (!canManageSchedule) throw new Error("You don't have permission to delete shifts.");
+      return del({ data: { id: shift.id, organization_id: org!.organization_id } });
+    },
     onSuccess: () => {
       toast.success("Deleted.");
       qc.invalidateQueries({ queryKey: ["scheduler-data"] });

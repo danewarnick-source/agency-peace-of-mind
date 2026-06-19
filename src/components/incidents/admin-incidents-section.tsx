@@ -13,6 +13,7 @@ import {
 } from "@/lib/incidents.functions";
 import { INCIDENT_CATEGORIES, GUARDIAN_METHODS, type GuardianMethod } from "./incident-categories";
 import { useCaseload } from "@/hooks/use-caseload";
+import { usePermissions } from "@/hooks/use-permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

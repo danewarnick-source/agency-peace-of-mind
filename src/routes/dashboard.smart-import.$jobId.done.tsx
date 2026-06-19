@@ -159,6 +159,9 @@ function DonePage() {
 
   const { job, subjects, audit } = q.data;
   const committedCount = subjects.filter((s) => s.committed).length;
+  const pendingCommit = subjects.filter(
+    (s) => !s.committed && s.review_status === "ready",
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -181,9 +184,22 @@ function DonePage() {
             {committedCount} of {subjects.length} {job.mode === "client" ? "client" : "staff"} profile{subjects.length === 1 ? "" : "s"} live.
             Gaps below are advisory — reminders queued, never blocking.
           </p>
+          {pendingCommit > 0 && (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+              {pendingCommit} marked-ready {pendingCommit === 1 ? "subject was" : "subjects were"} not saved — click <strong>Retry commit</strong> to finish.
+            </p>
+          )}
           {runError && <p className="mt-1 text-xs text-destructive">{runError}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
+          {pendingCommit > 0 && (
+            <Button onClick={() => retryM.mutate()} disabled={retryM.isPending}>
+              {retryM.isPending
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <RotateCw className="mr-2 h-4 w-4" />}
+              Retry commit
+            </Button>
+          )}
           <Button asChild variant="outline">
             <Link to={job.mode === "client" ? "/dashboard/clients" : "/dashboard/employees"}>
               <Users className="mr-2 h-4 w-4" /> Open {job.mode === "client" ? "clients" : "employees"}
@@ -199,6 +215,7 @@ function DonePage() {
           )}
         </div>
       </div>
+
 
       {/* Readiness / gap readout per subject */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">

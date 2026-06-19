@@ -101,12 +101,15 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
     "view_referrals",
     "manage_referrals",
     "send_emails",
+    "manage_schedule",
+    "manage_incidents",
   ],
 
 
   manager: [
     "invite_users", "assign_training", "view_team_reports", "approve_external_certs",
     "upload_external_certs", "view_analytics", "view_own_training", "view_certifications",
+    "manage_schedule", "manage_incidents",
   ],
   employee: ["view_own_training", "view_certifications", "upload_external_certs"],
   committee_member: [],

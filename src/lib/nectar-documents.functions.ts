@@ -50,110 +50,14 @@ function decodeBase64Text(base64: string): string {
   }
 }
 
-// ---------- AI parsing via Lovable AI Gateway ----------
-
-const FieldOut = z.object({
-  field_key: z.string().min(1).max(80),
-  field_group: z.string().max(80).optional().nullable(),
-  value_text: z.string().max(2000).optional().nullable(),
-  value_number: z.number().optional().nullable(),
-  value_date: z.string().max(40).optional().nullable(),
-  value_bool: z.boolean().optional().nullable(),
-  value_array: z.array(z.string().max(500)).max(50).optional().nullable(),
-  value_json: z.any().optional().nullable(),
-  source_locator: z.string().max(200).optional().nullable(),
-  confidence: z.number().min(0).max(1).optional().nullable(),
-});
-
-const ParseOut = z.object({
-  document_type: z.string().max(40).optional().nullable(),
-  fiscal_year: z.string().max(20).optional().nullable(),
-  effective_start: z.string().max(40).optional().nullable(),
-  effective_end: z.string().max(40).optional().nullable(),
-  medicaid_id: z.string().max(50).optional().nullable(),
-  title: z.string().max(200).optional().nullable(),
-  fields: z.array(FieldOut).max(300).default([]),
-});
-
-const SYSTEM_PROMPT = `You are NECTAR, an extraction engine for a Utah DSPD provider compliance platform (HIVE).
-You receive raw text from a document (PCSP, 1056 budget, SOW, referral, intake, assessment, certification, contract, etc.).
-
-Extract structured fields and return STRICT JSON only. Use these conventions:
-
-document_type: one of pcsp | 1056_budget | sow | referral | intake | assessment | certification | training | contract | evv_report | timesheet | incident_report | billing_record | other
-fiscal_year: e.g. "FY26"
-effective_start / effective_end: ISO yyyy-mm-dd
-medicaid_id: digits only if present
-
-Each extracted field has: field_key, field_group, optional value_text / value_number / value_date / value_bool / value_array / value_json, source_locator, confidence (0..1).
-- Dates in value_date as ISO yyyy-mm-dd.
-- Booleans in value_bool.
-- Short string lists (allergies, swallowing alerts) in value_array.
-- Structured rows (a billing-code authorization row) in value_json.
-
-Common field_key values you should extract when present (use field_group to bucket related fields):
-  Person (group "person"): first_name, last_name, dob (value_date), medicaid_id, phone, plan_year
-  Address (group "address"): physical_address  -- the client's service/home street address
-  Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone
-  Guardian (group "guardian"): is_own_guardian (value_bool), guardian_name, guardian_phone,
-    guardian_relationship, guardian_email, guardian_address
-  Goals (group "goals"): pcsp_goal  -- emit ONE field per distinct goal/objective in value_text
-  Health (group "health"): allergies (value_array), dysphagia (value_bool),
-    swallowing_alerts (value_array), self_admin_med_support (value_bool),
-    clinical_alert (value_text — any high-priority safety/clinical notice, e.g. choking risk),
-    special_directions (value_text — care/access notes)
-  Billing (group "billing_code"): emit ONE field per authorized service code with
-    field_key = "billing_code_row" and value_json = { service_code, rate, max_units, unit_type,
-    weekly_cap_units, plan_start, plan_end, financial_eligibility }.
-  SOW (group "sow_clause"): clause_number, required_document, obligation, deadline
-  Certification (group "cert"): cert_name, issued_at, expires_at, issuing_body
-  Support coordinator (group "support_coordinator"): support_coordinator_name,
-    support_coordinator_email, support_coordinator_phone
-  Medical (group "medical"): primary_care_name, primary_care_phone,
-    neurologist_name, neurologist_phone, dentist_name, dentist_phone,
-    prescriber_name, prescriber_phone, medical_insurance,
-    diagnoses (value_array), chronic_conditions (value_array),
-    immunizations (value_array),
-    emergency_medical_treatment_authorization (value_bool),
-    advanced_directives (value_text)
-  Rights & behavior (group "rights"): rights_restrictions (value_text),
-    bsp_status (value_text)
-  Service plan (group "service_plan"): staff_ratio (value_text e.g. "1:1"),
-    preferred_activities (value_array), preferred_living (value_text),
-    roommates (value_array), housing_voucher (value_text),
-    court_orders (value_text), personal_belongings_inventory (value_array),
-    emergency_contact_instructions (value_text), team_name (value_text)
-
-For each field include source_locator (e.g. "page 3", "§4.2", "row 12 of budget table") and a confidence 0..1.`;
-
+// ---------- AI parsing via shared extractor ----------
+// SYSTEM_PROMPT, FieldOut, ParseOut, and the gateway call live in
+// src/lib/document-extraction.ts so Smart Import and the per-client
+// uploader share one path. Field-key names match what
+// applyExtractedFieldsToClient consumes.
 
 async function callLovableAI(documentText: string, hint?: string) {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `${hint ? `HINT: ${hint}\n\n` : ""}DOCUMENT TEXT:\n\n${documentText.slice(0, 60000)}`,
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
-  if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
-  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-  const body = await res.json();
-  const content = body?.choices?.[0]?.message?.content ?? "{}";
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    parsed = {};
-  }
-  const result = ParseOut.safeParse(parsed);
-  return result.success ? result.data : { fields: [] };
+  return parseDocumentWithAI(documentText, hint);
 }
 
 // Client autofill logic lives in src/lib/client-import-schema.ts so both

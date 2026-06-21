@@ -1,72 +1,88 @@
-## Why nothing landed on the client
 
-End-to-end trace of the PCSP → client pipeline found three independent bugs. The extractor itself works; the pipeline downstream silently drops or zeroes the values.
+## Goal
 
-### Bug 1 — PCSP goals silently dropped
-The AI sometimes returns a goal in `value_text`, sometimes in `value_array` (the schema allows both). In the Smart Import round-trip, goals that land in `value_array` are serialized to JSON, but `applyExtractedFieldsToClient` reads goals via `fieldText()` which **only checks `value_text`**. Result: every goal stored as an array gets filtered out. (`src/lib/client-import-schema.ts:39–41` and `:195–199`.)
+A brand-new employee with nothing on file must show required trainings as **Overdue** or **To-Do** — never "0 overdue." Today `getStaffChecklist` only checks the admin-built `nectar_requirements` list, which is usually empty, so a fresh hire silently passes. We fix that with a fixed baseline list plus behavior/ABI conditional rules, completion-by-date OR cert-upload paths, and Nectar OCR for expiration dates.
 
-### Bug 2 — Billing rate & units become 0
-`applyExtractedFieldsToClient` accepts `rate` / `max_units` **only when `typeof === "number"`** (`client-import-schema.ts:216–222`). The model frequently returns them as strings (`"18.50"`, `"3120"`). They fall through to `?? 0`, the row is inserted with `rate_per_unit = 0` and `annual_unit_authorization = 0`, and the UI shows "no rate/units set." This is why authorized codes appear empty even when the code list itself did populate.
-
-### Bug 3 — MAR/eMAR never auto-disables
-There is **no code anywhere** that reads medication presence from the PCSP and toggles `feature_config.emar`. The prompt does not extract a medications signal, and no commit step touches the feature toggle. So MAR/eMAR stays "Enabled" by default forever.
-
-### Bug 4 (root cause shared by 1 & 2) — Smart Import round-trip lossiness
-The per-client uploader works better because it passes the raw `ExtractedField[]` straight to `applyExtractedFieldsToClient`. Smart Import stringifies every field into `extracted_fields.value`, then re-parses in `commitClient` — that's where `value_array` gets lost for scalar consumers like `fieldText`. Fixing bugs 1 & 2 also hardens this path.
+Build order is Step 1 → 5 exactly as you specified.
 
 ---
 
-## Fix plan (no schema changes)
+### Step 1 — Fixed baseline list
 
-### 1. `src/lib/client-import-schema.ts`
-- Add a `fieldArray(f)` helper and update `fieldText` consumers for goals to fall back to `value_array[0]` (or join). Concretely: in the `pcsp_goal` mapping block (~`:195–199`), accept text from `value_text`, `value_array`, or even `value_json.text`.
-- Make billing-row coercion forgiving:
-  ```ts
-  const toNum = (v: unknown) =>
-    typeof v === "number" ? v
-    : typeof v === "string" && v.trim() !== "" ? Number(v.replace(/[$,\s]/g, "")) || null
-    : null;
-  rate: toNum(row.rate),
-  max_units: toNum(row.max_units),
-  weekly_cap_units: toNum(row.weekly_cap_units),
-  ```
-  Same coercion for `unit_type`/dates passes through unchanged.
-- When `rate` or `max_units` is still null, skip the insert into `client_billing_codes` rather than writing zeros (so the readiness card can correctly flag "rate/units missing" for human follow-up instead of silently faking $0).
+New file `src/lib/staff-training-requirements.ts` exporting `BASELINE_STAFF_TRAININGS`:
 
-### 2. `src/lib/document-extraction.ts`
-- Extend `CORE_CLIENT_FIELD_KEYS` and the SYSTEM_PROMPT to extract:
-  - `client_medication` — one field per medication listed in the PCSP (name, dose, route, schedule) emitted in `value_json`.
-  - `pcsp_has_medications` — boolean derived from whether the PCSP lists any prescribed/administered medication.
-- Tell the model: "If the PCSP explicitly states no medications / 'none' / the medication section is absent or empty, emit `pcsp_has_medications=false`."
+| key | title | due (days from hire) | renews | expiration tracked | conditional |
+|---|---|---|---|---|---|
+| `thirty_day` | 30-Day Training | 30 | annual after yr 1 → see `annual_12h` | no | all |
+| `first_aid` | First Aid | 90 | every 2 yr (typical) | yes | all |
+| `cpr` | CPR | 90 | every 2 yr | yes | all |
+| `pct` | Person-Centered Thinking | 90 | one-time | no | all |
+| `deescalation` | De-escalation Certification (MANDT / SOAR / CPI / PART / Safety Care) | 180 | per cert (default 1 yr) | yes | **only if behavior client** |
+| `abi` | ABI Training | 90 | one-time | no | **only if ABI client** |
+| `annual_12h` | Annual Training (12 hours) | 365 from hire, recurring yearly | yearly | no | all (after yr 1) |
 
-### 3. `src/lib/smart-import.functions.ts`
-- Round-trip preserve `value_array` for `pcsp_goal` by JSON-encoding it the same way `billing_code_row` is encoded, so `commitClient` can re-hydrate it cleanly. (Pairs with Bug 1's reader-side fix as belt-and-suspenders.)
-- Persist the new `client_medication` rows and `pcsp_has_medications` boolean into `extracted_fields`.
+Each entry has: `key`, `title`, `due_days`, `tracks_expiration`, `default_validity_months | null`, `conditional: "all" | "behavior" | "abi" | "after_year_one"`, `category: "training"`.
 
-### 4. `src/lib/smart-import-commit.functions.ts` + `client-import-schema.ts`
-- In `applyExtractedFieldsToClient`, after processing fields:
-  - If `pcsp_has_medications === false` AND no `client_medication` rows were extracted → set `feature_config.emar = false` on the `clients` row.
-  - If `pcsp_has_medications === true` OR any `client_medication` row exists → keep `feature_config.emar = true` and write extracted medications into `client_medications` (best-effort; only fields the model is confident about — name/dose/route/frequency).
-- Never overwrite a user's existing explicit toggle: only flip `emar` when the current value matches the platform default (i.e., the user hasn't manually changed it). Skip if the client already has `client_medications` rows on file.
+Pure module — no DB, no imports from server code — so client and server can both consume it.
 
-### 5. Clarifying-question pass (already part of the system)
-- Anything the model returns with low confidence or that fails the new coercion (e.g., a rate the model couldn't read) is left empty and surfaces in the existing Readiness Card with its inline editor — no separate UI work needed.
+### Step 2 — Always check every employee
+
+Edit `getStaffChecklist` in `src/lib/hr-staff.functions.ts`:
+
+1. After loading `base` from `get_hr_staff_checklist_base`, also load:
+   - `profiles.hire_date`, `profiles.requires_deescalation` (new column, see Step 3), `profiles.requires_abi`
+   - `certifications` rows for this staff (we already store completions there) so completion/expiry can be sourced from real certs as a fallback when no `staff_checklist_completion` row exists
+   - assignment_map → derive `hasBehaviorClient` (any assigned client where `behavior_support_clients.features_enabled` OR client has a BC code) and `hasAbiClient` (clients flagged ABI)
+2. Synthesize `ChecklistRow`s for each baseline entry whose `requirement_id` is stable: `baseline:<key>` (string ID — keep the type as `string`, no DB row required). Skip conditional entries unless the staff qualifies (`requires_deescalation || hasBehaviorClient` → include `deescalation`; same for ABI; `annual_12h` only after 1 yr from hire).
+3. Merge with admin-defined `nectar_requirements` rows by deduping titles — admin list always wins on conflict so an org that defines its own version is unaffected.
+4. For each row compute status using hire_date + due_days + cert/completion data:
+   - cert/completion missing & `today > hire_date + due_days` → **overdue**
+   - cert/completion missing & still in window → **to_do**
+   - cert present & `expires_at` within 30 days → **expiring**
+   - cert present & valid → **current**
+
+Return the same `ChecklistRow[]` shape — UI changes are minimal.
+
+### Step 3 — Behavior question on add/edit employee
+
+- DB: add `profiles.requires_deescalation boolean default false`, `profiles.requires_abi boolean default false` (migration; will request approval).
+- Form: edit the add/edit employee form (used by `src/lib/employees.functions.ts createEmployeeManually` and the matching edit screen). Add one yes/no toggle: *"Does this employee work with clients who have behavior codes (BC1, BC2, BC3) or a Behavior Support Plan?"* Persist to `profiles.requires_deescalation`. Same field/UI for ABI alongside it.
+- Auto-on: in `getStaffChecklist` the behavior/ABI requirement is also enabled when assignment scan finds a qualifying client — the toggle is a manual override that can only *add*, never remove, a requirement that assignments imply.
+
+### Step 4 — Two completion paths per training
+
+In the existing certs/training section (`src/components/training/` — the staff-detail "Certs & Trainings" panel rendered from `src/routes/dashboard.employees.$staffId.tsx`), add two buttons per row:
+
+- **Mark complete** → small dialog: completed date (required), expiration date (required only if `tracks_expiration`). Writes a row to `certifications` (staff_id, type=baseline key, issued_on, expires_on) AND upserts `staff_checklist_completion` so the checklist flips green.
+- **Upload certificate** → file input (PDF / JPG / PNG, 10 MB cap). Uploads to existing cert storage bucket, creates the `certifications` row, links the file as `evidence_document_id`, then calls the Nectar OCR step.
+
+Both flows clear the row's red flag because Step 2 reads from `certifications` as a fallback.
+
+### Step 5 — Nectar reads expiration off uploads
+
+New server function `extractCertExpiration` in `src/lib/staff-training-requirements.functions.ts`:
+
+- Inputs: uploaded file URL + training key.
+- Calls Lovable AI Gateway (`google/gemini-2.5-flash`, multimodal, image or PDF block) with a tight prompt: *"Find the expiration date on this certificate. Reply with JSON `{expires_on: 'YYYY-MM-DD' | null, confidence: 0..1}` and nothing else."*
+- Writes `expires_on` to the new `certifications` row and to the checklist completion row. Sets a `nectar_suggested = true` flag in `certifications.metadata` so the UI can show *"Nectar set this — edit if wrong"* next to the date and let admin override with the existing edit control.
 
 ---
-
-## Definition of done
-- Re-uploading the same PCSP on a fresh client populates:
-  - `clients.pcsp_goals` (array, one per row in the PCSP goals table),
-  - `client_billing_codes` rows with non-zero `rate_per_unit` and `annual_unit_authorization`,
-  - `clients.authorized_dspd_codes` matching the PCSP's code list.
-- If the PCSP has no medications, the MAR/eMAR toggle is automatically `false` on the client profile.
-- Per-client uploader and Smart Import produce identical results on the same document (no path divergence).
-- Anything genuinely missing from the document still shows up in the Readiness Card with its inline editor, per the standing onboarding rule.
 
 ## Files touched
-- `src/lib/client-import-schema.ts` — bug 1, bug 2, MAR auto-toggle, medication writes.
-- `src/lib/document-extraction.ts` — extend prompt + CORE_CLIENT_FIELD_KEYS for medications signal.
-- `src/lib/smart-import.functions.ts` — JSON-encode `pcsp_goal` arrays + persist medication fields.
-- `src/lib/smart-import-commit.functions.ts` — decode + forward the new keys.
 
-No DB migrations, no new tables, no new columns — uses `clients.feature_config`, `client_medications`, `client_billing_codes`, and the existing `extracted_fields` staging table.
+- **new** `src/lib/staff-training-requirements.ts` (pure config)
+- **new** `src/lib/staff-training-requirements.functions.ts` (Nectar OCR server fn + mark-complete + upload-cert server fns)
+- **edit** `src/lib/hr-staff.functions.ts` — `getStaffChecklist` merge + status compute
+- **edit** `src/lib/employees.functions.ts` + employee add/edit form component — behavior/ABI toggles
+- **edit** `src/components/training/` (the staff-detail certs panel) + `src/routes/dashboard.employees.$staffId.tsx` — add Mark complete / Upload buttons, show expiration + Nectar tag
+- **migration** add `profiles.requires_deescalation`, `profiles.requires_abi`; add `certifications.metadata jsonb` if not present
+
+No schema change to `staff_checklist_completion` is needed — baseline rows use synthetic `requirement_id` strings, which the table already accepts as text.
+
+## Acceptance check
+
+- New employee, zero certs → checklist shows 30-Day, First Aid, CPR, PCT, Annual all as **To-Do** with due dates from hire_date; once a due date passes they flip **Overdue**.
+- Toggle "works with behavior clients" YES → De-escalation row appears.
+- Assign that employee to any client with a BC code → De-escalation row appears automatically even with the toggle off.
+- Mark CPR complete with date → row goes **Current**, expires_on shown.
+- Upload a CPR PDF → row goes **Current**, expires_on auto-filled by Nectar with an "edit" affordance.

@@ -18,7 +18,10 @@ const CreateEmployeeInput = z.object({
   startDate: z.string().optional().or(z.literal("")),
   endDate: z.string().optional().or(z.literal("")),
   trackIds: z.array(z.string().uuid()).max(50).default([]),
+  requiresDeescalation: z.boolean().default(false),
+  requiresAbi: z.boolean().default(false),
 });
+
 
 async function assertOrgManager(actorId: string, orgId: string) {
   const { data, error } = await supabaseAdmin
@@ -88,7 +91,10 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
         end_date: endDate,
         must_change_password: true,
         is_active: true,
-      }, { onConflict: "id" });
+        requires_deescalation: data.requiresDeescalation,
+        requires_abi: data.requiresAbi,
+      } as any, { onConflict: "id" });
+
       if (profErr) throw new Error(profErr.message);
 
       // The handle_new_user trigger auto-creates a personal org + admin membership.

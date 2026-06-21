@@ -2121,6 +2121,9 @@ function ProfileTab({
         id={client.id}
         fullName={`${client.first_name} ${client.last_name}`.trim()}
         organizationId={orgId}
+        onDeleted={() => {
+          window.location.assign("/dashboard/hub/clients");
+        }}
       />
     </div>
 

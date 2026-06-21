@@ -8,21 +8,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, ShieldCheck, AlertTriangle } from "lucide-react";
 import { clientReadiness, type ReadinessReport } from "@/lib/client-readiness.functions";
+import { AddCodesControl } from "@/components/clients/add-codes-control";
 
-type CheckRow = {
-  key: keyof Omit<ReadinessReport, "isLive">;
+type LinkRow = {
+  kind: "link";
+  key: "hasStaff" | "evvReady" | "guardianValid" | "goalsPresent";
   label: string;
-  fixHref: string;
+  tab: "caseload" | "overview" | "plan";
   fixLabel: string;
 };
+type InlineRow = {
+  kind: "inline";
+  key: "schedulable" | "billable";
+  label: string;
+};
+type CheckRow = LinkRow | InlineRow;
 
-const CHECKS = (clientId: string): CheckRow[] => [
-  { key: "schedulable", label: "Has a clockable service code", fixHref: `/dashboard/clients/${clientId}?tab=codes`, fixLabel: "Add billing code" },
-  { key: "hasStaff", label: "At least one staff assigned", fixHref: `/dashboard/clients/${clientId}?tab=caseload`, fixLabel: "Assign staff" },
-  { key: "evvReady", label: "Home geocoded for EVV", fixHref: `/dashboard/clients/${clientId}?tab=overview`, fixLabel: "Confirm home" },
-  { key: "billable", label: "Rate & units set on at least one code", fixHref: `/dashboard/clients/${clientId}?tab=codes`, fixLabel: "Set rate" },
-  { key: "guardianValid", label: "Guardian state valid", fixHref: `/dashboard/clients/${clientId}?tab=overview`, fixLabel: "Confirm guardian" },
-  { key: "goalsPresent", label: "PCSP goals captured", fixHref: `/dashboard/clients/${clientId}?tab=plan`, fixLabel: "Add goals" },
+const CHECKS: CheckRow[] = [
+  { kind: "inline", key: "schedulable", label: "Has a clockable service code" },
+  { kind: "link",   key: "hasStaff",     label: "At least one staff assigned",       tab: "caseload", fixLabel: "Assign staff" },
+  { kind: "link",   key: "evvReady",     label: "Home geocoded for EVV",             tab: "overview", fixLabel: "Confirm home" },
+  { kind: "inline", key: "billable",     label: "Rate & units set on at least one code" },
+  { kind: "link",   key: "guardianValid", label: "Guardian state valid",             tab: "overview", fixLabel: "Confirm guardian" },
+  { kind: "link",   key: "goalsPresent", label: "PCSP goals captured",               tab: "plan",     fixLabel: "Add goals" },
 ];
 
 export function useClientReadiness(clientId: string) {
@@ -38,8 +46,7 @@ export function ClientReadinessCard({ clientId }: { clientId: string }) {
   if (q.isLoading) return null;
   if (q.isError || !q.data) return null;
   const r = q.data;
-  const rows = CHECKS(clientId);
-  const failing = rows.filter((row) => !r[row.key]);
+  const failing = CHECKS.filter((row) => !r[row.key]);
 
   return (
     <Card
@@ -61,29 +68,43 @@ export function ClientReadinessCard({ clientId }: { clientId: string }) {
           </CardTitle>
         </div>
         <Badge variant="outline" className={r.isLive ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}>
-          {rows.length - failing.length}/{rows.length} checks
+          {CHECKS.length - failing.length}/{CHECKS.length} checks
         </Badge>
       </CardHeader>
-      <CardContent className="space-y-1.5">
-        {rows.map((row) => {
+      <CardContent className="space-y-2">
+        {CHECKS.map((row) => {
           const ok = r[row.key];
           return (
-            <div key={row.key} className="flex items-center justify-between gap-2 text-sm">
-              <span className="flex items-center gap-2">
-                {ok ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-amber-600" />
+            <div key={row.key} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex items-center gap-2">
+                  {ok ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-amber-600" />
+                  )}
+                  {row.label}
+                </span>
+                {!ok && row.kind === "link" && (
+                  <Link
+                    to="/dashboard/clients/$clientId"
+                    params={{ clientId }}
+                    search={{ tab: row.tab }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {row.fixLabel} →
+                  </Link>
                 )}
-                {row.label}
-              </span>
-              {!ok && (
-                <Link
-                  to={row.fixHref}
-                  className="text-xs text-primary hover:underline"
-                >
-                  {row.fixLabel} →
-                </Link>
+              </div>
+              {!ok && row.kind === "inline" && (
+                <div className="pl-6">
+                  <AddCodesControl clientId={clientId} compact />
+                  {row.key === "billable" && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Codes are added at $0 — open the Finish-onboarding card to set rate &amp; annual units.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           );

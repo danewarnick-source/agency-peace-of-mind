@@ -18,6 +18,13 @@ const CLIENT_COL: Record<string, string> = {
   address: "physical_address",
   medicaid_id: "medicaid_id",
   date_of_birth: "date_of_birth",
+  is_own_guardian: "is_own_guardian",
+  guardian_name: "guardian_name",
+  guardian_phone: "guardian_phone",
+  guardian_relationship: "guardian_relationship",
+  guardian_email: "guardian_email",
+  emergency_contact_name: "emergency_contact_name",
+  emergency_contact_phone: "emergency_contact_phone",
 };
 // On profiles we only update soft, non-auth fields
 const PROFILE_COL: Record<string, string> = {

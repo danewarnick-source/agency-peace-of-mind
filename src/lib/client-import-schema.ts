@@ -238,11 +238,10 @@ export async function applyExtractedFieldsToClient(
       if (row.service_code) {
         codeRows.push({
           service_code: String(row.service_code).toUpperCase(),
-          rate: typeof row.rate === "number" ? row.rate : null,
-          max_units: typeof row.max_units === "number" ? row.max_units : null,
+          rate: toNum(row.rate),
+          max_units: toNum(row.max_units),
           unit_type: row.unit_type ? String(row.unit_type) : null,
-          weekly_cap_units:
-            typeof row.weekly_cap_units === "number" ? row.weekly_cap_units : null,
+          weekly_cap_units: toNum(row.weekly_cap_units),
           plan_start: row.plan_start ? String(row.plan_start).slice(0, 10) : null,
           plan_end: row.plan_end ? String(row.plan_end).slice(0, 10) : null,
         });
@@ -252,16 +251,16 @@ export async function applyExtractedFieldsToClient(
   if (!codeRows.length) {
     const sc = byKey.get("service_code");
     if (sc && fieldText(sc)) {
-      const rate = byKey.get("rate")?.value_number ?? null;
-      const maxU = byKey.get("max_units")?.value_number ?? null;
+      const rateF = byKey.get("rate");
+      const maxF = byKey.get("max_units");
+      const wcapF = byKey.get("weekly_cap_units");
       const ut = byKey.get("unit_type");
-      const wcap = byKey.get("weekly_cap_units")?.value_number ?? null;
       codeRows.push({
         service_code: (fieldText(sc) as string).toUpperCase(),
-        rate,
-        max_units: maxU,
+        rate: rateF ? toNum(rateF.value_number ?? rateF.value_text) : null,
+        max_units: maxF ? toNum(maxF.value_number ?? maxF.value_text) : null,
         unit_type: ut ? fieldText(ut) : null,
-        weekly_cap_units: wcap,
+        weekly_cap_units: wcapF ? toNum(wcapF.value_number ?? wcapF.value_text) : null,
         plan_start: byKey.get("plan_start") ? fieldDate(byKey.get("plan_start") as ExtractedField) : null,
         plan_end: byKey.get("plan_end") ? fieldDate(byKey.get("plan_end") as ExtractedField) : null,
       });

@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { AddCodesControl } from "@/components/clients/add-codes-control";
 import {
   getClientOnboardingState,
   saveOnboardingClientPatch,

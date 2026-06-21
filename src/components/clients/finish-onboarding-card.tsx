@@ -5,10 +5,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   ListChecks, CheckCircle2, ChevronDown, ChevronRight, MapPin,
-  DollarSign, Shield, ClipboardList, Users,
+  DollarSign, Shield, ClipboardList, Users, HelpCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,11 @@ import {
   saveOnboardingCustomField,
   skipOnboardingItem,
 } from "@/lib/finish-onboarding.functions";
+import {
+  getClientFieldStates,
+  setFieldConfirmation,
+} from "@/lib/field-confirmations.functions";
+import { TRACKED_FIELDS } from "@/lib/field-confirmations";
 
 type State = Awaited<ReturnType<typeof getClientOnboardingState>>;
 type Rate = {

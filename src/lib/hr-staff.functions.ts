@@ -256,7 +256,12 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
             training_completion_id:
               (c?.training_completion_id as string) ?? null,
             auto_checked_at: (c?.auto_checked_at as string) ?? null,
+            admin_signed_off_at: null,
+            nectar_name_match: null,
+            nectar_extracted_name: null,
+            nectar_reviewed_at: null,
           },
+
           applicable,
           applies_to_staff_types:
             applies_to === null || applies_to === undefined ? "all" : applies_to,

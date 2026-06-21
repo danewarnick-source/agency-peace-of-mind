@@ -345,7 +345,14 @@ export function StaffHrChecklistCard({
                           </span>
                         </summary>
                         <div className="space-y-2 border-t border-border/60 p-3">
-                          {items.map((row) => {
+                          {[...items]
+                            .sort((a, b) => {
+                              // Applicable rows first; N/A rows last.
+                              const aNa = a.applicable === false ? 1 : 0;
+                              const bNa = b.applicable === false ? 1 : 0;
+                              return aNa - bNa;
+                            })
+                            .map((row) => {
                             const completionDoc = (docsQ.data ?? []).find(
                               (d) => d.id === row.completion.evidence_document_id,
                             );
@@ -361,11 +368,22 @@ export function StaffHrChecklistCard({
                               expMs >= todayMs &&
                               expMs <= in60Ms;
                             const isNA = row.applicable === false;
+                            const awaitingSignoff =
+                              !!row.completion.evidence_document_id &&
+                              !row.completion.admin_signed_off_at &&
+                              !isExpired;
                             // Status kind drives both the visual dot and the
                             // optional Requirements-tab filter chips.
-                            const statusKind: "na" | "current" | "expiring" | "overdue" | "todo" =
-                              isNA
-                                ? "na"
+                            const statusKind:
+                              | "na"
+                              | "current"
+                              | "expiring"
+                              | "overdue"
+                              | "awaiting_signoff"
+                              | "todo" = isNA
+                              ? "na"
+                              : awaitingSignoff
+                                ? "awaiting_signoff"
                                 : status === "complete" && !isExpired
                                   ? "current"
                                   : isExpired
@@ -381,16 +399,16 @@ export function StaffHrChecklistCard({
                             }
                             const pillLabel =
                               statusKind === "current"
-                                ? row.is_renewable
-                                  ? "Current"
-                                  : "Complete"
+                                ? "Completed"
                                 : statusKind === "expiring"
                                   ? "Expiring"
                                   : statusKind === "overdue"
                                     ? "Overdue"
-                                    : statusKind === "na"
-                                      ? "N/A"
-                                      : "To do";
+                                    : statusKind === "awaiting_signoff"
+                                      ? "Awaiting sign-off"
+                                      : statusKind === "na"
+                                        ? "N/A"
+                                        : "Incomplete";
                             const pillTone =
                               statusKind === "current"
                                 ? "bg-emerald-100 text-emerald-800"
@@ -398,18 +416,23 @@ export function StaffHrChecklistCard({
                                   ? "bg-amber-100 text-amber-800"
                                   : statusKind === "overdue"
                                     ? "bg-rose-100 text-rose-800"
-                                    : statusKind === "na"
-                                      ? "bg-muted text-muted-foreground"
-                                      : "bg-muted text-foreground/70";
+                                    : statusKind === "awaiting_signoff"
+                                      ? "bg-amber-100 text-amber-800"
+                                      : statusKind === "na"
+                                        ? "bg-muted text-muted-foreground"
+                                        : "bg-rose-100 text-rose-800";
                             const dot = isNA
                               ? "bg-muted-foreground/40"
                               : statusKind === "current"
                                 ? "bg-emerald-500"
-                                : statusKind === "expiring" || status === "in_progress"
+                                : statusKind === "expiring" ||
+                                    statusKind === "awaiting_signoff" ||
+                                    status === "in_progress"
                                   ? "bg-amber-500"
                                   : statusKind === "overdue"
                                     ? "bg-rose-500"
-                                    : "bg-muted";
+                                    : "bg-rose-500";
+
                             if (isNA) {
                               return (
                                 <div

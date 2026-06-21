@@ -265,6 +265,11 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
             nectar_name_match: null,
             nectar_extracted_name: null,
             nectar_reviewed_at: null,
+            nectar_validation_status: null,
+            nectar_validation_reasons: null,
+            nectar_extracted_cert_type: null,
+            nectar_extracted_completed_date: null,
+            nectar_extracted_summary: null,
           },
 
           applicable,

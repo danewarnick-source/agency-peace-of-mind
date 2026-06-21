@@ -4,6 +4,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { isClockableServiceCode } from "@/lib/service-billing";
 
 export type ReadinessReport = {
   schedulable: boolean;
@@ -13,6 +14,10 @@ export type ReadinessReport = {
   guardianValid: boolean;
   goalsPresent: boolean;
   isLive: boolean; // schedulable && hasStaff && evvReady
+  // Context for the inline "Add codes" question — so NECTAR can state
+  // what the client already has and ask the specific missing piece.
+  currentCodes: string[];
+  clockableCodes: string[];
 };
 
 export const clientReadiness = createServerFn({ method: "POST" })
@@ -27,7 +32,7 @@ export const clientReadiness = createServerFn({ method: "POST" })
 
     const { data: client } = await sb
       .from("clients")
-      .select("organization_id, home_latitude, home_longitude, is_own_guardian, guardian_name, pcsp_goals")
+      .select("organization_id, home_latitude, home_longitude, is_own_guardian, guardian_name, pcsp_goals, authorized_dspd_codes")
       .eq("id", data.clientId)
       .maybeSingle();
     if (!client) throw new Error("Client not found");
@@ -65,7 +70,18 @@ export const clientReadiness = createServerFn({ method: "POST" })
       annual_unit_authorization: number | null;
     }>;
 
-    const schedulable = codeRows.some((c) => !!c.service_code?.trim());
+    // Union of codes on file: client_billing_codes + clients.authorized_dspd_codes.
+    const codeSet = new Set<string>();
+    for (const c of codeRows) {
+      if (c.service_code?.trim()) codeSet.add(c.service_code.trim().toUpperCase());
+    }
+    for (const c of (client.authorized_dspd_codes ?? []) as string[]) {
+      if (c?.trim()) codeSet.add(c.trim().toUpperCase());
+    }
+    const currentCodes = Array.from(codeSet).sort();
+    const clockableCodes = currentCodes.filter((c) => isClockableServiceCode(c));
+
+    const schedulable = clockableCodes.length > 0;
     const billable = codeRows.some(
       (c) => (c.rate_per_unit ?? 0) > 0 && (c.annual_unit_authorization ?? 0) > 0,
     );
@@ -85,5 +101,8 @@ export const clientReadiness = createServerFn({ method: "POST" })
       guardianValid,
       goalsPresent,
       isLive: schedulable && hasStaff && evvReady,
+      currentCodes,
+      clockableCodes,
     };
   });
+

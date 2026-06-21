@@ -40,7 +40,7 @@ import {
 
 
 
-type State = Awaited<ReturnType<typeof getClientOnboardingState>>;
+export type State = Awaited<ReturnType<typeof getClientOnboardingState>>;
 type Rate = {
   id: string;
   service_code: string;
@@ -250,7 +250,7 @@ function StepRow({
 }
 
 // ── Home location & geofence ───────────────────────────────────────────────
-function HomeForm({
+export function HomeForm({
   clientId, state, onSaved,
 }: { clientId: string; state: State; onSaved: () => void }) {
   const c = state.client as { physical_address?: string | null; home_latitude?: number | null; home_longitude?: number | null; geofence_radius_feet?: number | null };
@@ -301,7 +301,7 @@ function HomeForm({
 }
 
 // ── Billing rates / units ──────────────────────────────────────────────────
-function RatesForm({
+export function RatesForm({
   state, onSaved,
 }: { state: State; onSaved: () => void }) {
   if (state.missingRates.length === 0) {
@@ -366,7 +366,7 @@ function RateRow({
 }
 
 // ── Guardian ───────────────────────────────────────────────────────────────
-function GuardianForm({
+export function GuardianForm({
   clientId, state, onSaved,
 }: { clientId: string; state: State; onSaved: () => void }) {
   const c = state.client as { is_own_guardian?: boolean | null; guardian_name?: string | null; guardian_phone?: string | null; guardian_relationship?: string | null; guardian_email?: string | null };

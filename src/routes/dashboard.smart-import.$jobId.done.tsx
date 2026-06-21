@@ -4,16 +4,20 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, Sparkles, Loader2, FileText,
-  Users, ExternalLink, Undo2, RotateCw,
+  Users, ExternalLink, Undo2, RotateCw, Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { getDoneReadout, commitSmartImportJob, recommitSmartImportJob } from "@/lib/smart-import-commit.functions";
+import { applyMissingClientFields } from "@/lib/smart-import-review.functions";
 import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-history.functions";
 

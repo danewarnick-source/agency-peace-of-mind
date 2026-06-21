@@ -18,12 +18,12 @@ import { clientReadiness, type ReadinessReport } from "@/lib/client-readiness.fu
 import {
   getClientOnboardingState,
   addClientBillingCodes,
-  type State as OnboardingState,
 } from "@/lib/finish-onboarding.functions";
 import {
   HomeForm,
   RatesForm,
   GuardianForm,
+  type State as OnboardingState,
 } from "@/components/clients/finish-onboarding-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { FEATURE_CODES } from "@/lib/client-features";

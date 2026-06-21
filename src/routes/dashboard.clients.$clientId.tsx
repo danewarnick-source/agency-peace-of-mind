@@ -107,6 +107,8 @@ function ClientProfileHub() {
         </Button>
       </div>
 
+      <FinishOnboardingCard clientId={clientId} />
+
       <Tabs value={tab ?? "overview"} className="w-full">
         <TabsList className="flex w-full flex-wrap h-auto justify-start">
           <TabTrigger value="overview" icon={<User className="h-3.5 w-3.5" />} label="Overview" clientId={clientId} />

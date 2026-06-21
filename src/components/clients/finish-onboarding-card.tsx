@@ -455,51 +455,45 @@ function SowField({
   clientId, field, state, onSaved,
 }: {
   clientId: string;
-  field: { key: string; label: string };
+  field: ProfileField;
   state: State;
   onSaved: () => void;
 }) {
-  const customDef = state.sowCustomFields.find((f) => f.key === field.key);
-  const isCustom = !!customDef;
-  const isBoolean = customDef?.type === "boolean";
-
-  const c = state.client as Record<string, unknown>;
-  const initial = isCustom
-    ? (isBoolean
-        ? customDef?.value?.value_boolean ?? false
-        : customDef?.value?.value_text ?? "")
-    : Array.isArray(c[field.key])
-      ? ((c[field.key] as string[]) ?? []).join(", ")
-      : ((c[field.key] as string | null) ?? "");
+  // PREFILL from the canonical store — wizard reads exactly what extraction
+  // and the profile have already written.
+  const prefilled = getProfileFieldValue(
+    state.client as Record<string, unknown>,
+    state.profileCustoms,
+    field,
+  );
+  const initial: string | boolean =
+    field.type === "bool"
+      ? prefilled === true
+      : Array.isArray(prefilled)
+        ? prefilled.join(", ")
+        : (prefilled ?? "") as string;
   const [val, setVal] = useState<string | boolean>(initial);
 
-  const patchFn = useServerFn(saveOnboardingClientPatch);
-  const cfFn = useServerFn(saveOnboardingCustomField);
-
+  const saveFn = useServerFn(saveProfileField);
   const m = useMutation({
     mutationFn: async () => {
-      if (isCustom) {
-        return cfFn({
-          data: {
-            clientId,
-            field_key: field.key,
-            field_label: customDef!.label,
-            data_type: isBoolean ? "boolean" : "text",
-            value_text: isBoolean ? null : String(val),
-            value_boolean: isBoolean ? Boolean(val) : null,
-          },
-        });
+      let value: string | boolean | string[] | null;
+      if (field.type === "bool") value = !!val;
+      else if (field.type === "array") {
+        const txt = String(val).trim();
+        value = txt ? txt.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean) : [];
+      } else {
+        const txt = String(val).trim();
+        value = txt ? txt : null;
       }
-      const text = String(val).trim();
-      const patch: Record<string, unknown> =
-        field.key === "allergies"
-          ? { allergies: text ? text.split(",").map((x) => x.trim()).filter(Boolean) : [] }
-          : { [field.key]: text || null };
-      return patchFn({ data: { clientId, patch } });
+      return saveFn({ data: { clientId, fieldKey: field.key, value } });
     },
     onSuccess: () => { toast.success(`${field.label} saved.`); onSaved(); },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const isLong = field.type === "textarea";
+  const isBoolean = field.type === "bool";
 
   return (
     <div className="rounded border border-border p-2">
@@ -507,7 +501,7 @@ function SowField({
       <div className="mt-1 flex items-center gap-2">
         {isBoolean ? (
           <Switch checked={Boolean(val)} onCheckedChange={(v) => setVal(v)} />
-        ) : field.key === "special_directions" || field.key === "advanced_directives" ? (
+        ) : isLong ? (
           <Textarea value={String(val)} onChange={(e) => setVal(e.target.value)} className="min-h-20" />
         ) : (
           <Input value={String(val)} onChange={(e) => setVal(e.target.value)} />
@@ -519,6 +513,7 @@ function SowField({
     </div>
   );
 }
+
 
 // ── NECTAR confirmation questions (tri-state tracked fields) ───────────────
 function UnknownConfirmations({

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { parseDocumentWithAI } from "@/lib/document-extraction";
 
 // =============================================================
 // NECTAR Universal Document Store — server functions

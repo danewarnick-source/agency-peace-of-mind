@@ -509,6 +509,7 @@ export async function applyExtractedFieldsToClient(
     "billing_code_row", "service_code", "rate", "max_units", "unit_type",
     "weekly_cap_units", "plan_start", "plan_end",
     "team_name", "staff_ratio",
+    "client_medication", "pcsp_has_medications",
   ]);
   const seenCustom = new Set<string>();
   for (const f of ok) {

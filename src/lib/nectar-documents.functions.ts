@@ -303,7 +303,7 @@ export const ingestDocument = createServerFn({ method: "POST" })
       const AUTOFILL_TYPES = new Set(["pcsp", "1056_budget", "intake", "assessment"]);
       if (data.clientId && AUTOFILL_TYPES.has(effectiveDocType)) {
         try {
-          autofillResult = await applyClientAutofill({
+          autofillResult = await applyExtractedFieldsToClient({
             supabase,
             organizationId: data.organizationId,
             clientId: data.clientId,

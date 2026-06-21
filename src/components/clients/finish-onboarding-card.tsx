@@ -228,7 +228,7 @@ function StepRow({
                 <div className="mb-1 text-xs font-medium text-muted-foreground">
                   Add more service codes
                 </div>
-                <AddCodesControl clientId={clientId} onChanged={onChanged} compact />
+                <AddCodesControl clientId={clientId} onAdded={onChanged} compact />
               </div>
               <RatesForm state={state} onSaved={onChanged} />
             </div>

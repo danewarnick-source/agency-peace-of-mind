@@ -563,6 +563,30 @@ export function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
             </div>
 
+            <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3">
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" name="requires_deescalation" className="mt-1 rounded" />
+                <span>
+                  <span className="font-medium">Works with behavior clients?</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Check if this employee works with clients who have behavior codes (BC1, BC2, BC3) or a Behavior Support Plan.
+                    De-escalation Certification will be required.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" name="requires_abi" className="mt-1 rounded" />
+                <span>
+                  <span className="font-medium">Works with ABI clients?</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Check if this employee works with ABI (acquired brain injury) clients. ABI Training will be required.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+
+
             {!!tracks?.length && (
               <div className="grid gap-2">
                 <Label>Assigned training tracks</Label>

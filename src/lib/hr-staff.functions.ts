@@ -321,8 +321,9 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
           auto_checked_at: null,
         },
         applicable,
-        applies_to_staff_types: "all",
+        applies_to_staff_types: "all" as const,
         applies_to_confirmed_at: null,
+
       };
     }).filter(
       // Don't double-list a baseline if the admin already created an

@@ -489,17 +489,21 @@ export function StaffHrChecklistCard({
                                             staffId={staffId}
                                             trainingKey={baselineKey}
                                             tracksExpiration={!!t?.tracks_expiration}
-                                            currentCompletedDate={row.completion.completed_date}
                                             currentExpiresAt={row.completion.expires_at}
                                             currentEvidenceDocId={row.completion.evidence_document_id}
+                                            adminSignedOffAt={row.completion.admin_signed_off_at}
+                                            nectarNameMatch={row.completion.nectar_name_match}
+                                            nectarExtractedName={row.completion.nectar_extracted_name}
                                             onChanged={invalidate}
-                                            markBaselineFn={markBaselineFn}
                                             attachBaselineFn={attachBaselineFn}
                                             setBaselineExpFn={setBaselineExpFn}
+                                            signOffBaselineFn={signOffBaselineFn}
+                                            revokeBaselineFn={revokeBaselineFn}
                                             createUpload={createUpload}
                                             getDocUrl={getDocUrl}
                                           />
                                         );
+
                                       }
                                       return (
                                         <>

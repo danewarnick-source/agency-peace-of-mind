@@ -284,14 +284,20 @@ export const adminSignOffBaselineCompletion = createServerFn({ method: "POST" })
 
     const { data: row, error: rErr } = await sb
       .from("staff_baseline_training_completions")
-      .select("evidence_document_id, completed_date")
+      .select(
+        "evidence_document_id, completed_date, nectar_validation_status",
+      )
       .eq("organization_id", data.organization_id)
       .eq("staff_id", data.staff_id)
       .eq("training_key", data.training_key)
       .maybeSingle();
     if (rErr) throw new Error(rErr.message);
     if (!row?.evidence_document_id)
-      throw new Error("Upload a certificate before signing off.");
+      throw new Error("Upload a valid certificate before signing off.");
+    if (row.nectar_validation_status === "failed")
+      throw new Error(
+        "Nectar rejected this certificate — upload a valid one before signing off.",
+      );
 
     const completedDate =
       (row.completed_date as string | null) ??

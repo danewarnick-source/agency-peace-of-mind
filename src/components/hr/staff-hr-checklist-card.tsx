@@ -26,8 +26,15 @@ import {
   getHrDocumentUrl,
   deleteHrDocument,
 } from "@/lib/hr-staff.functions";
+import {
+  markBaselineTrainingComplete,
+  attachBaselineCertificate,
+  setBaselineExpiration,
+} from "@/lib/staff-training-requirements.functions";
+import { parseBaselineId, baselineByKey } from "@/lib/staff-training-requirements";
 import { AnnualHoursSection } from "@/components/hr/annual-hours-progress";
 import { useAuth } from "@/hooks/use-auth";
+
 
 const STATUSES = ["not_started", "in_progress", "complete", "expired", "waived"] as const;
 

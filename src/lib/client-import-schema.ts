@@ -75,10 +75,12 @@ function fieldDate(f: ExtractedField): string | null {
 
 export async function applyExtractedFieldsToClient(
   ctx: ApplyExtractedCtx,
-): Promise<{ autofilled: string[]; suggested: string[] }> {
+): Promise<{ autofilled: string[]; suggested: string[]; customCreated: string[] }> {
   const { supabase, organizationId, clientId, fields } = ctx;
   const autofilled: string[] = [];
   const suggested: string[] = [];
+  const customCreated: string[] = [];
+
 
   const ok = fields.filter((f) => (f.confidence ?? 0) >= CONFIDENCE_THRESHOLD);
   const byKey = new Map<string, ExtractedField>();
@@ -89,7 +91,7 @@ export async function applyExtractedFieldsToClient(
   const { data: client, error: cErr } = await supabase
     .from("clients")
     .select(
-      "id, first_name, last_name, date_of_birth, medicaid_id, phone_number, physical_address, emergency_contact_name, emergency_contact_phone, is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email, guardian_address, special_directions, allergies, dysphagia, swallowing_alerts, self_admin_med_support, pcsp_goals, authorized_dspd_codes, job_code",
+      "id, first_name, last_name, date_of_birth, medicaid_id, phone_number, physical_address, emergency_contact_name, emergency_contact_phone, is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email, guardian_address, special_directions, allergies, dysphagia, swallowing_alerts, self_admin_med_support, pcsp_goals, authorized_dspd_codes, job_code, team_id",
     )
     .eq("id", clientId)
     .eq("organization_id", organizationId)
@@ -266,6 +268,27 @@ export async function applyExtractedFieldsToClient(
     autofilled.push(`client_billing_codes(${stubs.length})`);
   }
 
+  // Team resolution by name → clients.team_id (non-destructive: only fills if empty).
+  const teamF = byKey.get("team_name");
+  const teamName = teamF ? fieldText(teamF) : null;
+  if (teamName) {
+    const cur = (client as Record<string, unknown>).team_id;
+    if (cur === null || cur === undefined) {
+      const { data: t } = await supabase
+        .from("teams")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .ilike("team_name", teamName)
+        .maybeSingle();
+      if (t?.id) {
+        update.team_id = t.id;
+        autofilled.push("team_id");
+      } else {
+        suggested.push(`team_name (no match for "${teamName}")`);
+      }
+    }
+  }
+
   if (Object.keys(update).length) {
     const { data: updated, error: uErr } = await supabase
       .from("clients")
@@ -278,5 +301,93 @@ export async function applyExtractedFieldsToClient(
       throw new Error("Client autofill update returned no rows");
   }
 
-  return { autofilled, suggested };
+  // Staff ratio → client_ratios row (one per import, "default" setting).
+  const ratioF = byKey.get("staff_ratio");
+  const ratioText = ratioF ? fieldText(ratioF) : null;
+  if (ratioText) {
+    const m = /^\s*(\d+)\s*[:/x]\s*(\d+)\s*$/i.exec(ratioText);
+    if (m) {
+      const ratio_staff = parseInt(m[1], 10);
+      const ratio_clients = parseInt(m[2], 10);
+      const today = new Date().toISOString().slice(0, 10);
+      const { error: rErr } = await supabase.from("client_ratios").insert({
+        organization_id: organizationId,
+        client_id: clientId,
+        setting: "default",
+        ratio_staff,
+        ratio_clients,
+        effective_start: today,
+      });
+      if (!rErr) autofilled.push(`client_ratios(${ratio_staff}:${ratio_clients})`);
+    } else {
+      suggested.push(`staff_ratio (unparseable "${ratioText}")`);
+    }
+  }
+
+  // Anything we don't have a clients column for → custom field, so nothing
+  // extracted is lost and each agency builds its own field library.
+  const KNOWN_CORE = new Set<string>([
+    "first_name", "last_name", "dob", "medicaid_id", "phone",
+    "physical_address", "emergency_contact_name", "emergency_contact_phone",
+    "is_own_guardian", "guardian_name", "guardian_phone", "guardian_relationship",
+    "guardian_email", "guardian_address",
+    "clinical_alert", "special_directions", "dysphagia", "self_admin_med_support",
+    "allergies", "swallowing_alerts", "pcsp_goal",
+    "billing_code_row", "service_code", "rate", "max_units", "unit_type",
+    "weekly_cap_units", "plan_start", "plan_end",
+    "team_name", "staff_ratio",
+  ]);
+  const seenCustom = new Set<string>();
+  for (const f of ok) {
+    if (KNOWN_CORE.has(f.field_key)) continue;
+    if (seenCustom.has(f.field_key)) continue;
+    seenCustom.add(f.field_key);
+    const val = fieldText(f) ?? (fieldArray(f)?.join(", ") ?? null);
+    if (!val) continue;
+    try {
+      const { data: def } = await supabase
+        .from("custom_field_definitions")
+        .upsert(
+          {
+            organization_id: organizationId,
+            entity_kind: "client",
+            field_key: f.field_key,
+            field_label: f.field_key.replace(/_/g, " "),
+            data_type: "text",
+            source: "import",
+          },
+          { onConflict: "organization_id,entity_kind,field_key" },
+        )
+        .select("id")
+        .single();
+      if (!def) continue;
+      const { data: existing } = await supabase
+        .from("custom_field_values")
+        .select("id")
+        .eq("definition_id", def.id)
+        .eq("entity_id", clientId)
+        .maybeSingle();
+      if (existing) {
+        await supabase
+          .from("custom_field_values")
+          .update({ value_text: val })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("custom_field_values").insert({
+          organization_id: organizationId,
+          definition_id: def.id,
+          entity_id: clientId,
+          entity_kind: "client",
+          value_text: val,
+        });
+      }
+      customCreated.push(f.field_key);
+    } catch {
+      // Non-fatal: surface as a soft suggestion instead of blocking the commit.
+      suggested.push(`custom:${f.field_key}`);
+    }
+  }
+
+  return { autofilled, suggested, customCreated };
+
 }

@@ -9,8 +9,19 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { geocodeAddress } from "@/lib/geocode";
+import {
+  CLIENT_PROFILE_FIELDS,
+  PROFILE_CLIENT_COLUMNS,
+  PROFILE_CUSTOM_KEYS,
+  profileFieldHasValue,
+  writeProfileFieldValue,
+  type ProfileCustomsMap,
+  type ProfileField,
+} from "@/lib/client-profile-fields";
 
-// Whitelist of clients-table columns the wizard may patch directly.
+// Whitelist of clients-table columns the wizard may patch directly via
+// saveOnboardingClientPatch (legacy helpers below). The registry's
+// writeProfileFieldValue handles every other column write.
 const PATCHABLE_CLIENT_COLS = new Set([
   "physical_address", "geofence_radius_feet",
   "is_own_guardian", "guardian_name", "guardian_phone",
@@ -18,15 +29,6 @@ const PATCHABLE_CLIENT_COLS = new Set([
   "emergency_contact_name", "emergency_contact_phone",
   "special_directions", "allergies",
 ]);
-
-// SOW-required fields with no clients column → routed to custom_field_values.
-const SOW_CUSTOM_FIELDS: Array<{ key: string; label: string; type: "text" | "boolean" }> = [
-  { key: "support_coordinator_name", label: "Support coordinator name", type: "text" },
-  { key: "support_coordinator_phone", label: "Support coordinator phone", type: "text" },
-  { key: "support_coordinator_email", label: "Support coordinator email", type: "text" },
-  { key: "advanced_directives", label: "Advanced directives", type: "text" },
-  { key: "emergency_medical_treatment_authorization", label: "Emergency medical treatment authorization", type: "boolean" },
-];
 
 async function assertOrgMember(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,6 +46,8 @@ async function assertOrgMember(
 
 // ---------------------------------------------------------------------------
 // State readout for one client — drives the wizard's checklist.
+// Fetches every column the registry needs + every custom value keyed by a
+// registry custom key so the wizard can PRE-FILL fields from extraction.
 // ---------------------------------------------------------------------------
 export const getClientOnboardingState = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -53,11 +57,19 @@ export const getClientOnboardingState = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
+
+    // Pull a known-superset of columns: registry-required + wizard-required
+    // (geofence/guardian state lives outside the registry).
+    const extraCols = [
+      "id", "organization_id",
+      "home_latitude", "home_longitude", "geofence_radius_feet",
+      "is_own_guardian", "guardian_name", "guardian_phone",
+      "guardian_relationship", "guardian_email",
+    ];
+    const cols = Array.from(new Set([...extraCols, ...PROFILE_CLIENT_COLUMNS])).join(", ");
     const { data: client, error } = await sb
       .from("clients")
-      .select(
-        "id, organization_id, physical_address, home_latitude, home_longitude, geofence_radius_feet, is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email, emergency_contact_name, emergency_contact_phone, special_directions, allergies",
-      )
+      .select(cols)
       .eq("id", data.clientId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -77,7 +89,7 @@ export const getClientOnboardingState = createServerFn({ method: "POST" })
         .eq("client_id", data.clientId),
       sb
         .from("custom_field_definitions")
-        .select("id, field_key, field_label, data_type")
+        .select("id, field_key")
         .eq("organization_id", client.organization_id)
         .eq("entity_kind", "client"),
     ]);
@@ -99,11 +111,12 @@ export const getClientOnboardingState = createServerFn({ method: "POST" })
         .map((v) => [v.definition_id, v]),
     );
 
-    const customByKey: Record<string, { value_text: string | null; value_boolean: boolean | null } | null> = {};
-    for (const f of SOW_CUSTOM_FIELDS) {
-      const def = defByKey.get(f.key);
-      const v = def ? valByDef.get(def.id) ?? null : null;
-      customByKey[f.key] = v;
+    // Build a registry-keyed custom-value map (the SAME shape the wizard
+    // and profile read).
+    const profileCustoms: ProfileCustomsMap = {};
+    for (const key of PROFILE_CUSTOM_KEYS) {
+      const def = defByKey.get(key);
+      profileCustoms[key] = def ? valByDef.get(def.id) ?? null : null;
     }
 
     // Skipped items live in a single comma-separated custom field so the
@@ -124,25 +137,73 @@ export const getClientOnboardingState = createServerFn({ method: "POST" })
         !!client.guardian_name?.trim() &&
         !!client.guardian_phone?.trim());
 
+    // SOW-required registry fields that don't yet have a value.
+    const sowMissingKeys: string[] = CLIENT_PROFILE_FIELDS
+      .filter((f) => f.sowRequired && !profileFieldHasValue(client as Record<string, unknown>, profileCustoms, f))
+      .map((f) => f.key);
+
     return {
       organizationId: client.organization_id as string,
       client,
+      profileCustoms,
+      sowMissingKeys,
       assignedCount: assignedCount ?? 0,
       missingRates,
       billingCodes: codes ?? [],
-      sowCustomFields: SOW_CUSTOM_FIELDS.map((f) => ({
-        ...f,
-        value: customByKey[f.key],
-      })),
       skipped: Array.from(skipped),
       doneFlags: {
         staff: (assignedCount ?? 0) > 0,
         home: client.home_latitude != null && client.home_longitude != null,
         rates: missingRates.length === 0,
         guardian: guardianOk,
+        sow: sowMissingKeys.length === 0,
       },
     };
   });
+
+// ---------------------------------------------------------------------------
+// Save one registry field — column OR custom — via the registry helper.
+// ---------------------------------------------------------------------------
+export const saveProfileField = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      clientId: z.string().uuid(),
+      fieldKey: z.string().min(1),
+      value: z.union([
+        z.string(),
+        z.boolean(),
+        z.array(z.string()),
+        z.null(),
+      ]),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const field: ProfileField | undefined =
+      CLIENT_PROFILE_FIELDS.find((f) => f.key === data.fieldKey);
+    if (!field) throw new Error(`Unknown profile field: ${data.fieldKey}`);
+
+    const { data: client } = await sb
+      .from("clients")
+      .select("organization_id")
+      .eq("id", data.clientId)
+      .maybeSingle();
+    if (!client) throw new Error("Client not found");
+    await assertOrgMember(sb, context.userId, client.organization_id);
+
+    await writeProfileFieldValue(
+      sb,
+      client.organization_id,
+      data.clientId,
+      field,
+      data.value,
+    );
+    return { ok: true, fieldKey: field.key };
+  });
+
+
 
 // ---------------------------------------------------------------------------
 // Patch one client row + (when present) geocode a new address.

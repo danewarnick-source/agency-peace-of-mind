@@ -9,22 +9,25 @@ import { CheckCircle2, ShieldCheck, HelpCircle } from "lucide-react";
 import type { TrackedField, FieldState } from "@/lib/field-confirmations";
 
 export function FieldStateLine({
-  field, state, clientId,
+  field, state, clientId, valueText,
 }: {
   field: TrackedField;
   state: FieldState;
   clientId: string;
+  /** Real recorded value (registry-backed) shown when state === "has". */
+  valueText?: string | null;
 }) {
   return (
     <div className="flex items-start justify-between gap-3 rounded border border-border px-3 py-2 text-sm">
       <div className="min-w-0">
         <div className="font-medium">{field.label}</div>
-        <div className="mt-0.5 text-xs text-muted-foreground">
-          {state === "has" && "Recorded"}
+        <div className="mt-0.5 text-xs text-muted-foreground truncate">
+          {state === "has" && (valueText && valueText.trim() ? valueText : "Recorded")}
           {state === "none" && field.positiveStatement}
           {state === "unknown" && "Not yet confirmed — NECTAR needs this"}
         </div>
       </div>
+
       {state === "has" && (
         <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 className="mr-1 h-3 w-3" /> has

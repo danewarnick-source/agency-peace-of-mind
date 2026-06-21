@@ -368,8 +368,43 @@ export async function applyExtractedFieldsToClient(
     }
   }
 
-  // Anything we don't have a clients column for → custom field, so nothing
-  // extracted is lost and each agency builds its own field library.
+  // ── Registry-driven pass for custom-backed profile fields ──────────────
+  // Bind extraction → store under the SAME keys the wizard / profile read
+  // back. Any extracted field matching a registry custom field's `key` or
+  // one of its `extractionKeys` is persisted via writeProfileFieldValue.
+  const {
+    CLIENT_PROFILE_FIELDS,
+    writeProfileFieldValue,
+  } = await import("@/lib/client-profile-fields");
+  const registryConsumed = new Set<string>();
+  for (const field of CLIENT_PROFILE_FIELDS) {
+    if (field.storage.kind !== "custom") continue;
+    const aliasKeys = [field.key, ...(field.extractionKeys ?? [])];
+    let chosen: ExtractedField | null = null;
+    for (const k of aliasKeys) {
+      const f = byKey.get(k);
+      if (f) { chosen = f; break; }
+    }
+    if (!chosen) continue;
+    let value: string | boolean | string[] | null = null;
+    if (field.type === "bool") value = fieldBool(chosen);
+    else if (field.type === "array") value = fieldArray(chosen);
+    else value = fieldText(chosen);
+    if (value == null || (Array.isArray(value) && value.length === 0) ||
+        (typeof value === "string" && value.trim().length === 0)) {
+      continue;
+    }
+    try {
+      await writeProfileFieldValue(supabase, organizationId, clientId, field, value);
+      for (const k of aliasKeys) registryConsumed.add(k);
+      customCreated.push(field.key);
+    } catch (err) {
+      suggested.push(`custom:${field.key} (${(err as Error).message})`);
+    }
+  }
+
+  // Anything else without a clients column → generic custom field, so
+  // nothing extracted is lost and each agency builds its own field library.
   const KNOWN_CORE = new Set<string>([
     "first_name", "last_name", "dob", "medicaid_id", "phone",
     "physical_address", "emergency_contact_name", "emergency_contact_phone",
@@ -384,6 +419,7 @@ export async function applyExtractedFieldsToClient(
   const seenCustom = new Set<string>();
   for (const f of ok) {
     if (KNOWN_CORE.has(f.field_key)) continue;
+    if (registryConsumed.has(f.field_key)) continue;
     if (seenCustom.has(f.field_key)) continue;
     seenCustom.add(f.field_key);
     const val = fieldText(f) ?? (fieldArray(f)?.join(", ") ?? null);
@@ -431,6 +467,7 @@ export async function applyExtractedFieldsToClient(
       suggested.push(`custom:${f.field_key}`);
     }
   }
+
 
   // ── Tracked-field unknown sweep ─────────────────────────────────────────
   // For each field we explicitly track, if it has no real data AND no

@@ -178,20 +178,10 @@ function buildItems(s: State): Item[] {
   });
 }
 
-function sowMissing(s: State) {
-  const c = s.client as Record<string, unknown>;
-  const missing: Array<{ key: string; label: string }> = [];
-  if (!c.emergency_contact_name) missing.push({ key: "emergency_contact_name", label: "Emergency contact name" });
-  if (!c.emergency_contact_phone) missing.push({ key: "emergency_contact_phone", label: "Emergency contact phone" });
-  if (!Array.isArray(c.allergies) || (c.allergies as unknown[]).length === 0)
-    missing.push({ key: "allergies", label: "Allergies / clinical alert" });
-  if (!c.special_directions) missing.push({ key: "special_directions", label: "Special directions" });
-  for (const f of s.sowCustomFields) {
-    const v = f.value;
-    const has = f.type === "boolean" ? v?.value_boolean != null : !!v?.value_text?.trim();
-    if (!has) missing.push({ key: f.key, label: f.label });
-  }
-  return missing;
+function sowMissing(s: State): ProfileField[] {
+  return s.sowMissingKeys
+    .map((k) => PROFILE_FIELD_BY_KEY[k])
+    .filter((f): f is ProfileField => !!f);
 }
 
 function StepRow({
@@ -206,6 +196,7 @@ function StepRow({
       onChanged();
     },
     onError: (e: Error) => toast.error(e.message),
+
   });
 
   return (

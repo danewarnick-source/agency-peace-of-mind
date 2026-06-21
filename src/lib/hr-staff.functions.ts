@@ -285,22 +285,34 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
       const expiresAt = (bc?.expires_at as string | null) ?? null;
       const evidenceDocId =
         (bc?.evidence_document_id as string | null) ?? null;
-      // Status: complete if completed_date present AND (no expiry or expiry in future)
+      const adminSignedOffAt =
+        (bc?.admin_signed_off_at as string | null) ?? null;
+      const nectarNameMatch =
+        (bc?.nectar_name_match as string | null) ?? null;
+      const nectarExtractedName =
+        (bc?.nectar_extracted_name as string | null) ?? null;
+      const nectarReviewedAt =
+        (bc?.nectar_reviewed_at as string | null) ?? null;
+      // Status:
+      //   complete   = admin signed off AND not expired
+      //   expired    = past expiration OR (no completion and past due date)
+      //   in_progress= certificate uploaded, awaiting admin sign-off
+      //   not_started= nothing on file
       const todayMs = Date.now();
+      const expMs = expiresAt
+        ? new Date(`${expiresAt}T00:00:00Z`).getTime()
+        : null;
       let status: string = "not_started";
-      if (completedDate) {
-        const expMs = expiresAt
-          ? new Date(`${expiresAt}T00:00:00Z`).getTime()
-          : null;
-        if (expMs !== null && expMs < todayMs) status = "expired";
-        else status = "complete";
+      if (adminSignedOffAt) {
+        status = expMs !== null && expMs < todayMs ? "expired" : "complete";
+      } else if (evidenceDocId) {
+        status = "in_progress";
       } else {
-        // No completion. Compare due date vs today for to_do vs expired (overdue).
         const due = dueDateFor(t, hireDate);
         if (due && new Date(`${due}T00:00:00Z`).getTime() < todayMs) {
           status = "expired"; // UI renders as Overdue
         } else {
-          status = "not_started"; // UI renders as To do
+          status = "not_started"; // UI renders as Incomplete
         }
       }
       return {
@@ -324,12 +336,17 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
           completed_by: (bc?.completed_by as string | null) ?? null,
           training_completion_id: null,
           auto_checked_at: null,
+          admin_signed_off_at: adminSignedOffAt,
+          nectar_name_match: nectarNameMatch,
+          nectar_extracted_name: nectarExtractedName,
+          nectar_reviewed_at: nectarReviewedAt,
         },
         applicable,
         applies_to_staff_types: "all" as const,
         applies_to_confirmed_at: null,
 
       };
+
     }).filter(
       // Don't double-list a baseline if the admin already created an
       // equivalent custom requirement with the same title.

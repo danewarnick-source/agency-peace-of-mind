@@ -1,16 +1,19 @@
 /**
  * Server functions for the fixed baseline staff-training requirements.
  *
+ * Workflow:
+ *  1. Admin uploads a certificate (PDF/image) — Nectar runs OCR to read
+ *     both the expiration date and the name on the cert. Nectar compares
+ *     the cert name to the staffer's profile name and records a match /
+ *     mismatch / unreadable result. Re-uploading a cert clears any prior
+ *     admin sign-off (the new cert must be re-verified).
+ *  2. Admin reviews Nectar's result and explicitly signs off. ONLY then is
+ *     the training considered "Completed" (green). No certificate or no
+ *     sign-off → "Incomplete" (red).
+ *
  * Storage: rows live in `staff_baseline_training_completions` keyed by
  * (organization_id, staff_id, training_key). Evidence files reuse the
- * existing `hr-documents` bucket via `createHrDocumentUploadUrl` — we just
- * link the resulting hr_documents.id here.
- *
- * Nectar OCR: when an admin uploads a certificate, `attachBaselineCertificate`
- * downloads the file from the HR bucket and asks Lovable AI Gateway to read
- * the expiration date off it. The result is stored as a suggestion
- * (`nectar_suggested_expires = true`) so the admin sees a "Nectar set this —
- * edit if wrong" affordance.
+ * existing `hr-documents` bucket via `createHrDocumentUploadUrl`.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -24,87 +27,20 @@ const orgStaffKey = z.object({
   training_key: z.string().min(1).max(64),
 });
 
-async function assertCanWriteStaff(
+async function assertAdminOrManager(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   orgId: string,
-  staffId: string,
   viewerId: string,
 ) {
-  const { data: canView, error } = await supabase.rpc("can_view_staff_pii", {
-    _org: orgId,
-    _staff: staffId,
-    _viewer: viewerId,
-  });
-  if (error) throw new Error(error.message);
-  if (!canView) throw new Error("Forbidden: not allowed to edit this staffer");
-  if (viewerId !== staffId) return;
-  // Self-edit allowed only for admins/managers (an admin who is also an
-  // employee may upload their own certs); regular DSPs cannot self-attest.
-  const { data: isAdmin, error: roleErr } = await supabase.rpc(
+  const { data: isAdmin, error } = await supabase.rpc(
     "is_org_admin_or_manager",
     { _org: orgId, _user: viewerId },
   );
-  if (roleErr) throw new Error(roleErr.message);
-  if (!isAdmin) {
-    throw new Error("Forbidden: staff may not edit own training completion");
-  }
+  if (error) throw new Error(error.message);
+  if (!isAdmin)
+    throw new Error("Forbidden: admin or manager role required");
 }
-
-/** Mark a baseline training complete with a date (and optional expiration). */
-export const markBaselineTrainingComplete = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) =>
-    orgStaffKey
-      .extend({
-        completed_date: z.string().date(),
-        expires_at: z.string().date().nullable().optional(),
-        notes: z.string().max(2000).nullable().optional(),
-      })
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    await requireOrgMembership(supabase, userId, data.organization_id);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = supabase as any;
-    await assertCanWriteStaff(sb, data.organization_id, data.staff_id, userId);
-
-    const t = baselineByKey(data.training_key);
-    if (!t) throw new Error("Unknown training key");
-
-    // Auto-fill expiration from default_validity_months if tracking expiration
-    // and the admin didn't supply one (admin can always override later).
-    let expires = data.expires_at ?? null;
-    if (
-      !expires &&
-      t.tracks_expiration &&
-      t.default_validity_months &&
-      data.completed_date
-    ) {
-      const d = new Date(`${data.completed_date}T00:00:00Z`);
-      d.setUTCMonth(d.getUTCMonth() + t.default_validity_months);
-      expires = d.toISOString().slice(0, 10);
-    }
-
-    const { error } = await sb
-      .from("staff_baseline_training_completions")
-      .upsert(
-        {
-          organization_id: data.organization_id,
-          staff_id: data.staff_id,
-          training_key: data.training_key,
-          completed_date: data.completed_date,
-          expires_at: expires,
-          notes: data.notes ?? null,
-          completed_by: userId,
-          nectar_suggested_expires: false,
-        },
-        { onConflict: "organization_id,staff_id,training_key" },
-      );
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
 
 /** Attach an uploaded hr_documents row as the evidence for a baseline training. */
 export const attachBaselineCertificate = createServerFn({ method: "POST" })
@@ -123,29 +59,41 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
-    await assertCanWriteStaff(sb, data.organization_id, data.staff_id, userId);
+    await assertAdminOrManager(sb, data.organization_id, userId);
 
     const t = baselineByKey(data.training_key);
     if (!t) throw new Error("Unknown training key");
 
+    // Look up the staffer's profile name for Nectar's name-match.
+    const { data: prof } = await sb
+      .from("profiles")
+      .select("full_name")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    const profileName: string | null =
+      (prof?.full_name as string | null) ?? null;
+
     const today = new Date().toISOString().slice(0, 10);
     const completedDate = data.completed_date ?? today;
 
-    // Optional OCR — Nectar reads the expiration date off the certificate.
+    // OCR — read expiration AND name on certificate; compare to profile.
     let nectarExpires: string | null = null;
     let nectarConfidence: number | null = null;
-    if (data.run_ocr && t.tracks_expiration) {
+    let nectarName: string | null = null;
+    let nameMatch: "match" | "mismatch" | "unreadable" | null = null;
+    if (data.run_ocr) {
       try {
-        const ocr = await runNectarExpirationOcr(
+        const ocr = await runNectarCertOcr(
           sb,
           data.organization_id,
           data.hr_document_id,
           t.title,
         );
-        nectarExpires = ocr.expires_on;
+        nectarExpires = t.tracks_expiration ? ocr.expires_on : null;
         nectarConfidence = ocr.confidence;
+        nectarName = ocr.name_on_certificate;
+        nameMatch = compareNames(profileName, nectarName);
       } catch (e) {
-        // OCR is best-effort — never block the upload. Surface in notes.
         console.warn("[baseline cert] OCR failed", (e as Error).message);
       }
     }
@@ -158,6 +106,7 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
       expires = d.toISOString().slice(0, 10);
     }
 
+    // Re-uploading a cert ALWAYS clears any prior admin sign-off.
     const { error } = await sb
       .from("staff_baseline_training_completions")
       .upsert(
@@ -169,6 +118,11 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
           expires_at: expires,
           evidence_document_id: data.hr_document_id,
           nectar_suggested_expires: nectarExpires !== null,
+          nectar_name_match: nameMatch,
+          nectar_extracted_name: nectarName,
+          nectar_reviewed_at: new Date().toISOString(),
+          admin_signed_off_at: null,
+          admin_signed_off_by: null,
           completed_by: userId,
         },
         { onConflict: "organization_id,staff_id,training_key" },
@@ -180,6 +134,9 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
       expires_at: expires,
       nectar_suggested: nectarExpires !== null,
       nectar_confidence: nectarConfidence,
+      nectar_name: nectarName,
+      profile_name: profileName,
+      name_match: nameMatch,
     };
   });
 
@@ -196,10 +153,71 @@ export const setBaselineExpiration = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
-    await assertCanWriteStaff(sb, data.organization_id, data.staff_id, userId);
+    await assertAdminOrManager(sb, data.organization_id, userId);
     const { error } = await sb
       .from("staff_baseline_training_completions")
       .update({ expires_at: data.expires_at, nectar_suggested_expires: false })
+      .eq("organization_id", data.organization_id)
+      .eq("staff_id", data.staff_id)
+      .eq("training_key", data.training_key);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Admin sign-off — marks the training Completed (green). Requires a cert. */
+export const adminSignOffBaselineCompletion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => orgStaffKey.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    await assertAdminOrManager(sb, data.organization_id, userId);
+
+    const { data: row, error: rErr } = await sb
+      .from("staff_baseline_training_completions")
+      .select("evidence_document_id, completed_date")
+      .eq("organization_id", data.organization_id)
+      .eq("staff_id", data.staff_id)
+      .eq("training_key", data.training_key)
+      .maybeSingle();
+    if (rErr) throw new Error(rErr.message);
+    if (!row?.evidence_document_id)
+      throw new Error("Upload a certificate before signing off.");
+
+    const completedDate =
+      (row.completed_date as string | null) ??
+      new Date().toISOString().slice(0, 10);
+
+    const { error } = await sb
+      .from("staff_baseline_training_completions")
+      .update({
+        admin_signed_off_at: new Date().toISOString(),
+        admin_signed_off_by: userId,
+        completed_date: completedDate,
+        completed_by: userId,
+      })
+      .eq("organization_id", data.organization_id)
+      .eq("staff_id", data.staff_id)
+      .eq("training_key", data.training_key);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Revoke a prior sign-off (returns the row to "Awaiting sign-off"). */
+export const revokeBaselineSignOff = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => orgStaffKey.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    await assertAdminOrManager(sb, data.organization_id, userId);
+    const { error } = await sb
+      .from("staff_baseline_training_completions")
+      .update({ admin_signed_off_at: null, admin_signed_off_by: null })
       .eq("organization_id", data.organization_id)
       .eq("staff_id", data.staff_id)
       .eq("training_key", data.training_key);
@@ -216,7 +234,7 @@ export const clearBaselineCompletion = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
-    await assertCanWriteStaff(sb, data.organization_id, data.staff_id, userId);
+    await assertAdminOrManager(sb, data.organization_id, userId);
     const { error } = await sb
       .from("staff_baseline_training_completions")
       .delete()
@@ -228,22 +246,58 @@ export const clearBaselineCompletion = createServerFn({ method: "POST" })
   });
 
 // ---------------------------------------------------------------------------
+// Name comparison
+// ---------------------------------------------------------------------------
+
+function normalizeName(s: string | null): string {
+  if (!s) return "";
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "") // strip accents
+    .replace(/[.,'’"`-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Tolerant name comparison — handles middle initials and reordering. */
+function compareNames(
+  profileName: string | null,
+  certName: string | null,
+): "match" | "mismatch" | "unreadable" {
+  if (!certName || !certName.trim()) return "unreadable";
+  if (!profileName || !profileName.trim()) return "unreadable";
+  const a = normalizeName(profileName).split(" ").filter(Boolean);
+  const b = normalizeName(certName).split(" ").filter(Boolean);
+  if (a.length === 0 || b.length === 0) return "unreadable";
+  // First + last name match (ignore middle names/initials)
+  const aFirst = a[0];
+  const aLast = a[a.length - 1];
+  const bFirst = b[0];
+  const bLast = b[b.length - 1];
+  if (aFirst === bFirst && aLast === bLast) return "match";
+  // Allow reversed order (Last, First)
+  if (aFirst === bLast && aLast === bFirst) return "match";
+  return "mismatch";
+}
+
+// ---------------------------------------------------------------------------
 // Nectar OCR helper
 // ---------------------------------------------------------------------------
 
 interface OcrResult {
   expires_on: string | null;
+  name_on_certificate: string | null;
   confidence: number;
 }
 
-async function runNectarExpirationOcr(
+async function runNectarCertOcr(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   organizationId: string,
   hrDocumentId: string,
   trainingTitle: string,
 ): Promise<OcrResult> {
-  // Look up the document + signed URL.
   const { data: doc, error: docErr } = await sb
     .from("hr_documents")
     .select("id, object_path, mime_type, file_name")
@@ -257,11 +311,9 @@ async function runNectarExpirationOcr(
     .createSignedUrl(doc.object_path, 600);
   if (signErr) throw new Error(signErr.message);
 
-  // Download as base64 (Lovable AI Gateway accepts image_url or file blocks).
   const fileRes = await fetch(signed.signedUrl);
   if (!fileRes.ok) throw new Error(`Download failed (${fileRes.status})`);
   const buf = new Uint8Array(await fileRes.arrayBuffer());
-  // Lowercase mime; default to image/jpeg if missing.
   const mime = (doc.mime_type || "").toLowerCase() || "image/jpeg";
   const base64 = base64Encode(buf);
 
@@ -271,7 +323,14 @@ async function runNectarExpirationOcr(
   const contentBlocks: unknown[] = [
     {
       type: "text",
-      text: `This is a "${trainingTitle}" certificate. Find the expiration date. Reply ONLY with compact JSON: {"expires_on":"YYYY-MM-DD"|null,"confidence":0..1}. If multiple dates appear, pick the latest one that is clearly labeled as expiration/expires/valid through. If no expiration is visible, return null.`,
+      text: `This is a "${trainingTitle}" certificate. Extract:
+1. The expiration date (look for "expires", "expiration", "valid through", "valid until"). Pick the LATEST clearly-labeled expiration date if several appear.
+2. The full name of the person the certificate was issued to.
+
+Reply ONLY with compact JSON:
+{"expires_on":"YYYY-MM-DD"|null,"name_on_certificate":"Full Name"|null,"confidence":0..1}
+
+If either field is not clearly visible, return null for that field.`,
     },
   ];
   if (mime.startsWith("image/")) {
@@ -312,7 +371,11 @@ async function runNectarExpirationOcr(
   }
   const json = await aiRes.json();
   const raw = json?.choices?.[0]?.message?.content ?? "{}";
-  let parsed: { expires_on?: string | null; confidence?: number } = {};
+  let parsed: {
+    expires_on?: string | null;
+    name_on_certificate?: string | null;
+    confidence?: number;
+  } = {};
   try {
     parsed = JSON.parse(raw);
   } catch {
@@ -323,16 +386,19 @@ async function runNectarExpirationOcr(
     /^\d{4}-\d{2}-\d{2}$/.test(parsed.expires_on)
       ? parsed.expires_on
       : null;
+  const name =
+    typeof parsed.name_on_certificate === "string" &&
+    parsed.name_on_certificate.trim().length > 0
+      ? parsed.name_on_certificate.trim()
+      : null;
   const confidence =
     typeof parsed.confidence === "number"
       ? Math.max(0, Math.min(1, parsed.confidence))
       : 0;
-  return { expires_on: expires, confidence };
+  return { expires_on: expires, name_on_certificate: name, confidence };
 }
 
 function base64Encode(bytes: Uint8Array): string {
-  // Worker runtime: btoa exists but expects a binary string. Chunk to avoid
-  // exceeding the call-stack limit on large PDFs.
   let s = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {

@@ -301,6 +301,50 @@ export async function applyExtractedFieldsToClient(
       throw new Error("Client autofill update returned no rows");
   }
 
+  // ── EVV: geocode the home address when we just set/changed it and the
+  // client has no coordinates yet. Uses the SAME Nominatim helper the
+  // per-client "Auto-geocoded on save" form uses. Never throws.
+  const addrForGeo =
+    (update.physical_address as string | undefined) ??
+    (client.physical_address as string | null) ??
+    null;
+  if (addrForGeo && addrForGeo.trim()) {
+    const { data: geoRow } = await supabase
+      .from("clients")
+      .select("home_latitude, home_longitude")
+      .eq("id", clientId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    const hasCoords =
+      geoRow &&
+      geoRow.home_latitude !== null &&
+      geoRow.home_latitude !== undefined;
+    if (!hasCoords) {
+      try {
+        const { geocodeAddress } = await import("@/lib/geocode");
+        const geo = await geocodeAddress(addrForGeo);
+        if (geo) {
+          const { error: gErr } = await supabase
+            .from("clients")
+            .update({ home_latitude: geo.lat, home_longitude: geo.lng })
+            .eq("id", clientId)
+            .eq("organization_id", organizationId);
+          if (gErr) {
+            suggested.push("Confirm home location for EVV");
+          } else {
+            autofilled.push("home_latitude");
+            autofilled.push("home_longitude");
+          }
+        } else {
+          suggested.push("Confirm home location for EVV");
+        }
+      } catch {
+        suggested.push("Confirm home location for EVV");
+      }
+    }
+  }
+
+
   // Staff ratio → client_ratios row (one per import, "default" setting).
   const ratioF = byKey.get("staff_ratio");
   const ratioText = ratioF ? fieldText(ratioF) : null;

@@ -38,6 +38,16 @@ const CONFIDENCE_THRESHOLD = 0.6;
 
 function fieldText(f: ExtractedField): string | null {
   if (f.value_text && f.value_text.trim()) return f.value_text.trim();
+  // Rescue: AI sometimes places single-value text into value_array (e.g. one
+  // goal as ["Independent meal prep"]). Treat the joined array as the text.
+  if (Array.isArray(f.value_array) && f.value_array.length) {
+    const joined = f.value_array.map((s) => String(s).trim()).filter(Boolean).join("; ");
+    if (joined) return joined;
+  }
+  // Rescue: value_json may carry { text: "..." } or a string.
+  if (typeof f.value_json === "string" && f.value_json.trim()) return f.value_json.trim();
+  const j = f.value_json as { text?: unknown } | null | undefined;
+  if (j && typeof j.text === "string" && j.text.trim()) return j.text.trim();
   return null;
 }
 function fieldBool(f: ExtractedField): boolean | null {
@@ -70,6 +80,20 @@ function fieldDate(f: ExtractedField): string | null {
     return f.value_date.slice(0, 10);
   if (f.value_text && /^\d{4}-\d{2}-\d{2}/.test(f.value_text))
     return f.value_text.slice(0, 10);
+  return null;
+}
+
+// Forgiving numeric coercion — AI often returns "$18.50" or "3,120" as a
+// string even when the prompt asks for a number. Returns null when no real
+// number can be recovered; never returns NaN.
+function toNum(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const cleaned = v.replace(/[$,\s]/g, "");
+    if (!cleaned) return null;
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
+  }
   return null;
 }
 
@@ -214,11 +238,10 @@ export async function applyExtractedFieldsToClient(
       if (row.service_code) {
         codeRows.push({
           service_code: String(row.service_code).toUpperCase(),
-          rate: typeof row.rate === "number" ? row.rate : null,
-          max_units: typeof row.max_units === "number" ? row.max_units : null,
+          rate: toNum(row.rate),
+          max_units: toNum(row.max_units),
           unit_type: row.unit_type ? String(row.unit_type) : null,
-          weekly_cap_units:
-            typeof row.weekly_cap_units === "number" ? row.weekly_cap_units : null,
+          weekly_cap_units: toNum(row.weekly_cap_units),
           plan_start: row.plan_start ? String(row.plan_start).slice(0, 10) : null,
           plan_end: row.plan_end ? String(row.plan_end).slice(0, 10) : null,
         });
@@ -228,16 +251,16 @@ export async function applyExtractedFieldsToClient(
   if (!codeRows.length) {
     const sc = byKey.get("service_code");
     if (sc && fieldText(sc)) {
-      const rate = byKey.get("rate")?.value_number ?? null;
-      const maxU = byKey.get("max_units")?.value_number ?? null;
+      const rateF = byKey.get("rate");
+      const maxF = byKey.get("max_units");
+      const wcapF = byKey.get("weekly_cap_units");
       const ut = byKey.get("unit_type");
-      const wcap = byKey.get("weekly_cap_units")?.value_number ?? null;
       codeRows.push({
         service_code: (fieldText(sc) as string).toUpperCase(),
-        rate,
-        max_units: maxU,
+        rate: rateF ? toNum(rateF.value_number ?? rateF.value_text) : null,
+        max_units: maxF ? toNum(maxF.value_number ?? maxF.value_text) : null,
         unit_type: ut ? fieldText(ut) : null,
-        weekly_cap_units: wcap,
+        weekly_cap_units: wcapF ? toNum(wcapF.value_number ?? wcapF.value_text) : null,
         plan_start: byKey.get("plan_start") ? fieldDate(byKey.get("plan_start") as ExtractedField) : null,
         plan_end: byKey.get("plan_end") ? fieldDate(byKey.get("plan_end") as ExtractedField) : null,
       });
@@ -295,6 +318,49 @@ export async function applyExtractedFieldsToClient(
       suggested.push(`Closed stale auth: ${(r as { service_code: string }).service_code}`);
     }
   }
+
+  // ── Medications signal → auto-toggle MAR/eMAR ───────────────────────────
+  // The PCSP is authoritative on whether the client has prescribed meds.
+  // - If the document explicitly says "no medications" (pcsp_has_medications=false)
+  //   AND no client_medication rows were extracted, turn the feature OFF.
+  // - If any medication was extracted, leave the feature ON (default).
+  // Skips clients that already have client_medications rows on file, so we
+  // never disable MAR for a client who actually has meds tracked elsewhere.
+  try {
+    const medRows = ok.filter((f) => f.field_key === "client_medication");
+    const hasMedsFlag = (() => {
+      const f = byKey.get("pcsp_has_medications");
+      return f ? fieldBool(f) : null;
+    })();
+    const { count: existingMedCount } = await supabase
+      .from("client_medications")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("client_id", clientId)
+      .eq("is_active", true);
+    const hasExistingMeds = (existingMedCount ?? 0) > 0;
+
+    if (medRows.length === 0 && hasMedsFlag === false && !hasExistingMeds) {
+      const { data: cRow } = await supabase
+        .from("clients")
+        .select("feature_config")
+        .eq("id", clientId)
+        .maybeSingle();
+      const fc = (cRow?.feature_config ?? {}) as Record<string, boolean>;
+      if (fc.emar !== false) {
+        fc.emar = false;
+        await supabase
+          .from("clients")
+          .update({ feature_config: fc })
+          .eq("id", clientId)
+          .eq("organization_id", organizationId);
+        autofilled.push("feature_config.emar=off (no medications in PCSP)");
+      }
+    }
+  } catch {
+    // Non-fatal: auto-toggle is advisory.
+  }
+
 
   // Team resolution by name → clients.team_id (non-destructive: only fills if empty).
   const teamF = byKey.get("team_name");
@@ -443,6 +509,7 @@ export async function applyExtractedFieldsToClient(
     "billing_code_row", "service_code", "rate", "max_units", "unit_type",
     "weekly_cap_units", "plan_start", "plan_end",
     "team_name", "staff_ratio",
+    "client_medication", "pcsp_has_medications",
   ]);
   const seenCustom = new Set<string>();
   for (const f of ok) {

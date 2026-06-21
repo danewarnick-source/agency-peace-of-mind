@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { extractDocumentFields } from "@/lib/document-extraction";
 
 // =============================================================
 // NECTAR Universal Document Store — server functions
@@ -50,74 +50,72 @@ function decodeBase64Text(base64: string): string {
   }
 }
 
-// ---------- AI parsing via Lovable AI Gateway ----------
-
-const FieldOut = z.object({
-  field_key: z.string().min(1).max(80),
-  field_group: z.string().max(80).optional().nullable(),
-  value_text: z.string().max(2000).optional().nullable(),
-  value_number: z.number().optional().nullable(),
-  value_date: z.string().max(40).optional().nullable(),
-  value_json: z.any().optional().nullable(),
-  source_locator: z.string().max(200).optional().nullable(),
-  confidence: z.number().min(0).max(1).optional().nullable(),
-});
-
-const ParseOut = z.object({
-  document_type: z.string().max(40).optional().nullable(),
-  fiscal_year: z.string().max(20).optional().nullable(),
-  effective_start: z.string().max(40).optional().nullable(),
-  effective_end: z.string().max(40).optional().nullable(),
-  medicaid_id: z.string().max(50).optional().nullable(),
-  title: z.string().max(200).optional().nullable(),
-  fields: z.array(FieldOut).max(200).default([]),
-});
-
-const SYSTEM_PROMPT = `You are NECTAR, an extraction engine for a Utah DSPD provider compliance platform (HIVE).
-You receive raw text from a document (PCSP, 1056 budget, SOW, referral, intake, assessment, certification, contract, etc.).
-
-Extract structured fields and return STRICT JSON only. Use these conventions:
-
-document_type: one of pcsp | 1056_budget | sow | referral | intake | assessment | certification | training | contract | evv_report | timesheet | incident_report | billing_record | other
-fiscal_year: e.g. "FY26"
-effective_start / effective_end: ISO yyyy-mm-dd
-medicaid_id: digits only if present
-
-Common field_key values you should extract when present (use field_group to bucket related fields):
-  Billing (group "billing_code"): service_code, rate, max_units, unit_type, weekly_cap_units, plan_start, plan_end, financial_eligibility
-  SOW (group "sow_clause"): clause_number, required_document, obligation, deadline
-  Person (group "person"): first_name, last_name, dob, medicaid_id, plan_year
-  Certification (group "cert"): cert_name, issued_at, expires_at, issuing_body
-
-For each field include source_locator (e.g. "page 3", "§4.2", "row 12 of budget table") and a confidence 0..1.`;
+// ---------- AI parsing via shared document-extraction (AWS Bedrock) ----------
 
 async function callLovableAI(documentText: string, hint?: string) {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `${hint ? `HINT: ${hint}\n\n` : ""}DOCUMENT TEXT:\n\n${documentText.slice(0, 60000)}`,
-        },
-      ],
-      response_format: { type: "json_object" },
+  const result = await extractDocumentFields(documentText, hint);
+
+  // Expand structured arrays into flat field rows for nectar_extracted_fields.
+  type NectarField = {
+    field_key: string;
+    field_group: string | null;
+    value_text: string | null;
+    value_number: number | null;
+    value_date: string | null;
+    value_json: unknown | null;
+    source_locator: string | null;
+    confidence: number | null;
+  };
+  const rows: NectarField[] = [];
+
+  for (const f of result.fields) {
+    rows.push({
+      field_key: f.field_key,
+      field_group: f.field_group ?? null,
+      value_text: f.value_text ?? null,
+      value_number: f.value_number ?? null,
+      value_date: f.value_date ?? null,
+      value_json: f.value_json ?? null,
+      source_locator: f.source_locator ?? null,
+      confidence: f.confidence ?? null,
     });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
-  if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
-  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-  const body = await res.json();
-  const content = body?.choices?.[0]?.message?.content ?? "{}";
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    parsed = {};
   }
-  const result = ParseOut.safeParse(parsed);
-  return result.success ? result.data : { fields: [] };
+
+  for (const g of result.goals) {
+    rows.push({
+      field_key: "pcsp_goal",
+      field_group: "pcsp_goal",
+      value_text: g.goal_number ? `${g.goal_number}: ${g.text}` : g.text,
+      value_number: null,
+      value_date: null,
+      value_json: null,
+      source_locator: null,
+      confidence: 0.9,
+    });
+  }
+
+  for (const bc of result.billing_codes) {
+    rows.push({
+      field_key: "service_code",
+      field_group: "billing_code",
+      value_text: bc.service_code,
+      value_number: bc.rate ?? null,
+      value_date: null,
+      value_json: bc,
+      source_locator: null,
+      confidence: 0.9,
+    });
+  }
+
+  return {
+    document_type: result.document_type,
+    fiscal_year: result.fiscal_year,
+    effective_start: result.effective_start,
+    effective_end: result.effective_end,
+    medicaid_id: result.medicaid_id,
+    title: result.title,
+    fields: rows,
+  };
 }
 
 // =============================================================

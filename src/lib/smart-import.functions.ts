@@ -9,7 +9,7 @@ import { z } from "zod";
 import { Buffer } from "node:buffer";
 
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { extractDocumentFields } from "@/lib/document-extraction";
 
 // ----- Input schemas -----
 const ModeEnum = z.enum(["employee", "client"]);
@@ -392,7 +392,10 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
         .select("id", { count: "exact", head: true })
         .eq("import_job_id", data.jobId);
       if (!anyFieldCount) {
-        throw new Error("Extraction completed but no fields were captured. The document may be a scanned image (no embedded text) — paste the text or upload a text-based PDF.");
+        throw new Error(
+          "Extraction completed but saved no fields. " +
+            "This is unexpected — please report this document for review.",
+        );
       }
 
 
@@ -562,86 +565,43 @@ async function extractDocxText(buf: Buffer): Promise<string> {
   return (result?.value as string) ?? "";
 }
 
-// ---- 2) AI field extraction (Lovable AI Gateway → Gemini, swappable) ----
+// ---- 2) AI field extraction — Bedrock via shared document-extraction module ----
+
+// Core fields per mode that map directly to DB columns or well-known attributes.
+const KNOWN_CLIENT_FIELDS = new Set([
+  "first_name", "last_name", "full_name", "date_of_birth", "phone", "address",
+  "medicaid_id", "job_code", "team_name",
+  "allergies", "dysphagia", "diagnoses", "medications",
+  "guardian_name", "guardian_phone", "guardian_relationship",
+  "emergency_contact_name", "emergency_contact_phone",
+  "support_coordinator_name", "support_coordinator_phone", "support_coordinator_email",
+  "pcsp_goal", "service_code",
+]);
+const KNOWN_EMPLOYEE_FIELDS = new Set([
+  "full_name", "first_name", "last_name", "email", "phone",
+  "position", "hire_date", "team_name",
+]);
+
 async function aiExtractFieldsFromText(
   text: string,
   mode: "employee" | "client",
 ): Promise<{ display_name: string; fields: ExtractedFieldOut[]; unfiled: string[] }> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) {
-    throw new Error("AI extraction is not configured (LOVABLE_API_KEY missing). Cannot read documents.");
+  if (!text || text.trim().length < 30) {
+    throw new Error(
+      "PDF could not be read: the file contains no extractable text. " +
+        "It may be a scanned image — paste the text directly or upload a text-based PDF.",
+    );
   }
 
-  const targetFields =
-    mode === "client"
-      ? [
-          "first_name", "last_name", "full_name", "date_of_birth", "phone",
-          "address", "medicaid_id", "job_code", "team_name",
-          "medications", "guardian_name", "service_codes", "goals",
-          "diagnoses", "allergies", "emergency_contact",
-        ]
-      : [
-          "full_name", "first_name", "last_name", "email", "phone",
-          "position", "hire_date", "team_name",
-        ];
+  const result = await extractDocumentFields(text, `mode=${mode}`);
 
-  const system = `You extract structured fields from a Utah DSPD ${mode === "client" ? "client (PCSP / intake / Medicaid)" : "employee / HR"} document.
-Return STRICT JSON with shape:
-{
-  "display_name": string,
-  "fields": Array<{
-    "target_field": string,        // one of the allowed targets, OR a snake_case custom key
-    "value": string,                // the extracted value as plain text
-    "confidence": number,           // 0..1
-    "source_snippet": string        // short verbatim quote (<200 chars)
-  }>,
-  "unfiled": string[]               // sentences/scraps you couldn't place
-}
-Allowed core targets: ${targetFields.join(", ")}.
-Rules:
-- Use the allowed core target_field names exactly when the value clearly maps.
-- For information that doesn't map (e.g. provider notes), invent a snake_case key and still return it as a field; it will be treated as a custom attribute.
-- For lists (medications, service_codes, goals, diagnoses), join entries with "; ".
-- Dates as ISO YYYY-MM-DD when possible.
-- Never invent data. If a field isn't present, omit it.
-- Return ONLY JSON, no commentary.`;
-
-  const truncated = text.length > 60_000 ? text.slice(0, 60_000) : text;
-
-  const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: `Extract from this document text:\n\n${truncated}` },
-      ],
-      response_format: { type: "json_object" },
-    });
-
-  if (res.status === 429) throw new Error("AI is busy (rate limit). Try again in a moment.");
-  if (res.status === 402) throw new Error("AI workspace credits exhausted. Add credits to continue.");
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`AI extraction failed (${res.status}): ${t.slice(0, 200)}`);
-  }
-
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const raw = json.choices?.[0]?.message?.content ?? "{}";
-  let parsed: {
-    display_name?: string;
-    fields?: Array<{ target_field: string; value: string; confidence?: number; source_snippet?: string }>;
-    unfiled?: string[];
-  };
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("AI returned malformed JSON; document may be unreadable.");
-  }
-
-  const knownSet = new Set(targetFields);
+  const knownSet = mode === "client" ? KNOWN_CLIENT_FIELDS : KNOWN_EMPLOYEE_FIELDS;
   const fields: ExtractedFieldOut[] = [];
-  for (const f of parsed.fields ?? []) {
-    const tf = String(f.target_field || "").trim();
-    const val = String(f.value ?? "").trim();
+
+  // Flat fields
+  for (const f of result.fields) {
+    const tf = String(f.field_key || "").trim();
+    const val = String(f.value_text ?? f.value_date ?? f.value_number ?? "").trim();
     if (!tf || !val) continue;
     const isKnown = knownSet.has(tf);
     const malformed = isKnown && looksMalformed(tf, val);
@@ -651,13 +611,57 @@ Rules:
       value: val,
       status: malformed ? "flag" : isKnown ? "placed" : "review",
       confidence: malformed ? Math.min(conf, 0.55) : conf,
-      snippet: String(f.source_snippet || val).slice(0, 200),
+      snippet: String(f.source_locator ?? val).slice(0, 200),
       provenance: isKnown ? "source" : "inferred",
       is_custom: !isKnown,
     });
   }
 
-  let display = String(parsed.display_name || "").trim();
+  // Client-only: expand goals and billing codes into individual rows
+  if (mode === "client") {
+    for (const g of result.goals) {
+      const val = g.goal_number ? `${g.goal_number}: ${g.text}` : g.text;
+      fields.push({
+        target_field: "pcsp_goal",
+        value: val,
+        status: "placed",
+        confidence: 0.9,
+        snippet: val.slice(0, 200),
+        provenance: "source",
+        is_custom: true,
+      });
+    }
+
+    for (const bc of result.billing_codes) {
+      if (!bc.service_code) continue;
+      fields.push({
+        target_field: "service_code",
+        value: JSON.stringify(bc),
+        status: "placed",
+        confidence: 0.9,
+        snippet: `${bc.service_code} rate=${bc.rate ?? "?"} units=${bc.max_units ?? "?"}`,
+        provenance: "source",
+        is_custom: true,
+      });
+    }
+  }
+
+  if (fields.length === 0) {
+    console.warn(
+      "[smart-import] AI returned no fields. display_name=%s goals=%d codes=%d unfiled=%d",
+      result.display_name,
+      result.goals.length,
+      result.billing_codes.length,
+      result.unfiled.length,
+    );
+    throw new Error(
+      "AI returned no fields from this document. " +
+        "The text was present but the model found nothing to extract — " +
+        "check that the document is a PCSP or intake form.",
+    );
+  }
+
+  let display = (result.display_name ?? "").trim();
   if (!display) {
     const fn = fields.find((f) => f.target_field === "first_name")?.value;
     const ln = fields.find((f) => f.target_field === "last_name")?.value;
@@ -668,7 +672,7 @@ Rules:
   return {
     display_name: display,
     fields,
-    unfiled: (parsed.unfiled ?? []).map((s) => String(s)).filter((s) => s.length > 4).slice(0, 20),
+    unfiled: (result.unfiled).filter((s) => s.length > 4).slice(0, 20),
   };
 }
 

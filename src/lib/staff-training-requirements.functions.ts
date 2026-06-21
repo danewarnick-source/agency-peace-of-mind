@@ -42,7 +42,11 @@ async function assertAdminOrManager(
     throw new Error("Forbidden: admin or manager role required");
 }
 
-/** Attach an uploaded hr_documents row as the evidence for a baseline training. */
+/** Attach an uploaded hr_documents row as the evidence for a baseline training.
+ *  Nectar runs OCR, validates against the per-training rule, and records
+ *  pass/fail + reasons. A failed validation still saves the review (so the UI
+ *  can show why) but does NOT attach the certificate as evidence and does
+ *  NOT clear/grant any sign-off. */
 export const attachBaselineCertificate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
@@ -73,68 +77,171 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
     const profileName: string | null =
       (prof?.full_name as string | null) ?? null;
 
-    const today = new Date().toISOString().slice(0, 10);
-    const completedDate = data.completed_date ?? today;
-
-    // OCR — read expiration AND name on certificate; compare to profile.
+    // OCR — read expiration, name, cert type, completion date, and a short
+    // text summary of what Nectar actually saw.
     let nectarExpires: string | null = null;
     let nectarConfidence: number | null = null;
     let nectarName: string | null = null;
-    let nameMatch: "match" | "mismatch" | "unreadable" | null = null;
+    let nectarCertType: string | null = null;
+    let nectarCompletedDate: string | null = null;
+    let nectarSummary: string | null = null;
+    let ocrFailed = false;
+    let ocrError: string | null = null;
     if (data.run_ocr) {
       try {
         const ocr = await runNectarCertOcr(
           sb,
           data.organization_id,
           data.hr_document_id,
-          t.title,
+          t,
         );
-        nectarExpires = t.tracks_expiration ? ocr.expires_on : null;
+        nectarExpires = ocr.expires_on;
         nectarConfidence = ocr.confidence;
         nectarName = ocr.name_on_certificate;
-        nameMatch = compareNames(profileName, nectarName);
+        nectarCertType = ocr.cert_type;
+        nectarCompletedDate = ocr.completed_on;
+        nectarSummary = ocr.summary;
       } catch (e) {
-        console.warn("[baseline cert] OCR failed", (e as Error).message);
+        ocrFailed = true;
+        ocrError = (e as Error).message;
+        console.warn("[baseline cert] OCR failed", ocrError);
       }
     }
 
-    // Fallback expiration: default_validity_months from completed_date.
-    let expires = nectarExpires;
-    if (!expires && t.tracks_expiration && t.default_validity_months) {
-      const d = new Date(`${completedDate}T00:00:00Z`);
-      d.setUTCMonth(d.getUTCMonth() + t.default_validity_months);
-      expires = d.toISOString().slice(0, 10);
+    const nameMatch = compareNames(profileName, nectarName);
+
+    // Deterministic validation against the per-training rule.
+    const reasons: string[] = [];
+    if (ocrFailed) {
+      reasons.push(
+        `Nectar could not read this certificate${ocrError ? ` (${ocrError})` : ""}.`,
+      );
+    } else {
+      // Keyword groups
+      const summaryHaystack = (
+        (nectarSummary ?? "") +
+        " " +
+        (nectarCertType ?? "")
+      ).toLowerCase();
+      for (const group of t.validation.required_keyword_groups) {
+        const hit = group.any_of.some((kw) =>
+          summaryHaystack.includes(kw.toLowerCase()),
+        );
+        if (!hit) {
+          reasons.push(
+            `Missing ${group.label} (expected one of: ${group.any_of.join(", ")}).`,
+          );
+        }
+      }
+      // Name check
+      if (nameMatch === "unreadable") {
+        reasons.push("Could not read the staff member's name on the certificate.");
+      } else if (nameMatch === "mismatch") {
+        reasons.push(
+          `Name on certificate ("${nectarName}") does not match staff profile ("${profileName ?? "—"}").`,
+        );
+      }
+      // Required dates
+      if (t.validation.requires_completion_date && !nectarCompletedDate) {
+        reasons.push("Missing certificate/completion date.");
+      }
+      if (t.validation.requires_expiration_date && !nectarExpires) {
+        reasons.push("Missing expiration date.");
+      }
     }
 
-    // Re-uploading a cert ALWAYS clears any prior admin sign-off.
+    const validationStatus: "passed" | "failed" =
+      reasons.length === 0 ? "passed" : "failed";
+
+    // Compute effective dates only when validation passed.
+    const today = new Date().toISOString().slice(0, 10);
+    const completedDate =
+      validationStatus === "passed"
+        ? (nectarCompletedDate ?? data.completed_date ?? today)
+        : null;
+    let expires: string | null = null;
+    if (validationStatus === "passed") {
+      expires = t.tracks_expiration ? nectarExpires : null;
+      if (
+        !expires &&
+        t.tracks_expiration &&
+        t.default_validity_months &&
+        completedDate
+      ) {
+        const d = new Date(`${completedDate}T00:00:00Z`);
+        d.setUTCMonth(d.getUTCMonth() + t.default_validity_months);
+        expires = d.toISOString().slice(0, 10);
+      }
+    }
+
+    // Look up any existing row to preserve previous attached evidence when
+    // the NEW upload fails validation (we never silently replace a good cert
+    // with a bad one, and we never grant evidence based on a failed cert).
+    const { data: existing } = await sb
+      .from("staff_baseline_training_completions")
+      .select(
+        "id, evidence_document_id, completed_date, expires_at, admin_signed_off_at, admin_signed_off_by",
+      )
+      .eq("organization_id", data.organization_id)
+      .eq("staff_id", data.staff_id)
+      .eq("training_key", data.training_key)
+      .maybeSingle();
+
+    const passedEvidenceId =
+      validationStatus === "passed"
+        ? data.hr_document_id
+        : (existing?.evidence_document_id ?? null);
+    // Re-uploading a NEW passing cert clears any prior admin sign-off. A
+    // failed upload never touches existing sign-off / evidence / dates.
+    const upsertRow: Record<string, unknown> = {
+      organization_id: data.organization_id,
+      staff_id: data.staff_id,
+      training_key: data.training_key,
+      evidence_document_id: passedEvidenceId,
+      nectar_suggested_expires:
+        validationStatus === "passed" && nectarExpires !== null,
+      nectar_name_match: nameMatch,
+      nectar_extracted_name: nectarName,
+      nectar_extracted_cert_type: nectarCertType,
+      nectar_extracted_completed_date: nectarCompletedDate,
+      nectar_extracted_summary: nectarSummary,
+      nectar_validation_status: validationStatus,
+      nectar_validation_reasons: reasons,
+      nectar_reviewed_at: new Date().toISOString(),
+    };
+    if (validationStatus === "passed") {
+      upsertRow.completed_date = completedDate;
+      upsertRow.expires_at = expires;
+      upsertRow.admin_signed_off_at = null;
+      upsertRow.admin_signed_off_by = null;
+      upsertRow.completed_by = userId;
+    } else {
+      // Preserve prior fields on failure.
+      upsertRow.completed_date = existing?.completed_date ?? null;
+      upsertRow.expires_at = existing?.expires_at ?? null;
+      upsertRow.admin_signed_off_at = existing?.admin_signed_off_at ?? null;
+      upsertRow.admin_signed_off_by = existing?.admin_signed_off_by ?? null;
+    }
+
     const { error } = await sb
       .from("staff_baseline_training_completions")
-      .upsert(
-        {
-          organization_id: data.organization_id,
-          staff_id: data.staff_id,
-          training_key: data.training_key,
-          completed_date: completedDate,
-          expires_at: expires,
-          evidence_document_id: data.hr_document_id,
-          nectar_suggested_expires: nectarExpires !== null,
-          nectar_name_match: nameMatch,
-          nectar_extracted_name: nectarName,
-          nectar_reviewed_at: new Date().toISOString(),
-          admin_signed_off_at: null,
-          admin_signed_off_by: null,
-          completed_by: userId,
-        },
-        { onConflict: "organization_id,staff_id,training_key" },
-      );
+      .upsert(upsertRow, {
+        onConflict: "organization_id,staff_id,training_key",
+      });
     if (error) throw new Error(error.message);
 
     return {
-      ok: true,
+      ok: validationStatus === "passed",
+      validation_status: validationStatus,
+      reasons,
       expires_at: expires,
-      nectar_suggested: nectarExpires !== null,
+      completed_date: completedDate,
+      nectar_suggested: validationStatus === "passed" && nectarExpires !== null,
       nectar_confidence: nectarConfidence,
       nectar_name: nectarName,
+      nectar_cert_type: nectarCertType,
+      nectar_completed_date: nectarCompletedDate,
+      nectar_summary: nectarSummary,
       profile_name: profileName,
       name_match: nameMatch,
     };

@@ -375,7 +375,7 @@ export const skipOnboardingItem = createServerFn({ method: "POST" })
         recurrence_key: `client_onboarding:${data.clientId}:${data.item}`,
         next_remind_at: week,
       },
-      { onConflict: "recurrence_key" },
+      { onConflict: "organization_id,recurrence_key" },
     );
     return { ok: true };
   });

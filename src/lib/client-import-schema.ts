@@ -38,6 +38,16 @@ const CONFIDENCE_THRESHOLD = 0.6;
 
 function fieldText(f: ExtractedField): string | null {
   if (f.value_text && f.value_text.trim()) return f.value_text.trim();
+  // Rescue: AI sometimes places single-value text into value_array (e.g. one
+  // goal as ["Independent meal prep"]). Treat the joined array as the text.
+  if (Array.isArray(f.value_array) && f.value_array.length) {
+    const joined = f.value_array.map((s) => String(s).trim()).filter(Boolean).join("; ");
+    if (joined) return joined;
+  }
+  // Rescue: value_json may carry { text: "..." } or a string.
+  if (typeof f.value_json === "string" && f.value_json.trim()) return f.value_json.trim();
+  const j = f.value_json as { text?: unknown } | null | undefined;
+  if (j && typeof j.text === "string" && j.text.trim()) return j.text.trim();
   return null;
 }
 function fieldBool(f: ExtractedField): boolean | null {
@@ -70,6 +80,20 @@ function fieldDate(f: ExtractedField): string | null {
     return f.value_date.slice(0, 10);
   if (f.value_text && /^\d{4}-\d{2}-\d{2}/.test(f.value_text))
     return f.value_text.slice(0, 10);
+  return null;
+}
+
+// Forgiving numeric coercion — AI often returns "$18.50" or "3,120" as a
+// string even when the prompt asks for a number. Returns null when no real
+// number can be recovered; never returns NaN.
+function toNum(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const cleaned = v.replace(/[$,\s]/g, "");
+    if (!cleaned) return null;
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
+  }
   return null;
 }
 

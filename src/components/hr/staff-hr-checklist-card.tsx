@@ -475,84 +475,112 @@ export function StaffHrChecklistCard({
                                     </div>
                                   </div>
                                   <div className="flex flex-wrap items-center gap-2">
-                                    {isSelf ? (
-                                      <Badge>{status}</Badge>
-                                    ) : (
-                                      <Select
-                                        value={status}
-                                        onValueChange={(v) =>
-                                          setStatus.mutate({
-                                            requirement_id: row.requirement_id,
-                                            status: v as typeof STATUSES[number],
-                                          })
-                                        }
-                                      >
-                                        <SelectTrigger className="h-8 w-[140px] text-xs">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {STATUSES.map((s) => (
-                                            <SelectItem
-                                              key={s}
-                                              value={s}
-                                              className="text-xs"
-                                            >
-                                              {s}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    )}
-                                    {completionDoc && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => viewDoc(completionDoc.id)}
-                                      >
-                                        <Eye className="mr-1 h-3.5 w-3.5" /> Evidence
-                                      </Button>
-                                    )}
-                                    {!isSelf && (
-                                      <label
-                                        className="relative z-0 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
-                                        title={completionDoc ? "Replace evidence" : "Upload evidence (PDF, DOCX, image)"}
-                                        aria-label={completionDoc ? "Replace evidence" : "Upload evidence"}
-                                      >
-                                        <Upload className="h-3.5 w-3.5" />
-                                        <span>{completionDoc ? "Replace" : "Upload"}</span>
-                                        <input
-                                          type="file"
-                                          className="hidden"
-                                          accept=".pdf,.doc,.docx,image/*"
-                                          onChange={async (e) => {
-                                            const f = e.target.files?.[0];
-                                            if (!f) return;
-                                            const docId = await uploadEvidence(
-                                              f,
-                                              row.requirement_id,
-                                              row.category ?? "checklist_evidence",
-                                            );
-                                            if (docId) {
-                                              await upsertFn({
-                                                data: {
-                                                  organization_id: organizationId,
-                                                  staff_id: staffId,
+                                    {(() => {
+                                      const baselineKey = parseBaselineId(row.requirement_id);
+                                      if (baselineKey && !isSelf) {
+                                        const t = baselineByKey(baselineKey);
+                                        return (
+                                          <BaselineActions
+                                            organizationId={organizationId}
+                                            staffId={staffId}
+                                            trainingKey={baselineKey}
+                                            tracksExpiration={!!t?.tracks_expiration}
+                                            currentCompletedDate={row.completion.completed_date}
+                                            currentExpiresAt={row.completion.expires_at}
+                                            currentEvidenceDocId={row.completion.evidence_document_id}
+                                            onChanged={invalidate}
+                                            markBaselineFn={markBaselineFn}
+                                            attachBaselineFn={attachBaselineFn}
+                                            setBaselineExpFn={setBaselineExpFn}
+                                            createUpload={createUpload}
+                                            getDocUrl={getDocUrl}
+                                          />
+                                        );
+                                      }
+                                      return (
+                                        <>
+                                          {isSelf ? (
+                                            <Badge>{status}</Badge>
+                                          ) : (
+                                            <Select
+                                              value={status}
+                                              onValueChange={(v) =>
+                                                setStatus.mutate({
                                                   requirement_id: row.requirement_id,
-                                                  status: "in_progress",
-                                                  evidence_document_id: docId,
-                                                },
-                                              });
-                                              toast.message(
-                                                "Evidence attached — confirm to mark complete",
-                                              );
-                                              invalidate();
-                                            }
-                                            e.target.value = "";
-                                          }}
-                                        />
-                                      </label>
-                                    )}
+                                                  status: v as typeof STATUSES[number],
+                                                })
+                                              }
+                                            >
+                                              <SelectTrigger className="h-8 w-[140px] text-xs">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {STATUSES.map((s) => (
+                                                  <SelectItem
+                                                    key={s}
+                                                    value={s}
+                                                    className="text-xs"
+                                                  >
+                                                    {s}
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          )}
+                                          {completionDoc && (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              onClick={() => viewDoc(completionDoc.id)}
+                                            >
+                                              <Eye className="mr-1 h-3.5 w-3.5" /> Evidence
+                                            </Button>
+                                          )}
+                                          {!isSelf && (
+                                            <label
+                                              className="relative z-0 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+                                              title={completionDoc ? "Replace evidence" : "Upload evidence (PDF, DOCX, image)"}
+                                              aria-label={completionDoc ? "Replace evidence" : "Upload evidence"}
+                                            >
+                                              <Upload className="h-3.5 w-3.5" />
+                                              <span>{completionDoc ? "Replace" : "Upload"}</span>
+                                              <input
+                                                type="file"
+                                                className="hidden"
+                                                accept=".pdf,.doc,.docx,image/*"
+                                                onChange={async (e) => {
+                                                  const f = e.target.files?.[0];
+                                                  if (!f) return;
+                                                  const docId = await uploadEvidence(
+                                                    f,
+                                                    row.requirement_id,
+                                                    row.category ?? "checklist_evidence",
+                                                  );
+                                                  if (docId) {
+                                                    await upsertFn({
+                                                      data: {
+                                                        organization_id: organizationId,
+                                                        staff_id: staffId,
+                                                        requirement_id: row.requirement_id,
+                                                        status: "in_progress",
+                                                        evidence_document_id: docId,
+                                                      },
+                                                    });
+                                                    toast.message(
+                                                      "Evidence attached — confirm to mark complete",
+                                                    );
+                                                    invalidate();
+                                                  }
+                                                  e.target.value = "";
+                                                }}
+                                              />
+                                            </label>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
                                   </div>
+
                                 </div>
                                 {row.completion.completed_date && (
                                   <div

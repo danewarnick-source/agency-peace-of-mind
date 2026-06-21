@@ -203,7 +203,7 @@ function TabTrigger({
 
 type ClientRow = Record<string, unknown> | null | undefined;
 
-function OverviewPanel({ client, clientId, isHostHome, orgId }: { client: ClientRow; clientId: string; isHostHome: boolean; orgId?: string }) {
+function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { client: ClientRow; clientId: string; isHostHome: boolean; showBehavior: boolean; orgId?: string }) {
   if (!client) return <SkeletonCard />;
   return (
     <div className="grid gap-4 md:grid-cols-2">

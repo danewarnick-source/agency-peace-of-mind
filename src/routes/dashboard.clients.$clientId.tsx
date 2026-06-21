@@ -241,9 +241,10 @@ function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { 
         <CardContent className="flex flex-wrap gap-2 text-sm">
           <QuickLink to="/dashboard/billing/$clientId" params={{ clientId }} label="Billing detail" />
           <QuickLink to="/dashboard/client-intake/$clientId" params={{ clientId }} label="Intake checklist" />
-          <QuickLink to="/dashboard/hhs-hub/$clientId" params={{ clientId }} label="HHS hub" />
-          <QuickLink to="/dashboard/behavior-support/$clientId" params={{ clientId }} label="Behavior support" />
+          {isHostHome && <QuickLink to="/dashboard/hhs-hub/$clientId" params={{ clientId }} label="HHS hub" />}
+          {showBehavior && <QuickLink to="/dashboard/behavior-support/$clientId" params={{ clientId }} label="Behavior support" />}
           <QuickLink to="/dashboard/client-training/$clientId" params={{ clientId }} label="Client-specific training" />
+
         </CardContent>
       </Card>
       <div className="md:col-span-2">

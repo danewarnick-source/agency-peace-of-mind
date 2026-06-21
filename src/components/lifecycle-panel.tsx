@@ -17,9 +17,10 @@ type Props = {
   fullName: string;
   organizationId?: string | null;
   onDone?: () => void;
+  onDeleted?: () => void;
 };
 
-export function LifecyclePanel({ kind, id, fullName, organizationId, onDone }: Props) {
+export function LifecyclePanel({ kind, id, fullName, organizationId, onDone, onDeleted }: Props) {
   const qc = useQueryClient();
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -59,7 +60,8 @@ export function LifecyclePanel({ kind, id, fullName, organizationId, onDone }: P
       setDeleteOpen(false);
       setConfirmName("");
       invalidate();
-      onDone?.();
+      if (onDeleted) onDeleted();
+      else onDone?.();
     },
     onError: (e: Error) => toast.error(e.message),
   });

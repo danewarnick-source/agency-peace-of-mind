@@ -173,6 +173,7 @@ export function EmployeesPage() {
     mutationFn: async (input: {
       firstName: string; lastName: string; username: string; email: string;
       role: Role; department: string; startDate: string; endDate: string; trackIds: string[]; password: string;
+      requiresDeescalation: boolean; requiresAbi: boolean;
     }) => {
       if (input.startDate && input.endDate && input.endDate < input.startDate) {
         throw new Error("End date must be on or after Start date.");
@@ -184,8 +185,11 @@ export function EmployeesPage() {
         department: input.department, hireDate: input.startDate,
         startDate: input.startDate, endDate: input.endDate,
         trackIds: input.trackIds,
+        requiresDeescalation: input.requiresDeescalation,
+        requiresAbi: input.requiresAbi,
       } });
     },
+
     onSuccess: (res, vars) => {
       toast.success("Employee account created");
       setCredentialsShown({ identifier: vars.email || vars.username, password: vars.password });

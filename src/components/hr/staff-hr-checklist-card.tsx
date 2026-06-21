@@ -517,6 +517,11 @@ export function StaffHrChecklistCard({
                                             adminSignedOffAt={row.completion.admin_signed_off_at}
                                             nectarNameMatch={row.completion.nectar_name_match}
                                             nectarExtractedName={row.completion.nectar_extracted_name}
+                                            nectarValidationStatus={row.completion.nectar_validation_status}
+                                            nectarValidationReasons={row.completion.nectar_validation_reasons}
+                                            nectarExtractedCertType={row.completion.nectar_extracted_cert_type}
+                                            nectarExtractedCompletedDate={row.completion.nectar_extracted_completed_date}
+                                            nectarExtractedSummary={row.completion.nectar_extracted_summary}
                                             onChanged={invalidate}
                                             attachBaselineFn={attachBaselineFn}
                                             setBaselineExpFn={setBaselineExpFn}

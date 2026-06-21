@@ -358,3 +358,130 @@ function DonePage() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Quick "Complete missing info" dialog. Opens from a per-subject button on the
+// readout when a client's commit was blocked by missing guardianship data.
+// On save: writes the answers into the import's staging fields, then re-runs
+// the commit for the whole job (idempotent — already-live subjects are
+// skipped).
+// ---------------------------------------------------------------------------
+function MissingInfoButton({
+  subjectId, displayName, jobId, onFixed,
+}: { subjectId: string; displayName: string; jobId: string; onFixed: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [isOwn, setIsOwn] = useState(true);
+  const [gName, setGName] = useState("");
+  const [gPhone, setGPhone] = useState("");
+  const [gRel, setGRel] = useState("");
+  const [gEmail, setGEmail] = useState("");
+  const [ecName, setEcName] = useState("");
+  const [ecPhone, setEcPhone] = useState("");
+
+  const apply = useServerFn(applyMissingClientFields);
+  const recommit = useServerFn(recommitSmartImportJob);
+
+  const m = useMutation({
+    mutationFn: async () => {
+      await apply({
+        data: {
+          subjectId,
+          values: {
+            is_own_guardian: isOwn,
+            guardian_name: gName,
+            guardian_phone: gPhone,
+            guardian_relationship: gRel,
+            guardian_email: gEmail,
+            emergency_contact_name: ecName,
+            emergency_contact_phone: ecPhone,
+          },
+        },
+      });
+      return recommit({ data: { jobId } });
+    },
+    onSuccess: (res) => {
+      const live = (res?.results ?? []).filter((r) => r.committed && r.record_id).length;
+      if (live > 0) {
+        toast.success(`Imported ${live} record${live === 1 ? "" : "s"} into your directory.`);
+      } else {
+        toast.info("Saved — but commit still has work to do. Check the readout.");
+      }
+      setOpen(false);
+      onFixed();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const blocked = !isOwn && !gName.trim();
+
+  return (
+    <>
+      <Button size="sm" variant="default" onClick={() => setOpen(true)}>
+        <Wrench className="mr-2 h-3.5 w-3.5" /> Complete missing info
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete guardianship info</DialogTitle>
+            <DialogDescription>
+              {displayName} can&apos;t be saved until guardianship is set. Pick one option.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div>
+                <div className="text-sm font-medium">Client is their own guardian</div>
+                <p className="text-xs text-muted-foreground">
+                  Turn off if a separate person legally acts as guardian.
+                </p>
+              </div>
+              <Switch checked={isOwn} onCheckedChange={setIsOwn} />
+            </div>
+            {!isOwn && (
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Guardian name <span className="text-destructive">*</span></Label>
+                  <Input value={gName} onChange={(e) => setGName(e.target.value)} placeholder="Full legal name" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Phone</Label>
+                    <Input value={gPhone} onChange={(e) => setGPhone(e.target.value)} placeholder="(555) 555-5555" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Relationship</Label>
+                    <Input value={gRel} onChange={(e) => setGRel(e.target.value)} placeholder="Parent, sibling…" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Email</Label>
+                  <Input value={gEmail} onChange={(e) => setGEmail(e.target.value)} placeholder="optional" />
+                </div>
+              </div>
+            )}
+            <div className="space-y-3 rounded-lg border border-dashed border-border p-3">
+              <div className="text-xs font-semibold text-muted-foreground">Emergency contact (optional)</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Name</Label>
+                  <Input value={ecName} onChange={(e) => setEcName(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Phone</Label>
+                  <Input value={ecPhone} onChange={(e) => setEcPhone(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={() => m.mutate()} disabled={m.isPending || blocked}>
+              {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+              Save &amp; retry commit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+

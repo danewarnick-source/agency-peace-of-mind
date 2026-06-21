@@ -271,9 +271,9 @@ function SubjectReview({
       <DedupBanner subject={subject} matched={matched} onChanged={refresh} />
 
       <Tabs defaultValue="placement">
-        <TabsList className={jobMode === "client" ? "grid grid-cols-4" : "grid grid-cols-5"}>
+        <TabsList className={jobMode === "employee" ? "grid grid-cols-5" : "grid grid-cols-4"}>
           <TabsTrigger value="placement">Placement</TabsTrigger>
-          {jobMode !== "client" && (
+          {jobMode === "employee" && (
             <TabsTrigger value="certs">Certs / training</TabsTrigger>
           )}
           <TabsTrigger value="questions">NECTAR asks {questions.length > 0 && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{questions.length}</Badge>}</TabsTrigger>
@@ -284,7 +284,7 @@ function SubjectReview({
         <TabsContent value="placement" className="mt-3">
           <PlacementLineup fields={fields} targetFields={targetFields} matched={matched} decision={subject.review_decision} onChanged={refresh} />
         </TabsContent>
-        {jobMode !== "client" && (
+        {jobMode === "employee" && (
           <TabsContent value="certs" className="mt-3">
             <CertsPanel subjectId={subjectId} certs={certs} onChanged={refresh} />
           </TabsContent>

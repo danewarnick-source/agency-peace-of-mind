@@ -290,10 +290,45 @@ async function commitClient(
 
   // Run the shared autofill so Smart Import seeds billing codes, goals,
   // health arrays, etc. — same path as the per-client upload flow.
+  // The Smart Import extractor encodes structured values as JSON in `value`
+  // (billing_code_row, arrays, booleans); decode them back here so
+  // applyExtractedFieldsToClient sees value_json / value_array / value_bool.
   try {
-    const norm = fields
+    type NormField = {
+      field_key: string;
+      value_text?: string | null;
+      value_json?: unknown;
+      value_array?: string[] | null;
+      value_bool?: boolean | null;
+      confidence: number;
+    };
+    const norm: NormField[] = fields
       .filter((f) => !f.is_custom_attribute)
-      .map((f) => ({ field_key: f.target_field, value_text: f.value, confidence: 0.9 }));
+      .map((f) => {
+        const base: NormField = { field_key: f.target_field, confidence: 0.9 };
+        const v = f.value;
+        if (v == null || String(v).trim() === "") return base;
+        const s = String(v).trim();
+        if (f.target_field === "billing_code_row") {
+          try { base.value_json = JSON.parse(s); return base; } catch { /* fall through */ }
+        }
+        if (s.startsWith("[") || s.startsWith("{")) {
+          try {
+            const j = JSON.parse(s);
+            if (Array.isArray(j)) { base.value_array = j.map(String); return base; }
+            if (j && typeof j === "object") {
+              if (typeof (j as { bool?: unknown }).bool === "boolean") {
+                base.value_bool = (j as { bool: boolean }).bool;
+                return base;
+              }
+              base.value_json = j;
+              return base;
+            }
+          } catch { /* fall through */ }
+        }
+        base.value_text = s;
+        return base;
+      });
     const apply = await applyExtractedFieldsToClient({
       supabase: sb,
       organizationId: orgId,

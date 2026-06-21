@@ -612,68 +612,118 @@ async function extractDocxText(buf: Buffer): Promise<string> {
   return (result?.value as string) ?? "";
 }
 
-// ---- 2) AI field extraction (Lovable AI Gateway → Gemini, swappable) ----
+// ---- 2) AI field extraction (shared extractor: same prompt / schema as
+//        the per-client uploader). Emits one row per billing_code_row and
+//        one row per pcsp_goal so the PCSP's billing table and goal list
+//        are preserved end-to-end.
 async function aiExtractFieldsFromText(
   text: string,
   mode: "employee" | "client",
 ): Promise<{ display_name: string; fields: ExtractedFieldOut[]; unfiled: string[] }> {
+  if (mode === "employee") {
+    return aiExtractEmployeeFieldsFromText(text);
+  }
+
+  const { parseDocumentWithAI, CORE_CLIENT_FIELD_KEYS } = await import(
+    "@/lib/document-extraction"
+  );
+  const parsed = await parseDocumentWithAI(text, `subject=client`);
+
+  const out: ExtractedFieldOut[] = [];
+  const ARRAY_KEYS = new Set([
+    "allergies", "swallowing_alerts", "diagnoses", "chronic_conditions",
+    "immunizations", "preferred_activities", "roommates",
+    "personal_belongings_inventory",
+  ]);
+
+  for (const f of parsed.fields ?? []) {
+    const key = String(f.field_key || "").trim();
+    if (!key) continue;
+    const isKnown = CORE_CLIENT_FIELD_KEYS.has(key);
+    const conf = typeof f.confidence === "number"
+      ? Math.max(0, Math.min(1, f.confidence))
+      : 0.85;
+    const snippet = String(f.source_locator || f.value_text || "").slice(0, 200);
+    const base = {
+      target_field: key,
+      status: ("placed" as const),
+      confidence: conf,
+      snippet,
+      provenance: (isKnown ? "source" : "inferred") as "source" | "inferred",
+      is_custom: !isKnown,
+    };
+
+    // Billing code row → JSON-encode value_json so the commit can read it back
+    if (key === "billing_code_row" && f.value_json && typeof f.value_json === "object") {
+      out.push({ ...base, value: JSON.stringify(f.value_json) });
+      continue;
+    }
+    // Boolean → JSON {bool:true|false}
+    if (typeof f.value_bool === "boolean") {
+      out.push({ ...base, value: JSON.stringify({ bool: f.value_bool }) });
+      continue;
+    }
+    // Array fields → JSON array
+    if (Array.isArray(f.value_array) && f.value_array.length) {
+      out.push({ ...base, value: JSON.stringify(f.value_array) });
+      continue;
+    }
+    if (ARRAY_KEYS.has(key) && f.value_text) {
+      const arr = f.value_text.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+      if (arr.length > 1) {
+        out.push({ ...base, value: JSON.stringify(arr) });
+        continue;
+      }
+    }
+    // Date / number / text → store as string in `value`
+    const v = f.value_date || (typeof f.value_number === "number" ? String(f.value_number) : f.value_text || "");
+    if (!v || !String(v).trim()) continue;
+    out.push({ ...base, value: String(v).trim() });
+  }
+
+  // Derive a display name from extracted person fields.
+  const get = (k: string) => out.find((r) => r.target_field === k)?.value;
+  const full = get("full_name");
+  const fn = get("first_name");
+  const ln = get("last_name");
+  const display = (full || `${fn ?? ""} ${ln ?? ""}`.trim() || "Imported client").trim();
+
+  return { display_name: display, fields: out, unfiled: [] };
+}
+
+type ExtractedFieldOutLocal = ExtractedFieldOut;
+
+// Employee path keeps the lighter flat-field prompt (no PCSP-specific structure).
+async function aiExtractEmployeeFieldsFromText(
+  text: string,
+): Promise<{ display_name: string; fields: ExtractedFieldOutLocal[]; unfiled: string[] }> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) {
     throw new Error("AI extraction is not configured (LOVABLE_API_KEY missing). Cannot read documents.");
   }
-
-  const targetFields =
-    mode === "client"
-      ? [
-          "first_name", "last_name", "full_name", "date_of_birth", "phone",
-          "address", "medicaid_id", "job_code", "team_name",
-          "medications", "guardian_name", "service_codes", "goals",
-          "diagnoses", "allergies", "emergency_contact",
-        ]
-      : [
-          "full_name", "first_name", "last_name", "email", "phone",
-          "position", "hire_date", "team_name",
-        ];
-
-  const system = `You extract structured fields from a Utah DSPD ${mode === "client" ? "client (PCSP / intake / Medicaid)" : "employee / HR"} document.
-Return STRICT JSON with shape:
-{
-  "display_name": string,
-  "fields": Array<{
-    "target_field": string,        // one of the allowed targets, OR a snake_case custom key
-    "value": string,                // the extracted value as plain text
-    "confidence": number,           // 0..1
-    "source_snippet": string        // short verbatim quote (<200 chars)
-  }>,
-  "unfiled": string[]               // sentences/scraps you couldn't place
-}
+  const targetFields = [
+    "full_name", "first_name", "last_name", "email", "phone",
+    "position", "hire_date", "team_name",
+  ];
+  const system = `You extract structured fields from a Utah DSPD employee / HR document.
+Return STRICT JSON: { "display_name": string, "fields": Array<{ "target_field": string, "value": string, "confidence": number, "source_snippet": string }>, "unfiled": string[] }
 Allowed core targets: ${targetFields.join(", ")}.
-Rules:
-- Use the allowed core target_field names exactly when the value clearly maps.
-- For information that doesn't map (e.g. provider notes), invent a snake_case key and still return it as a field; it will be treated as a custom attribute.
-- For lists (medications, service_codes, goals, diagnoses), join entries with "; ".
-- Dates as ISO YYYY-MM-DD when possible.
-- Never invent data. If a field isn't present, omit it.
-- Return ONLY JSON, no commentary.`;
-
+Rules: dates ISO YYYY-MM-DD; never invent data; return ONLY JSON.`;
   const truncated = text.length > 60_000 ? text.slice(0, 60_000) : text;
-
   const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: `Extract from this document text:\n\n${truncated}` },
-      ],
-      response_format: { type: "json_object" },
-    });
-
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `Extract from this document text:\n\n${truncated}` },
+    ],
+    response_format: { type: "json_object" },
+  });
   if (res.status === 429) throw new Error("AI is busy (rate limit). Try again in a moment.");
   if (res.status === 402) throw new Error("AI workspace credits exhausted. Add credits to continue.");
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     throw new Error(`AI extraction failed (${res.status}): ${t.slice(0, 200)}`);
   }
-
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const raw = json.choices?.[0]?.message?.content ?? "{}";
   let parsed: {
@@ -681,14 +731,11 @@ Rules:
     fields?: Array<{ target_field: string; value: string; confidence?: number; source_snippet?: string }>;
     unfiled?: string[];
   };
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
+  try { parsed = JSON.parse(raw); } catch {
     throw new Error("AI returned malformed JSON; document may be unreadable.");
   }
-
   const knownSet = new Set(targetFields);
-  const fields: ExtractedFieldOut[] = [];
+  const fields: ExtractedFieldOutLocal[] = [];
   for (const f of parsed.fields ?? []) {
     const tf = String(f.target_field || "").trim();
     const val = String(f.value ?? "").trim();
@@ -697,8 +744,7 @@ Rules:
     const malformed = isKnown && looksMalformed(tf, val);
     const conf = typeof f.confidence === "number" ? Math.max(0, Math.min(1, f.confidence)) : 0.8;
     fields.push({
-      target_field: tf,
-      value: val,
+      target_field: tf, value: val,
       status: malformed ? "flag" : isKnown ? "placed" : "review",
       confidence: malformed ? Math.min(conf, 0.55) : conf,
       snippet: String(f.source_snippet || val).slice(0, 200),
@@ -706,7 +752,6 @@ Rules:
       is_custom: !isKnown,
     });
   }
-
   let display = String(parsed.display_name || "").trim();
   if (!display) {
     const fn = fields.find((f) => f.target_field === "first_name")?.value;
@@ -714,7 +759,6 @@ Rules:
     const full = fields.find((f) => f.target_field === "full_name")?.value;
     display = full || `${fn ?? ""} ${ln ?? ""}`.trim() || "Imported subject";
   }
-
   return {
     display_name: display,
     fields,

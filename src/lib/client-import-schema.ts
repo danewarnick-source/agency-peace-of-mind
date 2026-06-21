@@ -246,8 +246,16 @@ export async function applyExtractedFieldsToClient(
 
   if (codeRows.length) {
     const codes = Array.from(new Set(codeRows.map((r) => r.service_code)));
-    mergeArrayColumn("authorized_dspd_codes", codes);
-    mergeArrayColumn("job_code", codes);
+    // PCSP / 1056 is authoritative — REPLACE authorized_dspd_codes and job_code
+    // with exactly the codes the document yielded. A code the client had before
+    // that is NOT in this PCSP no longer remains as an active authorized code.
+    const curCodes = ((client as Record<string, unknown>).authorized_dspd_codes as string[] | null) ?? [];
+    const sameSet = curCodes.length === codes.length && curCodes.every((c) => codes.includes(c));
+    if (!sameSet) {
+      update.authorized_dspd_codes = codes;
+      autofilled.push("authorized_dspd_codes");
+    }
+    update.job_code = codes;
 
     const { isDailyServiceCode } = await import("@/lib/service-billing");
     const stubs = codeRows.map((r) => ({
@@ -266,6 +274,26 @@ export async function applyExtractedFieldsToClient(
       .upsert(stubs, { onConflict: "organization_id,client_id,service_code" });
     if (bcErr) throw new Error(`billing-codes upsert failed: ${bcErr.message}`);
     autofilled.push(`client_billing_codes(${stubs.length})`);
+
+    // Close any existing authorization rows for codes NOT in the new PCSP.
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: existingCodeRows } = await supabase
+      .from("client_billing_codes")
+      .select("id, service_code, service_end_date")
+      .eq("organization_id", organizationId)
+      .eq("client_id", clientId);
+    const stale = (existingCodeRows ?? []).filter(
+      (r: { service_code: string; service_end_date: string | null }) =>
+        !codes.includes(r.service_code) &&
+        (!r.service_end_date || r.service_end_date > today),
+    );
+    for (const r of stale) {
+      await supabase
+        .from("client_billing_codes")
+        .update({ service_end_date: today })
+        .eq("id", (r as { id: string }).id);
+      suggested.push(`Closed stale auth: ${(r as { service_code: string }).service_code}`);
+    }
   }
 
   // Team resolution by name → clients.team_id (non-destructive: only fills if empty).

@@ -1101,9 +1101,14 @@ function BaselineActions(props: {
           </Button>
         )}
 
-        {hasCert && !isSignedOff && (
+        {hasCert && !isSignedOff && !validationFailed && (
           <Button size="sm" onClick={signOff} disabled={working}>
             Sign off as completed
+          </Button>
+        )}
+        {hasCert && !isSignedOff && validationFailed && (
+          <Button size="sm" disabled title="Nectar rejected this certificate — upload a valid one first">
+            Sign off blocked
           </Button>
         )}
         {isSignedOff && (
@@ -1113,25 +1118,60 @@ function BaselineActions(props: {
         )}
       </div>
 
+      {validationFailed && (
+        <div className="rounded-md border border-rose-300 bg-rose-50 p-2 text-[11px] text-rose-900">
+          <div className="font-semibold">
+            ⚠ Nectar rejected the last uploaded certificate
+          </div>
+          {props.nectarExtractedCertType && (
+            <div className="mt-0.5">
+              What Nectar saw:{" "}
+              <span className="font-medium">{props.nectarExtractedCertType}</span>
+            </div>
+          )}
+          {(props.nectarValidationReasons ?? []).length > 0 && (
+            <ul className="mt-1 list-disc pl-4">
+              {(props.nectarValidationReasons ?? []).map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-1 italic">
+            Upload the correct certificate to continue. Previous valid evidence
+            (if any) has not been replaced.
+          </div>
+        </div>
+      )}
+
       {hasCert && (
         <div className="rounded-md border border-border/40 bg-muted/30 p-2 text-[11px]">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-medium text-muted-foreground">Nectar review:</span>
+            {validationPassed && (
+              <span className="text-emerald-700">✓ Certificate validated</span>
+            )}
+            {props.nectarExtractedCertType && (
+              <span className="text-muted-foreground">
+                · type: {props.nectarExtractedCertType}
+              </span>
+            )}
             {nameMatch === "match" && (
               <span className="text-emerald-700">
-                ✓ Name matches{props.nectarExtractedName ? ` (${props.nectarExtractedName})` : ""}
+                · ✓ Name matches{props.nectarExtractedName ? ` (${props.nectarExtractedName})` : ""}
               </span>
             )}
             {nameMatch === "mismatch" && (
               <span className="text-rose-700">
-                ⚠ Name mismatch — cert says "{props.nectarExtractedName}"
+                · ⚠ Name mismatch — cert says "{props.nectarExtractedName}"
               </span>
             )}
             {nameMatch === "unreadable" && (
-              <span className="text-amber-700">⚠ Could not read name on certificate</span>
+              <span className="text-amber-700">· ⚠ Could not read name</span>
             )}
-            {!nameMatch && (
-              <span className="text-muted-foreground italic">name check pending</span>
+            {props.nectarExtractedCompletedDate && (
+              <span className="text-muted-foreground">
+                · completed {props.nectarExtractedCompletedDate}
+              </span>
             )}
             {props.tracksExpiration && props.currentExpiresAt && !editExp && (
               <>
@@ -1172,6 +1212,11 @@ function BaselineActions(props: {
               </span>
             )}
           </div>
+          {props.nectarExtractedSummary && (
+            <div className="mt-1 text-muted-foreground italic">
+              Nectar saw: {props.nectarExtractedSummary}
+            </div>
+          )}
         </div>
       )}
     </div>

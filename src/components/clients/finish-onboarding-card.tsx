@@ -33,12 +33,11 @@ import {
 } from "@/lib/field-confirmations.functions";
 import { TRACKED_FIELDS } from "@/lib/field-confirmations";
 import {
-  CLIENT_PROFILE_FIELDS,
   PROFILE_FIELD_BY_KEY,
   getProfileFieldValue,
-  profileFieldHasValue,
   type ProfileField,
 } from "@/lib/client-profile-fields";
+
 
 
 type State = Awaited<ReturnType<typeof getClientOnboardingState>>;

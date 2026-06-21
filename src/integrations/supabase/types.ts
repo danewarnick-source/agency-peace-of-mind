@@ -11213,12 +11213,17 @@ export type Database = {
       }
       staff_baseline_training_completions: {
         Row: {
+          admin_signed_off_at: string | null
+          admin_signed_off_by: string | null
           completed_by: string | null
           completed_date: string | null
           created_at: string
           evidence_document_id: string | null
           expires_at: string | null
           id: string
+          nectar_extracted_name: string | null
+          nectar_name_match: string | null
+          nectar_reviewed_at: string | null
           nectar_suggested_expires: boolean
           notes: string | null
           organization_id: string
@@ -11227,12 +11232,17 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_signed_off_at?: string | null
+          admin_signed_off_by?: string | null
           completed_by?: string | null
           completed_date?: string | null
           created_at?: string
           evidence_document_id?: string | null
           expires_at?: string | null
           id?: string
+          nectar_extracted_name?: string | null
+          nectar_name_match?: string | null
+          nectar_reviewed_at?: string | null
           nectar_suggested_expires?: boolean
           notes?: string | null
           organization_id: string
@@ -11241,12 +11251,17 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_signed_off_at?: string | null
+          admin_signed_off_by?: string | null
           completed_by?: string | null
           completed_date?: string | null
           created_at?: string
           evidence_document_id?: string | null
           expires_at?: string | null
           id?: string
+          nectar_extracted_name?: string | null
+          nectar_name_match?: string | null
+          nectar_reviewed_at?: string | null
           nectar_suggested_expires?: boolean
           notes?: string | null
           organization_id?: string

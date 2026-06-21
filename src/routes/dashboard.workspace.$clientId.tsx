@@ -40,7 +40,7 @@ import { ClientSpendingShiftPanel } from "@/components/staff-mobile/client-spend
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useTodayShifts } from "@/hooks/use-today-shifts";
 import { ClientPhoto } from "@/components/client-photo";
-import { useClientFeature } from "@/lib/client-features";
+import { useClientFeature, clientFeatureVisible } from "@/lib/client-features";
 
 function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
   const { data: active } = useActiveShift();
@@ -122,9 +122,37 @@ function ClientWorkspace() {
     }
   }, [isLoading, client, assignments, allowedHourly.length, navigate]);
 
-  const { enabled: emarEnabled } = useClientFeature(client ?? null, "emar");
+  const { enabled: emarFeatureEnabled } = useClientFeature(client ?? null, "emar");
 
-  // Behavior Support visibility: bc_code set, features_enabled true, ≥1 published behavior
+  // Code-driven feature visibility (DSPD plan).
+  const planFeatureClient = client
+    ? {
+        feature_config: client.feature_config ?? null,
+        authorized_dspd_codes: client.authorized_dspd_codes ?? client.job_code ?? null,
+      }
+    : null;
+  const hasMedMonitoringCode = clientFeatureVisible(planFeatureClient, "med_monitoring");
+  const hasBehaviorCode = clientFeatureVisible(planFeatureClient, "behavior");
+
+  // Does the client have any active medications? A client w/ meds still
+  // needs MAR for self-admin support even without a nursing code.
+  const { data: hasMedications } = useQuery({
+    queryKey: ["workspace-has-meds", client?.id ?? null],
+    enabled: !!client?.id,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("client_medications")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", client!.id);
+      return (count ?? 0) > 0;
+    },
+  });
+
+  // MAR tab: tier+per-client toggle AND (nursing code OR client actually has meds).
+  const emarEnabled = emarFeatureEnabled && (hasMedMonitoringCode || !!hasMedications);
+
+  // Behavior Support visibility: bc_code set, features_enabled true, ≥1 published behavior,
+  // AND the client's plan includes a Behavior Consultation code (or feature_config override).
   const { data: bsTab } = useQuery({
     queryKey: ["workspace-bs-tab", client?.id ?? null],
     enabled: !!client?.id,
@@ -147,7 +175,8 @@ function ClientWorkspace() {
       };
     },
   });
-  const showBehaviorTab = !!bsTab?.show;
+  const showBehaviorTab = hasBehaviorCode && !!bsTab?.show;
+
 
   if (isLoading || !client) {
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;

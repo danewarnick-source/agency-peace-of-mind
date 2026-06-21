@@ -34,6 +34,7 @@ import {
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
 } from "lucide-react";
 import { saveAdminHours } from "@/lib/scheduler/scheduler.functions";
+import { clientFeatureVisible } from "@/lib/client-features";
 
 const search = z.object({
   tab: z
@@ -68,7 +69,7 @@ function ClientProfileHub() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week, feature_config" as any)
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -80,13 +81,23 @@ function ClientProfileHub() {
   const fullName = client
     ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || "—"
     : "Loading…";
-  // Host-home flag derived from authorized service codes (HHS).
+  // Code-driven feature visibility. Derived per-render from
+  // authorized_dspd_codes so plan edits re-evaluate without caching.
   const codes: string[] = Array.isArray(client?.job_code)
     ? (client?.job_code as string[])
     : Array.isArray(client?.authorized_dspd_codes)
     ? (client?.authorized_dspd_codes as string[])
     : [];
-  const isHostHome = codes.some((c) => String(c).toUpperCase() === "HHS");
+  const featureClient = client
+    ? {
+        feature_config: (client.feature_config as Record<string, boolean> | null) ?? null,
+        authorized_dspd_codes: codes,
+      }
+    : null;
+  const isHostHome = clientFeatureVisible(featureClient, "host_home");
+  const showBehavior = clientFeatureVisible(featureClient, "behavior");
+
+
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-6 space-y-6">
@@ -130,7 +141,7 @@ function ClientProfileHub() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
-          <OverviewPanel client={client} clientId={clientId} isHostHome={isHostHome} orgId={orgId} />
+          <OverviewPanel client={client} clientId={clientId} isHostHome={isHostHome} showBehavior={showBehavior} orgId={orgId} />
         </TabsContent>
         <TabsContent value="plan" className="mt-6">
           <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
@@ -191,7 +202,7 @@ function TabTrigger({
 
 type ClientRow = Record<string, unknown> | null | undefined;
 
-function OverviewPanel({ client, clientId, isHostHome, orgId }: { client: ClientRow; clientId: string; isHostHome: boolean; orgId?: string }) {
+function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { client: ClientRow; clientId: string; isHostHome: boolean; showBehavior: boolean; orgId?: string }) {
   if (!client) return <SkeletonCard />;
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -229,9 +240,10 @@ function OverviewPanel({ client, clientId, isHostHome, orgId }: { client: Client
         <CardContent className="flex flex-wrap gap-2 text-sm">
           <QuickLink to="/dashboard/billing/$clientId" params={{ clientId }} label="Billing detail" />
           <QuickLink to="/dashboard/client-intake/$clientId" params={{ clientId }} label="Intake checklist" />
-          <QuickLink to="/dashboard/hhs-hub/$clientId" params={{ clientId }} label="HHS hub" />
-          <QuickLink to="/dashboard/behavior-support/$clientId" params={{ clientId }} label="Behavior support" />
+          {isHostHome && <QuickLink to="/dashboard/hhs-hub/$clientId" params={{ clientId }} label="HHS hub" />}
+          {showBehavior && <QuickLink to="/dashboard/behavior-support/$clientId" params={{ clientId }} label="Behavior support" />}
           <QuickLink to="/dashboard/client-training/$clientId" params={{ clientId }} label="Client-specific training" />
+
         </CardContent>
       </Card>
       <div className="md:col-span-2">

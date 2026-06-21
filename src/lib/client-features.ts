@@ -1,5 +1,53 @@
 import { useDisabledFeatures, type FeatureKey as TierFeatureKey } from "@/hooks/use-tenant-features";
 
+// ─── Code-driven feature areas (DSPD SOW catalog) ─────────────────────────
+//
+// A client's authorized service codes determine which feature AREAS apply
+// to them. No Behavior Consultation codes → no behavior surfaces; no
+// supported-employment codes → no SE surfaces; etc. Per-client
+// `feature_config[<feature>]` overrides the code-derived default in either
+// direction (admin force-on or force-off).
+
+export const FEATURE_CODES = {
+  behavior:             ["BC1", "BC2", "BC3"],
+  med_monitoring:       ["PM1", "PM2", "PN1", "PN2"],
+  supported_employment: ["SEI", "SEC", "SED", "SEE", "SJD", "SJP", "SJR", "EPR"],
+  day_support:          ["DSI", "DSG", "DSP"],
+  host_home:            ["HHS", "PPS"],
+  residential:          ["RHS", "ELS", "SLH"],
+  respite:              ["RP2", "RP3", "RP4", "RP5", "RPS"],
+  companion_personal:   ["COM", "PAC", "HSQ"],
+  budget_assistance:    ["PBA"],
+  transportation:       ["MTP"],
+} as const;
+
+export type ClientCodeFeature = keyof typeof FEATURE_CODES;
+
+/** True if the client's authorized DSPD codes include any code for `feature`. */
+export function clientHasFeature(
+  authorizedCodes: readonly string[] | null | undefined,
+  feature: ClientCodeFeature,
+): boolean {
+  const codes = (authorizedCodes ?? []).map((c) => String(c).toUpperCase());
+  return (FEATURE_CODES[feature] ?? []).some((c) => codes.includes(c));
+}
+
+/**
+ * Final visibility for a code-driven feature on a given client.
+ * Per-client `feature_config[feature]` ALWAYS wins over the code-derived
+ * default (true → force on, false → force off). When unset, fall back to
+ * whether the client's authorized codes include the feature.
+ */
+export function clientFeatureVisible(
+  client: { feature_config?: Record<string, boolean> | null; authorized_dspd_codes?: readonly string[] | null } | null | undefined,
+  feature: ClientCodeFeature,
+): boolean {
+  const override = client?.feature_config?.[feature];
+  if (typeof override === "boolean") return override;
+  return clientHasFeature(client?.authorized_dspd_codes ?? null, feature);
+}
+
+
 /**
  * Per-client feature keys (stored in clients.feature_config jsonb).
  * Keep in sync with FEATURE_TOGGLES in src/routes/dashboard.clients.tsx.

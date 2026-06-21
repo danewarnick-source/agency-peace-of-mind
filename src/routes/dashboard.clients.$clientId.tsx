@@ -108,6 +108,7 @@ function ClientProfileHub() {
         </Button>
       </div>
 
+      <ClientReadinessCard clientId={clientId} />
       <FinishOnboardingCard clientId={clientId} />
 
       <Tabs value={tab ?? "overview"} className="w-full">

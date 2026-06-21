@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,

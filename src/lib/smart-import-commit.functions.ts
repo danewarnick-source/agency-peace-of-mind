@@ -288,8 +288,26 @@ async function commitClient(
   const unmapped = fields.filter((f) => !f.is_custom_attribute && !CLIENT_COL[f.target_field]);
   for (const u of unmapped) gaps.push(`Unmapped: ${u.target_field}`);
 
+  // Run the shared autofill so Smart Import seeds billing codes, goals,
+  // health arrays, etc. — same path as the per-client upload flow.
+  try {
+    const norm = fields
+      .filter((f) => !f.is_custom_attribute)
+      .map((f) => ({ field_key: f.target_field, value_text: f.value, confidence: 0.9 }));
+    const apply = await applyExtractedFieldsToClient({
+      supabase: sb,
+      organizationId: orgId,
+      clientId: recordId,
+      fields: norm,
+    });
+    gaps.push(...apply.suggested.map((s) => `Review: ${s}`));
+  } catch (err) {
+    gaps.push(`Autofill warning: ${(err as Error).message}`);
+  }
+
   return recordId;
 }
+
 
 // --------------------------------------------------------------
 async function commitEmployee(

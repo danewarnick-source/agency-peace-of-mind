@@ -18,6 +18,13 @@ const CLIENT_COL: Record<string, string> = {
   address: "physical_address",
   medicaid_id: "medicaid_id",
   date_of_birth: "date_of_birth",
+  is_own_guardian: "is_own_guardian",
+  guardian_name: "guardian_name",
+  guardian_phone: "guardian_phone",
+  guardian_relationship: "guardian_relationship",
+  guardian_email: "guardian_email",
+  emergency_contact_name: "emergency_contact_name",
+  emergency_contact_phone: "emergency_contact_phone",
 };
 // On profiles we only update soft, non-auth fields
 const PROFILE_COL: Record<string, string> = {
@@ -188,10 +195,39 @@ async function commitClient(
     mapped[col] = f.value;
   }
 
+  // Coerce/normalize guardianship so the validate_client_guardianship trigger always passes.
+  const normalizeGuardianship = (m: Record<string, unknown>, defaultSelf: boolean) => {
+    const guardianTouched =
+      "is_own_guardian" in m ||
+      "guardian_name" in m ||
+      "guardian_phone" in m ||
+      "guardian_relationship" in m ||
+      "guardian_email" in m;
+    if (!guardianTouched) return; // non-destructive on update path
+    const hasGuardianName = typeof m.guardian_name === "string" && (m.guardian_name as string).trim() !== "";
+    const extractedSelf =
+      m.is_own_guardian === true ||
+      m.is_own_guardian === "true" ||
+      m.is_own_guardian === undefined ||
+      m.is_own_guardian === null
+        ? defaultSelf || m.is_own_guardian === true || m.is_own_guardian === "true"
+        : false;
+    if (hasGuardianName && !extractedSelf) {
+      m.is_own_guardian = false;
+    } else {
+      m.is_own_guardian = true;
+      m.guardian_name = null;
+      m.guardian_phone = null;
+      m.guardian_relationship = null;
+      m.guardian_email = null;
+    }
+  };
+
   let recordId: string;
   if (subj.matched_record_id && subj.review_decision === "update") {
     recordId = subj.matched_record_id;
     if (Object.keys(mapped).length > 0) {
+      normalizeGuardianship(mapped, false);
       const { error } = await sb.from("clients").update(mapped).eq("id", recordId).eq("organization_id", orgId);
       if (error) throw new Error(`clients update: ${error.message}`);
     }
@@ -202,6 +238,22 @@ async function commitClient(
       const parts = (subj.display_name || "Imported").split(/\s+/);
       mapped.first_name = parts[0] ?? "Imported";
       mapped.last_name = parts.slice(1).join(" ") || "Client";
+    }
+    // Default to self-guardian on new clients unless the doc clearly named a separate guardian.
+    const hasGuardianName = typeof mapped.guardian_name === "string" && (mapped.guardian_name as string).trim() !== "";
+    const extractedSelf =
+      mapped.is_own_guardian === true ||
+      mapped.is_own_guardian === "true" ||
+      mapped.is_own_guardian === undefined ||
+      mapped.is_own_guardian === null;
+    if (hasGuardianName && !extractedSelf) {
+      mapped.is_own_guardian = false;
+    } else {
+      mapped.is_own_guardian = true;
+      mapped.guardian_name = null;
+      mapped.guardian_phone = null;
+      mapped.guardian_relationship = null;
+      mapped.guardian_email = null;
     }
     mapped.organization_id = orgId;
     mapped.account_status = "active";

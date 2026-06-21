@@ -9169,6 +9169,8 @@ export type Database = {
           must_change_password: boolean
           position: string | null
           positions: string[]
+          requires_abi: boolean
+          requires_deescalation: boolean
           ssn_last4: string | null
           staff_type_keys: string[]
           start_date: string | null
@@ -9204,6 +9206,8 @@ export type Database = {
           must_change_password?: boolean
           position?: string | null
           positions?: string[]
+          requires_abi?: boolean
+          requires_deescalation?: boolean
           ssn_last4?: string | null
           staff_type_keys?: string[]
           start_date?: string | null
@@ -9239,6 +9243,8 @@ export type Database = {
           must_change_password?: boolean
           position?: string | null
           positions?: string[]
+          requires_abi?: boolean
+          requires_deescalation?: boolean
           ssn_last4?: string | null
           staff_type_keys?: string[]
           start_date?: string | null
@@ -11204,6 +11210,59 @@ export type Database = {
           staff_id?: string
         }
         Relationships: []
+      }
+      staff_baseline_training_completions: {
+        Row: {
+          completed_by: string | null
+          completed_date: string | null
+          created_at: string
+          evidence_document_id: string | null
+          expires_at: string | null
+          id: string
+          nectar_suggested_expires: boolean
+          notes: string | null
+          organization_id: string
+          staff_id: string
+          training_key: string
+          updated_at: string
+        }
+        Insert: {
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          evidence_document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          nectar_suggested_expires?: boolean
+          notes?: string | null
+          organization_id: string
+          staff_id: string
+          training_key: string
+          updated_at?: string
+        }
+        Update: {
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          evidence_document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          nectar_suggested_expires?: boolean
+          notes?: string | null
+          organization_id?: string
+          staff_id?: string
+          training_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_baseline_training_completions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_checklist_completion: {
         Row: {

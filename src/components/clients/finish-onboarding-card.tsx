@@ -222,7 +222,17 @@ function StepRow({
         <div className="space-y-3 border-t border-border p-3">
           {item.key === "staff" && <CaseloadEditor clientId={clientId} />}
           {item.key === "home" && <HomeForm clientId={clientId} state={state} onSaved={onChanged} />}
-          {item.key === "rates" && <RatesForm state={state} onSaved={onChanged} />}
+          {item.key === "rates" && (
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">
+                  Add more service codes
+                </div>
+                <AddCodesControl clientId={clientId} onChanged={onChanged} compact />
+              </div>
+              <RatesForm state={state} onSaved={onChanged} />
+            </div>
+          )}
           {item.key === "guardian" && <GuardianForm clientId={clientId} state={state} onSaved={onChanged} />}
           {item.key === "sow" && <SowForm clientId={clientId} state={state} onSaved={onChanged} />}
           <div className="flex justify-end">

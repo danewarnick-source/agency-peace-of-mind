@@ -37,7 +37,8 @@ export function FieldStateLine({
       )}
       {state === "unknown" && (
         <Link
-          to={`/dashboard/clients/${clientId}`}
+          to="/dashboard/clients/$clientId"
+          params={{ clientId }}
           className="inline-flex items-center gap-1 rounded-full border border-amber-300/60 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300"
         >
           <HelpCircle className="h-3 w-3" /> Confirm

@@ -10,6 +10,7 @@ import { Buffer } from "node:buffer";
 
 
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { parseDocumentWithAI, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
 
 // ----- Input schemas -----
 const ModeEnum = z.enum(["employee", "client"]);
@@ -442,7 +443,10 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
         .select("id", { count: "exact", head: true })
         .eq("import_job_id", data.jobId);
       if (!anyFieldCount) {
-        throw new Error("Extraction completed but no fields were captured. The document may be a scanned image (no embedded text) — paste the text or upload a text-based PDF.");
+        throw new Error(
+          "Extraction completed but saved no fields. " +
+            "This is unexpected — please report this document for review.",
+        );
       }
 
 
@@ -624,9 +628,6 @@ async function aiExtractFieldsFromText(
     return aiExtractEmployeeFieldsFromText(text);
   }
 
-  const { parseDocumentWithAI, CORE_CLIENT_FIELD_KEYS } = await import(
-    "@/lib/document-extraction"
-  );
   const parsed = await parseDocumentWithAI(text, `subject=client`);
 
   const out: ExtractedFieldOut[] = [];
@@ -691,16 +692,10 @@ async function aiExtractFieldsFromText(
   return { display_name: display, fields: out, unfiled: [] };
 }
 
-type ExtractedFieldOutLocal = ExtractedFieldOut;
-
 // Employee path keeps the lighter flat-field prompt (no PCSP-specific structure).
 async function aiExtractEmployeeFieldsFromText(
   text: string,
-): Promise<{ display_name: string; fields: ExtractedFieldOutLocal[]; unfiled: string[] }> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) {
-    throw new Error("AI extraction is not configured (LOVABLE_API_KEY missing). Cannot read documents.");
-  }
+): Promise<{ display_name: string; fields: ExtractedFieldOut[]; unfiled: string[] }> {
   const targetFields = [
     "full_name", "first_name", "last_name", "email", "phone",
     "position", "hire_date", "team_name",
@@ -711,7 +706,6 @@ Allowed core targets: ${targetFields.join(", ")}.
 Rules: dates ISO YYYY-MM-DD; never invent data; return ONLY JSON.`;
   const truncated = text.length > 60_000 ? text.slice(0, 60_000) : text;
   const res = await gatewayFetch({
-    model: "google/gemini-2.5-flash",
     messages: [
       { role: "system", content: system },
       { role: "user", content: `Extract from this document text:\n\n${truncated}` },
@@ -719,13 +713,13 @@ Rules: dates ISO YYYY-MM-DD; never invent data; return ONLY JSON.`;
     response_format: { type: "json_object" },
   });
   if (res.status === 429) throw new Error("AI is busy (rate limit). Try again in a moment.");
-  if (res.status === 402) throw new Error("AI workspace credits exhausted. Add credits to continue.");
+  if (res.status === 401) throw new Error("AWS Bedrock credentials are not configured.");
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     throw new Error(`AI extraction failed (${res.status}): ${t.slice(0, 200)}`);
   }
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const raw = json.choices?.[0]?.message?.content ?? "{}";
+  const body = await res.json();
+  const raw: string = body?.choices?.[0]?.message?.content ?? "{}";
   let parsed: {
     display_name?: string;
     fields?: Array<{ target_field: string; value: string; confidence?: number; source_snippet?: string }>;
@@ -735,7 +729,7 @@ Rules: dates ISO YYYY-MM-DD; never invent data; return ONLY JSON.`;
     throw new Error("AI returned malformed JSON; document may be unreadable.");
   }
   const knownSet = new Set(targetFields);
-  const fields: ExtractedFieldOutLocal[] = [];
+  const fields: ExtractedFieldOut[] = [];
   for (const f of parsed.fields ?? []) {
     const tf = String(f.target_field || "").trim();
     const val = String(f.value ?? "").trim();

@@ -50,7 +50,7 @@ function decodeBase64Text(base64: string): string {
   }
 }
 
-// ---------- AI parsing via shared extractor ----------
+// ---------- AI parsing via shared extractor (AWS Bedrock) ----------
 // SYSTEM_PROMPT, FieldOut, ParseOut, and the gateway call live in
 // src/lib/document-extraction.ts so Smart Import and the per-client
 // uploader share one path. Field-key names match what

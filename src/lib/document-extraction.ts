@@ -146,11 +146,7 @@ export async function parseDocumentWithAI(
   documentText: string,
   hint?: string,
 ): Promise<ParseOutT> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  // gemini-2.5-pro for accuracy on dense PCSP tables; falls back gracefully.
   const res = await gatewayFetch({
-    model: "google/gemini-2.5-pro",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
@@ -161,15 +157,26 @@ export async function parseDocumentWithAI(
     response_format: { type: "json_object" },
   });
   if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
-  if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
+  if (res.status === 401)
+    throw new Error(
+      "AWS Bedrock credentials are not configured (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / BEDROCK_MODEL_ID).",
+    );
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     throw new Error(`AI gateway error ${res.status}: ${t.slice(0, 200)}`);
   }
   const body = await res.json();
-  const content = body?.choices?.[0]?.message?.content ?? "{}";
+  const content: string = body?.choices?.[0]?.message?.content ?? "{}";
+  if (!content || content === "{}") {
+    console.error("[document-extraction] Bedrock returned empty content");
+  }
   let parsed: unknown;
-  try { parsed = JSON.parse(content); } catch { parsed = {}; }
+  try {
+    const clean = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    parsed = JSON.parse(clean || "{}");
+  } catch {
+    throw new Error("AI returned malformed JSON. The document may be unreadable.");
+  }
   const result = ParseOut.safeParse(parsed);
   return result.success ? result.data : { fields: [] };
 }

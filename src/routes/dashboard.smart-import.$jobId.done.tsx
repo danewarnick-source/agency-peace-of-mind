@@ -21,6 +21,7 @@ import { applyMissingClientFields } from "@/lib/smart-import-review.functions";
 import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-history.functions";
 import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
+import { ClientLiveBadge, ClientReadinessCard } from "@/components/clients/client-readiness-card";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),
@@ -177,18 +178,20 @@ function DonePage() {
         <Badge variant="outline" className="gap-1 capitalize"><Sparkles className="h-3 w-3" /> {job.status.replace("_", " ")}</Badge>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-emerald-300/40 bg-emerald-50/40 p-5 dark:bg-emerald-950/20 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-amber-300/40 bg-amber-50/40 p-5 dark:bg-amber-950/20 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
             <CheckCircle2 className="h-5 w-5" />
             <div className="text-lg font-semibold">
-              {runState === "error" ? "Setup completed with issues" : "Setup complete"}
+              {runState === "error" ? "Records committed with issues" : "Records committed"}
             </div>
           </div>
           <p className="mt-1 text-sm">
-            {committedCount} of {subjects.length} {job.mode === "client" ? "client" : "staff"} profile{subjects.length === 1 ? "" : "s"} live.
-            Gaps below are advisory — reminders queued, never blocking.
+            {committedCount} of {subjects.length} {job.mode === "client" ? "client" : "staff"} profile{subjects.length === 1 ? "" : "s"} saved.
+            Each {job.mode === "client" ? "client" : "staff"} below shows its true readiness — only profiles passing
+            the live checks (schedulable, staff assigned, EVV-ready) are marked <strong>live</strong>.
           </p>
+
           {pendingCommit > 0 && (
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
               {pendingCommit} marked-ready {pendingCommit === 1 ? "subject was" : "subjects were"} not saved — click <strong>Retry commit</strong> to finish.
@@ -244,7 +247,11 @@ function DonePage() {
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     {s.committed ? (
-                      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">live</Badge>
+                      s.subject_type === "client" && s.record_id ? (
+                        <ClientLiveBadge clientId={s.record_id} />
+                      ) : (
+                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">live</Badge>
+                      )
                     ) : (
                       <Badge variant="outline" className="text-amber-600">not committed</Badge>
                     )}
@@ -281,7 +288,8 @@ function DonePage() {
                   </div>
                 )}
                 {s.record_id && s.subject_type === "client" && s.committed && (
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-3">
+                    <ClientReadinessCard clientId={s.record_id} />
                     <FinishOnboardingCard clientId={s.record_id} />
                   </div>
                 )}

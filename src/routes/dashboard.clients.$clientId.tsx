@@ -27,6 +27,7 @@ import {
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
+import { ClientReadinessCard } from "@/components/clients/client-readiness-card";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
@@ -107,6 +108,7 @@ function ClientProfileHub() {
         </Button>
       </div>
 
+      <ClientReadinessCard clientId={clientId} />
       <FinishOnboardingCard clientId={clientId} />
 
       <Tabs value={tab ?? "overview"} className="w-full">

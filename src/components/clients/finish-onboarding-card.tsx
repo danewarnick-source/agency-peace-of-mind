@@ -54,6 +54,7 @@ export function FinishOnboardingCard({ clientId }: { clientId: string }) {
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ["finish-onboarding", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-readiness", clientId] });
     qc.invalidateQueries({ queryKey: ["client-profile"] });
     qc.invalidateQueries({ queryKey: ["clients"] });
   }

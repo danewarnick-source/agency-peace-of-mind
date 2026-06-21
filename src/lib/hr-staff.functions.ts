@@ -117,6 +117,11 @@ export interface ChecklistRow {
     nectar_name_match: string | null;
     nectar_extracted_name: string | null;
     nectar_reviewed_at: string | null;
+    nectar_validation_status: string | null;
+    nectar_validation_reasons: string[] | null;
+    nectar_extracted_cert_type: string | null;
+    nectar_extracted_completed_date: string | null;
+    nectar_extracted_summary: string | null;
   };
 
   applicable: boolean;

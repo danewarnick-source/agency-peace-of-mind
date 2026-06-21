@@ -275,8 +275,8 @@ function RatesForm({
   }
   return (
     <div className="space-y-3">
-      {state.missingRates.map((row) => (
-        <RateRow key={row.id} row={row as State["missingRates"][number]} onSaved={onSaved} />
+      {(state.missingRates as Rate[]).map((row) => (
+        <RateRow key={row.id} row={row} onSaved={onSaved} />
       ))}
     </div>
   );
@@ -284,7 +284,7 @@ function RatesForm({
 
 function RateRow({
   row, onSaved,
-}: { row: State["missingRates"][number]; onSaved: () => void }) {
+}: { row: Rate; onSaved: () => void }) {
   const [rate, setRate] = useState(String(row.rate_per_unit ?? ""));
   const [units, setUnits] = useState(String(row.annual_unit_authorization ?? ""));
   const saveFn = useServerFn(saveOnboardingBillingRate);

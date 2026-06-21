@@ -432,6 +432,91 @@ export async function applyExtractedFieldsToClient(
     }
   }
 
-  return { autofilled, suggested, customCreated };
+  // ── Tracked-field unknown sweep ─────────────────────────────────────────
+  // For each field we explicitly track, if it has no real data AND no
+  // existing confirmation, flag it "unknown" in clients.field_confirmations
+  // and queue a NECTAR question in `suggested`. Never guesses.
+  try {
+    const { TRACKED_FIELDS } = await import("@/lib/field-confirmations");
+    const { data: cur } = await supabase
+      .from("clients")
+      .select(
+        "allergies, dysphagia, swallowing_alerts, special_directions, is_own_guardian, guardian_name, field_confirmations",
+      )
+      .eq("id", clientId)
+      .maybeSingle();
+    if (cur) {
+      const { count: medCount } = await supabase
+        .from("client_medications")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId)
+        .eq("is_active", true);
 
+      // Custom-field-backed tracked fields.
+      const builtIn = new Set([
+        "medications", "allergies", "dysphagia", "swallowing_alerts",
+        "clinical_alert", "guardian",
+      ]);
+      const customKeys = TRACKED_FIELDS
+        .map((f: { key: string }) => f.key)
+        .filter((k: string) => !builtIn.has(k));
+      const { data: defs } = await supabase
+        .from("custom_field_definitions")
+        .select("id, field_key")
+        .eq("organization_id", organizationId)
+        .eq("entity_kind", "client")
+        .in("field_key", customKeys);
+      const defIds = ((defs ?? []) as Array<{ id: string; field_key: string }>).map((d) => d.id);
+      const { data: vals } = defIds.length
+        ? await supabase
+            .from("custom_field_values")
+            .select("definition_id, value_text, value_boolean")
+            .eq("entity_id", clientId)
+            .in("definition_id", defIds)
+        : { data: [] as Array<{ definition_id: string; value_text: string | null; value_boolean: boolean | null }> };
+      const keyByDef = new Map(
+        ((defs ?? []) as Array<{ id: string; field_key: string }>).map((d) => [d.id, d.field_key]),
+      );
+      const customHas = new Set<string>();
+      for (const v of (vals ?? []) as Array<{ definition_id: string; value_text: string | null; value_boolean: boolean | null }>) {
+        const key = keyByDef.get(v.definition_id);
+        if (!key) continue;
+        if ((v.value_text && v.value_text.trim().length) || v.value_boolean === true) customHas.add(key);
+      }
+
+      const hasMap: Record<string, boolean> = {
+        medications: (medCount ?? 0) > 0,
+        allergies: Array.isArray(cur.allergies) && cur.allergies.length > 0,
+        dysphagia: cur.dysphagia === true,
+        swallowing_alerts: Array.isArray(cur.swallowing_alerts) && cur.swallowing_alerts.length > 0,
+        clinical_alert: !!(cur.special_directions && String(cur.special_directions).trim()),
+        guardian:
+          cur.is_own_guardian === true ||
+          (cur.is_own_guardian === false && !!cur.guardian_name?.trim()),
+      };
+      for (const k of customKeys) hasMap[k] = customHas.has(k);
+
+      const existing = (cur.field_confirmations as Record<string, string> | null) ?? {};
+      const next: Record<string, string> = { ...existing };
+      let changed = false;
+      for (const f of TRACKED_FIELDS) {
+        if (hasMap[f.key]) continue;
+        if (existing[f.key]) continue;
+        next[f.key] = "unknown";
+        changed = true;
+        suggested.push(`Confirm: ${(f as { question: string }).question}`);
+      }
+      if (changed) {
+        await supabase
+          .from("clients")
+          .update({ field_confirmations: next })
+          .eq("id", clientId);
+      }
+    }
+  } catch {
+    // Non-fatal — confirmation sweep is advisory.
+  }
+
+  return { autofilled, suggested, customCreated };
 }

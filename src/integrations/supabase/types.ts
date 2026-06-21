@@ -2619,6 +2619,7 @@ export type Database = {
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           feature_config: Json | null
+          field_confirmations: Json
           first_name: string
           geofence_radius_feet: number
           guardian_address: string | null
@@ -2656,6 +2657,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           feature_config?: Json | null
+          field_confirmations?: Json
           first_name: string
           geofence_radius_feet?: number
           guardian_address?: string | null
@@ -2693,6 +2695,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           feature_config?: Json | null
+          field_confirmations?: Json
           first_name?: string
           geofence_radius_feet?: number
           guardian_address?: string | null
@@ -13071,6 +13074,7 @@ export type Database = {
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           feature_config: Json | null
+          field_confirmations: Json
           first_name: string
           geofence_radius_feet: number
           guardian_address: string | null

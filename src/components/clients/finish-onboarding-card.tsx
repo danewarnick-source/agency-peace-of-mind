@@ -5,10 +5,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   ListChecks, CheckCircle2, ChevronDown, ChevronRight, MapPin,
-  DollarSign, Shield, ClipboardList, Users,
+  DollarSign, Shield, ClipboardList, Users, HelpCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,11 @@ import {
   saveOnboardingCustomField,
   skipOnboardingItem,
 } from "@/lib/finish-onboarding.functions";
+import {
+  getClientFieldStates,
+  setFieldConfirmation,
+} from "@/lib/field-confirmations.functions";
+import { TRACKED_FIELDS } from "@/lib/field-confirmations";
 
 type State = Awaited<ReturnType<typeof getClientOnboardingState>>;
 type Rate = {
@@ -38,22 +44,32 @@ type Rate = {
 export function FinishOnboardingCard({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
   const fetchState = useServerFn(getClientOnboardingState);
+  const fetchStates = useServerFn(getClientFieldStates);
 
   const stateQ = useQuery({
     queryKey: ["finish-onboarding", clientId],
     queryFn: () => fetchState({ data: { clientId } }) as Promise<State>,
   });
+  const fieldStatesQ = useQuery({
+    queryKey: ["client-field-states", clientId],
+    queryFn: () => fetchStates({ data: { clientId } }),
+  });
 
-  if (stateQ.isLoading) return null;
+  if (stateQ.isLoading || fieldStatesQ.isLoading) return null;
   if (stateQ.isError || !stateQ.data) return null;
   const s = stateQ.data;
 
   const items = buildItems(s);
   const open = items.filter((i) => !i.done && !i.skipped);
-  if (open.length === 0) return null;
+  const unknowns = fieldStatesQ.data
+    ? TRACKED_FIELDS.filter((f) => fieldStatesQ.data!.states[f.key] === "unknown")
+    : [];
+
+  if (open.length === 0 && unknowns.length === 0) return null;
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ["finish-onboarding", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-field-states", clientId] });
     qc.invalidateQueries({ queryKey: ["client-readiness", clientId] });
     qc.invalidateQueries({ queryKey: ["client-profile"] });
     qc.invalidateQueries({ queryKey: ["clients"] });
@@ -67,7 +83,7 @@ export function FinishOnboardingCard({ clientId }: { clientId: string }) {
           <CardTitle className="text-base">Finish onboarding</CardTitle>
         </div>
         <Badge variant="outline" className="text-amber-700 dark:text-amber-400">
-          {items.filter((i) => i.done).length}/{items.length} done
+          {items.filter((i) => i.done).length}/{items.length} done · {unknowns.length} to confirm
         </Badge>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -85,6 +101,14 @@ export function FinishOnboardingCard({ clientId }: { clientId: string }) {
             onChanged={refresh}
           />
         ))}
+
+        {unknowns.length > 0 && (
+          <UnknownConfirmations
+            clientId={clientId}
+            unknowns={unknowns}
+            onChanged={refresh}
+          />
+        )}
       </CardContent>
     </Card>
   );
@@ -481,6 +505,94 @@ function SowField({
         <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending}>
           {m.isPending ? "…" : "Save"}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── NECTAR confirmation questions (tri-state tracked fields) ───────────────
+function UnknownConfirmations({
+  clientId, unknowns, onChanged,
+}: {
+  clientId: string;
+  unknowns: typeof TRACKED_FIELDS;
+  onChanged: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-card">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <HelpCircle className="h-4 w-4 text-amber-600" />
+        <div className="text-sm font-semibold">
+          NECTAR has {unknowns.length} question{unknowns.length === 1 ? "" : "s"}
+        </div>
+      </div>
+      <div className="divide-y divide-border">
+        {unknowns.map((f) => (
+          <ConfirmRow key={f.key} clientId={clientId} field={f} onChanged={onChanged} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmRow({
+  clientId, field, onChanged,
+}: {
+  clientId: string;
+  field: (typeof TRACKED_FIELDS)[number];
+  onChanged: () => void;
+}) {
+  const setFn = useServerFn(setFieldConfirmation);
+  const m = useMutation({
+    mutationFn: (value: "has" | "none") =>
+      setFn({ data: { clientId, key: field.key, value } }),
+    onSuccess: (_r, value) => {
+      if (value === "none") {
+        toast.success(`Recorded: ${field.positiveStatement}`);
+      } else {
+        toast.success(
+          field.key === "medications"
+            ? "Marked as having medications — add them on the MAR tab."
+            : `Marked as having ${field.label.toLowerCase()} — add details on the profile.`,
+        );
+      }
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Where to send the admin to enter the data after answering Yes.
+  const tab = field.key === "medications" ? "plan" : "overview";
+
+  return (
+    <div className="space-y-2 px-3 py-3">
+      <div className="text-sm">{field.question}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="default"
+          disabled={m.isPending}
+          onClick={() => m.mutate("has")}
+          asChild={false}
+        >
+          Yes
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={m.isPending}
+          onClick={() => m.mutate("none")}
+        >
+          No, none
+        </Button>
+        <Link
+          to="/dashboard/clients/$clientId"
+          params={{ clientId }}
+          search={{ tab } as never}
+          className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+        >
+          Open profile →
+        </Link>
       </div>
     </div>
   );

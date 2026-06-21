@@ -28,6 +28,7 @@ import { ClientDocumentsCard } from "@/components/clients/client-documents-card"
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
 import { ClientReadinessCard } from "@/components/clients/client-readiness-card";
+import { TrackedFieldsCard } from "@/components/clients/tracked-fields-card";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
@@ -233,6 +234,9 @@ function OverviewPanel({ client, clientId, isHostHome, orgId }: { client: Client
           <QuickLink to="/dashboard/client-training/$clientId" params={{ clientId }} label="Client-specific training" />
         </CardContent>
       </Card>
+      <div className="md:col-span-2">
+        <TrackedFieldsCard clientId={clientId} />
+      </div>
     </div>
   );
 }

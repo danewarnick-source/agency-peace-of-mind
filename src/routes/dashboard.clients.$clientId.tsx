@@ -234,6 +234,9 @@ function OverviewPanel({ client, clientId, isHostHome, orgId }: { client: Client
           <QuickLink to="/dashboard/client-training/$clientId" params={{ clientId }} label="Client-specific training" />
         </CardContent>
       </Card>
+      <div className="md:col-span-2">
+        <TrackedFieldsCard clientId={clientId} />
+      </div>
     </div>
   );
 }

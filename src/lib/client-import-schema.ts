@@ -75,10 +75,12 @@ function fieldDate(f: ExtractedField): string | null {
 
 export async function applyExtractedFieldsToClient(
   ctx: ApplyExtractedCtx,
-): Promise<{ autofilled: string[]; suggested: string[] }> {
+): Promise<{ autofilled: string[]; suggested: string[]; customCreated: string[] }> {
   const { supabase, organizationId, clientId, fields } = ctx;
   const autofilled: string[] = [];
   const suggested: string[] = [];
+  const customCreated: string[] = [];
+
 
   const ok = fields.filter((f) => (f.confidence ?? 0) >= CONFIDENCE_THRESHOLD);
   const byKey = new Map<string, ExtractedField>();

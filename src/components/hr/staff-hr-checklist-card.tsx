@@ -477,7 +477,7 @@ export function StaffHrChecklistCard({
                                   <div className="flex flex-wrap items-center gap-2">
                                     {(() => {
                                       const baselineKey = parseBaselineId(row.requirement_id);
-                                      if (baselineKey && !isSelf) {
+                                      if (baselineKey) {
                                         const t = baselineByKey(baselineKey);
                                         return (
                                           <BaselineActions

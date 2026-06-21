@@ -68,6 +68,19 @@ const CORE_CLIENT = [
   "address", "medicaid_id", "job_code", "team_name",
   "is_own_guardian", "guardian_name", "guardian_phone", "guardian_relationship", "guardian_email",
   "emergency_contact_name", "emergency_contact_phone",
+  // SOW-required client record
+  "support_coordinator_name", "support_coordinator_email", "support_coordinator_phone",
+  "primary_care_name", "primary_care_phone",
+  "neurologist_name", "neurologist_phone",
+  "dentist_name", "dentist_phone",
+  "prescriber_name", "prescriber_phone",
+  "medical_insurance",
+  "diagnoses", "chronic_conditions", "immunizations",
+  "emergency_medical_treatment_authorization", "advanced_directives",
+  "rights_restrictions", "bsp_status",
+  "staff_ratio", "preferred_activities", "preferred_living", "roommates",
+  "housing_voucher", "court_orders", "personal_belongings_inventory",
+  "emergency_contact_instructions",
 ] as const;
 const CORE_EMPLOYEE = [
   "full_name", "first_name", "last_name", "email", "phone",
@@ -93,7 +106,36 @@ const HEURISTICS: Record<string, string[]> = {
   guardian_email: ["guardian email"],
   emergency_contact_name: ["emergency contact", "emergency contact name"],
   emergency_contact_phone: ["emergency phone", "emergency contact phone"],
+  // SOW-required
+  support_coordinator_name: ["support coordinator", "sc name", "coordinator name", "support coordinator name"],
+  support_coordinator_email: ["sc email", "support coordinator email", "coordinator email"],
+  support_coordinator_phone: ["sc phone", "support coordinator phone", "coordinator phone"],
+  primary_care_name: ["pcp", "primary care", "primary care physician", "primary care provider", "pcp name"],
+  primary_care_phone: ["pcp phone", "primary care phone"],
+  neurologist_name: ["neurologist", "neurologist name"],
+  neurologist_phone: ["neurologist phone"],
+  dentist_name: ["dentist", "dentist name"],
+  dentist_phone: ["dentist phone"],
+  prescriber_name: ["prescriber", "prescriber name", "psychiatrist"],
+  prescriber_phone: ["prescriber phone", "psychiatrist phone"],
+  medical_insurance: ["insurance", "medical insurance", "health insurance", "payer"],
+  diagnoses: ["diagnosis", "diagnoses", "dx"],
+  chronic_conditions: ["chronic", "chronic conditions", "conditions"],
+  immunizations: ["immunizations", "vaccines", "vaccinations"],
+  emergency_medical_treatment_authorization: ["emergency medical treatment", "emt authorization", "treatment authorization"],
+  advanced_directives: ["advanced directive", "advanced directives", "advance directive"],
+  rights_restrictions: ["rights restriction", "rights restrictions", "rights modification"],
+  bsp_status: ["bsp", "behavior support plan", "bsp status"],
+  staff_ratio: ["staff ratio", "ratio", "staffing ratio"],
+  preferred_activities: ["preferred activities", "activities", "interests"],
+  preferred_living: ["preferred living", "living preference", "living arrangement"],
+  roommates: ["roommates", "roommate", "housemates"],
+  housing_voucher: ["housing voucher", "voucher", "section 8"],
+  court_orders: ["court order", "court orders", "legal order"],
+  personal_belongings_inventory: ["belongings", "personal belongings", "inventory"],
+  emergency_contact_instructions: ["emergency instructions", "emergency contact instructions"],
 };
+
 
 function guessCore(header: string, mode: "employee" | "client"): string | null {
   const norm = header.toLowerCase().trim();

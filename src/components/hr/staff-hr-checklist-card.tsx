@@ -859,3 +859,231 @@ function TrainingHistoryCard({ staffId }: { staffId: string }) {
     </Card>
   );
 }
+
+/* ======================================================================
+ * BaselineActions — Mark Complete / Upload Certificate for the fixed
+ * baseline training list. Uploads route through the existing HR documents
+ * bucket; uploads also trigger Nectar OCR to auto-fill the expiration date.
+ * ====================================================================*/
+function BaselineActions(props: {
+  organizationId: string;
+  staffId: string;
+  trainingKey: string;
+  tracksExpiration: boolean;
+  currentCompletedDate: string | null;
+  currentExpiresAt: string | null;
+  currentEvidenceDocId: string | null;
+  onChanged: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  markBaselineFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  attachBaselineFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setBaselineExpFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createUpload: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getDocUrl: any;
+}) {
+  const [open, setOpen] = useState(false);
+  const [completedDate, setCompletedDate] = useState<string>(
+    props.currentCompletedDate ?? new Date().toISOString().slice(0, 10),
+  );
+  const [expiresAt, setExpiresAt] = useState<string>(props.currentExpiresAt ?? "");
+  const [working, setWorking] = useState(false);
+  const [editExp, setEditExp] = useState(false);
+
+  const submitManual = async () => {
+    try {
+      setWorking(true);
+      await props.markBaselineFn({
+        data: {
+          organization_id: props.organizationId,
+          staff_id: props.staffId,
+          training_key: props.trainingKey,
+          completed_date: completedDate,
+          expires_at:
+            props.tracksExpiration && expiresAt ? expiresAt : null,
+        },
+      });
+      toast.success("Marked complete");
+      setOpen(false);
+      props.onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const handleUpload = async (file: File) => {
+    try {
+      setWorking(true);
+      const r = await props.createUpload({
+        data: {
+          organization_id: props.organizationId,
+          staff_id: props.staffId,
+          requirement_id: null,
+          document_kind: `baseline:${props.trainingKey}`,
+          file_name: file.name,
+          mime_type: file.type,
+          size_bytes: file.size,
+        },
+      });
+      const up = await fetch(r.upload.signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!up.ok) throw new Error(`Upload failed (${up.status})`);
+      const att = await props.attachBaselineFn({
+        data: {
+          organization_id: props.organizationId,
+          staff_id: props.staffId,
+          training_key: props.trainingKey,
+          hr_document_id: r.hr_document_id,
+          run_ocr: true,
+        },
+      });
+      if (att?.nectar_suggested && att?.expires_at) {
+        toast.success(`Certificate saved — Nectar read expiration ${att.expires_at}`);
+      } else if (att?.expires_at) {
+        toast.success(`Certificate saved — expiration set to ${att.expires_at}`);
+      } else {
+        toast.success("Certificate saved");
+      }
+      props.onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const saveExpiration = async () => {
+    try {
+      setWorking(true);
+      await props.setBaselineExpFn({
+        data: {
+          organization_id: props.organizationId,
+          staff_id: props.staffId,
+          training_key: props.trainingKey,
+          expires_at: expiresAt || null,
+        },
+      });
+      toast.success("Expiration updated");
+      setEditExp(false);
+      props.onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {!open ? (
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)} disabled={working}>
+          Mark complete
+        </Button>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
+          <div>
+            <Label className="text-[10px] uppercase">Completed</Label>
+            <Input
+              type="date"
+              value={completedDate}
+              onChange={(e) => setCompletedDate(e.target.value)}
+              className="h-8 w-[140px] text-xs"
+            />
+          </div>
+          {props.tracksExpiration && (
+            <div>
+              <Label className="text-[10px] uppercase">Expires</Label>
+              <Input
+                type="date"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+                className="h-8 w-[140px] text-xs"
+              />
+            </div>
+          )}
+          <Button size="sm" onClick={submitManual} disabled={working || !completedDate}>
+            Save
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)} disabled={working}>
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      <label
+        className="relative z-0 inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+        title="Upload certificate (PDF or photo). Nectar will auto-read the expiration date."
+      >
+        <Upload className="h-3.5 w-3.5" />
+        <span>Upload certificate</span>
+        <input
+          type="file"
+          className="hidden"
+          accept=".pdf,image/png,image/jpeg,image/jpg"
+          disabled={working}
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            await handleUpload(f);
+            e.target.value = "";
+          }}
+        />
+      </label>
+
+      {props.currentEvidenceDocId && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={async () => {
+            const r = await props.getDocUrl({
+              data: {
+                organization_id: props.organizationId,
+                hr_document_id: props.currentEvidenceDocId,
+              },
+            });
+            window.open(r.signed_url, "_blank", "noopener");
+          }}
+        >
+          <Eye className="mr-1 h-3.5 w-3.5" /> View cert
+        </Button>
+      )}
+
+      {props.tracksExpiration && props.currentExpiresAt && !editExp && (
+        <button
+          type="button"
+          className="text-[11px] text-muted-foreground underline"
+          onClick={() => {
+            setExpiresAt(props.currentExpiresAt ?? "");
+            setEditExp(true);
+          }}
+        >
+          Edit expiration
+        </button>
+      )}
+      {editExp && (
+        <div className="flex items-center gap-1">
+          <Input
+            type="date"
+            value={expiresAt}
+            onChange={(e) => setExpiresAt(e.target.value)}
+            className="h-8 w-[140px] text-xs"
+          />
+          <Button size="sm" onClick={saveExpiration} disabled={working}>
+            Save
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditExp(false)} disabled={working}>
+            Cancel
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}

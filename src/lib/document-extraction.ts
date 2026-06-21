@@ -53,6 +53,8 @@ export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   // Health
   "allergies", "dysphagia", "swallowing_alerts", "self_admin_med_support",
   "clinical_alert", "special_directions",
+  // Medications — ONE field per medication + an overall presence boolean
+  "client_medication", "pcsp_has_medications",
   // Billing — ONE field per authorized service code
   "billing_code_row",
   // Support coordinator

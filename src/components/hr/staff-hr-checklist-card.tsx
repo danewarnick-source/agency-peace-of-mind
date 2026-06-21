@@ -892,60 +892,42 @@ function TrainingHistoryCard({ staffId }: { staffId: string }) {
 }
 
 /* ======================================================================
- * BaselineActions — Mark Complete / Upload Certificate for the fixed
- * baseline training list. Uploads route through the existing HR documents
- * bucket; uploads also trigger Nectar OCR to auto-fill the expiration date.
+ * BaselineActions — Upload certificate → Nectar reviews → admin signs off.
+ * There is intentionally NO manual "Mark complete" path: a training is
+ * only Completed once a certificate has been uploaded, Nectar has run its
+ * name/expiration verification, and an admin has explicitly signed off.
  * ====================================================================*/
 function BaselineActions(props: {
   organizationId: string;
   staffId: string;
   trainingKey: string;
   tracksExpiration: boolean;
-  currentCompletedDate: string | null;
   currentExpiresAt: string | null;
   currentEvidenceDocId: string | null;
+  adminSignedOffAt: string | null;
+  nectarNameMatch: string | null;
+  nectarExtractedName: string | null;
   onChanged: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  markBaselineFn: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   attachBaselineFn: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setBaselineExpFn: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  signOffBaselineFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  revokeBaselineFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createUpload: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getDocUrl: any;
 }) {
-  const [open, setOpen] = useState(false);
-  const [completedDate, setCompletedDate] = useState<string>(
-    props.currentCompletedDate ?? new Date().toISOString().slice(0, 10),
-  );
   const [expiresAt, setExpiresAt] = useState<string>(props.currentExpiresAt ?? "");
   const [working, setWorking] = useState(false);
   const [editExp, setEditExp] = useState(false);
 
-  const submitManual = async () => {
-    try {
-      setWorking(true);
-      await props.markBaselineFn({
-        data: {
-          organization_id: props.organizationId,
-          staff_id: props.staffId,
-          training_key: props.trainingKey,
-          completed_date: completedDate,
-          expires_at:
-            props.tracksExpiration && expiresAt ? expiresAt : null,
-        },
-      });
-      toast.success("Marked complete");
-      setOpen(false);
-      props.onChanged();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setWorking(false);
-    }
-  };
+  const hasCert = !!props.currentEvidenceDocId;
+  const isSignedOff = !!props.adminSignedOffAt;
+  const nameMatch = props.nectarNameMatch;
 
   const handleUpload = async (file: File) => {
     try {
@@ -976,13 +958,19 @@ function BaselineActions(props: {
           run_ocr: true,
         },
       });
-      if (att?.nectar_suggested && att?.expires_at) {
-        toast.success(`Certificate saved — Nectar read expiration ${att.expires_at}`);
-      } else if (att?.expires_at) {
-        toast.success(`Certificate saved — expiration set to ${att.expires_at}`);
-      } else {
-        toast.success("Certificate saved");
+      const parts: string[] = ["Certificate uploaded"];
+      if (att?.name_match === "match") {
+        parts.push(`Nectar verified name (${att.nectar_name})`);
+      } else if (att?.name_match === "mismatch") {
+        parts.push(
+          `⚠ Name mismatch — cert says "${att.nectar_name}", profile is "${att.profile_name}"`,
+        );
+      } else if (att?.name_match === "unreadable") {
+        parts.push("⚠ Nectar could not read the name");
       }
+      if (att?.expires_at) parts.push(`expires ${att.expires_at}`);
+      parts.push("awaiting admin sign-off");
+      toast.success(parts.join(" · "));
       props.onChanged();
     } catch (e) {
       toast.error((e as Error).message);
@@ -1012,109 +1000,168 @@ function BaselineActions(props: {
     }
   };
 
+  const signOff = async () => {
+    if (nameMatch === "mismatch" || nameMatch === "unreadable") {
+      const ok = confirm(
+        nameMatch === "mismatch"
+          ? `Nectar flagged a NAME MISMATCH on this certificate (cert: "${props.nectarExtractedName}"). Sign off anyway?`
+          : "Nectar could not read the name on this certificate. Sign off anyway?",
+      );
+      if (!ok) return;
+    }
+    try {
+      setWorking(true);
+      await props.signOffBaselineFn({
+        data: {
+          organization_id: props.organizationId,
+          staff_id: props.staffId,
+          training_key: props.trainingKey,
+        },
+      });
+      toast.success("Signed off — marked completed");
+      props.onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const revoke = async () => {
+    if (!confirm("Revoke this completion sign-off?")) return;
+    try {
+      setWorking(true);
+      await props.revokeBaselineFn({
+        data: {
+          organization_id: props.organizationId,
+          staff_id: props.staffId,
+          training_key: props.trainingKey,
+        },
+      });
+      toast.success("Sign-off revoked");
+      props.onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {!open ? (
-        <Button size="sm" variant="outline" onClick={() => setOpen(true)} disabled={working}>
-          Mark complete
-        </Button>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
-          <div>
-            <Label className="text-[10px] uppercase">Completed</Label>
-            <Input
-              type="date"
-              value={completedDate}
-              onChange={(e) => setCompletedDate(e.target.value)}
-              className="h-8 w-[140px] text-xs"
-            />
-          </div>
-          {props.tracksExpiration && (
-            <div>
-              <Label className="text-[10px] uppercase">Expires</Label>
-              <Input
-                type="date"
-                value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
-                className="h-8 w-[140px] text-xs"
-              />
-            </div>
-          )}
-          <Button size="sm" onClick={submitManual} disabled={working || !completedDate}>
-            Save
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setOpen(false)} disabled={working}>
-            Cancel
-          </Button>
-        </div>
-      )}
-
-      <label
-        className="relative z-0 inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
-        title="Upload certificate (PDF or photo). Nectar will auto-read the expiration date."
-      >
-        <Upload className="h-3.5 w-3.5" />
-        <span>Upload certificate</span>
-        <input
-          type="file"
-          className="hidden"
-          accept=".pdf,image/png,image/jpeg,image/jpg"
-          disabled={working}
-          onChange={async (e) => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            await handleUpload(f);
-            e.target.value = "";
-          }}
-        />
-      </label>
-
-      {props.currentEvidenceDocId && (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={async () => {
-            const r = await props.getDocUrl({
-              data: {
-                organization_id: props.organizationId,
-                hr_document_id: props.currentEvidenceDocId,
-              },
-            });
-            window.open(r.signed_url, "_blank", "noopener");
-          }}
+    <div className="flex w-full flex-col items-stretch gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <label
+          className="relative z-0 inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+          title="Upload certificate (PDF or photo). Nectar will verify the name and read the expiration date."
         >
-          <Eye className="mr-1 h-3.5 w-3.5" /> View cert
-        </Button>
-      )}
-
-      {props.tracksExpiration && props.currentExpiresAt && !editExp && (
-        <button
-          type="button"
-          className="text-[11px] text-muted-foreground underline"
-          onClick={() => {
-            setExpiresAt(props.currentExpiresAt ?? "");
-            setEditExp(true);
-          }}
-        >
-          Edit expiration
-        </button>
-      )}
-      {editExp && (
-        <div className="flex items-center gap-1">
-          <Input
-            type="date"
-            value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
-            className="h-8 w-[140px] text-xs"
+          <Upload className="h-3.5 w-3.5" />
+          <span>{hasCert ? "Replace certificate" : "Upload certificate"}</span>
+          <input
+            type="file"
+            className="hidden"
+            accept=".pdf,image/png,image/jpeg,image/jpg"
+            disabled={working}
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              await handleUpload(f);
+              e.target.value = "";
+            }}
           />
-          <Button size="sm" onClick={saveExpiration} disabled={working}>
-            Save
+        </label>
+
+        {props.currentEvidenceDocId && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              const r = await props.getDocUrl({
+                data: {
+                  organization_id: props.organizationId,
+                  hr_document_id: props.currentEvidenceDocId,
+                },
+              });
+              window.open(r.signed_url, "_blank", "noopener");
+            }}
+          >
+            <Eye className="mr-1 h-3.5 w-3.5" /> View cert
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setEditExp(false)} disabled={working}>
-            Cancel
+        )}
+
+        {hasCert && !isSignedOff && (
+          <Button size="sm" onClick={signOff} disabled={working}>
+            Sign off as completed
           </Button>
+        )}
+        {isSignedOff && (
+          <Button size="sm" variant="outline" onClick={revoke} disabled={working}>
+            Revoke sign-off
+          </Button>
+        )}
+      </div>
+
+      {hasCert && (
+        <div className="rounded-md border border-border/40 bg-muted/30 p-2 text-[11px]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-medium text-muted-foreground">Nectar review:</span>
+            {nameMatch === "match" && (
+              <span className="text-emerald-700">
+                ✓ Name matches{props.nectarExtractedName ? ` (${props.nectarExtractedName})` : ""}
+              </span>
+            )}
+            {nameMatch === "mismatch" && (
+              <span className="text-rose-700">
+                ⚠ Name mismatch — cert says "{props.nectarExtractedName}"
+              </span>
+            )}
+            {nameMatch === "unreadable" && (
+              <span className="text-amber-700">⚠ Could not read name on certificate</span>
+            )}
+            {!nameMatch && (
+              <span className="text-muted-foreground italic">name check pending</span>
+            )}
+            {props.tracksExpiration && props.currentExpiresAt && !editExp && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span>Expires {props.currentExpiresAt}</span>
+                <button
+                  type="button"
+                  className="text-muted-foreground underline"
+                  onClick={() => {
+                    setExpiresAt(props.currentExpiresAt ?? "");
+                    setEditExp(true);
+                  }}
+                >
+                  edit
+                </button>
+              </>
+            )}
+            {editExp && (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="date"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                  className="h-7 w-[140px] text-xs"
+                />
+                <Button size="sm" onClick={saveExpiration} disabled={working}>
+                  Save
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditExp(false)} disabled={working}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+            {isSignedOff && (
+              <span className="text-emerald-700">
+                · ✓ Admin signed off{" "}
+                {new Date(props.adminSignedOffAt!).toLocaleDateString()}
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 }
+

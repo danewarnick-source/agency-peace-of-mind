@@ -562,12 +562,7 @@ function ConfirmRow({
   });
 
   // Where to send the admin to enter the data after answering Yes.
-  const dataHref =
-    field.key === "medications"
-      ? `/dashboard/clients/${clientId}?tab=plan`
-      : field.key === "guardian"
-        ? `/dashboard/clients/${clientId}?tab=overview`
-        : `/dashboard/clients/${clientId}?tab=overview`;
+  const tab = field.key === "medications" ? "plan" : "overview";
 
   return (
     <div className="space-y-2 px-3 py-3">
@@ -591,7 +586,9 @@ function ConfirmRow({
           No, none
         </Button>
         <Link
-          to={dataHref}
+          to="/dashboard/clients/$clientId"
+          params={{ clientId }}
+          search={{ tab } as never}
           className="text-xs text-muted-foreground hover:text-foreground hover:underline"
         >
           Open profile →

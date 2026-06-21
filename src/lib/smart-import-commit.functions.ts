@@ -7,6 +7,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
+import { applyExtractedFieldsToClient } from "@/lib/client-import-schema";
+
 
 const JobId = z.object({ jobId: z.string().uuid() });
 

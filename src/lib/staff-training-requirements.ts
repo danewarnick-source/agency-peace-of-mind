@@ -11,6 +11,15 @@
 
 export type ConditionalRule = "all" | "behavior" | "abi" | "after_year_one";
 
+export interface BaselineValidationRule {
+  /** Human-readable certificate type name Nectar expects to see. */
+  cert_type_label: string;
+  /** Each group must match — within a group, ANY of the keywords (case-insensitive substring) is enough. */
+  required_keyword_groups: Array<{ label: string; any_of: string[] }>;
+  requires_completion_date: boolean;
+  requires_expiration_date: boolean;
+}
+
 export interface BaselineTraining {
   /** Stable key; checklist row synthesizes requirement_id = `baseline:<key>`. */
   key: string;
@@ -27,6 +36,8 @@ export interface BaselineTraining {
   category: string;
   /** Short hint shown in the UI. */
   hint?: string;
+  /** What Nectar must see on a valid certificate for this training. */
+  validation: BaselineValidationRule;
 }
 
 export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
@@ -38,6 +49,25 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     default_validity_months: 12,
     conditional: "all",
     category: "Required trainings",
+    validation: {
+      cert_type_label: "30-Day Training",
+      required_keyword_groups: [
+        {
+          label: "30-day / new-hire training wording",
+          any_of: [
+            "30-day",
+            "30 day",
+            "thirty day",
+            "thirty-day",
+            "new hire",
+            "new-hire",
+            "orientation",
+          ],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
   },
   {
     key: "cpr_first_aid",
@@ -48,6 +78,15 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     conditional: "all",
     category: "Required trainings",
     hint: "Combined CPR and First Aid certification.",
+    validation: {
+      cert_type_label: "CPR & First Aid",
+      required_keyword_groups: [
+        { label: "CPR wording", any_of: ["cpr", "cardiopulmonary"] },
+        { label: "First Aid wording", any_of: ["first aid", "first-aid"] },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: true,
+    },
   },
   {
     key: "pct",
@@ -57,6 +96,17 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     default_validity_months: 12,
     conditional: "all",
     category: "Required trainings",
+    validation: {
+      cert_type_label: "Person-Centered Thinking",
+      required_keyword_groups: [
+        {
+          label: "Person-Centered Thinking wording",
+          any_of: ["person-centered thinking", "person centered thinking", "pct"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
   },
   {
     key: "deescalation",
@@ -68,6 +118,27 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     conditional: "behavior",
     category: "Required trainings",
     hint: "Required when assigned to a behavior-coded client (BC1/2/3) or anyone with a Behavior Support Plan.",
+    validation: {
+      cert_type_label: "De-escalation",
+      required_keyword_groups: [
+        {
+          label: "Accepted de-escalation program (MANDT/SOAR/CPI/PART/Safety Care)",
+          any_of: [
+            "mandt",
+            "soar",
+            "cpi",
+            "crisis prevention",
+            "part ",
+            "safety care",
+            "safety-care",
+            "de-escalation",
+            "deescalation",
+          ],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
   },
   {
     key: "abi",
@@ -78,6 +149,17 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     conditional: "abi",
     category: "Required trainings",
     hint: "Required when assigned to an ABI (acquired brain injury) client.",
+    validation: {
+      cert_type_label: "ABI Training",
+      required_keyword_groups: [
+        {
+          label: "ABI / Acquired Brain Injury wording",
+          any_of: ["abi", "acquired brain injury", "brain injury"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
   },
   {
     key: "annual_12h",
@@ -88,6 +170,24 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     conditional: "all",
     category: "Required trainings",
     hint: "Required every year after hire.",
+    validation: {
+      cert_type_label: "Ongoing / Annual Training",
+      required_keyword_groups: [
+        {
+          label: "Ongoing / annual training wording",
+          any_of: [
+            "ongoing training",
+            "annual training",
+            "12 hour",
+            "12-hour",
+            "twelve hour",
+            "continuing education",
+          ],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
   },
 ];
 

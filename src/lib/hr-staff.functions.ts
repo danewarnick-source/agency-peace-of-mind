@@ -117,6 +117,11 @@ export interface ChecklistRow {
     nectar_name_match: string | null;
     nectar_extracted_name: string | null;
     nectar_reviewed_at: string | null;
+    nectar_validation_status: string | null;
+    nectar_validation_reasons: string[] | null;
+    nectar_extracted_cert_type: string | null;
+    nectar_extracted_completed_date: string | null;
+    nectar_extracted_summary: string | null;
   };
 
   applicable: boolean;
@@ -260,6 +265,11 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
             nectar_name_match: null,
             nectar_extracted_name: null,
             nectar_reviewed_at: null,
+            nectar_validation_status: null,
+            nectar_validation_reasons: null,
+            nectar_extracted_cert_type: null,
+            nectar_extracted_completed_date: null,
+            nectar_extracted_summary: null,
           },
 
           applicable,
@@ -345,6 +355,16 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
           nectar_name_match: nectarNameMatch,
           nectar_extracted_name: nectarExtractedName,
           nectar_reviewed_at: nectarReviewedAt,
+          nectar_validation_status:
+            (bc?.nectar_validation_status as string | null) ?? null,
+          nectar_validation_reasons:
+            (bc?.nectar_validation_reasons as string[] | null) ?? null,
+          nectar_extracted_cert_type:
+            (bc?.nectar_extracted_cert_type as string | null) ?? null,
+          nectar_extracted_completed_date:
+            (bc?.nectar_extracted_completed_date as string | null) ?? null,
+          nectar_extracted_summary:
+            (bc?.nectar_extracted_summary as string | null) ?? null,
         },
         applicable,
         applies_to_staff_types: "all" as const,

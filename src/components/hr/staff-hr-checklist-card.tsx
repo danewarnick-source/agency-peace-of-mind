@@ -517,6 +517,11 @@ export function StaffHrChecklistCard({
                                             adminSignedOffAt={row.completion.admin_signed_off_at}
                                             nectarNameMatch={row.completion.nectar_name_match}
                                             nectarExtractedName={row.completion.nectar_extracted_name}
+                                            nectarValidationStatus={row.completion.nectar_validation_status}
+                                            nectarValidationReasons={row.completion.nectar_validation_reasons}
+                                            nectarExtractedCertType={row.completion.nectar_extracted_cert_type}
+                                            nectarExtractedCompletedDate={row.completion.nectar_extracted_completed_date}
+                                            nectarExtractedSummary={row.completion.nectar_extracted_summary}
                                             onChanged={invalidate}
                                             attachBaselineFn={attachBaselineFn}
                                             setBaselineExpFn={setBaselineExpFn}
@@ -907,6 +912,11 @@ function BaselineActions(props: {
   adminSignedOffAt: string | null;
   nectarNameMatch: string | null;
   nectarExtractedName: string | null;
+  nectarValidationStatus: string | null;
+  nectarValidationReasons: string[] | null;
+  nectarExtractedCertType: string | null;
+  nectarExtractedCompletedDate: string | null;
+  nectarExtractedSummary: string | null;
   onChanged: () => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   attachBaselineFn: any;
@@ -928,6 +938,9 @@ function BaselineActions(props: {
   const hasCert = !!props.currentEvidenceDocId;
   const isSignedOff = !!props.adminSignedOffAt;
   const nameMatch = props.nectarNameMatch;
+  const validationStatus = props.nectarValidationStatus;
+  const validationFailed = validationStatus === "failed";
+  const validationPassed = validationStatus === "passed";
 
   const handleUpload = async (file: File) => {
     try {
@@ -958,19 +971,19 @@ function BaselineActions(props: {
           run_ocr: true,
         },
       });
-      const parts: string[] = ["Certificate uploaded"];
-      if (att?.name_match === "match") {
-        parts.push(`Nectar verified name (${att.nectar_name})`);
-      } else if (att?.name_match === "mismatch") {
-        parts.push(
-          `⚠ Name mismatch — cert says "${att.nectar_name}", profile is "${att.profile_name}"`,
+      if (att?.validation_status === "failed") {
+        const reasons: string[] = Array.isArray(att?.reasons) ? att.reasons : [];
+        toast.error(
+          `Nectar rejected this certificate:\n• ${reasons.join("\n• ") || "Unknown reason"}`,
+          { duration: 10000 },
         );
-      } else if (att?.name_match === "unreadable") {
-        parts.push("⚠ Nectar could not read the name");
+      } else {
+        const parts: string[] = ["Certificate accepted by Nectar"];
+        if (att?.nectar_name) parts.push(`name: ${att.nectar_name}`);
+        if (att?.expires_at) parts.push(`expires ${att.expires_at}`);
+        parts.push("awaiting admin sign-off");
+        toast.success(parts.join(" · "));
       }
-      if (att?.expires_at) parts.push(`expires ${att.expires_at}`);
-      parts.push("awaiting admin sign-off");
-      toast.success(parts.join(" · "));
       props.onChanged();
     } catch (e) {
       toast.error((e as Error).message);
@@ -1088,9 +1101,14 @@ function BaselineActions(props: {
           </Button>
         )}
 
-        {hasCert && !isSignedOff && (
+        {hasCert && !isSignedOff && !validationFailed && (
           <Button size="sm" onClick={signOff} disabled={working}>
             Sign off as completed
+          </Button>
+        )}
+        {hasCert && !isSignedOff && validationFailed && (
+          <Button size="sm" disabled title="Nectar rejected this certificate — upload a valid one first">
+            Sign off blocked
           </Button>
         )}
         {isSignedOff && (
@@ -1100,25 +1118,60 @@ function BaselineActions(props: {
         )}
       </div>
 
+      {validationFailed && (
+        <div className="rounded-md border border-rose-300 bg-rose-50 p-2 text-[11px] text-rose-900">
+          <div className="font-semibold">
+            ⚠ Nectar rejected the last uploaded certificate
+          </div>
+          {props.nectarExtractedCertType && (
+            <div className="mt-0.5">
+              What Nectar saw:{" "}
+              <span className="font-medium">{props.nectarExtractedCertType}</span>
+            </div>
+          )}
+          {(props.nectarValidationReasons ?? []).length > 0 && (
+            <ul className="mt-1 list-disc pl-4">
+              {(props.nectarValidationReasons ?? []).map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-1 italic">
+            Upload the correct certificate to continue. Previous valid evidence
+            (if any) has not been replaced.
+          </div>
+        </div>
+      )}
+
       {hasCert && (
         <div className="rounded-md border border-border/40 bg-muted/30 p-2 text-[11px]">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-medium text-muted-foreground">Nectar review:</span>
+            {validationPassed && (
+              <span className="text-emerald-700">✓ Certificate validated</span>
+            )}
+            {props.nectarExtractedCertType && (
+              <span className="text-muted-foreground">
+                · type: {props.nectarExtractedCertType}
+              </span>
+            )}
             {nameMatch === "match" && (
               <span className="text-emerald-700">
-                ✓ Name matches{props.nectarExtractedName ? ` (${props.nectarExtractedName})` : ""}
+                · ✓ Name matches{props.nectarExtractedName ? ` (${props.nectarExtractedName})` : ""}
               </span>
             )}
             {nameMatch === "mismatch" && (
               <span className="text-rose-700">
-                ⚠ Name mismatch — cert says "{props.nectarExtractedName}"
+                · ⚠ Name mismatch — cert says "{props.nectarExtractedName}"
               </span>
             )}
             {nameMatch === "unreadable" && (
-              <span className="text-amber-700">⚠ Could not read name on certificate</span>
+              <span className="text-amber-700">· ⚠ Could not read name</span>
             )}
-            {!nameMatch && (
-              <span className="text-muted-foreground italic">name check pending</span>
+            {props.nectarExtractedCompletedDate && (
+              <span className="text-muted-foreground">
+                · completed {props.nectarExtractedCompletedDate}
+              </span>
             )}
             {props.tracksExpiration && props.currentExpiresAt && !editExp && (
               <>
@@ -1159,6 +1212,11 @@ function BaselineActions(props: {
               </span>
             )}
           </div>
+          {props.nectarExtractedSummary && (
+            <div className="mt-1 text-muted-foreground italic">
+              Nectar saw: {props.nectarExtractedSummary}
+            </div>
+          )}
         </div>
       )}
     </div>

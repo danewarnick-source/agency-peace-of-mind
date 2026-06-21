@@ -245,7 +245,11 @@ function DonePage() {
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     {s.committed ? (
-                      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">live</Badge>
+                      s.subject_type === "client" && s.record_id ? (
+                        <ClientLiveBadge clientId={s.record_id} />
+                      ) : (
+                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">live</Badge>
+                      )
                     ) : (
                       <Badge variant="outline" className="text-amber-600">not committed</Badge>
                     )}

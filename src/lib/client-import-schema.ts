@@ -319,6 +319,49 @@ export async function applyExtractedFieldsToClient(
     }
   }
 
+  // ── Medications signal → auto-toggle MAR/eMAR ───────────────────────────
+  // The PCSP is authoritative on whether the client has prescribed meds.
+  // - If the document explicitly says "no medications" (pcsp_has_medications=false)
+  //   AND no client_medication rows were extracted, turn the feature OFF.
+  // - If any medication was extracted, leave the feature ON (default).
+  // Skips clients that already have client_medications rows on file, so we
+  // never disable MAR for a client who actually has meds tracked elsewhere.
+  try {
+    const medRows = ok.filter((f) => f.field_key === "client_medication");
+    const hasMedsFlag = (() => {
+      const f = byKey.get("pcsp_has_medications");
+      return f ? fieldBool(f) : null;
+    })();
+    const { count: existingMedCount } = await supabase
+      .from("client_medications")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("client_id", clientId)
+      .eq("is_active", true);
+    const hasExistingMeds = (existingMedCount ?? 0) > 0;
+
+    if (medRows.length === 0 && hasMedsFlag === false && !hasExistingMeds) {
+      const { data: cRow } = await supabase
+        .from("clients")
+        .select("feature_config")
+        .eq("id", clientId)
+        .maybeSingle();
+      const fc = (cRow?.feature_config ?? {}) as Record<string, boolean>;
+      if (fc.emar !== false) {
+        fc.emar = false;
+        await supabase
+          .from("clients")
+          .update({ feature_config: fc })
+          .eq("id", clientId)
+          .eq("organization_id", organizationId);
+        autofilled.push("feature_config.emar=off (no medications in PCSP)");
+      }
+    }
+  } catch {
+    // Non-fatal: auto-toggle is advisory.
+  }
+
+
   // Team resolution by name → clients.team_id (non-destructive: only fills if empty).
   const teamF = byKey.get("team_name");
   const teamName = teamF ? fieldText(teamF) : null;

@@ -40,7 +40,7 @@ import { ClientSpendingShiftPanel } from "@/components/staff-mobile/client-spend
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useTodayShifts } from "@/hooks/use-today-shifts";
 import { ClientPhoto } from "@/components/client-photo";
-import { useClientFeature } from "@/lib/client-features";
+import { useClientFeature, clientFeatureVisible } from "@/lib/client-features";
 
 function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
   const { data: active } = useActiveShift();

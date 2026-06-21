@@ -11221,10 +11221,15 @@ export type Database = {
           evidence_document_id: string | null
           expires_at: string | null
           id: string
+          nectar_extracted_cert_type: string | null
+          nectar_extracted_completed_date: string | null
           nectar_extracted_name: string | null
+          nectar_extracted_summary: string | null
           nectar_name_match: string | null
           nectar_reviewed_at: string | null
           nectar_suggested_expires: boolean
+          nectar_validation_reasons: Json | null
+          nectar_validation_status: string | null
           notes: string | null
           organization_id: string
           staff_id: string
@@ -11240,10 +11245,15 @@ export type Database = {
           evidence_document_id?: string | null
           expires_at?: string | null
           id?: string
+          nectar_extracted_cert_type?: string | null
+          nectar_extracted_completed_date?: string | null
           nectar_extracted_name?: string | null
+          nectar_extracted_summary?: string | null
           nectar_name_match?: string | null
           nectar_reviewed_at?: string | null
           nectar_suggested_expires?: boolean
+          nectar_validation_reasons?: Json | null
+          nectar_validation_status?: string | null
           notes?: string | null
           organization_id: string
           staff_id: string
@@ -11259,10 +11269,15 @@ export type Database = {
           evidence_document_id?: string | null
           expires_at?: string | null
           id?: string
+          nectar_extracted_cert_type?: string | null
+          nectar_extracted_completed_date?: string | null
           nectar_extracted_name?: string | null
+          nectar_extracted_summary?: string | null
           nectar_name_match?: string | null
           nectar_reviewed_at?: string | null
           nectar_suggested_expires?: boolean
+          nectar_validation_reasons?: Json | null
+          nectar_validation_status?: string | null
           notes?: string | null
           organization_id?: string
           staff_id?: string

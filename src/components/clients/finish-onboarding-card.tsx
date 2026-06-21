@@ -269,7 +269,7 @@ function RatesForm({
   return (
     <div className="space-y-3">
       {state.missingRates.map((row) => (
-        <RateRow key={row.id} row={row} onSaved={onSaved} />
+        <RateRow key={row.id} row={row as State["missingRates"][number]} onSaved={onSaved} />
       ))}
     </div>
   );

@@ -106,6 +106,13 @@ Common field_key values to extract when present (use field_group to bucket relat
     swallowing_alerts (value_array), self_admin_med_support (value_bool),
     clinical_alert (value_text — any high-priority safety/clinical notice, e.g. choking risk),
     special_directions (value_text — care/access notes)
+  Medications (group "medications"): emit ONE field per medication listed in the document with
+    field_key = "client_medication" and value_json = { name, dose, route, frequency, prn (bool), notes }.
+    ALSO emit a single field "pcsp_has_medications" with value_bool. Set TRUE if the document
+    lists ANY prescribed/administered medication (even one). Set FALSE only when the document
+    explicitly states no medications (e.g. "None", "No current medications", an empty
+    medications table, or there is no medications section at all). When uncertain, OMIT the
+    pcsp_has_medications field rather than guessing.
   Billing (group "billing_code"): emit ONE field per authorized service code with
     field_key = "billing_code_row" and
     value_json = { service_code, rate, max_units, unit_type, weekly_cap_units, plan_start, plan_end, financial_eligibility }.

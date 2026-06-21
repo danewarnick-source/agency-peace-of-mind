@@ -18,7 +18,10 @@ const CreateEmployeeInput = z.object({
   startDate: z.string().optional().or(z.literal("")),
   endDate: z.string().optional().or(z.literal("")),
   trackIds: z.array(z.string().uuid()).max(50).default([]),
+  requiresDeescalation: z.boolean().default(false),
+  requiresAbi: z.boolean().default(false),
 });
+
 
 async function assertOrgManager(actorId: string, orgId: string) {
   const { data, error } = await supabaseAdmin

@@ -27,6 +27,13 @@ import {
 } from "@/lib/finish-onboarding.functions";
 
 type State = Awaited<ReturnType<typeof getClientOnboardingState>>;
+type Rate = {
+  id: string;
+  service_code: string;
+  rate_per_unit: number | null;
+  annual_unit_authorization: number | null;
+  unit_type: string | null;
+};
 
 export function FinishOnboardingCard({ clientId }: { clientId: string }) {
   const qc = useQueryClient();

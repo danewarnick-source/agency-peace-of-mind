@@ -559,7 +559,7 @@ export function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="department">Department / team</Label><Input id="department" name="department" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2"><Label htmlFor="start_date">Start date</Label><Input id="start_date" name="start_date" type="date" /></div>
+              <div className="grid gap-2"><Label htmlFor="start_date">Start date <span className="text-destructive">*</span></Label><Input id="start_date" name="start_date" type="date" required /><p className="text-xs text-muted-foreground">All training deadlines are calculated from this date.</p></div>
               <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
             </div>
 

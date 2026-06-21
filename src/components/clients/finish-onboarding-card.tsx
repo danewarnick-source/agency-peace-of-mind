@@ -44,22 +44,32 @@ type Rate = {
 export function FinishOnboardingCard({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
   const fetchState = useServerFn(getClientOnboardingState);
+  const fetchStates = useServerFn(getClientFieldStates);
 
   const stateQ = useQuery({
     queryKey: ["finish-onboarding", clientId],
     queryFn: () => fetchState({ data: { clientId } }) as Promise<State>,
   });
+  const fieldStatesQ = useQuery({
+    queryKey: ["client-field-states", clientId],
+    queryFn: () => fetchStates({ data: { clientId } }),
+  });
 
-  if (stateQ.isLoading) return null;
+  if (stateQ.isLoading || fieldStatesQ.isLoading) return null;
   if (stateQ.isError || !stateQ.data) return null;
   const s = stateQ.data;
 
   const items = buildItems(s);
   const open = items.filter((i) => !i.done && !i.skipped);
-  if (open.length === 0) return null;
+  const unknowns = fieldStatesQ.data
+    ? TRACKED_FIELDS.filter((f) => fieldStatesQ.data!.states[f.key] === "unknown")
+    : [];
+
+  if (open.length === 0 && unknowns.length === 0) return null;
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ["finish-onboarding", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-field-states", clientId] });
     qc.invalidateQueries({ queryKey: ["client-readiness", clientId] });
     qc.invalidateQueries({ queryKey: ["client-profile"] });
     qc.invalidateQueries({ queryKey: ["clients"] });
@@ -73,7 +83,7 @@ export function FinishOnboardingCard({ clientId }: { clientId: string }) {
           <CardTitle className="text-base">Finish onboarding</CardTitle>
         </div>
         <Badge variant="outline" className="text-amber-700 dark:text-amber-400">
-          {items.filter((i) => i.done).length}/{items.length} done
+          {items.filter((i) => i.done).length}/{items.length} done · {unknowns.length} to confirm
         </Badge>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -91,6 +101,14 @@ export function FinishOnboardingCard({ clientId }: { clientId: string }) {
             onChanged={refresh}
           />
         ))}
+
+        {unknowns.length > 0 && (
+          <UnknownConfirmations
+            clientId={clientId}
+            unknowns={unknowns}
+            onChanged={refresh}
+          />
+        )}
       </CardContent>
     </Card>
   );

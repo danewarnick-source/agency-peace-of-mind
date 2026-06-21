@@ -31,9 +31,6 @@ async function assertCanWriteStaff(
   staffId: string,
   viewerId: string,
 ) {
-  if (viewerId === staffId) {
-    throw new Error("Forbidden: staff may not edit own training completion");
-  }
   const { data: canView, error } = await supabase.rpc("can_view_staff_pii", {
     _org: orgId,
     _staff: staffId,
@@ -41,6 +38,17 @@ async function assertCanWriteStaff(
   });
   if (error) throw new Error(error.message);
   if (!canView) throw new Error("Forbidden: not allowed to edit this staffer");
+  if (viewerId !== staffId) return;
+  // Self-edit allowed only for admins/managers (an admin who is also an
+  // employee may upload their own certs); regular DSPs cannot self-attest.
+  const { data: isAdmin, error: roleErr } = await supabase.rpc(
+    "is_org_admin_or_manager",
+    { _org: orgId, _user: viewerId },
+  );
+  if (roleErr) throw new Error(roleErr.message);
+  if (!isAdmin) {
+    throw new Error("Forbidden: staff may not edit own training completion");
+  }
 }
 
 /** Mark a baseline training complete with a date (and optional expiration). */

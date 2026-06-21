@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { AddCodesControl } from "@/components/clients/add-codes-control";
 import {
   getClientOnboardingState,
   saveOnboardingClientPatch,
@@ -221,7 +222,17 @@ function StepRow({
         <div className="space-y-3 border-t border-border p-3">
           {item.key === "staff" && <CaseloadEditor clientId={clientId} />}
           {item.key === "home" && <HomeForm clientId={clientId} state={state} onSaved={onChanged} />}
-          {item.key === "rates" && <RatesForm state={state} onSaved={onChanged} />}
+          {item.key === "rates" && (
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">
+                  Add more service codes
+                </div>
+                <AddCodesControl clientId={clientId} onAdded={onChanged} compact />
+              </div>
+              <RatesForm state={state} onSaved={onChanged} />
+            </div>
+          )}
           {item.key === "guardian" && <GuardianForm clientId={clientId} state={state} onSaved={onChanged} />}
           {item.key === "sow" && <SowForm clientId={clientId} state={state} onSaved={onChanged} />}
           <div className="flex justify-end">

@@ -379,3 +379,70 @@ export const skipOnboardingItem = createServerFn({ method: "POST" })
     );
     return { ok: true };
   });
+
+// ---------------------------------------------------------------------------
+// Add one or more DSPD service codes to a client. Used by the inline "Add
+// billing code" control on the readiness card + onboarding wizard — no
+// navigation: upsert client_billing_codes (default rate 0, default annual
+// auth 0) and merge codes into clients.authorized_dspd_codes + job_code.
+// ---------------------------------------------------------------------------
+export const addClientBillingCodes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      clientId: z.string().uuid(),
+      codes: z.array(z.string().min(1).max(8)).min(1),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { isDailyServiceCode } = await import("@/lib/service-billing");
+
+    const { data: client } = await sb
+      .from("clients")
+      .select("id, organization_id, authorized_dspd_codes, job_code")
+      .eq("id", data.clientId)
+      .maybeSingle();
+    if (!client) throw new Error("Client not found");
+    await assertOrgMember(sb, context.userId, client.organization_id);
+
+    const codes = Array.from(
+      new Set(data.codes.map((c) => c.trim().toUpperCase()).filter(Boolean)),
+    );
+    if (codes.length === 0) return { ok: true, added: 0 };
+
+    const rows = codes.map((code) => ({
+      organization_id: client.organization_id,
+      client_id: data.clientId,
+      service_code: code,
+      unit_type: isDailyServiceCode(code) ? "day" : "unit",
+      annual_unit_authorization: 0,
+      rate_per_unit: 0,
+    }));
+    const { data: upserted, error: uErr } = await sb
+      .from("client_billing_codes")
+      .upsert(rows, { onConflict: "organization_id,client_id,service_code" })
+      .select("id");
+    if (uErr) throw new Error(uErr.message);
+    if (!upserted || upserted.length === 0) {
+      throw new Error("No billing-code rows were written.");
+    }
+
+    const mergedAuthorized = Array.from(
+      new Set([...(client.authorized_dspd_codes ?? []), ...codes]),
+    );
+    const mergedJobCode = Array.from(
+      new Set([...(client.job_code ?? []), ...codes]),
+    );
+    const { error: cErr } = await sb
+      .from("clients")
+      .update({
+        authorized_dspd_codes: mergedAuthorized,
+        job_code: mergedJobCode,
+      })
+      .eq("id", data.clientId);
+    if (cErr) throw new Error(cErr.message);
+
+    return { ok: true, added: upserted.length };
+  });

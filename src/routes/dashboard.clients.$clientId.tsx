@@ -96,8 +96,7 @@ function ClientProfileHub() {
     : null;
   const isHostHome = clientFeatureVisible(featureClient, "host_home");
   const showBehavior = clientFeatureVisible(featureClient, "behavior");
-  const showSupportedEmployment = clientFeatureVisible(featureClient, "supported_employment");
-  const showMedMonitoring = clientFeatureVisible(featureClient, "med_monitoring");
+
 
 
   return (

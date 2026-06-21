@@ -75,6 +75,10 @@ export function StaffHrChecklistCard({
   const createUpload = useServerFn(createHrDocumentUploadUrl);
   const getDocUrl = useServerFn(getHrDocumentUrl);
   const delDoc = useServerFn(deleteHrDocument);
+  const markBaselineFn = useServerFn(markBaselineTrainingComplete);
+  const attachBaselineFn = useServerFn(attachBaselineCertificate);
+  const setBaselineExpFn = useServerFn(setBaselineExpiration);
+
 
   const piiQ = useQuery({
     queryKey: ["staff-pii", organizationId, staffId],

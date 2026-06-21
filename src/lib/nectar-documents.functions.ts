@@ -107,8 +107,25 @@ Common field_key values you should extract when present (use field_group to buck
     weekly_cap_units, plan_start, plan_end, financial_eligibility }.
   SOW (group "sow_clause"): clause_number, required_document, obligation, deadline
   Certification (group "cert"): cert_name, issued_at, expires_at, issuing_body
+  Support coordinator (group "support_coordinator"): support_coordinator_name,
+    support_coordinator_email, support_coordinator_phone
+  Medical (group "medical"): primary_care_name, primary_care_phone,
+    neurologist_name, neurologist_phone, dentist_name, dentist_phone,
+    prescriber_name, prescriber_phone, medical_insurance,
+    diagnoses (value_array), chronic_conditions (value_array),
+    immunizations (value_array),
+    emergency_medical_treatment_authorization (value_bool),
+    advanced_directives (value_text)
+  Rights & behavior (group "rights"): rights_restrictions (value_text),
+    bsp_status (value_text)
+  Service plan (group "service_plan"): staff_ratio (value_text e.g. "1:1"),
+    preferred_activities (value_array), preferred_living (value_text),
+    roommates (value_array), housing_voucher (value_text),
+    court_orders (value_text), personal_belongings_inventory (value_array),
+    emergency_contact_instructions (value_text), team_name (value_text)
 
 For each field include source_locator (e.g. "page 3", "§4.2", "row 12 of budget table") and a confidence 0..1.`;
+
 
 async function callLovableAI(documentText: string, hint?: string) {
   const apiKey = process.env.LOVABLE_API_KEY;

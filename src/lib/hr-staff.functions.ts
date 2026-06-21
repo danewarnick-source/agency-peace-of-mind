@@ -142,6 +142,9 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
       { data: base, error: baseErr },
       { data: comp, error: compErr },
       { data: prof },
+      { data: baselineComp },
+      { data: behaviorClients },
+      { data: assignedClientIds },
     ] = await Promise.all([
       sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
       sb
@@ -151,71 +154,186 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         .eq("staff_id", data.staff_id),
       sb
         .from("profiles")
-        .select("staff_type_keys")
+        .select("staff_type_keys, hire_date, start_date, requires_deescalation, requires_abi")
         .eq("id", data.staff_id)
         .maybeSingle(),
+      sb
+        .from("staff_baseline_training_completions")
+        .select("*")
+        .eq("organization_id", data.organization_id)
+        .eq("staff_id", data.staff_id),
+      sb
+        .from("behavior_support_clients")
+        .select("client_id")
+        .eq("organization_id", data.organization_id)
+        .eq("features_enabled", true),
+      sb
+        .from("staff_assignments")
+        .select("client_id")
+        .eq("organization_id", data.organization_id)
+        .eq("staff_id", data.staff_id),
     ]);
     if (baseErr) throw new Error(baseErr.message);
     if (compErr) throw new Error(compErr.message);
 
     const staffTypeKeys: string[] =
       (prof?.staff_type_keys as string[] | null) ?? [];
+    const hireDateStr =
+      (prof?.start_date as string | null) ??
+      (prof?.hire_date as string | null) ??
+      null;
+    const hireDate = hireDateStr ? new Date(`${hireDateStr}T00:00:00Z`) : null;
+    const behaviorClientIds = new Set<string>(
+      (behaviorClients ?? []).map((r: { client_id: string }) => r.client_id),
+    );
+    const myClientIds: string[] = (assignedClientIds ?? []).map(
+      (r: { client_id: string }) => r.client_id,
+    );
+    const hasBehaviorClient = myClientIds.some((id) =>
+      behaviorClientIds.has(id),
+    );
+    // ABI: at present no flag column on clients — fall back to the manual
+    // override only. (When ABI client tagging lands, OR it in here.)
+    const requiresDeescalation =
+      (prof?.requires_deescalation as boolean | undefined) === true ||
+      hasBehaviorClient;
+    const requiresAbi =
+      (prof?.requires_abi as boolean | undefined) === true;
 
     const compMap = new Map<string, Record<string, unknown>>();
     for (const c of comp ?? []) compMap.set(c.requirement_id as string, c);
 
-    return (base ?? []).map((r: Record<string, unknown>) => {
-      const c = compMap.get(r.id as string);
-      const meta = (r.metadata ?? {}) as Record<string, unknown>;
-      const isRenewable = meta.is_renewable === true;
-      const intervalMonths =
-        typeof meta.renewal_interval_months === "number"
-          ? (meta.renewal_interval_months as number)
+    const adminRows: ChecklistRow[] = (base ?? []).map(
+      (r: Record<string, unknown>) => {
+        const c = compMap.get(r.id as string);
+        const meta = (r.metadata ?? {}) as Record<string, unknown>;
+        const isRenewable = meta.is_renewable === true;
+        const intervalMonths =
+          typeof meta.renewal_interval_months === "number"
+            ? (meta.renewal_interval_months as number)
+            : null;
+        const completedDate = (c?.completed_date as string) ?? null;
+        let effExpiry = (c?.expires_at as string) ?? null;
+        if (!effExpiry && isRenewable && intervalMonths && completedDate) {
+          const d = new Date(completedDate);
+          if (!Number.isNaN(d.getTime())) {
+            d.setUTCMonth(d.getUTCMonth() + intervalMonths);
+            effExpiry = d.toISOString().slice(0, 10);
+          }
+        }
+        const { applies_to, applies_to_confirmed_at } = parseAppliesTo(meta);
+        const applicable = isRequirementApplicable({
+          applies_to,
+          applies_to_confirmed_at,
+          staff_type_keys: staffTypeKeys,
+        });
+        return {
+          requirement_id: r.id as string,
+          title:
+            (r.title as string) ?? (r.short_label as string) ?? "Untitled",
+          category: (r.category as string) ?? null,
+          source_citation: (r.source_citation as string) ?? null,
+          evidence_type: (r.evidence_type as string) ?? null,
+          renewal_frequency: (r.renewal_frequency as string) ?? null,
+          checklist_layer: (meta.checklist_layer as string) ?? null,
+          is_renewable: isRenewable,
+          renewal_interval_months: intervalMonths,
+          renewal_source: (meta.renewal_source as string) ?? null,
+          completion: {
+            id: (c?.id as string) ?? null,
+            status: (c?.status as string) ?? "not_started",
+            completed_date: completedDate,
+            expires_at: effExpiry,
+            evidence_document_id:
+              (c?.evidence_document_id as string) ?? null,
+            notes: (c?.notes as string) ?? null,
+            completed_by: (c?.completed_by as string) ?? null,
+            training_completion_id:
+              (c?.training_completion_id as string) ?? null,
+            auto_checked_at: (c?.auto_checked_at as string) ?? null,
+          },
+          applicable,
+          applies_to_staff_types:
+            applies_to === null || applies_to === undefined ? "all" : applies_to,
+          applies_to_confirmed_at,
+        };
+      },
+    );
+
+    // Baseline rows — synthesized for EVERY employee so a new hire with
+    // nothing on file shows Overdue / To-Do (never the silent "0 overdue").
+    const adminTitleSet = new Set(
+      adminRows.map((r) => r.title.trim().toLowerCase()),
+    );
+    const baselineMap = new Map<string, Record<string, unknown>>();
+    for (const bc of baselineComp ?? [])
+      baselineMap.set(bc.training_key as string, bc);
+
+    const baselineRows: ChecklistRow[] = BASELINE_STAFF_TRAININGS.map((t) => {
+      const applicable = isBaselineApplicable(t, {
+        hireDate,
+        requiresDeescalation,
+        requiresAbi,
+      });
+      const bc = baselineMap.get(t.key);
+      const completedDate = (bc?.completed_date as string | null) ?? null;
+      const expiresAt = (bc?.expires_at as string | null) ?? null;
+      const evidenceDocId =
+        (bc?.evidence_document_id as string | null) ?? null;
+      // Status: complete if completed_date present AND (no expiry or expiry in future)
+      const todayMs = Date.now();
+      let status: string = "not_started";
+      if (completedDate) {
+        const expMs = expiresAt
+          ? new Date(`${expiresAt}T00:00:00Z`).getTime()
           : null;
-      const completedDate = (c?.completed_date as string) ?? null;
-      let effExpiry = (c?.expires_at as string) ?? null;
-      if (!effExpiry && isRenewable && intervalMonths && completedDate) {
-        const d = new Date(completedDate);
-        if (!Number.isNaN(d.getTime())) {
-          d.setUTCMonth(d.getUTCMonth() + intervalMonths);
-          effExpiry = d.toISOString().slice(0, 10);
+        if (expMs !== null && expMs < todayMs) status = "expired";
+        else status = "complete";
+      } else {
+        // No completion. Compare due date vs today for to_do vs expired (overdue).
+        const due = dueDateFor(t, hireDate);
+        if (due && new Date(`${due}T00:00:00Z`).getTime() < todayMs) {
+          status = "expired"; // UI renders as Overdue
+        } else {
+          status = "not_started"; // UI renders as To do
         }
       }
-      const { applies_to, applies_to_confirmed_at } = parseAppliesTo(meta);
-      const applicable = isRequirementApplicable({
-        applies_to,
-        applies_to_confirmed_at,
-        staff_type_keys: staffTypeKeys,
-      });
       return {
-        requirement_id: r.id as string,
-        title: (r.title as string) ?? (r.short_label as string) ?? "Untitled",
-        category: (r.category as string) ?? null,
-        source_citation: (r.source_citation as string) ?? null,
-        evidence_type: (r.evidence_type as string) ?? null,
-        renewal_frequency: (r.renewal_frequency as string) ?? null,
-        checklist_layer: (meta.checklist_layer as string) ?? null,
-        is_renewable: isRenewable,
-        renewal_interval_months: intervalMonths,
-        renewal_source: (meta.renewal_source as string) ?? null,
+        requirement_id: baselineRequirementId(t.key),
+        title: t.title,
+        category: t.category,
+        source_citation: t.hint ?? null,
+        evidence_type: t.tracks_expiration ? "certificate" : "completion",
+        renewal_frequency: null,
+        checklist_layer: "Baseline",
+        is_renewable: t.tracks_expiration,
+        renewal_interval_months: t.default_validity_months,
+        renewal_source: null,
         completion: {
-          id: (c?.id as string) ?? null,
-          status: (c?.status as string) ?? "not_started",
+          id: (bc?.id as string | null) ?? null,
+          status,
           completed_date: completedDate,
-          expires_at: effExpiry,
-          evidence_document_id: (c?.evidence_document_id as string) ?? null,
-          notes: (c?.notes as string) ?? null,
-          completed_by: (c?.completed_by as string) ?? null,
-          training_completion_id: (c?.training_completion_id as string) ?? null,
-          auto_checked_at: (c?.auto_checked_at as string) ?? null,
+          expires_at: expiresAt,
+          evidence_document_id: evidenceDocId,
+          notes: (bc?.notes as string | null) ?? null,
+          completed_by: (bc?.completed_by as string | null) ?? null,
+          training_completion_id: null,
+          auto_checked_at: null,
         },
         applicable,
-        applies_to_staff_types:
-          applies_to === null || applies_to === undefined ? "all" : applies_to,
-        applies_to_confirmed_at,
+        applies_to_staff_types: "all",
+        applies_to_confirmed_at: null,
       };
-    });
+    }).filter(
+      // Don't double-list a baseline if the admin already created an
+      // equivalent custom requirement with the same title.
+      (r) => !adminTitleSet.has(r.title.trim().toLowerCase()),
+    );
+
+    return [...baselineRows, ...adminRows];
   });
+
+
 
 
 // --- Mutations -------------------------------------------------------------

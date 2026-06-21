@@ -912,6 +912,11 @@ function BaselineActions(props: {
   adminSignedOffAt: string | null;
   nectarNameMatch: string | null;
   nectarExtractedName: string | null;
+  nectarValidationStatus: string | null;
+  nectarValidationReasons: string[] | null;
+  nectarExtractedCertType: string | null;
+  nectarExtractedCompletedDate: string | null;
+  nectarExtractedSummary: string | null;
   onChanged: () => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   attachBaselineFn: any;
@@ -933,6 +938,9 @@ function BaselineActions(props: {
   const hasCert = !!props.currentEvidenceDocId;
   const isSignedOff = !!props.adminSignedOffAt;
   const nameMatch = props.nectarNameMatch;
+  const validationStatus = props.nectarValidationStatus;
+  const validationFailed = validationStatus === "failed";
+  const validationPassed = validationStatus === "passed";
 
   const handleUpload = async (file: File) => {
     try {
@@ -963,19 +971,19 @@ function BaselineActions(props: {
           run_ocr: true,
         },
       });
-      const parts: string[] = ["Certificate uploaded"];
-      if (att?.name_match === "match") {
-        parts.push(`Nectar verified name (${att.nectar_name})`);
-      } else if (att?.name_match === "mismatch") {
-        parts.push(
-          `⚠ Name mismatch — cert says "${att.nectar_name}", profile is "${att.profile_name}"`,
+      if (att?.validation_status === "failed") {
+        const reasons: string[] = Array.isArray(att?.reasons) ? att.reasons : [];
+        toast.error(
+          `Nectar rejected this certificate:\n• ${reasons.join("\n• ") || "Unknown reason"}`,
+          { duration: 10000 },
         );
-      } else if (att?.name_match === "unreadable") {
-        parts.push("⚠ Nectar could not read the name");
+      } else {
+        const parts: string[] = ["Certificate accepted by Nectar"];
+        if (att?.nectar_name) parts.push(`name: ${att.nectar_name}`);
+        if (att?.expires_at) parts.push(`expires ${att.expires_at}`);
+        parts.push("awaiting admin sign-off");
+        toast.success(parts.join(" · "));
       }
-      if (att?.expires_at) parts.push(`expires ${att.expires_at}`);
-      parts.push("awaiting admin sign-off");
-      toast.success(parts.join(" · "));
       props.onChanged();
     } catch (e) {
       toast.error((e as Error).message);

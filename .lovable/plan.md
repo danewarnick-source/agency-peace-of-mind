@@ -1,8 +1,16 @@
-In the NECTAR smart-import review page (`src/routes/dashboard.smart-import.$jobId.review.tsx`), the "Certs / training" tab currently appears for both employee and client imports. Since certifications and trainings only apply to employees/staff, hide this tab when the import subject is a client.
+## What
+After a client is permanently deleted, the page currently leaves the user on the deleted client's detail view. Change it so the app navigates to the main clients page (`/dashboard/hub/clients`) as soon as deletion succeeds.
 
-Changes:
-- In `SubjectReview`, conditionally render the "Certs / training" `TabsTrigger` only when `jobMode !== "client"`.
-- Adjust `TabsList` grid class from fixed `grid-cols-5` to dynamic: `grid-cols-4` for client mode, `grid-cols-5` for employee mode.
-- Conditionally render the `TabsContent value="certs"` block only when `jobMode !== "client"`.
+## Where
+- `src/routes/dashboard.clients.tsx` — contains the `<LifecyclePanel>` used to delete the active client.
 
-No other files touched.
+## How
+1. Verify `useNavigate` is already imported in `dashboard.clients.tsx`.
+2. Add a `navigate` call inside the `LifecyclePanel` `onDone` prop (only on permanent delete; `archive` can continue to keep the user in place or also redirect).
+3. Use the TanStack Start pattern: `navigate({ to: "/dashboard/hub/clients" })`.
+4. Keep the existing query invalidation logic intact so the client list refreshes.
+
+## Definition of done
+- Deleting a client from the client detail page redirects to `/dashboard/hub/clients`.
+- No dead detail view remains after deletion.
+- Build passes and route types remain valid.

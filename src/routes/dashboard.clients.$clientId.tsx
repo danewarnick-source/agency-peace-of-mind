@@ -34,6 +34,7 @@ import {
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
 } from "lucide-react";
 import { saveAdminHours } from "@/lib/scheduler/scheduler.functions";
+import { clientFeatureVisible } from "@/lib/client-features";
 
 const search = z.object({
   tab: z

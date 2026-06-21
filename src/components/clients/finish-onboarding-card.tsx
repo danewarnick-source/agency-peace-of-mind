@@ -509,3 +509,94 @@ function SowField({
     </div>
   );
 }
+
+// ── NECTAR confirmation questions (tri-state tracked fields) ───────────────
+function UnknownConfirmations({
+  clientId, unknowns, onChanged,
+}: {
+  clientId: string;
+  unknowns: typeof TRACKED_FIELDS;
+  onChanged: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-card">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <HelpCircle className="h-4 w-4 text-amber-600" />
+        <div className="text-sm font-semibold">
+          NECTAR has {unknowns.length} question{unknowns.length === 1 ? "" : "s"}
+        </div>
+      </div>
+      <div className="divide-y divide-border">
+        {unknowns.map((f) => (
+          <ConfirmRow key={f.key} clientId={clientId} field={f} onChanged={onChanged} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmRow({
+  clientId, field, onChanged,
+}: {
+  clientId: string;
+  field: (typeof TRACKED_FIELDS)[number];
+  onChanged: () => void;
+}) {
+  const setFn = useServerFn(setFieldConfirmation);
+  const m = useMutation({
+    mutationFn: (value: "has" | "none") =>
+      setFn({ data: { clientId, key: field.key, value } }),
+    onSuccess: (_r, value) => {
+      if (value === "none") {
+        toast.success(`Recorded: ${field.positiveStatement}`);
+      } else {
+        toast.success(
+          field.key === "medications"
+            ? "Marked as having medications — add them on the MAR tab."
+            : `Marked as having ${field.label.toLowerCase()} — add details on the profile.`,
+        );
+      }
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Where to send the admin to enter the data after answering Yes.
+  const dataHref =
+    field.key === "medications"
+      ? `/dashboard/clients/${clientId}?tab=plan`
+      : field.key === "guardian"
+        ? `/dashboard/clients/${clientId}?tab=overview`
+        : `/dashboard/clients/${clientId}?tab=overview`;
+
+  return (
+    <div className="space-y-2 px-3 py-3">
+      <div className="text-sm">{field.question}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="default"
+          disabled={m.isPending}
+          onClick={() => m.mutate("has")}
+          asChild={false}
+        >
+          Yes
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={m.isPending}
+          onClick={() => m.mutate("none")}
+        >
+          No, none
+        </Button>
+        <Link
+          to={dataHref}
+          className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+        >
+          Open profile →
+        </Link>
+      </div>
+    </div>
+  );
+}

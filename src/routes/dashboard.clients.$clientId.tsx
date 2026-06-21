@@ -80,13 +80,24 @@ function ClientProfileHub() {
   const fullName = client
     ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || "—"
     : "Loading…";
-  // Host-home flag derived from authorized service codes (HHS).
+  // Code-driven feature visibility. Derived per-render from
+  // authorized_dspd_codes so plan edits re-evaluate without caching.
   const codes: string[] = Array.isArray(client?.job_code)
     ? (client?.job_code as string[])
     : Array.isArray(client?.authorized_dspd_codes)
     ? (client?.authorized_dspd_codes as string[])
     : [];
-  const isHostHome = codes.some((c) => String(c).toUpperCase() === "HHS");
+  const featureClient = client
+    ? {
+        feature_config: (client.feature_config as Record<string, boolean> | null) ?? null,
+        authorized_dspd_codes: codes,
+      }
+    : null;
+  const isHostHome = clientFeatureVisible(featureClient, "host_home");
+  const showBehavior = clientFeatureVisible(featureClient, "behavior");
+  const showSupportedEmployment = clientFeatureVisible(featureClient, "supported_employment");
+  const showMedMonitoring = clientFeatureVisible(featureClient, "med_monitoring");
+
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-6 space-y-6">

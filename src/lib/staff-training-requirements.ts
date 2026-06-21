@@ -89,13 +89,13 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
   },
   {
     key: "annual_12h",
-    title: "Annual Training (12 hours)",
+    title: "Ongoing Training (12 Hours)",
     due_days: 365,
     tracks_expiration: true,
     default_validity_months: 12,
-    conditional: "after_year_one",
+    conditional: "all",
     category: "Required trainings",
-    hint: "Required every year starting 12 months after hire.",
+    hint: "Required every year after hire.",
   },
 ];
 

@@ -457,3 +457,106 @@ export const submitForSetup = createServerFn({ method: "POST" })
 
     return { ok: true, committed: result.jobCommitted, results: result.results };
   });
+
+// ---------- Quick "complete missing info" fix from the Done page ----------
+// Upserts admin-supplied values into extracted_fields for a single client
+// subject so the next commit can succeed. Currently scoped to guardianship +
+// emergency contact, which are the commit-blocking gaps surfaced in the UI.
+const MissingClientFields = z.object({
+  subjectId: z.string().uuid(),
+  values: z.object({
+    is_own_guardian: z.boolean(),
+    guardian_name: z.string().max(200).optional(),
+    guardian_phone: z.string().max(50).optional(),
+    guardian_relationship: z.string().max(100).optional(),
+    guardian_email: z.string().max(200).optional(),
+    emergency_contact_name: z.string().max(200).optional(),
+    emergency_contact_phone: z.string().max(50).optional(),
+  }),
+});
+const MISSING_CLIENT_TARGETS = [
+  "is_own_guardian",
+  "guardian_name",
+  "guardian_phone",
+  "guardian_relationship",
+  "guardian_email",
+  "emergency_contact_name",
+  "emergency_contact_phone",
+] as const;
+export const applyMissingClientFields = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => MissingClientFields.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: subj } = await sb
+      .from("import_subjects")
+      .select("import_job_id, org_id, subject_type")
+      .eq("id", data.subjectId)
+      .single();
+    if (!subj) throw new Error("Subject not found");
+    if (subj.subject_type !== "client") throw new Error("Only client subjects are supported here.");
+
+    const isOwn = !!data.values.is_own_guardian;
+    const payload: Record<string, string> = {
+      is_own_guardian: isOwn ? "true" : "false",
+      guardian_name: isOwn ? "" : (data.values.guardian_name ?? "").trim(),
+      guardian_phone: isOwn ? "" : (data.values.guardian_phone ?? "").trim(),
+      guardian_relationship: isOwn ? "" : (data.values.guardian_relationship ?? "").trim(),
+      guardian_email: isOwn ? "" : (data.values.guardian_email ?? "").trim(),
+      emergency_contact_name: (data.values.emergency_contact_name ?? "").trim(),
+      emergency_contact_phone: (data.values.emergency_contact_phone ?? "").trim(),
+    };
+
+    for (const target of MISSING_CLIENT_TARGETS) {
+      const value = payload[target] ?? "";
+      const { data: existing } = await sb
+        .from("extracted_fields")
+        .select("id, value, original_value")
+        .eq("import_subject_id", data.subjectId)
+        .eq("target_field", target)
+        .maybeSingle();
+      if (existing) {
+        await sb.from("extracted_fields").update({
+          value,
+          original_value: existing.original_value ?? existing.value,
+          status: "edited",
+          provenance: "admin_override",
+          edited_by: context.userId,
+          edited_at: new Date().toISOString(),
+        }).eq("id", existing.id);
+      } else {
+        await sb.from("extracted_fields").insert({
+          import_job_id: subj.import_job_id,
+          org_id: subj.org_id,
+          import_subject_id: data.subjectId,
+          target_table: "clients",
+          target_field: target,
+          value,
+          status: "edited",
+          confidence: 1,
+          provenance: "admin_override",
+          is_custom_attribute: false,
+          edited_by: context.userId,
+          edited_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Clear the stale commit error so the UI stops surfacing it after retry.
+    await sb.from("import_subjects").update({ commit_error: null }).eq("id", data.subjectId);
+
+    await sb.from("import_audit").insert({
+      import_job_id: subj.import_job_id,
+      org_id: subj.org_id,
+      subject_id: data.subjectId,
+      item: isOwn
+        ? "Completed missing info — client marked as their own guardian"
+        : "Completed missing info — guardian details supplied",
+      traces_to: "admin_override",
+      actor: context.userId,
+      action: "complete_missing_info",
+    });
+
+    return { ok: true };
+  });

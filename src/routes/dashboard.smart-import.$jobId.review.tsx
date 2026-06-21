@@ -35,7 +35,7 @@ export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
 });
 
 // Core target fields (matches what extraction emits)
-const CLIENT_FIELDS = ["first_name","last_name","full_name","date_of_birth","phone","address","medicaid_id","job_code","team_name"];
+const CLIENT_FIELDS = ["first_name","last_name","full_name","date_of_birth","phone","address","medicaid_id","job_code","team_name","is_own_guardian","guardian_name","guardian_phone","guardian_relationship","guardian_email","emergency_contact_name","emergency_contact_phone"];
 const EMPLOYEE_FIELDS = ["full_name","first_name","last_name","email","phone","position","hire_date","team_name"];
 
 type SubjectRow = {

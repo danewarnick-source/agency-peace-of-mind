@@ -66,6 +66,8 @@ const JobIdInput = z.object({ jobId: z.string().uuid() });
 const CORE_CLIENT = [
   "first_name", "last_name", "full_name", "date_of_birth", "phone",
   "address", "medicaid_id", "job_code", "team_name",
+  "is_own_guardian", "guardian_name", "guardian_phone", "guardian_relationship", "guardian_email",
+  "emergency_contact_name", "emergency_contact_phone",
 ] as const;
 const CORE_EMPLOYEE = [
   "full_name", "first_name", "last_name", "email", "phone",
@@ -85,6 +87,12 @@ const HEURISTICS: Record<string, string[]> = {
   medicaid_id: ["medicaid", "medicaid id", "client id", "member id"],
   job_code: ["job code", "service code", "auth code"],
   date_of_birth: ["dob", "date of birth", "birth date", "birthday"],
+  guardian_name: ["guardian", "guardian name", "legal guardian"],
+  guardian_phone: ["guardian phone", "guardian contact"],
+  guardian_relationship: ["guardian relationship", "relationship to guardian"],
+  guardian_email: ["guardian email"],
+  emergency_contact_name: ["emergency contact", "emergency contact name"],
+  emergency_contact_phone: ["emergency phone", "emergency contact phone"],
 };
 
 function guessCore(header: string, mode: "employee" | "client"): string | null {

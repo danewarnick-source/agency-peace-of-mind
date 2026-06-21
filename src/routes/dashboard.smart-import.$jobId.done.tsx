@@ -280,6 +280,11 @@ function DonePage() {
                     </Link>
                   </div>
                 )}
+                {s.record_id && s.subject_type === "client" && s.committed && (
+                  <div className="mt-3">
+                    <FinishOnboardingCard clientId={s.record_id} />
+                  </div>
+                )}
               </div>
             );
           })}

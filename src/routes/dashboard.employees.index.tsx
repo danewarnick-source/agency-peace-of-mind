@@ -518,8 +518,11 @@ export function EmployeesPage() {
 
               trackIds,
               password: String(fd.get("password") || tempPassword),
+              requiresDeescalation: fd.get("requires_deescalation") === "on",
+              requiresAbi: fd.get("requires_abi") === "on",
             });
           }} className="grid gap-4">
+
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2"><Label htmlFor="first_name">First name</Label><Input id="first_name" name="first_name" required /></div>
               <div className="grid gap-2"><Label htmlFor="last_name">Last name</Label><Input id="last_name" name="last_name" required /></div>

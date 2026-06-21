@@ -69,7 +69,7 @@ function ClientProfileHub() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week, feature_config" as any)
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;

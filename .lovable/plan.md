@@ -1,39 +1,44 @@
-# Make the signup verification code email for real
+# Per-training "Upload certificate" button
 
-The signup page logic is already correct — it calls `supabase.auth.signUp` and verifies with `supabase.auth.verifyOtp({ type: "email" })`. Nothing is wrong in `src/routes/signup.tsx`. The reason no email arrives is that this project has no email sender configured, and the default auth email shows a magic-link button instead of the 6-digit code your UI asks for.
+## What's happening now
+The fixed baseline trainings (30-Day, First Aid, CPR, Person-Centered Thinking, etc.) already have a working "Upload certificate" control wired to Nectar OCR — `BaselineActions` in `src/components/hr/staff-hr-checklist-card.tsx` renders a per-row upload input that:
 
-## Step 1 — Set up an email sender domain
+1. Uploads the file to the HR-documents bucket.
+2. Calls `attachBaselineCertificate` which downloads the file, runs Gemini 2.5 Flash OCR, extracts the expiration date, and writes it back to the row.
+3. Falls back to `default_validity_months` from `staff-training-requirements.ts` if OCR can't read a date.
 
-Email goes out from your own brand (e.g. `notify.yourdomain.com`) so it lands in real inboxes instead of spam. This is a one-time setup: you'll click through a dialog, paste two NS records at your DNS registrar, and Lovable handles SPF/DKIM/MX from there. DNS verification can take a bit, but we can do the rest of the setup in parallel.
+The reason no buttons appear in your screenshot is a permission gate: line 480 (`if (baselineKey && !isSelf)`) hides every baseline action — including the upload button — whenever the logged-in user is viewing their own employee record. The server-side helper `assertCanWriteStaff` in `staff-training-requirements.functions.ts` mirrors that and rejects self-edits outright.
 
-If you'd rather not use your own domain yet, Lovable can still send from a default Lovable address for testing — tell me and I'll go that route instead.
+For an admin who is also an employee (your `dane+zzztest` account), that means *their own* training rows show "not_started" with no controls.
 
-## Step 2 — Scaffold the auth email templates with a 6-digit code
+## Changes
 
-Once a domain is attached (even if DNS is still verifying), I'll generate the six auth email templates (signup, magic link, password reset, invite, email change, reauthentication) and edit the **signup** template to render the 6-digit token (`{{ .Token }}`) prominently — that's the code the user types into Step 2 of your existing signup wizard. I'll style them to match the Hive brand (dark surface, amber accent, your logo).
+### 1. `src/components/hr/staff-hr-checklist-card.tsx`
+- Drop the `!isSelf` guard around `<BaselineActions … />`. Always render the Mark complete + Upload certificate controls per row.
+- Keep the existing "Replace/Upload" gate on the *legacy* admin-defined requirement branch as-is — that one still goes through `upsertChecklistCompletion`, which has its own auth.
 
-No changes to `src/routes/signup.tsx` are required — the existing `verifyOtp` call already accepts the 6-digit code.
+### 2. `src/lib/staff-training-requirements.functions.ts`
+Rewrite `assertCanWriteStaff` so it permits self-edits **only when** the caller has an admin/manager role in the org (so a regular DSP can't silently mark their own CPR complete). Pseudocode:
 
-## Step 3 — Verify end-to-end
+```ts
+async function assertCanWriteStaff(sb, orgId, staffId, viewerId) {
+  const { data: canView } = await sb.rpc("can_view_staff_pii", { _org: orgId, _staff: staffId, _viewer: viewerId });
+  if (!canView) throw new Error("Forbidden: not allowed to edit this staffer");
+  if (viewerId !== staffId) return;
+  const { data: isAdmin } = await sb.rpc("is_org_admin_or_manager", { _org: orgId, _user: viewerId });
+  if (!isAdmin) throw new Error("Forbidden: staff may not edit own training completion");
+}
+```
 
-After DNS verifies, I'll send a test signup to confirm:
-- the email actually arrives
-- it shows the 6-digit code (not just a link)
-- entering that code on Step 2 completes verification and moves the wizard forward
+Applies to `markBaselineTrainingComplete`, `attachBaselineCertificate`, `setBaselineExpiration`, and `clearBaselineCompletion`.
 
-## What I will NOT change
+### 3. Tiny UX polish
+On the row, when no certificate has been uploaded yet, show the "Upload certificate" button prominently (current behavior already places it inline next to "Mark complete" — no layout change needed). When `currentEvidenceDocId` is set, the existing "View cert" + "Edit expiration" controls already render — leave as-is.
 
-- Signup wizard UI, steps, or validation
-- The Supabase auth flow itself
-- Any unrelated routes or templates
-- The Hive-exec / NECTAR work from earlier turns
+## Out of scope
+- No schema changes. `staff_baseline_training_completions` already stores `expires_at` + `nectar_suggested_expires`.
+- No change to OCR prompt or model.
+- No change to the non-baseline (admin-defined) checklist rows.
 
-## Technical notes
-
-- Tools used: `email_domain` setup dialog → `email_domain--scaffold_auth_email_templates`. No edge functions, no third-party provider (Resend/SendGrid), no new secrets.
-- Templates live in `supabase/functions/_shared/email-templates/*.tsx` after scaffolding; the signup one will include the `{{ .Token }}` block.
-- Auth emails route through Lovable's managed queue (`auth_emails` pgmq), so retries and deliverability are handled.
-
-## One thing I need from you
-
-Do you want to use **your own domain** (best deliverability, requires adding two NS records at your registrar), or **send from a default Lovable test address** for now and switch to your domain later?
+## Verification
+After build: open the employees page for the admin's own profile, confirm each baseline training row shows **Mark complete** + **Upload certificate** on the right, upload a sample CPR PDF, and confirm a toast like "Certificate saved — Nectar read expiration YYYY-MM-DD" appears and the row flips from To-Do to Current with an expiration date.

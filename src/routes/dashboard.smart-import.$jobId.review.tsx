@@ -35,7 +35,7 @@ export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
 });
 
 // Core target fields (matches what extraction emits)
-const CLIENT_FIELDS = ["first_name","last_name","full_name","date_of_birth","phone","address","medicaid_id","job_code","team_name"];
+const CLIENT_FIELDS = ["first_name","last_name","full_name","date_of_birth","phone","address","medicaid_id","job_code","team_name","is_own_guardian","guardian_name","guardian_phone","guardian_relationship","guardian_email","emergency_contact_name","emergency_contact_phone"];
 const EMPLOYEE_FIELDS = ["full_name","first_name","last_name","email","phone","position","hire_date","team_name"];
 
 type SubjectRow = {
@@ -271,9 +271,11 @@ function SubjectReview({
       <DedupBanner subject={subject} matched={matched} onChanged={refresh} />
 
       <Tabs defaultValue="placement">
-        <TabsList className="grid grid-cols-5">
+        <TabsList className={jobMode === "employee" ? "grid grid-cols-5" : "grid grid-cols-4"}>
           <TabsTrigger value="placement">Placement</TabsTrigger>
-          <TabsTrigger value="certs">Certs / training</TabsTrigger>
+          {jobMode === "employee" && (
+            <TabsTrigger value="certs">Certs / training</TabsTrigger>
+          )}
           <TabsTrigger value="questions">NECTAR asks {questions.length > 0 && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{questions.length}</Badge>}</TabsTrigger>
           <TabsTrigger value="unfiled">Additional info {unfiled.length > 0 && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{unfiled.length}</Badge>}</TabsTrigger>
           <TabsTrigger value="provision">Forecast</TabsTrigger>
@@ -282,9 +284,11 @@ function SubjectReview({
         <TabsContent value="placement" className="mt-3">
           <PlacementLineup fields={fields} targetFields={targetFields} matched={matched} decision={subject.review_decision} onChanged={refresh} />
         </TabsContent>
-        <TabsContent value="certs" className="mt-3">
-          <CertsPanel subjectId={subjectId} certs={certs} onChanged={refresh} />
-        </TabsContent>
+        {jobMode === "employee" && (
+          <TabsContent value="certs" className="mt-3">
+            <CertsPanel subjectId={subjectId} certs={certs} onChanged={refresh} />
+          </TabsContent>
+        )}
         <TabsContent value="questions" className="mt-3">
           <QuestionsPanel questions={questions} onChanged={refresh} />
         </TabsContent>

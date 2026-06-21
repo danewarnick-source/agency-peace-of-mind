@@ -277,10 +277,23 @@ function UploadDocDialog({
       });
     },
     onSuccess: (res) => {
-      toast.success(`Uploaded — NECTAR extracted ${res.extracted?.length ?? 0} field(s)`);
+      const r = res as {
+        document?: { id?: string };
+        extracted?: unknown[];
+        autofilled?: string[];
+        suggested?: string[];
+      };
+      const extractedN = r.extracted?.length ?? 0;
+      const autoN = r.autofilled?.length ?? 0;
+      const sugN = r.suggested?.length ?? 0;
+      toast.success(
+        autoN > 0
+          ? `NECTAR autofilled ${autoN} field${autoN === 1 ? "" : "s"} on ${clientName}'s profile${sugN > 0 ? ` · ${sugN} need review` : ""}`
+          : `Uploaded — NECTAR extracted ${extractedN} field${extractedN === 1 ? "" : "s"}${sugN > 0 ? ` · ${sugN} need review` : ""}`,
+      );
       setTitle(""); setFile(null); setFiscalYear("");
       onOpenChange(false);
-      onUploaded((res as { document?: { id?: string } }).document?.id);
+      onUploaded(r.document?.id);
     },
     onError: (e: Error) => toast.error(e.message),
   });

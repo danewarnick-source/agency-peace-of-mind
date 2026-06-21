@@ -5,7 +5,10 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
+import { applyExtractedFieldsToClient } from "@/lib/client-import-schema";
+
 
 const JobId = z.object({ jobId: z.string().uuid() });
 
@@ -17,6 +20,13 @@ const CLIENT_COL: Record<string, string> = {
   address: "physical_address",
   medicaid_id: "medicaid_id",
   date_of_birth: "date_of_birth",
+  is_own_guardian: "is_own_guardian",
+  guardian_name: "guardian_name",
+  guardian_phone: "guardian_phone",
+  guardian_relationship: "guardian_relationship",
+  guardian_email: "guardian_email",
+  emergency_contact_name: "emergency_contact_name",
+  emergency_contact_phone: "emergency_contact_phone",
 };
 // On profiles we only update soft, non-auth fields
 const PROFILE_COL: Record<string, string> = {
@@ -31,6 +41,27 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
     return runJobCommit(context.supabase, context.userId, data.jobId);
+  });
+
+// Explicit retry entry point for the Done page. Same engine as the auto-run,
+// but verifies the caller is an org admin first so we can safely expose it as
+// a manual button. Idempotent: subjects already committed are skipped.
+export const recommitSmartImportJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => JobId.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: job, error } = await sb
+      .from("import_jobs")
+      .select("id, org_id, target_org_id, source")
+      .eq("id", data.jobId)
+      .single();
+    if (error || !job) throw new Error("Job not found");
+    const orgId = (job.source === "white_glove" ? job.target_org_id : job.org_id) as string;
+    if (!orgId) throw new Error("Job has no organization to commit into.");
+    await requireOrgMembership(sb, context.userId, orgId, "admin");
+    return runJobCommit(sb, context.userId, data.jobId);
   });
 
 // Internal helper — usable from other server fns (e.g. submitForSetup) so
@@ -166,10 +197,39 @@ async function commitClient(
     mapped[col] = f.value;
   }
 
+  // Coerce/normalize guardianship so the validate_client_guardianship trigger always passes.
+  const normalizeGuardianship = (m: Record<string, unknown>, defaultSelf: boolean) => {
+    const guardianTouched =
+      "is_own_guardian" in m ||
+      "guardian_name" in m ||
+      "guardian_phone" in m ||
+      "guardian_relationship" in m ||
+      "guardian_email" in m;
+    if (!guardianTouched) return; // non-destructive on update path
+    const hasGuardianName = typeof m.guardian_name === "string" && (m.guardian_name as string).trim() !== "";
+    const extractedSelf =
+      m.is_own_guardian === true ||
+      m.is_own_guardian === "true" ||
+      m.is_own_guardian === undefined ||
+      m.is_own_guardian === null
+        ? defaultSelf || m.is_own_guardian === true || m.is_own_guardian === "true"
+        : false;
+    if (hasGuardianName && !extractedSelf) {
+      m.is_own_guardian = false;
+    } else {
+      m.is_own_guardian = true;
+      m.guardian_name = null;
+      m.guardian_phone = null;
+      m.guardian_relationship = null;
+      m.guardian_email = null;
+    }
+  };
+
   let recordId: string;
   if (subj.matched_record_id && subj.review_decision === "update") {
     recordId = subj.matched_record_id;
     if (Object.keys(mapped).length > 0) {
+      normalizeGuardianship(mapped, false);
       const { error } = await sb.from("clients").update(mapped).eq("id", recordId).eq("organization_id", orgId);
       if (error) throw new Error(`clients update: ${error.message}`);
     }
@@ -180,6 +240,22 @@ async function commitClient(
       const parts = (subj.display_name || "Imported").split(/\s+/);
       mapped.first_name = parts[0] ?? "Imported";
       mapped.last_name = parts.slice(1).join(" ") || "Client";
+    }
+    // Default to self-guardian on new clients unless the doc clearly named a separate guardian.
+    const hasGuardianName = typeof mapped.guardian_name === "string" && (mapped.guardian_name as string).trim() !== "";
+    const extractedSelf =
+      mapped.is_own_guardian === true ||
+      mapped.is_own_guardian === "true" ||
+      mapped.is_own_guardian === undefined ||
+      mapped.is_own_guardian === null;
+    if (hasGuardianName && !extractedSelf) {
+      mapped.is_own_guardian = false;
+    } else {
+      mapped.is_own_guardian = true;
+      mapped.guardian_name = null;
+      mapped.guardian_phone = null;
+      mapped.guardian_relationship = null;
+      mapped.guardian_email = null;
     }
     mapped.organization_id = orgId;
     mapped.account_status = "active";
@@ -212,8 +288,61 @@ async function commitClient(
   const unmapped = fields.filter((f) => !f.is_custom_attribute && !CLIENT_COL[f.target_field]);
   for (const u of unmapped) gaps.push(`Unmapped: ${u.target_field}`);
 
+  // Run the shared autofill so Smart Import seeds billing codes, goals,
+  // health arrays, etc. — same path as the per-client upload flow.
+  // The Smart Import extractor encodes structured values as JSON in `value`
+  // (billing_code_row, arrays, booleans); decode them back here so
+  // applyExtractedFieldsToClient sees value_json / value_array / value_bool.
+  try {
+    type NormField = {
+      field_key: string;
+      value_text?: string | null;
+      value_json?: unknown;
+      value_array?: string[] | null;
+      value_bool?: boolean | null;
+      confidence: number;
+    };
+    const norm: NormField[] = fields
+      .filter((f) => !f.is_custom_attribute)
+      .map((f) => {
+        const base: NormField = { field_key: f.target_field, confidence: 0.9 };
+        const v = f.value;
+        if (v == null || String(v).trim() === "") return base;
+        const s = String(v).trim();
+        if (f.target_field === "billing_code_row") {
+          try { base.value_json = JSON.parse(s); return base; } catch { /* fall through */ }
+        }
+        if (s.startsWith("[") || s.startsWith("{")) {
+          try {
+            const j = JSON.parse(s);
+            if (Array.isArray(j)) { base.value_array = j.map(String); return base; }
+            if (j && typeof j === "object") {
+              if (typeof (j as { bool?: unknown }).bool === "boolean") {
+                base.value_bool = (j as { bool: boolean }).bool;
+                return base;
+              }
+              base.value_json = j;
+              return base;
+            }
+          } catch { /* fall through */ }
+        }
+        base.value_text = s;
+        return base;
+      });
+    const apply = await applyExtractedFieldsToClient({
+      supabase: sb,
+      organizationId: orgId,
+      clientId: recordId,
+      fields: norm,
+    });
+    gaps.push(...apply.suggested.map((s) => `Review: ${s}`));
+  } catch (err) {
+    gaps.push(`Autofill warning: ${(err as Error).message}`);
+  }
+
   return recordId;
 }
+
 
 // --------------------------------------------------------------
 async function commitEmployee(
@@ -497,12 +626,12 @@ export const getDoneReadout = createServerFn({ method: "POST" })
     if (!job) throw new Error("Job not found");
 
     const { data: subjects } = await sb.from("import_subjects")
-      .select("id, display_name, subject_type, match_status, review_decision, committed_at, committed_record_id, commit_error")
+      .select("id, display_name, subject_type, match_status, review_decision, review_status, committed_at, committed_record_id, commit_error")
       .eq("import_job_id", data.jobId).order("created_at");
 
     const subjectSummaries: Array<{
       id: string; display_name: string; subject_type: string; committed: boolean;
-      record_id: string | null; error: string | null;
+      record_id: string | null; error: string | null; review_status: string;
       requirements_met: number; requirements_total: number; gaps: string[];
     }> = [];
 
@@ -525,6 +654,7 @@ export const getDoneReadout = createServerFn({ method: "POST" })
         committed: !!s.committed_at,
         record_id: s.committed_record_id,
         error: s.commit_error,
+        review_status: s.review_status ?? "pending",
         requirements_met: met,
         requirements_total: total,
         gaps,

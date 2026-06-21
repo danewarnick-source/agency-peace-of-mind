@@ -2619,6 +2619,7 @@ export type Database = {
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           feature_config: Json | null
+          field_confirmations: Json
           first_name: string
           geofence_radius_feet: number
           guardian_address: string | null
@@ -2656,6 +2657,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           feature_config?: Json | null
+          field_confirmations?: Json
           first_name: string
           geofence_radius_feet?: number
           guardian_address?: string | null
@@ -2693,6 +2695,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           feature_config?: Json | null
+          field_confirmations?: Json
           first_name?: string
           geofence_radius_feet?: number
           guardian_address?: string | null
@@ -8845,6 +8848,7 @@ export type Database = {
           account_contact_email: string | null
           account_contact_name: string | null
           additional_state_codes: string[]
+          approx_client_count: number | null
           billing_sms_phone: string | null
           created_at: string
           created_by: string | null
@@ -8858,7 +8862,10 @@ export type Database = {
           legal_name: string | null
           logo_url: string | null
           name: string
+          nectar_profile_saved_at: string | null
+          services_offered: string[] | null
           slug: string
+          specializations: string | null
           state_code: string | null
           updated_at: string
         }
@@ -8866,6 +8873,7 @@ export type Database = {
           account_contact_email?: string | null
           account_contact_name?: string | null
           additional_state_codes?: string[]
+          approx_client_count?: number | null
           billing_sms_phone?: string | null
           created_at?: string
           created_by?: string | null
@@ -8879,7 +8887,10 @@ export type Database = {
           legal_name?: string | null
           logo_url?: string | null
           name: string
+          nectar_profile_saved_at?: string | null
+          services_offered?: string[] | null
           slug: string
+          specializations?: string | null
           state_code?: string | null
           updated_at?: string
         }
@@ -8887,6 +8898,7 @@ export type Database = {
           account_contact_email?: string | null
           account_contact_name?: string | null
           additional_state_codes?: string[]
+          approx_client_count?: number | null
           billing_sms_phone?: string | null
           created_at?: string
           created_by?: string | null
@@ -8900,7 +8912,10 @@ export type Database = {
           legal_name?: string | null
           logo_url?: string | null
           name?: string
+          nectar_profile_saved_at?: string | null
+          services_offered?: string[] | null
           slug?: string
+          specializations?: string | null
           state_code?: string | null
           updated_at?: string
         }
@@ -9154,6 +9169,8 @@ export type Database = {
           must_change_password: boolean
           position: string | null
           positions: string[]
+          requires_abi: boolean
+          requires_deescalation: boolean
           ssn_last4: string | null
           staff_type_keys: string[]
           start_date: string | null
@@ -9189,6 +9206,8 @@ export type Database = {
           must_change_password?: boolean
           position?: string | null
           positions?: string[]
+          requires_abi?: boolean
+          requires_deescalation?: boolean
           ssn_last4?: string | null
           staff_type_keys?: string[]
           start_date?: string | null
@@ -9224,6 +9243,8 @@ export type Database = {
           must_change_password?: boolean
           position?: string | null
           positions?: string[]
+          requires_abi?: boolean
+          requires_deescalation?: boolean
           ssn_last4?: string | null
           staff_type_keys?: string[]
           start_date?: string | null
@@ -11190,6 +11211,59 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_baseline_training_completions: {
+        Row: {
+          completed_by: string | null
+          completed_date: string | null
+          created_at: string
+          evidence_document_id: string | null
+          expires_at: string | null
+          id: string
+          nectar_suggested_expires: boolean
+          notes: string | null
+          organization_id: string
+          staff_id: string
+          training_key: string
+          updated_at: string
+        }
+        Insert: {
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          evidence_document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          nectar_suggested_expires?: boolean
+          notes?: string | null
+          organization_id: string
+          staff_id: string
+          training_key: string
+          updated_at?: string
+        }
+        Update: {
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          evidence_document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          nectar_suggested_expires?: boolean
+          notes?: string | null
+          organization_id?: string
+          staff_id?: string
+          training_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_baseline_training_completions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_checklist_completion: {
         Row: {
           auto_checked_at: string | null
@@ -13059,6 +13133,7 @@ export type Database = {
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           feature_config: Json | null
+          field_confirmations: Json
           first_name: string
           geofence_radius_feet: number
           guardian_address: string | null

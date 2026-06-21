@@ -1,27 +1,13 @@
-// Shared document extraction engine backed by AWS Bedrock.
-// Used by both the Nectar document store (ingestDocument) and Smart Import.
-// Never checks LOVABLE_API_KEY — Bedrock credentials come from AWS_* env vars.
+// =============================================================
+// Shared document extractor — used by BOTH the per-client
+// uploader (src/lib/nectar-documents.functions.ts) and Smart
+// Import (src/lib/smart-import.functions.ts). One prompt, one
+// schema, one parser. Field keys here MUST match the keys that
+// applyExtractedFieldsToClient consumes in client-import-schema.ts.
+// =============================================================
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
 import { z } from "zod";
-
-// ---- Output schema ----
-
-export const BillingCodeOut = z.object({
-  service_code: z.string().min(1),
-  rate: z.number().optional().nullable(),
-  max_units: z.number().optional().nullable(),
-  unit_type: z.string().optional().nullable(),
-  plan_start: z.string().optional().nullable(),
-  plan_end: z.string().optional().nullable(),
-});
-export type BillingCode = z.infer<typeof BillingCodeOut>;
-
-export const GoalOut = z.object({
-  text: z.string().min(1),
-  goal_number: z.string().optional().nullable(),
-});
-export type Goal = z.infer<typeof GoalOut>;
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
 
 export const FieldOut = z.object({
   field_key: z.string().min(1).max(80),
@@ -29,161 +15,168 @@ export const FieldOut = z.object({
   value_text: z.string().max(2000).optional().nullable(),
   value_number: z.number().optional().nullable(),
   value_date: z.string().max(40).optional().nullable(),
-  value_json: z.unknown().optional().nullable(),
+  value_bool: z.boolean().optional().nullable(),
+  value_array: z.array(z.string().max(500)).max(50).optional().nullable(),
+  value_json: z.any().optional().nullable(),
   source_locator: z.string().max(200).optional().nullable(),
   confidence: z.number().min(0).max(1).optional().nullable(),
 });
-export type Field = z.infer<typeof FieldOut>;
+export type ExtractedFieldOut = z.infer<typeof FieldOut>;
 
-export const ExtractionOut = z.object({
+export const ParseOut = z.object({
   document_type: z.string().max(40).optional().nullable(),
   fiscal_year: z.string().max(20).optional().nullable(),
   effective_start: z.string().max(40).optional().nullable(),
   effective_end: z.string().max(40).optional().nullable(),
   medicaid_id: z.string().max(50).optional().nullable(),
   title: z.string().max(200).optional().nullable(),
-  display_name: z.string().max(200).optional().nullable(),
-  billing_codes: z.array(BillingCodeOut).default([]),
-  goals: z.array(GoalOut).default([]),
-  fields: z.array(FieldOut).max(200).default([]),
-  unfiled: z.array(z.string()).default([]),
+  fields: z.array(FieldOut).max(500).default([]),
 });
-export type ExtractionResult = z.infer<typeof ExtractionOut>;
+export type ParseOutT = z.infer<typeof ParseOut>;
 
-const EMPTY_RESULT: ExtractionResult = {
-  document_type: null,
-  fiscal_year: null,
-  effective_start: null,
-  effective_end: null,
-  medicaid_id: null,
-  title: null,
-  display_name: null,
-  billing_codes: [],
-  goals: [],
-  fields: [],
-  unfiled: [],
-};
+// The canonical set of field_keys the extractor is expected to produce
+// for client documents. applyExtractedFieldsToClient reads these names
+// directly; Smart Import uses this set to know what is NOT a custom
+// attribute. Keep in lockstep with client-import-schema.ts.
+export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
+  // Person
+  "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone", "plan_year",
+  // Address
+  "physical_address",
+  // Emergency contact (split, never one blob)
+  "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
+  // Guardian
+  "is_own_guardian", "guardian_name", "guardian_phone",
+  "guardian_relationship", "guardian_email", "guardian_address",
+  // Goals — ONE field per goal
+  "pcsp_goal",
+  // Health
+  "allergies", "dysphagia", "swallowing_alerts", "self_admin_med_support",
+  "clinical_alert", "special_directions",
+  // Medications — ONE field per medication + an overall presence boolean
+  "client_medication", "pcsp_has_medications",
+  // Billing — ONE field per authorized service code
+  "billing_code_row",
+  // Support coordinator
+  "support_coordinator_name", "support_coordinator_email", "support_coordinator_phone",
+  // Medical
+  "primary_care_name", "primary_care_phone",
+  "neurologist_name", "neurologist_phone",
+  "dentist_name", "dentist_phone",
+  "prescriber_name", "prescriber_phone",
+  "medical_insurance",
+  "diagnoses", "chronic_conditions", "immunizations",
+  "emergency_medical_treatment_authorization", "advanced_directives",
+  // Rights / behavior
+  "rights_restrictions", "bsp_status",
+  // Service plan
+  "staff_ratio", "preferred_activities", "preferred_living", "roommates",
+  "housing_voucher", "court_orders", "personal_belongings_inventory",
+  "team_name",
+]);
 
-// ---- Prompt ----
-
-const SYSTEM_PROMPT = `You are NECTAR, an extraction engine for a Utah DSPD provider compliance platform (HIVE).
+export const SYSTEM_PROMPT = `You are NECTAR, an extraction engine for a Utah DSPD provider compliance platform (HIVE).
 You receive raw text from a document (PCSP, 1056 budget, SOW, referral, intake, assessment, certification, contract, etc.).
+Take your time. Accuracy is more important than speed. Extract EVERY field that appears in the document.
 
-Return ONLY a single valid JSON object — no prose, no code fences, no commentary.
+Return STRICT JSON only. Use these conventions:
 
-Required top-level shape:
-{
-  "document_type": "pcsp"|"1056_budget"|"sow"|"referral"|"intake"|"assessment"|"certification"|"training"|"contract"|"evv_report"|"timesheet"|"incident_report"|"billing_record"|"other",
-  "fiscal_year": "FY26",
-  "effective_start": "yyyy-mm-dd",
-  "effective_end": "yyyy-mm-dd",
-  "medicaid_id": "digits only",
-  "title": "short doc title",
-  "display_name": "First Last (the client or employee this document is about)",
-  "billing_codes": [
-    {
-      "service_code": "HHS",
-      "rate": 125.00,
-      "max_units": 365,
-      "unit_type": "day",
-      "plan_start": "2026-07-01",
-      "plan_end": "2027-06-30"
-    }
-  ],
-  "goals": [
-    { "text": "Full goal text...", "goal_number": "1" }
-  ],
-  "fields": [
-    {
-      "field_key": "first_name",
-      "field_group": "person",
-      "value_text": "Jane",
-      "source_locator": "page 1",
-      "confidence": 0.97
-    }
-  ],
-  "unfiled": ["any sentence you could not place"]
-}
+document_type: one of pcsp | 1056_budget | sow | referral | intake | assessment | certification | training | contract | evv_report | timesheet | incident_report | billing_record | other
+fiscal_year: e.g. "FY26"
+effective_start / effective_end: ISO yyyy-mm-dd
+medicaid_id: digits only if present
 
-billing_codes rules:
-- One entry per authorization/service-code line — NEVER join into a string.
-- Include rate (numeric, per-unit dollar amount), max_units (annual total), unit_type (e.g. "quarter_hour", "day", "month").
+Each extracted field has: field_key, field_group, optional value_text / value_number / value_date / value_bool / value_array / value_json, source_locator, confidence (0..1).
+- Dates in value_date as ISO yyyy-mm-dd.
+- Booleans in value_bool.
+- Short string lists (allergies, diagnoses, chronic_conditions, swallowing_alerts, immunizations, preferred_activities, roommates, personal_belongings_inventory) in value_array — NEVER joined into one string.
+- Structured rows (per-code billing authorizations) in value_json.
 
-goals rules:
-- One entry per PCSP goal — NEVER join goals into a single string.
-- Capture goal_number if present (e.g. "1", "2a").
+Common field_key values to extract when present (use field_group to bucket related fields):
+  Person (group "person"): first_name, last_name, dob (value_date), medicaid_id, phone, plan_year
+  Address (group "address"): physical_address  -- client's service/home street address
+  Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_instructions
+    ALWAYS split name and phone into TWO separate fields. Never combine.
+  Guardian (group "guardian"): is_own_guardian (value_bool), guardian_name, guardian_phone,
+    guardian_relationship, guardian_email, guardian_address
+  Goals (group "goals"): pcsp_goal -- emit ONE field per distinct goal/objective in value_text.
+    PCSP goals often appear in a table (Goal / Objective / Support Code). Emit one pcsp_goal
+    per ROW, not one combined entry.
+  Health (group "health"): allergies (value_array), dysphagia (value_bool),
+    swallowing_alerts (value_array), self_admin_med_support (value_bool),
+    clinical_alert (value_text — any high-priority safety/clinical notice, e.g. choking risk),
+    special_directions (value_text — care/access notes)
+  Medications (group "medications"): emit ONE field per medication listed in the document with
+    field_key = "client_medication" and value_json = { name, dose, route, frequency, prn (bool), notes }.
+    ALSO emit a single field "pcsp_has_medications" with value_bool. Set TRUE if the document
+    lists ANY prescribed/administered medication (even one). Set FALSE only when the document
+    explicitly states no medications (e.g. "None", "No current medications", an empty
+    medications table, or there is no medications section at all). When uncertain, OMIT the
+    pcsp_has_medications field rather than guessing.
+  Billing (group "billing_code"): emit ONE field per authorized service code with
+    field_key = "billing_code_row" and
+    value_json = { service_code, rate, max_units, unit_type, weekly_cap_units, plan_start, plan_end, financial_eligibility }.
+    rate is the dollar rate per unit (a number, no "$"). max_units is the ANNUAL unit
+    authorization (an integer, e.g. 3120 for DSI, 960 for SEI). unit_type is "15 min"
+    or "day" or "session" or "month" exactly as printed. Read EVERY row of the
+    authorization table; do not collapse multiple codes into one.
+  SOW (group "sow_clause"): clause_number, required_document, obligation, deadline
+  Certification (group "cert"): cert_name, issued_at, expires_at, issuing_body
+  Support coordinator (group "support_coordinator"): support_coordinator_name,
+    support_coordinator_email, support_coordinator_phone
+  Medical (group "medical"): primary_care_name, primary_care_phone,
+    neurologist_name, neurologist_phone, dentist_name, dentist_phone,
+    prescriber_name, prescriber_phone, medical_insurance,
+    diagnoses (value_array), chronic_conditions (value_array),
+    immunizations (value_array),
+    emergency_medical_treatment_authorization (value_bool),
+    advanced_directives (value_text)
+  Rights & behavior (group "rights"): rights_restrictions (value_text),
+    bsp_status (value_text)
+  Service plan (group "service_plan"): staff_ratio (value_text e.g. "1:1"),
+    preferred_activities (value_array), preferred_living (value_text),
+    roommates (value_array), housing_voucher (value_text),
+    court_orders (value_text), personal_belongings_inventory (value_array),
+    team_name (value_text)
 
-fields[] — use these field_key / field_group values when the data is present:
-  Person        (group "person"):                first_name, last_name, date_of_birth, medicaid_id, phone, address
-  Emergency     (group "emergency_contact"):     emergency_contact_name, emergency_contact_phone
-  Guardian      (group "guardian"):              guardian_name, guardian_phone, guardian_relationship
-  Coordinator   (group "support_coordinator"):   support_coordinator_name, support_coordinator_phone, support_coordinator_email
-  Medical       (group "medical"):               allergies, dysphagia, diagnoses, medications
-  Billing meta  (group "billing_code"):          financial_eligibility
-  Certification (group "cert"):                  cert_name, issued_at, expires_at, issuing_body
+For each field include source_locator (e.g. "page 3", "§4.2", "row 12 of budget table") and a confidence 0..1.
+Never invent data — omit fields not present. Return ONLY JSON, no commentary.`;
 
-For any field not listed above, invent a snake_case field_key; it will be stored as a custom attribute.
-
-Rules:
-- Dates as ISO yyyy-mm-dd whenever possible.
-- confidence 0..1; omit or set null if you have no supporting text.
-- Never invent data. If a field isn't in the document, omit it.
-- Return ONLY the JSON object.`;
-
-// ---- Main export ----
-
-export async function extractDocumentFields(
+export async function parseDocumentWithAI(
   documentText: string,
   hint?: string,
-): Promise<ExtractionResult> {
-  const truncated = documentText.slice(0, 60_000);
-
+): Promise<ParseOutT> {
   const res = await gatewayFetch({
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
-        content: `${hint ? `HINT: ${hint}\n\n` : ""}DOCUMENT TEXT:\n\n${truncated}`,
+        content: `${hint ? `HINT: ${hint}\n\n` : ""}DOCUMENT TEXT:\n\n${documentText.slice(0, 120_000)}`,
       },
     ],
     response_format: { type: "json_object" },
-    max_tokens: 4096,
   });
-
+  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+  if (res.status === 401)
+    throw new Error(
+      "AWS Bedrock credentials are not configured (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / BEDROCK_MODEL_ID).",
+    );
   if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
-    if (res.status === 401)
-      throw new Error(
-        "AWS Bedrock credentials are not configured (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / BEDROCK_MODEL_ID).",
-      );
-    throw new Error(`AI extraction failed (${res.status}): ${errText.slice(0, 300)}`);
+    const t = await res.text().catch(() => "");
+    throw new Error(`AI gateway error ${res.status}: ${t.slice(0, 200)}`);
   }
-
   const body = await res.json();
-  const rawContent: string = body?.choices?.[0]?.message?.content ?? "";
-
-  if (!rawContent) {
+  const content: string = body?.choices?.[0]?.message?.content ?? "{}";
+  if (!content || content === "{}") {
     console.error("[document-extraction] Bedrock returned empty content");
-    throw new Error("AI returned an empty response. The document may be unreadable.");
   }
-
   let parsed: unknown;
   try {
-    const clean = rawContent
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/i, "")
-      .trim();
+    const clean = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     parsed = JSON.parse(clean || "{}");
   } catch {
-    console.error("[document-extraction] malformed JSON snippet:", rawContent.slice(0, 300));
     throw new Error("AI returned malformed JSON. The document may be unreadable.");
   }
-
-  const result = ExtractionOut.safeParse(parsed);
-  if (!result.success) {
-    console.warn("[document-extraction] schema mismatch, partial result:", JSON.stringify(parsed).slice(0, 300));
-    return EMPTY_RESULT;
-  }
-  return result.data;
+  const result = ParseOut.safeParse(parsed);
+  return result.success ? result.data : { fields: [] };
 }

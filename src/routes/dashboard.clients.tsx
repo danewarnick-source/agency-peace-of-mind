@@ -39,6 +39,7 @@ import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-gui
 import { JOB_CODES, jobCodeLabel } from "@/lib/job-codes";
 import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselect";
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
+import { isDailyServiceCode } from "@/lib/service-billing";
 import { LivingArrangementFlag } from "@/components/clients/living-arrangement-flag";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { ClientIntakeChecklistCard } from "@/components/clients/client-intake-checklist-card";
@@ -168,21 +169,9 @@ const FEATURE_TOGGLES: { key: string; label: string; description: string; wired?
 
 // ─── Geocoding helpers (preserved exactly) ───────────────────────────────────
 
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-    const res = await fetch(url, {
-      headers: { "Accept": "application/json", "User-Agent": "CareAcademyEVV/1.0 (compliance@careacademy.app)" },
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as Array<{ lat: string; lon: string }>;
-    if (!Array.isArray(json) || !json.length) return null;
-    const lat = parseFloat(json[0].lat);
-    const lng = parseFloat(json[0].lon);
-    if (!isFinite(lat) || !isFinite(lng)) return null;
-    return { lat, lng };
-  } catch { return null; }
-}
+import { geocodeAddress } from "@/lib/geocode";
+
+
 
 function getBrowserPosition(): Promise<{ lat: number; lng: number }> {
   return new Promise((resolve, reject) => {
@@ -264,11 +253,39 @@ export function ClientsPage() {
     },
   });
 
+  // Surface Smart Import jobs whose ready subjects never finished committing,
+  // so the directory makes their absence obvious instead of silently hiding them.
+  const { data: stuckImports = [] } = useQuery({
+    enabled: !!org,
+    queryKey: ["clients-uncommitted-imports", org?.organization_id],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("import_subjects")
+        .select("import_job_id, import_jobs!inner(id, org_id, mode, status)")
+        .eq("subject_type", "client")
+        .eq("review_status", "ready")
+        .is("committed_at", null)
+        .eq("import_jobs.org_id", org!.organization_id);
+      if (error) return [];
+      const seen = new Set<string>();
+      const jobs: string[] = [];
+      for (const row of (data ?? []) as Array<{ import_job_id: string }>) {
+        if (!seen.has(row.import_job_id)) {
+          seen.add(row.import_job_id);
+          jobs.push(row.import_job_id);
+        }
+      }
+      return jobs;
+    },
+  });
+
   const navigate = useNavigate();
 
   const addMutation = useMutation({
     mutationFn: async (input: ClientFormValues & { intake_mode: "intake" | "profile-only" }) => {
       const coords = await resolveCoords(input.physical_address);
+      const isOwn = input.is_own_guardian ?? true;
       const { data, error } = await (supabase as any).from("clients").insert({
         organization_id:      org!.organization_id,
         first_name:           input.first_name,
@@ -287,8 +304,30 @@ export function ClientsPage() {
         home_latitude:        coords.lat,
         home_longitude:       coords.lng,
         intake_status:        input.intake_mode === "intake" ? "in_progress" : "pending",
+        is_own_guardian:      isOwn,
+        guardian_name:        isOwn ? null : (input.guardian_name?.trim() || null),
+        guardian_phone:       isOwn ? null : (input.guardian_phone?.trim() || null),
+        guardian_relationship:isOwn ? null : (input.guardian_relationship?.trim() || null),
+        guardian_email:       isOwn ? null : (input.guardian_email?.trim() || null),
       }).select("id").single();
       if (error) throw error;
+
+      const codes = (input.job_code ?? []).map((c) => c.toUpperCase()).filter(Boolean);
+      if (codes.length) {
+        const stubRows = codes.map((service_code) => ({
+          organization_id: org!.organization_id,
+          client_id: data!.id,
+          service_code,
+          unit_type: isDailyServiceCode(service_code) ? "day" : "unit",
+          annual_unit_authorization: 0,
+          rate_per_unit: 0,
+        }));
+        const { error: bcErr } = await (supabase as any)
+          .from("client_billing_codes")
+          .upsert(stubRows, { onConflict: "organization_id,client_id,service_code" });
+        if (bcErr) throw bcErr;
+      }
+
       return { id: data!.id as string, mode: input.intake_mode };
     },
     onSuccess: ({ id, mode }) => {
@@ -382,6 +421,21 @@ export function ClientsPage() {
     <div className="space-y-5">
       <OnboardingReturnBar />
       <OnboardingGuidanceBanner step={4} />
+
+      {stuckImports.length > 0 && (
+        <Link
+          to="/dashboard/smart-import/$jobId/done"
+          params={{ jobId: stuckImports[0] }}
+          className="flex items-center justify-between gap-3 rounded-lg border border-amber-300/60 bg-amber-50/60 px-4 py-2.5 text-sm hover:bg-amber-50 dark:bg-amber-950/20 dark:hover:bg-amber-950/30"
+        >
+          <span className="flex items-center gap-2 text-amber-900 dark:text-amber-300">
+            <AlertTriangle className="h-4 w-4" />
+            {stuckImports.length} Smart Import {stuckImports.length === 1 ? "job has" : "jobs have"} uncommitted client{stuckImports.length === 1 ? "" : "s"} — finish import to add them here.
+          </span>
+          <span className="font-medium text-amber-900 dark:text-amber-300">Finish import →</span>
+        </Link>
+      )}
+
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -2067,6 +2121,9 @@ function ProfileTab({
         id={client.id}
         fullName={`${client.first_name} ${client.last_name}`.trim()}
         organizationId={orgId}
+        onDeleted={() => {
+          window.location.assign("/dashboard/hub/clients");
+        }}
       />
     </div>
 
@@ -2811,8 +2868,14 @@ function AddClientDialog({
   const [jobCodes, setJobCodes]   = useState<string[]>([]);
   const [radius, setRadius]       = useState(1000);
   const [pinning, setPinning]     = useState(false);
+  const [isOwnGuardian, setIsOwnGuardian] = useState(true);
+  const [gName, setGName]         = useState("");
+  const [gPhone, setGPhone]       = useState("");
+  const [gRel, setGRel]           = useState("");
+  const [gEmail, setGEmail]       = useState("");
 
-  const canSubmit = first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim();
+  const guardianInvalid = !isOwnGuardian && (!gName.trim() || !gPhone.trim());
+  const canSubmit = first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim() && !guardianInvalid;
 
   if (!mode) {
     return (
@@ -2917,6 +2980,37 @@ function AddClientDialog({
             </SelectContent>
           </Select>
         </div>
+
+        <div className="rounded-lg border border-border p-3 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+            <Checkbox checked={isOwnGuardian} onCheckedChange={(v) => setIsOwnGuardian(!!v)} />
+            Client is their own guardian
+          </label>
+          {!isOwnGuardian && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Guardian Name *</Label>
+                  <Input value={gName} onChange={(e) => setGName(e.target.value)} maxLength={150} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Guardian Phone *</Label>
+                  <Input value={gPhone} onChange={(e) => setGPhone(e.target.value)} maxLength={30} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Relationship</Label>
+                  <Input value={gRel} onChange={(e) => setGRel(e.target.value)} maxLength={100} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold">Guardian Email</Label>
+                  <Input value={gEmail} onChange={(e) => setGEmail(e.target.value)} maxLength={150} type="email" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       <DialogFooter>
         <Button
@@ -2928,6 +3022,11 @@ function AddClientDialog({
             special_directions: "", date_of_birth: "",
             emergency_contact_name: "", emergency_contact_phone: "",
             profile_photo_url: "",
+            is_own_guardian: isOwnGuardian,
+            guardian_name: isOwnGuardian ? "" : gName.trim(),
+            guardian_phone: isOwnGuardian ? "" : gPhone.trim(),
+            guardian_relationship: isOwnGuardian ? "" : gRel.trim(),
+            guardian_email: isOwnGuardian ? "" : gEmail.trim(),
             intake_mode: mode,
           })}
           disabled={!canSubmit || pending}

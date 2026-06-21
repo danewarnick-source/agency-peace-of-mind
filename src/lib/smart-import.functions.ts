@@ -9,7 +9,8 @@ import { z } from "zod";
 import { Buffer } from "node:buffer";
 
 
-import { extractDocumentFields } from "@/lib/document-extraction";
+import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { parseDocumentWithAI, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
 
 // ----- Input schemas -----
 const ModeEnum = z.enum(["employee", "client"]);
@@ -66,6 +67,21 @@ const JobIdInput = z.object({ jobId: z.string().uuid() });
 const CORE_CLIENT = [
   "first_name", "last_name", "full_name", "date_of_birth", "phone",
   "address", "medicaid_id", "job_code", "team_name",
+  "is_own_guardian", "guardian_name", "guardian_phone", "guardian_relationship", "guardian_email",
+  "emergency_contact_name", "emergency_contact_phone",
+  // SOW-required client record
+  "support_coordinator_name", "support_coordinator_email", "support_coordinator_phone",
+  "primary_care_name", "primary_care_phone",
+  "neurologist_name", "neurologist_phone",
+  "dentist_name", "dentist_phone",
+  "prescriber_name", "prescriber_phone",
+  "medical_insurance",
+  "diagnoses", "chronic_conditions", "immunizations",
+  "emergency_medical_treatment_authorization", "advanced_directives",
+  "rights_restrictions", "bsp_status",
+  "staff_ratio", "preferred_activities", "preferred_living", "roommates",
+  "housing_voucher", "court_orders", "personal_belongings_inventory",
+  "emergency_contact_instructions",
 ] as const;
 const CORE_EMPLOYEE = [
   "full_name", "first_name", "last_name", "email", "phone",
@@ -85,7 +101,42 @@ const HEURISTICS: Record<string, string[]> = {
   medicaid_id: ["medicaid", "medicaid id", "client id", "member id"],
   job_code: ["job code", "service code", "auth code"],
   date_of_birth: ["dob", "date of birth", "birth date", "birthday"],
+  guardian_name: ["guardian", "guardian name", "legal guardian"],
+  guardian_phone: ["guardian phone", "guardian contact"],
+  guardian_relationship: ["guardian relationship", "relationship to guardian"],
+  guardian_email: ["guardian email"],
+  emergency_contact_name: ["emergency contact", "emergency contact name"],
+  emergency_contact_phone: ["emergency phone", "emergency contact phone"],
+  // SOW-required
+  support_coordinator_name: ["support coordinator", "sc name", "coordinator name", "support coordinator name"],
+  support_coordinator_email: ["sc email", "support coordinator email", "coordinator email"],
+  support_coordinator_phone: ["sc phone", "support coordinator phone", "coordinator phone"],
+  primary_care_name: ["pcp", "primary care", "primary care physician", "primary care provider", "pcp name"],
+  primary_care_phone: ["pcp phone", "primary care phone"],
+  neurologist_name: ["neurologist", "neurologist name"],
+  neurologist_phone: ["neurologist phone"],
+  dentist_name: ["dentist", "dentist name"],
+  dentist_phone: ["dentist phone"],
+  prescriber_name: ["prescriber", "prescriber name", "psychiatrist"],
+  prescriber_phone: ["prescriber phone", "psychiatrist phone"],
+  medical_insurance: ["insurance", "medical insurance", "health insurance", "payer"],
+  diagnoses: ["diagnosis", "diagnoses", "dx"],
+  chronic_conditions: ["chronic", "chronic conditions", "conditions"],
+  immunizations: ["immunizations", "vaccines", "vaccinations"],
+  emergency_medical_treatment_authorization: ["emergency medical treatment", "emt authorization", "treatment authorization"],
+  advanced_directives: ["advanced directive", "advanced directives", "advance directive"],
+  rights_restrictions: ["rights restriction", "rights restrictions", "rights modification"],
+  bsp_status: ["bsp", "behavior support plan", "bsp status"],
+  staff_ratio: ["staff ratio", "ratio", "staffing ratio"],
+  preferred_activities: ["preferred activities", "activities", "interests"],
+  preferred_living: ["preferred living", "living preference", "living arrangement"],
+  roommates: ["roommates", "roommate", "housemates"],
+  housing_voucher: ["housing voucher", "voucher", "section 8"],
+  court_orders: ["court order", "court orders", "legal order"],
+  personal_belongings_inventory: ["belongings", "personal belongings", "inventory"],
+  emergency_contact_instructions: ["emergency instructions", "emergency contact instructions"],
 };
+
 
 function guessCore(header: string, mode: "employee" | "client"): string | null {
   const norm = header.toLowerCase().trim();
@@ -565,114 +616,147 @@ async function extractDocxText(buf: Buffer): Promise<string> {
   return (result?.value as string) ?? "";
 }
 
-// ---- 2) AI field extraction — Bedrock via shared document-extraction module ----
-
-// Core fields per mode that map directly to DB columns or well-known attributes.
-const KNOWN_CLIENT_FIELDS = new Set([
-  "first_name", "last_name", "full_name", "date_of_birth", "phone", "address",
-  "medicaid_id", "job_code", "team_name",
-  "allergies", "dysphagia", "diagnoses", "medications",
-  "guardian_name", "guardian_phone", "guardian_relationship",
-  "emergency_contact_name", "emergency_contact_phone",
-  "support_coordinator_name", "support_coordinator_phone", "support_coordinator_email",
-  "pcsp_goal", "service_code",
-]);
-const KNOWN_EMPLOYEE_FIELDS = new Set([
-  "full_name", "first_name", "last_name", "email", "phone",
-  "position", "hire_date", "team_name",
-]);
-
+// ---- 2) AI field extraction (shared extractor: same prompt / schema as
+//        the per-client uploader). Emits one row per billing_code_row and
+//        one row per pcsp_goal so the PCSP's billing table and goal list
+//        are preserved end-to-end.
 async function aiExtractFieldsFromText(
   text: string,
   mode: "employee" | "client",
 ): Promise<{ display_name: string; fields: ExtractedFieldOut[]; unfiled: string[] }> {
-  if (!text || text.trim().length < 30) {
-    throw new Error(
-      "PDF could not be read: the file contains no extractable text. " +
-        "It may be a scanned image — paste the text directly or upload a text-based PDF.",
-    );
+  if (mode === "employee") {
+    return aiExtractEmployeeFieldsFromText(text);
   }
 
-  const result = await extractDocumentFields(text, `mode=${mode}`);
+  const parsed = await parseDocumentWithAI(text, `subject=client`);
 
-  const knownSet = mode === "client" ? KNOWN_CLIENT_FIELDS : KNOWN_EMPLOYEE_FIELDS;
+  const out: ExtractedFieldOut[] = [];
+  const ARRAY_KEYS = new Set([
+    "allergies", "swallowing_alerts", "diagnoses", "chronic_conditions",
+    "immunizations", "preferred_activities", "roommates",
+    "personal_belongings_inventory",
+  ]);
+
+  for (const f of parsed.fields ?? []) {
+    const key = String(f.field_key || "").trim();
+    if (!key) continue;
+    const isKnown = CORE_CLIENT_FIELD_KEYS.has(key);
+    const conf = typeof f.confidence === "number"
+      ? Math.max(0, Math.min(1, f.confidence))
+      : 0.85;
+    const snippet = String(f.source_locator || f.value_text || "").slice(0, 200);
+    const base = {
+      target_field: key,
+      status: ("placed" as const),
+      confidence: conf,
+      snippet,
+      provenance: (isKnown ? "source" : "inferred") as "source" | "inferred",
+      is_custom: !isKnown,
+    };
+
+    // Billing code row → JSON-encode value_json so the commit can read it back
+    if (key === "billing_code_row" && f.value_json && typeof f.value_json === "object") {
+      out.push({ ...base, value: JSON.stringify(f.value_json) });
+      continue;
+    }
+    // Boolean → JSON {bool:true|false}
+    if (typeof f.value_bool === "boolean") {
+      out.push({ ...base, value: JSON.stringify({ bool: f.value_bool }) });
+      continue;
+    }
+    // Array fields → JSON array
+    if (Array.isArray(f.value_array) && f.value_array.length) {
+      out.push({ ...base, value: JSON.stringify(f.value_array) });
+      continue;
+    }
+    if (ARRAY_KEYS.has(key) && f.value_text) {
+      const arr = f.value_text.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+      if (arr.length > 1) {
+        out.push({ ...base, value: JSON.stringify(arr) });
+        continue;
+      }
+    }
+    // Date / number / text → store as string in `value`
+    const v = f.value_date || (typeof f.value_number === "number" ? String(f.value_number) : f.value_text || "");
+    if (!v || !String(v).trim()) continue;
+    out.push({ ...base, value: String(v).trim() });
+  }
+
+  // Derive a display name from extracted person fields.
+  const get = (k: string) => out.find((r) => r.target_field === k)?.value;
+  const full = get("full_name");
+  const fn = get("first_name");
+  const ln = get("last_name");
+  const display = (full || `${fn ?? ""} ${ln ?? ""}`.trim() || "Imported client").trim();
+
+  return { display_name: display, fields: out, unfiled: [] };
+}
+
+// Employee path keeps the lighter flat-field prompt (no PCSP-specific structure).
+async function aiExtractEmployeeFieldsFromText(
+  text: string,
+): Promise<{ display_name: string; fields: ExtractedFieldOut[]; unfiled: string[] }> {
+  const targetFields = [
+    "full_name", "first_name", "last_name", "email", "phone",
+    "position", "hire_date", "team_name",
+  ];
+  const system = `You extract structured fields from a Utah DSPD employee / HR document.
+Return STRICT JSON: { "display_name": string, "fields": Array<{ "target_field": string, "value": string, "confidence": number, "source_snippet": string }>, "unfiled": string[] }
+Allowed core targets: ${targetFields.join(", ")}.
+Rules: dates ISO YYYY-MM-DD; never invent data; return ONLY JSON.`;
+  const truncated = text.length > 60_000 ? text.slice(0, 60_000) : text;
+  const res = await gatewayFetch({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `Extract from this document text:\n\n${truncated}` },
+    ],
+    response_format: { type: "json_object" },
+  });
+  if (res.status === 429) throw new Error("AI is busy (rate limit). Try again in a moment.");
+  if (res.status === 401) throw new Error("AWS Bedrock credentials are not configured.");
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`AI extraction failed (${res.status}): ${t.slice(0, 200)}`);
+  }
+  const body = await res.json();
+  const raw: string = body?.choices?.[0]?.message?.content ?? "{}";
+  let parsed: {
+    display_name?: string;
+    fields?: Array<{ target_field: string; value: string; confidence?: number; source_snippet?: string }>;
+    unfiled?: string[];
+  };
+  try { parsed = JSON.parse(raw); } catch {
+    throw new Error("AI returned malformed JSON; document may be unreadable.");
+  }
+  const knownSet = new Set(targetFields);
   const fields: ExtractedFieldOut[] = [];
-
-  // Flat fields
-  for (const f of result.fields) {
-    const tf = String(f.field_key || "").trim();
-    const val = String(f.value_text ?? f.value_date ?? f.value_number ?? "").trim();
+  for (const f of parsed.fields ?? []) {
+    const tf = String(f.target_field || "").trim();
+    const val = String(f.value ?? "").trim();
     if (!tf || !val) continue;
     const isKnown = knownSet.has(tf);
     const malformed = isKnown && looksMalformed(tf, val);
     const conf = typeof f.confidence === "number" ? Math.max(0, Math.min(1, f.confidence)) : 0.8;
     fields.push({
-      target_field: tf,
-      value: val,
+      target_field: tf, value: val,
       status: malformed ? "flag" : isKnown ? "placed" : "review",
       confidence: malformed ? Math.min(conf, 0.55) : conf,
-      snippet: String(f.source_locator ?? val).slice(0, 200),
+      snippet: String(f.source_snippet || val).slice(0, 200),
       provenance: isKnown ? "source" : "inferred",
       is_custom: !isKnown,
     });
   }
-
-  // Client-only: expand goals and billing codes into individual rows
-  if (mode === "client") {
-    for (const g of result.goals) {
-      const val = g.goal_number ? `${g.goal_number}: ${g.text}` : g.text;
-      fields.push({
-        target_field: "pcsp_goal",
-        value: val,
-        status: "placed",
-        confidence: 0.9,
-        snippet: val.slice(0, 200),
-        provenance: "source",
-        is_custom: true,
-      });
-    }
-
-    for (const bc of result.billing_codes) {
-      if (!bc.service_code) continue;
-      fields.push({
-        target_field: "service_code",
-        value: JSON.stringify(bc),
-        status: "placed",
-        confidence: 0.9,
-        snippet: `${bc.service_code} rate=${bc.rate ?? "?"} units=${bc.max_units ?? "?"}`,
-        provenance: "source",
-        is_custom: true,
-      });
-    }
-  }
-
-  if (fields.length === 0) {
-    console.warn(
-      "[smart-import] AI returned no fields. display_name=%s goals=%d codes=%d unfiled=%d",
-      result.display_name,
-      result.goals.length,
-      result.billing_codes.length,
-      result.unfiled.length,
-    );
-    throw new Error(
-      "AI returned no fields from this document. " +
-        "The text was present but the model found nothing to extract — " +
-        "check that the document is a PCSP or intake form.",
-    );
-  }
-
-  let display = (result.display_name ?? "").trim();
+  let display = String(parsed.display_name || "").trim();
   if (!display) {
     const fn = fields.find((f) => f.target_field === "first_name")?.value;
     const ln = fields.find((f) => f.target_field === "last_name")?.value;
     const full = fields.find((f) => f.target_field === "full_name")?.value;
     display = full || `${fn ?? ""} ${ln ?? ""}`.trim() || "Imported subject";
   }
-
   return {
     display_name: display,
     fields,
-    unfiled: (result.unfiled).filter((s) => s.length > 4).slice(0, 20),
+    unfiled: (parsed.unfiled ?? []).map((s) => String(s)).filter((s) => s.length > 4).slice(0, 20),
   };
 }
 

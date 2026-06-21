@@ -26,6 +26,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   useSchedulerData, startOfWeek, startOfDay, startOfMonth,
   type SchedClient, type SchedStaff, type SchedShift,
@@ -261,12 +262,18 @@ function SchedulerBody({
 }) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
+  const { can } = usePermissions();
+  const canManageSchedule = can("manage_schedule");
   const [addOpen, setAddOpen] = useState(false);
   const [addPrefill, setAddPrefill] = useState<{ clientId?: string; code?: string; day?: Date } | null>(null);
   const [detailShiftId, setDetailShiftId] = useState<string | null>(null);
   const [hhsClientForHours, setHhsClientForHours] = useState<SchedClient | null>(null);
 
   function openAdd(prefill?: { clientId?: string; code?: string; day?: Date }) {
+    if (!canManageSchedule) {
+      toast.error("You don't have permission to create or edit shifts.");
+      return;
+    }
     setAddPrefill(prefill ?? null);
     setAddOpen(true);
   }
@@ -905,8 +912,12 @@ function AddShiftDialog({
   const toggleWeekday = (n: number) =>
     setWeekdays((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort());
 
+  const { can } = usePermissions();
+  const canManageSchedule = can("manage_schedule");
+
   const saveMut = useMutation({
     mutationFn: async () => {
+      if (!canManageSchedule) throw new Error("You don't have permission to create or edit shifts.");
       const starts = new Date(`${date}T${start}:00`).toISOString();
       const ends = new Date(`${date}T${end}:00`).toISOString();
       const res = await save({
@@ -1102,7 +1113,8 @@ function AddShiftDialog({
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             onClick={() => saveMut.mutate()}
-            disabled={!clientId || !code || saveMut.isPending}
+            disabled={!clientId || !code || saveMut.isPending || !canManageSchedule}
+            
             style={{ background: GOLD, color: NAVY }}
           >
             {saveMut.isPending ? "Saving…" : "Add shift"}
@@ -1151,9 +1163,13 @@ function ShiftDetailPanel({
     ? sched.staff.filter((s) => s.name.toLowerCase().includes(search.toLowerCase())).slice(0, 8)
     : [];
 
+  const { can } = usePermissions();
+  const canManageSchedule = can("manage_schedule");
+
   const assign = useMutation({
-    mutationFn: (newStaffId: string | null) =>
-      save({
+    mutationFn: (newStaffId: string | null) => {
+      if (!canManageSchedule) throw new Error("You don't have permission to edit shifts.");
+      return save({
         data: {
           id: shift.id,
           organization_id: org!.organization_id,
@@ -1166,7 +1182,8 @@ function ShiftDetailPanel({
           status: shift.status,
           published: shift.published,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Updated.");
       qc.invalidateQueries({ queryKey: ["scheduler-data"] });
@@ -1175,8 +1192,9 @@ function ShiftDetailPanel({
   });
 
   const dupMut = useMutation({
-    mutationFn: () =>
-      save({
+    mutationFn: () => {
+      if (!canManageSchedule) throw new Error("You don't have permission to create shifts.");
+      return save({
         data: {
           organization_id: org!.organization_id,
           client_id: shift.client_id,
@@ -1188,7 +1206,8 @@ function ShiftDetailPanel({
           status: "pending",
           published: false,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Duplicated.");
       qc.invalidateQueries({ queryKey: ["scheduler-data"] });
@@ -1197,7 +1216,10 @@ function ShiftDetailPanel({
   });
 
   const delMut = useMutation({
-    mutationFn: () => del({ data: { id: shift.id, organization_id: org!.organization_id } }),
+    mutationFn: () => {
+      if (!canManageSchedule) throw new Error("You don't have permission to delete shifts.");
+      return del({ data: { id: shift.id, organization_id: org!.organization_id } });
+    },
     onSuccess: () => {
       toast.success("Deleted.");
       qc.invalidateQueries({ queryKey: ["scheduler-data"] });
@@ -1231,11 +1253,15 @@ function ShiftDetailPanel({
       </div>
 
       <div className="p-4 space-y-4 overflow-y-auto">
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled><Edit2 className="h-3.5 w-3.5 mr-1" /> Edit</Button>
-          <Button size="sm" variant="outline" onClick={() => dupMut.mutate()} disabled={dupMut.isPending}><Copy className="h-3.5 w-3.5 mr-1" /> Duplicate</Button>
-          <Button size="sm" variant="outline" onClick={() => { if (confirm("Delete this shift?")) delMut.mutate(); }} disabled={delMut.isPending}><Trash2 className="h-3.5 w-3.5 mr-1" /> Delete</Button>
-        </div>
+        {canManageSchedule ? (
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled><Edit2 className="h-3.5 w-3.5 mr-1" /> Edit</Button>
+            <Button size="sm" variant="outline" onClick={() => dupMut.mutate()} disabled={dupMut.isPending}><Copy className="h-3.5 w-3.5 mr-1" /> Duplicate</Button>
+            <Button size="sm" variant="outline" onClick={() => { if (confirm("Delete this shift?")) delMut.mutate(); }} disabled={delMut.isPending}><Trash2 className="h-3.5 w-3.5 mr-1" /> Delete</Button>
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground">View only — you don't have permission to edit shifts.</div>
+        )}
 
         <div className="text-sm">
           <div className="font-semibold">{start.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
@@ -1246,6 +1272,7 @@ function ShiftDetailPanel({
           <Select
             value={shift.staff_id ?? "__open__"}
             onValueChange={(v) => assign.mutate(v === "__open__" ? null : v)}
+            disabled={!canManageSchedule}
           >
             <SelectTrigger>
               <SelectValue>

@@ -85,6 +85,8 @@ const TIMEZONES = [
   { v: "America/New_York",    l: "Eastern" },
 ];
 
+const MAX_GPS_ACCURACY_METERS = 100; // readings worse (larger) than this are too coarse to trust
+
 import { haversineFeet as _sharedHaversineFeet } from "@/lib/geo";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -154,6 +156,8 @@ export function PunchPad({
   const [hardwareDenied, setHardwareDenied] = useState(false);
   const [gpsAcquiring, setGpsAcquiring] = useState(true);
   const [awaitingGps, setAwaitingGps] = useState(false);
+
+  const gpsConfident = !!livePos && isFinite(livePos.acc) && livePos.acc <= MAX_GPS_ACCURACY_METERS;
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
@@ -230,7 +234,7 @@ export function PunchPad({
 
   // ── Clock-out variance state ────────────────────────────────────────────────
   const [outVariance, setOutVariance] = useState<null | {
-    distanceFeet: number;
+    distanceFeet?: number;
     limitFeet: number;
     pos: { lat: number; lng: number; acc: number };
   }>(null);
@@ -514,9 +518,11 @@ export function PunchPad({
       : null;
 
   const insideZone =
-    homeCoords && livePos
+    homeCoords && livePos && gpsConfident
       ? haversineFeet(homeCoords, livePos) <= mapRadiusFeet
-      : true;
+      : homeCoords && livePos
+        ? false
+        : true;
 
   // ── Readiness guard ─────────────────────────────────────────────────────────
   const requireFacility = entryType === "General_Sidebar_Unscheduled";
@@ -536,7 +542,9 @@ export function PunchPad({
       return { text: "📍 GPS confirmed. Select a service code above.", color: "neutral" as const };
     if (!isEvvLockedCode(serviceCode))
       return { text: `🛈 ${serviceCode} — GPS logged passively, geofence not enforced for this code.`, color: "neutral" as const };
-    const matchedHere = livePos ? matchApprovedLocation({ lat: livePos.lat, lng: livePos.lng }) : null;
+    if (livePos && !gpsConfident)
+      return { text: `📡 GPS signal is too weak to confirm your location (±${Math.round(livePos.acc)} m). A written variance will be required when you clock in.`, color: "amber" as const };
+    const matchedHere = livePos && gpsConfident ? matchApprovedLocation({ lat: livePos.lat, lng: livePos.lng }) : null;
     if (matchedHere)
       return { text: `🟢 GPS confirmed — inside approved location "${matchedHere.label}". No variance required.`, color: "green" as const };
     if (insideZone)
@@ -590,9 +598,10 @@ export function PunchPad({
     if (!user || !org || !clientForPunch) return;
     const nowIso = new Date().toISOString();
     const isOutOfBounds = !!args.outsideReason;
-    const matched = args.pos
-      ? matchApprovedLocation({ lat: args.pos.lat, lng: args.pos.lng })
-      : null;
+    const matched =
+      args.pos && isFinite(args.pos.acc) && args.pos.acc <= MAX_GPS_ACCURACY_METERS
+        ? matchApprovedLocation({ lat: args.pos.lat, lng: args.pos.lng })
+        : null;
 
     const payload = {
       organization_id:             org.organization_id,
@@ -662,6 +671,12 @@ export function PunchPad({
         isFinite(homeCoords.lat) &&
         isFinite(homeCoords.lng)
       ) {
+        // Low-confidence fixes can't auto-pass the geofence or match approved locations.
+        if (!gpsConfident) {
+          setVariance({ distanceFeet: undefined, limitFeet: mapRadiusFeet, pos });
+          setVarianceReason("");
+          return;
+        }
         // Approved locations skip the variance prompt — actual GPS still captured.
         const matched = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
         const dist = haversineFeet(homeCoords, { lat: pos.lat, lng: pos.lng });
@@ -1401,6 +1416,12 @@ export function PunchPad({
         typeof lat === "number" && typeof lng === "number" &&
         isFinite(lat) && isFinite(lng)
       ) {
+        // Low-confidence fixes can't auto-pass the geofence or match approved locations.
+        if (!gpsConfident) {
+          setOutVariance({ distanceFeet: undefined, limitFeet: radius, pos });
+          setOutVarianceReason("");
+          return;
+        }
         // Approved locations suppress the variance prompt on clock-out too.
         const matchedOut = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
         const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
@@ -1991,10 +2012,19 @@ export function PunchPad({
             </DialogHeader>
             {outVariance && (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
-                Measured distance:{" "}
-                <span className="font-mono font-semibold">{outVariance.distanceFeet.toLocaleString()} ft</span>
-                {" "}· Allowed:{" "}
-                <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
+                {typeof outVariance.distanceFeet === "number" ? (
+                  <>
+                    Measured distance:{" "}
+                    <span className="font-mono font-semibold">{outVariance.distanceFeet.toLocaleString()} ft</span>
+                    {" "}· Allowed:{" "}
+                    <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
+                  </>
+                ) : (
+                  <>
+                    GPS accuracy too low to confirm location. A written variance is required. · Allowed:{" "}
+                    <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
+                  </>
+                )}
               </div>
             )}
             <NectarInfusionLock

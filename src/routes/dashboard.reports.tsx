@@ -115,6 +115,45 @@ function StandardReports() {
     [progressProfiles],
   );
 
+  const { data: staffTraining } = useQuery({
+    enabled: !!org,
+    queryKey: ["report-staff-training", org?.organization_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("staff_other_assignments")
+        .select("staff_id, title, status, completed_at, due_date, assignment_type")
+        .eq("organization_id", org!.organization_id)
+        .eq("assignment_type", "training");
+      return data ?? [];
+    },
+  });
+
+  const staffTrainingUserIds = useMemo(
+    () => [...new Set((staffTraining ?? []).map((r: any) => r.staff_id).filter(Boolean))],
+    [staffTraining],
+  );
+  const { data: staffTrainingProfiles } = useQuery({
+    enabled: staffTrainingUserIds.length > 0,
+    queryKey: ["report-staff-training-profiles", staffTrainingUserIds],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", staffTrainingUserIds as string[]);
+      return data ?? [];
+    },
+  });
+  const staffTrainingNameMap = useMemo(
+    () =>
+      new Map(
+        (staffTrainingProfiles ?? []).map((p) => [
+          p.id,
+          p.full_name ?? p.email ?? p.id.slice(0, 8),
+        ]),
+      ),
+    [staffTrainingProfiles],
+  );
+
   // …while Certification Renewals comes from external_certifications (uploaded
   // staff credentials with an expiry), a completely different dataset.
   const { data: certs } = useQuery({
@@ -169,7 +208,7 @@ function StandardReports() {
       a.status, a.progress, a.due_date ?? "", a.completed_at ?? "", "Courses module",
     ]);
     const moduleRows = (moduleProgress ?? []).map((r) => {
-      const row = r as ModuleProgressRow;
+      const row = r as unknown as ModuleProgressRow;
       return [
         progressNameMap.get(row.user_id) ?? row.user_id,
         row.training_modules?.title ?? row.module_id,
@@ -181,7 +220,17 @@ function StandardReports() {
         "Training module",
       ];
     });
-    const allRows = [...courseRows, ...moduleRows];
+    const staffRows = (staffTraining ?? []).map((a: any) => [
+      staffTrainingNameMap.get(a.staff_id) ?? a.staff_id,
+      a.title,
+      "Staff training",
+      a.status,
+      a.status === "completed" ? 100 : 0,
+      a.due_date ?? "",
+      a.completed_at ?? "",
+      "Staff record",
+    ]);
+    const allRows = [...courseRows, ...moduleRows, ...staffRows];
     if (!allRows.length) return toast.error("No training assignments to export yet");
     download(
       "compliance-summary",
@@ -204,7 +253,7 @@ function StandardReports() {
       }));
 
     const fromModules = (moduleProgress ?? []).map((r) => {
-      const row = r as ModuleProgressRow;
+      const row = r as unknown as ModuleProgressRow;
       return {
         source: "Training module",
         title: row.training_modules?.title ?? row.module_id,
@@ -214,7 +263,17 @@ function StandardReports() {
       };
     });
 
-    const all = [...fromCourses, ...fromModules];
+    const fromStaff = (staffTraining ?? [])
+      .filter((a: any) => a.status === "completed" || !!a.completed_at)
+      .map((a: any) => ({
+        source: "Staff record",
+        title: a.title,
+        category: "Staff training",
+        completed_at: a.completed_at ?? "",
+        user_id: staffTrainingNameMap.get(a.staff_id) ?? a.staff_id,
+      }));
+
+    const all = [...fromCourses, ...fromModules, ...fromStaff];
     if (!all.length) return toast.error("No completed training to export yet.");
     download(
       "training-completion",

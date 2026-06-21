@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, CalendarClock, CheckCircle2, AlertTriangle } from "lucide-react";
 import { IncidentReportDialog } from "@/components/incidents/incident-report-dialog";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { usePermissions } from "@/hooks/use-permissions";
 
 type FormRow = {
   id: string;
@@ -26,6 +27,8 @@ export function FormsHubTab({ clientId, clientName }: { clientId: string; client
   const { data: org } = useCurrentOrg();
   const role = org?.role;
   const isManager = role === "admin" || role === "manager" || role === "super_admin";
+  const { can } = usePermissions();
+  const canManageIncidents = can("manage_incidents");
   const [incidentOpen, setIncidentOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -61,7 +64,13 @@ export function FormsHubTab({ clientId, clientName }: { clientId: string; client
             </div>
           </div>
           <div className="mt-3 flex justify-end">
-            <Button size="sm" className="min-h-[44px]" onClick={() => setIncidentOpen(true)}>
+            <Button
+              size="sm"
+              className="min-h-[44px]"
+              onClick={() => setIncidentOpen(true)}
+              disabled={!canManageIncidents}
+              title={!canManageIncidents ? "You don't have permission to report incidents." : undefined}
+            >
               Open Incident Report
             </Button>
           </div>

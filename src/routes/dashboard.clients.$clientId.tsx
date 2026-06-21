@@ -26,11 +26,15 @@ import {
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
+import { ClientReadinessCard } from "@/components/clients/client-readiness-card";
+import { TrackedFieldsCard } from "@/components/clients/tracked-fields-card";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
-  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users,
+  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
 } from "lucide-react";
 import { saveAdminHours } from "@/lib/scheduler/scheduler.functions";
+import { clientFeatureVisible } from "@/lib/client-features";
 
 const search = z.object({
   tab: z
@@ -65,7 +69,7 @@ function ClientProfileHub() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week, feature_config" as any)
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -77,13 +81,23 @@ function ClientProfileHub() {
   const fullName = client
     ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || "—"
     : "Loading…";
-  // Host-home flag derived from authorized service codes (HHS).
+  // Code-driven feature visibility. Derived per-render from
+  // authorized_dspd_codes so plan edits re-evaluate without caching.
   const codes: string[] = Array.isArray(client?.job_code)
     ? (client?.job_code as string[])
     : Array.isArray(client?.authorized_dspd_codes)
     ? (client?.authorized_dspd_codes as string[])
     : [];
-  const isHostHome = codes.some((c) => String(c).toUpperCase() === "HHS");
+  const featureClient = client
+    ? {
+        feature_config: (client.feature_config as Record<string, boolean> | null) ?? null,
+        authorized_dspd_codes: codes,
+      }
+    : null;
+  const isHostHome = clientFeatureVisible(featureClient, "host_home");
+  const showBehavior = clientFeatureVisible(featureClient, "behavior");
+
+
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-6 space-y-6">
@@ -106,6 +120,9 @@ function ClientProfileHub() {
         </Button>
       </div>
 
+      <ClientReadinessCard clientId={clientId} />
+      <FinishOnboardingCard clientId={clientId} />
+
       <Tabs value={tab ?? "overview"} className="w-full">
         <TabsList className="flex w-full flex-wrap h-auto justify-start">
           <TabTrigger value="overview" icon={<User className="h-3.5 w-3.5" />} label="Overview" clientId={clientId} />
@@ -124,10 +141,10 @@ function ClientProfileHub() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
-          <OverviewPanel client={client} clientId={clientId} isHostHome={isHostHome} orgId={orgId} />
+          <OverviewPanel client={client} clientId={clientId} isHostHome={isHostHome} showBehavior={showBehavior} orgId={orgId} />
         </TabsContent>
         <TabsContent value="plan" className="mt-6">
-          <PlanGoalsPanel client={client} />
+          <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
         </TabsContent>
         <TabsContent value="codes" className="mt-6">
           <BillingCodesPanel clientId={clientId} />
@@ -145,7 +162,7 @@ function ClientProfileHub() {
           <IncidentsPanel clientId={clientId} orgId={orgId} />
         </TabsContent>
         <TabsContent value="summaries" className="mt-6">
-          <SummariesPanel clientId={clientId} orgId={orgId} />
+          <SummariesPanel clientId={clientId} orgId={orgId} client={client} />
         </TabsContent>
         {isHostHome ? (
           <TabsContent value="hhcert" className="mt-6">
@@ -185,7 +202,7 @@ function TabTrigger({
 
 type ClientRow = Record<string, unknown> | null | undefined;
 
-function OverviewPanel({ client, clientId, isHostHome, orgId }: { client: ClientRow; clientId: string; isHostHome: boolean; orgId?: string }) {
+function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { client: ClientRow; clientId: string; isHostHome: boolean; showBehavior: boolean; orgId?: string }) {
   if (!client) return <SkeletonCard />;
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -223,11 +240,15 @@ function OverviewPanel({ client, clientId, isHostHome, orgId }: { client: Client
         <CardContent className="flex flex-wrap gap-2 text-sm">
           <QuickLink to="/dashboard/billing/$clientId" params={{ clientId }} label="Billing detail" />
           <QuickLink to="/dashboard/client-intake/$clientId" params={{ clientId }} label="Intake checklist" />
-          <QuickLink to="/dashboard/hhs-hub/$clientId" params={{ clientId }} label="HHS hub" />
-          <QuickLink to="/dashboard/behavior-support/$clientId" params={{ clientId }} label="Behavior support" />
+          {isHostHome && <QuickLink to="/dashboard/hhs-hub/$clientId" params={{ clientId }} label="HHS hub" />}
+          {showBehavior && <QuickLink to="/dashboard/behavior-support/$clientId" params={{ clientId }} label="Behavior support" />}
           <QuickLink to="/dashboard/client-training/$clientId" params={{ clientId }} label="Client-specific training" />
+
         </CardContent>
       </Card>
+      <div className="md:col-span-2">
+        <TrackedFieldsCard clientId={clientId} />
+      </div>
     </div>
   );
 }
@@ -300,22 +321,109 @@ function AdminHoursCard({ clientId, orgId, client }: { clientId: string; orgId?:
   );
 }
 
-function PlanGoalsPanel({ client }: { client: ClientRow }) {
+function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; clientId: string; orgId?: string }) {
+  const qc = useQueryClient();
+  const initial = Array.isArray(client?.pcsp_goals) ? (client!.pcsp_goals as string[]) : [];
+  const [draft, setDraft] = useState<string[]>(initial);
+  const [adding, setAdding] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const codes = Array.isArray(client?.authorized_dspd_codes) ? (client!.authorized_dspd_codes as string[]) : [];
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const cleaned = draft.map((g) => g.trim()).filter((g) => g.length > 0);
+      const { data, error } = await supabase
+        .from("clients")
+        .update({ pcsp_goals: cleaned })
+        .eq("id", clientId)
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Goals not saved — record not found or you don't have permission.");
+      }
+      return cleaned;
+    },
+    onSuccess: (cleaned) => {
+      toast.success("PCSP goals saved");
+      setDraft(cleaned);
+      setDirty(false);
+      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client", clientId] });
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save goals"),
+  });
+
+  const updateAt = (i: number, val: string) => {
+    setDraft((d) => d.map((g, idx) => (idx === i ? val : g)));
+    setDirty(true);
+  };
+  const removeAt = (i: number) => {
+    setDraft((d) => d.filter((_, idx) => idx !== i));
+    setDirty(true);
+  };
+  const addGoal = () => {
+    const v = adding.trim();
+    if (!v) return;
+    setDraft((d) => [...d, v]);
+    setAdding("");
+    setDirty(true);
+  };
+
   if (!client) return <SkeletonCard />;
-  const goals = Array.isArray(client.pcsp_goals) ? (client.pcsp_goals as string[]) : [];
-  const codes = Array.isArray(client.authorized_dspd_codes) ? (client.authorized_dspd_codes as string[]) : [];
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
-        <CardHeader><CardTitle className="text-base">PCSP goals</CardTitle></CardHeader>
-        <CardContent className="text-sm">
-          {goals.length === 0 ? (
-            <span className="text-muted-foreground">No goals recorded.</span>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">PCSP goals</CardTitle>
+          <Button
+            size="sm"
+            onClick={() => saveMut.mutate()}
+            disabled={!dirty || saveMut.isPending}
+          >
+            {saveMut.isPending ? "Saving…" : "Save goals"}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {draft.length === 0 ? (
+            <p className="text-muted-foreground">No goals yet — add one below.</p>
           ) : (
-            <ul className="list-disc pl-5 space-y-1">
-              {goals.map((g, i) => <li key={i}>{g}</li>)}
+            <ul className="space-y-2">
+              {draft.map((g, i) => (
+                <li key={i} className="flex gap-2 items-start">
+                  <textarea
+                    className="flex-1 min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={g}
+                    onChange={(e) => updateAt(i, e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => removeAt(i)}
+                    aria-label="Remove goal"
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </li>
+              ))}
             </ul>
           )}
+          <div className="flex gap-2 pt-2 border-t">
+            <Input
+              placeholder="Add a PCSP goal…"
+              value={adding}
+              onChange={(e) => setAdding(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addGoal();
+                }
+              }}
+            />
+            <Button type="button" variant="outline" onClick={addGoal} disabled={!adding.trim()}>
+              Add goal
+            </Button>
+          </div>
         </CardContent>
       </Card>
       <Card>
@@ -491,14 +599,16 @@ function IncidentsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
   );
 }
 
-function SummariesPanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
+function SummariesPanel({ clientId, orgId, client }: { clientId: string; orgId?: string; client: ClientRow }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
   const q = useQuery({
     enabled: !!orgId,
     queryKey: ["client-profile-summaries", orgId, clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_progress_summaries")
-        .select("id, summary_kind, period_kind, period_label, period_start, period_end, status, finalized_at")
+        .select("id, summary_kind, period_kind, period_label, period_start, period_end, status, finalized_at, due_date")
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
         .order("period_end", { ascending: false })
@@ -508,9 +618,19 @@ function SummariesPanel({ clientId, orgId }: { clientId: string; orgId?: string 
       return (data ?? []) as any[];
     },
   });
+
+  const codes = Array.isArray(client?.authorized_dspd_codes)
+    ? (client!.authorized_dspd_codes as string[])
+    : [];
+
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Progress summaries</CardTitle></CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">Progress summaries</CardTitle>
+        <Button size="sm" onClick={() => setOpen(true)} disabled={!orgId}>
+          New summary
+        </Button>
+      </CardHeader>
       <CardContent className="p-0">
         <ReadOnlyTable
           loading={q.isLoading}
@@ -522,12 +642,186 @@ function SummariesPanel({ clientId, orgId }: { clientId: string; orgId?: string 
             { header: "Period", cell: (r) => r.period_label ?? `${r.period_start ?? "—"} → ${r.period_end ?? "—"}` },
             { header: "Status", cell: (r) => r.status ?? "—" },
             { header: "Finalized", cell: (r) => r.finalized_at ? new Date(r.finalized_at).toLocaleDateString() : "—" },
+            {
+              header: "",
+              cell: (r) => (
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/dashboard/summaries" search={{ open: r.id }}>
+                    {r.status === "finalized" ? "View" : "Open editor"}
+                  </Link>
+                </Button>
+              ),
+            },
           ]}
         />
       </CardContent>
+      {open ? (
+        <NewSummaryDialog
+          clientId={clientId}
+          orgId={orgId!}
+          serviceCodes={codes}
+          onClose={() => setOpen(false)}
+          onCreated={() => {
+            qc.invalidateQueries({ queryKey: ["client-profile-summaries", orgId, clientId] });
+            qc.invalidateQueries({ queryKey: ["deadlines", "summaries", orgId] });
+            setOpen(false);
+          }}
+        />
+      ) : null}
     </Card>
   );
 }
+
+function NewSummaryDialog({
+  clientId, orgId, serviceCodes, onClose, onCreated,
+}: {
+  clientId: string;
+  orgId: string;
+  serviceCodes: string[];
+  onClose: () => void;
+  onCreated: (summaryId: string) => void;
+}) {
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const defaultQuarter = `${now.getFullYear()}-Q${Math.floor(now.getMonth() / 3) + 1}`;
+  const [periodKind, setPeriodKind] = useState<"monthly" | "quarterly">("quarterly");
+  const [month, setMonth] = useState(defaultMonth);
+  const [quarter, setQuarter] = useState(defaultQuarter);
+  const [summaryKind, setSummaryKind] = useState<"narrative" | "financial_statement">("narrative");
+  const [requiresUpi, setRequiresUpi] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const computePeriod = () => {
+    if (periodKind === "monthly") {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(Date.UTC(y, m - 1, 1));
+      const end = new Date(Date.UTC(y, m, 0));
+      const due = new Date(Date.UTC(y, m, 15));
+      return {
+        period_label: month,
+        period_start: start.toISOString().slice(0, 10),
+        period_end: end.toISOString().slice(0, 10),
+        due_date: due.toISOString().slice(0, 10),
+      };
+    }
+    const match = /^(\d{4})-Q([1-4])$/.exec(quarter);
+    if (!match) throw new Error("Invalid quarter (use YYYY-Q1..Q4)");
+    const y = Number(match[1]);
+    const qIdx = Number(match[2]) - 1;
+    const startMonth = qIdx * 3;
+    const start = new Date(Date.UTC(y, startMonth, 1));
+    const end = new Date(Date.UTC(y, startMonth + 3, 0));
+    // Quarter due 15 days after quarter end
+    const due = new Date(end);
+    due.setUTCDate(due.getUTCDate() + 15);
+    return {
+      period_label: `${y}-Q${qIdx + 1}`,
+      period_start: start.toISOString().slice(0, 10),
+      period_end: end.toISOString().slice(0, 10),
+      due_date: due.toISOString().slice(0, 10),
+    };
+  };
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const p = computePeriod();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("client_progress_summaries")
+        .insert({
+          organization_id: orgId,
+          client_id: clientId,
+          summary_kind: summaryKind,
+          period_kind: periodKind,
+          period_label: p.period_label,
+          period_start: p.period_start,
+          period_end: p.period_end,
+          due_date: p.due_date,
+          status: "pending",
+          service_codes: serviceCodes,
+          include_goal_progress: summaryKind === "narrative",
+          requires_upi_attestation: requiresUpi,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      if (!data?.id) throw new Error("Summary not created — record not returned.");
+      toast.success("Summary created — open the editor to draft.");
+      onCreated(data.id);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to create summary";
+      if (/duplicate|unique/i.test(msg)) {
+        toast.error("A summary for that period already exists.");
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="bg-background rounded-lg shadow-lg w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h3 className="text-base font-semibold">New progress summary</h3>
+          <p className="text-xs text-muted-foreground">Creates a draft row; open the editor to pre-fill from logs and finalize.</p>
+        </div>
+        <div className="space-y-3 text-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1">
+              <span className="text-xs font-medium">Cadence</span>
+              <select
+                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={periodKind}
+                onChange={(e) => setPeriodKind(e.target.value as "monthly" | "quarterly")}
+              >
+                <option value="quarterly">Quarterly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs font-medium">Kind</span>
+              <select
+                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={summaryKind}
+                onChange={(e) => setSummaryKind(e.target.value as "narrative" | "financial_statement")}
+              >
+                <option value="narrative">Narrative (progress)</option>
+                <option value="financial_statement">Financial statement</option>
+              </select>
+            </label>
+          </div>
+          {periodKind === "monthly" ? (
+            <label className="block space-y-1">
+              <span className="text-xs font-medium">Month</span>
+              <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+            </label>
+          ) : (
+            <label className="block space-y-1">
+              <span className="text-xs font-medium">Quarter (YYYY-Q#)</span>
+              <Input value={quarter} onChange={(e) => setQuarter(e.target.value)} placeholder="2026-Q1" />
+            </label>
+          )}
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={requiresUpi}
+              onChange={(e) => setRequiresUpi(e.target.checked)}
+            />
+            Requires UPI attestation (SEI)
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving ? "Creating…" : "Create draft"}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function HostHomeCertPanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
   const q = useQuery({
@@ -572,7 +866,7 @@ function DeadlinesPanel({ clientId }: { clientId: string }) {
       <CardHeader><CardTitle className="text-base">Deadlines</CardTitle></CardHeader>
       <CardContent className="text-sm text-muted-foreground">
         Client-scoped deadlines are tracked centrally. Open the deadlines desk and filter by this client.{" "}
-        <Link className="underline" to="/dashboard/deadlines">
+        <Link className="underline" to="/dashboard/deadlines" search={{ client: clientId }}>
           Open deadlines →
         </Link>
       </CardContent>

@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, BookOpen, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal } from "lucide-react";
+import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
@@ -73,7 +73,6 @@ export function EmployeesPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [assignOpen, setAssignOpen] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [resetUser, setResetUser] = useState<{ id: string; name: string } | null>(null);
   const [tempPassword, setTempPassword] = useState(() => genPassword());
@@ -169,22 +168,12 @@ export function EmployeesPage() {
   });
 
 
-  const assignMutation = useMutation({
-    mutationFn: async (input: { userId: string; courseId: string; dueDate: string | null }) => {
-      const { error } = await supabase.from("course_assignments").insert({
-        course_id: input.courseId, user_id: input.userId, organization_id: org!.organization_id,
-        assigned_by: user!.id, due_date: input.dueDate || null,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Course assigned"); setAssignOpen(null); },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const manualMutation = useMutation({
     mutationFn: async (input: {
       firstName: string; lastName: string; username: string; email: string;
       role: Role; department: string; startDate: string; endDate: string; trackIds: string[]; password: string;
+      requiresDeescalation: boolean; requiresAbi: boolean;
     }) => {
       if (input.startDate && input.endDate && input.endDate < input.startDate) {
         throw new Error("End date must be on or after Start date.");
@@ -196,8 +185,11 @@ export function EmployeesPage() {
         department: input.department, hireDate: input.startDate,
         startDate: input.startDate, endDate: input.endDate,
         trackIds: input.trackIds,
+        requiresDeescalation: input.requiresDeescalation,
+        requiresAbi: input.requiresAbi,
       } });
     },
+
     onSuccess: (res, vars) => {
       toast.success("Employee account created");
       setCredentialsShown({ identifier: vars.email || vars.username, password: vars.password });
@@ -237,7 +229,7 @@ export function EmployeesPage() {
       if (input.startDate && input.endDate && input.endDate < input.startDate) {
         throw new Error("End date must be on or after Start date.");
       }
-      const { error: pErr } = await supabase
+      const { data: pRows, error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({
@@ -252,8 +244,12 @@ export function EmployeesPage() {
           hire_date: input.startDate || null,
           ce_suggested_topics: input.ceSuggestedTopics ?? [],
         } as any)
-        .eq("id", input.userId);
+        .eq("id", input.userId)
+        .select("id");
       if (pErr) throw pErr;
+      if (!pRows || pRows.length === 0) {
+        throw new Error("Profile not updated — record not found or you don't have permission to edit it.");
+      }
 
       // Rates are PII-gated: route through the server fn so the
       // can_view_staff_pii() check applies on writes too.
@@ -266,11 +262,15 @@ export function EmployeesPage() {
         },
       });
 
-      const { error: mErr } = await supabase
+      const { data: mRows, error: mErr } = await supabase
         .from("organization_members")
         .update({ role: input.role, active: input.active })
-        .eq("id", input.membershipId);
+        .eq("id", input.membershipId)
+        .select("id");
       if (mErr) throw mErr;
+      if (!mRows || mRows.length === 0) {
+        throw new Error("Membership not updated — record not found or you don't have permission to change role/status.");
+      }
     },
     onSuccess: () => {
       toast.success("Employee updated");
@@ -471,9 +471,6 @@ export function EmployeesPage() {
                             <DropdownMenuItem onSelect={openEdit}>
                               <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setAssignOpen(m.user_id)}>
-                              <BookOpen className="mr-2 h-3.5 w-3.5" /> Assign course
-                            </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setResetUser({ id: m.user_id, name })}>
                               <KeyRound className="mr-2 h-3.5 w-3.5" /> Reset password
                             </DropdownMenuItem>
@@ -501,26 +498,6 @@ export function EmployeesPage() {
         </div>
       </div>
 
-      <Dialog open={!!assignOpen} onOpenChange={(o) => !o && setAssignOpen(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Assign a course</DialogTitle></DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const fd = new FormData(e.currentTarget);
-            assignMutation.mutate({ userId: assignOpen!, courseId: String(fd.get("course_id")), dueDate: String(fd.get("due_date") || "") });
-          }} className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Course</Label>
-              <Select name="course_id" required>
-                <SelectTrigger><SelectValue placeholder="Select a course" /></SelectTrigger>
-                <SelectContent>{courses?.map((c) => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2"><Label htmlFor="due_date">Due date (optional)</Label><Input type="date" id="due_date" name="due_date" /></div>
-            <DialogFooter><Button type="submit" disabled={assignMutation.isPending}>Assign</Button></DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Add manually */}
       <Dialog open={manualOpen} onOpenChange={setManualOpen}>
@@ -545,8 +522,11 @@ export function EmployeesPage() {
 
               trackIds,
               password: String(fd.get("password") || tempPassword),
+              requiresDeescalation: fd.get("requires_deescalation") === "on",
+              requiresAbi: fd.get("requires_abi") === "on",
             });
           }} className="grid gap-4">
+
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2"><Label htmlFor="first_name">First name</Label><Input id="first_name" name="first_name" required /></div>
               <div className="grid gap-2"><Label htmlFor="last_name">Last name</Label><Input id="last_name" name="last_name" required /></div>
@@ -579,9 +559,33 @@ export function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="department">Department / team</Label><Input id="department" name="department" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2"><Label htmlFor="start_date">Start date</Label><Input id="start_date" name="start_date" type="date" /></div>
+              <div className="grid gap-2"><Label htmlFor="start_date">Start date <span className="text-destructive">*</span></Label><Input id="start_date" name="start_date" type="date" required /><p className="text-xs text-muted-foreground">All training deadlines are calculated from this date.</p></div>
               <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
             </div>
+
+            <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3">
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" name="requires_deescalation" className="mt-1 rounded" />
+                <span>
+                  <span className="font-medium">Works with behavior clients?</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Check if this employee works with clients who have behavior codes (BC1, BC2, BC3) or a Behavior Support Plan.
+                    De-escalation Certification will be required.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" name="requires_abi" className="mt-1 rounded" />
+                <span>
+                  <span className="font-medium">Works with ABI clients?</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Check if this employee works with ABI (acquired brain injury) clients. ABI Training will be required.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+
 
             {!!tracks?.length && (
               <div className="grid gap-2">

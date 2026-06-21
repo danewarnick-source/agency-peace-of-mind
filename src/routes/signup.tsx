@@ -48,7 +48,6 @@ const inputStyle: React.CSSProperties = {
 
 const STEPS = [
   "Account",
-  "Verify email",
   "Your business",
   "Team & pricing",
   "Staff training",
@@ -266,7 +265,7 @@ function SignupPage() {
     <div className="relative min-h-screen overflow-hidden text-white" style={{ background: NAVY_BG, fontFamily: JAKARTA }}>
       <HexPattern />
       <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-5 py-8 md:py-12">
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Brand />
           <Link to="/login" className="text-sm text-white/60 hover:text-white">
             Already have an account? <span className="font-medium text-[#f4a93a]">Sign in</span>
@@ -288,22 +287,15 @@ function SignupPage() {
               />
             )}
             {step === 1 && (
-              <Step2Verify
-                email={form.email}
-                onBack={goBack}
-                onNext={() => setStep(2)}
-              />
+              <Step3Business form={form} update={update} onBack={goBack} onNext={() => setStep(2)} />
             )}
             {step === 2 && (
-              <Step3Business form={form} update={update} onBack={goBack} onNext={() => setStep(3)} />
+              <Step4Pricing form={form} update={update} onBack={goBack} onNext={() => setStep(3)} />
             )}
             {step === 3 && (
-              <Step4Pricing form={form} update={update} onBack={goBack} onNext={() => setStep(4)} />
+              <Step5Training form={form} update={update} onBack={goBack} onNext={() => setStep(4)} />
             )}
             {step === 4 && (
-              <Step5Training form={form} update={update} onBack={goBack} onNext={() => setStep(5)} />
-            )}
-            {step === 5 && (
               <Step6Payment
                 form={form}
                 onBack={goBack}
@@ -390,7 +382,7 @@ function Step1Account({
         setBusy(false);
         return;
       }
-      toast.success("Verification code sent — check your inbox.");
+      toast.success("Account created — let's set up your business.");
       setBusy(false);
       onNext();
     } catch (e) {
@@ -401,7 +393,7 @@ function Step1Account({
 
   return (
     <>
-      <Header title="Create your account" subtitle="Start with a few quick details. We'll send a code to verify your email." />
+      <Header title="Create your account" subtitle="Start with a few quick details to get your workspace ready." />
       <div className="grid gap-4">
         <Field
           label="Email address"
@@ -465,7 +457,7 @@ function Step1Account({
         onNext={submit}
         loading={busy}
         nextDisabled={!emailValid || !lenOk || !numOk || !matchOk || !!emailErr}
-        nextLabel="Send verification code"
+        nextLabel="Create account"
       />
     </>
   );
@@ -599,49 +591,66 @@ function Step3Business({
       return;
     }
     setBusy(true);
-    // The org row is auto-created by the handle_new_user trigger using the
-    // metadata we sent during signUp. Update the org name/contact details now
-    // that the user has filled them in (and ensure profile is up to date).
     try {
       const { data: userResp } = await supabase.auth.getUser();
       const uid = userResp.user?.id;
-      if (uid) {
+      if (!uid) {
+        toast.error("Your workspace isn't ready yet — please refresh and try again.");
+        setBusy(false);
+        return;
+      }
+
+      // Best-effort profile update — don't block on failure.
+      try {
         await supabase.from("profiles").update({
           full_name: form.contactName,
           agency_name: form.agencyName,
         }).eq("id", uid);
+      } catch {
+        /* non-blocking */
+      }
 
-        // Find the org this user owns (created_by) and update name/provider id
-        const { data: orgs } = await supabase
-          .from("organizations")
-          .select("id")
-          .eq("created_by", uid)
-          .limit(1);
-        const orgId = orgs?.[0]?.id;
-        if (orgId) {
-          await supabase
-            .from("organizations")
-            .update({
-              name: form.agencyName,
-              state_code: "UT",
-              dhhs_provider_id: form.providerNumber || null,
-              account_contact_name: form.contactName || null,
-              account_contact_email: userResp.user?.email ?? null,
-            })
-            .eq("id", orgId);
-          // Persist required billing SMS phone (server-side, E.164 normalized).
-          try {
-            await setSmsPhoneFn({ data: { organizationId: orgId, phone: form.phone } });
-          } catch (e) {
-            console.warn("[signup] sms phone save failed", e);
-            toast.error("Could not save your mobile number. Please try again.");
-            setBusy(false);
-            return;
-          }
-        }
+      const { data: orgs } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("created_by", uid)
+        .limit(1);
+      const orgId = orgs?.[0]?.id;
+      if (!orgId) {
+        toast.error("Your workspace isn't ready yet — please refresh and try again.");
+        setBusy(false);
+        return;
+      }
+
+      const { error: orgErr } = await supabase
+        .from("organizations")
+        .update({
+          name: form.agencyName,
+          state_code: "UT",
+          dhhs_provider_id: form.providerNumber || null,
+          account_contact_name: form.contactName || null,
+          account_contact_email: userResp.user?.email ?? null,
+        })
+        .eq("id", orgId);
+      if (orgErr) {
+        toast.error("Couldn't save your business details — please try again.");
+        setBusy(false);
+        return;
+      }
+
+      try {
+        await setSmsPhoneFn({ data: { organizationId: orgId, phone: form.phone } });
+      } catch (e) {
+        console.warn("[signup] sms phone save failed", e);
+        toast.error("Could not save your mobile number. Please try again.");
+        setBusy(false);
+        return;
       }
     } catch (e) {
-      console.warn("[signup] business save failed (non-fatal)", e);
+      console.warn("[signup] business save failed", e);
+      toast.error("Couldn't save your business details — please try again.");
+      setBusy(false);
+      return;
     }
     setBusy(false);
     onNext();
@@ -1101,7 +1110,7 @@ function Step6Payment({
       // integration only needs to populate the stripe_* ids via webhooks.
       // Card details are intentionally never stored.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from("org_subscriptions") as any).upsert(
+      const { error: subErr } = await (supabase.from("org_subscriptions") as any).upsert(
         {
           organization_id: orgId,
           plan: "hive_standard", // single standard plan; "enterprise" is operator-set later
@@ -1125,6 +1134,7 @@ function Step6Payment({
         },
         { onConflict: "organization_id" },
       );
+      if (subErr) throw subErr;
 
       // Training order — separate table so a Stripe PaymentIntent webhook
       // can flip status to 'paid' and attach stripe_payment_intent_id.
@@ -1138,7 +1148,7 @@ function Step6Payment({
             ? ["cpr", "mandt", "dspd"]
             : [];
 
-      await supabase.from("org_training_orders").insert({
+      const { error: trainErr } = await supabase.from("org_training_orders").insert({
         organization_id: orgId,
         training_type: trainingType,
         selected_modules: selectedModules,
@@ -1147,6 +1157,7 @@ function Step6Payment({
         status: trainingCharge > 0 ? "paid" : "pending",
         stripe_payment_intent_id: null,
       });
+      if (trainErr) throw trainErr;
 
 
       toast.success("Welcome to Hive!");

@@ -638,7 +638,7 @@ function Billing520Page() {
 
   const exportPdf = () => {
     const monthLabel = periodStart.toLocaleString("en-US", { month: "long", year: "numeric" });
-    const win = window.open("", "_blank", "noopener,noreferrer");
+    const win = window.open("", "_blank");
     if (!win) return toast.error("Pop-up blocked — allow pop-ups to export PDF.");
     const rowsHtml = rows
       .map(
@@ -779,6 +779,13 @@ function Billing520Page() {
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {!ATTESTATION_COPY_APPROVED && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+              Submission to the State is currently disabled — the provider attestation language is pending
+              legal review and must be finalized before any 520 can be signed and submitted. Review and
+              export (CSV / Excel / PDF) remain available.
+            </div>
+          )}
           {!submission ? (
             <div className="rounded-xl border border-dashed border-border bg-background/40 p-6 text-center">
               <p className="text-sm font-medium">

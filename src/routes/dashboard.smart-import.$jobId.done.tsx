@@ -228,43 +228,60 @@ function DonePage() {
           <div className="text-sm font-semibold">Readiness readout</div>
         </div>
         <div className="space-y-2">
-          {subjects.map((s) => (
-            <div key={s.id} className="rounded-lg border border-border p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="text-sm font-semibold">{s.display_name}</div>
-                  <div className="mt-0.5 text-xs text-muted-foreground capitalize">{s.subject_type}</div>
+          {subjects.map((s) => {
+            const missingGuardian =
+              !s.committed &&
+              s.subject_type === "client" &&
+              typeof s.error === "string" &&
+              /guardian/i.test(s.error);
+            return (
+              <div key={s.id} className="rounded-lg border border-border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold">{s.display_name}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground capitalize">{s.subject_type}</div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    {s.committed ? (
+                      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">live</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-amber-600">not committed</Badge>
+                    )}
+                    <span className="text-muted-foreground">{s.requirements_met}/{s.requirements_total} requirements met</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs">
-                  {s.committed ? (
-                    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">live</Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-amber-600">not committed</Badge>
-                  )}
-                  <span className="text-muted-foreground">{s.requirements_met}/{s.requirements_total} requirements met</span>
-                </div>
+                {s.gaps.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs">
+                    {s.gaps.map((g, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="mt-0.5 h-3 w-3" /><span>{g}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {missingGuardian && (
+                  <div className="mt-2">
+                    <MissingInfoButton
+                      subjectId={s.id}
+                      displayName={s.display_name}
+                      jobId={jobId}
+                      onFixed={() => { invalidateAfterCommit(); q.refetch(); }}
+                    />
+                  </div>
+                )}
+                {s.record_id && (
+                  <div className="mt-2 text-xs">
+                    <Link
+                      to={s.subject_type === "client" ? "/dashboard/clients" : "/dashboard/employees"}
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                    >
+                      Open profile <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
+                )}
               </div>
-              {s.gaps.length > 0 && (
-                <ul className="mt-2 space-y-1 text-xs">
-                  {s.gaps.map((g, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
-                      <AlertTriangle className="mt-0.5 h-3 w-3" /><span>{g}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {s.record_id && (
-                <div className="mt-2 text-xs">
-                  <Link
-                    to={s.subject_type === "client" ? "/dashboard/clients" : "/dashboard/employees"}
-                    className="inline-flex items-center gap-1 text-primary hover:underline"
-                  >
-                    Open profile <ExternalLink className="h-3 w-3" />
-                  </Link>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
           {subjects.length === 0 && <div className="text-sm text-muted-foreground">No subjects in this job.</div>}
         </div>
       </div>

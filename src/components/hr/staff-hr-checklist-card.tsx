@@ -77,9 +77,11 @@ export function StaffHrChecklistCard({
   const createUpload = useServerFn(createHrDocumentUploadUrl);
   const getDocUrl = useServerFn(getHrDocumentUrl);
   const delDoc = useServerFn(deleteHrDocument);
-  const markBaselineFn = useServerFn(markBaselineTrainingComplete);
   const attachBaselineFn = useServerFn(attachBaselineCertificate);
   const setBaselineExpFn = useServerFn(setBaselineExpiration);
+  const signOffBaselineFn = useServerFn(adminSignOffBaselineCompletion);
+  const revokeBaselineFn = useServerFn(revokeBaselineSignOff);
+
 
 
   const piiQ = useQuery({

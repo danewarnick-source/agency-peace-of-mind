@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
@@ -105,6 +106,8 @@ function ClientProfileHub() {
           </Link>
         </Button>
       </div>
+
+      <FinishOnboardingCard clientId={clientId} />
 
       <Tabs value={tab ?? "overview"} className="w-full">
         <TabsList className="flex w-full flex-wrap h-auto justify-start">

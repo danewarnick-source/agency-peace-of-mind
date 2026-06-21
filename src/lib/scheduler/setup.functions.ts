@@ -43,10 +43,23 @@ export const setClientCaseload = createServerFn({ method: "POST" })
       .map((r) => r.id);
 
     if (toAdd.length > 0) {
+      // Pull the client's authorized service codes so new assignments are
+      // immediately clockable for those codes (no manual table edit needed).
+      const { data: clientRow } = await supabase
+        .from("clients")
+        .select("authorized_dspd_codes")
+        .eq("id", data.client_id)
+        .maybeSingle();
+      const codes = Array.isArray((clientRow as { authorized_dspd_codes?: string[] } | null)?.authorized_dspd_codes)
+        ? ((clientRow as { authorized_dspd_codes: string[] }).authorized_dspd_codes)
+        : [];
+
       const rows = toAdd.map((staffId) => ({
         organization_id: data.organization_id,
         client_id: data.client_id,
         staff_id: staffId,
+        is_group_home_assignment: false,
+        service_codes: codes,
       }));
       const { error: iErr } = await supabase
         .from("staff_assignments")

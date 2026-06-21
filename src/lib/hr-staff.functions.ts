@@ -113,7 +113,12 @@ export interface ChecklistRow {
     completed_by: string | null;
     training_completion_id: string | null;
     auto_checked_at: string | null;
+    admin_signed_off_at: string | null;
+    nectar_name_match: string | null;
+    nectar_extracted_name: string | null;
+    nectar_reviewed_at: string | null;
   };
+
   applicable: boolean;
   applies_to_staff_types: string[] | "all";
   applies_to_confirmed_at: string | null;

@@ -40,7 +40,7 @@ import {
 
 
 
-type State = Awaited<ReturnType<typeof getClientOnboardingState>>;
+export type State = Awaited<ReturnType<typeof getClientOnboardingState>>;
 type Rate = {
   id: string;
   service_code: string;

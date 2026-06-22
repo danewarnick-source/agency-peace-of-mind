@@ -32,6 +32,7 @@ const SERVICE_OPTIONS = ["HHS", "SLN", "SLH", "SEI", "DSI", "RHS"] as const;
 type Service = (typeof SERVICE_OPTIONS)[number];
 
 type ProfileDraft = {
+  providerEmail: string;
   services: Service[];
   clientCount: string;
   staffCount: string;
@@ -40,6 +41,7 @@ type ProfileDraft = {
 };
 
 const EMPTY: ProfileDraft = {
+  providerEmail: "",
   services: [],
   clientCount: "",
   staffCount: "",
@@ -91,6 +93,7 @@ function NectarCompanyProfilePage() {
         approx_client_count: Number(draft.clientCount) || null,
         specializations,
         nectar_profile_saved_at: new Date().toISOString(),
+        provider_approver_email: draft.providerEmail?.trim() || null,
       }).eq("id", orgId);
     } catch (err) {
       console.warn("[nectar-profile] DB write pending; localStorage fallback active", err);
@@ -147,6 +150,16 @@ function NectarCompanyProfilePage() {
               );
             })}
           </div>
+        </div>
+
+        <div>
+          <Label className="text-xs">Provider approver email (for 520 billing)</Label>
+          <Input
+            type="email"
+            value={draft.providerEmail}
+            onChange={(e) => setDraft({ ...draft, providerEmail: e.target.value })}
+            placeholder="email that signs off 520 billing"
+          />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">

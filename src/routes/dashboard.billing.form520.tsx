@@ -85,10 +85,27 @@ function Billing520Page() {
   const { data: org } = useCurrentOrg();
   const { data: codes } = useAllClientBillingCodes();
 
-  const periodStart = startOfMonth();
-  const periodEnd = endOfMonth();
-  const periodStartStr = periodStart.toISOString().slice(0, 10);
-  const periodEndStr = periodEnd.toISOString().slice(0, 10);
+  const { data: orgEmailRow } = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["520-provider-email", org?.organization_id],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("organizations")
+        .select("provider_approver_email")
+        .eq("id", org!.organization_id)
+        .maybeSingle();
+      return data ?? null;
+    },
+  });
+  const providerEmail = (orgEmailRow?.provider_approver_email as string | undefined) || user?.email;
+
+  const toIso = (d: Date) => d.toISOString().slice(0, 10);
+  const [rangeStartStr, setRangeStartStr] = useState<string>(() => toIso(startOfMonth()));
+  const [rangeEndStr, setRangeEndStr] = useState<string>(() => toIso(new Date()));
+  const periodStart = new Date(rangeStartStr + "T00:00:00");
+  const periodEnd = new Date(rangeEndStr + "T23:59:59");
+  const periodStartStr = rangeStartStr;
+  const periodEndStr = rangeEndStr;
 
   const actorName =
     (user?.user_metadata?.full_name as string | undefined) ||
@@ -99,7 +116,7 @@ function Billing520Page() {
   // ─── Data feeds for the 520 grid ──────────────────────────────────────────
   const tsQ = useQuery({
     enabled: !!org?.organization_id,
-    queryKey: ["520-evv", org?.organization_id, periodStart.toISOString()],
+    queryKey: ["520-evv", org?.organization_id, [rangeStartStr, rangeEndStr]],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("evv_timesheets")
@@ -114,7 +131,7 @@ function Billing520Page() {
 
   const dailyQ = useQuery({
     enabled: !!org?.organization_id,
-    queryKey: ["520-daily", org?.organization_id, periodStart.toISOString()],
+    queryKey: ["520-daily", org?.organization_id, [rangeStartStr, rangeEndStr]],
     queryFn: async () => {
       // Daily-rate days come from the hhs_daily_records_v view; only
       // billable rows (attendance Present + daily note) may be billed.
@@ -181,7 +198,7 @@ function Billing520Page() {
 
   const shiftsQ = useQuery({
     enabled: !!org?.organization_id,
-    queryKey: ["520-shifts", org?.organization_id, periodStart.toISOString()],
+    queryKey: ["520-shifts", org?.organization_id, [rangeStartStr, rangeEndStr]],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("scheduled_shifts")
@@ -272,7 +289,7 @@ function Billing520Page() {
       const remaining = Math.max(0, annual - consumed);
       out.push({
         line_number: line++,
-        provider_approver_email: b.provider_approver_email ?? "",
+        provider_approver_email: providerEmail ?? "",
         consumer_name: `${client.last_name}, ${client.first_name}`,
         consumer_pid: client.medicaid_id ?? "",
         service_code: b.service_code,
@@ -291,13 +308,36 @@ function Billing520Page() {
       });
     }
     return out;
-  }, [codes, clientsQ.data, tsQ.data, dailyQ.data, authUsageQ.data, periodStartStr, periodEndStr]);
+  }, [codes, clientsQ.data, tsQ.data, dailyQ.data, authUsageQ.data, periodStartStr, periodEndStr, providerEmail]);
+
+  const clientsInData = useMemo(() => {
+    const map = new Map<string, { client_id: string; name: string; codeKeys: Array<{ key: string; service_code: string }> }>();
+    for (const r of rows) {
+      if (!map.has(r._client_id)) {
+        map.set(r._client_id, { client_id: r._client_id, name: r.consumer_name, codeKeys: [] });
+      }
+      map.get(r._client_id)!.codeKeys.push({ key: r._key, service_code: r.service_code });
+    }
+    return Array.from(map.values());
+  }, [rows]);
+
+  const [includedClients, setIncludedClients] = useState<Set<string> | null>(null);
+  const [excludedCodeKeys, setExcludedCodeKeys] = useState<Set<string>>(new Set());
+
+  const visibleRows = useMemo(() => {
+    return rows.filter((r) => {
+      const clientIncluded = includedClients === null || includedClients.has(r._client_id);
+      return clientIncluded && !excludedCodeKeys.has(r._key);
+    });
+  }, [rows, includedClients, excludedCodeKeys]);
+
+  const visibleClientCount = useMemo(() => new Set(visibleRows.map((r) => r._client_id)).size, [visibleRows]);
 
   // ─── Warning generation (HIVE-surfaced audit checks) ──────────────────────
   const draftWarnings = useMemo<DraftWarning[]>(() => {
     const out: DraftWarning[] = [];
 
-    for (const r of rows) {
+    for (const r of visibleRows) {
       if (r.units > 0 && r.rate <= 0) {
         out.push({
           row_key: r._key,
@@ -385,7 +425,7 @@ function Billing520Page() {
     }
 
     return out;
-  }, [rows, shiftsQ.data, tsQ.data]);
+  }, [visibleRows, shiftsQ.data, tsQ.data]);
 
   // ─── Submission + warning persistence ─────────────────────────────────────
   const submissionQ = useQuery({
@@ -503,7 +543,7 @@ function Billing520Page() {
         actor_user_id: user.id,
         actor_name: actorName,
         action: "submission_opened",
-        payload: { warning_count: draftWarnings.length, row_count: rows.length },
+        payload: { warning_count: draftWarnings.length, row_count: visibleRows.length },
       });
 
       toast.success("Submission opened for review.");
@@ -602,17 +642,17 @@ function Billing520Page() {
   ] as const;
 
   const copyTSV = async () => {
-    const lines = [HEADERS.join("\t"), ...rows.map((r) => HEADERS.map((h) => String((r as unknown as Record<string, unknown>)[h] ?? "")).join("\t"))];
+    const lines = [HEADERS.join("\t"), ...visibleRows.map((r) => HEADERS.map((h) => String((r as unknown as Record<string, unknown>)[h] ?? "")).join("\t"))];
     await navigator.clipboard.writeText(lines.join("\n"));
     toast.success("Copied 520 rows to clipboard");
   };
 
   const exportXlsx = () => {
-    const exportRows = rows.map(({ _key: _k, _client_id: _c, ...r }) => r);
+    const exportRows = visibleRows.map(({ _key: _k, _client_id: _c, ...r }) => r);
     const ws = XLSX.utils.json_to_sheet(exportRows, { header: HEADERS as unknown as string[] });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "520");
-    XLSX.writeFile(wb, `520-${periodStart.toISOString().slice(0, 7)}.xlsx`);
+    XLSX.writeFile(wb, `520-${rangeStartStr}_${rangeEndStr}.xlsx`);
   };
 
   const exportCsv = () => {
@@ -622,7 +662,7 @@ function Billing520Page() {
     };
     const lines = [
       HEADERS.join(","),
-      ...rows.map((r) =>
+      ...visibleRows.map((r) =>
         HEADERS.map((h) => esc((r as unknown as Record<string, unknown>)[h])).join(","),
       ),
     ];
@@ -630,17 +670,17 @@ function Billing520Page() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `520-${periodStart.toISOString().slice(0, 7)}.csv`;
+    a.download = `520-${rangeStartStr}_${rangeEndStr}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("520 CSV downloaded");
   };
 
   const exportPdf = () => {
-    const monthLabel = periodStart.toLocaleString("en-US", { month: "long", year: "numeric" });
+    const rangeLabel = `${rangeStartStr} to ${rangeEndStr}`;
     const win = window.open("", "_blank");
     if (!win) return toast.error("Pop-up blocked — allow pop-ups to export PDF.");
-    const rowsHtml = rows
+    const rowsHtml = visibleRows
       .map(
         (r) =>
           `<tr>${HEADERS.map(
@@ -651,7 +691,7 @@ function Billing520Page() {
           ).join("")}</tr>`,
       )
       .join("");
-    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>520 ${monthLabel}</title>
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>520 ${rangeLabel}</title>
 <style>
   body{font-family:ui-sans-serif,system-ui,sans-serif;color:#0f1b3d;padding:24px;}
   h1{font-size:18px;margin:0 0 4px;} p{margin:0 0 16px;color:#555;font-size:12px;}
@@ -660,8 +700,8 @@ function Billing520Page() {
   th{background:#f5f3ee;text-transform:uppercase;font-size:10px;letter-spacing:.04em;}
   @media print{body{padding:0;}}
 </style></head><body>
-<h1>520 Submission — ${monthLabel}</h1>
-<p>${rows.length} line item${rows.length === 1 ? "" : "s"} · Generated ${new Date().toLocaleString()}</p>
+<h1>520 Submission — ${rangeLabel}</h1>
+<p>${visibleRows.length} line item${visibleRows.length === 1 ? "" : "s"} · Generated ${new Date().toLocaleString()}</p>
 <table><thead><tr>${HEADERS.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
 <tbody>${rowsHtml}</tbody></table>
 <script>window.onload=()=>{window.print();}</script>
@@ -700,11 +740,20 @@ function Billing520Page() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">
-            520 Billing — {periodStart.toLocaleString("en-US", { month: "long", year: "numeric" })}
+            520 Billing — {rangeStartStr} to {rangeEndStr}
           </h1>
           <p className="text-sm text-muted-foreground">
             Auto-populated from EVV time punches + daily logs. Hourly hours → units at {fmtHours(1)} hr = 4 units.
           </p>
+          {providerEmail ? (
+            <p className="text-sm text-muted-foreground">
+              Provider approver: {providerEmail} · <Link to="/dashboard/nectar-company-profile" className="underline underline-offset-2">Edit</Link>
+            </p>
+          ) : (
+            <p className="text-sm text-red-600 dark:text-red-400">
+              No provider approver email set — add it on the <Link to="/dashboard/nectar-company-profile" className="underline underline-offset-2">company profile</Link>
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {locked && (
@@ -712,6 +761,14 @@ function Billing520Page() {
               <Lock className="h-3 w-3" /> Submitted & locked
             </Badge>
           )}
+          <div className="flex items-end gap-2">
+            <div><Label className="text-xs">Start</Label>
+              <Input type="date" value={rangeStartStr} onChange={(e) => setRangeStartStr(e.target.value)} /></div>
+            <div><Label className="text-xs">End</Label>
+              <Input type="date" value={rangeEndStr} onChange={(e) => setRangeEndStr(e.target.value)} /></div>
+            <Button variant="outline" size="sm" onClick={() => { setRangeStartStr(toIso(startOfMonth())); setRangeEndStr(toIso(new Date())); }}>This month</Button>
+            <Button variant="outline" size="sm" onClick={() => { const d = new Date(); const s = new Date(d.getFullYear(), d.getMonth()-1, 1); const e = new Date(d.getFullYear(), d.getMonth(), 0); setRangeStartStr(toIso(s)); setRangeEndStr(toIso(e)); }}>Last month</Button>
+          </div>
           <Button variant="outline" onClick={copyTSV}><Copy className="mr-2 h-4 w-4" />Copy</Button>
           <Button variant="outline" onClick={exportCsv}><Download className="mr-2 h-4 w-4" />CSV</Button>
           <Button variant="outline" onClick={exportPdf}><Download className="mr-2 h-4 w-4" />PDF</Button>
@@ -719,15 +776,56 @@ function Billing520Page() {
         </div>
       </header>
 
+      <div className="rounded-xl border border-border bg-card p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Clients & codes on this 520</h3>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setIncludedClients(null); setExcludedCodeKeys(new Set()); }}>Select all</Button>
+            <Button variant="outline" size="sm" onClick={() => setIncludedClients(new Set())}>Clear all</Button>
+          </div>
+        </div>
+        {clientsInData.map((c) => {
+          const clientChecked = includedClients === null || includedClients.has(c.client_id);
+          return (
+            <div key={c.client_id} className="border-t border-border pt-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Checkbox checked={clientChecked} onCheckedChange={(v) => {
+                  setIncludedClients((prev) => {
+                    const base = prev === null ? new Set(clientsInData.map(x => x.client_id)) : new Set(prev);
+                    if (v) base.add(c.client_id); else base.delete(c.client_id);
+                    return base;
+                  });
+                }} />
+                {c.name}
+              </label>
+              <div className="ml-6 flex flex-wrap gap-3 mt-1">
+                {c.codeKeys.map((ck) => {
+                  const codeChecked = !excludedCodeKeys.has(ck.key) && clientChecked;
+                  return (
+                    <label key={ck.key} className="flex items-center gap-1.5 text-xs">
+                      <Checkbox checked={codeChecked} onCheckedChange={(v) => {
+                        setExcludedCodeKeys((prev) => { const n = new Set(prev); if (v) n.delete(ck.key); else n.add(ck.key); return n; });
+                      }} />
+                      {ck.service_code}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+        <p className="text-xs text-muted-foreground">Including {visibleClientCount} of {clientsInData.length} clients · {visibleRows.length} code lines</p>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full min-w-[1100px] text-sm max-md:[&_th:first-child]:sticky max-md:[&_th:first-child]:left-0 max-md:[&_th:first-child]:z-10 max-md:[&_th:first-child]:bg-card max-md:[&_td:first-child]:sticky max-md:[&_td:first-child]:left-0 max-md:[&_td:first-child]:bg-card">
           <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
             <tr>{HEADERS.map((h) => <th key={h} className="px-3 py-2 whitespace-nowrap">{h}</th>)}</tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {visibleRows.length === 0 ? (
               <tr><td colSpan={HEADERS.length} className="p-6 text-center text-muted-foreground">No billing rows for this period — add client billing codes and time data.</td></tr>
-            ) : rows.map((r) => (
+            ) : visibleRows.map((r) => (
               <tr key={`${r.consumer_pid}-${r.service_code}-${r.line_number}`} className="border-t border-border">
                 <td className="px-3 py-2 tabular-nums">{r.line_number}</td>
                 <td className="px-3 py-2">{r.provider_approver_email}</td>

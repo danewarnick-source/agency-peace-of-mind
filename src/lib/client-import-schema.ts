@@ -719,6 +719,7 @@ export async function applyExtractedFieldsToClient(
       customCreated.push(field.key);
     } catch (err) {
       suggested.push(`custom:${field.key} (${(err as Error).message})`);
+      await onError("custom_field_registry_error", `${field.key}: ${(err as Error).message}`);
     }
   }
 
@@ -752,6 +753,10 @@ export async function applyExtractedFieldsToClient(
     "preferred_activities", "roommates", "personal_belongings_inventory",
     // SOW §1.10 dates
     "admission_date", "discharge_date",
+    // 1056 header fields
+    "form_1056_number", "form_1056_approved_date",
+    // End-of-life / advanced care
+    "dnr_status", "dnr_location", "polst_status", "palliative_care_status", "hospice_status",
   ]);
   const seenCustom = new Set<string>();
   for (const f of ok) {

@@ -2508,6 +2508,7 @@ export type Database = {
           organization_id: string
           status: string
           title: string
+          training_type: string
           updated_at: string
           version: number
         }
@@ -2522,6 +2523,7 @@ export type Database = {
           organization_id: string
           status?: string
           title?: string
+          training_type?: string
           updated_at?: string
           version?: number
         }
@@ -2536,6 +2538,7 @@ export type Database = {
           organization_id?: string
           status?: string
           title?: string
+          training_type?: string
           updated_at?: string
           version?: number
         }

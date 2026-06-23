@@ -399,6 +399,47 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
         </div>
       </div>
 
+      {/* Group 2 — NECTAR asks */}
+      <div>
+        <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          NECTAR asks
+        </div>
+        <div className="space-y-2">
+          <MedicationsAskRow
+            clientId={clientId}
+            state={fieldStates.medications}
+            passing={askPass.medications}
+            onChanged={invalidateAll}
+          />
+          <AllergiesAskRow
+            clientId={clientId}
+            state={fieldStates.allergies}
+            passing={askPass.allergies}
+            onChanged={invalidateAll}
+          />
+          <ImmunizationsAskRow
+            clientId={clientId}
+            state={fieldStates.immunizations}
+            passing={askPass.immunizations}
+            onChanged={invalidateAll}
+          />
+          <AdvancedDirectivesAskRow
+            clientId={clientId}
+            state={fieldStates.advanced_directives}
+            passing={askPass.advanced_directives}
+            onChanged={invalidateAll}
+          />
+          <CourtOrdersAskRow
+            clientId={clientId}
+            state={fieldStates.court_orders}
+            passing={askPass.court_orders}
+            onChanged={invalidateAll}
+          />
+        </div>
+      </div>
+
+
+
 
       {/* Footer */}
       <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">

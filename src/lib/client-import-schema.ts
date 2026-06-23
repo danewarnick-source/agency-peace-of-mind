@@ -193,10 +193,13 @@ export async function applyExtractedFieldsToClient(
       "dentist_name, dentist_phone, " +
       "prescriber_name, prescriber_phone, " +
       "bsp_status, medical_insurance, housing_voucher, preferred_living, " +
-      "plan_year, disability_category, staff_ratio, " +
+      "plan_year, disability_category, staff_ratio, level_of_need, " +
       "advanced_directives, emergency_medical_treatment_authorization, " +
       "diagnoses, chronic_conditions, immunizations, court_orders, rights_restrictions, " +
       "preferred_activities, roommates, personal_belongings_inventory, " +
+      "emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_instructions, " +
+      "grievance_acknowledged, grievance_signed_date, " +
+      "dnr_status, dnr_location, polst_status, palliative_care_status, hospice_status, " +
       "admission_date, discharge_date, form_1056_number, form_1056_approved_date",
     )
     .eq("id", clientId)

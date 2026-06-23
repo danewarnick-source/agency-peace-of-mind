@@ -8,6 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 import { applyExtractedFieldsToClient } from "@/lib/client-import-schema";
+import { validateClientDraft, filterBlocking, type ClientDraft } from "@/lib/import-validation";
 
 
 const JobId = z.object({ jobId: z.string().uuid() });
@@ -124,6 +125,43 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string) {
         results.push({ subjectId: subj.id, display_name: subj.display_name, committed: true, record_id: null, gaps: ["skipped"] });
         continue;
       }
+
+      // Never silent-merge two different people. An ambiguous match without an
+      // explicit admin decision must block at commit time.
+      if (subj.match_status === "ambiguous" && !subj.review_decision) {
+        const msg = "Ambiguous match — admin must pick update vs create_new.";
+        await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
+        await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "ambiguous_unresolved");
+        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: [msg] });
+        continue;
+      }
+
+      // ── Triple-check validation gate (pre-write) ───────────────────────
+      // Reuse the same validator the review screen uses; honor admin overrides.
+      try {
+        const { data: subjFields } = await sb
+          .from("extracted_fields")
+          .select("target_field, value")
+          .eq("import_subject_id", subj.id);
+        const draft = buildClientDraftFromFields(subjFields ?? []);
+        const { issues } = validateClientDraft(draft);
+        const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
+        const blocking = filterBlocking(issues, overrides);
+        if (blocking.length > 0) {
+          const msg = `NECTAR validation blocked commit: ${blocking.map((b) => b.message).join(" | ")}`;
+          await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
+          await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "validation_blocked");
+          results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: blocking.map((b) => b.message) });
+          continue;
+        }
+      } catch (e) {
+        // A validator failure must NEVER silently allow a commit. Log + skip.
+        const msg = `Validator threw: ${(e as Error).message}`;
+        await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "validation_error");
+        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: [msg] });
+        continue;
+      }
+
 
       try {
         const { data: fields } = await sb.from("extracted_fields")

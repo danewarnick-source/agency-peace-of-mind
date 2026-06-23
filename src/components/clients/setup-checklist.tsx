@@ -146,7 +146,7 @@ type BillingCodeRow = {
 
 type ClientPcsp = { pcsp_goals: string[] | null; physical_address: string | null; geofence_radius_feet: number | null; is_own_guardian: boolean | null; guardian_name: string | null };
 
-export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; jobId: string }) {
+export function SetupChecklist({ clientId, jobId }: { clientId: string; jobId: string }) {
   const qc = useQueryClient();
   const readinessFn = useServerFn(clientReadiness);
 

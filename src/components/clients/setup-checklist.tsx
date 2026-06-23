@@ -50,12 +50,16 @@ import {
   setGrievanceAcknowledgment,
   appendClientArrayField,
   upsertClientMedication,
+  listHrcReviewsForClient,
+  createHrcReview,
+  setEndOfLifeStatus,
 } from "@/lib/import-checklist.functions";
 import {
   getClientFieldStates,
   setFieldConfirmation,
   type FieldStateMap,
 } from "@/lib/field-confirmations.functions";
+import { submitForSetup } from "@/lib/smart-import-review.functions";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { isClockableServiceCode } from "@/lib/service-billing";
 import {
@@ -142,7 +146,7 @@ type BillingCodeRow = {
 
 type ClientPcsp = { pcsp_goals: string[] | null; physical_address: string | null; geofence_radius_feet: number | null; is_own_guardian: boolean | null; guardian_name: string | null };
 
-export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; jobId: string }) {
+export function SetupChecklist({ clientId, jobId }: { clientId: string; jobId: string }) {
   const qc = useQueryClient();
   const readinessFn = useServerFn(clientReadiness);
 
@@ -269,6 +273,7 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     advanced_directives: fieldStates.advanced_directives !== "unknown",
     court_orders: fieldStates.court_orders !== "unknown",
   };
+  const rightsState = fieldStates.rights_restrictions ?? "unknown";
 
   // Required-row passing flags (Group 1).
   const rowPass = {
@@ -282,6 +287,11 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     lon: !!sowSupp.level_of_need?.trim(),
     ec2: !!sowSupp.emergency_contact_2_name?.trim(),
     grievance: !!sowSupp.grievance_acknowledged,
+    // Rights row passes when answered. The HRC sub-flow is enforced
+    // inside the row component itself — the row stays expanded with a
+    // visible CTA until artifacts are linked, but it counts as answered
+    // so submit isn't blocked indefinitely while artifacts are gathered.
+    rights: rightsState !== "unknown",
   };
   const requiredFlags: boolean[] = [
     rowPass.code, rowPass.rates, rowPass.goals, rowPass.staff, rowPass.guardian,
@@ -289,7 +299,9 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     rowPass.sow, rowPass.lon, rowPass.ec2, rowPass.grievance,
     askPass.medications, askPass.allergies, askPass.immunizations,
     askPass.advanced_directives, askPass.court_orders,
+    rowPass.rights,
   ];
+  const allRequiredPass = requiredFlags.every(Boolean);
   const doneCount = requiredFlags.filter(Boolean).length;
   const totalCount = requiredFlags.length;
   const pct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
@@ -435,18 +447,45 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
             passing={askPass.court_orders}
             onChanged={invalidateAll}
           />
+          <RightsRestrictionRow
+            clientId={clientId}
+            state={rightsState}
+            passing={rowPass.rights}
+            onChanged={invalidateAll}
+          />
         </div>
       </div>
 
-
-
+      {/* Group 3 — Optional Advanced care / end-of-life */}
+      <EndOfLifeGroup clientId={clientId} />
 
       {/* Footer */}
-      <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <Button disabled={!readiness.isLive} title={readiness.isLive ? "" : "Resolve required items first"}>
-          Submit for setup
-        </Button>
-      </div>
+      <SubmitFooter jobId={jobId} canSubmit={allRequiredPass} />
+    </div>
+  );
+}
+
+function SubmitFooter({ jobId, canSubmit }: { jobId: string; canSubmit: boolean }) {
+  const submitFn = useServerFn(submitForSetup);
+  const m = useMutation({
+    mutationFn: () => submitFn({ data: { jobId } }),
+    onSuccess: () => toast.success("Submitted for setup."),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      {!canSubmit && (
+        <div className="mr-auto text-xs text-muted-foreground">
+          Answer all required items to submit.
+        </div>
+      )}
+      <Button
+        disabled={!canSubmit || m.isPending}
+        onClick={() => m.mutate()}
+      >
+        {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Submit for setup
+      </Button>
     </div>
   );
 }
@@ -1452,5 +1491,300 @@ function CourtOrdersAskRow({
         answeredSummary={summary}
       />
     </ChecklistRow>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rights restrictions → HRC chain (SOW §1.20)
+// ---------------------------------------------------------------------------
+function RightsRestrictionRow({
+  clientId, state, passing, onChanged,
+}: { clientId: string; state: FieldState; passing: boolean; onChanged: () => void }) {
+  const setConfFn = useServerFn(setFieldConfirmation);
+  const listFn = useServerFn(listHrcReviewsForClient);
+  const createFn = useServerFn(createHrcReview);
+
+  const reviewsQ = useQuery({
+    queryKey: ["hrc-reviews-for-client", clientId],
+    queryFn: async () => {
+      const r = await listFn({ data: { clientId } });
+      return (r.reviews ?? []) as Array<{ id: string; status: string; restriction_summary: string | null }>;
+    },
+    enabled: state === "has",
+  });
+
+  const approvalsQ = useQuery({
+    queryKey: ["hrc-approvals-for-client", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_documents")
+        .select("id, file_name")
+        .eq("client_id", clientId)
+        .eq("document_type", "hrc_approval");
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+    enabled: state === "has",
+  });
+
+  const [summary, setSummary] = useState("");
+  const createM = useMutation({
+    mutationFn: () => createFn({ data: { clientId, restriction_summary: summary, status: "pending" } }),
+    onSuccess: () => {
+      toast.success("HRC review created (pending).");
+      setSummary("");
+      reviewsQ.refetch();
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const setNone = async () => {
+    await setConfFn({ data: { clientId, key: "rights_restrictions", value: "none" } });
+    toast.success("Recorded — no rights restrictions.");
+    onChanged();
+  };
+  const setYes = async () => {
+    await setConfFn({ data: { clientId, key: "rights_restrictions", value: "has" } });
+    onChanged();
+  };
+
+  const reviews = reviewsQ.data ?? [];
+  const approvals = approvalsQ.data ?? [];
+  const hasArtifacts = reviews.length > 0 || approvals.length > 0;
+
+  const summaryText =
+    state === "none" ? "No rights restrictions."
+    : state === "has"
+      ? hasArtifacts
+        ? `${reviews.length} HRC review${reviews.length === 1 ? "" : "s"}${approvals.length ? `, ${approvals.length} approval doc${approvals.length === 1 ? "" : "s"}` : ""}`
+        : "Yes — HRC artifacts needed"
+      : null;
+
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Rights restrictions / HRC"
+      valueChip={summaryText ? <span className="text-xs text-muted-foreground">{summaryText}</span> : null}
+      defaultOpen={!passing || (state === "has" && !hasArtifacts)}
+    >
+      {state === "unknown" && (
+        <NectarAsk
+          question="Are any of this client's rights restricted?"
+          kind="simple_yes_no"
+          onYes={setYes}
+          onNone={setNone}
+        />
+      )}
+      {state === "none" && (
+        <div className="flex items-center justify-between rounded-md border border-emerald-300/60 bg-emerald-50/30 p-3 text-sm dark:bg-emerald-950/10">
+          <span>No rights restrictions on file.</span>
+          <Button size="sm" variant="ghost" onClick={setYes}>Change to Yes</Button>
+        </div>
+      )}
+      {state === "has" && (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            DSPD §1.20: every restriction requires an HRC review + documented informed consent.
+            Link an existing review, create a new one, or upload the signed approval.
+          </div>
+          {reviews.length > 0 && (
+            <div className="space-y-1 rounded border border-border bg-background p-2">
+              <div className="text-xs font-semibold">Existing HRC reviews</div>
+              {reviews.map((r) => (
+                <div key={r.id} className="flex items-center justify-between text-xs">
+                  <span className="truncate">{r.restriction_summary ?? "(no summary)"}</span>
+                  <Badge variant="outline">{r.status}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="space-y-1">
+            <Label className="text-xs">Create new HRC review</Label>
+            <Textarea
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="Summarize the restriction(s)"
+              rows={2}
+            />
+            <Button size="sm" onClick={() => createM.mutate()} disabled={createM.isPending || !summary.trim()}>
+              {createM.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Create HRC review (pending)
+            </Button>
+          </div>
+          <NectarAsk
+            question="Upload signed HRC approval"
+            kind="data_rich_gap"
+            clientId={clientId}
+            uploadDocumentType="hrc_approval"
+            onNone={setNone}
+          />
+          <div className="text-right">
+            <Button size="sm" variant="ghost" onClick={setNone}>
+              No restrictions after all
+            </Button>
+          </div>
+        </div>
+      )}
+    </ChecklistRow>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Optional group — Advanced care / end-of-life (never blocks submit)
+// ---------------------------------------------------------------------------
+type EolField = "dnr_status" | "polst_status" | "palliative_care_status" | "hospice_status";
+const EOL_QUESTIONS: Array<{ field: EolField; question: string; positive: string; uploadType: string; needsLocation?: boolean }> = [
+  { field: "dnr_status", question: "Does this client have a DNR on file?", positive: "DNR on file", uploadType: "dnr", needsLocation: true },
+  { field: "polst_status", question: "Does this client have a POLST on file?", positive: "POLST on file", uploadType: "polst" },
+  { field: "palliative_care_status", question: "Does this client have palliative-care orders on file?", positive: "Palliative-care orders on file", uploadType: "palliative" },
+  { field: "hospice_status", question: "Does this client have hospice protocols on file?", positive: "Hospice protocols on file", uploadType: "hospice" },
+];
+
+function EndOfLifeGroup({ clientId }: { clientId: string }) {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["client-eol", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("dnr_status, dnr_location, polst_status, palliative_care_status, hospice_status, special_directions")
+        .eq("id", clientId)
+        .maybeSingle();
+      if (error) throw error;
+      const { data: docs } = await supabase
+        .from("client_documents")
+        .select("document_type")
+        .eq("client_id", clientId)
+        .in("document_type", ["dnr", "polst", "palliative", "hospice"]);
+      return {
+        row: (data ?? {}) as Record<string, string | null>,
+        nectarDetected: (docs ?? []).length > 0,
+      };
+    },
+  });
+
+  const detected = useMemo(() => {
+    const row = q.data?.row ?? {};
+    const anyStatus = ["dnr_status", "polst_status", "palliative_care_status", "hospice_status"]
+      .some((k) => !!(row[k] && row[k] !== "none"));
+    const specials = String(row.special_directions ?? "").toLowerCase();
+    const kw = ["hospice", "palliative", "comfort care", "polst", "dnr"]
+      .some((k) => specials.includes(k));
+    return anyStatus || kw || !!q.data?.nectarDetected;
+  }, [q.data]);
+
+  const [openOverride, setOpenOverride] = useState<boolean | null>(null);
+  const open = openOverride ?? detected;
+
+  const setFn = useServerFn(setEndOfLifeStatus);
+  const refresh = () => qc.invalidateQueries({ queryKey: ["client-eol", clientId] });
+
+  return (
+    <div>
+      <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Advanced care / end-of-life
+      </div>
+      <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+        <button
+          type="button"
+          onClick={() => setOpenOverride(open ? false : true)}
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+        >
+          <div>
+            <div className="text-sm font-medium">Advanced care / end-of-life</div>
+            <div className="text-xs text-muted-foreground">
+              Optional — does not block submission.
+              {detected && (
+                <span className="ml-1 text-primary">
+                  NECTAR detected end-of-life signals — please confirm.
+                </span>
+              )}
+            </div>
+          </div>
+          {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+        </button>
+        {open && (
+          <div className="space-y-3 border-t border-border/60 px-4 py-4">
+            {EOL_QUESTIONS.map((row) => {
+              const current = (q.data?.row?.[row.field] as string | null) ?? null;
+              const answered = current ? (current === "none" ? "Not on file" : row.positive) : null;
+              return (
+                <NectarAsk
+                  key={row.field}
+                  question={row.question}
+                  kind="data_rich_gap"
+                  clientId={clientId}
+                  uploadDocumentType={row.uploadType}
+                  answeredSummary={answered}
+                  onNone={async () => {
+                    await setFn({ data: { clientId, field: row.field, status: "none" } });
+                    refresh();
+                  }}
+                  manualForm={
+                    row.needsLocation ? (
+                      <DnrStatusForm
+                        clientId={clientId}
+                        initialLocation={(q.data?.row?.dnr_location as string | null) ?? ""}
+                        onSaved={refresh}
+                      />
+                    ) : (
+                      <EolStatusForm
+                        clientId={clientId}
+                        field={row.field}
+                        onSaved={refresh}
+                      />
+                    )
+                  }
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EolStatusForm({
+  clientId, field, onSaved,
+}: { clientId: string; field: EolField; onSaved: () => void }) {
+  const setFn = useServerFn(setEndOfLifeStatus);
+  const m = useMutation({
+    mutationFn: () => setFn({ data: { clientId, field, status: "on_file" } }),
+    onSuccess: () => { toast.success("Saved — on file."); onSaved(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="flex justify-end">
+      <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending}>
+        {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Confirm on file
+      </Button>
+    </div>
+  );
+}
+
+function DnrStatusForm({
+  clientId, initialLocation, onSaved,
+}: { clientId: string; initialLocation: string; onSaved: () => void }) {
+  const [loc, setLoc] = useState(initialLocation);
+  const setFn = useServerFn(setEndOfLifeStatus);
+  const m = useMutation({
+    mutationFn: () => setFn({ data: { clientId, field: "dnr_status", status: "on_file", location: loc.trim() } }),
+    onSuccess: () => { toast.success("DNR location saved."); onSaved(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs">Where is the DNR kept?</Label>
+      <Input value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="e.g. front of binder, fridge magnet…" />
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || !loc.trim()}>
+          {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Save DNR location
+        </Button>
+      </div>
+    </div>
   );
 }

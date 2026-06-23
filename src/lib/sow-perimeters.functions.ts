@@ -5,17 +5,17 @@
  * silently assumed satisfied. Numbers (e.g. 24h incident deadline) come from
  * the database (`state_submission_deadline`) — NOT hardcoded here.
  *
- * R1 — ABI training       — profiles.requires_abi = true + no current "abi" training
+ * R1 — ABI training       — staff assigned to a client with disability_category "ABI" + no current "abi" training
+ *                           (profiles.requires_abi honored as manual fallback)
  * R2 — De-escalation cert — profiles.requires_deescalation OR assigned to a
  *                           behavior_support_client + no current "deescalation" training
  * R3 — 30-day training    — active org member + no current "thirty_day" training
  * R4 — Incident timeframe — incident_reports past state_submission_deadline
  * R5 — Generic SOW        — nectar_requirements with unmet tracking cadence
  *
- * NOTE: clients.is_abi does not exist in the current schema. R1 uses
- * profiles.requires_abi (set by admins when assigning staff to ABI clients).
- * A clients.is_abi column would allow more precise per-assignment checking —
- * flagged as a needed DB field.
+ * NOTE: R1 derives the ABI requirement from clients.disability_category = 'ABI'
+ * via staff_assignments (set automatically during PCSP import). profiles.requires_abi
+ * is honored as a manual fallback so existing data is not broken.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -123,14 +123,15 @@ export const computeSowAlerts = createServerFn({ method: "POST" })
         .select("id, title, review_status, metadata")
         .eq("organization_id", orgId),
       sb.from("clients")
-        .select("id, first_name, last_name")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, first_name, last_name, disability_category" as any)
         .eq("organization_id", orgId),
     ]);
 
     type Profile = { id: string; full_name: string | null; requires_abi: boolean; requires_deescalation: boolean; is_active: boolean };
     type Incident = { id: string; report_number: string; client_id: string; state_submission_deadline: string };
     type Requirement = { id: string; title: string; review_status: string | null; metadata: Record<string, unknown> | null };
-    type ClientRow = { id: string; first_name: string; last_name: string };
+    type ClientRow = { id: string; first_name: string; last_name: string; disability_category?: string | null };
 
     const profiles = ((profilesRes.data ?? []) as Profile[]).filter((p) => p.is_active);
     const trainings = (trainingsRes.data ?? []) as TrainingRow[];
@@ -150,18 +151,30 @@ export const computeSowAlerts = createServerFn({ method: "POST" })
     };
 
     // ── R1 — ABI training ────────────────────────────────────────────────────
-    for (const p of profiles) {
-      if (!p.requires_abi) continue;
-      if (!isTrainingCurrent(trainings, p.id, SOW_TRAINING_KEYS.ABI, today)) {
-        const name = p.full_name ?? "Staff";
+    // Staff needs ABI training if: admin set requires_abi on their profile
+    // OR they're assigned to a client whose disability_category is "ABI".
+    const abiClientIds = new Set(
+      clientList
+        .filter((c) => c.disability_category === "ABI")
+        .map((c) => c.id),
+    );
+    const staffNeedingAbi = new Set<string>(
+      profiles.filter((p) => p.requires_abi).map((p) => p.id),
+    );
+    for (const a of assignments) {
+      if (abiClientIds.has(a.client_id)) staffNeedingAbi.add(a.staff_id);
+    }
+    for (const staffId of staffNeedingAbi) {
+      if (!isTrainingCurrent(trainings, staffId, SOW_TRAINING_KEYS.ABI, today)) {
+        const name = staffName(staffId);
         alerts.push({
-          key: `sow:r1:${p.id}`,
+          key: `sow:r1:${staffId}`,
           title: `${name} works with an ABI client but has no ABI training on file.`,
           subject: name,
           subjectKind: "staff",
           dueAt: overdueIso,
-          href: `/dashboard/employees/${p.id}`,
-          staffId: p.id,
+          href: `/dashboard/employees/${staffId}`,
+          staffId,
         });
       }
     }

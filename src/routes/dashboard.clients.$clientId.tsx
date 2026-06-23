@@ -32,6 +32,7 @@ import { TrackedFieldsCard } from "@/components/clients/tracked-fields-card";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
+  Phone,
 } from "lucide-react";
 import { saveAdminHours } from "@/lib/scheduler/scheduler.functions";
 import { clientFeatureVisible } from "@/lib/client-features";
@@ -69,7 +70,7 @@ function ClientProfileHub() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week, feature_config" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week, feature_config, support_coordinator_name, support_coordinator_email, support_coordinator_phone, disability_category, bsp_status, diagnoses, advanced_directives, admission_date, discharge_date" as any)
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -99,6 +100,8 @@ function ClientProfileHub() {
 
 
 
+  const disabilityCategory = client?.disability_category as string | null | undefined;
+
   return (
     <div className="container mx-auto max-w-7xl px-4 py-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -111,6 +114,8 @@ function ClientProfileHub() {
             {client?.medicaid_id ? <span>Medicaid #{String(client.medicaid_id)}</span> : null}
             {client?.account_status ? <Badge variant="outline">{String(client.account_status)}</Badge> : null}
             {isHostHome ? <Badge variant="secondary">Host home</Badge> : null}
+            {disabilityCategory === "ABI" && <Badge className="bg-amber-100 text-amber-800 border border-amber-200">ABI</Badge>}
+            {disabilityCategory === "ID-RC" && <Badge variant="outline">ID/RC</Badge>}
           </div>
         </div>
         <Button asChild variant="outline" size="sm">
@@ -204,6 +209,19 @@ type ClientRow = Record<string, unknown> | null | undefined;
 
 function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { client: ClientRow; clientId: string; isHostHome: boolean; showBehavior: boolean; orgId?: string }) {
   if (!client) return <SkeletonCard />;
+
+  const scName = client.support_coordinator_name as string | null | undefined;
+  const scEmail = client.support_coordinator_email as string | null | undefined;
+  const scPhone = client.support_coordinator_phone as string | null | undefined;
+  const hasCoordinator = !!(scName || scEmail || scPhone);
+
+  const diagnoses = Array.isArray(client.diagnoses)
+    ? (client.diagnoses as string[]).join(", ")
+    : (client.diagnoses as string | null | undefined) ?? null;
+  const advancedDirectives = client.advanced_directives;
+  const advancedDirectivesLabel =
+    advancedDirectives === true ? "Yes" : advancedDirectives === false ? "No" : null;
+
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
@@ -212,8 +230,31 @@ function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { 
           <Field label="Phone" value={client.phone_number as string | null} />
           <Field label="Address" value={client.physical_address as string | null} />
           <Field label="Date of birth" value={client.date_of_birth as string | null} />
+          <Field label="Admission" value={client.admission_date as string | null | undefined} />
+          <Field label="Discharge" value={client.discharge_date as string | null | undefined} />
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Phone className="h-4 w-4 text-muted-foreground" />
+            Support Coordinator
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-1">
+          {hasCoordinator ? (
+            <>
+              <Field label="Name" value={scName ?? null} />
+              <Field label="Phone" value={scPhone ?? null} />
+              <Field label="Email" value={scEmail ?? null} />
+            </>
+          ) : (
+            <span className="text-muted-foreground">No support coordinator on file.</span>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader><CardTitle className="text-base">Emergency contact</CardTitle></CardHeader>
         <CardContent className="text-sm space-y-1">
@@ -221,6 +262,22 @@ function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { 
           <Field label="Phone" value={client.emergency_contact_phone as string | null} />
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Stethoscope className="h-4 w-4 text-muted-foreground" />
+            Clinical
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-1">
+          <Field label="Disability category" value={(client.disability_category as string | null | undefined) ?? null} />
+          <Field label="BSP status" value={(client.bsp_status as string | null | undefined) ?? null} />
+          <Field label="Diagnoses" value={diagnoses} />
+          <Field label="Adv. directives" value={advancedDirectivesLabel} />
+        </CardContent>
+      </Card>
+
       {isHostHome && (
         <Card className="md:col-span-2">
           <CardHeader><CardTitle className="text-base">Administrative hours</CardTitle></CardHeader>

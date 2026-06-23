@@ -119,7 +119,8 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       await Promise.all([
         supabase
           .from("clients")
-          .select("id, first_name, last_name, authorized_dspd_codes, job_code")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .select("id, first_name, last_name, authorized_dspd_codes, job_code, support_coordinator_name, support_coordinator_email, support_coordinator_phone" as any)
           .eq("organization_id", orgId),
         supabase
           .from("organization_members")
@@ -170,6 +171,9 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       last_name: string;
       authorized_dspd_codes: string[] | null;
       job_code: string[] | null;
+      support_coordinator_name?: string | null;
+      support_coordinator_email?: string | null;
+      support_coordinator_phone?: string | null;
     };
     const clients = (clientsRes.data ?? []) as ClientRow[];
     const clientById = new Map(clients.map((c) => [c.id, c]));
@@ -474,6 +478,25 @@ export const runInternalAudit = createServerFn({ method: "POST" })
             subjectName: `${c.last_name}, ${c.first_name}`,
             fixHref: `/dashboard/hhs-hub/${c.id}`,
             fixLabel: "Upload PCSP",
+            asOf: todayIso(),
+          });
+        }
+
+        // Support Coordinator required on every active client record (SOW line 308).
+        const hasSc = !!(c.support_coordinator_name && c.support_coordinator_name.trim());
+        if (!hasSc) {
+          findings.push({
+            id: `doc-sc-${c.id}`,
+            area: "documentation",
+            severity: "attention",
+            title: "Support Coordinator not on file",
+            detail: `${c.last_name}, ${c.first_name} has no Support Coordinator name recorded. SOW line 308 requires name, email, and phone.`,
+            sourceCitation: "SOW §1.10 line 308",
+            subjectKind: "client",
+            subjectId: c.id,
+            subjectName: `${c.last_name}, ${c.first_name}`,
+            fixHref: `/dashboard/clients/${c.id}?tab=overview`,
+            fixLabel: "Add support coordinator",
             asOf: todayIso(),
           });
         }

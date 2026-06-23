@@ -149,17 +149,7 @@ export function GeneralTimeClock() {
             {running ? `On the clock · ${shift!.category}` : "Out of clock"}
           </span>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          Non-client work · no EVV
-        </span>
       </header>
-
-      {/* Compact info strip */}
-      <div className="mb-3 rounded-lg border border-border bg-muted/40 px-3 py-1.5">
-        <p className="text-[11px] text-muted-foreground">
-          General Time Clock is for non-client work only. Use My Caseload to clock into a client shift with EVV.
-        </p>
-      </div>
 
       {/* Category dropdown */}
       <div className="mb-3">

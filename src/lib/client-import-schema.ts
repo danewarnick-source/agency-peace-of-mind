@@ -360,13 +360,28 @@ export async function applyExtractedFieldsToClient(
   setScalarText("housing_voucher", "housing_voucher");
   setScalarText("preferred_living", "preferred_living");
   setScalarText("emergency_contact_instructions", "emergency_contact_instructions");
+  setScalarText("emergency_contact_2_name", "emergency_contact_2_name");
+  setScalarText("emergency_contact_2_phone", "emergency_contact_2_phone");
+  setScalarText("emergency_contact_2_instructions", "emergency_contact_2_instructions");
   setScalarText("plan_year", "plan_year");
   setScalarText("disability_category", "disability_category");
   setScalarText("staff_ratio", "staff_ratio");
+  setScalarText("level_of_need", "level_of_need");
+
+  // End-of-life / advanced care — extractor maps real document wording onto
+  // these columns. Status values stay as-extracted (e.g. "Active", "On file");
+  // the EOL UI normalizes "none" vs anything-else.
+  setScalarText("dnr_status", "dnr_status");
+  setScalarText("dnr_location", "dnr_location");
+  setScalarText("polst_status", "polst_status");
+  setScalarText("palliative_care_status", "palliative_care_status");
+  setScalarText("hospice_status", "hospice_status");
 
   // Booleans
   setScalarBool("advanced_directives", "advanced_directives");
   setScalarBool("emergency_medical_treatment_authorization", "emergency_medical_treatment_authorization");
+  setScalarBool("grievance_acknowledged", "grievance_acknowledged");
+  setScalarDate("grievance_signed_date", "grievance_signed_date");
 
   // Array columns
   const diagnosesF = byKey.get("diagnoses");

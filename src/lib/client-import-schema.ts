@@ -197,7 +197,7 @@ export async function applyExtractedFieldsToClient(
       "advanced_directives, emergency_medical_treatment_authorization, " +
       "diagnoses, chronic_conditions, immunizations, court_orders, rights_restrictions, " +
       "preferred_activities, roommates, personal_belongings_inventory, " +
-      "admission_date, discharge_date",
+      "admission_date, discharge_date, form_1056_number, form_1056_approved_date",
     )
     .eq("id", clientId)
     .eq("organization_id", organizationId)
@@ -218,6 +218,8 @@ export async function applyExtractedFieldsToClient(
       autofilled.push(column);
     } else if (cur !== v) {
       suggested.push(column);
+      // Surface as a structured merge flag for admin review.
+      void writeScalarConflict(column, cur, v);
     }
   };
   const setScalarBool = (column: string, key: string) => {
@@ -233,6 +235,7 @@ export async function applyExtractedFieldsToClient(
       }
     } else if (cur !== v) {
       suggested.push(column);
+      void writeScalarConflict(column, cur, v);
     }
   };
   const setScalarDate = (column: string, key: string) => {
@@ -246,11 +249,40 @@ export async function applyExtractedFieldsToClient(
       autofilled.push(column);
     } else if (cur !== v) {
       suggested.push(column);
+      void writeScalarConflict(column, cur, v);
     }
   };
+
+  // Lightweight token-set Jaccard for "is this the same item, worded differently?".
+  const tokenize = (s: string) =>
+    new Set(
+      s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((t) => t.length > 2),
+    );
+  const looksDuplicate = (a: string, b: string): boolean => {
+    const al = a.trim().toLowerCase();
+    const bl = b.trim().toLowerCase();
+    if (al === bl) return false; // exact dupe is already collapsed by Set()
+    if (al.includes(bl) || bl.includes(al)) return true;
+    const ta = tokenize(a);
+    const tb = tokenize(b);
+    if (ta.size === 0 || tb.size === 0) return false;
+    let inter = 0;
+    for (const t of ta) if (tb.has(t)) inter++;
+    const union = ta.size + tb.size - inter;
+    return union > 0 && inter / union >= 0.6;
+  };
+
   const mergeArrayColumn = (column: string, additions: string[]) => {
     if (!additions.length) return;
     const cur = ((client as Record<string, unknown>)[column] as string[] | null) ?? [];
+    // Detect possible duplicates against the existing list before unioning.
+    for (const add of additions) {
+      for (const existing of cur) {
+        if (looksDuplicate(existing, add)) {
+          void writeDuplicateFlag(column, existing, add);
+        }
+      }
+    }
     const merged = Array.from(
       new Set([...cur, ...additions].map((s) => s.trim()).filter(Boolean)),
     );

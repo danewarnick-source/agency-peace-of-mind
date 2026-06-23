@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -32,8 +33,10 @@ import { clientFeatureVisible } from "@/lib/client-features";
 const search = z.object({
   tab: z
     .enum([
+      "profile", "care", "activity", "funds", "files",
+      // legacy deep-link values kept for backwards compat
       "overview", "plan", "codes", "caseload", "shifts", "logs", "incidents",
-      "summaries", "hhcert", "deadlines", "documents", "files",
+      "summaries", "hhcert", "deadlines", "documents",
     ])
     .optional(),
 });
@@ -48,12 +51,29 @@ export const Route = createFileRoute("/dashboard/clients/$clientId")({
   ),
 });
 
+// Map legacy deep-link tab values to the new five-tab model
+function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | "funds" | "files" {
+  if (!raw) return "profile";
+  if (raw === "profile" || raw === "overview") return "profile";
+  if (raw === "care" || raw === "plan" || raw === "caseload") return "care";
+  if (raw === "activity" || raw === "shifts" || raw === "logs" || raw === "incidents" || raw === "summaries" || raw === "hhcert" || raw === "deadlines") return "activity";
+  if (raw === "funds" || raw === "codes") return "funds";
+  if (raw === "files" || raw === "documents") return "files";
+  return "profile";
+}
+
 function ClientProfileHub() {
   const { clientId } = Route.useParams();
+  const { tab: rawTab } = Route.useSearch();
   const { data: org } = useCurrentOrg();
   const router = useRouter();
   const orgId = org?.organization_id;
-  const [showFiles, setShowFiles] = useState(false);
+
+  const activeTab = resolveTab(rawTab);
+
+  const setTab = (t: string) => {
+    router.navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, tab: t }) });
+  };
 
   const clientQ = useQuery({
     enabled: !!orgId,
@@ -74,8 +94,6 @@ function ClientProfileHub() {
   const fullName = client
     ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || "—"
     : "Loading…";
-  // Code-driven feature visibility. Derived per-render from
-  // authorized_dspd_codes so plan edits re-evaluate without caching.
   const codes: string[] = Array.isArray(client?.job_code)
     ? (client?.job_code as string[])
     : Array.isArray(client?.authorized_dspd_codes)
@@ -88,17 +106,15 @@ function ClientProfileHub() {
       }
     : null;
   const isHostHome = clientFeatureVisible(featureClient, "host_home");
-  const showBehavior = clientFeatureVisible(featureClient, "behavior");
-
-
 
   const disabilityCategory = client?.disability_category as string | null | undefined;
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-6 space-y-6">
+      {/* Back nav + client header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/clients" })}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Clients
+          <ArrowLeft className="h-4 w-4 mr-1" /> Clients
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold truncate">{fullName}</h1>
@@ -112,21 +128,42 @@ function ClientProfileHub() {
         </div>
       </div>
 
+      {/* Tab navigation */}
+      <Tabs value={activeTab} onValueChange={setTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="care">Care</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="funds">Funds</TabsTrigger>
+          <TabsTrigger value="files">Files</TabsTrigger>
+        </TabsList>
 
+        <TabsContent value="profile" className="space-y-4">
+          <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
+        </TabsContent>
 
-      {showFiles ? (
-        <div className="space-y-4">
-          <Button variant="ghost" size="sm" onClick={() => setShowFiles(false)}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back to profile
-          </Button>
+        <TabsContent value="care" className="space-y-4">
+          <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
+          <CaseloadEditor clientId={clientId} />
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-4">
+          <ShiftsPanel clientId={clientId} orgId={orgId} />
+          <DailyLogsPanel clientId={clientId} orgId={orgId} />
+          <IncidentsPanel clientId={clientId} orgId={orgId} />
+          <SummariesPanel clientId={clientId} orgId={orgId} client={client} />
+          {isHostHome && <HostHomeCertPanel clientId={clientId} orgId={orgId} />}
+          <DeadlinesPanel clientId={clientId} />
+        </TabsContent>
+
+        <TabsContent value="funds" className="space-y-4">
+          <BillingCodesPanel clientId={clientId} />
+        </TabsContent>
+
+        <TabsContent value="files" className="space-y-4">
           <ClientDocumentsCard clientId={clientId} clientName={fullName} />
-        </div>
-      ) : (
-        <ClientProfileTab
-          clientId={clientId}
-          onOpenFiles={() => setShowFiles(true)}
-        />
-      )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

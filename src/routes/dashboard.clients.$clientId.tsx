@@ -597,40 +597,59 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
 
   if (isLoading) return <SkeletonCard />;
 
+  const pcspDialog = (
+    <Dialog open={showPcspPrompt} onOpenChange={setShowPcspPrompt}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Upload the PCSP first</DialogTitle>
+          <DialogDescription>
+            This client has no PCSP on file. Support strategies and client-specific training are built from the PCSP, so you'll need to upload it before drafting. Add it under the client's Files tab.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>Got it</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!training) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Support strategies</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your goals verbatim; you write the staff instructions.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => pcspReady ? draftMut.mutate("nectar") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
-              {draftMut.isPending
-                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
-              Build from PCSP goals (NECTAR)
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => pcspReady ? draftMut.mutate("blank") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
-              Write manually
-            </Button>
-            <Button
-              size="sm" variant="outline"
-              onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)}
-              disabled={uploading || !orgId}
-            >
-              {uploading
-                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                : <Upload className="mr-1.5 h-3.5 w-3.5" />}
-              Upload document
-            </Button>
-            {fileInput}
-          </div>
-        </CardContent>
-      </Card>
+      <>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Support strategies</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your goals verbatim; you write the staff instructions.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => pcspReady ? draftMut.mutate("nectar") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
+                {draftMut.isPending
+                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
+                Build from PCSP goals (NECTAR)
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => pcspReady ? draftMut.mutate("blank") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
+                Write manually
+              </Button>
+              <Button
+                size="sm" variant="outline"
+                onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)}
+                disabled={uploading || !orgId}
+              >
+                {uploading
+                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+                Upload document
+              </Button>
+              {fileInput}
+            </div>
+          </CardContent>
+        </Card>
+        {pcspDialog}
+      </>
     );
   }
 

@@ -43,6 +43,7 @@ import {
   updateClientSpecificTraining,
   publishClientSpecificTraining,
   extractPcspGoalsForTraining,
+  draftClientSpecificTrainingBlank,
   type CSTContent,
   type CSTGoal,
   type CSTReviewQuestion,

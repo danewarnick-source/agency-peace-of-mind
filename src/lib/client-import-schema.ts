@@ -773,6 +773,10 @@ export async function applyExtractedFieldsToClient(
     "admission_date", "discharge_date",
     // 1056 header fields
     "form_1056_number", "form_1056_approved_date",
+    // SOW supplemental
+    "level_of_need",
+    "emergency_contact_2_name", "emergency_contact_2_phone", "emergency_contact_2_instructions",
+    "grievance_acknowledged", "grievance_signed_date",
     // End-of-life / advanced care
     "dnr_status", "dnr_location", "polst_status", "palliative_care_status", "hospice_status",
   ]);

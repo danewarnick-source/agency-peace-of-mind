@@ -2504,6 +2504,7 @@ export type Database = {
           client_id: string
           content: Json
           created_at: string
+          goals: Json
           id: string
           organization_id: string
           status: string
@@ -2519,6 +2520,7 @@ export type Database = {
           client_id: string
           content?: Json
           created_at?: string
+          goals?: Json
           id?: string
           organization_id: string
           status?: string
@@ -2534,6 +2536,7 @@ export type Database = {
           client_id?: string
           content?: Json
           created_at?: string
+          goals?: Json
           id?: string
           organization_id?: string
           status?: string

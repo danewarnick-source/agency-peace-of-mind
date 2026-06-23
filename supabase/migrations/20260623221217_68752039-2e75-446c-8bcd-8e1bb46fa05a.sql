@@ -1,0 +1,1 @@
+ALTER TABLE public.client_specific_trainings ADD COLUMN IF NOT EXISTS goals jsonb NOT NULL DEFAULT '[]'::jsonb;

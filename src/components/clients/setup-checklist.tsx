@@ -171,15 +171,48 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     },
   });
 
+  // SOW supplemental — separate columns on clients.
+  const sowSuppQ = useQuery({
+    queryKey: ["client-sow-supp", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("level_of_need, emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_instructions, grievance_acknowledged, grievance_signed_date")
+        .eq("id", clientId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return (data ?? {}) as {
+        level_of_need: string | null;
+        emergency_contact_2_name: string | null;
+        emergency_contact_2_phone: string | null;
+        emergency_contact_2_instructions: string | null;
+        grievance_acknowledged: boolean | null;
+        grievance_signed_date: string | null;
+      };
+    },
+  });
+
+  // SOW required-field gaps (computed server-side by getClientOnboardingState
+  // — exactly the same logic the legacy onboarding wizard uses, including the
+  // custom-field-backed keys).
+  const onbFn = useServerFn(getClientOnboardingState);
+  const onbStateQ = useQuery({
+    queryKey: ["client-onboarding-state", clientId],
+    queryFn: () => onbFn({ data: { clientId } }),
+  });
+
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["client-readiness", clientId] });
     qc.invalidateQueries({ queryKey: ["client-billing-codes", clientId] });
     qc.invalidateQueries({ queryKey: ["client-setup-checklist-row", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-sow-supp", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-onboarding-state", clientId] });
   };
 
   const readiness = readinessQ.data;
   const codes = codesQ.data ?? [];
   const client = clientQ.data;
+  const sowSupp = sowSuppQ.data;
 
   const evvApplicable = useMemo(() => {
     const current = readiness?.currentCodes ?? [];
@@ -188,14 +221,23 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     );
   }, [readiness?.currentCodes]);
 
-  if (readinessQ.isLoading || codesQ.isLoading || clientQ.isLoading) {
+  // SOW-required missing keys, photograph excluded (PHI, deferred).
+  const sowMissingKeys: string[] = useMemo(() => {
+    const keys = (onbStateQ.data?.sowMissingKeys ?? []) as string[];
+    return keys.filter((k) => k !== "photograph");
+  }, [onbStateQ.data?.sowMissingKeys]);
+
+  if (
+    readinessQ.isLoading || codesQ.isLoading || clientQ.isLoading ||
+    sowSuppQ.isLoading || onbStateQ.isLoading
+  ) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading setup checklist…
       </div>
     );
   }
-  if (!readiness || !client) {
+  if (!readiness || !client || !sowSupp) {
     return (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
         Couldn&apos;t load setup checklist for this client.
@@ -211,14 +253,20 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     staff: readiness.hasStaff,
     guardian: readiness.guardianValid,
     evv: readiness.evvReady,
+    sow: sowMissingKeys.length === 0,
+    lon: !!sowSupp.level_of_need?.trim(),
+    ec2: !!sowSupp.emergency_contact_2_name?.trim(),
+    grievance: !!sowSupp.grievance_acknowledged,
   };
   const requiredFlags: boolean[] = [
     rowPass.code, rowPass.rates, rowPass.goals, rowPass.staff, rowPass.guardian,
     ...(evvApplicable ? [rowPass.evv] : []),
+    rowPass.sow, rowPass.lon, rowPass.ec2, rowPass.grievance,
   ];
   const doneCount = requiredFlags.filter(Boolean).length;
   const totalCount = requiredFlags.length;
   const pct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+
 
   return (
     <div className="space-y-4">

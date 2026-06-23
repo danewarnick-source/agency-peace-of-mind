@@ -129,8 +129,8 @@ function ClientProfileHub() {
     <div className="container mx-auto max-w-7xl px-4 py-6 space-y-6">
       {/* Back nav + client header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/clients" })}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Clients
+        <Button variant="ghost" size="sm" onClick={() => router.navigate({ to: "/dashboard/hub/clients" })}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Client directory
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold truncate">{fullName}</h1>

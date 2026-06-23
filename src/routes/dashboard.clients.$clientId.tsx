@@ -7,7 +7,7 @@
 // Tabs: Overview / Plan & goals / Billing codes / Shifts / Daily logs /
 // Incidents / Summaries / Host-home cert / Deadlines / Documents.
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { z } from "zod";
 import { useServerFn } from "@tanstack/react-start";
@@ -24,7 +24,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { ClientPhoto } from "@/components/client-photo";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
@@ -33,7 +32,7 @@ import { TrackedFieldsCard } from "@/components/clients/tracked-fields-card";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
-  Camera, Phone, Mail,
+  Phone,
 } from "lucide-react";
 import { saveAdminHours } from "@/lib/scheduler/scheduler.functions";
 import { clientFeatureVisible } from "@/lib/client-features";
@@ -71,7 +70,7 @@ function ClientProfileHub() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week, feature_config, profile_photo_url, support_coordinator_name, support_coordinator_email, support_coordinator_phone, disability_category, bsp_status, diagnoses, advanced_directives, admission_date, discharge_date" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week, feature_config, support_coordinator_name, support_coordinator_email, support_coordinator_phone, disability_category, bsp_status, diagnoses, advanced_directives, admission_date, discharge_date" as any)
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -101,31 +100,6 @@ function ClientProfileHub() {
 
 
 
-  const photoInputRef = useRef<HTMLInputElement | null>(null);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const qc = useQueryClient();
-
-  async function handlePhotoUpload(file: File) {
-    if (!orgId || !client) return;
-    setPhotoUploading(true);
-    try {
-      const ext = file.name.split(".").pop() ?? "jpg";
-      const path = `${orgId}/${clientId}/profile.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("client-photos")
-        .upload(path, file, { upsert: true });
-      if (uploadError) throw uploadError;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("clients").update({ profile_photo_url: path }).eq("id", clientId);
-      toast.success("Profile photo updated.");
-      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
-    } catch (e) {
-      toast.error((e as Error).message ?? "Photo upload failed.");
-    } finally {
-      setPhotoUploading(false);
-    }
-  }
-
   const disabilityCategory = client?.disability_category as string | null | undefined;
 
   return (
@@ -134,26 +108,6 @@ function ClientProfileHub() {
         <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/clients" })}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Clients
         </Button>
-        <div className="relative shrink-0">
-          <div className="h-14 w-14 rounded-full overflow-hidden bg-muted flex items-center justify-center text-muted-foreground border border-border">
-            <ClientPhoto
-              path={client?.profile_photo_url as string | null | undefined}
-              alt={fullName}
-              className="h-full w-full object-cover"
-              fallback={<User className="h-6 w-6" />}
-            />
-          </div>
-          <label className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center cursor-pointer shadow" title="Upload photo">
-            {photoUploading ? <span className="h-3 w-3 border-2 border-t-transparent border-white rounded-full animate-spin" /> : <Camera className="h-3 w-3" />}
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.currentTarget.value = ""; }}
-            />
-          </label>
-        </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold truncate">{fullName}</h1>
           <div className="flex flex-wrap gap-2 mt-1 text-xs text-muted-foreground">

@@ -510,29 +510,27 @@ export async function applyExtractedFieldsToClient(
     if (bcErr) throw new Error(`billing-codes upsert failed: ${bcErr.message}`);
     autofilled.push(`client_billing_codes(${stubs.length})`);
 
-    // Close stale rows only on authoritative writes.
-    if (!isAuthoritative) {
-      // Skip the stale-closing sweep below.
-    }
-
-    // Close any existing authorization rows for codes NOT in the new PCSP.
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: existingCodeRows } = await supabase
-      .from("client_billing_codes")
-      .select("id, service_code, service_end_date")
-      .eq("organization_id", organizationId)
-      .eq("client_id", clientId);
-    const stale = (existingCodeRows ?? []).filter(
-      (r: { service_code: string; service_end_date: string | null }) =>
-        !codes.includes(r.service_code) &&
-        (!r.service_end_date || r.service_end_date > today),
-    );
-    for (const r of stale) {
-      await supabase
+    // Close any existing authorization rows for codes NOT in the new doc.
+    // Only authoritative documents (PCSP / 1056) ever close stale rows.
+    if (isAuthoritative) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: existingCodeRows } = await supabase
         .from("client_billing_codes")
-        .update({ service_end_date: today })
-        .eq("id", (r as { id: string }).id);
-      suggested.push(`Closed stale auth: ${(r as { service_code: string }).service_code}`);
+        .select("id, service_code, service_end_date")
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId);
+      const stale = (existingCodeRows ?? []).filter(
+        (r: { service_code: string; service_end_date: string | null }) =>
+          !codes.includes(r.service_code) &&
+          (!r.service_end_date || r.service_end_date > today),
+      );
+      for (const r of stale) {
+        await supabase
+          .from("client_billing_codes")
+          .update({ service_end_date: today })
+          .eq("id", (r as { id: string }).id);
+        suggested.push(`Closed stale auth: ${(r as { service_code: string }).service_code}`);
+      }
     }
   }
 

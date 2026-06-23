@@ -539,8 +539,6 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
               </ul>
             </div>
           )}
-            </div>
-          )}
         </CardContent>
       </Card>
       <Card>

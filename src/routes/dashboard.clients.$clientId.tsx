@@ -115,8 +115,7 @@ function ClientProfileHub() {
         </div>
       </div>
 
-      <ClientReadinessCard clientId={clientId} />
-      <FinishOnboardingCard clientId={clientId} />
+
 
       <Tabs value={tab ?? "overview"} className="w-full">
         <TabsList className="flex w-full flex-wrap h-auto justify-start">

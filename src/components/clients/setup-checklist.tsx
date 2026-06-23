@@ -41,10 +41,22 @@ import {
   removeClientBillingCode,
   saveOnboardingBillingRate,
   saveOnboardingClientPatch,
+  saveProfileField,
+  getClientOnboardingState,
 } from "@/lib/finish-onboarding.functions";
+import {
+  setLevelOfNeed,
+  setEmergencyContact,
+  setGrievanceAcknowledgment,
+} from "@/lib/import-checklist.functions";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { isClockableServiceCode } from "@/lib/service-billing";
+import {
+  PROFILE_FIELD_BY_KEY,
+  type ProfileField,
+} from "@/lib/client-profile-fields";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { Textarea } from "@/components/ui/textarea";
 
 // ---------------------------------------------------------------------------
 // Reusable row primitive — every checklist row in every prompt uses this.

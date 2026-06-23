@@ -409,45 +409,80 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
               e.target.value = "";
             }}
           />
-          {extractedGoals.length === 0 ? (
+          {editingGoals ? (
+            <div className="space-y-2">
+              <GoalsEditor goals={draftGoals ?? []} onChange={setDraftGoals} />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setEditingGoals(false); setDraftGoals(null); }}
+                  disabled={saveGoalsMut.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => saveGoalsMut.mutate()}
+                  disabled={saveGoalsMut.isPending}
+                  className="gap-1"
+                >
+                  {saveGoalsMut.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+                  Save goals
+                </Button>
+              </div>
+            </div>
+          ) : extractedGoals.length === 0 ? (
             <div className="space-y-2">
               <p className="text-muted-foreground">
-                Upload the client's PCSP — NECTAR pulls the goals, supports, and details verbatim.
+                No goals yet — upload a PCSP so NECTAR can pull them, or add them manually.
               </p>
-              <Button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={busy || !orgId}
-                className="gap-2"
-              >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {busy ? "Extracting…" : "Upload PCSP & extract goals (NECTAR)"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={busy || !orgId}
+                  className="gap-2"
+                >
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {busy ? "Extracting…" : "Upload PCSP & extract goals (NECTAR)"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={startManualEntry}
+                  disabled={busy}
+                  className="gap-2"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Add goals manually
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium">{extractedGoals.length} goals extracted from PCSP</p>
                 <div className="flex items-center gap-1">
-                  {!editingGoals && (
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => { setDraftGoals(structuredClone(extractedGoals)); setEditingGoals(true); }}
-                      disabled={busy}
-                      aria-label="Edit goals"
-                      className="h-7 w-7"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => { setDraftGoals(structuredClone(extractedGoals)); setEditingGoals(true); }}
+                    disabled={busy}
+                    aria-label="Edit goals"
+                    className="h-7 w-7"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
                     onClick={() => void runExtract()}
-                    disabled={busy || editingGoals}
+                    disabled={busy}
                     className="gap-1"
                   >
                     {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
@@ -455,69 +490,55 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                   </Button>
                 </div>
               </div>
-              {editingGoals ? (
-                <div className="space-y-2">
-                  <GoalsEditor goals={draftGoals ?? []} onChange={setDraftGoals} />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => { setEditingGoals(false); setDraftGoals(null); }}
-                      disabled={saveGoalsMut.isPending}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => saveGoalsMut.mutate()}
-                      disabled={saveGoalsMut.isPending}
-                      className="gap-1"
-                    >
-                      {saveGoalsMut.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
-                      Save goals
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {extractedGoals.map((g, i) => {
-                    const key = g.id ?? i;
-                    const isOpen = openGoal === key;
-                    return (
-                      <li key={key} className="rounded-md border border-border p-2">
-                        <button
-                          type="button"
-                          onClick={() => setOpenGoal(isOpen ? null : key)}
-                          className="flex w-full items-start gap-2 text-left"
-                          aria-expanded={isOpen}
-                        >
-                          {isOpen ? (
-                            <ChevronDown className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                          )}
-                          <p className={isOpen ? "flex-1" : "flex-1 line-clamp-2"}>{g.goal}</p>
-                        </button>
-                        {Array.isArray(g.job_codes) && g.job_codes.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1 pl-5">
-                            {g.job_codes.map((c, j) => (
-                              <Badge key={`${c}-${j}`} variant="outline" className="text-[10px]">{c}</Badge>
-                            ))}
-                          </div>
-                        )}
-                        {isOpen && (
-                          <div className="mt-2 space-y-1 pl-5 text-xs text-muted-foreground">
-                            <p><span className="font-medium text-foreground">Supports:</span> {g.supports?.trim() ? g.supports : "—"}</p>
-                            <p><span className="font-medium text-foreground">Details:</span> {g.details?.trim() ? g.details : "—"}</p>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+              {incompleteCount > 0 && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  {incompleteCount} of {extractedGoals.length} goals need supports or details — click the pencil to add them.
+                </p>
               )}
+              <ul className="space-y-2">
+                {extractedGoals.map((g, i) => {
+                  const key = g.id ?? i;
+                  const isOpen = openGoal === key;
+                  const incomplete = goalIsIncomplete(g);
+                  return (
+                    <li key={key} className="rounded-md border border-border p-2">
+                      <button
+                        type="button"
+                        onClick={() => setOpenGoal(isOpen ? null : key)}
+                        className="flex w-full items-start gap-2 text-left"
+                        aria-expanded={isOpen}
+                      >
+                        {isOpen ? (
+                          <ChevronDown className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                        )}
+                        <p className={isOpen ? "flex-1" : "flex-1 line-clamp-2"}>{g.goal}</p>
+                      </button>
+                      {(incomplete || (Array.isArray(g.job_codes) && g.job_codes.length > 0)) && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1 pl-5">
+                          {incomplete && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                              ⚠ {missingLabel(g)}
+                            </span>
+                          )}
+                          {Array.isArray(g.job_codes) && g.job_codes.map((c, j) => (
+                            <Badge key={`${c}-${j}`} variant="outline" className="text-[10px]">{c}</Badge>
+                          ))}
+                        </div>
+                      )}
+                      {isOpen && (
+                        <div className="mt-2 space-y-1 pl-5 text-xs text-muted-foreground">
+                          <p><span className="font-medium text-foreground">Supports:</span> {g.supports?.trim() ? g.supports : "—"}</p>
+                          <p><span className="font-medium text-foreground">Details:</span> {g.details?.trim() ? g.details : "—"}</p>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
             </div>
           )}
         </CardContent>

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -32,6 +32,9 @@ export const Route = createFileRoute("/dashboard/client-training/$clientId")({
 // ── Question answer state ────────────────────────────────────────────────────
 type QAnswer = { question: string; answer: string; tab: string; relevant: boolean | null; hint: string; checking: boolean };
 
+const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+const MIN_WORDS = 25;
+
 function ClientTrainingViewer() {
   const { clientId } = Route.useParams();
   const { trainingType: rawType } = Route.useSearch();
@@ -44,6 +47,8 @@ function ClientTrainingViewer() {
   const [signature, setSignature] = useState("");
   const [answers, setAnswers] = useState<QAnswer[]>([]);
   const [lastTrainingId, setLastTrainingId] = useState<string | null>(null);
+  const [contentRead, setContentRead] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const queryKey = ["staff-client-training", clientId, trainingType];
   const { data, isLoading, error } = useQuery({
@@ -61,7 +66,15 @@ function ClientTrainingViewer() {
   if (training?.id && training.id !== lastTrainingId) {
     setLastTrainingId(training.id);
     setAnswers(questions.map((q) => ({ question: q.prompt, answer: "", tab: q.tab, relevant: null, hint: "", checking: false })));
+    setContentRead(false);
   }
+
+  // Short-content safety: if there's nothing to scroll, mark as read.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !training) return;
+    if (el.scrollHeight <= el.clientHeight + 4) setContentRead(true);
+  }, [training, lastTrainingId]);
 
   function patchAnswer(idx: number, p: Partial<QAnswer>) {
     setAnswers((prev) => { const next = [...prev]; next[idx] = { ...next[idx], ...p }; return next; });
@@ -154,7 +167,7 @@ function ClientTrainingViewer() {
   const alreadyCurrent = completion?.is_current && pinned;
   const goals = (training as { goals?: CSTGoal[] | null }).goals ?? null;
 
-  const allAnswered = questions.length === 0 || answers.every((a) => a.answer.trim().length > 0);
+  const allAnswered = questions.length === 0 || answers.every((a) => wordCount(a.answer) >= MIN_WORDS);
   const anyChecking = answers.some((a) => a.checking);
 
   return (
@@ -188,7 +201,14 @@ function ClientTrainingViewer() {
         )}
       </header>
 
-      <div className="flex-1 min-h-0 overflow-y-auto bg-card px-4 py-4 space-y-6">
+      <div
+        ref={scrollRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setContentRead(true);
+        }}
+        className="flex-1 min-h-0 overflow-y-auto bg-card px-4 py-4 space-y-6"
+      >
         <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 flex gap-2">
           <Shield className="h-4 w-4 shrink-0 mt-0.5" />
           <span>
@@ -235,6 +255,9 @@ function ClientTrainingViewer() {
                     className={ans?.relevant === false ? "border-destructive" : ""}
                     disabled={alreadyCurrent}
                   />
+                  <p className={`text-[11px] ${wordCount(ans?.answer ?? "") >= MIN_WORDS ? "text-emerald-700" : "text-muted-foreground"}`}>
+                    {wordCount(ans?.answer ?? "")}/{MIN_WORDS} words minimum
+                  </p>
                   {ans?.checking && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Checking relevance...</p>
                   )}
@@ -266,7 +289,12 @@ function ClientTrainingViewer() {
             )}
             {questions.length > 0 && !allAnswered && (
               <p className="text-[11px] text-amber-800">
-                Please answer all review questions above before signing.
+                Please answer all review questions (at least 25 words each) before signing.
+              </p>
+            )}
+            {!contentRead && (
+              <p className="text-[11px] text-amber-800">
+                Scroll through the full training above before signing.
               </p>
             )}
             <p className="text-[11px] leading-relaxed text-muted-foreground">
@@ -285,7 +313,7 @@ function ClientTrainingViewer() {
               </div>
               <Button
                 onClick={() => completeMut.mutate()}
-                disabled={completeMut.isPending || anyChecking || signature.trim().length < 3 || !allAnswered}
+                disabled={completeMut.isPending || anyChecking || signature.trim().length < 3 || !allAnswered || !contentRead}
                 className="bg-[image:var(--gradient-brand)] text-primary-foreground"
               >
                 {completeMut.isPending || anyChecking

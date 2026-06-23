@@ -1532,7 +1532,7 @@ function CertsTab({
                       subjectRef={key}
                       hrDocumentId={row.completion.evidence_document_id}
                       statement="I verify that the information on this document is accurate and current, and that this individual has met this requirement."
-                      attested={(attestationsQ.data ?? []).some((a) => a.subject_kind === "baseline_cert" && a.subject_ref === key)}
+                      attested={(attestationsQ.data ?? []).some((a: { subject_kind: string; subject_ref: string }) => a.subject_kind === "baseline_cert" && a.subject_ref === key)}
                       onAttested={async () => {
                         attestationsQ.refetch();
                         try { await signOffBaselineFn({ data: { organization_id: organizationId, staff_id: staffId, training_key: key } }); } catch (_) {}

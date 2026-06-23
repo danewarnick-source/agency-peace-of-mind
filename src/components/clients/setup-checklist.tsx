@@ -50,12 +50,16 @@ import {
   setGrievanceAcknowledgment,
   appendClientArrayField,
   upsertClientMedication,
+  listHrcReviewsForClient,
+  createHrcReview,
+  setEndOfLifeStatus,
 } from "@/lib/import-checklist.functions";
 import {
   getClientFieldStates,
   setFieldConfirmation,
   type FieldStateMap,
 } from "@/lib/field-confirmations.functions";
+import { submitForSetup } from "@/lib/smart-import-review.functions";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { isClockableServiceCode } from "@/lib/service-billing";
 import {

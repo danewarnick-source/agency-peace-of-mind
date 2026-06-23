@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_org_recurrence_key_uq ON public.notifications (organization_id, recurrence_key) WHERE recurrence_key IS NOT NULL;

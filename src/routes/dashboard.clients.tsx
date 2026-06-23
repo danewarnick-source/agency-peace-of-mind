@@ -215,13 +215,10 @@ function ClientsError({ error }: { error: Error; reset: () => void }) {
   );
 }
 
+// Layout route — renders child routes (e.g. /dashboard/clients/$clientId).
+// The directory page lives at /dashboard/clients/ in dashboard.clients.index.tsx.
 export const Route = createFileRoute("/dashboard/clients")({
-  head: () => ({ meta: [{ title: "Client Directory — HIVE" }] }),
-  component: () => (
-    <RequirePermission perm="manage_users">
-      <ClientsPage />
-    </RequirePermission>
-  ),
+  component: () => <Outlet />,
   errorComponent: ClientsError,
 });
 

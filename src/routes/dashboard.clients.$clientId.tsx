@@ -39,7 +39,9 @@ import {
   attachSupportStrategyDocument,
   updateClientSpecificTraining,
   publishClientSpecificTraining,
+  extractPcspGoalsForTraining,
   type CSTContent,
+  type CSTGoal,
   type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
 
@@ -234,15 +236,21 @@ function TrainingSetupBadge({ clientId }: { clientId: string }) {
 
 function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; clientId: string; orgId?: string }) {
   const qc = useQueryClient();
-  const initial = Array.isArray(client?.pcsp_goals) ? (client!.pcsp_goals as string[]) : [];
-  const [draft, setDraft] = useState<string[]>(initial);
-  const [adding, setAdding] = useState("");
-  const [dirty, setDirty] = useState(false);
-  const [editingGoals, setEditingGoals] = useState(false);
   const codes = Array.isArray(client?.authorized_dspd_codes) ? (client!.authorized_dspd_codes as string[]) : [];
   const [editingCodes, setEditingCodes] = useState(false);
   const [codeDraft, setCodeDraft] = useState<string[]>(codes);
   const [addingCode, setAddingCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const getCST = useServerFn(getClientSpecificTraining);
+  const extractFn = useServerFn(extractPcspGoalsForTraining);
+  const { data: cstData } = useQuery({
+    queryKey: ["client-specific-training", clientId],
+    queryFn: () => getCST({ data: { clientId } }),
+    staleTime: 30_000,
+  });
+  const extractedGoals = ((cstData?.training as { goals?: CSTGoal[] } | null)?.goals ?? []) as CSTGoal[];
 
   const codesMut = useMutation({
     mutationFn: async () => {
@@ -268,119 +276,133 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save codes"),
   });
 
-  const saveMut = useMutation({
-    mutationFn: async () => {
-      const cleaned = draft.map((g) => g.trim()).filter((g) => g.length > 0);
-      const { data, error } = await supabase
-        .from("clients")
-        .update({ pcsp_goals: cleaned })
-        .eq("id", clientId)
-        .select("id");
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error("Goals not saved — record not found or you don't have permission.");
-      }
-      return cleaned;
-    },
-    onSuccess: (cleaned) => {
-      toast.success("PCSP goals saved");
-      setDraft(cleaned);
-      setDirty(false);
-      setEditingGoals(false);
-      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
-      qc.invalidateQueries({ queryKey: ["client", clientId] });
-    },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save goals"),
-  });
+  async function syncFlatGoals() {
+    const res = await getCST({ data: { clientId } });
+    const goals = ((res?.training as { goals?: CSTGoal[] } | null)?.goals ?? []) as CSTGoal[];
+    const flat = goals.map((g) => g.goal).filter((g): g is string => !!g && g.trim().length > 0);
+    await supabase.from("clients").update({ pcsp_goals: flat }).eq("id", clientId);
+    qc.invalidateQueries({ queryKey: ["client-specific-training", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
+    qc.invalidateQueries({ queryKey: ["client", clientId] });
+  }
 
-  const updateAt = (i: number, val: string) => {
-    setDraft((d) => d.map((g, idx) => (idx === i ? val : g)));
-    setDirty(true);
-  };
-  const removeAt = (i: number) => {
-    setDraft((d) => d.filter((_, idx) => idx !== i));
-    setDirty(true);
-  };
-  const addGoal = () => {
-    const v = adding.trim();
-    if (!v) return;
-    setDraft((d) => [...d, v]);
-    setAdding("");
-    setDirty(true);
-  };
+  async function runExtract() {
+    setBusy(true);
+    try {
+      const res = await extractFn({ data: { clientId } });
+      if (!res?.ok) {
+        toast.error(res?.reason ?? "Extraction failed");
+        return;
+      }
+      toast.success(`Extracted ${res.goalCount} goals from the PCSP`);
+      await syncFlatGoals();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Extraction failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handlePcspUpload(file: File) {
+    if (!orgId) {
+      toast.error("Organization not loaded");
+      return;
+    }
+    setBusy(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${orgId}/${clientId}/pcsp/${Date.now()}_${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from("client-documents")
+        .upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      const { error: insErr } = await supabase.from("client_documents").insert({
+        client_id: clientId,
+        organization_id: orgId,
+        document_type: "pcsp",
+        file_name: file.name,
+        file_url: path,
+        storage_path: path,
+      });
+      if (insErr) throw insErr;
+      const res = await extractFn({ data: { clientId } });
+      if (!res?.ok) {
+        toast.error(res?.reason ?? "Extraction failed");
+        return;
+      }
+      toast.success(`Extracted ${res.goalCount} goals from the PCSP`);
+      await syncFlatGoals();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (!client) return <SkeletonCard />;
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle className="text-base">PCSP goals</CardTitle>
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              aria-label="Edit goals"
-              onClick={() => setEditingGoals((v) => !v)}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => saveMut.mutate()}
-              disabled={!dirty || saveMut.isPending}
-            >
-              {saveMut.isPending ? "Saving…" : "Save goals"}
-            </Button>
-          </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {draft.length === 0 ? (
-            <p className="text-muted-foreground">No goals yet — add one below.</p>
-          ) : (
-            <ul className="space-y-2">
-              {draft.map((g, i) => (
-                <li key={i} className="flex gap-2 items-start">
-                  {editingGoals ? (
-                    <>
-                      <textarea
-                        className="flex-1 min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        value={g}
-                        onChange={(e) => updateAt(i, e.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => removeAt(i)}
-                        aria-label="Remove goal"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </>
-                  ) : (
-                    <p className="text-sm">{g}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          {editingGoals && (
-            <div className="flex gap-2 pt-2 border-t">
-              <Input
-                placeholder="Add a PCSP goal…"
-                value={adding}
-                onChange={(e) => setAdding(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addGoal();
-                  }
-                }}
-              />
-              <Button type="button" variant="outline" onClick={addGoal} disabled={!adding.trim()}>
-                Add goal
+          <input
+            ref={fileRef}
+            type="file"
+            className="hidden"
+            accept=".pdf,.docx,.txt,.doc"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handlePcspUpload(f);
+              e.target.value = "";
+            }}
+          />
+          {extractedGoals.length === 0 ? (
+            <div className="space-y-2">
+              <p className="text-muted-foreground">
+                Upload the client's PCSP — NECTAR pulls the goals, supports, and details verbatim.
+              </p>
+              <Button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={busy || !orgId}
+                className="gap-2"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {busy ? "Extracting…" : "Upload PCSP & extract goals (NECTAR)"}
               </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="font-medium">{extractedGoals.length} goals extracted from PCSP</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void runExtract()}
+                  disabled={busy}
+                  className="gap-1"
+                >
+                  {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  Re-extract from PCSP
+                </Button>
+              </div>
+              <ul className="space-y-2">
+                {extractedGoals.map((g, i) => (
+                  <li key={g.id ?? i} className="rounded-md border border-border p-2">
+                    <p className="line-clamp-2">{g.goal}</p>
+                    {Array.isArray(g.job_codes) && g.job_codes.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {g.job_codes.map((c, j) => (
+                          <Badge key={`${c}-${j}`} variant="outline" className="text-[10px]">{c}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </CardContent>

@@ -15,6 +15,9 @@ import {
   ChevronDown,
   Download,
   X,
+  Loader2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,7 +53,11 @@ import {
   revokeBaselineSignOff,
 } from "@/lib/staff-training-requirements.functions";
 import { parseBaselineId, baselineByKey } from "@/lib/staff-training-requirements";
-import { AnnualHoursSection } from "@/components/hr/annual-hours-progress";
+import {
+  getStaffAnnualHoursDetail,
+  addStaffHoursEntry,
+  deleteStaffHoursEntry,
+} from "@/lib/hr-training-hours.functions";
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (
@@ -634,9 +641,18 @@ function CertsTab({
   const revokeBaselineFn = useServerFn(revokeBaselineSignOff);
   const createUpload = useServerFn(createHrDocumentUploadUrl);
   const getDocUrl = useServerFn(getHrDocumentUrl);
+  const fetchAnnualHours = useServerFn(getStaffAnnualHoursDetail);
+  const addHoursFn = useServerFn(addStaffHoursEntry);
+  const delHoursFn = useServerFn(deleteStaffHoursEntry);
 
   const [filter, setFilter] = useState<"all" | "action" | "current" | "na">("all");
   const [auditOpen, setAuditOpen] = useState(false);
+  const [logHoursOpen, setLogHoursOpen] = useState(false);
+  const [hoursDraft, setHoursDraft] = useState({
+    entry_date: new Date().toISOString().slice(0, 10),
+    hours: "",
+    note: "",
+  });
 
   const checklistQ = useQuery({
     queryKey: ["staff-checklist", organizationId, staffId],
@@ -648,10 +664,51 @@ function CertsTab({
     queryFn: () => fetchPii({ data: { organization_id: organizationId, staff_id: staffId } }),
   });
 
+  const annualHoursQ = useQuery({
+    queryKey: ["staff-annual-hours", organizationId, staffId],
+    queryFn: () => fetchAnnualHours({ data: { organization_id: organizationId, staff_id: staffId } }),
+  });
+
   const invalidate = () => {
     checklistQ.refetch();
     piiQ.refetch();
   };
+
+  const addHoursMutation = useMutation({
+    mutationFn: async (requirementId: string) => {
+      const hrs = Number(hoursDraft.hours);
+      if (!Number.isFinite(hrs) || hrs <= 0) throw new Error("Enter hours > 0");
+      await addHoursFn({
+        data: {
+          organization_id: organizationId,
+          staff_id: staffId,
+          requirement_id: requirementId,
+          entry_date: hoursDraft.entry_date,
+          hours: hrs,
+          note: hoursDraft.note || null,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Hours logged");
+      setLogHoursOpen(false);
+      setHoursDraft({ entry_date: new Date().toISOString().slice(0, 10), hours: "", note: "" });
+      annualHoursQ.refetch();
+      checklistQ.refetch();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const delHoursMutation = useMutation({
+    mutationFn: async (entryId: string) =>
+      delHoursFn({ data: { organization_id: organizationId, entry_id: entryId } }),
+    onSuccess: () => {
+      toast.success("Entry removed");
+      annualHoursQ.refetch();
+      checklistQ.refetch();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
 
   const todayMs = Date.now();
   const in60Ms = todayMs + 60 * 86400_000;
@@ -672,10 +729,49 @@ function CertsTab({
     return "todo";
   }
 
+  const allRows = checklistQ.data ?? [];
+
+  const REQUIRED_BASELINE_KEYS = [
+    "thirty_day",
+    "cpr_first_aid",
+    "pct",
+    "annual_12h",
+    "deescalation",
+  ] as const;
+
+  const BASELINE_DUPLICATE_TITLES_LC = new Set([
+    "cpr & first aid",
+    "cpr certification",
+    "first aid certification",
+    "person-centered thinking",
+    "person-centered thinking & practices",
+    "person centered thinking",
+  ]);
+
+  const ALLOWED_OTHER_CATEGORIES = new Set([
+    "Background & Eligibility (Upon Hire)",
+    "Employment Documents (Upon Hire)",
+  ]);
+
+  const baselineRows = REQUIRED_BASELINE_KEYS.map((key) =>
+    allRows.find((r) => r.requirement_id === `baseline:${key}`) ?? null,
+  );
+
+  const baselineIds = new Set(REQUIRED_BASELINE_KEYS.map((k) => `baseline:${k}`));
+  const otherRows = allRows.filter(
+    (r) =>
+      !baselineIds.has(r.requirement_id) &&
+      !BASELINE_DUPLICATE_TITLES_LC.has(r.title.trim().toLowerCase()),
+  );
+
   const counts = useMemo(() => {
     const c = { current: 0, expiring: 0, overdue: 0, todo: 0 };
-    for (const row of checklistQ.data ?? []) {
-      if (row.applicable === false) continue;
+    const visibleRows = [
+      ...baselineRows.filter(Boolean),
+      ...otherRows.filter((r) => ALLOWED_OTHER_CATEGORIES.has(r.category ?? "")),
+    ];
+    for (const row of visibleRows) {
+      if (!row || row.applicable === false) continue;
       const kind = rowStatusKind(row);
       if (kind === "current") c.current++;
       else if (kind === "expiring") c.expiring++;
@@ -711,40 +807,6 @@ function CertsTab({
     return "text-muted-foreground";
   }
 
-  const allRows = checklistQ.data ?? [];
-
-  // The 5 fixed required baseline rows, in order.
-  const REQUIRED_BASELINE_KEYS = [
-    "thirty_day",
-    "cpr_first_aid",
-    "pct",
-    "annual_12h",
-    "deescalation",
-  ] as const;
-
-  // Suppress state_base duplicates that the baseline rows already cover.
-  const BASELINE_DUPLICATE_TITLES_LC = new Set([
-    "cpr & first aid",
-    "cpr certification",
-    "first aid certification",
-    "person-centered thinking",
-    "person-centered thinking & practices",
-    "person centered thinking",
-  ]);
-
-  const baselineRows = REQUIRED_BASELINE_KEYS.map((key) =>
-    allRows.find((r) => r.requirement_id === `baseline:${key}`) ?? null,
-  );
-
-  // Other rows (state_base / company_custom) excluding baseline duplicates.
-  const baselineIds = new Set(REQUIRED_BASELINE_KEYS.map((k) => `baseline:${k}`));
-  const otherRows = allRows.filter(
-    (r) =>
-      !baselineIds.has(r.requirement_id) &&
-      !BASELINE_DUPLICATE_TITLES_LC.has(r.title.trim().toLowerCase()),
-  );
-
-  // Group other rows by category.
   const otherByCategory = new Map<string, typeof otherRows>();
   for (const r of otherRows) {
     const cat = r.category ?? "Other";
@@ -939,6 +1001,7 @@ function CertsTab({
           const notTriggeredMeta = notTriggered ? ` · Not triggered — no behavior-coded client currently assigned` : "";
 
           const isAnnual12h = key === "annual_12h";
+          const annualDetail = isAnnual12h ? ((annualHoursQ.data ?? [])[0] ?? null) : null;
 
           return (
             <div key={key} className="flex items-start gap-3 border-b border-border/30 py-3 last:border-0">
@@ -948,17 +1011,115 @@ function CertsTab({
                 <div className="mt-0.5 text-[11px] text-muted-foreground">
                   {display.meta}{isDeescalation ? notTriggeredMeta : ""}
                 </div>
-                {isAnnual12h && (
-                  <div className="mt-2">
-                    <AnnualHoursSection
-                      organizationId={organizationId}
-                      staffId={staffId}
-                      canEdit={canEdit}
-                    />
+                {isAnnual12h && annualHoursQ.isLoading && (
+                  <div className="mt-2 text-[11px] text-muted-foreground">
+                    <Loader2 className="mr-1 inline h-3 w-3 animate-spin" /> Loading hours…
+                  </div>
+                )}
+                {isAnnual12h && annualDetail && (
+                  <div className="mt-2 space-y-2">
+                    <div>
+                      <div className="text-sm font-medium">
+                        {annualDetail.hours_to_date} / {annualDetail.target_hours} hrs
+                      </div>
+                      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full ${
+                            annualDetail.status === "complete" || annualDetail.status === "on_target"
+                              ? "bg-emerald-500"
+                              : annualDetail.status === "behind"
+                                ? "bg-amber-500"
+                                : "bg-muted-foreground/40"
+                          }`}
+                          style={{
+                            width: `${Math.min(100, Math.round((annualDetail.hours_to_date / Math.max(1, annualDetail.target_hours)) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {annualDetail.window_start && annualDetail.window_end
+                          ? `Window: ${annualDetail.window_start} → ${annualDetail.window_end} · training ${annualDetail.training_hours} hr · manual ${annualDetail.manual_hours} hr`
+                          : "No employment-year window — hire date missing."}
+                      </div>
+                    </div>
+                    {annualDetail.entries.length > 0 && (
+                      <ul className="space-y-1 text-xs">
+                        {annualDetail.entries.map((e) => (
+                          <li key={e.id} className="flex items-center justify-between rounded-md border border-border/40 px-2 py-1">
+                            <div className="min-w-0">
+                              <span className="font-medium">{e.hours} hr</span>
+                              <span className="ml-2 text-muted-foreground">{e.entry_date}</span>
+                              {e.note && <span className="ml-2 text-muted-foreground">· {e.note}</span>}
+                            </div>
+                            {canEdit && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={() => {
+                                  if (confirm("Remove this entry?")) delHoursMutation.mutate(e.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {canEdit && !logHoursOpen && (
+                      <Button size="sm" variant="outline" onClick={() => setLogHoursOpen(true)}>
+                        <Plus className="mr-1 h-3.5 w-3.5" /> Log hours
+                      </Button>
+                    )}
+                    {canEdit && logHoursOpen && (
+                      <div className="grid gap-2 rounded-md border border-border/60 p-2 sm:grid-cols-4">
+                        <div>
+                          <Label className="text-[11px]">Date</Label>
+                          <Input
+                            type="date"
+                            value={hoursDraft.entry_date}
+                            onChange={(e) => setHoursDraft({ ...hoursDraft, entry_date: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px]">Hours</Label>
+                          <Input
+                            type="number"
+                            step="0.25"
+                            min="0.25"
+                            max="24"
+                            value={hoursDraft.hours}
+                            onChange={(e) => setHoursDraft({ ...hoursDraft, hours: e.target.value })}
+                            placeholder="1.5"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Label className="text-[11px]">Note</Label>
+                          <Input
+                            value={hoursDraft.note}
+                            onChange={(e) => setHoursDraft({ ...hoursDraft, note: e.target.value })}
+                            placeholder="What was the training?"
+                          />
+                        </div>
+                        <div className="sm:col-span-4 flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => addHoursMutation.mutate(annualDetail.config.requirement_id)}
+                            disabled={addHoursMutation.isPending}
+                          >
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setLogHoursOpen(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-              {!isAnnual12h && !notTriggered && (
+              {!notTriggered && (
                 <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
                   {row.completion.expires_at && (
                     <span className={`text-[11px] ${expDateColor(kind)}`}>
@@ -990,7 +1151,9 @@ function CertsTab({
       </div>
 
       {/* Other rows by category */}
-      {Array.from(otherByCategory.entries()).map(([cat, items]) => {
+      {Array.from(otherByCategory.entries())
+        .filter(([cat]) => ALLOWED_OTHER_CATEGORIES.has(cat))
+        .map(([cat, items]) => {
         const visibleItems = items.filter(passesFilter);
         if (visibleItems.length === 0) return null;
         const completedCount = items.filter((r) => rowStatusKind(r) === "current").length;

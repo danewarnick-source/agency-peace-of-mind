@@ -23,6 +23,7 @@ import {
   setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
   computeProvisioningForecast, togglePlanItem, confirmAssignment, submitForSetup,
 } from "@/lib/smart-import-review.functions";
+import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
 import { providerSignoff } from "@/lib/hive-migration.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
@@ -263,12 +264,23 @@ function SubjectReview({
   if (q.isError || !q.data) return <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">Failed to load subject.</div>;
 
   const { subject, fields, unfiled, certs, questions, matched } = q.data;
+  const validation = (q.data as { validation?: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] } }).validation;
+  const mergeFlags = (q.data as { mergeFlags?: Array<Record<string, string | number | boolean | null>> }).mergeFlags ?? [];
   const targetFields = jobMode === "client" ? CLIENT_FIELDS : EMPLOYEE_FIELDS;
+  const canMarkReady = !validation || validation.ok;
 
   return (
     <div className="space-y-4">
-      <SubjectHeader subject={subject} onChanged={refresh} />
+      <SubjectHeader subject={subject} onChanged={refresh} canMarkReady={canMarkReady} />
       <DedupBanner subject={subject} matched={matched} onChanged={refresh} />
+
+      {validation && validation.issues.length > 0 && (
+        <ValidationPanel subjectId={subjectId} validation={validation} onChanged={refresh} />
+      )}
+      {mergeFlags.length > 0 && (
+        <MergeFlagsPanel flags={mergeFlags} onChanged={refresh} />
+      )}
+
 
       <Tabs defaultValue="placement">
         <TabsList className={jobMode === "employee" ? "grid grid-cols-5" : "grid grid-cols-4"}>

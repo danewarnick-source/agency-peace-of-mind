@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getClientSpecificTraining,
   draftClientSpecificTrainingWithNectar,
+  draftClientSpecificTrainingBlank,
+  attachClientSpecificTrainingDocument,
   updateClientSpecificTraining,
   publishClientSpecificTraining,
   extractPcspGoalsForTraining,
@@ -14,11 +16,13 @@ import {
   type CSTGoal,
   type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Loader2, CheckCircle2, RefreshCw, Pencil, Trash2, Plus, ArrowUp, ArrowDown, Shield, BookOpen } from "lucide-react";
+import { Sparkles, Loader2, CheckCircle2, RefreshCw, Pencil, Trash2, Plus, ArrowUp, ArrowDown, Shield, BookOpen, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 type Training = {

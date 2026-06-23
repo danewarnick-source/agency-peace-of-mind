@@ -572,8 +572,9 @@ export async function applyExtractedFieldsToClient(
         autofilled.push("feature_config.emar=off (no medications in PCSP)");
       }
     }
-  } catch {
-    // Non-fatal: auto-toggle is advisory.
+  } catch (err) {
+    // Non-fatal — auto-toggle is advisory, but never silent: audit it.
+    await onError("medications_signal_error", (err as Error).message);
   }
 
 
@@ -640,6 +641,7 @@ export async function applyExtractedFieldsToClient(
             .eq("organization_id", organizationId);
           if (gErr) {
             suggested.push("Confirm home location for EVV");
+            await onError("geocode_update_error", gErr.message);
           } else {
             autofilled.push("home_latitude");
             autofilled.push("home_longitude");
@@ -647,8 +649,9 @@ export async function applyExtractedFieldsToClient(
         } else {
           suggested.push("Confirm home location for EVV");
         }
-      } catch {
+      } catch (err) {
         suggested.push("Confirm home location for EVV");
+        await onError("geocode_lookup_error", (err as Error).message);
       }
     }
   }
@@ -671,9 +674,16 @@ export async function applyExtractedFieldsToClient(
         ratio_clients,
         effective_start: today,
       });
-      if (!rErr) autofilled.push(`client_ratios(${ratio_staff}:${ratio_clients})`);
+      if (rErr) {
+        // Used to silently swallow → caused the staff_ratio debugging session.
+        suggested.push(`staff_ratio (db error: ${rErr.message})`);
+        await onError("client_ratios_insert_error", rErr.message);
+      } else {
+        autofilled.push(`client_ratios(${ratio_staff}:${ratio_clients})`);
+      }
     } else {
       suggested.push(`staff_ratio (unparseable "${ratioText}")`);
+      await onError("staff_ratio_unparseable", `"${ratioText}"`);
     }
   }
 

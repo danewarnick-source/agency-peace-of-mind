@@ -22,6 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { previewClientUpdateFromDocument, applySelectedClientFields } from "@/lib/import-checklist.functions";
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,

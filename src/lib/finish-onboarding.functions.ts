@@ -525,3 +525,51 @@ export const addClientBillingCodes = createServerFn({ method: "POST" })
 
     return { ok: true, added: upserted.length };
   });
+
+// ---------------------------------------------------------------------------
+// Remove a single client_billing_codes row. Also cleans the mirrored entries
+// in clients.authorized_dspd_codes / clients.job_code for that service code,
+// so readiness recomputes correctly. Used by the Setup Checklist row 1.
+// ---------------------------------------------------------------------------
+export const removeClientBillingCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ codeId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: row } = await sb
+      .from("client_billing_codes")
+      .select("id, organization_id, client_id, service_code")
+      .eq("id", data.codeId)
+      .maybeSingle();
+    if (!row) throw new Error("Billing code row not found");
+    await assertOrgMember(sb, context.userId, row.organization_id);
+
+    const { error: dErr } = await sb
+      .from("client_billing_codes")
+      .delete()
+      .eq("id", data.codeId);
+    if (dErr) throw new Error(dErr.message);
+
+    const code = String(row.service_code ?? "").trim().toUpperCase();
+    if (code) {
+      const { data: client } = await sb
+        .from("clients")
+        .select("authorized_dspd_codes, job_code")
+        .eq("id", row.client_id)
+        .maybeSingle();
+      if (client) {
+        const authorized = ((client.authorized_dspd_codes ?? []) as string[])
+          .filter((c) => String(c ?? "").trim().toUpperCase() !== code);
+        const jobCode = ((client.job_code ?? []) as string[])
+          .filter((c) => String(c ?? "").trim().toUpperCase() !== code);
+        await sb
+          .from("clients")
+          .update({ authorized_dspd_codes: authorized, job_code: jobCode })
+          .eq("id", row.client_id);
+      }
+    }
+    return { ok: true };
+  });

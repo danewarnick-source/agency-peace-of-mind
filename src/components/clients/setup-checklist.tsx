@@ -48,7 +48,14 @@ import {
   setLevelOfNeed,
   setEmergencyContact,
   setGrievanceAcknowledgment,
+  appendClientArrayField,
+  upsertClientMedication,
 } from "@/lib/import-checklist.functions";
+import {
+  getClientFieldStates,
+  setFieldConfirmation,
+  type FieldStateMap,
+} from "@/lib/field-confirmations.functions";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { isClockableServiceCode } from "@/lib/service-billing";
 import {
@@ -56,6 +63,7 @@ import {
   type ProfileField,
 } from "@/lib/client-profile-fields";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { NectarAsk } from "@/components/clients/nectar-ask";
 import { Textarea } from "@/components/ui/textarea";
 
 // ---------------------------------------------------------------------------
@@ -201,12 +209,20 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     queryFn: () => onbFn({ data: { clientId } }),
   });
 
+  const fieldStatesFn = useServerFn(getClientFieldStates);
+  const fieldStatesQ = useQuery({
+    queryKey: ["client-field-states", clientId],
+    queryFn: () => fieldStatesFn({ data: { clientId } }),
+  });
+
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["client-readiness", clientId] });
     qc.invalidateQueries({ queryKey: ["client-billing-codes", clientId] });
     qc.invalidateQueries({ queryKey: ["client-setup-checklist-row", clientId] });
     qc.invalidateQueries({ queryKey: ["client-sow-supp", clientId] });
     qc.invalidateQueries({ queryKey: ["client-onboarding-state", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-field-states", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
   };
 
   const readiness = readinessQ.data;
@@ -229,7 +245,7 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
 
   if (
     readinessQ.isLoading || codesQ.isLoading || clientQ.isLoading ||
-    sowSuppQ.isLoading || onbStateQ.isLoading
+    sowSuppQ.isLoading || onbStateQ.isLoading || fieldStatesQ.isLoading
   ) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
@@ -237,13 +253,22 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
       </div>
     );
   }
-  if (!readiness || !client || !sowSupp) {
+  if (!readiness || !client || !sowSupp || !fieldStatesQ.data) {
     return (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
         Couldn&apos;t load setup checklist for this client.
       </div>
     );
   }
+
+  const fieldStates: FieldStateMap = fieldStatesQ.data.states;
+  const askPass = {
+    medications: fieldStates.medications !== "unknown",
+    allergies: fieldStates.allergies !== "unknown",
+    immunizations: fieldStates.immunizations !== "unknown",
+    advanced_directives: fieldStates.advanced_directives !== "unknown",
+    court_orders: fieldStates.court_orders !== "unknown",
+  };
 
   // Required-row passing flags (Group 1).
   const rowPass = {
@@ -262,10 +287,13 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     rowPass.code, rowPass.rates, rowPass.goals, rowPass.staff, rowPass.guardian,
     ...(evvApplicable ? [rowPass.evv] : []),
     rowPass.sow, rowPass.lon, rowPass.ec2, rowPass.grievance,
+    askPass.medications, askPass.allergies, askPass.immunizations,
+    askPass.advanced_directives, askPass.court_orders,
   ];
   const doneCount = requiredFlags.filter(Boolean).length;
   const totalCount = requiredFlags.length;
   const pct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+
 
 
   return (
@@ -370,6 +398,47 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
           />
         </div>
       </div>
+
+      {/* Group 2 — NECTAR asks */}
+      <div>
+        <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          NECTAR asks
+        </div>
+        <div className="space-y-2">
+          <MedicationsAskRow
+            clientId={clientId}
+            state={fieldStates.medications}
+            passing={askPass.medications}
+            onChanged={invalidateAll}
+          />
+          <AllergiesAskRow
+            clientId={clientId}
+            state={fieldStates.allergies}
+            passing={askPass.allergies}
+            onChanged={invalidateAll}
+          />
+          <ImmunizationsAskRow
+            clientId={clientId}
+            state={fieldStates.immunizations}
+            passing={askPass.immunizations}
+            onChanged={invalidateAll}
+          />
+          <AdvancedDirectivesAskRow
+            clientId={clientId}
+            state={fieldStates.advanced_directives}
+            passing={askPass.advanced_directives}
+            onChanged={invalidateAll}
+          />
+          <CourtOrdersAskRow
+            clientId={clientId}
+            state={fieldStates.court_orders}
+            passing={askPass.court_orders}
+            onChanged={invalidateAll}
+          />
+        </div>
+      </div>
+
+
 
 
       {/* Footer */}
@@ -1024,6 +1093,364 @@ function GrievanceRow({
           </Button>
         </div>
       </div>
+    </ChecklistRow>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NECTAR ask rows
+// ---------------------------------------------------------------------------
+import type { FieldState } from "@/lib/field-confirmations";
+
+function useNoneHandler(clientId: string, key: string, onChanged: () => void) {
+  const fn = useServerFn(setFieldConfirmation);
+  return async () => {
+    await fn({ data: { clientId, key, value: "none" } });
+    toast.success("Saved — none on file.");
+    onChanged();
+  };
+}
+
+function answeredSummaryFor(state: FieldState, hasLabel: string, noneLabel: string): string | null {
+  if (state === "has") return hasLabel;
+  if (state === "none") return noneLabel;
+  return null;
+}
+
+// ── Medications ───────────────────────────────────────────────────────────
+type MedRow = {
+  id: string;
+  medication_name: string;
+  dosage: string | null;
+  am_pm: string | null;
+  scheduled_time: string | null;
+  prescriber: string | null;
+  support_level: string | null;
+  support_explanation: string | null;
+};
+
+function MedicationsAskRow({
+  clientId, state, passing, onChanged,
+}: { clientId: string; state: FieldState; passing: boolean; onChanged: () => void }) {
+  const medsQ = useQuery({
+    queryKey: ["client-medications", clientId],
+    queryFn: async (): Promise<MedRow[]> => {
+      const { data, error } = await supabase
+        .from("client_medications")
+        .select("id, medication_name, dosage, am_pm, scheduled_time, prescriber, support_level, support_explanation")
+        .eq("client_id", clientId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as MedRow[];
+    },
+  });
+  const onNone = useNoneHandler(clientId, "medications", onChanged);
+  const meds = medsQ.data ?? [];
+
+  const summary = answeredSummaryFor(
+    state,
+    meds.length > 0 ? `${meds.length} medication${meds.length === 1 ? "" : "s"} on file` : "On file",
+    "No medications.",
+  );
+
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Medications"
+      valueChip={summary ? <span className="text-xs text-muted-foreground">{summary}</span> : null}
+      defaultOpen={!passing}
+    >
+      <NectarAsk
+        question="Does this client take any medications?"
+        finding={state === "unknown" ? "No medications were found in the uploaded documents." : null}
+        kind="data_rich_gap"
+        clientId={clientId}
+        uploadDocumentType="mar"
+        onNone={onNone}
+        answeredSummary={summary}
+        manualForm={
+          <MedicationsEditor
+            clientId={clientId}
+            meds={meds}
+            onChanged={onChanged}
+          />
+        }
+      />
+    </ChecklistRow>
+  );
+}
+
+function blankMed(): Omit<MedRow, "id"> & { id?: string } {
+  return {
+    medication_name: "", dosage: "", am_pm: "", scheduled_time: "",
+    prescriber: "", support_level: "", support_explanation: "",
+  };
+}
+
+function MedicationsEditor({
+  clientId, meds, onChanged,
+}: { clientId: string; meds: MedRow[]; onChanged: () => void }) {
+  const [drafts, setDrafts] = useState<Array<Partial<MedRow> & { _key: string }>>(
+    meds.length === 0
+      ? [{ ...blankMed(), _key: "new-0" }]
+      : meds.map((m) => ({ ...m, _key: m.id })),
+  );
+  const saveFn = useServerFn(upsertClientMedication);
+
+  const updateAt = (i: number, patch: Partial<MedRow>) =>
+    setDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
+
+  const saveOne = async (i: number) => {
+    const d = drafts[i];
+    if (!d.medication_name?.trim()) {
+      toast.error("Medication name is required.");
+      return;
+    }
+    if (!d.support_explanation?.trim()) {
+      toast.error("Support explanation is required.");
+      return;
+    }
+    try {
+      const res = await saveFn({
+        data: {
+          clientId,
+          medicationId: d.id,
+          medication_name: d.medication_name.trim(),
+          dosage: d.dosage || null,
+          am_pm: d.am_pm || null,
+          scheduled_time: d.scheduled_time || null,
+          prescriber: d.prescriber || null,
+          support_level: d.support_level || null,
+          support_explanation: d.support_explanation.trim(),
+        },
+      });
+      toast.success(`Saved ${d.medication_name}.`);
+      updateAt(i, { id: res.id });
+      onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {drafts.map((d, i) => (
+        <div key={d._key} className="rounded-lg border border-border p-3 space-y-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Medication name</Label>
+              <Input value={d.medication_name ?? ""} onChange={(e) => updateAt(i, { medication_name: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Dose</Label>
+              <Input value={d.dosage ?? ""} onChange={(e) => updateAt(i, { dosage: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">AM / PM</Label>
+              <Select value={d.am_pm ?? ""} onValueChange={(v) => updateAt(i, { am_pm: v })}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AM">AM</SelectItem>
+                  <SelectItem value="PM">PM</SelectItem>
+                  <SelectItem value="AM & PM">AM & PM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Scheduled time</Label>
+              <Input value={d.scheduled_time ?? ""} onChange={(e) => updateAt(i, { scheduled_time: e.target.value })} placeholder="e.g. 8:00, 20:00" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Prescribing doctor</Label>
+              <Input value={d.prescriber ?? ""} onChange={(e) => updateAt(i, { prescriber: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Level of support</Label>
+              <Select value={d.support_level ?? ""} onValueChange={(v) => updateAt(i, { support_level: v })}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Self-administers">Self-administers</SelectItem>
+                  <SelectItem value="Self-administers with reminders">Self-administers with reminders</SelectItem>
+                  <SelectItem value="Staff assists">Staff assists</SelectItem>
+                  <SelectItem value="Staff administers">Staff administers</SelectItem>
+                  <SelectItem value="Nurse-delegated">Nurse-delegated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Support explanation</Label>
+            <Textarea rows={2} value={d.support_explanation ?? ""} onChange={(e) => updateAt(i, { support_explanation: e.target.value })} />
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => saveOne(i)}>
+              {d.id ? "Update" : "Save"} medication
+            </Button>
+          </div>
+        </div>
+      ))}
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setDrafts((p) => [...p, { ...blankMed(), _key: `new-${Date.now()}` }])}
+      >
+        <Plus className="mr-1 h-3 w-3" /> Add another medication
+      </Button>
+    </div>
+  );
+}
+
+// ── Allergies ─────────────────────────────────────────────────────────────
+function AllergiesAskRow({
+  clientId, state, passing, onChanged,
+}: { clientId: string; state: FieldState; passing: boolean; onChanged: () => void }) {
+  const onNone = useNoneHandler(clientId, "allergies", onChanged);
+  const summary = answeredSummaryFor(state, "Allergies on file", "No known allergies.");
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Allergies"
+      valueChip={summary ? <span className="text-xs text-muted-foreground">{summary}</span> : null}
+      defaultOpen={!passing}
+    >
+      <NectarAsk
+        question="Does this client have any known allergies?"
+        finding={state === "unknown" ? "No allergies were found." : null}
+        kind="data_rich_gap"
+        clientId={clientId}
+        uploadDocumentType="allergies"
+        onNone={onNone}
+        answeredSummary={summary}
+        manualForm={<RepeatableAppender clientId={clientId} field="allergies" labelA="Allergen" labelB="Reaction" onChanged={onChanged} />}
+      />
+    </ChecklistRow>
+  );
+}
+
+// ── Immunizations ─────────────────────────────────────────────────────────
+function ImmunizationsAskRow({
+  clientId, state, passing, onChanged,
+}: { clientId: string; state: FieldState; passing: boolean; onChanged: () => void }) {
+  const onNone = useNoneHandler(clientId, "immunizations", onChanged);
+  const summary = answeredSummaryFor(state, "Records on file", "No immunization records on file.");
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Immunizations"
+      valueChip={summary ? <span className="text-xs text-muted-foreground">{summary}</span> : null}
+      defaultOpen={!passing}
+    >
+      <NectarAsk
+        question="Are immunization records on file?"
+        finding={state === "unknown" ? "No immunization records were found." : null}
+        kind="data_rich_gap"
+        clientId={clientId}
+        uploadDocumentType="immunizations"
+        onNone={onNone}
+        answeredSummary={summary}
+        manualForm={<RepeatableAppender clientId={clientId} field="immunizations" labelA="Vaccine" labelB="Date given" typeB="date" onChanged={onChanged} />}
+      />
+    </ChecklistRow>
+  );
+}
+
+function RepeatableAppender({
+  clientId, field, labelA, labelB, typeB, onChanged,
+}: {
+  clientId: string;
+  field: "allergies" | "immunizations";
+  labelA: string;
+  labelB: string;
+  typeB?: "text" | "date";
+  onChanged: () => void;
+}) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const fn = useServerFn(appendClientArrayField);
+  const save = async () => {
+    if (!a.trim()) { toast.error(`${labelA} is required.`); return; }
+    try {
+      await fn({ data: { clientId, field, value: `${a.trim()}${b.trim() ? ` — ${b.trim()}` : ""}` } });
+      toast.success("Added.");
+      setA(""); setB("");
+      onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label className="text-xs">{labelA}</Label>
+          <Input value={a} onChange={(e) => setA(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">{labelB}</Label>
+          <Input type={typeB ?? "text"} value={b} onChange={(e) => setB(e.target.value)} />
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <Button size="sm" onClick={save} disabled={!a.trim()}>
+          <Plus className="mr-1 h-3 w-3" /> Add entry
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Advanced directives ───────────────────────────────────────────────────
+function AdvancedDirectivesAskRow({
+  clientId, state, passing, onChanged,
+}: { clientId: string; state: FieldState; passing: boolean; onChanged: () => void }) {
+  const fn = useServerFn(setFieldConfirmation);
+  const summary = answeredSummaryFor(state, "Directives on file", "No advanced directives on file.");
+  const onYes = async () => {
+    await fn({ data: { clientId, key: "advanced_directives", value: "has" } });
+    toast.success("Saved.");
+    onChanged();
+  };
+  const onNone = useNoneHandler(clientId, "advanced_directives", onChanged);
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Advanced directives"
+      valueChip={summary ? <span className="text-xs text-muted-foreground">{summary}</span> : null}
+      defaultOpen={!passing}
+    >
+      <NectarAsk
+        question="Are there advanced directives on file for this client?"
+        kind="simple_yes_no"
+        onYes={onYes}
+        onNone={onNone}
+        answeredSummary={summary}
+      />
+    </ChecklistRow>
+  );
+}
+
+// ── Court orders ──────────────────────────────────────────────────────────
+function CourtOrdersAskRow({
+  clientId, state, passing, onChanged,
+}: { clientId: string; state: FieldState; passing: boolean; onChanged: () => void }) {
+  const onNone = useNoneHandler(clientId, "court_orders", onChanged);
+  const summary = answeredSummaryFor(state, "Court orders on file", "No court orders.");
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Court orders"
+      valueChip={summary ? <span className="text-xs text-muted-foreground">{summary}</span> : null}
+      defaultOpen={!passing}
+    >
+      <NectarAsk
+        question="Are there any court orders for this client?"
+        kind="data_rich_gap"
+        clientId={clientId}
+        uploadDocumentType="court_order"
+        onNone={onNone}
+        answeredSummary={summary}
+      />
     </ChecklistRow>
   );
 }

@@ -357,9 +357,9 @@ export const extractPcspGoalsForTraining = createServerFn({ method: "POST" })
     // 1) Find the most recent PCSP document for this client.
     const { data: docs, error: dErr } = await supabase
       .from("client_documents")
-      .select("id, document_type, file_name, storage_path, file_url, created_at")
+      .select("id, document_type, file_name, storage_path, file_url, uploaded_at")
       .eq("client_id", data.clientId)
-      .order("created_at", { ascending: false });
+      .order("uploaded_at", { ascending: false });
     if (dErr) throw new Error(dErr.message);
     const pcsp = (docs ?? []).find((d: { document_type: string | null }) =>
       (d.document_type ?? "").toLowerCase().includes("pcsp"),

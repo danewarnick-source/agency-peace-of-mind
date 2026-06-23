@@ -314,13 +314,24 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">PCSP goals</CardTitle>
-          <Button
-            size="sm"
-            onClick={() => saveMut.mutate()}
-            disabled={!dirty || saveMut.isPending}
-          >
-            {saveMut.isPending ? "Saving…" : "Save goals"}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Edit goals"
+              onClick={() => setEditingGoals((v) => !v)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => saveMut.mutate()}
+              disabled={!dirty || saveMut.isPending}
+            >
+              {saveMut.isPending ? "Saving…" : "Save goals"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           {draft.length === 0 ? (
@@ -329,49 +340,128 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
             <ul className="space-y-2">
               {draft.map((g, i) => (
                 <li key={i} className="flex gap-2 items-start">
-                  <textarea
-                    className="flex-1 min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={g}
-                    onChange={(e) => updateAt(i, e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => removeAt(i)}
-                    aria-label="Remove goal"
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  {editingGoals ? (
+                    <>
+                      <textarea
+                        className="flex-1 min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={g}
+                        onChange={(e) => updateAt(i, e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => removeAt(i)}
+                        aria-label="Remove goal"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-sm">{g}</p>
+                  )}
                 </li>
               ))}
             </ul>
           )}
-          <div className="flex gap-2 pt-2 border-t">
-            <Input
-              placeholder="Add a PCSP goal…"
-              value={adding}
-              onChange={(e) => setAdding(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addGoal();
-                }
-              }}
-            />
-            <Button type="button" variant="outline" onClick={addGoal} disabled={!adding.trim()}>
-              Add goal
-            </Button>
-          </div>
+          {editingGoals && (
+            <div className="flex gap-2 pt-2 border-t">
+              <Input
+                placeholder="Add a PCSP goal…"
+                value={adding}
+                onChange={(e) => setAdding(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addGoal();
+                  }
+                }}
+              />
+              <Button type="button" variant="outline" onClick={addGoal} disabled={!adding.trim()}>
+                Add goal
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle className="text-base">Authorized DSPD codes</CardTitle></CardHeader>
-        <CardContent className="flex flex-wrap gap-1.5 text-sm">
-          {codes.length === 0 ? (
-            <span className="text-muted-foreground">None.</span>
-          ) : codes.map((c) => <Badge key={c} variant="outline">{c}</Badge>)}
-        </CardContent>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Authorized DSPD codes</CardTitle>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label="Edit codes"
+            onClick={() => setEditingCodes((v) => !v)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        {editingCodes ? (
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex flex-wrap gap-1.5">
+              {codeDraft.length === 0 ? (
+                <span className="text-muted-foreground">None.</span>
+              ) : codeDraft.map((c, i) => (
+                <Badge key={`${c}-${i}`} variant="outline" className="gap-1">
+                  {c}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${c}`}
+                    className="ml-1 text-muted-foreground hover:text-destructive"
+                    onClick={() => setCodeDraft((d) => d.filter((_, idx) => idx !== i))}
+                  >
+                    ×
+                  </button>
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Add code…"
+                value={addingCode}
+                onChange={(e) => setAddingCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const v = addingCode.trim().toUpperCase();
+                    if (v) {
+                      setCodeDraft((d) => [...d, v]);
+                      setAddingCode("");
+                    }
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const v = addingCode.trim().toUpperCase();
+                  if (!v) return;
+                  setCodeDraft((d) => [...d, v]);
+                  setAddingCode("");
+                }}
+                disabled={!addingCode.trim()}
+              >
+                Add
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => codesMut.mutate()}
+                disabled={codesMut.isPending}
+              >
+                {codesMut.isPending ? "Saving…" : "Save codes"}
+              </Button>
+            </div>
+          </CardContent>
+        ) : (
+          <CardContent className="flex flex-wrap gap-1.5 text-sm">
+            {codes.length === 0 ? (
+              <span className="text-muted-foreground">None.</span>
+            ) : codes.map((c) => <Badge key={c} variant="outline">{c}</Badge>)}
+          </CardContent>
+        )}
       </Card>
     </div>
   );

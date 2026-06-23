@@ -72,7 +72,8 @@ function ClientProfileHub() {
   const activeTab = resolveTab(rawTab);
 
   const setTab = (t: string) => {
-    router.navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, tab: t }) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    router.navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, tab: t })) as any });
   };
 
   const clientQ = useQuery({

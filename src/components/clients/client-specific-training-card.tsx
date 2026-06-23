@@ -83,6 +83,35 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const blankMut = useMutation({
+    mutationFn: () => draftBlankFn({ data: { clientId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      toast.success("Blank draft created — start writing.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  async function handleFileUpload(file: File) {
+    if (!orgId) return;
+    setUploading(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${orgId}/${clientId}/person-specific/${Date.now()}_${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from("client-documents")
+        .upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      await attachDocFn({ data: { clientId, fileName: file.name, storagePath: path } });
+      qc.invalidateQueries({ queryKey });
+      toast.success("Document attached.");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   const updateMut = useMutation({
     mutationFn: (payload: { id: string; title?: string; content?: CSTContent }) => updateFn({ data: payload }),
     onSuccess: () => { qc.invalidateQueries({ queryKey }); toast.success("Saved."); setEditing(false); setDraftContent(null); },

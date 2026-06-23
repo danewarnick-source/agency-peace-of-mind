@@ -181,10 +181,40 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
           No client-specific training yet. NECTAR will assemble a draft from this client's own authoritative data (intake, PCSP goals, billing codes, active meds, BSP status & published behaviors, rights summary, documents). NECTAR <strong>presents verbatim</strong> — it does not author care guidance.
         </div>
-        <Button onClick={() => draftMut.mutate(false)} disabled={draftMut.isPending}>
-          {draftMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-amber-500" />}
-          Draft with NECTAR
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => draftMut.mutate(false)} disabled={draftMut.isPending}>
+            {draftMut.isPending
+              ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
+            Build from PCSP goals (NECTAR)
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => blankMut.mutate()} disabled={blankMut.isPending}>
+            {blankMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            Write manually
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || !orgId}
+          >
+            {uploading
+              ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+            Upload document
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept=".pdf,.docx,.txt,.doc"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleFileUpload(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
       </div>
     );
   }

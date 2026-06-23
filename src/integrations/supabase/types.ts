@@ -6881,6 +6881,72 @@ export type Database = {
           },
         ]
       }
+      import_merge_flags: {
+        Row: {
+          client_id: string
+          created_at: string
+          existing_value: string | null
+          field: string
+          id: string
+          import_job_id: string | null
+          incoming_value: string | null
+          kind: string
+          organization_id: string
+          resolved_action: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          source_document_type: string | null
+          suggested_value: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          existing_value?: string | null
+          field: string
+          id?: string
+          import_job_id?: string | null
+          incoming_value?: string | null
+          kind: string
+          organization_id: string
+          resolved_action?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source_document_type?: string | null
+          suggested_value?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          existing_value?: string | null
+          field?: string
+          id?: string
+          import_job_id?: string | null
+          incoming_value?: string | null
+          kind?: string
+          organization_id?: string
+          resolved_action?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source_document_type?: string | null
+          suggested_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_merge_flags_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_merge_flags_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_nectar_questions: {
         Row: {
           answer: string | null
@@ -6960,6 +7026,7 @@ export type Database = {
           reviewed_by: string | null
           subject_type: string
           updated_at: string
+          validation_overrides: Json
         }
         Insert: {
           commit_error?: string | null
@@ -6978,6 +7045,7 @@ export type Database = {
           reviewed_by?: string | null
           subject_type: string
           updated_at?: string
+          validation_overrides?: Json
         }
         Update: {
           commit_error?: string | null
@@ -6996,6 +7064,7 @@ export type Database = {
           reviewed_by?: string | null
           subject_type?: string
           updated_at?: string
+          validation_overrides?: Json
         }
         Relationships: [
           {

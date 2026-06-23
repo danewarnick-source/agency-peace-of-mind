@@ -8,6 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 import { applyExtractedFieldsToClient } from "@/lib/client-import-schema";
+import { validateClientDraft, filterBlocking, type ClientDraft } from "@/lib/import-validation";
 
 
 const JobId = z.object({ jobId: z.string().uuid() });
@@ -124,6 +125,43 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string) {
         results.push({ subjectId: subj.id, display_name: subj.display_name, committed: true, record_id: null, gaps: ["skipped"] });
         continue;
       }
+
+      // Never silent-merge two different people. An ambiguous match without an
+      // explicit admin decision must block at commit time.
+      if (subj.match_status === "ambiguous" && !subj.review_decision) {
+        const msg = "Ambiguous match — admin must pick update vs create_new.";
+        await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
+        await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "ambiguous_unresolved");
+        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: [msg] });
+        continue;
+      }
+
+      // ── Triple-check validation gate (pre-write) ───────────────────────
+      // Reuse the same validator the review screen uses; honor admin overrides.
+      try {
+        const { data: subjFields } = await sb
+          .from("extracted_fields")
+          .select("target_field, value")
+          .eq("import_subject_id", subj.id);
+        const draft = buildClientDraftFromFields(subjFields ?? []);
+        const { issues } = validateClientDraft(draft);
+        const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
+        const blocking = filterBlocking(issues, overrides);
+        if (blocking.length > 0) {
+          const msg = `NECTAR validation blocked commit: ${blocking.map((b) => b.message).join(" | ")}`;
+          await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
+          await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "validation_blocked");
+          results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: blocking.map((b) => b.message) });
+          continue;
+        }
+      } catch (e) {
+        // A validator failure must NEVER silently allow a commit. Log + skip.
+        const msg = `Validator threw: ${(e as Error).message}`;
+        await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "validation_error");
+        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: [msg] });
+        continue;
+      }
+
 
       try {
         const { data: fields } = await sb.from("extracted_fields")
@@ -329,11 +367,24 @@ async function commitClient(
         base.value_text = s;
         return base;
       });
+    // Infer source document type from the extracted fields (good enough for the
+    // authoritative-source rules — see client-import-schema for full semantics).
+    const inferredType: "1056_budget" | "pcsp" | "other" =
+      norm.some((n) => n.field_key === "form_1056_number" || n.field_key === "form_1056_approved_date")
+        ? "1056_budget"
+        : norm.some((n) => n.field_key === "pcsp_goal" || n.field_key === "pcsp_has_medications")
+        ? "pcsp"
+        : "other";
     const apply = await applyExtractedFieldsToClient({
       supabase: sb,
       organizationId: orgId,
       clientId: recordId,
       fields: norm,
+      sourceDocumentType: inferredType,
+      importJobId: jobId,
+      onError: async (action, message) => {
+        await audit(sb, jobId, orgId, subj.id, message, "admin_override", userId, action);
+      },
     });
     gaps.push(...apply.suggested.map((s) => `Review: ${s}`));
   } catch (err) {
@@ -345,6 +396,57 @@ async function commitClient(
 
   return recordId;
 }
+
+// Helper for the pre-commit validation gate. Builds a minimal ClientDraft
+// from extracted_fields rows so the same validator the review screen uses
+// can also run server-side immediately before write.
+function buildClientDraftFromFields(
+  rows: Array<{ target_field: string; value: string | null }>,
+): ClientDraft {
+  const d: ClientDraft = {};
+  const codes: NonNullable<ClientDraft["billing_codes"]> = [];
+  for (const r of rows) {
+    const v = (r.value ?? "").trim();
+    if (!v) continue;
+    switch (r.target_field) {
+      case "first_name": d.first_name = v; break;
+      case "last_name": d.last_name = v; break;
+      case "physical_address":
+      case "address":
+        d.physical_address = v; break;
+      case "medicaid_id": d.medicaid_id = v; break;
+      case "date_of_birth":
+      case "dob":
+        d.date_of_birth = v; break;
+      case "admission_date": d.admission_date = v; break;
+      case "discharge_date": d.discharge_date = v; break;
+      case "form_1056_approved_date": d.form_1056_approved_date = v; break;
+      case "is_own_guardian":
+        try { d.is_own_guardian = !!(JSON.parse(v) as { bool?: boolean }).bool; }
+        catch { d.is_own_guardian = v === "true"; }
+        break;
+      case "guardian_name": d.guardian_name = v; break;
+      case "billing_code_row":
+        try {
+          const j = JSON.parse(v) as Record<string, unknown>;
+          if (j.service_code) {
+            codes.push({
+              service_code: String(j.service_code).toUpperCase(),
+              rate: typeof j.rate === "number" ? j.rate : Number(j.rate) || null,
+              max_units: typeof j.max_units === "number" ? j.max_units : Number(j.max_units) || null,
+              unit_type: j.unit_type ? String(j.unit_type) : null,
+              plan_start: j.plan_start ? String(j.plan_start).slice(0, 10) : null,
+              plan_end: j.plan_end ? String(j.plan_end).slice(0, 10) : null,
+            });
+          }
+        } catch { /* malformed row — validator only checks codes it can read */ }
+        break;
+    }
+  }
+  if (codes.length) d.billing_codes = codes;
+  return d;
+}
+
 
 
 // --------------------------------------------------------------

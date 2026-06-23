@@ -145,7 +145,9 @@ export const upsertClientMedication = createServerFn({ method: "POST" })
   });
 
 // ── Attach an uploaded document to the client profile ────────────────────
-// Honest: this records the file. It does NOT extract or interpret it.
+// Records the file in client_documents. Extraction is a separate step
+// (extractAndApplyClientUpload below) so the attach succeeds even when the
+// file is a scanned PDF or otherwise unreadable.
 export const attachClientDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -176,4 +178,180 @@ export const attachClientDocument = createServerFn({ method: "POST" })
       .single();
     if (error) throw error;
     return { ok: true, id: ins.id as string };
+  });
+
+// ── Extract + apply an uploaded document to the client ───────────────────
+// Downloads the file the admin just uploaded via NectarAsk, runs it through
+// the shared NECTAR extractor with a category hint, and writes the results
+// to the right tables. The file is ALREADY attached (via
+// attachClientDocument); this fn only reads + applies content.
+//
+// Honest scope: this is best-effort. If the file is a scanned PDF or
+// otherwise unreadable, the attach already succeeded and the admin can
+// fill values manually — we return { ok: true, applied: false } with a
+// reason instead of throwing.
+const ExtractApplyInput = z.object({
+  clientId: z.string().uuid(),
+  documentType: z.enum([
+    "pcsp", "1056_budget", "mar", "bsp",
+    "immunization", "allergy",
+    "dnr", "polst", "palliative", "hospice", "other",
+  ]),
+  storagePath: z.string().min(1).max(500),
+  fileName: z.string().min(1).max(300),
+  bucket: z.string().min(1).max(80).default("client-documents"),
+});
+
+export const extractAndApplyClientUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ExtractApplyInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as Sb;
+    const orgId = await requireAdminForClient(sb, context.userId as string, data.clientId);
+
+    // 1) Download
+    const { data: file, error: dlErr } = await sb.storage
+      .from(data.bucket)
+      .download(data.storagePath);
+    if (dlErr || !file) {
+      return { ok: true, applied: false, reason: `download failed: ${dlErr?.message ?? "no file"}` };
+    }
+    const buf = Buffer.from(await file.arrayBuffer());
+
+    // 2) Text
+    const { extractTextFromUpload } = await import("@/lib/document-text.server");
+    const text = await extractTextFromUpload(buf, data.fileName);
+    if (!text || text.trim().length < 20) {
+      return {
+        ok: true,
+        applied: false,
+        reason: "NECTAR couldn't read the document text (scanned PDF?). The file is attached; please fill values manually.",
+      };
+    }
+
+    // 3) Extract via the shared NECTAR extractor with a category hint
+    const { parseDocumentWithAI } = await import("@/lib/document-extraction");
+    const parsed = await parseDocumentWithAI(text, `documentType=${data.documentType}`);
+    const fields = (parsed.fields ?? []).map((f) => ({
+      field_key: f.field_key,
+      value_text: f.value_text ?? null,
+      value_number: f.value_number ?? null,
+      value_date: f.value_date ?? null,
+      value_bool: f.value_bool ?? null,
+      value_array: f.value_array ?? null,
+      value_json: f.value_json ?? null,
+      confidence: f.confidence ?? 0.85,
+    }));
+
+    // 4) Apply, with audit-on-error so nothing vanishes
+    const { applyExtractedFieldsToClient } = await import("@/lib/client-import-schema");
+    const summary = await applyExtractedFieldsToClient({
+      supabase: sb,
+      organizationId: orgId,
+      clientId: data.clientId,
+      fields,
+      sourceDocumentType: data.documentType,
+      onError: async (action, message) => {
+        try {
+          await sb.from("import_audit").insert({
+            org_id: orgId,
+            item: `[checklist-upload] ${data.documentType} ${data.fileName}: ${message}`,
+            traces_to: "inferred",
+            actor: context.userId,
+            action,
+          });
+        } catch { /* never let audit failure break a save */ }
+      },
+    });
+
+    return {
+      ok: true,
+      applied: true,
+      autofilled: summary.autofilled,
+      suggested: summary.suggested,
+      customCreated: summary.customCreated,
+      fieldCount: fields.length,
+    };
+  });
+
+// ── Resolve a merge flag (keep both / merge / replace) ───────────────────
+const ResolveFlag = z.object({
+  flagId: z.string().uuid(),
+  action: z.enum(["keep_both", "merge_into_existing", "replace"]),
+});
+export const resolveMergeFlag = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ResolveFlag.parse(i))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as Sb;
+    const { data: flag } = await sb
+      .from("import_merge_flags")
+      .select("id, client_id, field, incoming_value, kind")
+      .eq("id", data.flagId)
+      .maybeSingle();
+    if (!flag) throw new Error("Flag not found");
+    await requireAdminForClient(sb, context.userId as string, flag.client_id);
+
+    if (data.action === "replace" && flag.field && flag.incoming_value) {
+      // Only safe to auto-apply on plain text scalar columns on `clients`. We
+      // try the update; if it fails (column doesn't exist / wrong shape) we
+      // still mark the flag resolved so it stops blocking the queue, and the
+      // admin can manually fix the field on the profile page.
+      try {
+        await sb
+          .from("clients")
+          .update({ [flag.field]: flag.incoming_value })
+          .eq("id", flag.client_id);
+      } catch { /* best-effort */ }
+    }
+    // keep_both / merge_into_existing don't need a column write; they're
+    // admin acknowledgements that the existing value stays as-is.
+
+    const { error } = await sb
+      .from("import_merge_flags")
+      .update({
+        resolved_action: data.action,
+        resolved_at: new Date().toISOString(),
+        resolved_by: context.userId,
+      })
+      .eq("id", data.flagId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+// ── Override a validation issue ─────────────────────────────────────────
+const OverrideIssue = z.object({
+  subjectId: z.string().uuid(),
+  issueKey: z.string().min(1).max(120),
+  overridden: z.boolean(),
+});
+export const overrideValidationIssue = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => OverrideIssue.parse(i))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as Sb;
+    const { data: subj } = await sb
+      .from("import_subjects")
+      .select("id, org_id, import_job_id, validation_overrides")
+      .eq("id", data.subjectId)
+      .maybeSingle();
+    if (!subj) throw new Error("Subject not found");
+    const next = { ...(subj.validation_overrides as Record<string, boolean> ?? {}) };
+    if (data.overridden) next[data.issueKey] = true;
+    else delete next[data.issueKey];
+    const { error } = await sb
+      .from("import_subjects")
+      .update({ validation_overrides: next })
+      .eq("id", data.subjectId);
+    if (error) throw error;
+    await sb.from("import_audit").insert({
+      import_job_id: subj.import_job_id,
+      org_id: subj.org_id,
+      subject_id: data.subjectId,
+      item: `Validation issue ${data.issueKey} ${data.overridden ? "overridden" : "un-overridden"} by admin`,
+      traces_to: "admin_override",
+      actor: context.userId,
+      action: data.overridden ? "validation_override" : "validation_override_removed",
+    });
+    return { ok: true, overrides: next };
   });

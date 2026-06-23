@@ -58,6 +58,8 @@ export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   "client_medication", "pcsp_has_medications",
   // Billing — ONE field per authorized service code
   "billing_code_row",
+  // 1056 (DSPD Service Authorization Form)
+  "form_1056_number", "form_1056_approved_date",
   // Support coordinator
   "support_coordinator_name", "support_coordinator_email", "support_coordinator_phone",
   // Medical
@@ -68,8 +70,9 @@ export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   "medical_insurance",
   "diagnoses", "chronic_conditions", "immunizations",
   "emergency_medical_treatment_authorization", "advanced_directives",
-  // Rights / behavior
+  // Rights / behavior / end-of-life
   "rights_restrictions", "bsp_status",
+  "dnr_status", "dnr_location", "polst_status", "palliative_care_status", "hospice_status",
   // Service plan
   "staff_ratio", "preferred_activities", "preferred_living", "roommates",
   "housing_voucher", "court_orders", "personal_belongings_inventory",
@@ -131,6 +134,25 @@ Common field_key values to extract when present (use field_group to bucket relat
     the document genuinely omits them for that code.
     unit_type is "15 min" or "day" or "session" or "month" exactly as printed.
     Read EVERY row of the authorization table; do not collapse multiple codes into one.
+  1056 / Service Authorization Form (group "form_1056"): when the document is a DSPD 1056
+    Service Authorization Form (header reads "Service Authorization" or "Form 1056"), extract:
+      form_1056_number (value_text — the 1056 form number from the header, e.g. "1056-12345")
+      form_1056_approved_date (value_date — the approval/effective date, ISO yyyy-mm-dd)
+    AND emit one billing_code_row per authorized code in the 1056's authorization table,
+    using the SAME billing_code_row shape above. The 1056's rate column is often blank; leave
+    rate null when the document omits it. max_units (annual units) is ALWAYS present on a 1056.
+  Medications / MAR (group "mar"): when reading a Medication Administration Record, populate
+    EVERY field on each client_medication value_json: { name, dose, schedule, route, frequency,
+    prescriber, am_pm ("AM" | "PM" | "Both"), scheduled_time ("08:00"), support_level
+    ("independent" | "reminder" | "set_up" | "full_assist"), support_explanation }.
+  BSP / Behavior Support Plan (group "bsp"): bsp_status (value_text), and free-text notes in
+    special_directions if a target behavior or de-escalation strategy is summarised.
+  Immunization records (group "health"): immunizations as value_array; one entry per vaccine
+    (e.g. "Tdap 2024-03-15").
+  Allergy lists (group "health"): allergies as value_array; one entry per allergen + reaction.
+  Advanced care (group "advance_care"): dnr_status, dnr_location, polst_status,
+    palliative_care_status, hospice_status — each value_text matching the document's wording
+    (e.g. "Active", "On file"). Omit any not present.
   SOW (group "sow_clause"): clause_number, required_document, obligation, deadline
   Certification (group "cert"): cert_name, issued_at, expires_at, issuing_body
   Support coordinator (group "support_coordinator"): support_coordinator_name,

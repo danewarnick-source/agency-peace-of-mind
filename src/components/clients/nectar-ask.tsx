@@ -14,7 +14,7 @@ import { Sparkles, Upload, Loader2, Paperclip, Check, Pencil } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { attachClientDocument } from "@/lib/import-checklist.functions";
+import { attachClientDocument, extractAndApplyClientUpload } from "@/lib/import-checklist.functions";
 
 export type NectarAskKind = "confident_suggestion" | "data_rich_gap" | "simple_yes_no";
 
@@ -59,6 +59,7 @@ export function NectarAsk({
   const [busy, setBusy] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const attachFn = useServerFn(attachClientDocument);
+  const extractFn = useServerFn(extractAndApplyClientUpload);
 
   if (answeredSummary) {
     return (
@@ -121,10 +122,53 @@ export function NectarAsk({
         },
       });
       setAttachedFile(f.name);
-      toast.success(`${f.name} attached to profile.`);
-      // Honest: open the manual form blank after attaching — NECTAR has NOT
-      // read the file in this prompt.
-      setMode("manual");
+
+      // Run NECTAR extraction against the file we just attached. Best effort:
+      // a scanned PDF (no readable text) returns applied=false with a reason,
+      // and the user falls back to manual entry.
+      const extractableTypes = new Set([
+        "pcsp", "1056_budget", "mar", "bsp",
+        "immunization", "immunizations", "allergy", "allergies",
+        "dnr", "polst", "palliative", "hospice",
+      ]);
+      let extractionApplied = false;
+      if (extractableTypes.has(uploadDocumentType)) {
+        try {
+          // Normalize plural ask labels to the schema's singular types.
+          const docType = (uploadDocumentType === "immunizations" ? "immunization"
+            : uploadDocumentType === "allergies" ? "allergy"
+            : uploadDocumentType) as
+              "pcsp" | "1056_budget" | "mar" | "bsp" | "immunization" | "allergy" | "dnr" | "polst" | "palliative" | "hospice";
+          const result = await extractFn({
+            data: {
+              clientId,
+              documentType: docType,
+              storagePath: path,
+              fileName: f.name,
+              bucket: "client-documents",
+            },
+          });
+          if (result.applied) {
+            extractionApplied = true;
+            const n = result.autofilled?.length ?? 0;
+            toast.success(
+              n > 0
+                ? `${f.name} attached. NECTAR pulled ${n} field${n === 1 ? "" : "s"} from it.`
+                : `${f.name} attached. NECTAR read it but found nothing new.`,
+            );
+          } else {
+            toast.success(`${f.name} attached. ${result.reason ?? "NECTAR couldn't read it — fill values manually."}`);
+          }
+        } catch (e) {
+          toast.success(`${f.name} attached. NECTAR extraction failed: ${(e as Error).message}`);
+        }
+      } else {
+        toast.success(`${f.name} attached to profile.`);
+      }
+
+      // Only fall through to the manual form when extraction didn't apply
+      // any fields — otherwise the data is already saved.
+      if (!extractionApplied) setMode("manual");
     } catch (e) {
       toast.error((e as Error).message ?? "Upload failed");
     } finally {

@@ -302,25 +302,25 @@ function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { 
         </CardContent>
       </Card>
 
-      {(client.dnr_status || client.polst_status || client.palliative_care_status || client.hospice_status) && (
+      {Boolean(client.dnr_status || client.polst_status || client.palliative_care_status || client.hospice_status) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Advanced care / end-of-life</CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
-            {client.dnr_status && client.dnr_status !== "none" && (
+            {Boolean(client.dnr_status) && client.dnr_status !== "none" && (
               <>
                 <Field label="DNR" value={client.dnr_status as string} />
                 <Field label="DNR kept at" value={(client.dnr_location as string | null) ?? null} />
               </>
             )}
-            {client.polst_status && client.polst_status !== "none" && (
+            {Boolean(client.polst_status) && client.polst_status !== "none" && (
               <Field label="POLST" value={client.polst_status as string} />
             )}
-            {client.palliative_care_status && client.palliative_care_status !== "none" && (
+            {Boolean(client.palliative_care_status) && client.palliative_care_status !== "none" && (
               <Field label="Palliative care" value={client.palliative_care_status as string} />
             )}
-            {client.hospice_status && client.hospice_status !== "none" && (
+            {Boolean(client.hospice_status) && client.hospice_status !== "none" && (
               <Field label="Hospice" value={client.hospice_status as string} />
             )}
           </CardContent>

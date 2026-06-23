@@ -32,7 +32,7 @@ import { TrackedFieldsCard } from "@/components/clients/tracked-fields-card";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
-  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
+  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Users, Trash2,
   Phone,
 } from "lucide-react";
 import { saveAdminHours } from "@/lib/scheduler/scheduler.functions";

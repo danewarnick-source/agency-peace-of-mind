@@ -237,7 +237,35 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
   const [draft, setDraft] = useState<string[]>(initial);
   const [adding, setAdding] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [editingGoals, setEditingGoals] = useState(false);
   const codes = Array.isArray(client?.authorized_dspd_codes) ? (client!.authorized_dspd_codes as string[]) : [];
+  const [editingCodes, setEditingCodes] = useState(false);
+  const [codeDraft, setCodeDraft] = useState<string[]>(codes);
+  const [addingCode, setAddingCode] = useState("");
+
+  const codesMut = useMutation({
+    mutationFn: async () => {
+      const cleaned = codeDraft.map((c) => c.trim().toUpperCase()).filter(Boolean);
+      const { data, error } = await supabase
+        .from("clients")
+        .update({ authorized_dspd_codes: cleaned })
+        .eq("id", clientId)
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Codes not saved — record not found or you don't have permission.");
+      }
+      return cleaned;
+    },
+    onSuccess: (cleaned) => {
+      toast.success("DSPD codes saved");
+      setCodeDraft(cleaned);
+      setEditingCodes(false);
+      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client", clientId] });
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save codes"),
+  });
 
   const saveMut = useMutation({
     mutationFn: async () => {

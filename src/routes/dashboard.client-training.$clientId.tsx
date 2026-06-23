@@ -255,6 +255,9 @@ function ClientTrainingViewer() {
                     className={ans?.relevant === false ? "border-destructive" : ""}
                     disabled={alreadyCurrent}
                   />
+                  <p className={`text-[11px] ${wordCount(ans?.answer ?? "") >= MIN_WORDS ? "text-emerald-700" : "text-muted-foreground"}`}>
+                    {wordCount(ans?.answer ?? "")}/{MIN_WORDS} words minimum
+                  </p>
                   {ans?.checking && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Checking relevance...</p>
                   )}

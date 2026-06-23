@@ -134,34 +134,6 @@ function buildItems(s: State): Item[] {
   const skipSet = new Set(s.skipped);
   return [
     {
-      key: "staff",
-      label: "Assign staff",
-      icon: <Users className="h-4 w-4" />,
-      done: s.doneFlags.staff,
-      skipped: skipSet.has("staff"),
-    },
-    {
-      key: "home",
-      label: "Confirm home location & geofence",
-      icon: <MapPin className="h-4 w-4" />,
-      done: s.doneFlags.home,
-      skipped: skipSet.has("home"),
-    },
-    {
-      key: "rates",
-      label: `Billing rates (${s.missingRates.length} missing)`,
-      icon: <DollarSign className="h-4 w-4" />,
-      done: s.doneFlags.rates,
-      skipped: skipSet.has("rates"),
-    },
-    {
-      key: "guardian",
-      label: "Guardian",
-      icon: <Shield className="h-4 w-4" />,
-      done: s.doneFlags.guardian,
-      skipped: skipSet.has("guardian"),
-    },
-    {
       key: "sow",
       label: "Required SOW fields",
       icon: <ClipboardList className="h-4 w-4" />,

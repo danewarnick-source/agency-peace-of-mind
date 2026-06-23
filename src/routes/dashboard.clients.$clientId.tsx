@@ -264,7 +264,7 @@ function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { 
             <Field label="Phone" value={client.emergency_contact_phone as string | null} />
             <Field label="How to reach" value={(client.emergency_contact_instructions as string | null) ?? null} />
           </div>
-          {(client.emergency_contact_2_name || client.emergency_contact_2_phone) && (
+          {Boolean(client.emergency_contact_2_name || client.emergency_contact_2_phone) && (
             <div className="space-y-1 border-t border-border pt-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Secondary</div>
               <Field label="Name" value={client.emergency_contact_2_name as string | null} />

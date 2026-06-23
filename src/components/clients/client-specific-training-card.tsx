@@ -41,11 +41,18 @@ type Training = {
 
 export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
+  const orgId = org?.organization_id;
   const getFn = useServerFn(getClientSpecificTraining);
   const draftFn = useServerFn(draftClientSpecificTrainingWithNectar);
+  const draftBlankFn = useServerFn(draftClientSpecificTrainingBlank);
+  const attachDocFn = useServerFn(attachClientSpecificTrainingDocument);
   const updateFn = useServerFn(updateClientSpecificTraining);
   const publishFn = useServerFn(publishClientSpecificTraining);
   const extractGoalsFn = useServerFn(extractPcspGoalsForTraining);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const queryKey = ["client-specific-training", clientId];
 

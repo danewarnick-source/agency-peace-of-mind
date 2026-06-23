@@ -26,12 +26,31 @@ export interface ExtractedField {
   confidence?: number | null;
 }
 
+export type SourceDocumentType =
+  | "pcsp"
+  | "1056_budget"
+  | "mar"
+  | "bsp"
+  | "immunization"
+  | "allergy"
+  | "dnr"
+  | "polst"
+  | "palliative"
+  | "hospice"
+  | "other";
+
 export interface ApplyExtractedCtx {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any;
   organizationId: string;
   clientId: string;
   fields: ExtractedField[];
+  /** Authoritative source for per-domain conflict resolution. Optional. */
+  sourceDocumentType?: SourceDocumentType;
+  /** Optional importJob context so merge flags and audit rows can link back. */
+  importJobId?: string | null;
+  /** Optional audit hook — called for every silently-handled error. */
+  onError?: (action: string, message: string) => Promise<void> | void;
 }
 
 const CONFIDENCE_THRESHOLD = 0.6;

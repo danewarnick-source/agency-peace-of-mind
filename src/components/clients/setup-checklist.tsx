@@ -41,10 +41,22 @@ import {
   removeClientBillingCode,
   saveOnboardingBillingRate,
   saveOnboardingClientPatch,
+  saveProfileField,
+  getClientOnboardingState,
 } from "@/lib/finish-onboarding.functions";
+import {
+  setLevelOfNeed,
+  setEmergencyContact,
+  setGrievanceAcknowledgment,
+} from "@/lib/import-checklist.functions";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { isClockableServiceCode } from "@/lib/service-billing";
+import {
+  PROFILE_FIELD_BY_KEY,
+  type ProfileField,
+} from "@/lib/client-profile-fields";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { Textarea } from "@/components/ui/textarea";
 
 // ---------------------------------------------------------------------------
 // Reusable row primitive — every checklist row in every prompt uses this.
@@ -159,15 +171,48 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     },
   });
 
+  // SOW supplemental — separate columns on clients.
+  const sowSuppQ = useQuery({
+    queryKey: ["client-sow-supp", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("level_of_need, emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_instructions, grievance_acknowledged, grievance_signed_date")
+        .eq("id", clientId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return (data ?? {}) as {
+        level_of_need: string | null;
+        emergency_contact_2_name: string | null;
+        emergency_contact_2_phone: string | null;
+        emergency_contact_2_instructions: string | null;
+        grievance_acknowledged: boolean | null;
+        grievance_signed_date: string | null;
+      };
+    },
+  });
+
+  // SOW required-field gaps (computed server-side by getClientOnboardingState
+  // — exactly the same logic the legacy onboarding wizard uses, including the
+  // custom-field-backed keys).
+  const onbFn = useServerFn(getClientOnboardingState);
+  const onbStateQ = useQuery({
+    queryKey: ["client-onboarding-state", clientId],
+    queryFn: () => onbFn({ data: { clientId } }),
+  });
+
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["client-readiness", clientId] });
     qc.invalidateQueries({ queryKey: ["client-billing-codes", clientId] });
     qc.invalidateQueries({ queryKey: ["client-setup-checklist-row", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-sow-supp", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-onboarding-state", clientId] });
   };
 
   const readiness = readinessQ.data;
   const codes = codesQ.data ?? [];
   const client = clientQ.data;
+  const sowSupp = sowSuppQ.data;
 
   const evvApplicable = useMemo(() => {
     const current = readiness?.currentCodes ?? [];
@@ -176,14 +221,23 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     );
   }, [readiness?.currentCodes]);
 
-  if (readinessQ.isLoading || codesQ.isLoading || clientQ.isLoading) {
+  // SOW-required missing keys, photograph excluded (PHI, deferred).
+  const sowMissingKeys: string[] = useMemo(() => {
+    const keys = (onbStateQ.data?.sowMissingKeys ?? []) as string[];
+    return keys.filter((k) => k !== "photograph");
+  }, [onbStateQ.data?.sowMissingKeys]);
+
+  if (
+    readinessQ.isLoading || codesQ.isLoading || clientQ.isLoading ||
+    sowSuppQ.isLoading || onbStateQ.isLoading
+  ) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading setup checklist…
       </div>
     );
   }
-  if (!readiness || !client) {
+  if (!readiness || !client || !sowSupp) {
     return (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
         Couldn&apos;t load setup checklist for this client.
@@ -199,14 +253,20 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     staff: readiness.hasStaff,
     guardian: readiness.guardianValid,
     evv: readiness.evvReady,
+    sow: sowMissingKeys.length === 0,
+    lon: !!sowSupp.level_of_need?.trim(),
+    ec2: !!sowSupp.emergency_contact_2_name?.trim(),
+    grievance: !!sowSupp.grievance_acknowledged,
   };
   const requiredFlags: boolean[] = [
     rowPass.code, rowPass.rates, rowPass.goals, rowPass.staff, rowPass.guardian,
     ...(evvApplicable ? [rowPass.evv] : []),
+    rowPass.sow, rowPass.lon, rowPass.ec2, rowPass.grievance,
   ];
   const doneCount = requiredFlags.filter(Boolean).length;
   const totalCount = requiredFlags.length;
   const pct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+
 
   return (
     <div className="space-y-4">
@@ -277,8 +337,40 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
               onChanged={invalidateAll}
             />
           ) : null}
+          <SowFieldsRow
+            clientId={clientId}
+            missingKeys={sowMissingKeys}
+            passing={rowPass.sow}
+            onChanged={invalidateAll}
+          />
+          <LevelOfNeedRow
+            clientId={clientId}
+            initial={sowSupp.level_of_need ?? ""}
+            passing={rowPass.lon}
+            onChanged={invalidateAll}
+          />
+          <EmergencyContact2Row
+            clientId={clientId}
+            initial={{
+              name: sowSupp.emergency_contact_2_name ?? "",
+              phone: sowSupp.emergency_contact_2_phone ?? "",
+              instructions: sowSupp.emergency_contact_2_instructions ?? "",
+            }}
+            passing={rowPass.ec2}
+            onChanged={invalidateAll}
+          />
+          <GrievanceRow
+            clientId={clientId}
+            initial={{
+              acknowledged: !!sowSupp.grievance_acknowledged,
+              date: sowSupp.grievance_signed_date ?? "",
+            }}
+            passing={rowPass.grievance}
+            onChanged={invalidateAll}
+          />
         </div>
       </div>
+
 
       {/* Footer */}
       <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -674,6 +766,261 @@ function HomeEvvRow({
           <Button onClick={() => m.mutate()} disabled={m.isPending || !addr.trim()}>
             {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Save home location
+          </Button>
+        </div>
+      </div>
+    </ChecklistRow>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Row 7: missing SOW-required profile fields
+// ---------------------------------------------------------------------------
+function SowFieldsRow({
+  clientId, missingKeys, passing, onChanged,
+}: { clientId: string; missingKeys: string[]; passing: boolean; onChanged: () => void }) {
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Missing required Scope of Work fields"
+      valueChip={
+        passing ? (
+          <span className="text-xs text-muted-foreground">All required filled</span>
+        ) : (
+          <span className="text-xs text-amber-700 dark:text-amber-400">
+            {missingKeys.length} missing
+          </span>
+        )
+      }
+      defaultOpen={!passing}
+    >
+      {missingKeys.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Nothing missing — every SOW-required field has a value.</p>
+      ) : (
+        <div className="space-y-3">
+          {missingKeys.map((key) => {
+            const f = PROFILE_FIELD_BY_KEY[key];
+            if (!f) return null;
+            return <SowFieldInput key={key} clientId={clientId} field={f} onSaved={onChanged} />;
+          })}
+        </div>
+      )}
+    </ChecklistRow>
+  );
+}
+
+function SowFieldInput({
+  clientId, field, onSaved,
+}: { clientId: string; field: ProfileField; onSaved: () => void }) {
+  const [textVal, setTextVal] = useState<string>("");
+  const [boolVal, setBoolVal] = useState<boolean>(false);
+  const saveFn = useServerFn(saveProfileField);
+
+  function buildPayload(): string | boolean | string[] | null {
+    if (field.type === "bool") return boolVal;
+    if (field.type === "array") {
+      return textVal.split(/[,\n;]/).map((s) => s.trim()).filter(Boolean);
+    }
+    return textVal.trim() || null;
+  }
+
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { clientId, fieldKey: field.key, value: buildPayload() } }),
+    onSuccess: () => { toast.success(`${field.label} saved.`); setTextVal(""); onSaved(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const blocked =
+    field.type === "bool"
+      ? false
+      : field.type === "array"
+        ? buildPayload() instanceof Array && (buildPayload() as string[]).length === 0
+        : !textVal.trim();
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <Label className="text-xs">{field.label}</Label>
+      {field.type === "textarea" ? (
+        <Textarea
+          className="mt-1"
+          rows={3}
+          value={textVal}
+          onChange={(e) => setTextVal(e.target.value)}
+        />
+      ) : field.type === "bool" ? (
+        <div className="mt-2 flex items-center gap-3">
+          <Switch checked={boolVal} onCheckedChange={setBoolVal} />
+          <span className="text-sm">{boolVal ? "Yes" : "No"}</span>
+        </div>
+      ) : field.type === "date" ? (
+        <Input className="mt-1" type="date" value={textVal} onChange={(e) => setTextVal(e.target.value)} />
+      ) : field.type === "array" ? (
+        <Input
+          className="mt-1"
+          value={textVal}
+          onChange={(e) => setTextVal(e.target.value)}
+          placeholder="Comma-separated"
+        />
+      ) : (
+        <Input className="mt-1" value={textVal} onChange={(e) => setTextVal(e.target.value)} />
+      )}
+      <div className="mt-2 flex justify-end">
+        <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || blocked}>
+          {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Row 8: level of need
+// ---------------------------------------------------------------------------
+function LevelOfNeedRow({
+  clientId, initial, passing, onChanged,
+}: { clientId: string; initial: string; passing: boolean; onChanged: () => void }) {
+  const [val, setVal] = useState(initial);
+  const saveFn = useServerFn(setLevelOfNeed);
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { clientId, value: val.trim() || null } }),
+    onSuccess: () => { toast.success("Level of need saved."); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Level of need"
+      valueChip={passing ? <span className="text-xs text-muted-foreground">{initial}</span> : null}
+      defaultOpen={!passing}
+    >
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Level of need (DSPD-assigned)</Label>
+          <Input value={val} onChange={(e) => setVal(e.target.value)} placeholder="e.g. Level 5" />
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || !val.trim()}>
+            {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save
+          </Button>
+        </div>
+      </div>
+    </ChecklistRow>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Row 9: second emergency contact
+// ---------------------------------------------------------------------------
+function EmergencyContact2Row({
+  clientId, initial, passing, onChanged,
+}: {
+  clientId: string;
+  initial: { name: string; phone: string; instructions: string };
+  passing: boolean;
+  onChanged: () => void;
+}) {
+  const [name, setName] = useState(initial.name);
+  const [phone, setPhone] = useState(initial.phone);
+  const [instr, setInstr] = useState(initial.instructions);
+  const saveFn = useServerFn(setEmergencyContact);
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { clientId, slot: "secondary", name, phone, instructions: instr } }),
+    onSuccess: () => { toast.success("Secondary emergency contact saved."); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Second emergency contact"
+      valueChip={
+        passing ? (
+          <span className="text-xs text-muted-foreground">{initial.name}</span>
+        ) : null
+      }
+      defaultOpen={!passing}
+    >
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Phone</Label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Instructions on how to reach them</Label>
+          <Textarea
+            rows={2}
+            value={instr}
+            onChange={(e) => setInstr(e.target.value)}
+            placeholder="Best times to call, voicemail OK, backup number, etc."
+          />
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || !name.trim()}>
+            {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save
+          </Button>
+        </div>
+      </div>
+    </ChecklistRow>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Row 10: grievance policy acknowledgment
+// ---------------------------------------------------------------------------
+function GrievanceRow({
+  clientId, initial, passing, onChanged,
+}: {
+  clientId: string;
+  initial: { acknowledged: boolean; date: string };
+  passing: boolean;
+  onChanged: () => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [acked, setAcked] = useState(initial.acknowledged);
+  const [date, setDate] = useState(initial.date || today);
+  const saveFn = useServerFn(setGrievanceAcknowledgment);
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { clientId, acknowledged: acked, signedDate: date } }),
+    onSuccess: () => { toast.success("Grievance acknowledgment saved."); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Grievance policy acknowledged"
+      valueChip={
+        passing ? (
+          <span className="text-xs text-muted-foreground">Signed {initial.date || "today"}</span>
+        ) : null
+      }
+      defaultOpen={!passing}
+    >
+      <div className="space-y-3">
+        <div className="flex items-center justify-between rounded-lg border border-border p-3">
+          <div>
+            <div className="text-sm font-medium">Client / representative acknowledged the grievance policy</div>
+            <p className="text-xs text-muted-foreground">
+              Toggle on once they&apos;ve received and acknowledged it.
+            </p>
+          </div>
+          <Switch checked={acked} onCheckedChange={setAcked} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Date signed / acknowledged</Label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || !acked}>
+            {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save
           </Button>
         </div>
       </div>

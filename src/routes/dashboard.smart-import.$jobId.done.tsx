@@ -20,8 +20,8 @@ import { getDoneReadout, commitSmartImportJob, recommitSmartImportJob } from "@/
 import { applyMissingClientFields } from "@/lib/smart-import-review.functions";
 import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-history.functions";
-import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
-import { ClientLiveBadge, ClientReadinessCard } from "@/components/clients/client-readiness-card";
+import { ClientLiveBadge } from "@/components/clients/client-readiness-card";
+import { ImportChecklist } from "@/components/clients/import-checklist";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),
@@ -172,8 +172,8 @@ function DonePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Link to="/dashboard/smart-import" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Smart Import
+        <Link to="/dashboard/smart-import/$jobId/review" params={{ jobId }} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Back to review
         </Link>
         <Badge variant="outline" className="gap-1 capitalize"><Sparkles className="h-3 w-3" /> {job.status.replace("_", " ")}</Badge>
       </div>
@@ -288,9 +288,8 @@ function DonePage() {
                   </div>
                 )}
                 {s.record_id && s.subject_type === "client" && s.committed && (
-                  <div className="mt-3 space-y-3">
-                    <ClientReadinessCard clientId={s.record_id} />
-                    <FinishOnboardingCard clientId={s.record_id} />
+                  <div className="mt-3">
+                    <ImportChecklist clientId={s.record_id} jobId={jobId} />
                   </div>
                 )}
               </div>

@@ -7,8 +7,9 @@
 // Tabs: Overview / Plan & goals / Billing codes / Shifts / Daily logs /
 // Incidents / Summaries / Host-home cert / Deadlines / Documents.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,8 +28,17 @@ import {
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { SectionsView } from "@/components/clients/client-specific-training-card";
+import { ArrowLeft, CheckCircle2, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
+import {
+  getSupportStrategiesTraining,
+  draftSupportStrategies,
+  attachSupportStrategyDocument,
+  updateClientSpecificTraining,
+  publishClientSpecificTraining,
+  type CSTContent,
+} from "@/lib/client-specific-training.functions";
 
 const search = z.object({
   tab: z
@@ -145,6 +155,7 @@ function ClientProfileHub() {
 
         <TabsContent value="care" className="space-y-4">
           <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
+          <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
           <CaseloadEditor clientId={clientId} />
         </TabsContent>
 
@@ -288,6 +299,256 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function isUploadDoc(content: CSTContent): boolean {
+  const s = content?.sections ?? [];
+  return s.length === 1 && s[0].items.length === 1 && s[0].items[0].kind === "link";
+}
+
+function SSStatusBadge({ status, version }: { status: string; version: number }) {
+  if (status === "published") {
+    return (
+      <Badge variant="default" className="gap-1">
+        <CheckCircle2 className="h-3 w-3" /> Published v{version}
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="bg-amber-100 text-amber-800 border border-amber-200">
+      Draft v{version}
+    </Badge>
+  );
+}
+
+function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; clientId: string; orgId?: string }) {
+  const qc = useQueryClient();
+  const getSS = useServerFn(getSupportStrategiesTraining);
+  const draftSS = useServerFn(draftSupportStrategies);
+  const attachSS = useServerFn(attachSupportStrategyDocument);
+  const updateFn = useServerFn(updateClientSpecificTraining);
+  const publishFn = useServerFn(publishClientSpecificTraining);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftContent, setDraftContent] = useState<CSTContent | null>(null);
+
+  const queryKey = useMemo(() => ["support-strategies-training", clientId], [clientId]);
+
+  const { data, isLoading } = useQuery({
+    queryKey,
+    queryFn: () => getSS({ data: { clientId } }),
+  });
+
+  type SSRow = {
+    id: string; title: string; content: CSTContent;
+    status: string; version: number;
+    approved_by: string | null; approved_at: string | null; updated_at: string;
+  };
+  const training = (data?.training ?? null) as SSRow | null;
+
+  const draftMut = useMutation({
+    mutationFn: (mode: "nectar" | "blank" | "rebuild") => draftSS({ data: { clientId, mode } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      setEditing(false);
+      setDraftContent(null);
+      toast.success("Support strategies draft ready.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (payload: { id: string; content: CSTContent }) => updateFn({ data: payload }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      setEditing(false);
+      setDraftContent(null);
+      toast.success("Saved.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const publishMut = useMutation({
+    mutationFn: (id: string) => publishFn({ data: { id } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey }); toast.success("Support strategies published."); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  async function handleFileUpload(file: File) {
+    if (!orgId) return;
+    setUploading(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${orgId}/${clientId}/support-strategy/${Date.now()}_${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from("client-documents")
+        .upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      await attachSS({ data: { clientId, fileName: file.name, storagePath: path } });
+      qc.invalidateQueries({ queryKey });
+      toast.success("Document attached.");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      className="hidden"
+      accept=".pdf,.docx,.txt,.doc"
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) void handleFileUpload(file);
+        e.target.value = "";
+      }}
+    />
+  );
+
+  if (isLoading) return <SkeletonCard />;
+
+  if (!training) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Support strategies</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your goals verbatim; you write the staff instructions.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => draftMut.mutate("nectar")} disabled={draftMut.isPending}>
+              {draftMut.isPending
+                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
+              Build from PCSP goals (NECTAR)
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => draftMut.mutate("blank")} disabled={draftMut.isPending}>
+              Write manually
+            </Button>
+            <Button
+              size="sm" variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || !orgId}
+            >
+              {uploading
+                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+              Upload document
+            </Button>
+            {fileInput}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const content = training.content as CSTContent;
+
+  if (isUploadDoc(content)) {
+    const linkItem = content.sections[0].items[0];
+    const fileName = linkItem.kind === "link" ? (linkItem.links[0]?.label ?? "document") : "document";
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Support strategies</CardTitle>
+          <SSStatusBadge status={training.status} version={training.version} />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
+            <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              <p className="font-medium truncate">{fileName}</p>
+              <p className="text-xs text-muted-foreground">Uploaded provider document</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {training.status !== "published" && (
+              <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
+                {publishMut.isPending
+                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                Approve & Publish
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading || !orgId}>
+              {uploading
+                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+              Replace
+            </Button>
+            {fileInput}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const workingContent: CSTContent = editing && draftContent ? draftContent : content;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">Support strategies</CardTitle>
+        <div className="flex flex-wrap items-center gap-2">
+          <SSStatusBadge status={training.status} version={training.version} />
+          {!editing ? (
+            <>
+              <Button variant="outline" size="sm" onClick={() => {
+                setDraftContent(structuredClone(content));
+                setEditing(true);
+              }}>Edit</Button>
+              <Button
+                variant="outline" size="sm"
+                onClick={() => {
+                  if (window.confirm("Rebuild from current PCSP goals? The existing draft will be replaced.")) {
+                    draftMut.mutate("rebuild");
+                  }
+                }}
+                disabled={draftMut.isPending}
+              >
+                {draftMut.isPending
+                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+                Rebuild from goals
+              </Button>
+              {training.status !== "published" && (
+                <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
+                  {publishMut.isPending
+                    ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                  Approve & Publish
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setDraftContent(null); }}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={() => { if (training && draftContent) updateMut.mutate({ id: training.id, content: draftContent }); }} disabled={updateMut.isPending}>
+                {updateMut.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                Save
+              </Button>
+            </>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <SectionsView
+          content={workingContent}
+          editing={editing}
+          onChange={setDraftContent}
+        />
+      </CardContent>
+    </Card>
   );
 }
 

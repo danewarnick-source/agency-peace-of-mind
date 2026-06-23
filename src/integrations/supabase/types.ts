@@ -3776,6 +3776,56 @@ export type Database = {
           },
         ]
       }
+      document_attestations: {
+        Row: {
+          attestation_text: string
+          attested_at: string
+          attested_by: string
+          attested_by_name: string | null
+          created_at: string
+          hr_document_id: string | null
+          id: string
+          organization_id: string
+          staff_id: string
+          subject_kind: string
+          subject_ref: string
+        }
+        Insert: {
+          attestation_text: string
+          attested_at?: string
+          attested_by: string
+          attested_by_name?: string | null
+          created_at?: string
+          hr_document_id?: string | null
+          id?: string
+          organization_id: string
+          staff_id: string
+          subject_kind: string
+          subject_ref: string
+        }
+        Update: {
+          attestation_text?: string
+          attested_at?: string
+          attested_by?: string
+          attested_by_name?: string | null
+          created_at?: string
+          hr_document_id?: string | null
+          id?: string
+          organization_id?: string
+          staff_id?: string
+          subject_kind?: string
+          subject_ref?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_attestations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       els_usage_ledger: {
         Row: {
           client_id: string

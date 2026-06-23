@@ -10,7 +10,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { z } from "zod";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,16 +25,11 @@ import {
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
-import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
-import { ClientReadinessCard } from "@/components/clients/client-readiness-card";
-import { TrackedFieldsCard } from "@/components/clients/tracked-fields-card";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Users, Trash2,
-  Phone,
 } from "lucide-react";
-import { saveAdminHours } from "@/lib/scheduler/scheduler.functions";
 import { clientFeatureVisible } from "@/lib/client-features";
 
 const search = z.object({

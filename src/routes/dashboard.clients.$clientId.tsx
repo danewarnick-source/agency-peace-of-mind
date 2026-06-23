@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -500,6 +501,22 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
   const [editing, setEditing] = useState(false);
   const [draftContent, setDraftContent] = useState<CSTContent | null>(null);
   const [editingQuestions, setEditingQuestions] = useState(false);
+  const [showPcspPrompt, setShowPcspPrompt] = useState(false);
+
+  const { data: hasPcsp } = useQuery({
+    queryKey: ["client-has-pcsp", clientId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("client_documents")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .eq("document_type", "pcsp");
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    staleTime: 30_000,
+  });
+  const pcspReady = hasPcsp === true;
 
   const queryKey = useMemo(() => ["support-strategies-training", clientId], [clientId]);
 
@@ -580,40 +597,59 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
 
   if (isLoading) return <SkeletonCard />;
 
+  const pcspDialog = (
+    <Dialog open={showPcspPrompt} onOpenChange={setShowPcspPrompt}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Upload the PCSP first</DialogTitle>
+          <DialogDescription>
+            This client has no PCSP on file. Support strategies and client-specific training are built from the PCSP, so you'll need to upload it before drafting. Add it under the client's Files tab.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>Got it</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!training) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Support strategies</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your goals verbatim; you write the staff instructions.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => draftMut.mutate("nectar")} disabled={draftMut.isPending}>
-              {draftMut.isPending
-                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
-              Build from PCSP goals (NECTAR)
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => draftMut.mutate("blank")} disabled={draftMut.isPending}>
-              Write manually
-            </Button>
-            <Button
-              size="sm" variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || !orgId}
-            >
-              {uploading
-                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                : <Upload className="mr-1.5 h-3.5 w-3.5" />}
-              Upload document
-            </Button>
-            {fileInput}
-          </div>
-        </CardContent>
-      </Card>
+      <>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Support strategies</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your goals verbatim; you write the staff instructions.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => pcspReady ? draftMut.mutate("nectar") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
+                {draftMut.isPending
+                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
+                Build from PCSP goals (NECTAR)
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => pcspReady ? draftMut.mutate("blank") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
+                Write manually
+              </Button>
+              <Button
+                size="sm" variant="outline"
+                onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)}
+                disabled={uploading || !orgId}
+              >
+                {uploading
+                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+                Upload document
+              </Button>
+              {fileInput}
+            </div>
+          </CardContent>
+        </Card>
+        {pcspDialog}
+      </>
     );
   }
 
@@ -623,69 +659,21 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
     const linkItem = content.sections[0].items[0];
     const fileName = linkItem.kind === "link" ? (linkItem.links[0]?.label ?? "document") : "document";
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Support strategies</CardTitle>
-          <SSStatusBadge status={training.status} version={training.version} />
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
-            <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="font-medium truncate">{fileName}</p>
-              <p className="text-xs text-muted-foreground">Uploaded provider document</p>
+      <>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Support strategies</CardTitle>
+            <SSStatusBadge status={training.status} version={training.version} />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
+              <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="font-medium truncate">{fileName}</p>
+                <p className="text-xs text-muted-foreground">Uploaded provider document</p>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {training.status !== "published" && (
-              <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
-                {publishMut.isPending
-                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
-                Approve & Publish
-              </Button>
-            )}
-            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading || !orgId}>
-              {uploading
-                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                : <Upload className="mr-1.5 h-3.5 w-3.5" />}
-              Replace
-            </Button>
-            {fileInput}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const workingContent: CSTContent = editing && draftContent ? draftContent : content;
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">Support strategies</CardTitle>
-        <div className="flex flex-wrap items-center gap-2">
-          <SSStatusBadge status={training.status} version={training.version} />
-          {!editing ? (
-            <>
-              <Button variant="outline" size="sm" onClick={() => {
-                setDraftContent(structuredClone(content));
-                setEditing(true);
-              }}>Edit</Button>
-              <Button
-                variant="outline" size="sm"
-                onClick={() => {
-                  if (window.confirm("Rebuild from current PCSP goals? The existing draft will be replaced.")) {
-                    draftMut.mutate("rebuild");
-                  }
-                }}
-                disabled={draftMut.isPending}
-              >
-                {draftMut.isPending
-                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
-                Rebuild from goals
-              </Button>
+            <div className="flex flex-wrap gap-2">
               {training.status !== "published" && (
                 <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
                   {publishMut.isPending
@@ -694,67 +682,122 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
                   Approve & Publish
                 </Button>
               )}
-            </>
-          ) : (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setDraftContent(null); }}>
-                Cancel
+              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading || !orgId}>
+                {uploading
+                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+                Replace
               </Button>
-              <Button size="sm" onClick={() => { if (training && draftContent) updateMut.mutate({ id: training.id, content: draftContent }); }} disabled={updateMut.isPending}>
-                {updateMut.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                Save
-              </Button>
-            </>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <SectionsView
-          content={workingContent}
-          editing={editing}
-          onChange={setDraftContent}
-        />
-        {/* Review questions */}
-        <div className="space-y-2 pt-2 border-t border-border/40">
+              {fileInput}
+            </div>
+          </CardContent>
+        </Card>
+        {pcspDialog}
+      </>
+    );
+  }
+
+  const workingContent: CSTContent = editing && draftContent ? draftContent : content;
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Support strategies</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-sm font-semibold">Review questions</h4>
-            <span className="text-xs text-muted-foreground">
-              {(training.review_questions ?? []).length} question{(training.review_questions ?? []).length === 1 ? "" : "s"}
-            </span>
-            <div className="ml-auto">
-              {!editingQuestions ? (
-                <Button variant="outline" size="sm" onClick={() => setEditingQuestions(true)}>
-                  {(training.review_questions ?? []).length > 0 ? "Edit questions" : "Add questions"}
+            <SSStatusBadge status={training.status} version={training.version} />
+            {!editing ? (
+              <>
+                <Button variant="outline" size="sm" onClick={() => {
+                  setDraftContent(structuredClone(content));
+                  setEditing(true);
+                }}>Edit</Button>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => {
+                    if (!pcspReady) { setShowPcspPrompt(true); return; }
+                    if (window.confirm("Rebuild from current PCSP goals? The existing draft will be replaced.")) {
+                      draftMut.mutate("rebuild");
+                    }
+                  }}
+                  disabled={draftMut.isPending}
+                >
+                  {draftMut.isPending
+                    ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+                  Rebuild from goals
                 </Button>
-              ) : (
-                <Button variant="ghost" size="sm" onClick={() => setEditingQuestions(false)}>Cancel</Button>
-              )}
-            </div>
+                {training.status !== "published" && (
+                  <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
+                    {publishMut.isPending
+                      ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                    Approve & Publish
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setDraftContent(null); }}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={() => { if (training && draftContent) updateMut.mutate({ id: training.id, content: draftContent }); }} disabled={updateMut.isPending}>
+                  {updateMut.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  Save
+                </Button>
+              </>
+            )}
           </div>
-          {editingQuestions ? (
-            <ReviewQuestionsEditor
-              trainingId={training.id}
-              questions={(training.review_questions ?? []) as CSTReviewQuestion[]}
-              defaultTab="support_strategies"
-              onSaved={() => { setEditingQuestions(false); qc.invalidateQueries({ queryKey }); }}
-            />
-          ) : (training.review_questions ?? []).length > 0 ? (
-            <div className="space-y-1">
-              {((training.review_questions ?? []) as CSTReviewQuestion[]).map((q, i) => (
-                <div key={q.id} className="rounded border border-border/40 px-2 py-1 text-sm text-muted-foreground">
-                  {q.prompt}
-                  <span className="ml-1 text-xs text-muted-foreground/50">Q{i + 1}</span>
-                </div>
-              ))}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <SectionsView
+            content={workingContent}
+            editing={editing}
+            onChange={setDraftContent}
+          />
+          {/* Review questions */}
+          <div className="space-y-2 pt-2 border-t border-border/40">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="text-sm font-semibold">Review questions</h4>
+              <span className="text-xs text-muted-foreground">
+                {(training.review_questions ?? []).length} question{(training.review_questions ?? []).length === 1 ? "" : "s"}
+              </span>
+              <div className="ml-auto">
+                {!editingQuestions ? (
+                  <Button variant="outline" size="sm" onClick={() => setEditingQuestions(true)}>
+                    {(training.review_questions ?? []).length > 0 ? "Edit questions" : "Add questions"}
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={() => setEditingQuestions(false)}>Cancel</Button>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-              No review questions yet. Add applied-reasoning prompts for staff to answer when completing this training.
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            {editingQuestions ? (
+              <ReviewQuestionsEditor
+                trainingId={training.id}
+                questions={(training.review_questions ?? []) as CSTReviewQuestion[]}
+                defaultTab="support_strategies"
+                onSaved={() => { setEditingQuestions(false); qc.invalidateQueries({ queryKey }); }}
+              />
+            ) : (training.review_questions ?? []).length > 0 ? (
+              <div className="space-y-1">
+                {((training.review_questions ?? []) as CSTReviewQuestion[]).map((q, i) => (
+                  <div key={q.id} className="rounded border border-border/40 px-2 py-1 text-sm text-muted-foreground">
+                    {q.prompt}
+                    <span className="ml-1 text-xs text-muted-foreground/50">Q{i + 1}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                No review questions yet. Add applied-reasoning prompts for staff to answer when completing this training.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      {pcspDialog}
+    </>
   );
 }
 

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sparkles, Loader2, CheckCircle2, RefreshCw, Pencil, Trash2, Plus, ArrowUp, ArrowDown, Shield, BookOpen, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,8 +54,24 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [showPcspPrompt, setShowPcspPrompt] = useState(false);
 
   const queryKey = ["client-specific-training", clientId];
+
+  const { data: hasPcsp } = useQuery({
+    queryKey: ["client-has-pcsp", clientId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("client_documents")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .eq("document_type", "pcsp");
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    staleTime: 30_000,
+  });
+  const pcspReady = hasPcsp === true;
 
   const { data, isLoading } = useQuery({
     queryKey,
@@ -175,6 +192,22 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
     return <div className="text-sm text-muted-foreground"><Loader2 className="inline h-3.5 w-3.5 animate-spin mr-1.5" />Loading…</div>;
   }
 
+  const pcspDialog = (
+    <Dialog open={showPcspPrompt} onOpenChange={setShowPcspPrompt}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Upload the PCSP first</DialogTitle>
+          <DialogDescription>
+            This client has no PCSP on file. Support strategies and client-specific training are built from the PCSP, so you'll need to upload it before drafting. Add it under the client's Files tab.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>Got it</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!training) {
     return (
       <div className="space-y-3">
@@ -182,20 +215,20 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
           No client-specific training yet. NECTAR will assemble a draft from this client's own authoritative data (intake, PCSP goals, billing codes, active meds, BSP status & published behaviors, rights summary, documents). NECTAR <strong>presents verbatim</strong> — it does not author care guidance.
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => draftMut.mutate(false)} disabled={draftMut.isPending}>
+          <Button size="sm" onClick={() => pcspReady ? draftMut.mutate(false) : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
             {draftMut.isPending
               ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
             Build from PCSP goals (NECTAR)
           </Button>
-          <Button size="sm" variant="outline" onClick={() => blankMut.mutate()} disabled={blankMut.isPending}>
+          <Button size="sm" variant="outline" onClick={() => pcspReady ? blankMut.mutate() : setShowPcspPrompt(true)} disabled={blankMut.isPending}>
             {blankMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
             Write manually
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)}
             disabled={uploading || !orgId}
           >
             {uploading
@@ -215,6 +248,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
             }}
           />
         </div>
+        {pcspDialog}
       </div>
     );
   }
@@ -379,6 +413,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Competency attestation (fixed)</div>
         <div className="italic">"{training.attestation_statement}"</div>
       </div>
+      {pcspDialog}
     </div>
   );
 }

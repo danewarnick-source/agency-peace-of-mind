@@ -756,31 +756,11 @@ function DeadlinesPanel({ clientId }: { clientId: string }) {
 
 // ─── Tiny shared bits ─────────────────────────────────────────────────────────
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div className="flex gap-2">
-      <span className="text-muted-foreground w-28 shrink-0">{label}:</span>
-      <span>{value || <span className="text-muted-foreground">—</span>}</span>
-    </div>
-  );
-}
-
 function SkeletonCard() {
   return (
     <Card>
       <CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent>
     </Card>
-  );
-}
-
-function QuickLink<T extends Record<string, string>>({
-  to, params, label,
-}: { to: string; params: T; label: string }) {
-  return (
-    <Button asChild variant="outline" size="sm">
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <Link to={to as any} params={params as any}>{label}</Link>
-    </Button>
   );
 }
 
